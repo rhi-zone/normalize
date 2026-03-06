@@ -21,13 +21,12 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ## Immediate Fixes
 
-### Failing skeleton tests (4 tests)
-- `skeleton::tests::test_filter_types_go`
-- `skeleton::tests::test_filter_types_java`
-- `skeleton::tests::test_filter_types_ruby`
-- `skeleton::tests::test_markdown_skeleton`
-
-Pre-existing failures on master. Need investigation — likely tree-sitter grammar or skeleton extraction regression.
+### ~~Failing skeleton tests (4 tests)~~ FIXED
+Root causes:
+- **Go/Ruby:** `collect_symbols_from_tags` had a sanity check that bailed when `@definition.method` had no enclosing container — but Go receiver methods and Ruby standalone methods are legitimately top-level. Removed the check.
+- **Java:** `java.tags.scm` was missing `enum_declaration` pattern. Added `@definition.enum`.
+- **Markdown:** No `markdown.tags.scm` existed. Created it with `(section (atx_heading (inline) @name)) @definition.heading`.
+- Also added `definition.enum`/`definition.heading` to `tags_capture_to_kind` and `Enum`/`Heading` to `is_container_kind`.
 
 ### LSP diagnostics for all rule engines
 Design: `normalize serve lsp` should publish diagnostics from all rule engines (syntax, fact, native) via `textDocument/publishDiagnostics`. Key concerns:

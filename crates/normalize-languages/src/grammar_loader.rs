@@ -542,6 +542,7 @@ fn bundled_tags_query(name: &str) -> Option<&'static str> {
         "lean" => Some(include_str!("queries/lean.tags.scm")),
         "rescript" => Some(include_str!("queries/rescript.tags.scm")),
         "elm" => Some(include_str!("queries/elm.tags.scm")),
+        "markdown" => Some(include_str!("queries/markdown.tags.scm")),
         _ => None,
     }
 }

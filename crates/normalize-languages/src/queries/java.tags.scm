@@ -14,6 +14,9 @@
 (interface_declaration
   name: (identifier) @name) @definition.interface
 
+(enum_declaration
+  name: (identifier) @name) @definition.enum
+
 (type_list
   (type_identifier) @name) @reference.implementation
 

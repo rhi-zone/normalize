@@ -515,6 +515,8 @@ fn tags_capture_to_kind(capture_name: &str) -> Option<SymbolKind> {
         "definition.interface" => Some(SymbolKind::Interface),
         "definition.module" => Some(SymbolKind::Module),
         "definition.type" => Some(SymbolKind::Type),
+        "definition.enum" => Some(SymbolKind::Enum),
+        "definition.heading" => Some(SymbolKind::Heading),
         // No Macro variant — map to Function (closest semantic equivalent)
         "definition.macro" => Some(SymbolKind::Function),
         "definition.constant" => Some(SymbolKind::Constant),
@@ -526,7 +528,11 @@ fn tags_capture_to_kind(capture_name: &str) -> Option<SymbolKind> {
 fn is_container_kind(kind: SymbolKind) -> bool {
     matches!(
         kind,
-        SymbolKind::Class | SymbolKind::Interface | SymbolKind::Module
+        SymbolKind::Class
+            | SymbolKind::Interface
+            | SymbolKind::Module
+            | SymbolKind::Enum
+            | SymbolKind::Heading
     )
 }
 
@@ -629,22 +635,6 @@ fn collect_symbols_from_tags<'tree>(
 
     // Container indices (for nesting reconstruction).
     let container_idxs: Vec<usize> = (0..defs.len()).filter(|&i| defs[i].is_container).collect();
-
-    // Sanity check: if any explicit `definition.method` capture has no enclosing container
-    // in the tags defs, the tags query is structurally incomplete for nesting (e.g. Rust
-    // impl blocks not captured). Fall back to the trait path.
-    for i in 0..defs.len() {
-        if !defs[i].is_method_capture {
-            continue;
-        }
-        let has_container = container_idxs.iter().any(|&ci| {
-            let c = &defs[ci];
-            c.start_line <= defs[i].start_line && c.end_line >= defs[i].end_line
-        });
-        if !has_container {
-            return None;
-        }
-    }
 
     // Process each def in order, placing it either as a top-level symbol or as a child
     // of its innermost enclosing container.
@@ -1209,5 +1199,19 @@ class Foo implements IUnknown {
         let results =
             extract_implements("test.hs", "instance MyClass Foo where\n  doStuff f = y f\n");
         assert_eq!(results, vec![("MyClass".into(), vec!["MyClass".into()])]);
+    }
+
+    #[test]
+    fn test_go_extract() {
+        let extractor = Extractor::new();
+        let content = "package main\n\nfunc helper() {}\n\ntype MyStruct struct {\n    Field int\n}\n\nfunc (m *MyStruct) Method() {}\n\ntype MyInterface interface {\n    Required()\n}\n";
+        let result = extractor.extract(&std::path::PathBuf::from("test.go"), content);
+        let names: Vec<_> = result.symbols.iter().map(|s| s.name.as_str()).collect();
+        assert!(names.contains(&"helper"), "Should have function helper");
+        assert!(names.contains(&"MyStruct"), "Should have struct MyStruct");
+        assert!(
+            names.contains(&"MyInterface"),
+            "Should have interface MyInterface"
+        );
     }
 }
