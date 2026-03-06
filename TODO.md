@@ -21,7 +21,7 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ## Immediate Fixes
 
-### Incremental caching for `normalize analyze check --summary`
+### Incremental caching for `normalize analyze check --summary` — HIGH PRIORITY
 
 Currently re-runs `git log` and `git status` for every directory on every invocation. For large
 repos (265+ dirs), this is slow. Cache the per-directory results keyed by HEAD commit hash:
