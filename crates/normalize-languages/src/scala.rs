@@ -21,6 +21,14 @@ impl Language for Scala {
         " {}"
     }
 
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_scaladoc(node, content)
+    }
+
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        extract_scala_annotations(node, content)
+    }
+
     fn refine_kind(
         &self,
         node: &Node,
@@ -134,6 +142,59 @@ impl Language for Scala {
     ) -> Option<ContainerBody> {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
+}
+
+/// Extract a ScalaDoc comment (`/** ... */`) preceding a node.
+///
+/// Walks backwards through siblings looking for a `block_comment` starting with `/**`.
+fn extract_scaladoc(node: &Node, content: &str) -> Option<String> {
+    let mut prev = node.prev_sibling();
+    while let Some(sibling) = prev {
+        match sibling.kind() {
+            "block_comment" => {
+                let text = &content[sibling.byte_range()];
+                if text.starts_with("/**") {
+                    return Some(clean_block_doc_comment(text));
+                }
+                return None;
+            }
+            "annotation" => {
+                // Skip annotations between doc comment and declaration
+            }
+            _ => return None,
+        }
+        prev = sibling.prev_sibling();
+    }
+    None
+}
+
+/// Clean a `/** ... */` block doc comment into plain text.
+fn clean_block_doc_comment(text: &str) -> String {
+    let lines: Vec<&str> = text
+        .strip_prefix("/**")
+        .unwrap_or(text)
+        .strip_suffix("*/")
+        .unwrap_or(text)
+        .lines()
+        .map(|l| l.trim().strip_prefix('*').unwrap_or(l).trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+    lines.join(" ")
+}
+
+/// Extract annotations from a Scala definition node.
+///
+/// Scala annotations (`@deprecated`, `@tailrec`, etc.) appear as `annotation`
+/// children of the definition node.
+fn extract_scala_annotations(node: &Node, content: &str) -> Vec<String> {
+    let mut attrs = Vec::new();
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "annotation" {
+            attrs.push(content[child.byte_range()].to_string());
+        }
+    }
+    attrs
 }
 
 #[cfg(test)]

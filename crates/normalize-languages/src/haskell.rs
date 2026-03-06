@@ -17,6 +17,10 @@ impl Language for Haskell {
         "haskell"
     }
 
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_haddock(node, content)
+    }
+
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "import" {
             return Vec::new();
@@ -87,6 +91,66 @@ impl Language for Haskell {
         // directly, with no enclosing keywords in the node itself
         crate::body::analyze_end_body(body_node, content, inner_indent)
     }
+}
+
+/// Extract a Haddock documentation comment preceding a definition node.
+///
+/// Haddock comments use `-- |` (preceding) or `-- ^` (following) syntax.
+/// The tree-sitter-haskell grammar parses these as `haddock` nodes.
+///
+/// The `haddock` node is a sibling of the `declarations` container, not a
+/// sibling of the `function`/`data_type`/etc. inside it. So we walk up to the
+/// parent (`declarations`) and check the parent's prev sibling.
+fn extract_haddock(node: &Node, content: &str) -> Option<String> {
+    // First check immediate prev siblings (within declarations)
+    let mut prev = node.prev_sibling();
+    while let Some(sibling) = prev {
+        match sibling.kind() {
+            "haddock" => {
+                return Some(clean_haddock(&content[sibling.byte_range()]));
+            }
+            "signature" => {
+                // Skip type signature between haddock and function definition
+            }
+            _ => break,
+        }
+        prev = sibling.prev_sibling();
+    }
+
+    // Check if the parent's prev sibling is a haddock node.
+    // This handles the case where haddock is at the top level (sibling of
+    // `declarations`) while the definition node is inside `declarations`.
+    if let Some(parent) = node.parent()
+        && let Some(sibling) = parent.prev_sibling()
+        && sibling.kind() == "haddock"
+    {
+        return Some(clean_haddock(&content[sibling.byte_range()]));
+    }
+
+    None
+}
+
+/// Clean a Haddock comment into plain text.
+///
+/// Strips `-- |`, `-- ^`, and `--` prefixes from each line.
+fn clean_haddock(text: &str) -> String {
+    let lines: Vec<&str> = text
+        .lines()
+        .map(|l| {
+            let l = l.trim();
+            if let Some(rest) = l.strip_prefix("-- |") {
+                rest.trim()
+            } else if let Some(rest) = l.strip_prefix("-- ^") {
+                rest.trim()
+            } else if let Some(rest) = l.strip_prefix("--") {
+                rest.strip_prefix(' ').unwrap_or(rest)
+            } else {
+                l
+            }
+        })
+        .filter(|l| !l.is_empty())
+        .collect();
+    lines.join(" ")
 }
 
 #[cfg(test)]

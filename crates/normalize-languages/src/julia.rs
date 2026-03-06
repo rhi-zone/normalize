@@ -17,6 +17,10 @@ impl Language for Julia {
         "julia"
     }
 
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_julia_docstring(node, content)
+    }
+
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         let text = &content[node.byte_range()];
         let line = node.start_position().row + 1;
@@ -83,6 +87,41 @@ impl Language for Julia {
     ) -> Option<ContainerBody> {
         crate::body::analyze_end_body(body_node, content, inner_indent)
     }
+}
+
+/// Extract a Julia docstring (triple-quoted `\"\"\"...\"\"\"``) preceding a definition node.
+///
+/// Julia docstrings are `string_literal` nodes that appear as the previous sibling
+/// of a function or type definition. They must start with `"""`.
+fn extract_julia_docstring(node: &Node, content: &str) -> Option<String> {
+    let prev = node.prev_sibling()?;
+    if prev.kind() != "string_literal" {
+        return None;
+    }
+
+    let text = &content[prev.byte_range()];
+    if !text.starts_with("\"\"\"") {
+        return None;
+    }
+
+    // Strip the triple quotes and clean up
+    let inner = text
+        .strip_prefix("\"\"\"")
+        .unwrap_or(text)
+        .strip_suffix("\"\"\"")
+        .unwrap_or(text);
+
+    let lines: Vec<&str> = inner
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+
+    if lines.is_empty() {
+        return None;
+    }
+
+    Some(lines.join(" "))
 }
 
 #[cfg(test)]

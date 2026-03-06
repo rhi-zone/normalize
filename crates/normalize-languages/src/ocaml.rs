@@ -17,6 +17,10 @@ impl Language for OCaml {
         "ocaml"
     }
 
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_ocamldoc(node, content)
+    }
+
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "open_module" {
             return Vec::new();
@@ -78,6 +82,38 @@ impl Language for OCaml {
         // skip the opening keyword line, strip "end" from the tail
         crate::body::analyze_keyword_end_body(body_node, content, inner_indent)
     }
+}
+
+/// Extract an OCamldoc comment (`(** ... *)`) preceding a definition node.
+///
+/// OCamldoc comments are parsed as `comment` nodes by tree-sitter-ocaml.
+/// We look for a prev sibling `comment` that starts with `(**`.
+fn extract_ocamldoc(node: &Node, content: &str) -> Option<String> {
+    let sibling = node.prev_sibling()?;
+    if sibling.kind() != "comment" {
+        return None;
+    }
+    let text = &content[sibling.byte_range()];
+    if text.starts_with("(**") && !text.starts_with("(***") {
+        Some(clean_ocamldoc(text))
+    } else {
+        None
+    }
+}
+
+/// Clean an OCamldoc comment `(** ... *)` into plain text.
+fn clean_ocamldoc(text: &str) -> String {
+    let inner = text
+        .strip_prefix("(**")
+        .unwrap_or(text)
+        .strip_suffix("*)")
+        .unwrap_or(text);
+    let lines: Vec<&str> = inner
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+    lines.join(" ")
 }
 
 #[cfg(test)]

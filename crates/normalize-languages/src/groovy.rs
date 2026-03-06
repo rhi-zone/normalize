@@ -21,6 +21,14 @@ impl Language for Groovy {
         " {}"
     }
 
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_groovydoc(node, content)
+    }
+
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        extract_groovy_annotations(node, content)
+    }
+
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "groovy_import" {
             return Vec::new();
@@ -109,6 +117,62 @@ impl Language for Groovy {
     ) -> Option<ContainerBody> {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
+}
+
+/// Extract a GroovyDoc comment from a node.
+///
+/// The Groovy tree-sitter grammar wraps documented declarations in a `groovy_doc`
+/// parent node rather than making the doc comment a sibling. This function checks
+/// the parent node for `groovy_doc` and extracts the doc text from `first_line`
+/// and `tag_value` children.
+fn extract_groovydoc(node: &Node, content: &str) -> Option<String> {
+    let parent = node.parent()?;
+    if parent.kind() != "groovy_doc" {
+        return None;
+    }
+
+    let mut doc_parts: Vec<String> = Vec::new();
+    let mut cursor = parent.walk();
+    for child in parent.children(&mut cursor) {
+        match child.kind() {
+            "first_line" => {
+                let text = content[child.byte_range()].trim();
+                // first_line may include trailing */
+                let text = text.strip_suffix("*/").unwrap_or(text).trim();
+                if !text.is_empty() {
+                    doc_parts.push(text.to_string());
+                }
+            }
+            "tag_value" => {
+                let text = content[child.byte_range()].trim();
+                if !text.is_empty() {
+                    doc_parts.push(text.to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if doc_parts.is_empty() {
+        None
+    } else {
+        Some(doc_parts.join(" "))
+    }
+}
+
+/// Extract annotations from a Groovy definition node.
+///
+/// Groovy annotations (`@Grab`, `@Test`, etc.) appear as `annotation`
+/// children of the definition node (when no GroovyDoc is present).
+fn extract_groovy_annotations(node: &Node, content: &str) -> Vec<String> {
+    let mut attrs = Vec::new();
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "annotation" {
+            attrs.push(content[child.byte_range()].to_string());
+        }
+    }
+    attrs
 }
 
 #[cfg(test)]
