@@ -110,6 +110,7 @@ fn build_commit_session_map(root: &Path, sessions_path: Option<&Path>) -> Commit
     }
 
     // Regex for git commit output: [branch hash] message
+    // normalize-syntax-allow: rust/unwrap-in-impl - compile-time constant regex pattern
     let commit_re = Regex::new(r"\[[\w./-]+ ([a-f0-9]{7,40})\]").unwrap();
 
     let mut short_to_session: HashMap<String, CommitSession> = HashMap::new();

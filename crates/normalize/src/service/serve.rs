@@ -48,6 +48,7 @@ impl ServeService {
         let config = crate::config::NormalizeConfig::load(&root_path);
         let effective_port = port.unwrap_or_else(|| config.serve.http_port());
 
+        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
         let rt = tokio::runtime::Runtime::new().unwrap();
         let exit = rt.block_on(crate::serve::http::run_http_server(
             &root_path,
@@ -68,6 +69,7 @@ impl ServeService {
         >,
     ) -> Result<(), String> {
         let root_path = root.as_deref().map(PathBuf::from);
+        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
         let rt = tokio::runtime::Runtime::new().unwrap();
         let exit = rt.block_on(crate::serve::lsp::run_lsp_server(root_path.as_deref()));
         if exit != 0 {

@@ -122,6 +122,7 @@ pub fn cmd_list_service(
 ) -> Result<HistoryListReport, String> {
     let root = root
         .map(PathBuf::from)
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let shadow = Shadow::new(&root);
     if !shadow.exists() {
@@ -145,6 +146,7 @@ pub fn cmd_list_service(
 pub fn cmd_diff_service(root: Option<&str>, commit_ref: &str) -> Result<HistoryDiffReport, String> {
     let root = root
         .map(PathBuf::from)
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let shadow = Shadow::new(&root);
     match shadow.diff(commit_ref) {
@@ -160,6 +162,7 @@ pub fn cmd_diff_service(root: Option<&str>, commit_ref: &str) -> Result<HistoryD
 pub fn cmd_status_service(root: Option<&str>) -> Result<HistoryStatusReport, String> {
     let root = root
         .map(PathBuf::from)
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let shadow = Shadow::new(&root);
     let entries = shadow.history(None, 100);
@@ -183,6 +186,7 @@ pub fn cmd_status_service(root: Option<&str>) -> Result<HistoryStatusReport, Str
 pub fn cmd_tree_service(root: Option<&str>, limit: usize) -> Result<HistoryTreeReport, String> {
     let root = root
         .map(PathBuf::from)
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let shadow = Shadow::new(&root);
     match shadow.tree(limit) {
@@ -198,6 +202,7 @@ pub fn cmd_tree_service(root: Option<&str>, limit: usize) -> Result<HistoryTreeR
 pub fn cmd_prune_service(root: Option<&str>, keep: usize) -> Result<HistoryPruneReport, String> {
     let root = root
         .map(PathBuf::from)
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let shadow = Shadow::new(&root);
     match shadow.prune(keep) {

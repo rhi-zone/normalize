@@ -16,6 +16,7 @@ pub fn cmd_trace(
     recursive: bool,
     case_insensitive: bool,
 ) -> i32 {
+    // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(cmd_trace_async(
         symbol,

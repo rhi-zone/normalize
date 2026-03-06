@@ -105,6 +105,7 @@ fn real_main(cli: &Cli) -> Result<ExitCode, String> {
             let inputs = file_inputs(cli, &bytes);
 
             if cli.in_place {
+                // normalize-syntax-allow: rust/unwrap-in-impl - path is a file (guarded by is_file check), so parent() always returns Some
                 let location = path.parent().unwrap();
                 let mut tmp = tempfile::Builder::new()
                     .prefix("jaq")

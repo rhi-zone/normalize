@@ -321,6 +321,7 @@ impl DaemonServer {
     }
 
     fn add_root(&self, root: PathBuf) -> Response {
+        // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error (thread panicked while holding lock)
         let mut roots = self.roots.lock().unwrap();
 
         if roots.contains_key(&root) {
@@ -334,6 +335,7 @@ impl DaemonServer {
         }
 
         // Initial index refresh
+        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
         let rt = tokio::runtime::Runtime::new().unwrap();
         match rt.block_on(crate::index::open(&root)) {
             Ok(mut idx) => {
@@ -395,6 +397,7 @@ impl DaemonServer {
     }
 
     fn remove_root(&self, root: &Path) -> Response {
+        // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error (thread panicked while holding lock)
         let mut roots = self.roots.lock().unwrap();
         if roots.remove(root).is_some() {
             Response::ok(serde_json::json!({"removed": true}))
@@ -404,12 +407,14 @@ impl DaemonServer {
     }
 
     fn list_roots(&self) -> Response {
+        // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error (thread panicked while holding lock)
         let roots = self.roots.lock().unwrap();
         let list: Vec<&PathBuf> = roots.keys().collect();
         Response::ok(serde_json::json!(list))
     }
 
     fn status(&self) -> Response {
+        // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error (thread panicked while holding lock)
         let roots = self.roots.lock().unwrap();
         Response::ok(serde_json::json!({
             "uptime_secs": self.start_time.elapsed().as_secs(),
@@ -429,8 +434,10 @@ impl DaemonServer {
     }
 
     fn refresh_root(&self, root: &Path) {
+        // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error (thread panicked while holding lock)
         let mut roots = self.roots.lock().unwrap();
         if let Some(watched) = roots.get_mut(root) {
+            // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
             let rt = tokio::runtime::Runtime::new().unwrap();
             match rt.block_on(crate::index::open(root)) {
                 Ok(mut idx) => {
@@ -497,6 +504,7 @@ pub async fn run_daemon() -> Result<i32, Box<dyn std::error::Error>> {
                 let response = match serde_json::from_str::<Request>(&line) {
                     Ok(Request::Shutdown) => {
                         let resp = server.handle_request(Request::Shutdown);
+                        // normalize-syntax-allow: rust/unwrap-in-impl - Response is always JSON-serializable
                         let resp_str = serde_json::to_string(&resp).unwrap();
                         let _ = writer.write_all(resp_str.as_bytes()).await;
                         let _ = writer.write_all(b"\n").await;
@@ -506,6 +514,7 @@ pub async fn run_daemon() -> Result<i32, Box<dyn std::error::Error>> {
                     Err(e) => Response::err(&format!("Invalid request: {}", e)),
                 };
 
+                // normalize-syntax-allow: rust/unwrap-in-impl - Response is always JSON-serializable
                 let resp_str = serde_json::to_string(&response).unwrap();
                 let _ = writer.write_all(resp_str.as_bytes()).await;
                 let _ = writer.write_all(b"\n").await;

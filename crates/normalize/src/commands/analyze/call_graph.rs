@@ -12,6 +12,7 @@ pub fn cmd_call_graph(
     show_callees: bool,
     case_insensitive: bool,
 ) -> i32 {
+    // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(cmd_call_graph_async(
         root,

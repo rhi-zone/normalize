@@ -301,6 +301,7 @@ pub fn analyze_cross_repo_health(repos: &[std::path::PathBuf]) -> CrossRepoHealt
         })
         .collect();
 
+    // normalize-syntax-allow: rust/unwrap-in-impl - tech_debt_score is always finite (no NaN/Inf produced in scoring logic)
     repos.sort_by(|a, b| b.tech_debt_score.partial_cmp(&a.tech_debt_score).unwrap());
 
     CrossRepoHealthReport { repos }

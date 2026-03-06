@@ -757,7 +757,13 @@ pub fn cmd_sessions_show(
                     return 1;
                 }
             },
-            None => registry.get("claude").unwrap(),
+            None => match registry.get("claude") {
+                Some(f) => f,
+                None => {
+                    eprintln!("Claude format not available (compile with feature = format-claude)");
+                    return 1;
+                }
+            },
         };
 
         let path = &paths[0];
@@ -800,7 +806,9 @@ fn parse_session_for_show(path: &Path, format: Option<&str>) -> Result<Session, 
         Some(name) => registry
             .get(name)
             .ok_or_else(|| format!("Unknown format: {}", name))?,
-        None => registry.get("claude").unwrap(),
+        None => registry.get("claude").ok_or_else(|| {
+            "Claude format not available (compile with feature = format-claude)".to_string()
+        })?,
     };
 
     log_format.parse(path)

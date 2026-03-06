@@ -284,6 +284,7 @@ impl NormalizeService {
     ) -> Result<crate::commands::view::report::ViewOutput, String> {
         let root_path = root
             .map(PathBuf::from)
+            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
             .unwrap_or_else(|| std::env::current_dir().unwrap());
 
         self.resolve_format(pretty, compact, &root_path);
@@ -352,6 +353,7 @@ impl NormalizeService {
     ) -> Result<GrepResult, String> {
         let root_path = root
             .map(PathBuf::from)
+            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
             .unwrap_or_else(|| std::env::current_dir().unwrap());
 
         self.resolve_format(pretty, compact, &root_path);
@@ -382,6 +384,7 @@ impl NormalizeService {
     ) -> Result<AliasesReport, String> {
         let root_path = root
             .map(PathBuf::from)
+            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
             .unwrap_or_else(|| std::env::current_dir().unwrap());
 
         let config = NormalizeConfig::load(&root_path);
@@ -402,6 +405,7 @@ impl NormalizeService {
     ) -> Result<ContextOutput, String> {
         let root_path = root
             .map(PathBuf::from)
+            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
             .unwrap_or_else(|| std::env::current_dir().unwrap());
         let target_str = target.as_deref().unwrap_or(".");
         let target = root_path.join(target_str);
@@ -503,6 +507,7 @@ impl NormalizeService {
     ) -> Result<ReferencesReport, String> {
         let root_path = root
             .map(PathBuf::from)
+            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
             .unwrap_or_else(|| std::env::current_dir().unwrap());
         self.resolve_format(pretty, compact, &root_path);
         Ok(commands::find_references::cmd_find_references(

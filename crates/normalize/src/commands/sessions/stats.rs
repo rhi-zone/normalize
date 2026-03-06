@@ -73,7 +73,13 @@ pub fn cmd_sessions_stats(
                 return 1;
             }
         },
-        None => registry.get("claude").unwrap(),
+        None => match registry.get("claude") {
+            Some(f) => f,
+            None => {
+                eprintln!("Claude format not available (compile with feature = format-claude)");
+                return 1;
+            }
+        },
     };
 
     // Validate group_by values
@@ -221,7 +227,9 @@ pub fn build_stats_data(
         Some(name) => registry
             .get(name)
             .ok_or_else(|| format!("Unknown format: {}", name))?,
-        None => registry.get("claude").unwrap(),
+        None => registry.get("claude").ok_or_else(|| {
+            "Claude format not available (compile with feature = format-claude)".to_string()
+        })?,
     };
 
     let grep_re = grep

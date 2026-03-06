@@ -65,6 +65,7 @@ impl OutputFormatter for StaleDocsReport {
 pub fn build_stale_docs_report(root: &Path) -> StaleDocsReport {
     use regex::Regex;
 
+    // normalize-syntax-allow: rust/unwrap-in-impl - compile-time constant regex pattern
     let covers_re = Regex::new(r"<!--\s*covers:\s*(.+?)\s*-->").unwrap();
 
     let md_files: Vec<_> = walkdir::WalkDir::new(root)
@@ -116,6 +117,7 @@ pub fn build_stale_docs_report(root: &Path) -> StaleDocsReport {
 
         let doc_modified = std::fs::metadata(md_file)
             .and_then(|m| m.modified())
+            // normalize-syntax-allow: rust/unwrap-in-impl - UNIX_EPOCH is always earlier than any real file timestamp
             .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
             .unwrap_or(0);
 
@@ -138,6 +140,7 @@ pub fn build_stale_docs_report(root: &Path) -> StaleDocsReport {
                     .filter_map(|f| {
                         std::fs::metadata(root.join(f))
                             .and_then(|m| m.modified())
+                            // normalize-syntax-allow: rust/unwrap-in-impl - UNIX_EPOCH is always earlier than any real file timestamp
                             .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
                             .ok()
                     })
@@ -223,6 +226,7 @@ pub fn cmd_stale_docs(root: &Path) -> i32 {
     use regex::Regex;
 
     // Find markdown files with <!-- covers: ... --> declarations
+    // normalize-syntax-allow: rust/unwrap-in-impl - compile-time constant regex pattern
     let covers_re = Regex::new(r"<!--\s*covers:\s*(.+?)\s*-->").unwrap();
 
     let md_files: Vec<_> = walkdir::WalkDir::new(root)
@@ -278,6 +282,7 @@ pub fn cmd_stale_docs(root: &Path) -> i32 {
         // Get doc modification time
         let doc_modified = std::fs::metadata(md_file)
             .and_then(|m| m.modified())
+            // normalize-syntax-allow: rust/unwrap-in-impl - UNIX_EPOCH is always earlier than any real file timestamp
             .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
             .unwrap_or(0);
 
@@ -303,6 +308,7 @@ pub fn cmd_stale_docs(root: &Path) -> i32 {
                     .filter_map(|f| {
                         std::fs::metadata(root.join(f))
                             .and_then(|m| m.modified())
+                            // normalize-syntax-allow: rust/unwrap-in-impl - UNIX_EPOCH is always earlier than any real file timestamp
                             .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
                             .ok()
                     })

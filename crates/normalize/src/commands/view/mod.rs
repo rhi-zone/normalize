@@ -68,6 +68,7 @@ pub fn cmd_view(
     let json = false;
     let root = root
         .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     // Ensure daemon is running if configured
@@ -165,6 +166,7 @@ pub fn cmd_view(
             }
             return 1;
         }
+        // normalize-syntax-allow: rust/unwrap-in-impl - match arm guards exactly 1 match, so next() is always Some
         (1, 0) => matches.into_iter().next().unwrap(),
         (0, 1) => {
             let sym = &symbol_matches[0];
@@ -406,6 +408,7 @@ pub fn build_view_service(
             }
             return Err(msg);
         }
+        // normalize-syntax-allow: rust/unwrap-in-impl - match arm guards exactly 1 match, so next() is always Some
         (1, 0) => matches.into_iter().next().unwrap(),
         (0, 1) => {
             let sym = &symbol_matches[0];

@@ -83,6 +83,7 @@ impl SecurityReport {
         counts.insert("low", 0);
 
         for f in &self.findings {
+            // normalize-syntax-allow: rust/unwrap-in-impl - keys are compile-time constants inserted above
             *counts.get_mut(f.severity.as_str()).unwrap() += 1;
         }
         counts
@@ -670,6 +671,7 @@ pub fn analyze(
             if let Some(ref mut r) = report
                 && has_symbol_target
             {
+                // normalize-syntax-allow: rust/unwrap-in-impl - symbol_path is non-empty (has_symbol_target is true only when symbol_path has entries)
                 let target_name = symbol_path.last().unwrap();
                 let target_parent = if symbol_path.len() > 1 {
                     Some(symbol_path[symbol_path.len() - 2].as_str())

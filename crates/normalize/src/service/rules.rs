@@ -128,6 +128,7 @@ impl RulesService {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
+            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
             .unwrap_or_else(|| std::env::current_dir().unwrap());
         let target_root = target
             .as_deref()

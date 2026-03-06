@@ -21,6 +21,7 @@ pub fn has_language_support(path: &str) -> bool {
 /// Search for symbols in the index by name.
 /// Supports qualified names like "ClassName/method" or "file.rs/ClassName/method"
 pub fn search_symbols(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
+    // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(search_symbols_async(query, root))
 }
@@ -91,6 +92,7 @@ fn parse_symbol_query(query: &str) -> SymbolQuery {
             }
         }
         _ => {
+            // normalize-syntax-allow: rust/unwrap-in-impl - parts is non-empty (3+ elements in this match arm)
             let symbol_name = parts.last().unwrap().to_string();
             let parent_hint = parts.get(parts.len() - 2).map(|s| s.to_string());
             let file_hint = if parts.len() > 2 {

@@ -52,6 +52,7 @@ pub fn build_check_examples_report(root: &Path) -> CheckExamplesReport {
     use regex::Regex;
     use std::collections::HashSet;
 
+    // normalize-syntax-allow: rust/unwrap-in-impl - compile-time constant regex patterns
     let marker_start_re = Regex::new(r"//\s*\[example:\s*([^\]]+)\]").unwrap();
     let ref_re = Regex::new(r"\{\{example:\s*([^}]+)\}\}").unwrap();
 
@@ -129,6 +130,7 @@ pub fn build_check_examples_report(root: &Path) -> CheckExamplesReport {
             }
 
             for cap in ref_re.captures_iter(line) {
+                // normalize-syntax-allow: rust/unwrap-in-impl - cap.get(0) is always Some (the full match)
                 let match_start = cap.get(0).unwrap().start();
                 let match_end = cap.get(0).unwrap().end();
                 let before = &line[..match_start];
@@ -192,6 +194,7 @@ pub fn cmd_check_examples(root: &Path) -> i32 {
     use std::collections::HashSet;
 
     // Find all example markers in source files: // [example: name] ... // [/example]
+    // normalize-syntax-allow: rust/unwrap-in-impl - compile-time constant regex patterns
     let marker_start_re = Regex::new(r"//\s*\[example:\s*([^\]]+)\]").unwrap();
 
     // Find all example references in docs: {{example: path#name}}
@@ -278,6 +281,7 @@ pub fn cmd_check_examples(root: &Path) -> i32 {
 
             for cap in ref_re.captures_iter(line) {
                 // Skip if match is inside backticks (inline code)
+                // normalize-syntax-allow: rust/unwrap-in-impl - cap.get(0) is always Some (the full match)
                 let match_start = cap.get(0).unwrap().start();
                 let match_end = cap.get(0).unwrap().end();
                 let before = &line[..match_start];

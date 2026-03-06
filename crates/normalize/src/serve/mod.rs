@@ -93,6 +93,7 @@ pub fn run(args: ServeArgs) -> i32 {
                 } else {
                     config.serve.http_port()
                 };
+                // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
                 let rt = tokio::runtime::Runtime::new().unwrap();
                 rt.block_on(http::run_http_server(&root, effective_port))
             }

@@ -93,7 +93,10 @@ pub(crate) fn resolve_session_paths_literal(
             Some(f) => f,
             None => return Vec::new(),
         },
-        None => registry.get("claude").unwrap(),
+        None => match registry.get("claude") {
+            Some(f) => f,
+            None => return Vec::new(),
+        },
     };
 
     let sessions = format.list_sessions(project);
@@ -121,7 +124,7 @@ fn resolve_session_fuzzy(
     let registry = FormatRegistry::new();
     let format: &dyn LogFormat = match format_name {
         Some(name) => registry.get(name)?,
-        None => registry.get("claude").unwrap(),
+        None => registry.get("claude")?,
     };
 
     let sessions = format.list_sessions(project);

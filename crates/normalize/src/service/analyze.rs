@@ -64,6 +64,7 @@ impl AnalyzeService {
 
     fn root_path(root: Option<String>) -> PathBuf {
         root.map(PathBuf::from)
+            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
             .unwrap_or_else(|| std::env::current_dir().unwrap())
     }
 

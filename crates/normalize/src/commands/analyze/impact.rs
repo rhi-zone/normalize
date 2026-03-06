@@ -9,6 +9,7 @@ use std::path::Path;
 
 /// Run impact analysis CLI command.
 pub fn cmd_impact(root: &Path, target: &str, _json: bool) -> i32 {
+    // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
     let rt = tokio::runtime::Runtime::new().unwrap();
     let idx = match rt.block_on(crate::index::ensure_ready(root)) {
         Ok(i) => i,

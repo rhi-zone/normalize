@@ -165,6 +165,7 @@ impl OutputFormatter for ArchitectureReport {
 
 /// Run architecture analysis
 pub fn cmd_architecture(root: &Path, _json: bool) -> i32 {
+    // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
     let rt = tokio::runtime::Runtime::new().unwrap();
     let idx = match rt.block_on(crate::index::ensure_ready(root)) {
         Ok(i) => i,

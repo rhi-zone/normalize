@@ -376,6 +376,7 @@ impl Sha256 {
         self.total_len += data.len() as u64;
 
         while self.buffer.len() >= 64 {
+            // normalize-syntax-allow: rust/unwrap-in-impl - while-loop guarantees buffer.len() >= 64, so try_into always succeeds
             let block: [u8; 64] = self.buffer[..64].try_into().unwrap();
             self.process_block(&block);
             self.buffer.drain(..64);
@@ -396,6 +397,7 @@ impl Sha256 {
         // Process remaining blocks - clone buffer to avoid borrow conflict
         let buffer = std::mem::take(&mut self.buffer);
         for chunk in buffer.chunks(64) {
+            // normalize-syntax-allow: rust/unwrap-in-impl - buffer is padded to exact 64-byte multiple above, so all chunks are exactly 64 bytes
             let block: [u8; 64] = chunk.try_into().unwrap();
             self.process_block(&block);
         }
@@ -424,6 +426,7 @@ impl Sha256 {
 
         let mut w = [0u32; 64];
         for i in 0..16 {
+            // normalize-syntax-allow: rust/unwrap-in-impl - slice is exactly 4 bytes (i*4 to i*4+4, i in 0..16, block is [u8; 64])
             w[i] = u32::from_be_bytes(block[i * 4..(i + 1) * 4].try_into().unwrap());
         }
         for i in 16..64 {

@@ -147,6 +147,7 @@ pub fn grep(
             if !file_matches.is_empty() {
                 total_matches.fetch_add(file_matches.len(), Ordering::Relaxed);
 
+                // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error (thread panicked while holding lock)
                 let mut guard = matches.lock().unwrap();
                 for m in file_matches {
                     if guard.len() < limit {
@@ -164,6 +165,7 @@ pub fn grep(
         })
     });
 
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error; into_inner() is the Arc-free unwrap after parallel_walk completes
     let mut matches = matches.into_inner().unwrap();
 
     // Enrich matches with containing symbol info
@@ -213,7 +215,8 @@ fn add_symbol_context(matches: &mut [GrepMatch], root: &Path) {
                 if sym.start_line <= line && line <= sym.end_line {
                     // Prefer smaller (more specific) symbols
                     if best.is_none()
-                        || (sym.end_line - sym.start_line)
+                        // normalize-syntax-allow: rust/unwrap-in-impl - guarded by is_none() check in same condition
+                    || (sym.end_line - sym.start_line)
                             < (best.unwrap().end_line - best.unwrap().start_line)
                     {
                         best = Some(sym);

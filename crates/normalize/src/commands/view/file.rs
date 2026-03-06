@@ -289,6 +289,7 @@ pub fn cmd_view_file(
 
         // Fisheye mode: show skeletons of imported files
         if let Some(focus_filter) = focus {
+            // normalize-syntax-allow: rust/unwrap-in-impl - deps_result is Some when focus.is_some() (computed on same condition)
             print_fisheye_imports(
                 deps_result.as_ref().unwrap(),
                 focus_filter,
@@ -302,6 +303,7 @@ pub fn cmd_view_file(
 
         // Resolve imports mode
         if resolve_imports {
+            // normalize-syntax-allow: rust/unwrap-in-impl - deps_result is Some when resolve_imports is true (computed on same condition)
             let deps = deps_result.as_ref().unwrap();
 
             let mut resolved_symbols: Vec<(String, String, String)> = Vec::new();

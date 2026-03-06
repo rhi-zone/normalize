@@ -238,6 +238,7 @@ impl LanguageServer for MossBackend {
             .map(|sym| {
                 let file_path = root.clone().join(&sym.file);
                 let uri = Url::from_file_path(&file_path)
+                    // normalize-syntax-allow: rust/unwrap-in-impl - "file:///unknown" is a compile-time constant valid URL
                     .unwrap_or_else(|_| Url::parse("file:///unknown").unwrap());
 
                 SymbolInformation {

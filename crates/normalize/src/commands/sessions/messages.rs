@@ -274,7 +274,9 @@ pub fn build_messages_report(
         Some(name) => registry
             .get(name)
             .ok_or_else(|| format!("Unknown format: {}", name))?,
-        None => registry.get("claude").unwrap(),
+        None => registry.get("claude").ok_or_else(|| {
+            "Claude format not available (compile with feature = format-claude)".to_string()
+        })?,
     };
 
     let grep_re = grep

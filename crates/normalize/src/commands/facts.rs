@@ -125,6 +125,7 @@ pub enum FactsAction {
 /// Run an index management action
 pub fn cmd_facts(action: FactsAction, root: Option<&Path>) -> i32 {
     let json = false;
+    // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
     let rt = tokio::runtime::Runtime::new().unwrap();
     match action {
         FactsAction::Rebuild { include } => rt.block_on(cmd_rebuild(root, &include)),
@@ -145,6 +146,7 @@ pub fn cmd_facts(action: FactsAction, root: Option<&Path>) -> i32 {
         FactsAction::Check { rules_file, list } => {
             let effective_root = root
                 .map(|p| p.to_path_buf())
+                // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
                 .unwrap_or_else(|| std::env::current_dir().unwrap());
             let config = crate::config::NormalizeConfig::load(&effective_root);
             super::rules::cmd_run_facts(
@@ -165,6 +167,7 @@ pub fn cmd_facts(action: FactsAction, root: Option<&Path>) -> i32 {
 async fn cmd_rebuild(root: Option<&Path>, include: &[FactsContent]) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     match index::open(&root).await {
@@ -248,6 +251,7 @@ fn is_binary_file(path: &Path) -> bool {
 async fn cmd_stats(root: Option<&Path>, json: bool, storage: bool) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     // If --storage, just show storage usage
@@ -377,6 +381,7 @@ async fn cmd_list_files(
 ) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     let idx = match index::open(&root).await {
@@ -727,6 +732,7 @@ async fn cmd_rules(
 ) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     // Load rule pack(s)
@@ -1000,6 +1006,7 @@ async fn cmd_rebuild_data(
 ) -> Result<RebuildResult, String> {
     let root = root
         .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     let mut idx = index::open(&root)
@@ -1053,6 +1060,7 @@ pub fn cmd_stats_service(root: Option<&str>, storage: bool) -> Result<FactsStats
     if storage {
         let effective_root = root_ref
             .map(|p| p.to_path_buf())
+            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
             .unwrap_or_else(|| std::env::current_dir().unwrap());
         return Ok(FactsStatsOutput::Storage(build_storage_report(
             &effective_root,
@@ -1067,6 +1075,7 @@ pub fn cmd_stats_service(root: Option<&str>, storage: bool) -> Result<FactsStats
 async fn cmd_stats_data(root: Option<&Path>) -> Result<FactsStats, String> {
     let root = root
         .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     let moss_dir = get_normalize_dir(&root);
@@ -1194,6 +1203,7 @@ async fn cmd_list_files_data(
 ) -> Result<FileList, String> {
     let root = root
         .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     let idx = index::open(&root)
@@ -1338,6 +1348,7 @@ pub fn cmd_check_service(
 ) -> Result<CommandResult, String> {
     let effective_root = root
         .map(PathBuf::from)
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = crate::config::NormalizeConfig::load(&effective_root);
     let rules_file_path = rules_file.map(PathBuf::from);

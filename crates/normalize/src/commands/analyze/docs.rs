@@ -70,6 +70,7 @@ impl OutputFormatter for DocCoverageReport {
                 } else {
                     1.0
                 };
+                // normalize-syntax-allow: rust/unwrap-in-impl - pct values are finite ratios (0.0-1.0)
                 pct_a.partial_cmp(&pct_b).unwrap()
             });
             for (lang, (documented, total)) in langs {
@@ -138,6 +139,7 @@ pub fn analyze_docs(
         .collect();
 
     // Try to load index for cross-file resolution, fall back to on-demand parsing
+    // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
     let rt = tokio::runtime::Runtime::new().unwrap();
     let index = rt.block_on(crate::index::open(root)).ok();
     let resolver: Box<dyn InterfaceResolver> = match &index {
@@ -205,6 +207,7 @@ fn process_file(
         return;
     }
 
+    // normalize-syntax-allow: rust/unwrap-in-impl - guarded by is_none() check above
     let lang = lang.unwrap();
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,

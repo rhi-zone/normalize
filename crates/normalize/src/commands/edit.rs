@@ -165,6 +165,7 @@ pub fn cmd_edit_each(
 ) -> Result<EditResult, String> {
     let root = root
         .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     let op_name = match &action {
@@ -321,6 +322,7 @@ fn cmd_edit(
 ) -> Result<EditOutput, String> {
     let root = root
         .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     let config = NormalizeConfig::load(&root);
@@ -395,6 +397,7 @@ fn cmd_edit(
         );
     }
 
+    // normalize-syntax-allow: rust/unwrap-in-impl - symbol_path is non-empty (checked via is_empty() + early return above)
     let symbol_name = unified.symbol_path.last().unwrap();
     let loc = editor
         .find_symbol(&file_path, &content, symbol_name, case_insensitive)
@@ -869,6 +872,7 @@ fn cmd_undo_redo(
 ) -> Result<UndoOutput, String> {
     let root = root
         .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     let shadow = Shadow::new(&root);
@@ -958,6 +962,7 @@ fn cmd_batch_edit(
 ) -> Result<BatchOutput, String> {
     let root = root
         .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     let json_content = if batch_file == "-" {
@@ -1164,6 +1169,7 @@ pub fn cmd_edit_rename(
 
     let root = root
         .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     let config = NormalizeConfig::load(&root);
@@ -1180,6 +1186,7 @@ pub fn cmd_edit_rename(
         ));
     }
 
+    // normalize-syntax-allow: rust/unwrap-in-impl - symbol_path is non-empty (checked via is_empty() + early return above)
     let old_name = unified.symbol_path.last().unwrap().as_str();
     let def_rel_path = unified.file_path.clone();
     let def_abs_path = root.join(&def_rel_path);

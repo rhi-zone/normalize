@@ -150,6 +150,7 @@ pub fn build_view_line_range_service(
     let matches = crate::path_resolve::resolve_unified_all(file_path, root);
     let resolved = match matches.len() {
         0 => return Err(format!("File not found: {}", file_path)),
+        // normalize-syntax-allow: rust/unwrap-in-impl - match arm guards exactly 1 match, so next() is always Some
         1 => matches.into_iter().next().unwrap(),
         _ => {
             return Err(format!(

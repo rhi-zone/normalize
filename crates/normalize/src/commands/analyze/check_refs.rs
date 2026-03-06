@@ -86,6 +86,7 @@ pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, Str
     }
 
     // Regex for code references: `identifier` or `Module::method` or `Module.method`
+    // normalize-syntax-allow: rust/unwrap-in-impl - compile-time constant regex pattern
     let code_ref_re =
         Regex::new(r"`([A-Z][a-zA-Z0-9_]*(?:[:\.][a-zA-Z_][a-zA-Z0-9_]*)*)`").unwrap();
 
@@ -141,6 +142,7 @@ pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, Str
 
 /// Check documentation references for broken links
 pub fn cmd_check_refs(root: &Path) -> i32 {
+    // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(cmd_check_refs_async(root))
 }
@@ -190,6 +192,7 @@ async fn cmd_check_refs_async(root: &Path) -> i32 {
     }
 
     // Regex for code references: `identifier` or `Module::method` or `Module.method`
+    // normalize-syntax-allow: rust/unwrap-in-impl - compile-time constant regex pattern
     let code_ref_re =
         Regex::new(r"`([A-Z][a-zA-Z0-9_]*(?:[:\.][a-zA-Z_][a-zA-Z0-9_]*)*)`").unwrap();
 

@@ -196,6 +196,7 @@ impl RulesLock {
 pub fn cmd_rules(action: RulesAction, root: Option<&Path>) -> i32 {
     let effective_root = root
         .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = crate::config::NormalizeConfig::load(&effective_root);
     let json = false;
@@ -301,6 +302,7 @@ pub fn cmd_run_facts(
     json: bool,
     config: &interpret::FactsRulesConfig,
 ) -> i32 {
+    // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(run_fact_rules(
         root, rules_file, list_only, json, config, None,
@@ -760,12 +762,14 @@ fn cmd_enable_disable(
 
     // Apply syntax rule changes → [analyze.rules."id"]
     if !changes_syntax.is_empty() {
+        // normalize-syntax-allow: rust/unwrap-in-impl - "analyze" was just inserted as a Table above; guaranteed to be a table
         let analyze = doc["analyze"].as_table_mut().unwrap();
         if !analyze.contains_key("rules") {
             let mut t = toml_edit::Table::new();
             t.set_implicit(true);
             analyze["rules"] = toml_edit::Item::Table(t);
         }
+        // normalize-syntax-allow: rust/unwrap-in-impl - "rules" was just inserted as a Table above; guaranteed to be a table
         let rules_table = analyze["rules"].as_table_mut().unwrap();
         for id in &changes_syntax {
             if !rules_table.contains_key(id) {
@@ -777,12 +781,14 @@ fn cmd_enable_disable(
 
     // Apply fact rule changes → [analyze.facts-rules."id"]
     if !changes_fact.is_empty() {
+        // normalize-syntax-allow: rust/unwrap-in-impl - "analyze" was just inserted as a Table above; guaranteed to be a table
         let analyze = doc["analyze"].as_table_mut().unwrap();
         if !analyze.contains_key("facts-rules") {
             let mut t = toml_edit::Table::new();
             t.set_implicit(true);
             analyze["facts-rules"] = toml_edit::Item::Table(t);
         }
+        // normalize-syntax-allow: rust/unwrap-in-impl - "facts-rules" was just inserted as a Table above; guaranteed to be a table
         let facts_table = analyze["facts-rules"].as_table_mut().unwrap();
         for id in &changes_fact {
             if !facts_table.contains_key(id) {
@@ -1126,6 +1132,7 @@ fn cmd_run(
 
     // Run fact rules (pass filter_ids for tag-based filtering)
     if matches!(type_filter, RuleType::All | RuleType::Fact) {
+        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
         let rt = tokio::runtime::Runtime::new().unwrap();
         let code = rt.block_on(run_fact_rules(
             root,
@@ -1268,6 +1275,7 @@ pub fn run_rules_report(
 
     // Fact rules
     if matches!(engine, RuleType::All | RuleType::Fact) {
+        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
         let rt = tokio::runtime::Runtime::new().unwrap();
         let diagnostics = rt.block_on(collect_fact_diagnostics(
             root,
@@ -1900,6 +1908,7 @@ pub fn cmd_list_service(
 ) -> Result<RuleResult, String> {
     let effective_root = root
         .map(PathBuf::from)
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = crate::config::NormalizeConfig::load(&effective_root);
     let exit_code = cmd_list(
@@ -1934,6 +1943,7 @@ pub fn cmd_run_service(
 ) -> Result<RuleResult, String> {
     let effective_root = root
         .map(PathBuf::from)
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = crate::config::NormalizeConfig::load(&effective_root);
     let target_root = target
@@ -1963,6 +1973,7 @@ pub fn cmd_enable_disable_service(
 ) -> Result<RuleResult, String> {
     let effective_root = root
         .map(PathBuf::from)
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = crate::config::NormalizeConfig::load(&effective_root);
     let exit_code = cmd_enable_disable(&effective_root, id_or_tag, enable, dry_run, &config);
@@ -1978,6 +1989,7 @@ pub fn cmd_show_service(
 ) -> Result<RuleResult, String> {
     let effective_root = root
         .map(PathBuf::from)
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = crate::config::NormalizeConfig::load(&effective_root);
     let exit_code = cmd_show(&effective_root, id, false, use_colors, &config);
@@ -1994,6 +2006,7 @@ pub fn cmd_tags_service(
 ) -> Result<RuleResult, String> {
     let effective_root = root
         .map(PathBuf::from)
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = crate::config::NormalizeConfig::load(&effective_root);
     let exit_code = cmd_tags(&effective_root, show_rules, tag, false, use_colors, &config);

@@ -31,6 +31,7 @@ pub fn cmd_ast(file: &Path, at_line: Option<usize>, sexp: bool) -> i32 {
 
     // Parse
     let mut parser = tree_sitter::Parser::new();
+    // normalize-syntax-allow: rust/unwrap-in-impl - set_language only fails if grammar/parser version mismatch (compile-time issue)
     parser.set_language(&grammar).unwrap();
     let tree = match parser.parse(&content, None) {
         Some(t) => t,
@@ -362,6 +363,7 @@ pub fn build_ast_output(
         .ok_or_else(|| format!("Failed to load grammar for {}", lang.name()))?;
 
     let mut parser = tree_sitter::Parser::new();
+    // normalize-syntax-allow: rust/unwrap-in-impl - set_language only fails if grammar/parser version mismatch (compile-time issue)
     parser.set_language(&grammar).unwrap();
     let tree = parser
         .parse(&content, None)

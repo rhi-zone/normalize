@@ -472,6 +472,7 @@ pub fn cmd_view_symbol(
     };
 
     let mut parser = symbols::SymbolParser::new();
+    // normalize-syntax-allow: rust/unwrap-in-impl - symbol_path is non-empty (caller passes non-empty slice)
     let symbol_name = symbol_path.last().unwrap();
 
     let grammar = support_for_path(&full_path).map(|s| s.grammar_name().to_string());
@@ -943,6 +944,7 @@ fn display_referenced_types(
     let mut external_types: Vec<(String, String, String, usize)> = Vec::new(); // (name, file, signature, line)
 
     if !remaining.is_empty() {
+        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
         let rt = tokio::runtime::Runtime::new().unwrap();
         if let Some(idx) = rt.block_on(crate::index::open_if_enabled(root)) {
             for type_name in &remaining {
@@ -1103,6 +1105,7 @@ pub fn build_view_symbol_at_line_service(
     let matches = crate::path_resolve::resolve_unified_all(file_path, root);
     let resolved = match matches.len() {
         0 => return Err(format!("File not found: {}", file_path)),
+        // normalize-syntax-allow: rust/unwrap-in-impl - match arm guards exactly 1 match, so next() is always Some
         1 => matches.into_iter().next().unwrap(),
         _ => {
             return Err(format!(

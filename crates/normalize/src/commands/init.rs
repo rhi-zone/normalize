@@ -91,6 +91,7 @@ pub fn cmd_init(root: &Path, do_index: bool, setup: bool) -> i32 {
     // 5. Optionally index
     if do_index {
         println!("\nIndexing codebase...");
+        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
         let rt = tokio::runtime::Runtime::new().unwrap();
         let mut idx = match rt.block_on(crate::index::open(root)) {
             Ok(idx) => idx,

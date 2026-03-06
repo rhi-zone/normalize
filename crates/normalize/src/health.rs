@@ -934,6 +934,7 @@ pub fn analyze_health(root: &Path) -> HealthReport {
     // Try index first for file/line stats, fall back to filesystem walk
     let config = crate::config::NormalizeConfig::load(root);
     if config.index.enabled() {
+        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
         let rt = tokio::runtime::Runtime::new().unwrap();
         if let Ok(mut index) = rt.block_on(crate::index::open(root)) {
             return rt.block_on(analyze_health_indexed(

@@ -433,6 +433,7 @@ pub fn cmd_duplicate_types(root: &Path, config_root: &Path, min_overlap_percent:
 
     // Regex to extract field names from struct definitions
     // Matches patterns like: field_name: Type or pub field_name: Type
+    // normalize-syntax-allow: rust/unwrap-in-impl - compile-time constant regex pattern
     let field_re = Regex::new(r"(?m)^\s*(?:pub\s+)?(\w+)\s*:\s*\S").unwrap();
 
     // Collect files to scan - either a single file or walk a directory
@@ -701,6 +702,7 @@ fn containing_function(
         }
         if sym.start_line <= line && line <= sym.end_line {
             // Prefer the innermost (latest start line).
+            // normalize-syntax-allow: rust/unwrap-in-impl - guarded by is_none() check in same condition
             if best.is_none() || sym.start_line > best.unwrap().0 {
                 best = Some((sym.start_line, &sym.name));
             }
@@ -2021,6 +2023,7 @@ pub fn build_duplicate_types_report(
 
     let mut types: Vec<TypeInfo> = Vec::new();
     let mut files_scanned = 0;
+    // normalize-syntax-allow: rust/unwrap-in-impl - compile-time constant regex pattern
     let field_re = Regex::new(r"(?m)^\s*(?:pub\s+)?(\w+)\s*:\s*\S").unwrap();
 
     let files: Vec<PathBuf> = if root.is_file() {
