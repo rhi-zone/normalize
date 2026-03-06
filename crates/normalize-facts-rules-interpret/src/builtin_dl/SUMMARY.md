@@ -1,0 +1,5 @@
+# normalize-facts-rules-interpret/src/builtin_dl
+
+Built-in Datalog rule files (`.dl`) for architectural analysis, bundled with the interpreter crate.
+
+Each file contains a TOML frontmatter header (rule id, message, enabled flag) followed by Ascent Datalog rules. Rules: `barrel_file.dl`, `bidirectional_deps.dl`, `circular_deps.dl`, `dead_api.dl`, `deep_nesting.dl`, `duplicate_symbol.dl`, `fan_out.dl`, `god_class.dl`, `god_file.dl`, `hub_file.dl`, `layering_violation.dl`, `long_function.dl`, `missing_export.dl`, `missing_impl.dl`, `orphan_file.dl`, `self_import.dl`, `unused_import.dl`.

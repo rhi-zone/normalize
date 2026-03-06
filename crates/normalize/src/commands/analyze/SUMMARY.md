@@ -1,0 +1,3 @@
+# src/commands/analyze
+
+All `normalize analyze` subcommand implementations (~48 files). Each file defines a report struct, implements `OutputFormatter` (`format_text` / `format_pretty`), and exposes a computation function. Representative subcommands: `complexity`, `length`, `hotspots`, `coupling`, `coupling_clusters`, `duplicates`, `docs`, `stale_docs`, `stale_summary`, `imports`, `layering`, `ownership`, `security`, `trace`, `trend`, `call_graph`, `graph`, `fragments`, `skeleton_diff`, `check_refs`, `check_examples`, `rules_cmd`, `summary`. `mod.rs` declares all modules and defines the shared `AnalyzeConfig` struct.

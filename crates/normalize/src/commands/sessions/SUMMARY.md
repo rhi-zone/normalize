@@ -1,0 +1,3 @@
+# src/commands/sessions
+
+`normalize sessions` subcommand implementations for inspecting Claude Code and other agent session logs. Modules: `list` (enumerate sessions with fuzzy matching, `SessionListReport`), `show` (display a single session's turns, `SessionShowReport`), `messages` (extract message content, `MessagesReport`), `stats` (token/turn statistics), `plans` (extract plan-mode content, `PlansListReport`), `analyze` (delegate to normalize-session-analysis), `serve` (optional web UI, gated on `sessions-web` feature). Session path resolution supports literal, prefix, and fuzzy matching via `nucleo-matcher`.

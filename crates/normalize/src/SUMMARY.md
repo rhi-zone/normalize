@@ -1,0 +1,3 @@
+# src (normalize crate source root)
+
+Root of the normalize library and binary. `main.rs` handles argv[0] dispatch (symlink-as-drop-in for `rg`, `jq`, `sg`) and delegates to the server-less service layer or legacy clap dispatch. `lib.rs` declares all top-level modules. Key infrastructure files at this level: `config.rs` (NormalizeConfig/TOML), `output.rs` (OutputFormatter trait + format dispatch), `rules.rs` (unified rule execution via syntax/fact/SARIF engines), `diagnostic_convert.rs` (Finding/ABI diagnostic → Issue), `index.rs`, `symbols.rs`, `parsers.rs`, `extract.rs`, `skeleton.rs`, `tree.rs`.

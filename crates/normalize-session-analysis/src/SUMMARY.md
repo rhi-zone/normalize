@@ -1,0 +1,5 @@
+# normalize-session-analysis/src
+
+Source for session analytics.
+
+- `lib.rs` — all analysis logic: `SessionAnalysis`, `ToolStats`, `TokenStats`, `ModelPricing`; computation functions that walk `Session` turns and messages to aggregate metrics; `OutputFormatter` implementations for text and pretty display

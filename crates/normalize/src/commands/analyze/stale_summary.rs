@@ -1,6 +1,7 @@
 use crate::output::OutputFormatter;
 use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
 
@@ -79,6 +80,52 @@ fn is_excluded_dir(name: &str) -> bool {
         name,
         "target" | "node_modules" | ".git" | ".claude" | "dist" | "build" | "__pycache__"
     ) || name.starts_with('.')
+}
+
+// --- Incremental cache ---
+
+/// One cached entry per directory, keyed by relative dir path.
+#[derive(Debug, Serialize, Deserialize)]
+struct CacheEntry {
+    /// Last commit hash touching SUMMARY.md, or None if no SUMMARY.md has ever been committed.
+    last_summary_commit: Option<String>,
+    /// Commits touching this dir since `last_summary_commit` (exclusive), or total commits if
+    /// `last_summary_commit` is None.
+    commits_count: usize,
+}
+
+/// Cache file stored at `.normalize/cache/summary-freshness.json`.
+#[derive(Debug, Serialize, Deserialize)]
+struct SummaryCache {
+    /// HEAD commit hash when this cache was written.
+    head: String,
+    dirs: HashMap<String, CacheEntry>,
+}
+
+fn cache_path(root: &Path) -> std::path::PathBuf {
+    root.join(".normalize/cache/summary-freshness.json")
+}
+
+fn load_cache(root: &Path) -> Option<SummaryCache> {
+    let content = std::fs::read_to_string(cache_path(root)).ok()?;
+    serde_json::from_str(&content).ok()
+}
+
+fn save_cache(root: &Path, cache: &SummaryCache) {
+    let dir = root.join(".normalize/cache");
+    let _ = std::fs::create_dir_all(&dir);
+    if let Ok(json) = serde_json::to_string_pretty(cache) {
+        let _ = std::fs::write(cache_path(root), json);
+    }
+}
+
+fn git_head(root: &Path) -> Option<String> {
+    let out = Command::new("git")
+        .args(["-C", root.to_str().unwrap_or("."), "rev-parse", "HEAD"])
+        .output()
+        .ok()?;
+    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if s.is_empty() { None } else { Some(s) }
 }
 
 /// Returns the commit hash of the last commit touching `rel_path`, or None.
@@ -175,6 +222,13 @@ pub fn build_stale_summary_report(root: &Path, threshold: usize) -> StaleSummary
     let mut missing = Vec::new();
     let mut dirs_checked = 0;
 
+    // Load incremental cache: keyed by HEAD commit, avoids per-dir `git log` on repeat runs.
+    let head = git_head(root);
+    let mut cache = head
+        .as_deref()
+        .and_then(|h| load_cache(root).filter(|c| c.head == h));
+    let mut updated_dirs: HashMap<String, CacheEntry> = HashMap::new();
+
     let dirs: Vec<_> = walkdir::WalkDir::new(root)
         .min_depth(0)
         .into_iter()
@@ -225,36 +279,72 @@ pub fn build_stale_summary_report(root: &Path, threshold: usize) -> StaleSummary
             rel_dir.to_string()
         };
 
-        // Check for uncommitted content changes in this directory
+        // git status is cheap — always re-check for uncommitted changes.
         let content_dirty = git_has_uncommitted_content_changes(root, &rel_dir_git);
         let summary_dirty = git_summary_has_uncommitted_changes(root, &summary_path);
-
-        // If content is dirty but SUMMARY.md is already being updated, no issue
         let has_uncommitted = content_dirty && !summary_dirty;
 
-        match git_last_commit(root, &summary_path) {
+        // Use cached git log result if available (same HEAD = commits haven't changed).
+        let cached = cache.as_ref().and_then(|c| c.dirs.get(&dir_label));
+        let (last_summary_commit, commits_count) = if let Some(entry) = cached {
+            (entry.last_summary_commit.clone(), entry.commits_count)
+        } else {
+            let last = git_last_commit(root, &summary_path);
+            let count = if let Some(ref h) = last {
+                git_commit_count(root, Some(h), &rel_dir_git)
+            } else {
+                git_commit_count(root, None, &rel_dir_git)
+            };
+            (last, count)
+        };
+
+        // Store result for cache write.
+        updated_dirs.insert(
+            dir_label.clone(),
+            CacheEntry {
+                last_summary_commit: last_summary_commit.clone(),
+                commits_count,
+            },
+        );
+
+        match last_summary_commit {
             Some(last_commit) => {
-                let commits_since = git_commit_count(root, Some(&last_commit), &rel_dir_git);
-                if commits_since > threshold || has_uncommitted {
+                if commits_count > threshold || has_uncommitted {
                     stale.push(StaleSummary {
                         dir: dir_label,
-                        commits_since_update: commits_since,
+                        commits_since_update: commits_count,
                         last_summary_commit: last_commit,
                         has_uncommitted_changes: has_uncommitted,
                     });
                 }
             }
             None => {
-                let total = git_commit_count(root, None, &rel_dir_git);
-                if total > 0 || has_uncommitted {
+                if commits_count > 0 || has_uncommitted {
                     missing.push(MissingSummary {
                         dir: dir_label,
-                        total_commits: total,
+                        total_commits: commits_count,
                         has_uncommitted_changes: has_uncommitted,
                     });
                 }
             }
         }
+    }
+
+    // Persist updated cache (merge with existing to preserve entries not visited this run).
+    if let Some(head_hash) = head {
+        let merged_dirs = if let Some(ref mut old) = cache {
+            old.dirs.extend(updated_dirs);
+            std::mem::take(&mut old.dirs)
+        } else {
+            updated_dirs
+        };
+        save_cache(
+            root,
+            &SummaryCache {
+                head: head_hash,
+                dirs: merged_dirs,
+            },
+        );
     }
 
     StaleSummaryReport {

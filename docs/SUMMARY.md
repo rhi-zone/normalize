@@ -1,0 +1,3 @@
+# Docs
+
+Project documentation for the normalize toolchain, organized into subdirectories by topic. Top-level files cover architecture decisions, design philosophy, session modes, CLI design, language support, dogfooding notes, and rule specifications. Subdirectories group CLI command references (`cli/`), in-progress design proposals (`design/`), research notes (`research/`), workflow pattern specs (`workflows/`), archived historical design docs (`archive/`), and MkDocs stylesheet overrides (`stylesheets/`). The docs directory also contains the MkDocs package configuration for building the documentation site.
