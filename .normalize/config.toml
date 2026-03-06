@@ -123,5 +123,14 @@ severity = "error"
 [analyze.rules."missing-summary"]
 severity = "error"
 
+[analyze.rules."js/eq-null"]
+enabled = true
+
+[analyze.rules."python/assert-in-non-test"]
+enabled = true
+
+[analyze.rules."js/no-await-in-loop"]
+enabled = true
+
 [aliases]
 todo = ["TODO.md"]
