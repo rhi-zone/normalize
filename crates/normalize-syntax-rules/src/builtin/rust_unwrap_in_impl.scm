@@ -2,7 +2,7 @@
 # id = "rust/unwrap-in-impl"
 # severity = "info"
 # tags = ["error-handling"]
-# message = ".unwrap() found - consider using ? or .expect() with context"
+# message = ".unwrap() found - consider using ? to propagate or .unwrap_or_else() for fallbacks"
 # languages = ["rust"]
 # allow = ["**/tests/**", "**/test_*.rs", "**/*_test.rs", "**/*_tests.rs", "**/examples/**", "**/benches/**"]
 # enabled = false
@@ -14,9 +14,16 @@
 #
 # ## How to fix
 #
-# Use `?` to propagate errors to the caller, `.unwrap_or_else(|e| ...)` to
-# provide a fallback, or `.expect("context message")` to make the panic
-# informative. Prefer `?` in most cases.
+# **Preferred:** Use `?` to propagate errors/None to the caller. This requires
+# the function to return `Result` or `Option` — if it doesn't, consider whether
+# it should. Callers should handle errors, not panic on them.
+#
+# **For fallbacks:** `.unwrap_or(default)`, `.unwrap_or_else(|| compute())`,
+# `.unwrap_or_default()`, or `if let Some(x) = ...`.
+#
+# **Avoid:** `.expect("message")` — it is still a panic, just a louder one.
+# Use it only for conditions that are genuinely impossible (compile-time
+# invariants), and add a comment explaining why it cannot fail.
 #
 # ## When to disable
 #

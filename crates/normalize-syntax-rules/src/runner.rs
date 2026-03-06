@@ -146,10 +146,15 @@ pub fn run_rules(
     let mut findings = Vec::new();
     let source_registry = builtin_registry();
 
-    // Filter rules first (all filters compose via AND)
+    // Filter rules: --rule / --ids explicitly requesting a rule bypasses enabled=false.
+    // Tag filters still require the rule to be enabled (we don't want --tag to activate
+    // disabled rules wholesale, only explicit rule selection does).
+    let explicitly_requested = |r: &&Rule| {
+        filter_rule.is_some_and(|f| r.id == f) || filter_ids.is_some_and(|ids| ids.contains(&r.id))
+    };
     let active_rules: Vec<&Rule> = rules
         .iter()
-        .filter(|r| r.enabled)
+        .filter(|r| r.enabled || explicitly_requested(r))
         .filter(|r| filter_rule.is_none_or(|f| r.id == f))
         .filter(|r| filter_tag.is_none_or(|t| r.tags.iter().any(|tag| tag == t)))
         .filter(|r| filter_ids.is_none_or(|ids| ids.contains(&r.id)))
