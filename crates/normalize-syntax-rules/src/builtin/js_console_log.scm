@@ -5,7 +5,6 @@
 # message = "console.log/debug found - remove before committing"
 # languages = ["javascript", "typescript", "tsx", "jsx"]
 # allow = ["**/tests/**", "**/*.test.*", "**/*.spec.*"]
-# fix = ""
 # enabled = false
 # ---
 #
@@ -18,7 +17,7 @@
 #
 # Remove the console call before committing. For structured production
 # logging, use a library like `winston` or `pino` that supports log levels
-# and output sinks. The auto-fix (`fix = ""`) deletes the entire statement.
+# and output sinks.
 #
 # ## When to disable
 #

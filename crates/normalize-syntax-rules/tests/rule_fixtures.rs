@@ -1,8 +1,10 @@
 //! Fixture-based tests for all builtin syntax rules.
 //!
 //! Structure:
-//!   tests/fixtures/<lang>/<rule-name>/match.<ext>     — must produce ≥1 findings
-//!   tests/fixtures/<lang>/<rule-name>/no_match.<ext>  — must produce 0 findings
+//!   tests/fixtures/<lang>/<rule-name>/match.<ext>          — must produce ≥1 findings
+//!   tests/fixtures/<lang>/<rule-name>/no_match.<ext>       — must produce 0 findings
+//!   tests/fixtures/<lang>/<rule-name>/fix.<ext>            — input for auto-fix test
+//!   tests/fixtures/<lang>/<rule-name>/fix.expected.<ext>   — expected output after fix
 //!
 //! Top-level rules (no namespace): tests/fixtures/<rule-name>/match.<ext>
 //!
@@ -10,7 +12,7 @@
 //! joining path components with `/`. e.g. `fixtures/rust/static-mut/` → `rust/static-mut`.
 
 use normalize_languages::GrammarLoader;
-use normalize_syntax_rules::{DebugFlags, load_all_rules, run_rules};
+use normalize_syntax_rules::{DebugFlags, apply_fixes, load_all_rules, run_rules};
 use std::path::{Path, PathBuf};
 
 fn fixtures_dir() -> PathBuf {
@@ -19,7 +21,7 @@ fn fixtures_dir() -> PathBuf {
         .join("fixtures")
 }
 
-/// Recursively find fixture directories (those containing `match.*` or `no_match.*` files).
+/// Recursively find fixture directories (those containing `match.*`, `no_match.*`, or `fix.*` files).
 fn find_fixture_dirs(dir: &Path) -> Vec<PathBuf> {
     let mut result = Vec::new();
     let Ok(entries) = std::fs::read_dir(dir) else {
@@ -35,7 +37,8 @@ fn find_fixture_dirs(dir: &Path) -> Vec<PathBuf> {
                 es.flatten().any(|e| {
                     let name = e.file_name();
                     let s = name.to_string_lossy();
-                    (s.starts_with("match.") || s.starts_with("no_match.")) && e.path().is_file()
+                    (s.starts_with("match.") || s.starts_with("no_match.") || s.starts_with("fix."))
+                        && e.path().is_file()
                 })
             })
             .unwrap_or(false);
@@ -59,6 +62,32 @@ fn derive_rule_id(fixture_dir: &Path, fixtures_root: &Path) -> String {
         .map(|c| c.as_os_str().to_string_lossy().into_owned())
         .collect::<Vec<_>>()
         .join("/")
+}
+
+/// Find a file in `dir` whose name starts with `prefix.` but not `prefix.expected.`.
+/// Returns `(path, extension)` or None if not found.
+fn find_fixture_file(dir: &Path, prefix: &str) -> Option<(PathBuf, String)> {
+    let expected_prefix = format!("{prefix}.expected.");
+    std::fs::read_dir(dir).ok()?.flatten().find_map(|e| {
+        let name = e.file_name();
+        let s = name.to_string_lossy().into_owned();
+        if s.starts_with(&format!("{prefix}."))
+            && !s.starts_with(&expected_prefix)
+            && e.path().is_file()
+        {
+            let ext = s[prefix.len() + 1..].to_string();
+            Some((e.path(), ext))
+        } else {
+            None
+        }
+    })
+}
+
+/// Find the `fix.expected.<ext>` file for a given extension.
+fn find_expected_file(dir: &Path, ext: &str) -> Option<PathBuf> {
+    let name = format!("fix.expected.{ext}");
+    let path = dir.join(&name);
+    path.is_file().then_some(path)
 }
 
 #[test]
@@ -146,6 +175,23 @@ fn test_rule_fixtures() {
         }
 
         tested += 1;
+
+        // --- Fix fixture test ---
+        // If fix.<ext> exists, apply fixes and compare to fix.expected.<ext>.
+        if let Some((fix_src, ext)) = find_fixture_file(fixture_dir, "fix") {
+            match run_fix_fixture(
+                fixture_dir,
+                &fix_src,
+                &ext,
+                &rule_id,
+                &rules,
+                &loader,
+                &debug,
+            ) {
+                Ok(()) => {}
+                Err(msg) => failures.push(msg),
+            }
+        }
     }
 
     if !failures.is_empty() {
@@ -163,4 +209,65 @@ fn test_rule_fixtures() {
         "expected at least 10 fixture tests, only found {tested} — are the fixture files missing?"
     );
     println!("Tested {tested} rule fixtures.");
+}
+
+/// Run the fix fixture test for one rule:
+/// 1. Copy `fix.<ext>` to a temp directory.
+/// 2. Run the rule against the temp dir.
+/// 3. Apply fixes (loop until stable).
+/// 4. Compare the result to `fix.expected.<ext>`.
+fn run_fix_fixture(
+    fixture_dir: &Path,
+    fix_src: &Path,
+    ext: &str,
+    rule_id: &str,
+    rules: &[normalize_syntax_rules::Rule],
+    loader: &GrammarLoader,
+    debug: &DebugFlags,
+) -> Result<(), String> {
+    let expected_path = match find_expected_file(fixture_dir, ext) {
+        Some(p) => p,
+        None => {
+            return Err(format!(
+                "`{rule_id}`: fix.{ext} exists but fix.expected.{ext} is missing"
+            ));
+        }
+    };
+
+    let expected = std::fs::read_to_string(&expected_path)
+        .map_err(|e| format!("`{rule_id}`: failed to read fix.expected.{ext}: {e}"))?;
+
+    let input = std::fs::read_to_string(fix_src)
+        .map_err(|e| format!("`{rule_id}`: failed to read fix.{ext}: {e}"))?;
+
+    // Work in a temp dir inside the fixture dir so Cargo.toml walk-up works
+    // for `requires` checks (e.g., rust.edition).
+    let tmp = tempfile::tempdir_in(fixture_dir)
+        .map_err(|e| format!("`{rule_id}`: failed to create tempdir: {e}"))?;
+    let tmp_file = tmp.path().join(format!("fix.{ext}"));
+    std::fs::write(&tmp_file, &input)
+        .map_err(|e| format!("`{rule_id}`: failed to write temp fix file: {e}"))?;
+
+    // Apply fixes in a loop until stable (handles multi-pass nested fixes).
+    const MAX_PASSES: usize = 10;
+    for pass in 0..MAX_PASSES {
+        let findings = run_rules(rules, tmp.path(), loader, None, None, None, debug);
+        let fixable: Vec<_> = findings.into_iter().filter(|f| f.fix.is_some()).collect();
+        if fixable.is_empty() {
+            break;
+        }
+        apply_fixes(&fixable)
+            .map_err(|e| format!("`{rule_id}`: apply_fixes pass {pass} failed: {e}"))?;
+    }
+
+    let actual = std::fs::read_to_string(&tmp_file)
+        .map_err(|e| format!("`{rule_id}`: failed to read fixed output: {e}"))?;
+
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(format!(
+            "`{rule_id}`: fix output mismatch\n--- expected (fix.expected.{ext}) ---\n{expected}\n--- actual ---\n{actual}"
+        ))
+    }
 }

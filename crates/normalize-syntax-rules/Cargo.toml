@@ -32,3 +32,6 @@ schemars = "1"
 
 # Core traits
 normalize-core = { path = "../normalize-core", version = "0.1.0" }
+
+[dev-dependencies]
+tempfile = "3"

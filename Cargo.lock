@@ -4078,6 +4078,7 @@ dependencies = [
  "schemars",
  "serde",
  "streaming-iterator",
+ "tempfile",
  "toml",
  "tree-sitter",
 ]

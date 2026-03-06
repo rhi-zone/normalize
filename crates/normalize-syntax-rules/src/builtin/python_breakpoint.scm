@@ -5,7 +5,6 @@
 # message = "breakpoint() found - remove before committing"
 # languages = ["python"]
 # allow = ["**/tests/**"]
-# fix = ""
 # ---
 #
 # `breakpoint()` drops into the Python debugger (pdb or a configured
@@ -15,8 +14,7 @@
 #
 # ## How to fix
 #
-# Remove the `breakpoint()` call. The auto-fix (`fix = ""`) deletes the
-# entire statement. If you need post-mortem debugging, use
+# Remove the `breakpoint()` call. If you need post-mortem debugging, use
 # `sys.excepthook` or configure your runner to break on exceptions.
 #
 # ## When to disable

@@ -5,7 +5,6 @@
 # message = "binding.pry found - remove debug statement before committing"
 # languages = ["ruby"]
 # allow = ["**/tests/**", "**/test/**", "**/spec/**"]
-# fix = ""
 # ---
 #
 # `binding.pry` and `binding.irb` drop into an interactive Ruby debugger
@@ -15,9 +14,8 @@
 #
 # ## How to fix
 #
-# Remove the `binding.pry` or `binding.irb` call before committing. The
-# auto-fix (`fix = ""`) deletes the entire statement. Use proper logging or
-# exception handling for production debugging.
+# Remove the `binding.pry` or `binding.irb` call before committing. Use
+# proper logging or exception handling for production debugging.
 #
 # ## When to disable
 #
