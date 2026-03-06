@@ -47,8 +47,11 @@ Pre-commit now enforces zero error-severity violations. Resolved (9ae3b496):
 - `no-todo-comment`: 17 violations (info)
 - Other: 12 violations across 6 rules
 
-Strategy: fix these incrementally or batch-fix by rule. `no-todo-comment` may have false
-positives. `chained-if-let`, `unnecessary-type-alias`, `unnecessary-let` are real style fixes.
+Strategy: batch-fix by rule. Priority order:
+1. `rust/unnecessary-type-alias` ×36 — straightforward inline
+2. `rust/unnecessary-let` ×32 — straightforward inline
+3. `no-todo-comment` ×17 — review for false positives first
+4. `rust/chained-if-let` ×122 — run `normalize rules run --fix` (auto-fix exists)
 
 **rust/tuple-return (54 warnings):** Need `ByteRange { start, end }` struct or similar in
 normalize-languages for `container_body()` return type. Also affects normalize-manifest and
@@ -785,6 +788,19 @@ git push --tags
 - Verify cross-platform builds in GitHub Actions
 - Test `normalize update` against real release
 - view: directory output shows dir name as first line (tree style) - intentional?
+
+## Syntax Ruleset Breadth
+
+After batch-fixing the current info violations, audit and expand rule coverage:
+- **What we have**: ~20 builtin rules, mostly Rust-focused. Good Rust coverage; thin everywhere else.
+- **Next**: flesh out rules for JS/TS, Python, Go, Ruby — languages with large userbases and well-known anti-patterns.
+- **Trigger for fix infrastructure**: once enough rules have structural auto-fixes that need correct indentation, build the corpus-based indentation model (see `docs/prior-art.md` § "Corpus-based indentation model"). Don't build it speculatively.
+- **Rule ideas by language**:
+  - JS/TS: `var` usage, `== null` vs `=== null`, `typeof` checks, async/await anti-patterns
+  - Python: mutable default args, bare `except`, `assert` in non-test code
+  - Go: error ignored (`_ = err`), `fmt.Println` in non-main, unnecessary `return` at end
+  - Ruby: `rescue Exception`, `puts` in non-script, string interpolation over concatenation
+  - Cross-language: hardcoded credentials (already have), magic numbers, commented-out code blocks
 
 ## Fix System: Structural Rewrites (post text-replacement)
 - **Sexpr-based fix expressions**: The current `fix = "template $capture"` is text replacement. For structural transforms (indentation-aware, composable), consider expressing fixes as output tree patterns rather than strings. eglint (~/git/eglint) does this for TypeScript — useful prior art for the approach even though it's TS-compiler-specific and doesn't port directly.
