@@ -252,7 +252,22 @@ See `docs/design/rules-unification.md` for full design.
 
 **Three threads:**
 
-1. **Unified diagnostic type** — DONE. `Issue` + `DiagnosticsReport` in `normalize-output::diagnostics`. Conversion functions `finding_to_issue` and `abi_diagnostic_to_issue` in `normalize::diagnostic_convert`. Ad-hoc checks (`BrokenRef`, `MissingExample`, `StaleDoc`) already converted. Remaining: `SecurityFinding` → `DiagnosticsReport`, wire native checks as `--engine native`.
+1. **Unified diagnostic type** — DONE. `Issue` + `DiagnosticsReport` in `normalize-output::diagnostics`. Conversion functions `finding_to_issue` and `abi_diagnostic_to_issue` in `normalize::diagnostic_convert`. Ad-hoc checks (`BrokenRef`, `MissingExample`, `StaleDoc`, `StaleSummary`) already converted. Remaining: `SecurityFinding` → `DiagnosticsReport`, wire native checks as `--engine native`.
+
+4. **Unify rule engine config** — `syntax-rules` has a config system (`RulesConfig`, per-rule overrides, severity mapping). The other engines (native, fact, future SARIF) have none. Extract a shared `normalize-rules-config` crate (or extend `normalize-output`) with a unified config schema: rule IDs, severity overrides, enable/disable, per-directory excludes. All engines consult this at run time; `normalize rules run` passes it down.
+
+5. **SARIF passthrough engine** (`--engine sarif`) — accepts a list of external tool commands that emit SARIF output. Runs them with configurable parallelism (default: 8). Parses each tool's stdout as SARIF 2.1.0 and merges into `DiagnosticsReport`. Enables wrapping ESLint, clippy, semgrep, etc. without per-tool adapters. Config lives in `[rules.sarif]` in normalize.toml:
+   ```toml
+   [[rules.sarif.tools]]
+   name = "eslint"
+   command = ["npx", "eslint", "--format", "json", "{root}"]
+   [[rules.sarif.tools]]
+   name = "semgrep"
+   command = ["semgrep", "--sarif", "{root}"]
+   ```
+   Tools that emit JSON (not SARIF) need a `format = "json"` adapter — stretch goal.
+
+6. **`normalize analyze check` help text is scuff** — "Use flags to run specific checks only" appears in the doc comment and gets repeated as-is. Rewrite the doc comment as a single clean sentence; the individual `--flag` help strings carry the per-flag detail. No need to enumerate flags in the top-level description.
 
 2. **Lift `rules` to top level** — DONE. `normalize rules` is now top-level. `--type` → `--engine`. `normalize facts rules` and `normalize facts check` removed. `normalize syntax` retains only `ast` and `query`.
 
