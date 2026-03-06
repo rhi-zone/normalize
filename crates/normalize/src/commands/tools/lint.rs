@@ -49,15 +49,19 @@ impl OutputFormatter for LintListResult {
     }
 }
 
+struct ToolRunResult {
+    all_results: Vec<normalize_tools::ToolResult>,
+    had_errors: bool,
+}
+
 /// Run a set of tools against `paths` and collect results.
-/// Returns `(all_results, had_errors)`.
 fn run_tools(
     tools_to_run: &[&dyn normalize_tools::Tool],
     paths: &[&Path],
     fix: bool,
     json: bool,
     root: &Path,
-) -> (Vec<normalize_tools::ToolResult>, bool) {
+) -> ToolRunResult {
     let mut all_results = Vec::new();
     let mut had_errors = false;
 
@@ -109,7 +113,10 @@ fn run_tools(
         }
     }
 
-    (all_results, had_errors)
+    ToolRunResult {
+        all_results,
+        had_errors,
+    }
 }
 
 /// Run linting tools on the codebase.
@@ -174,7 +181,9 @@ pub fn cmd_lint_run(
     // Prepare paths
     let paths: Vec<&Path> = target.map(|t| vec![Path::new(t)]).unwrap_or_default();
 
-    let (all_results, had_errors) = run_tools(&tools_to_run, &paths, fix, json, root);
+    let run = run_tools(&tools_to_run, &paths, fix, json, root);
+    let all_results = run.all_results;
+    let had_errors = run.had_errors;
 
     // Output results
     if sarif {
@@ -416,7 +425,7 @@ pub fn build_lint_run(
     }
 
     let paths: Vec<&Path> = target.map(|t| vec![Path::new(t)]).unwrap_or_default();
-    let (all_results, _) = run_tools(&tools_to_run, &paths, fix, false, root);
+    let all_results = run_tools(&tools_to_run, &paths, fix, false, root).all_results;
 
     let mut diagnostics = Vec::new();
     let mut error_count = 0;
@@ -576,7 +585,9 @@ fn run_lint_once(
     }
 
     let paths: Vec<&Path> = target.map(|t| vec![Path::new(t)]).unwrap_or_default();
-    let (all_results, had_errors) = run_tools(&tools_to_run, &paths, fix, json, root);
+    let run2 = run_tools(&tools_to_run, &paths, fix, json, root);
+    let all_results = run2.all_results;
+    let had_errors = run2.had_errors;
 
     // Output results
     if json {

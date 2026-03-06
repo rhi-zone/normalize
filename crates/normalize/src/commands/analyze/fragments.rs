@@ -278,10 +278,16 @@ pub fn analyze_fragments(
     let effective_min = min_members.max(2);
     let is_fuzzy = similarity < 1.0;
 
-    let (clusters, pair_sims) = if is_fuzzy {
+    let FuzzyGroups {
+        clusters,
+        pair_sims,
+    } = if is_fuzzy {
         group_fuzzy(&all_fragments, similarity)
     } else {
-        (group_exact(&all_fragments), HashMap::new())
+        FuzzyGroups {
+            clusters: group_exact(&all_fragments),
+            pair_sims: HashMap::new(),
+        }
     };
 
     let clustered_count: usize = clusters
@@ -565,13 +571,13 @@ fn group_exact(fragments: &[Fragment]) -> Vec<Vec<usize>> {
     groups.into_values().collect()
 }
 
+struct FuzzyGroups {
+    clusters: Vec<Vec<usize>>,
+    pair_sims: HashMap<(usize, usize), f64>,
+}
+
 /// Group fragments by MinHash + LSH + union-find clustering.
-/// Returns (clusters, pair_similarities) for avg_similarity computation.
-#[allow(clippy::type_complexity)]
-fn group_fuzzy(
-    fragments: &[Fragment],
-    similarity: f64,
-) -> (Vec<Vec<usize>>, HashMap<(usize, usize), f64>) {
+fn group_fuzzy(fragments: &[Fragment], similarity: f64) -> FuzzyGroups {
     let sigs: Vec<[u64; MINHASH_N]> = fragments
         .par_iter()
         .map(|f| compute_minhash(&f.tokens))
@@ -628,7 +634,10 @@ fn group_fuzzy(
         clusters.entry(root_id).or_default().push(i);
     }
 
-    (clusters.into_values().collect(), pair_sims)
+    FuzzyGroups {
+        clusters: clusters.into_values().collect(),
+        pair_sims,
+    }
 }
 
 /// Build a FragmentCluster from a set of fragment indices.

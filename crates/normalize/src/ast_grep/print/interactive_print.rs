@@ -139,6 +139,11 @@ pub struct InteractiveDiff<D> {
     display: D,
 }
 
+pub struct SplitDiff<D> {
+    pub confirmed: InteractiveDiff<()>,
+    pub display: D,
+}
+
 impl<D> InteractiveDiff<D> {
     fn new(diff: Diff, display: D) -> Self {
         Self {
@@ -150,15 +155,17 @@ impl<D> InteractiveDiff<D> {
         }
     }
 
-    fn split(self) -> (InteractiveDiff<()>, D) {
-        let pure = InteractiveDiff {
-            first_line: self.first_line,
-            range: self.range,
-            replacement: self.replacement,
-            title: self.title,
-            display: (),
-        };
-        (pure, self.display)
+    fn split(self) -> SplitDiff<D> {
+        SplitDiff {
+            confirmed: InteractiveDiff {
+                first_line: self.first_line,
+                range: self.range,
+                replacement: self.replacement,
+                title: self.title,
+                display: (),
+            },
+            display: self.display,
+        }
     }
 }
 
@@ -331,16 +338,16 @@ fn print_diff_and_prompt_action(
 ) -> Result<InteractionChoice> {
     // default to first diff when accept_all
     if interactive.accept_all {
-        let confirmed = processed.remove(0).split().0;
+        let confirmed = processed.remove(0).split().confirmed;
         return Ok(InteractionChoice::Yes(confirmed));
     }
     utils::run_in_alternate_screen(|| {
         let mut to_confirm = Vec::with_capacity(processed.len());
         let mut display = Vec::with_capacity(processed.len());
         for diff in processed {
-            let (c, d) = diff.split();
-            to_confirm.push(c);
-            display.push(d);
+            let parts = diff.split();
+            to_confirm.push(parts.confirmed);
+            display.push(parts.display);
         }
         let mut index = 0;
         let len = to_confirm.len();

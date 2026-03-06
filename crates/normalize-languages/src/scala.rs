@@ -41,7 +41,7 @@ impl Language for Scala {
         }
     }
 
-    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
+    fn extract_implements(&self, node: &Node, content: &str) -> crate::ImplementsInfo {
         let mut implements = Vec::new();
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
@@ -54,7 +54,10 @@ impl Language for Scala {
                 }
             }
         }
-        (false, implements)
+        crate::ImplementsInfo {
+            is_interface: false,
+            implements,
+        }
     }
 
     fn build_signature(&self, node: &Node, content: &str) -> String {

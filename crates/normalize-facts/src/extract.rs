@@ -567,10 +567,10 @@ fn build_symbol_from_def<'tree>(
         } else {
             tag_kind
         };
-    let (is_interface_impl, implements) = if def.is_container {
+    let implements_info = if def.is_container {
         support.extract_implements(&def.node, content)
     } else {
-        (false, Vec::new())
+        normalize_languages::ImplementsInfo::default()
     };
     Some(Symbol {
         name: name.to_string(),
@@ -582,8 +582,8 @@ fn build_symbol_from_def<'tree>(
         end_line: def.node.end_position().row + 1,
         visibility: support.get_visibility(&def.node, content),
         children: Vec::new(),
-        is_interface_impl,
-        implements,
+        is_interface_impl: implements_info.is_interface,
+        implements: implements_info.implements,
     })
 }
 

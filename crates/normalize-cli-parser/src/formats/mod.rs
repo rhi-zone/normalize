@@ -180,6 +180,12 @@ pub(super) fn is_section_header(line: &str) -> bool {
         && trimmed.ends_with(':')
 }
 
+/// Result of parsing options and commands sections from CLI help output.
+pub(super) struct OptionCommandSections<O, C> {
+    pub options: Vec<O>,
+    pub commands: Vec<C>,
+}
+
 /// Parse sections of a help output into options and commands.
 ///
 /// Used by format parsers that use "Options:" / "Commands:" section headers.
@@ -188,7 +194,7 @@ pub(super) fn parse_option_command_sections<O, C>(
     lines: &[&str],
     parse_opt: impl Fn(&str) -> Option<O>,
     parse_cmd: impl Fn(&str) -> Option<C>,
-) -> (Vec<O>, Vec<C>) {
+) -> OptionCommandSections<O, C> {
     let mut options = Vec::new();
     let mut commands = Vec::new();
     let mut i = 0;
@@ -214,7 +220,7 @@ pub(super) fn parse_option_command_sections<O, C>(
             i += 1;
         }
     }
-    (options, commands)
+    OptionCommandSections { options, commands }
 }
 
 /// Parse a trimmed help-output line as a subcommand, skipping "help".

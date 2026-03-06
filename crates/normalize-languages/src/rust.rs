@@ -29,22 +29,25 @@ impl Language for Rust {
         extract_attributes(node, content)
     }
 
-    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
+    fn extract_implements(&self, node: &Node, content: &str) -> crate::ImplementsInfo {
         if node.kind() == "impl_item" {
             let type_node = match node.child_by_field_name("type") {
                 Some(n) => n,
-                None => return (false, Vec::new()),
+                None => return crate::ImplementsInfo::default(),
             };
             let _ = &content[type_node.byte_range()]; // used below
-            let is_trait_impl = node.child_by_field_name("trait").is_some();
+            let is_interface = node.child_by_field_name("trait").is_some();
             let implements = if let Some(trait_node) = node.child_by_field_name("trait") {
                 vec![content[trait_node.byte_range()].to_string()]
             } else {
                 Vec::new()
             };
-            (is_trait_impl, implements)
+            crate::ImplementsInfo {
+                is_interface,
+                implements,
+            }
         } else {
-            (false, Vec::new())
+            crate::ImplementsInfo::default()
         }
     }
 

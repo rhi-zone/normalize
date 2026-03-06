@@ -168,13 +168,22 @@ pub(crate) fn project_from_path(path: &Path) -> Option<String> {
         .map(String::from)
 }
 
+struct SessionStats {
+    name: Option<String>,
+    message_count: usize,
+    tool_use_count: usize,
+    first_timestamp: Option<u64>,
+}
+
 /// Extract rich stats from a session file.
-fn extract_session_stats(
-    format: &dyn LogFormat,
-    path: &Path,
-) -> (Option<String>, usize, usize, Option<u64>) {
+fn extract_session_stats(format: &dyn LogFormat, path: &Path) -> SessionStats {
     let Ok(session) = format.parse(path) else {
-        return (None, 0, 0, None);
+        return SessionStats {
+            name: None,
+            message_count: 0,
+            tool_use_count: 0,
+            first_timestamp: None,
+        };
     };
 
     let first_message = session
@@ -211,7 +220,12 @@ fn extract_session_stats(
         None
     };
 
-    (first_message, user_messages, tool_calls, duration_seconds)
+    SessionStats {
+        name: first_message,
+        message_count: user_messages,
+        tool_use_count: tool_calls,
+        first_timestamp: duration_seconds,
+    }
 }
 
 /// Parse two RFC 3339 timestamps and return the difference in seconds.
@@ -301,17 +315,16 @@ pub fn build_session_list(
                 .to_string();
             let age_seconds = s.mtime.elapsed().map(|d| d.as_secs()).unwrap_or(0);
             let project = project_from_path(&s.path);
-            let (first_message, user_messages, tool_calls, duration_seconds) =
-                extract_session_stats(format, &s.path);
+            let stats = extract_session_stats(format, &s.path);
             SessionListItem {
                 id,
                 path: s.path.clone(),
                 age_seconds,
                 project,
-                first_message,
-                user_messages,
-                tool_calls,
-                duration_seconds,
+                first_message: stats.name,
+                user_messages: stats.message_count,
+                tool_calls: stats.tool_use_count,
+                duration_seconds: stats.first_timestamp,
             }
         })
         .collect();

@@ -25,7 +25,7 @@ impl Language for Python {
         extract_docstring(node, content)
     }
 
-    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
+    fn extract_implements(&self, node: &Node, content: &str) -> crate::ImplementsInfo {
         let mut implements = Vec::new();
         if let Some(superclasses) = node.child_by_field_name("superclasses") {
             let mut cursor = superclasses.walk();
@@ -35,7 +35,10 @@ impl Language for Python {
                 }
             }
         }
-        (false, implements)
+        crate::ImplementsInfo {
+            is_interface: false,
+            implements,
+        }
     }
 
     fn build_signature(&self, node: &Node, content: &str) -> String {

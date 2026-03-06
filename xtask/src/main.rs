@@ -29,7 +29,8 @@ fn print_help() {
 }
 
 fn build_grammars(args: &[String]) {
-    let (out_dir, force) = parse_build_args(args);
+    let args = parse_build_args(args);
+    let (out_dir, force) = (args.out_dir, args.force);
     fs::create_dir_all(&out_dir).expect("Failed to create output directory");
 
     let registry_src = find_cargo_registry_src();
@@ -93,7 +94,12 @@ fn build_grammars(args: &[String]) {
     }
 }
 
-fn parse_build_args(args: &[String]) -> (PathBuf, bool) {
+struct BuildArgs {
+    out_dir: PathBuf,
+    force: bool,
+}
+
+fn parse_build_args(args: &[String]) -> BuildArgs {
     let mut out_dir = PathBuf::from("target/grammars");
     let mut force = false;
     let mut i = 0;
@@ -108,7 +114,7 @@ fn parse_build_args(args: &[String]) -> (PathBuf, bool) {
         }
         i += 1;
     }
-    (out_dir, force)
+    BuildArgs { out_dir, force }
 }
 
 fn lib_extension() -> &'static str {

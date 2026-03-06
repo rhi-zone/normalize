@@ -75,26 +75,36 @@ fn truncate_path(s: &str, max: usize) -> String {
     }
 }
 
-/// Classify a file as test or impl and return (impl_lines, test_lines).
+pub(crate) struct LineClassification {
+    pub(crate) impl_lines: usize,
+    pub(crate) test_lines: usize,
+}
+
+/// Classify a file as test or impl.
 ///
 /// For Rust files: extract `#[cfg(test)]` block lines as test lines, rest as impl.
 /// For other languages: entire file is test if path matches test pattern.
-fn classify_file(path: &Path, content: &str) -> (usize, usize) {
+fn classify_file(path: &Path, content: &str) -> LineClassification {
     if is_test_path(path) {
-        return (0, content.lines().count());
+        return LineClassification {
+            impl_lines: 0,
+            test_lines: content.lines().count(),
+        };
     }
 
     // Rust: extract #[cfg(test)] block lines
     if path.extension().and_then(|e| e.to_str()) == Some("rs") {
-        let (impl_lines, test_lines) = split_rust_test_lines(content);
-        return (impl_lines, test_lines);
+        return split_rust_test_lines(content);
     }
 
-    (content.lines().count(), 0)
+    LineClassification {
+        impl_lines: content.lines().count(),
+        test_lines: 0,
+    }
 }
 
-/// Split a Rust source file into (impl_lines, test_lines) by tracking `#[cfg(test)]` mod blocks.
-pub(crate) fn split_rust_test_lines(content: &str) -> (usize, usize) {
+/// Split a Rust source file into impl_lines and test_lines by tracking `#[cfg(test)]` mod blocks.
+pub(crate) fn split_rust_test_lines(content: &str) -> LineClassification {
     let mut impl_lines = 0usize;
     let mut test_lines = 0usize;
     let mut in_test_block = false;
@@ -161,7 +171,10 @@ pub(crate) fn split_rust_test_lines(content: &str) -> (usize, usize) {
         }
     }
 
-    (impl_lines, test_lines)
+    LineClassification {
+        impl_lines,
+        test_lines,
+    }
 }
 
 /// Analyze test/impl ratio across the codebase.
@@ -180,11 +193,11 @@ pub fn analyze_test_ratio(root: &Path, limit: usize) -> TestRatioReport {
             if content.is_empty() {
                 return None;
             }
-            let (impl_lines, test_lines) = classify_file(&abs_path, &content);
-            if impl_lines + test_lines == 0 {
+            let lc = classify_file(&abs_path, &content);
+            if lc.impl_lines + lc.test_lines == 0 {
                 return None;
             }
-            Some((f.path.clone(), impl_lines, test_lines))
+            Some((f.path.clone(), lc.impl_lines, lc.test_lines))
         })
         .collect();
 

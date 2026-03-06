@@ -260,18 +260,28 @@ fn compression_ratio(content: &[u8]) -> Option<f64> {
     Some(compressed.len() as f64 / content.len() as f64)
 }
 
+struct TokenUniqueness {
+    total: usize,
+    unique: usize,
+}
+
 /// Split content into word-like tokens (alphanumeric + underscore, length > 1).
-/// Returns (total_tokens, unique_tokens).
-fn token_uniqueness(content: &str) -> (usize, usize) {
+fn token_uniqueness(content: &str) -> TokenUniqueness {
     let tokens: Vec<&str> = content
         .split(|c: char| !c.is_alphanumeric() && c != '_')
         .filter(|t| t.len() > 1)
         .collect();
     if tokens.is_empty() {
-        return (0, 0);
+        return TokenUniqueness {
+            total: 0,
+            unique: 0,
+        };
     }
     let unique: HashSet<_> = tokens.iter().copied().collect();
-    (tokens.len(), unique.len())
+    TokenUniqueness {
+        total: tokens.len(),
+        unique: unique.len(),
+    }
 }
 
 /// Analyze information density across the codebase.
@@ -292,11 +302,11 @@ pub fn analyze_density(root: &Path, module_limit: usize, worst_limit: usize) -> 
             let bytes = content.as_bytes();
             let total_bytes = bytes.len();
             let comp_ratio = compression_ratio(bytes)?;
-            let (total_tokens, unique_tokens) = token_uniqueness(&content);
-            if total_tokens == 0 {
+            let tok = token_uniqueness(&content);
+            if tok.total == 0 {
                 return None;
             }
-            let tok_uniq = unique_tokens as f64 / total_tokens as f64;
+            let tok_uniq = tok.unique as f64 / tok.total as f64;
             let density_score = (comp_ratio + tok_uniq) / 2.0;
             let lines = content.lines().count();
             Some(FileDensity {
@@ -304,8 +314,8 @@ pub fn analyze_density(root: &Path, module_limit: usize, worst_limit: usize) -> 
                 total_bytes,
                 compressed_bytes: (comp_ratio * total_bytes as f64) as usize,
                 compression_ratio: comp_ratio,
-                total_tokens,
-                unique_tokens,
+                total_tokens: tok.total,
+                unique_tokens: tok.unique,
                 token_uniqueness: tok_uniq,
                 density_score,
                 lines,

@@ -65,7 +65,7 @@ impl ScanArg {
 }
 
 pub fn run_with_config(arg: ScanArg, project: Result<ProjectConfig>) -> Result<ExitCode> {
-    let context = arg.context.get();
+    let context: (u16, u16) = arg.context.get().into();
     if arg.output.files_with_matches {
         let printer = FileNamePrinter::stdout(arg.output.color);
         return run_scan(arg, printer, project);

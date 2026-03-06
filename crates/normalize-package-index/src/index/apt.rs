@@ -98,10 +98,15 @@ pub enum AptRepo {
     OldstableNonFree,
 }
 
+struct DistComponent {
+    dist: &'static str,
+    component: &'static str,
+}
+
 impl AptRepo {
     /// Get the distribution and component parts.
-    fn parts(&self) -> (&'static str, &'static str) {
-        match self {
+    fn parts(&self) -> DistComponent {
+        let (dist, component) = match self {
             Self::StableMain => ("stable", "main"),
             Self::StableContrib => ("stable", "contrib"),
             Self::StableNonFree => ("stable", "non-free"),
@@ -128,15 +133,16 @@ impl AptRepo {
             Self::OldstableMain => ("oldstable", "main"),
             Self::OldstableContrib => ("oldstable", "contrib"),
             Self::OldstableNonFree => ("oldstable", "non-free"),
-        }
+        };
+        DistComponent { dist, component }
     }
 
     /// Get the Packages.gz URL for this repository.
     fn packages_url(&self) -> String {
-        let (dist, component) = self.parts();
+        let parts = self.parts();
         format!(
             "{}/dists/{}/{}/binary-amd64/Packages.gz",
-            DEBIAN_MIRROR, dist, component
+            DEBIAN_MIRROR, parts.dist, parts.component
         )
     }
 

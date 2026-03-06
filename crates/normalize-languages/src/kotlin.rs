@@ -43,7 +43,7 @@ impl Language for Kotlin {
         extract_kdoc(node, content)
     }
 
-    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
+    fn extract_implements(&self, node: &Node, content: &str) -> crate::ImplementsInfo {
         let mut implements = Vec::new();
         for i in 0..node.child_count() {
             if let Some(child) = node.child(i as u32)
@@ -52,7 +52,10 @@ impl Language for Kotlin {
                 Self::find_type_identifier(&child, content, &mut implements);
             }
         }
-        (false, implements)
+        crate::ImplementsInfo {
+            is_interface: false,
+            implements,
+        }
     }
 
     fn build_signature(&self, node: &Node, content: &str) -> String {

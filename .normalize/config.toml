@@ -97,11 +97,12 @@ enabled = true
 [analyze.rules."no-grammar-loader-new"]
 allow = ["**/tests/**", "crates/*/tests/**", "crates/normalize-scope/src/lib.rs"]
 
-# rust/tuple-return: many violations in normalize-languages trait impls and manifest parsers.
-# Lowered to warning pending systematic refactoring to named structs. See TODO.md.
+# rust/tuple-return: rg/ is vendored from ripgrep (do not modify); fixtures intentionally
+# contain the bad pattern. All other violations must be fixed.
 [analyze.rules."rust/tuple-return"]
-severity = "warning"
+severity = "error"
 enabled = true
+allow = ["crates/normalize/src/rg/**", "**/tests/fixtures/**"]
 
 # SUMMARY.md freshness: currently at info severity (TODO: re-escalate to "error" once all
 # SUMMARY.md enforcement — severity=error blocks commits when SUMMARY.md is stale/missing.

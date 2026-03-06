@@ -94,10 +94,15 @@ pub enum UbuntuRepo {
     OracularUniverse,
 }
 
+struct DistComponent {
+    dist: &'static str,
+    component: &'static str,
+}
+
 impl UbuntuRepo {
     /// Get the distribution and component parts.
-    fn parts(&self) -> (&'static str, &'static str) {
-        match self {
+    fn parts(&self) -> DistComponent {
+        let (dist, component) = match self {
             // Noble 24.04 LTS
             Self::NobleMain => ("noble", "main"),
             Self::NobleRestricted => ("noble", "restricted"),
@@ -125,15 +130,16 @@ impl UbuntuRepo {
             // Oracular 24.10
             Self::OracularMain => ("oracular", "main"),
             Self::OracularUniverse => ("oracular", "universe"),
-        }
+        };
+        DistComponent { dist, component }
     }
 
     /// Get the Packages.gz URL for this repository.
     fn packages_url(&self) -> String {
-        let (dist, component) = self.parts();
+        let parts = self.parts();
         format!(
             "{}/dists/{}/{}/binary-amd64/Packages.gz",
-            UBUNTU_MIRROR, dist, component
+            UBUNTU_MIRROR, parts.dist, parts.component
         )
     }
 

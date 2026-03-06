@@ -26,7 +26,7 @@ impl Language for JavaScript {
         ecmascript::extract_jsdoc(node, content)
     }
 
-    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
+    fn extract_implements(&self, node: &Node, content: &str) -> crate::ImplementsInfo {
         ecmascript::extract_implements(node, content)
     }
 

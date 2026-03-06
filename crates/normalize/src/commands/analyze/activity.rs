@@ -366,18 +366,17 @@ fn generate_window_labels(window_size: &str, count: usize) -> Vec<String> {
                     let start_day = week * 7;
                     let start_ts = start_day * 86400;
                     // Format as YYYY-Www
-                    let (year, month, day) = timestamp_to_ymd(start_ts);
-                    let _ = (month, day);
-                    format!("{}-W{:02}", year, (start_day % 365) / 7 + 1)
+                    let ymd = timestamp_to_ymd(start_ts);
+                    format!("{}-W{:02}", ymd.year, (start_day % 365) / 7 + 1)
                 })
                 .collect()
         }
         _ => {
             // "month" (default)
-            let (year, month, _) = timestamp_to_ymd(now);
+            let ymd_now = timestamp_to_ymd(now);
             let mut labels = Vec::with_capacity(count);
-            let mut y = year as i32;
-            let mut m = month as i32;
+            let mut y = ymd_now.year as i32;
+            let mut m = ymd_now.month as i32;
 
             for _ in 0..count {
                 labels.push(format!("{:04}-{:02}", y, m));
@@ -393,7 +392,14 @@ fn generate_window_labels(window_size: &str, count: usize) -> Vec<String> {
     }
 }
 
-fn timestamp_to_ymd(ts: u64) -> (u32, u32, u32) {
+struct Ymd {
+    year: u32,
+    month: u32,
+    #[allow(dead_code)]
+    day: u32,
+}
+
+fn timestamp_to_ymd(ts: u64) -> Ymd {
     // Simple conversion from unix timestamp to (year, month, day)
     let days = (ts / 86400) as i64;
     // Algorithm from http://howardhinnant.github.io/date_algorithms.html
@@ -407,7 +413,11 @@ fn timestamp_to_ymd(ts: u64) -> (u32, u32, u32) {
     let d = doy - (153 * mp + 2) / 5 + 1;
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = if m <= 2 { y + 1 } else { y };
-    (y as u32, m, d)
+    Ymd {
+        year: y as u32,
+        month: m,
+        day: d,
+    }
 }
 
 fn timestamp_to_window_key(ts: u64, window_size: &str) -> String {
@@ -417,12 +427,12 @@ fn timestamp_to_window_key(ts: u64, window_size: &str) -> String {
             let week = day / 7;
             let start_day = week * 7;
             let start_ts = start_day * 86400;
-            let (year, _, _) = timestamp_to_ymd(start_ts);
-            format!("{}-W{:02}", year, (start_day % 365) / 7 + 1)
+            let ymd = timestamp_to_ymd(start_ts);
+            format!("{}-W{:02}", ymd.year, (start_day % 365) / 7 + 1)
         }
         _ => {
-            let (year, month, _) = timestamp_to_ymd(ts);
-            format!("{:04}-{:02}", year, month)
+            let ymd = timestamp_to_ymd(ts);
+            format!("{:04}-{:02}", ymd.year, ymd.month)
         }
     }
 }

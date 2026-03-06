@@ -228,13 +228,13 @@ fn pretty_opts() -> FormatOptions {
 }
 
 fn render_dir(node: &ViewNode, opts: &FormatOptions) -> String {
-    let (dirs, files) = count_dir_file_nodes(node);
+    let counts = count_dir_file_nodes(node);
     let lines = format_view_node(node, opts);
     format!(
         "{}\n\n{} directories, {} files",
         lines.join("\n"),
-        dirs,
-        files
+        counts.directories,
+        counts.files
     )
 }
 
@@ -460,21 +460,30 @@ impl std::fmt::Display for ViewOutput {
     }
 }
 
+/// Count of directories and files in a ViewNode tree.
+pub struct DirFileCounts {
+    pub directories: usize,
+    pub files: usize,
+}
+
 /// Count directories and files in a ViewNode tree.
-pub fn count_dir_file_nodes(node: &ViewNode) -> (usize, usize) {
+pub fn count_dir_file_nodes(node: &ViewNode) -> DirFileCounts {
     let mut dirs = 0usize;
     let mut files = 0usize;
     for child in &node.children {
         match child.kind {
             ViewNodeKind::Directory => {
                 dirs += 1;
-                let (sub_dirs, sub_files) = count_dir_file_nodes(child);
-                dirs += sub_dirs;
-                files += sub_files;
+                let sub = count_dir_file_nodes(child);
+                dirs += sub.directories;
+                files += sub.files;
             }
             ViewNodeKind::File => files += 1,
             ViewNodeKind::Symbol(_) => {}
         }
     }
-    (dirs, files)
+    DirFileCounts {
+        directories: dirs,
+        files,
+    }
 }

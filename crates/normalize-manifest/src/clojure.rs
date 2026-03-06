@@ -30,9 +30,9 @@ impl ManifestParser for LeinParser {
             .lines()
             .find(|l| l.trim_start().starts_with("(defproject"))
         {
-            let (n, v) = parse_defproject_header(line);
-            name = n;
-            version = v;
+            let header = parse_defproject_header(line);
+            name = header.name;
+            version = header.version;
         }
 
         // Extract all dep vectors from the whole content.
@@ -48,12 +48,32 @@ impl ManifestParser for LeinParser {
     }
 }
 
+struct ProjectHeader {
+    name: Option<String>,
+    version: Option<String>,
+}
+
+struct DepVectors {
+    deps: Vec<DeclaredDep>,
+    bytes_consumed: usize,
+}
+
+struct BracedContent {
+    content: String,
+    chars_consumed: usize,
+}
+
 /// Parse `(defproject myapp "0.1.0-SNAPSHOT" ...` → name + version.
-fn parse_defproject_header(line: &str) -> (Option<String>, Option<String>) {
+fn parse_defproject_header(line: &str) -> ProjectHeader {
     // Tokens after `defproject`
     let after = match line.find("defproject") {
         Some(i) => &line[i + "defproject".len()..],
-        None => return (None, None),
+        None => {
+            return ProjectHeader {
+                name: None,
+                version: None,
+            };
+        }
     };
 
     let mut tokens = after.split_whitespace();
@@ -64,7 +84,7 @@ fn parse_defproject_header(line: &str) -> (Option<String>, Option<String>) {
         .next()
         .map(|t| t.trim_matches(['"', '\'', '(', ')']).to_string());
 
-    (name, version)
+    ProjectHeader { name, version }
 }
 
 /// Extract Leiningen dependency vectors from content.
@@ -96,9 +116,9 @@ fn extract_lein_deps(content: &str, deps: &mut Vec<DeclaredDep>) {
                 };
 
                 // Extract all `[name "version"]` entries inside this bracket
-                let (extracted, end) = extract_dep_vectors(&content[bp..], kind);
-                deps.extend(extracted);
-                i = bp + end;
+                let extracted = extract_dep_vectors(&content[bp..], kind);
+                deps.extend(extracted.deps);
+                i = bp + extracted.bytes_consumed;
                 continue;
             } else {
                 i = after_kw;
@@ -139,8 +159,8 @@ fn is_inside_dev_profile(content: &str, dep_pos: usize) -> bool {
 }
 
 /// Extract `[name "version"]` dep vectors starting from an outer `[`.
-/// Returns (deps, bytes consumed from start of outer bracket).
-fn extract_dep_vectors(s: &str, kind: DepKind) -> (Vec<DeclaredDep>, usize) {
+/// Returns deps and bytes consumed from start of outer bracket.
+fn extract_dep_vectors(s: &str, kind: DepKind) -> DepVectors {
     let mut deps = Vec::new();
     let mut depth = 0i32;
     let mut i = 0;
@@ -182,7 +202,10 @@ fn extract_dep_vectors(s: &str, kind: DepKind) -> (Vec<DeclaredDep>, usize) {
             ']' => {
                 depth -= 1;
                 if depth == 0 {
-                    return (deps, char_byte_offset(s, i + 1));
+                    return DepVectors {
+                        deps,
+                        bytes_consumed: char_byte_offset(s, i + 1),
+                    };
                 }
             }
             _ => {}
@@ -190,7 +213,10 @@ fn extract_dep_vectors(s: &str, kind: DepKind) -> (Vec<DeclaredDep>, usize) {
         i += 1;
     }
 
-    (deps, s.len())
+    DepVectors {
+        deps,
+        bytes_consumed: s.len(),
+    }
 }
 
 fn char_byte_offset(s: &str, char_idx: usize) -> usize {
@@ -380,14 +406,14 @@ fn parse_edn_dep_map(s: &str, kind: DepKind, deps: &mut Vec<DeclaredDep>) {
 
         // Read the value — should be a map `{...}`
         if chars[i] == '{' {
-            let (value_map, consumed) = extract_braced(&chars[i..]);
-            let version_req = extract_mvn_version(&value_map);
+            let braced = extract_braced(&chars[i..]);
+            let version_req = extract_mvn_version(&braced.content);
             deps.push(DeclaredDep {
                 name: dep_name.to_string(),
                 version_req,
                 kind,
             });
-            i += consumed;
+            i += braced.chars_consumed;
         } else {
             // Unexpected token — skip
             i += 1;
@@ -396,8 +422,7 @@ fn parse_edn_dep_map(s: &str, kind: DepKind, deps: &mut Vec<DeclaredDep>) {
 }
 
 /// Extract a `{...}` block from a char slice (including nested braces).
-/// Returns (content_string, chars_consumed).
-fn extract_braced(chars: &[char]) -> (String, usize) {
+fn extract_braced(chars: &[char]) -> BracedContent {
     let mut depth = 0i32;
     let mut result = String::new();
     for (idx, &ch) in chars.iter().enumerate() {
@@ -407,14 +432,20 @@ fn extract_braced(chars: &[char]) -> (String, usize) {
                 depth -= 1;
                 if depth == 0 {
                     result.push(ch);
-                    return (result, idx + 1);
+                    return BracedContent {
+                        content: result,
+                        chars_consumed: idx + 1,
+                    };
                 }
             }
             _ => {}
         }
         result.push(ch);
     }
-    (result, chars.len())
+    BracedContent {
+        content: result,
+        chars_consumed: chars.len(),
+    }
 }
 
 /// Extract `:mvn/version "x"` from a string like `{:mvn/version "1.11.1"}`.

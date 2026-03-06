@@ -7,7 +7,7 @@
 //! - `Commands:` section
 //! - Help option shows "Show this message and exit."
 
-use super::{CliFormat, is_section_header, parse_option_command_sections};
+use super::{CliFormat, OptionCommandSections, is_section_header, parse_option_command_sections};
 use crate::{CliCommand, CliOption, CliSpec};
 use regex::Regex;
 
@@ -94,10 +94,10 @@ impl CliFormat for ClickFormat {
 
         // Parse sections
         let remaining = &lines[i..];
-        let (opts, cmds) =
+        let OptionCommandSections { options, commands } =
             parse_option_command_sections(remaining, parse_option_line, parse_command_line);
-        spec.options.extend(opts);
-        spec.commands.extend(cmds);
+        spec.options.extend(options);
+        spec.commands.extend(commands);
 
         Ok(spec)
     }

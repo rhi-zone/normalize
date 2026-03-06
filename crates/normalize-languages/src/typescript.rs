@@ -29,7 +29,7 @@ impl Language for TypeScript {
         ecmascript::extract_jsdoc(node, content)
     }
 
-    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
+    fn extract_implements(&self, node: &Node, content: &str) -> crate::ImplementsInfo {
         ecmascript::extract_implements(node, content)
     }
 
@@ -136,7 +136,7 @@ impl Language for Tsx {
         ecmascript::extract_jsdoc(node, content)
     }
 
-    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
+    fn extract_implements(&self, node: &Node, content: &str) -> crate::ImplementsInfo {
         ecmascript::extract_implements(node, content)
     }
 

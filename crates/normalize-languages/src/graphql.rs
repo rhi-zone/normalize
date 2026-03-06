@@ -54,7 +54,7 @@ impl Language for GraphQL {
         format!("{} {}", keyword, name)
     }
 
-    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
+    fn extract_implements(&self, node: &Node, content: &str) -> crate::ImplementsInfo {
         let mut implements = Vec::new();
         for i in 0..node.child_count() {
             if let Some(child) = node.child(i as u32)
@@ -63,7 +63,10 @@ impl Language for GraphQL {
                 GraphQL::collect_named_types(&child, &mut implements, content);
             }
         }
-        (false, implements)
+        crate::ImplementsInfo {
+            is_interface: false,
+            implements,
+        }
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

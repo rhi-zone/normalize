@@ -77,10 +77,15 @@ pub enum AlpineRepo {
     V318Community,
 }
 
+struct RepoParts {
+    branch: &'static str,
+    repo: &'static str,
+}
+
 impl AlpineRepo {
     /// Get the branch and repo parts.
-    fn parts(&self) -> (&'static str, &'static str) {
-        match self {
+    fn parts(&self) -> RepoParts {
+        let (branch, repo) = match self {
             Self::EdgeMain => ("edge", "main"),
             Self::EdgeCommunity => ("edge", "community"),
             Self::EdgeTesting => ("edge", "testing"),
@@ -92,13 +97,14 @@ impl AlpineRepo {
             Self::V319Community => ("v3.19", "community"),
             Self::V318Main => ("v3.18", "main"),
             Self::V318Community => ("v3.18", "community"),
-        }
+        };
+        RepoParts { branch, repo }
     }
 
     /// Get the repository name for tagging.
     pub fn name(&self) -> String {
-        let (branch, repo) = self.parts();
-        format!("{}-{}", branch, repo)
+        let parts = self.parts();
+        format!("{}-{}", parts.branch, parts.repo)
     }
 
     /// All available repositories.
@@ -245,16 +251,16 @@ impl Apk {
 
     /// Fetch and parse APKINDEX.tar.gz from a repository.
     fn load_repo(&self, repo: AlpineRepo) -> Result<Vec<PackageMeta>, IndexError> {
-        let (branch, repo_name) = repo.parts();
+        let parts = repo.parts();
         let url = format!(
             "{}/{}/{}/{}/APKINDEX.tar.gz",
-            ALPINE_MIRROR, branch, repo_name, self.arch
+            ALPINE_MIRROR, parts.branch, parts.repo, self.arch
         );
 
         // Try cache first
         let (data, _was_cached) = cache::fetch_with_cache(
             "apk",
-            &format!("apkindex-{}-{}-{}", branch, repo_name, self.arch),
+            &format!("apkindex-{}-{}-{}", parts.branch, parts.repo, self.arch),
             &url,
             INDEX_CACHE_TTL,
         )
@@ -412,7 +418,8 @@ impl ApkPackageBuilder {
         let name = self.name?;
         let version = self.version?;
         let repo = self.repo?;
-        let (branch, repo_name) = repo.parts();
+        let repo_parts = repo.parts();
+        let (branch, repo_name) = (repo_parts.branch, repo_parts.repo);
 
         let mut extra = HashMap::new();
 

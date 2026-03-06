@@ -133,7 +133,7 @@ impl Language for D {
         }
     }
 
-    fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
+    fn extract_implements(&self, node: &Node, content: &str) -> crate::ImplementsInfo {
         let mut implements = Vec::new();
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
@@ -141,7 +141,10 @@ impl Language for D {
                 D::collect_identifiers(&child, content, &mut implements);
             }
         }
-        (false, implements)
+        crate::ImplementsInfo {
+            is_interface: false,
+            implements,
+        }
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {

@@ -263,13 +263,18 @@ impl OutputFormatter for CallComplexityReport {
 /// Key to identify a function: (file, symbol_name).
 type FnKey = (String, String);
 
+struct ReachableComplexity {
+    reachable_sum: usize,
+    critical_path_max: usize,
+    reachable_count: usize,
+}
+
 /// BFS from start to compute reachable CC sum and max CC on any path.
 fn reachable_complexity(
     start: &FnKey,
     cc_map: &HashMap<FnKey, usize>,
     call_edges: &HashMap<FnKey, Vec<FnKey>>,
-) -> (usize, usize, usize) {
-    // returns (reachable_sum, critical_path_max, reachable_count)
+) -> ReachableComplexity {
     let mut visited: HashSet<FnKey> = HashSet::new();
     let mut queue = VecDeque::new();
     let mut total_cc = 0usize;
@@ -292,19 +297,22 @@ fn reachable_complexity(
         }
     }
     let reachable_count = visited.len().saturating_sub(1); // exclude start itself
-    (total_cc, max_cc, reachable_count)
+    ReachableComplexity {
+        reachable_sum: total_cc,
+        critical_path_max: max_cc,
+        reachable_count,
+    }
+}
+
+struct CallGraphData {
+    cc_map: HashMap<FnKey, usize>,
+    call_edges: HashMap<FnKey, Vec<FnKey>>,
+    total_call_edges: usize,
+    resolved_edges: usize,
 }
 
 /// Parse call edges from all source files without an index.
-/// Returns (cc_map, call_edges, total_call_edges, resolved_edges).
-fn build_call_graph_from_files(
-    root: &Path,
-) -> (
-    HashMap<FnKey, usize>,
-    HashMap<FnKey, Vec<FnKey>>,
-    usize,
-    usize,
-) {
+fn build_call_graph_from_files(root: &Path) -> CallGraphData {
     let all_files = crate::path_resolve::all_files(root);
     let analyzer = ComplexityAnalyzer::new();
 
@@ -383,7 +391,12 @@ fn build_call_graph_from_files(
         }
     }
 
-    (cc_map, call_edges, total_call_edges, resolved_edges)
+    CallGraphData {
+        cc_map,
+        call_edges,
+        total_call_edges,
+        resolved_edges,
+    }
 }
 
 /// Extract call edges from a single file using SymbolParser.
@@ -417,34 +430,35 @@ pub fn analyze_call_complexity(
     module_limit: usize,
 ) -> CallComplexityReport {
     let module_dirs = discover_module_dirs(root);
-    let (cc_map, call_edges, total_edges, resolved_edges) = build_call_graph_from_files(root);
+    let graph = build_call_graph_from_files(root);
 
-    let total_functions = cc_map.len();
-    let unresolved_pct = if total_edges > 0 {
-        (total_edges - resolved_edges) as f64 / total_edges as f64 * 100.0
+    let total_functions = graph.cc_map.len();
+    let unresolved_pct = if graph.total_call_edges > 0 {
+        (graph.total_call_edges - graph.resolved_edges) as f64 / graph.total_call_edges as f64
+            * 100.0
     } else {
         0.0
     };
 
     // Compute reachable complexity for each function (BFS per function).
-    let entries: Vec<FunctionCallComplexity> = cc_map
+    let entries: Vec<FunctionCallComplexity> = graph
+        .cc_map
         .par_iter()
         .map(|(key, &local_cc)| {
-            let (reachable_cc, critical_path_cc, reachable_count) =
-                reachable_complexity(key, &cc_map, &call_edges);
+            let rc = reachable_complexity(key, &graph.cc_map, &graph.call_edges);
             let amplification = if local_cc > 0 {
-                reachable_cc as f64 / local_cc as f64
+                rc.reachable_sum as f64 / local_cc as f64
             } else {
-                reachable_cc as f64
+                rc.reachable_sum as f64
             };
             FunctionCallComplexity {
                 file: key.0.clone(),
                 symbol: key.1.clone(),
                 local_cc,
-                reachable_cc,
-                critical_path_cc,
+                reachable_cc: rc.reachable_sum,
+                critical_path_cc: rc.critical_path_max,
                 amplification,
-                reachable_count,
+                reachable_count: rc.reachable_count,
             }
         })
         .collect();

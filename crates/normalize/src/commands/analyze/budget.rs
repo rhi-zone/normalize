@@ -379,11 +379,11 @@ fn classify_file(rel_path: &str, content: &str) -> FileClassification {
         .unwrap_or("");
 
     if ext == "rs" {
-        let (impl_lines, test_lines) = split_rust_test_lines(content);
+        let lc = split_rust_test_lines(content);
         return FileClassification {
             rel_path: rel_path.to_string(),
-            logic_lines: impl_lines,
-            test_lines,
+            logic_lines: lc.impl_lines,
+            test_lines: lc.test_lines,
             doc_lines: 0,
             config_lines: 0,
             generated_lines: 0,

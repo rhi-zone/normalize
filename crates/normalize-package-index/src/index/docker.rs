@@ -80,6 +80,17 @@ impl DockerRegistry {
     }
 }
 
+struct DetectedRegistry {
+    registry: DockerRegistry,
+    clean_name: String,
+}
+
+struct FetchedPackage {
+    package: PackageMeta,
+    #[allow(dead_code)]
+    registry: DockerRegistry,
+}
+
 /// Docker container registry fetcher with configurable registries.
 pub struct Docker {
     registries: Vec<DockerRegistry>,
@@ -122,29 +133,32 @@ impl Docker {
     }
 
     /// Detect which registry an image name refers to.
-    fn detect_registry(name: &str) -> (DockerRegistry, String) {
+    fn detect_registry(name: &str) -> DetectedRegistry {
         if name.starts_with("ghcr.io/") {
-            (
-                DockerRegistry::Ghcr,
-                name.trim_start_matches("ghcr.io/").to_string(),
-            )
+            DetectedRegistry {
+                registry: DockerRegistry::Ghcr,
+                clean_name: name.trim_start_matches("ghcr.io/").to_string(),
+            }
         } else if name.starts_with("quay.io/") {
-            (
-                DockerRegistry::Quay,
-                name.trim_start_matches("quay.io/").to_string(),
-            )
+            DetectedRegistry {
+                registry: DockerRegistry::Quay,
+                clean_name: name.trim_start_matches("quay.io/").to_string(),
+            }
         } else if name.starts_with("gcr.io/") {
-            (
-                DockerRegistry::Gcr,
-                name.trim_start_matches("gcr.io/").to_string(),
-            )
+            DetectedRegistry {
+                registry: DockerRegistry::Gcr,
+                clean_name: name.trim_start_matches("gcr.io/").to_string(),
+            }
         } else {
-            (DockerRegistry::DockerHub, name.to_string())
+            DetectedRegistry {
+                registry: DockerRegistry::DockerHub,
+                clean_name: name.to_string(),
+            }
         }
     }
 
     /// Fetch from Docker Hub.
-    fn fetch_from_dockerhub(name: &str) -> Result<(PackageMeta, DockerRegistry), IndexError> {
+    fn fetch_from_dockerhub(name: &str) -> Result<FetchedPackage, IndexError> {
         let (namespace, repo) = if name.contains('/') {
             let parts: Vec<&str> = name.splitn(2, '/').collect();
             (parts[0], parts[1])
@@ -192,8 +206,8 @@ impl Docker {
             serde_json::Value::String("docker-hub".to_string()),
         );
 
-        Ok((
-            PackageMeta {
+        Ok(FetchedPackage {
+            package: PackageMeta {
                 name: format!(
                     "{}/{}",
                     namespace,
@@ -218,8 +232,8 @@ impl Docker {
                 checksum: None,
                 extra,
             },
-            DockerRegistry::DockerHub,
-        ))
+            registry: DockerRegistry::DockerHub,
+        })
     }
 
     /// Fetch tags from Docker Hub.
@@ -374,7 +388,7 @@ impl Docker {
     }
 
     /// Fetch from Quay.io.
-    fn fetch_from_quay(name: &str) -> Result<(PackageMeta, DockerRegistry), IndexError> {
+    fn fetch_from_quay(name: &str) -> Result<FetchedPackage, IndexError> {
         let (namespace, repo) = if name.contains('/') {
             let parts: Vec<&str> = name.splitn(2, '/').collect();
             (parts[0], parts[1])
@@ -402,8 +416,8 @@ impl Docker {
             serde_json::Value::String("quay".to_string()),
         );
 
-        Ok((
-            PackageMeta {
+        Ok(FetchedPackage {
+            package: PackageMeta {
                 name: format!("quay.io/{}/{}", namespace, repo),
                 version: latest_tag.to_string(),
                 description: response["description"].as_str().map(String::from),
@@ -419,8 +433,8 @@ impl Docker {
                 checksum: None,
                 extra,
             },
-            DockerRegistry::Quay,
-        ))
+            registry: DockerRegistry::Quay,
+        })
     }
 
     /// Fetch tags from Quay.io.
@@ -558,25 +572,27 @@ impl PackageIndex for Docker {
     }
 
     fn fetch(&self, name: &str) -> Result<PackageMeta, IndexError> {
-        let (detected_registry, clean_name) = Self::detect_registry(name);
+        let detected = Self::detect_registry(name);
 
         // If the detected registry is in our configured list, use it
-        if self.registries.contains(&detected_registry) {
-            return match detected_registry {
+        if self.registries.contains(&detected.registry) {
+            return match detected.registry {
                 DockerRegistry::DockerHub => {
-                    Self::fetch_from_dockerhub(&clean_name).map(|(p, _)| p)
+                    Self::fetch_from_dockerhub(&detected.clean_name).map(|f| f.package)
                 }
-                DockerRegistry::Quay => Self::fetch_from_quay(&clean_name).map(|(p, _)| p),
+                DockerRegistry::Quay => {
+                    Self::fetch_from_quay(&detected.clean_name).map(|f| f.package)
+                }
                 DockerRegistry::Ghcr | DockerRegistry::Gcr => {
                     // GHCR and GCR require authentication for most operations
                     // Return basic metadata from what we know
                     let mut extra = HashMap::new();
                     extra.insert(
                         "source_repo".to_string(),
-                        serde_json::Value::String(detected_registry.name().to_string()),
+                        serde_json::Value::String(detected.registry.name().to_string()),
                     );
                     Ok(PackageMeta {
-                        name: format!("{}{}", detected_registry.prefix(), clean_name),
+                        name: format!("{}{}", detected.registry.prefix(), detected.clean_name),
                         version: "latest".to_string(),
                         description: None,
                         homepage: None,
@@ -603,8 +619,8 @@ impl PackageIndex for Docker {
                 DockerRegistry::Ghcr | DockerRegistry::Gcr => continue, // Skip auth-required registries
             };
 
-            if let Ok((pkg, _)) = result {
-                return Ok(pkg);
+            if let Ok(fetched) = result {
+                return Ok(fetched.package);
             }
         }
 
@@ -612,14 +628,14 @@ impl PackageIndex for Docker {
     }
 
     fn fetch_versions(&self, name: &str) -> Result<Vec<VersionMeta>, IndexError> {
-        let (detected_registry, clean_name) = Self::detect_registry(name);
+        let detected = Self::detect_registry(name);
         let mut all_versions = Vec::new();
 
         // If the detected registry is in our configured list, use it
-        if self.registries.contains(&detected_registry) {
-            let versions = match detected_registry {
-                DockerRegistry::DockerHub => Self::fetch_versions_dockerhub(&clean_name),
-                DockerRegistry::Quay => Self::fetch_versions_quay(&clean_name),
+        if self.registries.contains(&detected.registry) {
+            let versions = match detected.registry {
+                DockerRegistry::DockerHub => Self::fetch_versions_dockerhub(&detected.clean_name),
+                DockerRegistry::Quay => Self::fetch_versions_quay(&detected.clean_name),
                 DockerRegistry::Ghcr | DockerRegistry::Gcr => {
                     // These require authentication
                     Err(IndexError::Parse("Registry requires authentication".into()))
@@ -652,12 +668,14 @@ impl PackageIndex for Docker {
     }
 
     fn fetch_all_versions(&self, name: &str) -> Result<Vec<PackageMeta>, IndexError> {
-        let (detected_registry, clean_name) = Self::detect_registry(name);
+        let detected = Self::detect_registry(name);
 
         // If the detected registry is in our configured list, use it
-        if self.registries.contains(&detected_registry) {
-            return match detected_registry {
-                DockerRegistry::DockerHub => Self::fetch_all_versions_dockerhub(&clean_name),
+        if self.registries.contains(&detected.registry) {
+            return match detected.registry {
+                DockerRegistry::DockerHub => {
+                    Self::fetch_all_versions_dockerhub(&detected.clean_name)
+                }
                 DockerRegistry::Quay | DockerRegistry::Ghcr | DockerRegistry::Gcr => {
                     // Fall back to default implementation for other registries
                     let versions = self.fetch_versions(name)?;

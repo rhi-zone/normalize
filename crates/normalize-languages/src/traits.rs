@@ -18,6 +18,15 @@ pub struct ContainerBody {
     pub is_empty: bool,
 }
 
+/// Information about what a class/container implements or extends.
+#[derive(Debug, Default)]
+pub struct ImplementsInfo {
+    /// True if this is an interface/protocol/trait definition (not a concrete class).
+    pub is_interface: bool,
+    /// List of implemented interfaces, superclasses, or mixed-in traits.
+    pub implements: Vec<String>,
+}
+
 /// Embedded content block (e.g., JS in Vue, CSS in HTML)
 #[derive(Debug, Clone)]
 pub struct EmbeddedBlock {
@@ -118,9 +127,8 @@ pub trait Language: Send + Sync {
 
     /// Extract interfaces/traits/superclasses that a container node implements/extends.
     /// Called by generic extraction for container nodes only.
-    /// Returns (is_interface_impl, implements_list).
-    fn extract_implements(&self, _node: &Node, _content: &str) -> (bool, Vec<String>) {
-        (false, Vec::new())
+    fn extract_implements(&self, _node: &Node, _content: &str) -> ImplementsInfo {
+        ImplementsInfo::default()
     }
 
     /// Build the display signature for a definition node.

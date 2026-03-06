@@ -216,12 +216,29 @@ pub struct ContextArgs {
     pub context: u16,
 }
 
+pub struct ContextLines {
+    pub before: u16,
+    pub after: u16,
+}
+
+impl From<ContextLines> for (u16, u16) {
+    fn from(c: ContextLines) -> Self {
+        (c.before, c.after)
+    }
+}
+
 impl ContextArgs {
-    pub fn get(&self) -> (u16, u16) {
+    pub fn get(&self) -> ContextLines {
         if self.context > 0 {
-            (self.context, self.context)
+            ContextLines {
+                before: self.context,
+                after: self.context,
+            }
         } else {
-            (self.before, self.after)
+            ContextLines {
+                before: self.before,
+                after: self.after,
+            }
         }
     }
 }

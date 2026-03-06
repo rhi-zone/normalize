@@ -85,11 +85,13 @@ struct CommitSession {
     timestamp: Option<String>,
 }
 
+struct CommitSessionMap {
+    map: HashMap<String, CommitSession>,
+    warnings: Vec<String>,
+}
+
 /// Build commit→session map by scanning session tool-use blocks.
-fn build_commit_session_map(
-    root: &Path,
-    sessions_path: Option<&Path>,
-) -> (HashMap<String, CommitSession>, Vec<String>) {
+fn build_commit_session_map(root: &Path, sessions_path: Option<&Path>) -> CommitSessionMap {
     let mut warnings = Vec::new();
     let format = ClaudeCodeFormat;
 
@@ -101,7 +103,10 @@ fn build_commit_session_map(
 
     if session_files.is_empty() {
         warnings.push("No session files found".to_string());
-        return (HashMap::new(), warnings);
+        return CommitSessionMap {
+            map: HashMap::new(),
+            warnings,
+        };
     }
 
     // Regex for git commit output: [branch hash] message
@@ -188,7 +193,10 @@ fn build_commit_session_map(
         }
     }
 
-    (full_map, warnings)
+    CommitSessionMap {
+        map: full_map,
+        warnings,
+    }
 }
 
 fn resolve_full_hash(root: &Path, short: &str) -> Option<String> {
@@ -473,8 +481,9 @@ pub fn analyze_provenance(root: &Path, opts: &ProvenanceOptions) -> ProvenanceRe
 
     // 2. Build commit→session map
     let sessions_dir = opts.sessions_path.as_ref().map(|p| Path::new(p.as_str()));
-    let (commit_session_map, session_warnings) = build_commit_session_map(root, sessions_dir);
-    warnings.extend(session_warnings);
+    let csm = build_commit_session_map(root, sessions_dir);
+    warnings.extend(csm.warnings);
+    let commit_session_map = csm.map;
 
     // 3. Blame extraction (parallel)
     let blame_results: Vec<(String, HashMap<String, usize>)> = files

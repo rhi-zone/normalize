@@ -96,11 +96,11 @@ fn build_tree(files: &[(String, usize)], total: usize) -> Vec<SizeNode> {
     // Group by first path component
     let mut groups: BTreeMap<String, Vec<(String, usize)>> = BTreeMap::new();
     for (path, lines) in files {
-        let (head, tail) = split_path(path);
+        let parts = split_path(path);
         groups
-            .entry(head)
+            .entry(parts.first)
             .or_default()
-            .push((tail.to_string(), *lines));
+            .push((parts.rest, *lines));
     }
 
     let mut nodes: Vec<SizeNode> = groups
@@ -149,10 +149,21 @@ fn build_tree(files: &[(String, usize)], total: usize) -> Vec<SizeNode> {
     nodes
 }
 
-/// Split "foo/bar/baz" into ("foo", "bar/baz"). Returns ("foo", "") for "foo".
-fn split_path(path: &str) -> (String, &str) {
+struct PathParts {
+    first: String,
+    rest: String,
+}
+
+/// Split "foo/bar/baz" into first="foo", rest="bar/baz". Returns rest="" for "foo".
+fn split_path(path: &str) -> PathParts {
     match path.find('/') {
-        Some(i) => (path[..i].to_string(), &path[i + 1..]),
-        None => (path.to_string(), ""),
+        Some(i) => PathParts {
+            first: path[..i].to_string(),
+            rest: path[i + 1..].to_string(),
+        },
+        None => PathParts {
+            first: path.to_string(),
+            rest: String::new(),
+        },
     }
 }

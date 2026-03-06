@@ -93,12 +93,20 @@ fn is_signature_line(line: &str, grammar: &str) -> bool {
     }
 }
 
+struct CodePreview {
+    content: String,
+    count: usize,
+}
+
 /// Generate a skeleton preview for container types (impl, class, trait).
 /// Shows the opening line + method signatures.
-fn skeleton_preview(text: &str, grammar: &str) -> (String, usize) {
+fn skeleton_preview(text: &str, grammar: &str) -> CodePreview {
     let lines: Vec<&str> = text.lines().collect();
     if lines.is_empty() {
-        return (String::new(), 0);
+        return CodePreview {
+            content: String::new(),
+            count: 0,
+        };
     }
 
     let mut preview_lines = Vec::new();
@@ -136,7 +144,10 @@ fn skeleton_preview(text: &str, grammar: &str) -> (String, usize) {
         result.push_str(&format!("\n{}}}", indent));
     }
 
-    (result, hidden)
+    CodePreview {
+        content: result,
+        count: hidden,
+    }
 }
 
 fn is_rust_structural(trimmed: &str) -> bool {
@@ -230,10 +241,13 @@ fn is_structural_line(line: &str, grammar: &str) -> bool {
 
 /// Generate a structural preview for functions.
 /// Shows signature + control flow + bindings.
-fn structural_preview(text: &str, grammar: &str) -> (String, usize) {
+fn structural_preview(text: &str, grammar: &str) -> CodePreview {
     let lines: Vec<&str> = text.lines().collect();
     if lines.is_empty() {
-        return (String::new(), 0);
+        return CodePreview {
+            content: String::new(),
+            count: 0,
+        };
     }
 
     let mut preview_lines = Vec::new();
@@ -260,7 +274,10 @@ fn structural_preview(text: &str, grammar: &str) -> (String, usize) {
     let hidden = lines.len().saturating_sub(preview_lines.len());
     let result = preview_lines.join("\n");
 
-    (result, hidden)
+    CodePreview {
+        content: result,
+        count: hidden,
+    }
 }
 
 /// Collect files to search based on path argument.
@@ -484,11 +501,11 @@ pub fn cmd_query(
                 if show_source || total_lines <= context_lines {
                     (r.text.clone(), 0, PreviewKind::Full)
                 } else if is_container {
-                    let (text, hidden) = skeleton_preview(&r.text, &r.grammar);
-                    (text, hidden, PreviewKind::Skeleton)
+                    let cp = skeleton_preview(&r.text, &r.grammar);
+                    (cp.content, cp.count, PreviewKind::Skeleton)
                 } else if is_function {
-                    let (text, hidden) = structural_preview(&r.text, &r.grammar);
-                    (text, hidden, PreviewKind::Structural)
+                    let cp = structural_preview(&r.text, &r.grammar);
+                    (cp.content, cp.count, PreviewKind::Structural)
                 } else {
                     let preview = lines[..context_lines].join("\n");
                     (preview, total_lines - context_lines, PreviewKind::Truncated)

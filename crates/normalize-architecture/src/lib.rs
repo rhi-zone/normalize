@@ -177,12 +177,18 @@ pub async fn build_import_graph(idx: &FileIndex) -> Result<ImportGraph, libsql::
 
 // ── Coupling and hub detection ────────────────────────────────────────────────
 
+/// Result of coupling and hub detection.
+pub struct CouplingAndHubs {
+    pub coupling: Vec<ModuleCoupling>,
+    pub hubs: Vec<HubModule>,
+}
+
 /// Compute coupling metrics and hub modules from the import graph.
 pub fn compute_coupling_and_hubs(
     imports_by_file: &HashMap<String, HashSet<String>>,
     importers_by_file: &HashMap<String, HashSet<String>>,
     all_files: &HashSet<String>,
-) -> (Vec<ModuleCoupling>, Vec<HubModule>) {
+) -> CouplingAndHubs {
     let mut coupling: Vec<ModuleCoupling> = Vec::new();
     for file in all_files {
         let fan_out = imports_by_file.get(file).map(|s| s.len()).unwrap_or(0);
@@ -220,7 +226,10 @@ pub fn compute_coupling_and_hubs(
     hub_modules.truncate(10);
 
     coupling.truncate(15);
-    (coupling, hub_modules)
+    CouplingAndHubs {
+        coupling,
+        hubs: hub_modules,
+    }
 }
 
 // ── Cross-import detection ────────────────────────────────────────────────────

@@ -201,7 +201,7 @@ pub async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport,
         }
     }
 
-    let (coupling, hub_modules) =
+    let coupling_and_hubs =
         compute_coupling_and_hubs(&graph.imports_by_file, &graph.importers_by_file, &all_files);
     let cross_imports = detect_cross_imports(&graph.imports_by_file);
     let layer_flows = compute_layer_flows(&graph.imports_by_file);
@@ -222,9 +222,9 @@ pub async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport,
 
     Ok(ArchitectureReport {
         cross_imports,
-        hub_modules,
+        hub_modules: coupling_and_hubs.hubs,
         layer_flows,
-        coupling_hotspots: coupling,
+        coupling_hotspots: coupling_and_hubs.coupling,
         orphan_modules: orphans,
         symbol_hotspots,
         total_modules,

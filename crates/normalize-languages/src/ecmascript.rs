@@ -3,7 +3,7 @@
 //! This module contains common logic shared between JavaScript, TypeScript, and TSX.
 //! Each language struct delegates to these functions for DRY implementation.
 
-use crate::Import;
+use crate::{ImplementsInfo, Import};
 use tree_sitter::Node;
 
 // ============================================================================
@@ -39,7 +39,7 @@ pub fn build_signature(node: &Node, content: &str, name: &str) -> String {
 }
 
 /// Extract implements/extends list for a JS/TS class or interface node.
-pub fn extract_implements(node: &Node, content: &str) -> (bool, Vec<String>) {
+pub fn extract_implements(node: &Node, content: &str) -> ImplementsInfo {
     let mut implements = Vec::new();
     for i in 0..node.child_count() as u32 {
         if let Some(heritage) = node.child(i)
@@ -63,7 +63,10 @@ pub fn extract_implements(node: &Node, content: &str) -> (bool, Vec<String>) {
             }
         }
     }
-    (false, implements)
+    ImplementsInfo {
+        is_interface: false,
+        implements,
+    }
 }
 
 // ============================================================================

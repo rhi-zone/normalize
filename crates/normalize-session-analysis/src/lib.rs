@@ -1481,19 +1481,25 @@ fn split_command_chain(cmd: &str) -> Vec<&str> {
     parts.into_iter().filter(|p| !p.starts_with('#')).collect()
 }
 
-fn categorize_cargo(sub: &str) -> (&'static str, String) {
-    match sub {
+pub struct CommandCategory {
+    pub category: &'static str,
+    pub pattern: String,
+}
+
+fn categorize_cargo(sub: &str) -> CommandCategory {
+    let (category, pattern) = match sub {
         "build" | "b" => ("build", "cargo build".to_string()),
         "test" | "t" | "nextest" => ("test", "cargo test".to_string()),
         "clippy" => ("lint", "cargo clippy".to_string()),
         "fmt" => ("lint", "cargo fmt".to_string()),
         "add" | "install" => ("install", format!("cargo {}", sub)),
         _ => ("build", format!("cargo {}", sub)),
-    }
+    };
+    CommandCategory { category, pattern }
 }
 
-fn categorize_npm_run(runner: &str, script: &str) -> (&'static str, String) {
-    if script.contains("build") {
+fn categorize_npm_run(runner: &str, script: &str) -> CommandCategory {
+    let (category, pattern) = if script.contains("build") {
         ("build", format!("{} run build", runner))
     } else if script.contains("test") {
         ("test", format!("{} run test", runner))
@@ -1503,26 +1509,39 @@ fn categorize_npm_run(runner: &str, script: &str) -> (&'static str, String) {
         ("lint", format!("{} run {}", runner, script))
     } else {
         ("other", format!("{} run {}", runner, script))
-    }
+    };
+    CommandCategory { category, pattern }
 }
 
-fn categorize_js_runner(base_name: &str, sub: &str, effective: &[&str]) -> (&'static str, String) {
+fn categorize_js_runner(base_name: &str, sub: &str, effective: &[&str]) -> CommandCategory {
     match sub {
         "run" => {
             let script = effective.get(2).copied().unwrap_or("?");
             categorize_npm_run(base_name, script)
         }
-        "build" => ("build", format!("{} build", base_name)),
-        "test" => ("test", format!("{} test", base_name)),
-        "install" | "i" | "add" | "ci" => ("install", format!("{} install", base_name)),
-        _ => ("other", format!("{} {}", base_name, sub)),
+        "build" => CommandCategory {
+            category: "build",
+            pattern: format!("{} build", base_name),
+        },
+        "test" => CommandCategory {
+            category: "test",
+            pattern: format!("{} test", base_name),
+        },
+        "install" | "i" | "add" | "ci" => CommandCategory {
+            category: "install",
+            pattern: format!("{} install", base_name),
+        },
+        _ => CommandCategory {
+            category: "other",
+            pattern: format!("{} {}", base_name, sub),
+        },
     }
 }
 
-/// Categorize a single shell command and return (category, normalized_pattern).
+/// Categorize a single shell command and return category + normalized pattern.
 ///
 /// The normalized pattern is the base command + subcommand (e.g. "cargo test", "npm run build").
-pub fn categorize_command(cmd: &str) -> (&'static str, String) {
+pub fn categorize_command(cmd: &str) -> CommandCategory {
     // Strip leading env vars (KEY=val cmd ...) and cd prefixes
     let cmd = cmd.trim();
     // Skip env var assignments at the start
@@ -1531,7 +1550,10 @@ pub fn categorize_command(cmd: &str) -> (&'static str, String) {
         .skip_while(|w| w.contains('=') && !w.starts_with('-'))
         .collect::<Vec<_>>();
     if effective.is_empty() {
-        return ("other", cmd.to_string());
+        return CommandCategory {
+            category: "other",
+            pattern: cmd.to_string(),
+        };
     }
 
     let base = effective[0];
@@ -1545,39 +1567,79 @@ pub fn categorize_command(cmd: &str) -> (&'static str, String) {
         "npm" | "npx" | "yarn" | "pnpm" => categorize_js_runner(base_name, sub, &effective),
 
         // Build tools
-        "make" | "cmake" | "ninja" => ("build", base_name.to_string()),
-        "tsc" => ("build", "tsc".to_string()),
-        "webpack" | "vite" | "esbuild" | "rollup" | "parcel" => ("build", base_name.to_string()),
+        "make" | "cmake" | "ninja" => CommandCategory {
+            category: "build",
+            pattern: base_name.to_string(),
+        },
+        "tsc" => CommandCategory {
+            category: "build",
+            pattern: "tsc".to_string(),
+        },
+        "webpack" | "vite" | "esbuild" | "rollup" | "parcel" => CommandCategory {
+            category: "build",
+            pattern: base_name.to_string(),
+        },
 
         // Test tools
-        "pytest" | "jest" | "vitest" | "mocha" => ("test", base_name.to_string()),
-        "go" if sub == "test" => ("test", "go test".to_string()),
-        "ruby" if sub == "-e" || sub == "test" => ("test", "ruby test".to_string()),
-        "rspec" | "phpunit" => ("test", base_name.to_string()),
+        "pytest" | "jest" | "vitest" | "mocha" => CommandCategory {
+            category: "test",
+            pattern: base_name.to_string(),
+        },
+        "go" if sub == "test" => CommandCategory {
+            category: "test",
+            pattern: "go test".to_string(),
+        },
+        "ruby" if sub == "-e" || sub == "test" => CommandCategory {
+            category: "test",
+            pattern: "ruby test".to_string(),
+        },
+        "rspec" | "phpunit" => CommandCategory {
+            category: "test",
+            pattern: base_name.to_string(),
+        },
 
         // Lint/format tools
         "eslint" | "prettier" | "ruff" | "black" | "flake8" | "mypy" | "pylint" | "rubocop"
-        | "biome" | "oxlint" => ("lint", base_name.to_string()),
+        | "biome" | "oxlint" => CommandCategory {
+            category: "lint",
+            pattern: base_name.to_string(),
+        },
 
         // Git
         "git" | "gh" => {
             let git_sub = if sub.is_empty() { "git" } else { sub };
-            ("git", format!("{} {}", base_name, git_sub))
+            CommandCategory {
+                category: "git",
+                pattern: format!("{} {}", base_name, git_sub),
+            }
         }
 
         // Install/dependency
-        "pip" | "pip3" if sub == "install" => ("install", "pip install".to_string()),
-        "apt" | "apt-get" | "brew" | "dnf" | "pacman" | "nix" => {
-            ("install", format!("{} {}", base_name, sub))
-        }
+        "pip" | "pip3" if sub == "install" => CommandCategory {
+            category: "install",
+            pattern: "pip install".to_string(),
+        },
+        "apt" | "apt-get" | "brew" | "dnf" | "pacman" | "nix" => CommandCategory {
+            category: "install",
+            pattern: format!("{} {}", base_name, sub),
+        },
 
         // Search/read tools
-        "find" | "grep" | "rg" | "ag" | "fd" => ("search", base_name.to_string()),
+        "find" | "grep" | "rg" | "ag" | "fd" => CommandCategory {
+            category: "search",
+            pattern: base_name.to_string(),
+        },
         "ls" | "cat" | "head" | "tail" | "wc" | "file" | "stat" | "tree" | "less" => {
-            ("search", base_name.to_string())
+            CommandCategory {
+                category: "search",
+                pattern: base_name.to_string(),
+            }
         }
 
-        _ => ("other", base_name.to_string()),
+        _ => CommandCategory {
+            category: "other",
+            pattern: base_name.to_string(),
+        },
     }
 }
 
@@ -1802,8 +1864,8 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
                             let subcmds = split_command_chain(cmd);
                             let mut entries = Vec::new();
                             for subcmd in subcmds {
-                                let (cat, pattern) = categorize_command(subcmd);
-                                entries.push((pattern, cat));
+                                let cc = categorize_command(subcmd);
+                                entries.push((cc.pattern, cc.category));
                             }
                             bash_commands.insert(id.clone(), entries);
                         }

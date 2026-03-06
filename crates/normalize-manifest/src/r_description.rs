@@ -53,13 +53,13 @@ impl ManifestParser for RDescriptionParser {
                 if entry.is_empty() {
                     continue;
                 }
-                let (pkg_name, ver) = parse_r_dep_entry(entry);
-                if pkg_name.is_empty() || pkg_name == "R" {
+                let dep_entry = parse_r_dep_entry(entry);
+                if dep_entry.pkg_name.is_empty() || dep_entry.pkg_name == "R" {
                     continue;
                 }
                 deps.push(DeclaredDep {
-                    name: pkg_name,
-                    version_req: ver,
+                    name: dep_entry.pkg_name,
+                    version_req: dep_entry.version_req,
                     kind,
                 });
             }
@@ -127,17 +127,28 @@ impl ManifestParser for RDescriptionParser {
     }
 }
 
-/// Parse `dplyr (>= 1.0.0)` → `("dplyr", Some(">= 1.0.0"))`.
-/// Also handles bare `ggplot2` → `("ggplot2", None)`.
-fn parse_r_dep_entry(s: &str) -> (String, Option<String>) {
+struct RDepEntry {
+    pkg_name: String,
+    version_req: Option<String>,
+}
+
+/// Parse `dplyr (>= 1.0.0)` → name + optional version.
+/// Also handles bare `ggplot2` → name with no version.
+fn parse_r_dep_entry(s: &str) -> RDepEntry {
     if let Some(paren) = s.find('(') {
         let pkg_name = s[..paren].trim().to_string();
         let rest = s[paren + 1..].trim();
         let ver = rest.trim_end_matches(')').trim().to_string();
-        let ver_opt = if ver.is_empty() { None } else { Some(ver) };
-        (pkg_name, ver_opt)
+        let version_req = if ver.is_empty() { None } else { Some(ver) };
+        RDepEntry {
+            pkg_name,
+            version_req,
+        }
     } else {
-        (s.trim().to_string(), None)
+        RDepEntry {
+            pkg_name: s.trim().to_string(),
+            version_req: None,
+        }
     }
 }
 
