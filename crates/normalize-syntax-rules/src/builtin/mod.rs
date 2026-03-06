@@ -70,6 +70,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         content: include_str!("js_module_let.scm"),
     },
     BuiltinRule {
+        id: "js/var-declaration",
+        content: include_str!("js_var_declaration.scm"),
+    },
+    BuiltinRule {
         id: "typescript/tuple-return",
         content: include_str!("typescript_tuple_return.scm"),
     },
@@ -89,6 +93,14 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
     BuiltinRule {
         id: "python/module-assign",
         content: include_str!("python_module_assign.scm"),
+    },
+    BuiltinRule {
+        id: "python/bare-except",
+        content: include_str!("python_bare_except.scm"),
+    },
+    BuiltinRule {
+        id: "python/mutable-default-arg",
+        content: include_str!("python_mutable_default_arg.scm"),
     },
     // Go rules
     BuiltinRule {
@@ -111,6 +123,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
     BuiltinRule {
         id: "ruby/global-var",
         content: include_str!("ruby_global_var.scm"),
+    },
+    BuiltinRule {
+        id: "ruby/rescue-exception",
+        content: include_str!("ruby_rescue_exception.scm"),
     },
     // Cross-language rules
     BuiltinRule {
