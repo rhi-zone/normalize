@@ -31,8 +31,7 @@ repos (265+ dirs), this is slow. Cache the per-directory results keyed by HEAD c
   Still re-check `git status --short` for uncommitted changes (cheap, always current).
 - Invalidate cache entries when the SUMMARY.md file itself is touched.
 
-The index (SQLite) is the right long-term home for this data since it already tracks per-file
-commit info. Short-term: a simple JSON cache file is fine.
+The index (SQLite) is the right home for this data since it already tracks per-file commit info.
 
 ### Bootstrap all SUMMARY.md files — HIGH PRIORITY
 
