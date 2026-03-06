@@ -37,6 +37,14 @@ impl Language for D {
         " {}"
     }
 
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_d_docstring(node, content)
+    }
+
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        extract_d_attributes(node, content)
+    }
+
     fn build_signature(&self, node: &Node, content: &str) -> String {
         let name = self.node_name(node, content).unwrap_or("");
         match node.kind() {
@@ -132,6 +140,93 @@ impl Language for D {
         }
         None
     }
+}
+
+/// Extract D doc comments (`///`, `/** */`, `/++ +/`) from preceding siblings.
+fn extract_d_docstring(node: &Node, content: &str) -> Option<String> {
+    let mut prev = node.prev_sibling();
+    let mut doc_lines = Vec::new();
+    while let Some(sibling) = prev {
+        let text = &content[sibling.byte_range()];
+        match sibling.kind() {
+            "comment" => {
+                if text.starts_with("///") {
+                    let line = text.strip_prefix("///").unwrap_or(text).trim();
+                    if !line.is_empty() {
+                        doc_lines.push(line.to_string());
+                    }
+                    prev = sibling.prev_sibling();
+                } else {
+                    break;
+                }
+            }
+            "block_comment" => {
+                if text.starts_with("/**") {
+                    let inner = text
+                        .strip_prefix("/**")
+                        .unwrap_or(text)
+                        .strip_suffix("*/")
+                        .unwrap_or(text);
+                    for line in inner.lines() {
+                        let clean = line.trim().strip_prefix('*').unwrap_or(line).trim();
+                        if !clean.is_empty() {
+                            doc_lines.push(clean.to_string());
+                        }
+                    }
+                }
+                break;
+            }
+            "nesting_block_comment" => {
+                if text.starts_with("/++") {
+                    let inner = text
+                        .strip_prefix("/++")
+                        .unwrap_or(text)
+                        .strip_suffix("+/")
+                        .unwrap_or(text);
+                    for line in inner.lines() {
+                        let clean = line.trim().strip_prefix('+').unwrap_or(line).trim();
+                        if !clean.is_empty() {
+                            doc_lines.push(clean.to_string());
+                        }
+                    }
+                }
+                break;
+            }
+            _ => break,
+        }
+    }
+    if doc_lines.is_empty() {
+        return None;
+    }
+    doc_lines.reverse();
+    Some(doc_lines.join(" "))
+}
+
+/// Extract D attributes (`@safe`, `@nogc`, `@property`, etc.) from children and preceding siblings.
+fn extract_d_attributes(node: &Node, content: &str) -> Vec<String> {
+    let mut attrs = Vec::new();
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "attribute_specifier" {
+            let text = content[child.byte_range()].trim().to_string();
+            if !text.is_empty() {
+                attrs.push(text);
+            }
+        }
+    }
+    let mut prev = node.prev_sibling();
+    while let Some(sibling) = prev {
+        if sibling.kind() == "attribute_specifier" {
+            let text = content[sibling.byte_range()].trim().to_string();
+            if !text.is_empty() {
+                attrs.insert(0, text);
+            }
+            prev = sibling.prev_sibling();
+        } else {
+            break;
+        }
+    }
+    attrs
 }
 
 #[cfg(test)]

@@ -21,6 +21,10 @@ impl Language for Elixir {
         " end"
     }
 
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        extract_elixir_attributes(node, content)
+    }
+
     fn build_signature(&self, node: &Node, content: &str) -> String {
         if node.kind() != "call" {
             let text = &content[node.byte_range()];
@@ -150,6 +154,26 @@ impl Elixir {
         }
         None
     }
+}
+
+/// Extract Elixir module attributes (`@spec`, `@deprecated`, etc.) from preceding siblings.
+/// Skips `@doc`/`@moduledoc` (those are docstrings).
+fn extract_elixir_attributes(node: &Node, content: &str) -> Vec<String> {
+    let mut attrs = Vec::new();
+    let mut prev = node.prev_sibling();
+    while let Some(sibling) = prev {
+        if sibling.kind() == "unary_operator" {
+            let text = content[sibling.byte_range()].trim();
+            if text.starts_with('@') && !text.starts_with("@doc") && !text.starts_with("@moduledoc")
+            {
+                attrs.insert(0, text.to_string());
+            }
+            prev = sibling.prev_sibling();
+        } else {
+            break;
+        }
+    }
+    attrs
 }
 
 #[cfg(test)]

@@ -21,6 +21,10 @@ impl Language for Dart {
         " {}"
     }
 
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        extract_dart_annotations(node, content)
+    }
+
     fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
         let mut implements = Vec::new();
         let mut cursor = node.walk();
@@ -179,6 +183,33 @@ impl Language for Dart {
     ) -> Option<ContainerBody> {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
+}
+
+/// Extract Dart annotations from child and preceding sibling nodes.
+fn extract_dart_annotations(node: &Node, content: &str) -> Vec<String> {
+    let mut attrs = Vec::new();
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "annotation" {
+            let text = content[child.byte_range()].trim().to_string();
+            if !text.is_empty() {
+                attrs.push(text);
+            }
+        }
+    }
+    let mut prev = node.prev_sibling();
+    while let Some(sibling) = prev {
+        if sibling.kind() == "annotation" {
+            let text = content[sibling.byte_range()].trim().to_string();
+            if !text.is_empty() {
+                attrs.insert(0, text);
+            }
+            prev = sibling.prev_sibling();
+        } else {
+            break;
+        }
+    }
+    attrs
 }
 
 #[cfg(test)]

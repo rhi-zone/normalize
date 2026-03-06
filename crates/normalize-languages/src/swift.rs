@@ -39,6 +39,10 @@ impl Language for Swift {
         " {}"
     }
 
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        extract_swift_attributes(node, content)
+    }
+
     fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
         let mut implements = Vec::new();
         let mut cursor = node.walk();
@@ -170,6 +174,35 @@ impl Language for Swift {
     fn test_file_globs(&self) -> &'static [&'static str] {
         &["**/*Tests.swift", "**/*Test.swift"]
     }
+}
+
+/// Extract Swift attributes from `modifiers` child and preceding siblings.
+fn extract_swift_attributes(node: &Node, content: &str) -> Vec<String> {
+    let mut attrs = Vec::new();
+    if let Some(mods) = node.child_by_field_name("modifiers") {
+        let mut cursor = mods.walk();
+        for child in mods.children(&mut cursor) {
+            if child.kind() == "attribute" {
+                let text = content[child.byte_range()].trim().to_string();
+                if !text.is_empty() {
+                    attrs.push(text);
+                }
+            }
+        }
+    }
+    let mut prev = node.prev_sibling();
+    while let Some(sibling) = prev {
+        if sibling.kind() == "attribute" {
+            let text = content[sibling.byte_range()].trim().to_string();
+            if !text.is_empty() {
+                attrs.insert(0, text);
+            }
+            prev = sibling.prev_sibling();
+        } else {
+            break;
+        }
+    }
+    attrs
 }
 
 #[cfg(test)]
