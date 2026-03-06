@@ -162,7 +162,7 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
             let mut file_inherent = 0usize;
 
             fn walk(
-                symbols: &[crate::skeleton::SkeletonSymbol],
+                symbols: &[normalize_languages::Symbol],
                 file_total: &mut usize,
                 file_interface_impl: &mut usize,
                 file_free: &mut usize,

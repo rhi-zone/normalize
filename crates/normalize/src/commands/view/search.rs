@@ -234,7 +234,7 @@ pub fn suggest_symbols_trigram(
 }
 
 fn collect_trigram_symbols(
-    symbols: &[skeleton::SkeletonSymbol],
+    symbols: &[normalize_languages::Symbol],
     q_trigrams: &std::collections::HashSet<[char; 3]>,
     threshold: f32,
     file: &str,
@@ -269,7 +269,7 @@ fn collect_trigram_symbols(
 }
 
 fn collect_matching_symbols(
-    symbols: &[skeleton::SkeletonSymbol],
+    symbols: &[normalize_languages::Symbol],
     query: &str,
     matcher: &mut nucleo_matcher::Matcher,
     file: &str,

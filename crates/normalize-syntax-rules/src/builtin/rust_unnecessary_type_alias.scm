@@ -24,7 +24,16 @@
 # and public re-exports are legitimate uses.
 
 ; Detects: type X = Y; where both are simple type identifiers
-; May be intentional for re-exports or semantic clarity
-(type_item
-  name: (type_identifier) @_alias
-  type: (type_identifier) @_target) @match
+; Only matches standalone type aliases at file or module scope —
+; NOT associated types inside impl blocks (which use the same syntax
+; but are required trait associated type definitions, not aliases).
+(source_file
+  (type_item
+    name: (type_identifier) @_alias
+    type: (type_identifier) @_target) @match)
+
+(mod_item
+  body: (declaration_list
+    (type_item
+      name: (type_identifier) @_alias
+      type: (type_identifier) @_target) @match))

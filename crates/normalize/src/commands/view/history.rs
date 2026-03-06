@@ -75,10 +75,10 @@ pub fn cmd_history(target: Option<&str>, root: &Path, limit: usize, case_insensi
 
 /// Find symbol by path (parent/child).
 fn find_symbol_by_path<'a>(
-    symbols: &'a [skeleton::SkeletonSymbol],
+    symbols: &'a [normalize_languages::Symbol],
     path: &[String],
     case_insensitive: bool,
-) -> Option<&'a skeleton::SkeletonSymbol> {
+) -> Option<&'a normalize_languages::Symbol> {
     if path.is_empty() {
         return None;
     }

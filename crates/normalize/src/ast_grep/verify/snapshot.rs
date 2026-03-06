@@ -15,12 +15,9 @@ use serde::{Deserialize, Serialize, Serializer};
 
 use std::collections::{BTreeMap, HashMap};
 
-type CaseId = String;
-type Source = String;
-
 /// A collection of test snapshots for different rules
 /// where each [TestSnapshots] is identified by its rule ID.
-pub type SnapshotCollection = HashMap<CaseId, TestSnapshots>;
+pub type SnapshotCollection = HashMap<String, TestSnapshots>;
 
 fn merge_snapshots(
     accepted: SnapshotCollection,
@@ -69,9 +66,9 @@ impl SnapshotAction {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TestSnapshots {
-    pub id: CaseId,
+    pub id: String,
     #[serde(serialize_with = "ordered_map")]
-    pub snapshots: HashMap<Source, TestSnapshot>,
+    pub snapshots: HashMap<String, TestSnapshot>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]

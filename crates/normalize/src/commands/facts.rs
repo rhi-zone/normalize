@@ -517,7 +517,7 @@ async fn cmd_packages(only: &[String], clear: bool, root: Option<&Path>, json: b
 async fn count_and_insert_symbols(
     pkg_index: &external_packages::PackageIndex,
     pkg_id: i64,
-    symbols: &[skeleton::SkeletonSymbol],
+    symbols: &[normalize_languages::Symbol],
 ) -> usize {
     let mut count = 0;
     for sym in symbols {

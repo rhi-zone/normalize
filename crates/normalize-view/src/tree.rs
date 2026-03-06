@@ -2,9 +2,10 @@
 //!
 //! Git-aware tree display using the `ignore` crate for gitignore support.
 
-use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
+use crate::skeleton::SkeletonExtractor;
 use ignore::WalkBuilder;
 use normalize_facts::grammar_loader;
+use normalize_languages::Symbol;
 use normalize_languages::{GrammarLoader, support_for_grammar, support_for_path};
 use nu_ansi_term::Color::{LightCyan, LightGreen, LightMagenta, Red, White as LightGray, Yellow};
 use serde::Serialize;
@@ -1397,8 +1398,8 @@ fn extract_file_symbols(file_path: &Path, view_path: &str) -> Option<Vec<ViewNod
     Some(children)
 }
 
-/// Convert a SkeletonSymbol to a ViewNode.
-fn skeleton_to_view_node(sym: &SkeletonSymbol, parent_path: &str, grammar: &str) -> ViewNode {
+/// Convert a Symbol to a ViewNode.
+fn skeleton_to_view_node(sym: &Symbol, parent_path: &str, grammar: &str) -> ViewNode {
     let path = format!("{}/{}", parent_path, sym.name);
 
     let children: Vec<ViewNode> = sym

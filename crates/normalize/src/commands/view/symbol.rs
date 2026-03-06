@@ -90,12 +90,12 @@ pub fn cmd_view_symbol_at_line(
     let skeleton_result = extractor.extract(&full_path, &content);
 
     fn find_symbol_at_line<'a>(
-        symbols: &'a [skeleton::SkeletonSymbol],
+        symbols: &'a [normalize_languages::Symbol],
         line: usize,
-        parent: Option<&'a skeleton::SkeletonSymbol>,
+        parent: Option<&'a normalize_languages::Symbol>,
     ) -> Option<(
-        &'a skeleton::SkeletonSymbol,
-        Vec<&'a skeleton::SkeletonSymbol>,
+        &'a normalize_languages::Symbol,
+        Vec<&'a normalize_languages::Symbol>,
     )> {
         for sym in symbols {
             if let Some((child, mut ancestors)) =
@@ -203,18 +203,18 @@ fn names_match(a: &str, b: &str, case_insensitive: bool) -> bool {
 
 /// Find a symbol by name in a skeleton (recursive)
 pub fn find_symbol<'a>(
-    symbols: &'a [skeleton::SkeletonSymbol],
+    symbols: &'a [normalize_languages::Symbol],
     name: &str,
-) -> Option<&'a skeleton::SkeletonSymbol> {
+) -> Option<&'a normalize_languages::Symbol> {
     find_symbol_ci(symbols, name, false)
 }
 
 /// Find a symbol by name in a skeleton (recursive), with case sensitivity control
 pub fn find_symbol_ci<'a>(
-    symbols: &'a [skeleton::SkeletonSymbol],
+    symbols: &'a [normalize_languages::Symbol],
     name: &str,
     case_insensitive: bool,
-) -> Option<&'a skeleton::SkeletonSymbol> {
+) -> Option<&'a normalize_languages::Symbol> {
     for sym in symbols {
         if names_match(&sym.name, name, case_insensitive) {
             return Some(sym);
@@ -228,10 +228,10 @@ pub fn find_symbol_ci<'a>(
 
 /// Find a symbol by qualified path (e.g., ["Tsx", "format_import"])
 fn find_symbol_by_path<'a>(
-    symbols: &'a [skeleton::SkeletonSymbol],
+    symbols: &'a [normalize_languages::Symbol],
     path: &[String],
     case_insensitive: bool,
-) -> Option<&'a skeleton::SkeletonSymbol> {
+) -> Option<&'a normalize_languages::Symbol> {
     if path.is_empty() {
         return None;
     }
@@ -255,7 +255,7 @@ fn find_symbol_by_path<'a>(
 
 /// Info about one ancestor in the chain
 struct AncestorInfo<'a> {
-    symbol: &'a skeleton::SkeletonSymbol,
+    symbol: &'a normalize_languages::Symbol,
     sibling_count: usize,
 }
 
@@ -266,11 +266,11 @@ struct SymbolWithAncestors<'a> {
 
 /// Find a symbol by name along with all its ancestors (outermost first)
 fn find_symbol_with_ancestors<'a>(
-    symbols: &'a [skeleton::SkeletonSymbol],
+    symbols: &'a [normalize_languages::Symbol],
     name: &str,
     ancestors: &mut Vec<AncestorInfo<'a>>,
     case_insensitive: bool,
-) -> Option<&'a skeleton::SkeletonSymbol> {
+) -> Option<&'a normalize_languages::Symbol> {
     for sym in symbols {
         if names_match(&sym.name, name, case_insensitive) {
             return Some(sym);
@@ -302,7 +302,7 @@ fn find_symbol_with_ancestors<'a>(
 
 /// Helper that returns ancestors in a Vec
 fn find_symbol_with_parent<'a>(
-    symbols: &'a [skeleton::SkeletonSymbol],
+    symbols: &'a [normalize_languages::Symbol],
     name: &str,
     case_insensitive: bool,
 ) -> SymbolWithAncestors<'a> {
@@ -312,7 +312,10 @@ fn find_symbol_with_parent<'a>(
 }
 
 /// Find a symbol's signature in a skeleton
-pub fn find_symbol_signature(symbols: &[skeleton::SkeletonSymbol], name: &str) -> Option<String> {
+pub fn find_symbol_signature(
+    symbols: &[normalize_languages::Symbol],
+    name: &str,
+) -> Option<String> {
     find_symbol(symbols, name).map(|sym| sym.signature.clone())
 }
 
@@ -881,9 +884,9 @@ fn collect_type_identifiers_fallback(
 /// Find type definitions in skeleton that match the given type names.
 /// Returns symbols that are type definitions (struct, enum, type alias, trait, interface, class).
 fn find_type_definitions<'a>(
-    symbols: &'a [skeleton::SkeletonSymbol],
+    symbols: &'a [normalize_languages::Symbol],
     type_names: &HashSet<String>,
-) -> Vec<&'a skeleton::SkeletonSymbol> {
+) -> Vec<&'a normalize_languages::Symbol> {
     let mut found = Vec::new();
 
     for sym in symbols {
@@ -914,7 +917,7 @@ fn find_type_definitions<'a>(
 fn display_referenced_types(
     source: &str,
     grammar: &str,
-    symbols: &[skeleton::SkeletonSymbol],
+    symbols: &[normalize_languages::Symbol],
     symbol_name: &str,
     use_colors: bool,
     root: &Path,
@@ -1124,12 +1127,12 @@ pub fn build_view_symbol_at_line_service(
     let skeleton_result = extractor.extract(&full_path, &content);
 
     fn find_at_line<'a>(
-        symbols: &'a [skeleton::SkeletonSymbol],
+        symbols: &'a [normalize_languages::Symbol],
         line: usize,
-        parent: Option<&'a skeleton::SkeletonSymbol>,
+        parent: Option<&'a normalize_languages::Symbol>,
     ) -> Option<(
-        &'a skeleton::SkeletonSymbol,
-        Vec<&'a skeleton::SkeletonSymbol>,
+        &'a normalize_languages::Symbol,
+        Vec<&'a normalize_languages::Symbol>,
     )> {
         for sym in symbols {
             if let Some((child, mut ancestors)) = find_at_line(&sym.children, line, Some(sym)) {

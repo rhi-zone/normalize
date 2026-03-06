@@ -171,7 +171,7 @@ impl LanguageServer for MossBackend {
         let result = extractor.extract(&file_path, &content);
 
         // Convert to LSP document symbols (nested structure)
-        fn to_document_symbol(sym: &crate::skeleton::SkeletonSymbol) -> DocumentSymbol {
+        fn to_document_symbol(sym: &normalize_languages::Symbol) -> DocumentSymbol {
             let range = Range {
                 start: Position {
                     line: sym.start_line.saturating_sub(1) as u32,
@@ -289,9 +289,9 @@ impl LanguageServer for MossBackend {
         let line = position.line as usize + 1;
 
         fn find_symbol_at_line(
-            symbols: &[crate::skeleton::SkeletonSymbol],
+            symbols: &[normalize_languages::Symbol],
             line: usize,
-        ) -> Option<&crate::skeleton::SkeletonSymbol> {
+        ) -> Option<&normalize_languages::Symbol> {
             for sym in symbols {
                 if line >= sym.start_line && line <= sym.end_line {
                     // Check children first for more specific match

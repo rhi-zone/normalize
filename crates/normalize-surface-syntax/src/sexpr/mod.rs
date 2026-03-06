@@ -15,11 +15,7 @@ mod to_sexpr;
 pub use from_sexpr::from_sexpr;
 pub use to_sexpr::to_sexpr;
 
-use serde_json::Value;
 use thiserror::Error;
-
-/// S-expression type alias (JSON Value).
-pub type SExpr = Value;
 
 #[derive(Debug, Error)]
 pub enum SExprError {

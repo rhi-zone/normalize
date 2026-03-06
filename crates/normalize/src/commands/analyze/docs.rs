@@ -220,7 +220,7 @@ fn process_file(
     let mut total = 0;
 
     fn count_docs(
-        symbols: &[crate::skeleton::SkeletonSymbol],
+        symbols: &[normalize_languages::Symbol],
         documented: &mut usize,
         total: &mut usize,
         exclude_interface_impls: bool,

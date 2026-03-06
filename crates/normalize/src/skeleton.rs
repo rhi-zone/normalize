@@ -8,10 +8,6 @@ use normalize_facts::{ExtractResult, Extractor};
 use normalize_languages::Symbol;
 use std::path::Path;
 
-/// Re-export Symbol as SkeletonSymbol for backwards compatibility.
-/// This is the canonical Symbol type from normalize_languages.
-pub type SkeletonSymbol = Symbol;
-
 /// Extension trait for converting Symbol to ViewNode
 pub trait SymbolExt {
     fn to_view_node(&self, parent_path: &str, grammar: Option<&str>) -> ViewNode;
@@ -44,9 +40,6 @@ impl SymbolExt for Symbol {
         }
     }
 }
-
-/// Result of skeleton extraction (alias for ExtractResult)
-pub type SkeletonResult = ExtractResult;
 
 /// Extension trait for ExtractResult to add view-related methods
 pub trait ExtractResultExt {
@@ -89,9 +82,9 @@ impl SkeletonExtractor {
         }
     }
 
-    pub fn extract(&self, path: &Path, content: &str) -> SkeletonResult {
+    pub fn extract(&self, path: &Path, content: &str) -> ExtractResult {
         let result = self.extractor.extract(path, content);
-        SkeletonResult {
+        ExtractResult {
             symbols: result.symbols,
             file_path: result.file_path,
         }
@@ -103,11 +96,11 @@ impl SkeletonExtractor {
         path: &Path,
         content: &str,
         resolver: Option<&dyn normalize_facts::InterfaceResolver>,
-    ) -> SkeletonResult {
+    ) -> ExtractResult {
         let result = self
             .extractor
             .extract_with_resolver(path, content, resolver);
-        SkeletonResult {
+        ExtractResult {
             symbols: result.symbols,
             file_path: result.file_path,
         }
@@ -115,14 +108,14 @@ impl SkeletonExtractor {
 
     /// Trait-based extraction (for future use when implementations are complete)
     #[allow(dead_code)]
-    pub fn extract_with_support(&self, path: &Path, content: &str) -> Option<SkeletonResult> {
+    pub fn extract_with_support(&self, path: &Path, content: &str) -> Option<ExtractResult> {
         let result = self.extractor.extract(path, content);
         if result.symbols.is_empty() {
             // Check if this is a supported file type that just has no symbols
             use normalize_languages::support_for_path;
             support_for_path(path)?;
         }
-        Some(SkeletonResult {
+        Some(ExtractResult {
             symbols: result.symbols,
             file_path: result.file_path,
         })

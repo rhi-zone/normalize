@@ -77,4 +77,4 @@ pub use output::LuaWriter;
 pub use output::lua::LuaWriterImpl;
 
 #[cfg(feature = "sexpr")]
-pub use sexpr::{SExpr, SExprError, from_sexpr, to_sexpr};
+pub use sexpr::{SExprError, from_sexpr, to_sexpr};

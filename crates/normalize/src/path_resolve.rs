@@ -2,7 +2,8 @@ use glob::Pattern as GlobPattern;
 use std::path::Path;
 
 use crate::config::NormalizeConfig;
-use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
+use crate::skeleton::SkeletonExtractor;
+use normalize_languages::Symbol;
 
 // Re-export public types from the extracted crate
 pub use normalize_path_resolve::{PathMatch, PathSource, SigilExpansion, UnifiedPath};
@@ -100,7 +101,7 @@ pub use normalize_path_resolve::is_glob_pattern;
 #[derive(Debug, Clone)]
 pub struct SymbolMatch {
     /// The symbol itself
-    pub symbol: SkeletonSymbol,
+    pub symbol: Symbol,
     /// Full path from root (e.g., "Parent/Child/Symbol")
     pub path: String,
 }
@@ -116,7 +117,7 @@ pub fn resolve_symbol_glob(file_path: &Path, content: &str, pattern: &str) -> Ve
     };
 
     fn collect_matching(
-        symbols: &[SkeletonSymbol],
+        symbols: &[Symbol],
         glob: &GlobPattern,
         parent_path: &str,
         matches: &mut Vec<SymbolMatch>,
