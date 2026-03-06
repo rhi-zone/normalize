@@ -1,0 +1,30 @@
+[
+  {
+    "file": "main.dart",
+    "name": "main",
+    "kind": "Function",
+    "start_line": 3,
+    "parent": null
+  },
+  {
+    "file": "math_utils.dart",
+    "name": "MathUtils",
+    "kind": "Class",
+    "start_line": 1,
+    "parent": null
+  },
+  {
+    "file": "math_utils.dart",
+    "name": "add",
+    "kind": "Function",
+    "start_line": 2,
+    "parent": "MathUtils"
+  },
+  {
+    "file": "math_utils.dart",
+    "name": "multiply",
+    "kind": "Function",
+    "start_line": 7,
+    "parent": null
+  }
+]
