@@ -838,8 +838,7 @@ fn compute_complexity_stats(root: &Path, allowlist: &[String]) -> ComplexityStat
 
     // If complexity came back empty, check whether any present languages have missing grammars.
     let missing_grammars = if report.functions.is_empty() {
-        use normalize_languages::GrammarLoader;
-        let loader = GrammarLoader::new();
+        let loader = normalize_languages::parsers::grammar_loader();
         let mut seen: HashSet<&'static str> = HashSet::new();
         all_files(root, None)
             .iter()

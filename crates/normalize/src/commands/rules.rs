@@ -332,7 +332,7 @@ fn tag_color(tag: &str) -> nu_ansi_term::Color {
         Color::Fixed(73),  // cadet blue
     ];
     // FNV-1a hash for a stable, fast, dependency-free result
-    let mut hash: u64 = 0xcbf29ce484222325;
+    let mut hash = 0xcbf29ce484222325u64;
     for byte in tag.bytes() {
         hash ^= u64::from(byte);
         hash = hash.wrapping_mul(0x100000001b3);

@@ -1904,8 +1904,8 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
     analysis.total_turns = session.turns.len();
     let mut actual_cost_sum: f64 = 0.0;
     let mut has_model_pricing = false;
-    let mut prev_context: u64 = 0;
-    let mut unique_input: u64 = 0;
+    let mut prev_context = 0u64;
+    let mut unique_input = 0u64;
 
     for turn in &session.turns {
         if let Some(usage) = &turn.token_usage {

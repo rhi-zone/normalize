@@ -189,7 +189,7 @@ fn parse_git_churn(root: &Path) -> Result<HashMap<String, ChurnStats>, String> {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut stats: HashMap<String, ChurnStats> = HashMap::new();
-    let mut current_timestamp: u64 = 0;
+    let mut current_timestamp = 0u64;
 
     for line in stdout.lines() {
         let trimmed = line.trim();

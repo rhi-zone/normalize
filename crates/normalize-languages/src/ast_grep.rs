@@ -52,13 +52,11 @@ impl LanguageExt for DynLang {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::GrammarLoader;
-
     #[test]
     fn test_pattern_matching() {
         use ast_grep_core::tree_sitter::LanguageExt;
 
-        let loader = GrammarLoader::new();
+        let loader = crate::parsers::grammar_loader();
         let Some(ts_lang) = loader.get("rust") else {
             eprintln!("Skipping test: rust grammar not available");
             return;

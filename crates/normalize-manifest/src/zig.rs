@@ -32,9 +32,9 @@ impl ManifestParser for ZigZonParser {
         }
 
         let mut state = State::TopLevel;
-        let mut depth: usize = 0;
-        let mut deps_depth: usize = 0;
-        let mut dep_entry_depth: usize = 0;
+        let mut depth = 0usize;
+        let mut deps_depth = 0usize;
+        let mut dep_entry_depth = 0usize;
         let mut current_dep_name: Option<String> = None;
 
         for line in content.lines() {

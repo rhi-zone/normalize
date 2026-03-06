@@ -10,7 +10,7 @@ Usage: normalize rules list [OPTIONS]
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
       --sources                    Show source URLs for imported rules
-  -e, --engine <engine>            Filter by engine (all, syntax, fact) [possible values: all, syntax, fact]
+  -e, --engine <engine>            Filter by engine (all, syntax, fact, sarif)
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression
       --tag <tag>                  Filter by tag

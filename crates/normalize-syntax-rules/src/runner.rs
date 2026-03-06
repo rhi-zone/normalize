@@ -555,10 +555,12 @@ fn collect_source_files(root: &Path) -> Vec<PathBuf> {
 mod tests {
     use super::*;
     use normalize_languages::GrammarLoader;
+    use normalize_languages::parsers::grammar_loader;
+    use std::sync::Arc;
     use streaming_iterator::StreamingIterator;
 
-    fn loader() -> GrammarLoader {
-        GrammarLoader::new()
+    fn loader() -> Arc<GrammarLoader> {
+        grammar_loader()
     }
 
     /// Test that combined queries correctly scope predicates per-pattern.

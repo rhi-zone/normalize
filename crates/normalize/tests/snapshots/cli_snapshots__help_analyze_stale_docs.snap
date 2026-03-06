@@ -53,12 +53,7 @@ Module structure:
   layering           Per-module import layering compliance — are imports flowing downward?
 
 Repository:
-  check              Run documentation checks: broken refs, stale docs, missing examples
-
-Default: run all checks. Use flags to run specific checks only.
-Use --refs for broken documentation references (requires index).
-Use --stale for stale documentation (code newer than docs).
-Use --examples for missing example markers.
+  check              Check documentation health: broken refs, stale docs, missing examples, and SUMMARY.md freshness.
   docs               Analyze documentation coverage
   files              Show longest files in codebase
 

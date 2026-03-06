@@ -524,7 +524,7 @@ impl<'a> ExtractContext<'a> {
 
         let mut string_variants = Vec::new();
         let mut int_variants = Vec::new();
-        let mut auto_index: i64 = 0;
+        let mut auto_index = 0i64;
         let mut is_string = false;
         let mut cursor = body.walk();
 

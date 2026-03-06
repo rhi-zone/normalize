@@ -487,6 +487,27 @@ impl AnalyzeService {
             return Err(format!("{error_count} error(s) found"));
         }
 
+        if !report.issues.is_empty() && !self.pretty.get() {
+            // Determine which check(s) were run to build a precise suggestion.
+            let flag = if run_all {
+                "normalize analyze check".to_string()
+            } else {
+                let flags: Vec<&str> = [
+                    refs.then_some("--refs"),
+                    stale.then_some("--stale"),
+                    examples.then_some("--examples"),
+                    summary.then_some("--summary"),
+                ]
+                .into_iter()
+                .flatten()
+                .collect();
+                format!("normalize analyze check {}", flags.join(" "))
+            };
+            report
+                .hints
+                .push(format!("Run `{flag} --pretty` for a detailed view"));
+        }
+
         Ok(report)
     }
 

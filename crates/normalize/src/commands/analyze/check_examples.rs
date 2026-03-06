@@ -181,6 +181,7 @@ impl From<CheckExamplesReport> for DiagnosticsReport {
                 .collect(),
             files_checked: 0, // not tracked separately in CheckExamplesReport
             sources_run: vec!["check-examples".into()],
+            hints: Vec::new(),
         }
     }
 }

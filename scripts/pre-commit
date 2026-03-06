@@ -20,11 +20,10 @@ if [ -x "./target/debug/normalize" ] || [ -x "./target/release/normalize" ]; the
     [ -x "$NORMALIZE" ] || NORMALIZE="./target/release/normalize"
 
     if [ -x "$NORMALIZE" ]; then
-        # Run all enabled rules (informational until existing violations are fixed — see TODO.md).
-        # Remove --no-fail once error-severity violations are resolved.
+        # Syntax rules: errors block commits; warnings and info are informational.
         # Use `normalize rules run --limit 0` for full list.
         echo "Running normalize rules..."
-        $NORMALIZE rules run --engine syntax --no-fail
+        $NORMALIZE rules run --engine syntax
 
         # Check SUMMARY.md freshness — severity=error blocks commits on stale/missing files.
         echo "Running SUMMARY.md freshness check..."

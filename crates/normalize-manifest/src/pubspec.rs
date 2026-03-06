@@ -26,7 +26,7 @@ impl ManifestParser for PubspecParser {
         }
 
         let mut section = Section::None;
-        let mut section_indent: usize = 0;
+        let mut section_indent = 0usize;
         let mut dep_name: Option<(String, DepKind)> = None;
 
         for line in content.lines() {

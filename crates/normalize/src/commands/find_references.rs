@@ -9,7 +9,7 @@
 //! Output lists every reference as `file:line:col  name`.
 
 use crate::output::OutputFormatter;
-use normalize_languages::GrammarLoader;
+use normalize_languages::parsers::grammar_loader;
 use normalize_languages::support_for_path;
 use normalize_scope::ScopeEngine;
 use schemars::JsonSchema;
@@ -92,7 +92,7 @@ impl OutputFormatter for ReferencesReport {
 /// - `symbol`: symbol name to search for
 /// - `file`: if Some, restrict scope search to this file; cross-file always covers all files
 pub fn cmd_find_references(root: &Path, symbol: &str, file: Option<&str>) -> ReferencesReport {
-    let loader = GrammarLoader::new();
+    let loader = grammar_loader();
     let engine = ScopeEngine::new(&loader);
 
     let mut entries: Vec<ReferenceEntry> = Vec::new();

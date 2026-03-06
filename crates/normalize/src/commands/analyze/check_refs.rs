@@ -268,6 +268,7 @@ impl From<CheckRefsReport> for DiagnosticsReport {
                 .collect(),
             files_checked: report.files_checked,
             sources_run: vec!["check-refs".into()],
+            hints: Vec::new(),
         }
     }
 }

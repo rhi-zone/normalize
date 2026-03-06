@@ -18,7 +18,7 @@ impl ManifestParser for StackParser {
     fn parse(&self, content: &str) -> Result<ParsedManifest, ManifestError> {
         let mut deps = Vec::new();
         let mut in_extra_deps = false;
-        let mut list_indent: usize = 0;
+        let mut list_indent = 0usize;
 
         for line in content.lines() {
             let trimmed = line.trim();

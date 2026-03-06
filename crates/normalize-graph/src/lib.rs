@@ -193,7 +193,7 @@ pub fn weakly_connected_components(imports: &HashMap<String, HashSet<String>>) -
 /// Iterative Tarjan's SCC algorithm.
 pub fn tarjan_sccs(imports: &HashMap<String, HashSet<String>>) -> Vec<Vec<String>> {
     let nodes = all_nodes(imports);
-    let mut index_counter: usize = 0;
+    let mut index_counter = 0usize;
     let mut indices: HashMap<String, usize> = HashMap::new();
     let mut lowlink: HashMap<String, usize> = HashMap::new();
     let mut on_stack: HashSet<String> = HashSet::new();
@@ -401,7 +401,7 @@ pub fn find_bridges(imports: &HashMap<String, HashSet<String>>) -> Vec<BridgeEdg
     let mut disc = vec![0usize; n];
     let mut low = vec![0usize; n];
     let mut visited = vec![false; n];
-    let mut timer: usize = 1;
+    let mut timer = 1usize;
     let mut bridges_idx: Vec<(usize, usize)> = Vec::new();
 
     #[derive(Debug)]

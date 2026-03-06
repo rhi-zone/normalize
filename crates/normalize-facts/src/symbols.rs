@@ -121,7 +121,7 @@ impl SymbolParser {
 
         let mut matches = qcursor.matches(&query, root, source.as_bytes());
         while let Some(m) = matches.next() {
-            let mut stmt_line: usize = 0;
+            let mut stmt_line = 0usize;
             let mut path: Option<String> = None;
             let mut name: Option<String> = None;
             let mut alias: Option<String> = None;

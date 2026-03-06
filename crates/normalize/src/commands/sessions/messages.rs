@@ -437,8 +437,8 @@ pub fn build_messages_report(
     // Build stats
     let mut by_role: HashMap<String, usize> = HashMap::new();
     let mut total_chars = 0;
-    let mut total_input_tokens: u64 = 0;
-    let mut total_output_tokens: u64 = 0;
+    let mut total_input_tokens = 0u64;
+    let mut total_output_tokens = 0u64;
     let mut has_token_data = false;
     for msg in &messages {
         *by_role.entry(msg.role.clone()).or_insert(0) += 1;

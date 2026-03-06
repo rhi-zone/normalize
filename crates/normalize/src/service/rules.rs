@@ -158,6 +158,7 @@ impl RulesService {
                     issues: Vec::new(),
                     files_checked: 0,
                     sources_run: vec!["syntax-rules (fix: no fixable issues)".into()],
+                    hints: Vec::new(),
                 });
             }
             match normalize_syntax_rules::apply_fixes(&findings) {
@@ -170,6 +171,7 @@ impl RulesService {
                             fixable.len(),
                             files_modified
                         )],
+                        hints: Vec::new(),
                     });
                 }
                 Err(e) => return Err(format!("Error applying fixes: {e}")),
@@ -177,7 +179,7 @@ impl RulesService {
         }
 
         let engine_filter = engine.unwrap_or_default();
-        let report = crate::commands::rules::run_rules_report(
+        let mut report = crate::commands::rules::run_rules_report(
             &target_root,
             rule.as_deref(),
             tag.as_deref(),
@@ -189,6 +191,21 @@ impl RulesService {
         let error_count = report.count_by_severity(normalize_output::diagnostics::Severity::Error);
         if !no_fail && error_count > 0 {
             return Err(format!("{error_count} error(s) found"));
+        }
+
+        if !report.issues.is_empty() && !self.pretty.get() && !self.sarif.get() {
+            report
+                .hints
+                .push("Run `normalize rules run --pretty` for a detailed view".to_string());
+            let has_syntax_engine = matches!(
+                engine_filter,
+                crate::commands::rules::RuleType::All | crate::commands::rules::RuleType::Syntax
+            );
+            if has_syntax_engine {
+                report.hints.push(
+                    "Run `normalize rules run --fix` to auto-fix style violations".to_string(),
+                );
+            }
         }
 
         Ok(report)

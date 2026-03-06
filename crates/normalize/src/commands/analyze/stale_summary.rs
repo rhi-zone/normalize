@@ -437,6 +437,7 @@ impl From<StaleSummaryReport> for DiagnosticsReport {
             issues,
             files_checked: report.dirs_checked,
             sources_run: vec!["stale-summary".into()],
+            hints: Vec::new(),
         }
     }
 }
