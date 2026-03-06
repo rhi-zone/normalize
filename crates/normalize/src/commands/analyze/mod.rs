@@ -39,6 +39,7 @@ pub mod security;
 pub mod size;
 pub mod skeleton_diff;
 pub mod stale_docs;
+pub mod stale_summary;
 pub mod summary;
 pub mod surface;
 pub mod test_gaps;
