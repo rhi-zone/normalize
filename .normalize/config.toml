@@ -43,6 +43,25 @@ exclude = [
 [analyze.rules."rust/println-debug"]
 enabled = false
 
+# dbg!/todo!/expect("") should never reach committed code.
+[analyze.rules."rust/dbg-macro"]
+severity = "error"
+allow = ["**/tests/fixtures/**"]
+
+[analyze.rules."rust/todo-macro"]
+severity = "error"
+allow = ["**/tests/fixtures/**"]
+
+[analyze.rules."rust/expect-empty"]
+severity = "error"
+allow = ["**/tests/fixtures/**"]
+
+# static mut is an unsafe footgun; always wrong outside of FFI/embedded.
+[analyze.rules."rust/static-mut"]
+severity = "error"
+enabled = true
+allow = ["**/tests/fixtures/**"]
+
 # js/console-log: re-enabled below with allow patterns
 
 # Enable numeric literal suffix rule (disabled by default).
@@ -58,10 +77,21 @@ allow = ["**/tests/fixtures/**"]
 enabled = false
 
 [analyze.rules."rust/unnecessary-let"]
+severity = "warning"
 enabled = true
+# normalize-manifest parsers use let x = i; while i < ... (index-snapshot pattern:
+# captures start position before mutation). Needs dataflow analysis to exclude.
+allow = [
+    "crates/normalize-manifest/src/clojure.rs",
+    "crates/normalize-manifest/src/erlang.rs",
+    "crates/normalize-manifest/src/sexpr.rs",
+    "**/tests/fixtures/**",
+]
 
 [analyze.rules."rust/unnecessary-type-alias"]
+severity = "warning"
 enabled = true
+allow = ["**/tests/fixtures/**"]
 
 [analyze.rules."rust/chained-if-let"]
 enabled = true
