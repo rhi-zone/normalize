@@ -21,6 +21,10 @@ impl Language for Php {
         " {}"
     }
 
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_phpdoc(node, content)
+    }
+
     fn build_signature(&self, node: &Node, content: &str) -> String {
         let name = match self.node_name(node, content) {
             Some(n) => n,
@@ -141,6 +145,38 @@ impl Language for Php {
         // PHP default visibility for methods/properties in classes is public
         Visibility::Public
     }
+}
+
+/// Extract a PHPDoc comment (`/** ... */`) preceding a PHP declaration.
+fn extract_phpdoc(node: &Node, content: &str) -> Option<String> {
+    let mut prev = node.prev_sibling();
+    while let Some(sibling) = prev {
+        if sibling.kind() == "comment" {
+            let text = &content[sibling.byte_range()];
+            if text.starts_with("/**") {
+                let lines: Vec<&str> = text
+                    .strip_prefix("/**")
+                    .unwrap_or(text)
+                    .strip_suffix("*/")
+                    .unwrap_or(text)
+                    .lines()
+                    .map(|l| l.trim().strip_prefix('*').unwrap_or(l).trim())
+                    .filter(|l| !l.is_empty())
+                    .collect();
+                if !lines.is_empty() {
+                    return Some(lines.join(" "));
+                }
+            }
+            return None;
+        }
+        // Skip attributes between doc comment and declaration
+        if sibling.kind() == "attribute_list" {
+            prev = sibling.prev_sibling();
+            continue;
+        }
+        return None;
+    }
+    None
 }
 
 #[cfg(test)]

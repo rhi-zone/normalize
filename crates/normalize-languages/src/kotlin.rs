@@ -184,6 +184,10 @@ impl Language for Kotlin {
         None
     }
 
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        extract_kotlin_annotations(node, content)
+    }
+
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
@@ -258,6 +262,24 @@ fn extract_kdoc(node: &Node, content: &str) -> Option<String> {
         prev = sibling.prev_sibling();
     }
     None
+}
+
+/// Extract annotations from a Kotlin definition node.
+/// Kotlin annotations live inside a `modifiers` child (e.g. `@JvmStatic`, `@Deprecated`).
+fn extract_kotlin_annotations(node: &Node, content: &str) -> Vec<String> {
+    let mut attrs = Vec::new();
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "modifiers" {
+            let mut mod_cursor = child.walk();
+            for mod_child in child.children(&mut mod_cursor) {
+                if mod_child.kind() == "annotation" {
+                    attrs.push(content[mod_child.byte_range()].to_string());
+                }
+            }
+        }
+    }
+    attrs
 }
 
 #[cfg(test)]

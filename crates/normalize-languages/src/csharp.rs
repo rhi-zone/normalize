@@ -21,6 +21,10 @@ impl Language for CSharp {
         " {}"
     }
 
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_csharp_doc_comment(node, content)
+    }
+
     fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
         let mut implements = Vec::new();
         let mut cursor = node.walk();
@@ -146,6 +150,10 @@ impl Language for CSharp {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        extract_csharp_attributes(node, content)
+    }
+
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
@@ -168,6 +176,89 @@ impl Language for CSharp {
         // C# default visibility depends on context, but for skeleton purposes treat as public
         Visibility::Public
     }
+}
+
+/// Extract attributes from a C# definition node.
+/// C# attributes are `attribute_list` children (e.g. `[Obsolete]`, `[DllImport("...")]`).
+fn extract_csharp_attributes(node: &Node, content: &str) -> Vec<String> {
+    let mut attrs = Vec::new();
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "attribute_list" {
+            attrs.push(content[child.byte_range()].to_string());
+        }
+    }
+    attrs
+}
+
+/// Extract a C# doc comment preceding a node.
+///
+/// Supports `///` XML doc comment lines and `/** ... */` block doc comments.
+fn extract_csharp_doc_comment(node: &Node, content: &str) -> Option<String> {
+    let mut doc_lines: Vec<String> = Vec::new();
+    let mut prev = node.prev_sibling();
+
+    while let Some(sibling) = prev {
+        if sibling.kind() == "comment" {
+            let text = &content[sibling.byte_range()];
+            if text.starts_with("///") {
+                let line = text.strip_prefix("///").unwrap_or("").trim();
+                let line = strip_xml_tags(line);
+                if !line.is_empty() {
+                    doc_lines.push(line);
+                }
+            } else if text.starts_with("/**") {
+                let lines: Vec<&str> = text
+                    .strip_prefix("/**")
+                    .unwrap_or(text)
+                    .strip_suffix("*/")
+                    .unwrap_or(text)
+                    .lines()
+                    .map(|l| l.trim().strip_prefix('*').unwrap_or(l).trim())
+                    .filter(|l| !l.is_empty())
+                    .collect();
+                if !lines.is_empty() {
+                    return Some(lines.join(" "));
+                }
+                return None;
+            } else {
+                break;
+            }
+        } else if sibling.kind() == "attribute_list" {
+            // Skip [Attribute] between doc comment and declaration
+        } else {
+            break;
+        }
+        prev = sibling.prev_sibling();
+    }
+
+    if doc_lines.is_empty() {
+        return None;
+    }
+
+    doc_lines.reverse();
+    let joined = doc_lines.join(" ").trim().to_string();
+    if joined.is_empty() {
+        None
+    } else {
+        Some(joined)
+    }
+}
+
+/// Strip common XML doc comment tags.
+fn strip_xml_tags(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut in_tag = false;
+    for ch in s.chars() {
+        if ch == '<' {
+            in_tag = true;
+        } else if ch == '>' {
+            in_tag = false;
+        } else if !in_tag {
+            result.push(ch);
+        }
+    }
+    result.trim().to_string()
 }
 
 #[cfg(test)]

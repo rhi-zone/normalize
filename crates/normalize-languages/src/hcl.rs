@@ -55,6 +55,10 @@ impl Language for Hcl {
         Vec::new()
     }
 
+    fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
+        format!("  source = \"{}\"", import.module)
+    }
+
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
         let name = symbol.name.as_str();
         match symbol.kind {

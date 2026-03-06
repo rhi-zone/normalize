@@ -38,6 +38,10 @@ impl Language for AsciiDoc {
         }]
     }
 
+    fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
+        import.module.clone()
+    }
+
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("content")
     }

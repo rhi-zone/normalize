@@ -22,6 +22,10 @@ impl Language for JavaScript {
         " {}"
     }
 
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        ecmascript::extract_jsdoc(node, content)
+    }
+
     fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
         ecmascript::extract_implements(node, content)
     }
@@ -77,6 +81,10 @@ impl Language for JavaScript {
             "**/*.test.jsx",
             "**/*.spec.jsx",
         ]
+    }
+
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        ecmascript::extract_decorators(node, content)
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

@@ -1,5 +1,29 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 138
 expression: "snapshot_help(&[\"edit\", \"swap\"])"
 ---
+Swap two symbols
 
+Usage: normalize edit swap [OPTIONS] [target] [other]
+
+Arguments:
+  [target]  Target to edit (path/Symbol)
+  [other]   Symbol to swap with
+
+Options:
+      --dry-run                    Dry run - show what would change
+      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
+      --exclude <exclude>          Exclude files matching patterns
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --only <only>                Only include files matching patterns
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+  -m, --message <message>          Message for shadow history
+  -i, --case-insensitive           Case-insensitive matching
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -r, --root <root>                Root directory
+  -h, --help                       Print help

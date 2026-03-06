@@ -21,6 +21,10 @@ impl Language for C {
         " {}"
     }
 
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_c_doc_comment(node, content)
+    }
+
     fn build_signature(&self, node: &Node, content: &str) -> String {
         match node.kind() {
             "function_definition" => {
@@ -123,6 +127,38 @@ impl C {
         }
         None
     }
+}
+
+/// Extract a Doxygen-style doc comment (`/** ... */`) preceding a C declaration.
+fn extract_c_doc_comment(node: &Node, content: &str) -> Option<String> {
+    let mut prev = node.prev_sibling();
+    while let Some(sibling) = prev {
+        if sibling.kind() == "comment" {
+            let text = &content[sibling.byte_range()];
+            if text.starts_with("/**") {
+                return Some(clean_block_doc_comment(text));
+            }
+            return None;
+        }
+        // Skip other non-comment nodes (e.g. preprocessor directives)
+        if sibling.kind() != "preproc_def" && sibling.kind() != "preproc_ifdef" {
+            return None;
+        }
+        prev = sibling.prev_sibling();
+    }
+    None
+}
+
+fn clean_block_doc_comment(text: &str) -> String {
+    text.strip_prefix("/**")
+        .unwrap_or(text)
+        .strip_suffix("*/")
+        .unwrap_or(text)
+        .lines()
+        .map(|l| l.trim().strip_prefix('*').unwrap_or(l).trim())
+        .filter(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 #[cfg(test)]

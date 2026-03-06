@@ -1,63 +1,14 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 322
 expression: "snapshot_help(&[\"analyze\", \"rules\"])"
 ---
 Analyze codebase (health, complexity, security, duplicates, docs)
 
-Usage: normalize analyze [OPTIONS] [COMMAND]
+Usage: normalize analyze [OPTIONS] [target]
 
-Commands:
-  check-refs         Check for broken documentation references
-  stale-docs         Check for stale documentation
-  check-examples     Check for missing example references in documentation
-  call-graph         Show AST structure for a file
-                     Show callers and/or callees of a symbol
-  trace              Trace value provenance for a symbol
-  architecture       Show architecture analysis (coupling, cycles, hubs)
-  impact             What-if impact analysis: reverse-dependency closure + blast radius
-  health             Run health analysis (file counts, complexity stats, large file warnings)
-  all                Run all analysis passes
-  security           Run security analysis
-  complexity         Run complexity analysis
-  length             Run function length analysis
-  docs               Analyze documentation coverage
-  files              Show longest files in codebase
-  size               Show hierarchical LOC breakdown (ncdu-style)
-  ceremony           Show ceremony ratio: fraction of callables that are trait/interface boilerplate
-  clusters           Group similar functions into structural clusters (connected components of similar-functions pairs)
-  churn              Temporal churn analysis: coupling pairs, change-clusters, or hotspots
-                     
-                     Default: coupling pairs (files that change together).
-                     Use --cluster for change-clusters (connected components).
-                     Use --hotspots for churn × complexity hotspots.
-  ownership          Show per-file ownership concentration from git blame
-  contributors       Analyze contributors across repos
-  activity           Analyze cross-repo activity over time
-  repo-coupling      Analyze cross-repo coupling
-  cross-repo-health  Detect duplicate functions (code clones)
-                     Rank repos by tech debt (churn + complexity + coupling)
-  duplicates         Detect duplicate/similar code (functions or blocks)
-  duplicate-types    Detect duplicate type definitions
-  coverage           Test coverage analysis: ratio, gaps, or budget view
-                     
-                     Default: test-ratio (test/impl line ratio per module).
-                     Use --gaps to find untested public functions.
-                     Use --budget for line budget breakdown by purpose.
-  density            Measure information density (compression ratio + token uniqueness) per module
-  uniqueness         Measure what fraction of functions have no structural near-twin per module
-  call-complexity    Compute effective (reachable) cyclomatic complexity via call-graph BFS
-  module-health      Score each module across test ratio, uniqueness, and density (worst first)
-  summary            Auto-generated single-page codebase overview
-  imports            Rank modules by import fan-in (requires facts index)
-  depth-map          Per-module dependency depth + ripple risk
-  graph              Graph-theoretic properties of the dependency graph
-  surface            Per-module public symbol count, public ratio, and constraint score
-  layering           Per-module import layering compliance — are imports flowing downward?
-  provenance         Provenance graph: git blame → session mapping + code relations
-  skeleton-diff      Show structural changes between a base ref and HEAD
-  trend              Track health metrics over git history at regular intervals
-  patterns           Auto-detect recurring structural code patterns
-  help               Print this message or the help of the given subcommand(s)
+Arguments:
+  [target]  Target file or directory
 
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
@@ -66,5 +17,76 @@ Options:
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -r, --root <root>                Root directory (defaults to current directory)
+      --exclude <exclude>          Exclude paths matching pattern
+      --only <only>                Include only paths matching pattern
+      --pretty                     Enable pretty
+      --compact                    Enable compact
   -h, --help                       Print help
   -V, --version                    Print version
+
+Commands:
+  health             Run health analysis (file counts, complexity stats, large file warnings)
+  all                Run all analysis passes
+  cross-repo-health  Rank repos by tech debt (churn + complexity + coupling)
+  summary            Auto-generated single-page codebase overview
+
+Code quality:
+  complexity         Run complexity analysis
+  length             Run function length analysis
+  ceremony           Show ceremony ratio: fraction of callables that are trait/interface boilerplate
+  duplicates         Detect duplicate/similar code (functions or blocks)
+
+Modes: exact (default), similar (fuzzy MinHash), clusters (connected components).
+  duplicate-types    Detect duplicate type definitions
+  uniqueness         Measure what fraction of functions have no structural near-twin per module
+  call-complexity    Compute effective (reachable) cyclomatic complexity via call-graph BFS
+  fragments          Find repeated AST fragments across the codebase
+
+Module structure:
+  size               Show hierarchical LOC breakdown (ncdu-style)
+  density            Measure information density (compression ratio + token uniqueness) per module
+  module-health      Score each module across test ratio, uniqueness, and density (worst first)
+  imports            Rank modules by import fan-in (requires facts index)
+  depth-map          Per-module dependency depth + ripple risk
+  surface            Per-module public symbol count, public ratio, and constraint score
+  layering           Per-module import layering compliance — are imports flowing downward?
+
+Repository:
+  check              Run documentation checks: broken refs, stale docs, missing examples
+
+Default: run all checks. Use flags to run specific checks only.
+Use --refs for broken documentation references (requires index).
+Use --stale for stale documentation (code newer than docs).
+Use --examples for missing example markers.
+  docs               Analyze documentation coverage
+  files              Show longest files in codebase
+
+Graph analysis:
+  call-graph         Show callers and/or callees of a symbol
+  trace              Trace value provenance for a symbol
+  architecture       Show architecture analysis (coupling, cycles, hubs)
+  impact             What-if impact analysis: reverse-dependency closure + blast radius
+  repo-coupling      Analyze cross-repo coupling
+  graph              Graph-theoretic properties of the dependency graph
+
+Git history:
+  coupling           Temporal coupling: file pairs that change together in git history
+  coupling-clusters  Change-clusters: connected components of temporally coupled files
+  hotspots           Churn × complexity hotspots: files ranked by change frequency and complexity
+  ownership          Show per-file ownership concentration from git blame
+  contributors       Analyze contributors across repos
+  activity           Analyze cross-repo activity over time
+  provenance         Provenance graph: git blame → session mapping + code relations
+  trend              Track health metrics over git history at regular intervals
+
+Testing:
+  test-ratio         Test/impl line ratio per module
+  test-gaps          Find untested public functions ranked by risk
+  budget             Line budget breakdown by purpose (business logic, tests, docs, config, etc.)
+
+Security:
+  security           Run security analysis
+
+Diff:
+  skeleton-diff      Show structural changes between a base ref and HEAD

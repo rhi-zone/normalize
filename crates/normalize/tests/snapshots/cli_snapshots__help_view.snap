@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 32
 expression: "snapshot_help(&[\"view\"])"
 ---
 View a node in the codebase tree (directory, file, or symbol)
@@ -19,7 +20,7 @@ Options:
       --deps                       Show dependencies (imports/exports)
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression
-  -k, --kind <kind>                Filter by symbol kind: class, function, method
+  -k, --kind <kind>                Filter by symbol kind: class, function, method [possible values: class, function, method]
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --types-only                 Show only type definitions
       --output-schema              Print JSON Schema of the subcommand's return type and exit

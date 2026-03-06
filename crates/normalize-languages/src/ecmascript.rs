@@ -67,6 +67,65 @@ pub fn extract_implements(node: &Node, content: &str) -> (bool, Vec<String>) {
 }
 
 // ============================================================================
+// Docstring extraction
+// ============================================================================
+
+/// Extract a JSDoc comment (`/** ... */`) preceding a node.
+///
+/// Walks backwards through siblings looking for a `comment` starting with `/**`.
+pub fn extract_jsdoc(node: &Node, content: &str) -> Option<String> {
+    let mut prev = node.prev_sibling();
+    while let Some(sibling) = prev {
+        match sibling.kind() {
+            "comment" => {
+                let text = &content[sibling.byte_range()];
+                if text.starts_with("/**") {
+                    return Some(clean_block_doc_comment(text));
+                }
+                return None;
+            }
+            "decorator" | "export_statement" => {}
+            _ => return None,
+        }
+        prev = sibling.prev_sibling();
+    }
+    None
+}
+
+/// Clean a `/** ... */` block doc comment into plain text.
+fn clean_block_doc_comment(text: &str) -> String {
+    let lines: Vec<&str> = text
+        .strip_prefix("/**")
+        .unwrap_or(text)
+        .strip_suffix("*/")
+        .unwrap_or(text)
+        .lines()
+        .map(|l| l.trim().strip_prefix('*').unwrap_or(l).trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+    lines.join(" ")
+}
+
+/// Extract decorator attributes (`@decorator`) preceding a node.
+///
+/// Walks backwards through siblings looking for `decorator` nodes.
+pub fn extract_decorators(node: &Node, content: &str) -> Vec<String> {
+    let mut attrs = Vec::new();
+    let mut prev = node.prev_sibling();
+    while let Some(sibling) = prev {
+        if sibling.kind() == "decorator" {
+            attrs.insert(0, content[sibling.byte_range()].to_string());
+        } else if sibling.kind() == "comment" {
+            // Skip comments between decorators and declaration
+        } else {
+            break;
+        }
+        prev = sibling.prev_sibling();
+    }
+    attrs
+}
+
+// ============================================================================
 // Node kind constants
 // ============================================================================
 

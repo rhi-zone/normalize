@@ -25,6 +25,10 @@ impl Language for TypeScript {
         " {}"
     }
 
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        ecmascript::extract_jsdoc(node, content)
+    }
+
     fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
         ecmascript::extract_implements(node, content)
     }
@@ -78,6 +82,10 @@ impl Language for TypeScript {
         ]
     }
 
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        ecmascript::extract_decorators(node, content)
+    }
+
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         // Try 'body' field first, then look for interface_body or class_body child
         if let Some(body) = node.child_by_field_name("body") {
@@ -122,6 +130,10 @@ impl Language for Tsx {
 
     fn signature_suffix(&self) -> &'static str {
         " {}"
+    }
+
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        ecmascript::extract_jsdoc(node, content)
     }
 
     fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
@@ -179,6 +191,10 @@ impl Language for Tsx {
 
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
+    }
+
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        ecmascript::extract_decorators(node, content)
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

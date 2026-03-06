@@ -188,6 +188,10 @@ impl Language for Python {
         }
     }
 
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        extract_decorators(node, content)
+    }
+
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
         if let Some(name) = self.node_name(node, content) {
             if name.starts_with("__") && name.ends_with("__") {
@@ -350,6 +354,25 @@ fn extract_docstring(node: &Node, content: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+/// Extract decorators from a Python definition node.
+/// Python wraps decorated definitions in a `decorated_definition` parent node.
+/// The node passed here is `function_definition` or `class_definition`,
+/// so we look at the parent for `decorator` siblings.
+fn extract_decorators(node: &Node, content: &str) -> Vec<String> {
+    let mut attrs = Vec::new();
+    if let Some(parent) = node.parent()
+        && parent.kind() == "decorated_definition"
+    {
+        let mut cursor = parent.walk();
+        for child in parent.children(&mut cursor) {
+            if child.kind() == "decorator" {
+                attrs.push(content[child.byte_range()].to_string());
+            }
+        }
+    }
+    attrs
 }
 
 #[cfg(test)]

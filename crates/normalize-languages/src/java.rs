@@ -21,6 +21,14 @@ impl Language for Java {
         " {}"
     }
 
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_javadoc(node, content)
+    }
+
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        extract_annotations(node, content)
+    }
+
     fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
         let mut implements = Vec::new();
         let mut cursor = node.walk();
@@ -176,6 +184,64 @@ impl Language for Java {
         // No modifier = package-private, but still visible for skeleton purposes
         Visibility::Public
     }
+}
+
+/// Extract a JavaDoc comment (`/** ... */`) preceding a node.
+///
+/// Walks backwards through siblings looking for a `block_comment` starting with `/**`.
+fn extract_javadoc(node: &Node, content: &str) -> Option<String> {
+    let mut prev = node.prev_sibling();
+    while let Some(sibling) = prev {
+        match sibling.kind() {
+            "block_comment" => {
+                let text = &content[sibling.byte_range()];
+                if text.starts_with("/**") {
+                    return Some(clean_block_doc_comment(text));
+                }
+                return None;
+            }
+            "line_comment" => {
+                // Skip line comments, keep looking for a block comment
+            }
+            "modifiers" | "marker_annotation" | "annotation" => {
+                // Skip annotations/modifiers between doc comment and declaration
+            }
+            _ => return None,
+        }
+        prev = sibling.prev_sibling();
+    }
+    None
+}
+
+/// Clean a `/** ... */` block doc comment into plain text.
+fn clean_block_doc_comment(text: &str) -> String {
+    let lines: Vec<&str> = text
+        .strip_prefix("/**")
+        .unwrap_or(text)
+        .strip_suffix("*/")
+        .unwrap_or(text)
+        .lines()
+        .map(|l| l.trim().strip_prefix('*').unwrap_or(l).trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+    lines.join(" ")
+}
+
+/// Extract annotations from a Java definition node.
+fn extract_annotations(node: &Node, content: &str) -> Vec<String> {
+    let mut attrs = Vec::new();
+    if let Some(modifiers) = node.child_by_field_name("modifiers").or_else(|| {
+        let mut cursor = node.walk();
+        node.children(&mut cursor).find(|c| c.kind() == "modifiers")
+    }) {
+        let mut cursor = modifiers.walk();
+        for child in modifiers.children(&mut cursor) {
+            if child.kind() == "marker_annotation" || child.kind() == "annotation" {
+                attrs.push(content[child.byte_range()].to_string());
+            }
+        }
+    }
+    attrs
 }
 
 #[cfg(test)]
