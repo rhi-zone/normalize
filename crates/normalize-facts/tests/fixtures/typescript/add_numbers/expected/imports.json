@@ -1,0 +1,23 @@
+[
+  {
+    "alias": null,
+    "file": "math.ts",
+    "line": 1,
+    "module": null,
+    "name": "./logger"
+  },
+  {
+    "alias": null,
+    "file": "math.ts",
+    "line": 1,
+    "module": "./logger",
+    "name": "Logger"
+  },
+  {
+    "alias": null,
+    "file": "math.ts",
+    "line": 1,
+    "module": "./logger",
+    "name": "Logger"
+  }
+]

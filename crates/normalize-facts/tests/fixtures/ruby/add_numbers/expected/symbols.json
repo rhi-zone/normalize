@@ -1,0 +1,58 @@
+[
+  {
+    "file": "calculator.rb",
+    "kind": "Class",
+    "name": "Calculator",
+    "parent": null,
+    "start_line": 4
+  },
+  {
+    "file": "calculator.rb",
+    "kind": "Method",
+    "name": "initialize",
+    "parent": "Calculator",
+    "start_line": 7
+  },
+  {
+    "file": "calculator.rb",
+    "kind": "Method",
+    "name": "add",
+    "parent": "Calculator",
+    "start_line": 12
+  },
+  {
+    "file": "calculator.rb",
+    "kind": "Method",
+    "name": "multiply",
+    "parent": "Calculator",
+    "start_line": 18
+  },
+  {
+    "file": "calculator.rb",
+    "kind": "Method",
+    "name": "to_s",
+    "parent": "Calculator",
+    "start_line": 24
+  },
+  {
+    "file": "math_helpers.rb",
+    "kind": "Module",
+    "name": "MathHelpers",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "math_helpers.rb",
+    "kind": "Method",
+    "name": "add",
+    "parent": "MathHelpers",
+    "start_line": 2
+  },
+  {
+    "file": "math_helpers.rb",
+    "kind": "Method",
+    "name": "multiply",
+    "parent": "MathHelpers",
+    "start_line": 6
+  }
+]

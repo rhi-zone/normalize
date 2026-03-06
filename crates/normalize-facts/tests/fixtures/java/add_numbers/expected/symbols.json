@@ -1,0 +1,37 @@
+[
+  {
+    "file": "Calculator.java",
+    "kind": "Class",
+    "name": "Calculator",
+    "parent": null,
+    "start_line": 4
+  },
+  {
+    "file": "Calculator.java",
+    "kind": "Method",
+    "name": "add",
+    "parent": "Calculator",
+    "start_line": 11
+  },
+  {
+    "file": "Calculator.java",
+    "kind": "Method",
+    "name": "multiply",
+    "parent": "Calculator",
+    "start_line": 17
+  },
+  {
+    "file": "Calculator.java",
+    "kind": "Method",
+    "name": "getHistory",
+    "parent": "Calculator",
+    "start_line": 23
+  },
+  {
+    "file": "Calculator.java",
+    "kind": "Method",
+    "name": "main",
+    "parent": "Calculator",
+    "start_line": 27
+  }
+]

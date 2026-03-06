@@ -1,0 +1,79 @@
+[
+  {
+    "file": "logger.ts",
+    "kind": "Interface",
+    "name": "Loggable",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "logger.ts",
+    "kind": "Method",
+    "name": "log",
+    "parent": "Loggable",
+    "start_line": 2
+  },
+  {
+    "file": "logger.ts",
+    "kind": "Class",
+    "name": "Logger",
+    "parent": null,
+    "start_line": 5
+  },
+  {
+    "file": "logger.ts",
+    "kind": "Method",
+    "name": "constructor",
+    "parent": "Logger",
+    "start_line": 8
+  },
+  {
+    "file": "logger.ts",
+    "kind": "Method",
+    "name": "log",
+    "parent": "Logger",
+    "start_line": 12
+  },
+  {
+    "file": "math.ts",
+    "kind": "Interface",
+    "name": "MathOperation",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "math.ts",
+    "kind": "Method",
+    "name": "execute",
+    "parent": "MathOperation",
+    "start_line": 5
+  },
+  {
+    "file": "math.ts",
+    "kind": "Class",
+    "name": "Calculator",
+    "parent": null,
+    "start_line": 16
+  },
+  {
+    "file": "math.ts",
+    "kind": "Method",
+    "name": "constructor",
+    "parent": "Calculator",
+    "start_line": 21
+  },
+  {
+    "file": "math.ts",
+    "kind": "Method",
+    "name": "execute",
+    "parent": "Calculator",
+    "start_line": 27
+  },
+  {
+    "file": "math.ts",
+    "kind": "Method",
+    "name": "getHistory",
+    "parent": "Calculator",
+    "start_line": 34
+  }
+]

@@ -1,0 +1,65 @@
+[
+  {
+    "file": "Calculator.php",
+    "kind": "Module",
+    "name": "App\\Math",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "Calculator.php",
+    "kind": "Interface",
+    "name": "MathOperation",
+    "parent": null,
+    "start_line": 8
+  },
+  {
+    "file": "Calculator.php",
+    "kind": "Method",
+    "name": "execute",
+    "parent": "MathOperation",
+    "start_line": 9
+  },
+  {
+    "file": "Calculator.php",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 12
+  },
+  {
+    "file": "Calculator.php",
+    "kind": "Class",
+    "name": "Calculator",
+    "parent": null,
+    "start_line": 16
+  },
+  {
+    "file": "Calculator.php",
+    "kind": "Method",
+    "name": "__construct",
+    "parent": "Calculator",
+    "start_line": 20
+  },
+  {
+    "file": "Calculator.php",
+    "kind": "Method",
+    "name": "execute",
+    "parent": "Calculator",
+    "start_line": 25
+  },
+  {
+    "file": "Calculator.php",
+    "kind": "Method",
+    "name": "multiply",
+    "parent": "Calculator",
+    "start_line": 32
+  },
+  {
+    "file": "Calculator.php",
+    "kind": "Method",
+    "name": "getHistory",
+    "parent": "Calculator",
+    "start_line": 38
+  }
+]
