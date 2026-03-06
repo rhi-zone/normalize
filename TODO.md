@@ -33,25 +33,29 @@ Severity re-escalated to `error`; hook blocks commits when SUMMARY.md is too sta
 Staleness condition: `(commits_since_update + has_uncommitted) > threshold` (configurable,
 default 10). Single uncommitted change alone no longer blocks commits.
 
-### Audit info/hint rule noise — HIGH PRIORITY
+### ~~Audit info/hint rule noise~~ PARTIAL (pre-commit --no-fail removed)
 
-`normalize rules run` currently emits ~1827 info-severity findings, dominated by
-`rust/unwrap-in-impl` (1608 hits). The signal-to-noise ratio is terrible. Before dogfooding
-rules seriously, audit every enabled info-level rule and either:
-- Fix the violations (if rule is genuinely useful and violations are real)
-- Demote to `enabled = false` (if too noisy in practice — e.g., `rust/unwrap-in-impl` in
-  low-level parsing code where unwrap is genuinely the right call)
-- Raise to `warning` only for code we actually own (not fixtures, not generated code)
+Pre-commit now enforces zero error-severity violations. Resolved (9ae3b496):
+- `no-grammar-loader-new`: 2 production fixes; allow pattern for test modules needing `add_path()`
+- `rust/numeric-type-annotation`: 15 violations fixed; allow pattern for test fixtures
+- `rust/tuple-return`: Lowered from error → warning (54 violations remain — see below)
 
-The exclude patterns in `[analyze]` don't apply to rules — they're `analyze`-specific.
-Add per-rule `allow` patterns for fixture files, generated code, and vendored code.
-Alternatively: add a global `[rules.exclude]` section analogous to `[analyze].exclude`.
+**Remaining info noise (219 issues):** Not yet addressed. Current breakdown:
+- `rust/chained-if-let`: 122 violations (info)
+- `rust/unnecessary-type-alias`: 36 violations (info)
+- `rust/unnecessary-let`: 32 violations (info)
+- `no-todo-comment`: 17 violations (info)
+- Other: 12 violations across 6 rules
 
-Info ≠ noise in principle, but 1827 of them is noise in practice right now.
+Strategy: fix these incrementally or batch-fix by rule. `no-todo-comment` may have false
+positives. `chained-if-let`, `unnecessary-type-alias`, `unnecessary-let` are real style fixes.
 
-**Immediate:** `rust/unwrap-in-impl` disabled (1608 hits). Needs investigation — could be
-genuine architectural smell (unwrap-heavy code is a fragility signal) or could be legitimate
-in infallible/parsing contexts. Audit and triage before re-enabling. See §Audit rust/unwrap-in-impl.
+**rust/tuple-return (54 warnings):** Need `ByteRange { start, end }` struct or similar in
+normalize-languages for `container_body()` return type. Also affects normalize-manifest and
+normalize-package-index parsers. Plan: create shared `normalize-ranges` or reuse existing type.
+
+The exclude patterns in `[analyze]` still don't apply to rules. Adding a global
+`[rules.exclude]` section analogous to `[analyze].exclude` would clean up fixture violations.
 
 ### Guided rule setup — DONE (`normalize init --setup`)
 
@@ -71,16 +75,17 @@ violations — then prompting [e]nable / [d]isable / [s]kip / [q]uit. Persists d
 setup is the cure. Also: `normalize init --setup` currently only covers rules — extend to
 other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md enforcement).
 
-### Actionable output for all diagnostic commands — HIGH PRIORITY
+### ~~Actionable output for all diagnostic commands~~ DONE (9ae3b496)
 
-Commands that emit `DiagnosticsReport` should include a "what to do next" section at the end
-when there are actionable issues. Bar to clear: Rust compiler diagnostics style — tell users
-exactly what to run or fix. Concretely:
-- `normalize rules run` with errors → "Run `normalize rules run --pretty` for details; `--fix` to auto-fix"
-- `normalize analyze check --summary` with missing → "Run `normalize analyze check --summary --pretty`"
-- `normalize rules run --engine sarif` → show which tools had errors
-- Consider a `format_text_with_hints(next_steps: &[&str])` API on DiagnosticsReport, or
-  embed hints in the `sources_run` / footer automatically based on what ran.
+`DiagnosticsReport` now has `hints: Vec<String>`. Service methods populate hints
+based on context and output mode:
+- `rules run` (non-pretty, non-sarif): "Run with --pretty for detailed view" + "--fix to auto-fix"
+- `analyze check` (non-pretty): "Run `normalize analyze check [flags] --pretty` for detailed view"
+
+Remaining gaps:
+- `rules run --engine sarif` could show which SARIF tools had errors (not done)
+- Hints only appear in text mode. Pretty mode shows them too but they're redundant there.
+  Could suppress hints in pretty mode (hints are most useful in the compact/default mode).
 
 ### ~~Failing skeleton tests (4 tests)~~ FIXED
 Root causes:
