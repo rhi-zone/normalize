@@ -1,9 +1,9 @@
 [
   {
-    "file": "main.jl",
-    "module": "MathUtils",
-    "name": "*",
     "alias": null,
-    "line": 1
+    "file": "main.jl",
+    "line": 1,
+    "module": null,
+    "name": "MathUtils"
   }
 ]

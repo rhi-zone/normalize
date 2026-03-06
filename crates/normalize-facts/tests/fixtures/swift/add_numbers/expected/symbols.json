@@ -1,23 +1,23 @@
 [
   {
     "file": "MathUtils.swift",
-    "name": "MathUtils",
     "kind": "Class",
-    "start_line": 3,
-    "parent": null
+    "name": "MathUtils",
+    "parent": null,
+    "start_line": 3
   },
   {
     "file": "MathUtils.swift",
+    "kind": "Method",
     "name": "add",
-    "kind": "Function",
-    "start_line": 4,
-    "parent": "MathUtils"
+    "parent": "MathUtils",
+    "start_line": 4
   },
   {
     "file": "MathUtils.swift",
-    "name": "multiply",
     "kind": "Function",
-    "start_line": 9,
-    "parent": null
+    "name": "multiply",
+    "parent": null,
+    "start_line": 9
   }
 ]

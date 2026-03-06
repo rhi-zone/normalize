@@ -1,16 +1,16 @@
 [
   {
-    "file": "main.adb",
-    "module": null,
-    "name": "with Math_Utils;",
     "alias": null,
-    "line": 1
+    "file": "main.adb",
+    "line": 1,
+    "module": null,
+    "name": "with Math_Utils;"
   },
   {
-    "file": "main.adb",
-    "module": "use Math_Utils;",
-    "name": "*",
     "alias": null,
-    "line": 2
+    "file": "main.adb",
+    "line": 2,
+    "module": null,
+    "name": "use Math_Utils;"
   }
 ]

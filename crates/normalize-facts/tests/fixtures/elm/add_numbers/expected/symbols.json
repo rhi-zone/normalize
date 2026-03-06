@@ -1,16 +1,1 @@
-[
-  {
-    "file": "Main.elm",
-    "name": "Main",
-    "kind": "module",
-    "start_line": 1,
-    "parent": null
-  },
-  {
-    "file": "MathUtils.elm",
-    "name": "MathUtils",
-    "kind": "module",
-    "start_line": 1,
-    "parent": null
-  }
-]
+[]
