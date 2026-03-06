@@ -78,6 +78,14 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         content: include_str!("js_typeof_string.scm"),
     },
     BuiltinRule {
+        id: "js/eq-null",
+        content: include_str!("js_eq_null.scm"),
+    },
+    BuiltinRule {
+        id: "js/no-await-in-loop",
+        content: include_str!("js_no_await_in_loop.scm"),
+    },
+    BuiltinRule {
         id: "typescript/tuple-return",
         content: include_str!("typescript_tuple_return.scm"),
     },
@@ -105,6 +113,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
     BuiltinRule {
         id: "python/mutable-default-arg",
         content: include_str!("python_mutable_default_arg.scm"),
+    },
+    BuiltinRule {
+        id: "python/assert-in-non-test",
+        content: include_str!("python_assert.scm"),
     },
     // Go rules
     BuiltinRule {
