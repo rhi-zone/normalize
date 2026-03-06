@@ -1,0 +1,37 @@
+[
+  {
+    "file": "MathUtils.h",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 16
+  },
+  {
+    "file": "MathUtils.h",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 17
+  },
+  {
+    "file": "MathUtils.m",
+    "kind": "Function",
+    "name": "add(int a, int b)",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "MathUtils.m",
+    "kind": "Function",
+    "name": "multiply(int a, int b)",
+    "parent": null,
+    "start_line": 7
+  },
+  {
+    "file": "MathUtils.m",
+    "kind": "Class",
+    "name": "MathUtils",
+    "parent": null,
+    "start_line": 11
+  }
+]

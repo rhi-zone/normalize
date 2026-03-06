@@ -1,0 +1,51 @@
+[
+  {
+    "file": "Main.vb",
+    "kind": "Module",
+    "name": "Program",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "Main.vb",
+    "kind": "Method",
+    "name": "Main",
+    "parent": "Program",
+    "start_line": 5
+  },
+  {
+    "file": "MathUtils.vb",
+    "kind": "Module",
+    "name": "MathUtils",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "MathUtils.vb",
+    "kind": "Method",
+    "name": "Add",
+    "parent": "MathUtils",
+    "start_line": 3
+  },
+  {
+    "file": "MathUtils.vb",
+    "kind": "Method",
+    "name": "Multiply",
+    "parent": "MathUtils",
+    "start_line": 7
+  },
+  {
+    "file": "MathUtils.vb",
+    "kind": "Class",
+    "name": "Calculator",
+    "parent": null,
+    "start_line": 13
+  },
+  {
+    "file": "MathUtils.vb",
+    "kind": "Method",
+    "name": "Compute",
+    "parent": "Calculator",
+    "start_line": 17
+  }
+]

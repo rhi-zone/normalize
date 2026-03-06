@@ -1,0 +1,23 @@
+[
+  {
+    "alias": null,
+    "file": "main.pro",
+    "line": 1,
+    "module": null,
+    "name": ":- use_module(math_utils)."
+  },
+  {
+    "alias": null,
+    "file": "main.pro",
+    "line": 16,
+    "module": null,
+    "name": ":- initialization(main)."
+  },
+  {
+    "alias": null,
+    "file": "math_utils.pro",
+    "line": 1,
+    "module": null,
+    "name": ":- module(math_utils, [add/3, multiply/3])."
+  }
+]
