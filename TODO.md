@@ -28,15 +28,13 @@ Root causes:
 - **Markdown:** No `markdown.tags.scm` existed. Created it with `(section (atx_heading (inline) @name)) @definition.heading`.
 - Also added `definition.enum`/`definition.heading` to `tags_capture_to_kind` and `Enum`/`Heading` to `is_container_kind`.
 
-### LSP diagnostics for all rule engines
-Design: `normalize serve lsp` should publish diagnostics from all rule engines (syntax, fact, native) via `textDocument/publishDiagnostics`. Key concerns:
-- **Performance:** Rule engines are not incremental — full re-run on every save is expensive. Need file-level caching or incremental strategies.
-- **Memory:** Fact engine requires full index + relations in memory. For large repos, this is significant.
-- **Approach options:**
-  1. Run on save with debounce, cache per-file results, invalidate on dependency changes
-  2. Background thread with configurable interval
-  3. On-demand only (code action or manual trigger)
-- SARIF→LSP Diagnostic mapping already trivial since `Issue` fields match LSP `Diagnostic`
+### ~~LSP diagnostics for all rule engines~~ IMPLEMENTED (basic)
+Implemented on-save diagnostics with debounce (500ms). Design doc: `docs/design/lsp-diagnostics.md`.
+Future improvements:
+- Per-file syntax rules (only re-run on the saved file, not the whole workspace)
+- Incremental fact rules (currently rebuilds full index each run)
+- Configurable debounce interval
+- Progress reporting during long runs
 
 ## Next Up
 
