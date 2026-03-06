@@ -123,6 +123,44 @@ severity = "error"
 [analyze.rules."missing-summary"]
 severity = "error"
 
+# Error-severity: genuine bugs / serious antipatterns — clean in current codebase.
+[analyze.rules."python/mutable-default-arg"]
+severity = "error"
+enabled = true
+allow = ["**/tests/fixtures/**"]
+
+[analyze.rules."python/bare-except"]
+severity = "error"
+enabled = true
+allow = ["**/tests/fixtures/**"]
+
+[analyze.rules."ruby/rescue-exception"]
+severity = "error"
+enabled = true
+allow = ["**/tests/fixtures/**"]
+
+[analyze.rules."go/error-ignored"]
+severity = "error"
+enabled = true
+allow = ["**/tests/fixtures/**"]
+
+# Warning-severity: bad practice but sometimes intentional.
+[analyze.rules."js/var-declaration"]
+severity = "warning"
+enabled = true
+allow = ["**/tests/fixtures/**"]
+
+[analyze.rules."js/typeof-string"]
+severity = "warning"
+enabled = true
+allow = ["**/tests/fixtures/**"]
+
+[analyze.rules."ruby/puts-in-lib"]
+severity = "warning"
+enabled = true
+allow = ["**/tests/fixtures/**"]
+
+# Info-severity (already enabled).
 [analyze.rules."js/eq-null"]
 enabled = true
 
