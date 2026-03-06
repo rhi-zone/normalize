@@ -15,6 +15,8 @@ pub enum RuleType {
     All,
     Syntax,
     Fact,
+    /// Run external tools that emit SARIF 2.1.0 output (configured via `[[analyze.sarif-tools]]`).
+    Sarif,
 }
 
 impl std::fmt::Display for RuleType {
@@ -23,6 +25,7 @@ impl std::fmt::Display for RuleType {
             Self::All => f.write_str("all"),
             Self::Syntax => f.write_str("syntax"),
             Self::Fact => f.write_str("fact"),
+            Self::Sarif => f.write_str("sarif"),
         }
     }
 }
@@ -34,7 +37,10 @@ impl std::str::FromStr for RuleType {
             "all" => Ok(Self::All),
             "syntax" => Ok(Self::Syntax),
             "fact" => Ok(Self::Fact),
-            _ => Err(format!("unknown rule type: {s}")),
+            "sarif" => Ok(Self::Sarif),
+            _ => Err(format!(
+                "unknown rule type: {s}; valid: all, syntax, fact, sarif"
+            )),
         }
     }
 }
@@ -1176,6 +1182,35 @@ pub async fn collect_fact_diagnostics(
     all_diagnostics
 }
 
+/// Apply `RulesConfig` severity/enabled overrides to issues in a `DiagnosticsReport`.
+/// This lets native checks (stale-summary, missing-summary, check-refs, etc.) be
+/// configured via `[analyze.rules."rule-id"]` in normalize.toml, just like syntax rules.
+pub fn apply_native_rules_config(
+    report: &mut normalize_output::diagnostics::DiagnosticsReport,
+    config: &normalize_syntax_rules::RulesConfig,
+) {
+    use normalize_output::diagnostics::Severity;
+    report.issues.retain_mut(|issue| {
+        let Some(override_) = config.0.get(&issue.rule_id) else {
+            return true;
+        };
+        // enabled=false suppresses the issue entirely
+        if override_.enabled == Some(false) {
+            return false;
+        }
+        if let Some(sev_str) = &override_.severity {
+            issue.severity = match sev_str.as_str() {
+                "error" => Severity::Error,
+                "warning" => Severity::Warning,
+                "info" => Severity::Info,
+                "hint" => Severity::Hint,
+                _ => issue.severity,
+            };
+        }
+        true
+    });
+}
+
 /// Run all rules (syntax + fact) and return a unified DiagnosticsReport.
 pub fn run_rules_report(
     root: &Path,
@@ -1221,6 +1256,10 @@ pub fn run_rules_report(
             &config.analyze.rules,
             &debug_flags,
         );
+        // Count unique files with violations for the report header.
+        let unique_files: HashSet<&std::path::Path> =
+            findings.iter().map(|f| f.file.as_path()).collect();
+        report.files_checked = report.files_checked.max(unique_files.len());
         for f in &findings {
             report.issues.push(finding_to_issue(f, root));
         }
@@ -1241,7 +1280,140 @@ pub fn run_rules_report(
         report.sources_run.push("fact-rules".into());
     }
 
+    // SARIF passthrough: run external tools and merge their SARIF output
+    if matches!(engine, RuleType::Sarif) {
+        let sarif_report = run_sarif_tools(root, &config.analyze.sarif_tools);
+        report.merge(sarif_report);
+    }
+
     report.sort();
+    report
+}
+
+/// Run external SARIF tools and merge their output into a DiagnosticsReport.
+/// Each tool's command is run with `{root}` replaced by the project root path.
+/// Tools must emit SARIF 2.1.0 JSON to stdout.
+pub fn run_sarif_tools(
+    root: &Path,
+    tools: &[crate::commands::analyze::SarifTool],
+) -> normalize_output::diagnostics::DiagnosticsReport {
+    use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
+
+    let mut report = DiagnosticsReport::new();
+    let root_str = root.to_string_lossy();
+
+    for tool in tools {
+        if tool.command.is_empty() {
+            continue;
+        }
+        let args: Vec<String> = tool
+            .command
+            .iter()
+            .map(|a| a.replace("{root}", &root_str))
+            .collect();
+
+        let output = std::process::Command::new(&args[0])
+            .args(&args[1..])
+            .current_dir(root)
+            .output();
+
+        let stdout = match output {
+            Ok(o) => String::from_utf8_lossy(&o.stdout).into_owned(),
+            Err(e) => {
+                eprintln!("normalize: SARIF tool '{}' failed to run: {}", tool.name, e);
+                continue;
+            }
+        };
+
+        let sarif: serde_json::Value = match serde_json::from_str(&stdout) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!(
+                    "normalize: SARIF tool '{}' did not emit valid JSON: {}",
+                    tool.name, e
+                );
+                continue;
+            }
+        };
+
+        let runs = match sarif.get("runs").and_then(|v| v.as_array()) {
+            Some(r) => r,
+            None => {
+                eprintln!(
+                    "normalize: SARIF tool '{}' output missing 'runs' array",
+                    tool.name
+                );
+                continue;
+            }
+        };
+
+        for run in runs {
+            let driver_name = run
+                .pointer("/tool/driver/name")
+                .and_then(|v| v.as_str())
+                .unwrap_or(&tool.name);
+            let source = format!("sarif:{}", driver_name);
+
+            let results = run.get("results").and_then(|v| v.as_array());
+            let Some(results) = results else { continue };
+
+            for result in results {
+                let rule_id = result
+                    .get("ruleId")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let message = result
+                    .pointer("/message/text")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let level = result
+                    .get("level")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("warning");
+                let severity = match level {
+                    "error" => Severity::Error,
+                    "warning" => Severity::Warning,
+                    "note" | "none" => Severity::Info,
+                    _ => Severity::Warning,
+                };
+
+                // Extract location from first entry
+                let loc = result.pointer("/locations/0/physicalLocation");
+                let file = loc
+                    .and_then(|l| l.pointer("/artifactLocation/uri"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let line = loc
+                    .and_then(|l| l.pointer("/region/startLine"))
+                    .and_then(|v| v.as_u64())
+                    .map(|n| n as usize);
+                let column = loc
+                    .and_then(|l| l.pointer("/region/startColumn"))
+                    .and_then(|v| v.as_u64())
+                    .map(|n| n as usize);
+
+                report.issues.push(Issue {
+                    file,
+                    line,
+                    column,
+                    end_line: None,
+                    end_column: None,
+                    rule_id,
+                    message,
+                    severity,
+                    source: source.clone(),
+                    related: vec![],
+                    suggestion: None,
+                });
+            }
+
+            report.sources_run.push(source);
+        }
+    }
+
     report
 }
 

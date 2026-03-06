@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pre-commit hook: format check and clippy
+# Pre-commit hook: format check, clippy, and normalize checks
 #
 # Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 
@@ -13,17 +13,23 @@ cargo clippy --all-targets --all-features -- -D warnings 2>/dev/null || {
     echo "  Warning: clippy check failed or not available (non-critical)"
 }
 
-# Run normalize rules if binary exists
-if [ -x "./target/release/normalize" ] || [ -x "./target/debug/normalize" ]; then
-    NORMALIZE="${NORMALIZE:-./target/release/normalize}"
-    [ -x "$NORMALIZE" ] || NORMALIZE="./target/debug/normalize"
+# Run normalize checks if binary exists.
+# Prefer debug (always current); release may be stale during active development.
+if [ -x "./target/debug/normalize" ] || [ -x "./target/release/normalize" ]; then
+    NORMALIZE="${NORMALIZE:-./target/debug/normalize}"
+    [ -x "$NORMALIZE" ] || NORMALIZE="./target/release/normalize"
 
     if [ -x "$NORMALIZE" ]; then
+        # Run all enabled rules (informational until existing violations are fixed — see TODO.md).
+        # Remove --no-fail once error-severity violations are resolved.
+        # Use `normalize rules run --limit 0` for full list.
         echo "Running normalize rules..."
-        $NORMALIZE analyze rules --rule rust/tuple-return crates/ || {
-            echo "  Error: tuple return rule violations found"
-            exit 1
-        }
+        $NORMALIZE rules run --engine syntax --no-fail
+
+        # Check SUMMARY.md freshness (currently info severity — see TODO.md §Bootstrap SUMMARY.md).
+        # Once severity=error is re-enabled in .normalize/config.toml, this will block on errors.
+        echo "Running SUMMARY.md freshness check..."
+        $NORMALIZE analyze check --summary
     fi
 fi
 

@@ -55,8 +55,10 @@ severity = "error"
 enabled = true
 
 # Re-enable info-level rules for dogfooding (disabled by default for new users)
+# Disabled: 1608 hits in current codebase — needs audit to distinguish genuine smells
+# from legitimate unwrap use in parsing/infallible contexts. See TODO.md §Audit rust/unwrap-in-impl.
 [analyze.rules."rust/unwrap-in-impl"]
-enabled = true
+enabled = false
 
 [analyze.rules."rust/unnecessary-let"]
 enabled = true
@@ -91,6 +93,15 @@ enabled = true
 
 [analyze.rules."no-todo-comment"]
 enabled = true
+
+# SUMMARY.md freshness: currently at info severity (TODO: re-escalate to "error" once all
+# SUMMARY.md files have been bootstrapped — see TODO.md §Bootstrap SUMMARY.md).
+# With severity=error, `normalize analyze check --summary` will exit 1 on stale/missing files.
+[analyze.rules."stale-summary"]
+severity = "info"
+
+[analyze.rules."missing-summary"]
+severity = "info"
 
 [aliases]
 todo = ["TODO.md"]

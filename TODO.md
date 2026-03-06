@@ -21,6 +21,52 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ## Immediate Fixes
 
+### Bootstrap all SUMMARY.md files — HIGH PRIORITY
+
+Every directory with source files needs a `SUMMARY.md`. Once bootstrapped:
+1. Change severity back to `"error"` in `.normalize/config.toml` (`stale-summary`, `missing-summary`)
+2. Remove `--no-fail` from the pre-commit hook's `normalize analyze check --summary` call
+3. The hook will then block commits that don't update SUMMARY.md when content changes
+
+Approach: use parallel Sonnet subagents (one per crate or logical grouping). Each agent reads
+the directory structure and existing code, then writes a `SUMMARY.md` describing the directory's
+purpose, key modules/structs/functions, and how it fits into the broader ecosystem. Opus is an
+option for higher quality but gains may be marginal vs. cost; Sonnet is fine for initial bootstrap.
+
+Run `normalize analyze check --summary --no-fail` to see which directories need coverage.
+Currently ~265 directories are missing SUMMARY.md.
+
+### Audit info/hint rule noise — HIGH PRIORITY
+
+`normalize rules run` currently emits ~1827 info-severity findings, dominated by
+`rust/unwrap-in-impl` (1608 hits). The signal-to-noise ratio is terrible. Before dogfooding
+rules seriously, audit every enabled info-level rule and either:
+- Fix the violations (if rule is genuinely useful and violations are real)
+- Demote to `enabled = false` (if too noisy in practice — e.g., `rust/unwrap-in-impl` in
+  low-level parsing code where unwrap is genuinely the right call)
+- Raise to `warning` only for code we actually own (not fixtures, not generated code)
+
+The exclude patterns in `[analyze]` don't apply to rules — they're `analyze`-specific.
+Add per-rule `allow` patterns for fixture files, generated code, and vendored code.
+Alternatively: add a global `[rules.exclude]` section analogous to `[analyze].exclude`.
+
+Info ≠ noise in principle, but 1827 of them is noise in practice right now.
+
+**Immediate:** `rust/unwrap-in-impl` disabled (1608 hits). Needs investigation — could be
+genuine architectural smell (unwrap-heavy code is a fragility signal) or could be legitimate
+in infallible/parsing contexts. Audit and triage before re-enabling. See §Audit rust/unwrap-in-impl.
+
+### Actionable output for all diagnostic commands — HIGH PRIORITY
+
+Commands that emit `DiagnosticsReport` should include a "what to do next" section at the end
+when there are actionable issues. Bar to clear: Rust compiler diagnostics style — tell users
+exactly what to run or fix. Concretely:
+- `normalize rules run` with errors → "Run `normalize rules run --pretty` for details; `--fix` to auto-fix"
+- `normalize analyze check --summary` with missing → "Run `normalize analyze check --summary --pretty`"
+- `normalize rules run --engine sarif` → show which tools had errors
+- Consider a `format_text_with_hints(next_steps: &[&str])` API on DiagnosticsReport, or
+  embed hints in the `sources_run` / footer automatically based on what ran.
+
 ### ~~Failing skeleton tests (4 tests)~~ FIXED
 Root causes:
 - **Go/Ruby:** `collect_symbols_from_tags` had a sanity check that bailed when `@definition.method` had no enclosing container — but Go receiver methods and Ruby standalone methods are legitimately top-level. Removed the check.

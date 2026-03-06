@@ -90,6 +90,19 @@ pub struct AnalyzeConfig {
     /// Patterns to exclude from all analysis (e.g., generated or intentionally parallel code)
     #[serde(default)]
     pub exclude: Vec<String>,
+    /// External tools to run as SARIF sources (used with `normalize rules run --engine sarif`).
+    #[serde(default, rename = "sarif-tools")]
+    pub sarif_tools: Vec<SarifTool>,
+}
+
+/// An external tool that emits SARIF 2.1.0 output.
+#[derive(Debug, Clone, Deserialize, Serialize, Default, schemars::JsonSchema)]
+pub struct SarifTool {
+    /// Display name for this tool (used as `source` in DiagnosticsReport).
+    pub name: String,
+    /// Command to run. `{root}` is replaced with the project root path.
+    /// Example: `["npx", "eslint", "--format", "json", "{root}"]`
+    pub command: Vec<String>,
 }
 
 /// Weights for each analysis pass (higher = more impact on grade).

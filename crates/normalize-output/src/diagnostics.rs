@@ -199,8 +199,10 @@ impl Default for DiagnosticsReport {
     }
 }
 
-impl OutputFormatter for DiagnosticsReport {
-    fn format_text(&self) -> String {
+impl DiagnosticsReport {
+    /// Format as text with an optional limit on the number of issues shown.
+    /// Only errors and warnings are shown in detail; info/hints are summarized at the end.
+    pub fn format_text_limited(&self, limit: Option<usize>) -> String {
         let mut out = String::new();
         if self.issues.is_empty() {
             out.push_str(&format!(
@@ -215,13 +217,15 @@ impl OutputFormatter for DiagnosticsReport {
         let warnings = self.count_by_severity(Severity::Warning);
         let infos = self.count_by_severity(Severity::Info);
         let hints = self.count_by_severity(Severity::Hint);
+        let actionable = errors + warnings;
 
-        out.push_str(&format!(
-            "{} issues ({} files checked, sources: {})\n",
-            self.issues.len(),
-            self.files_checked,
-            self.sources_run.join(", ")
-        ));
+        // Header counts all issues for complete picture
+        let files_str = if self.files_checked > 0 {
+            format!("{} files", self.files_checked)
+        } else {
+            format!("sources: {}", self.sources_run.join(", "))
+        };
+        out.push_str(&format!("{} issues ({})\n", self.issues.len(), files_str));
 
         let mut parts = Vec::new();
         if errors > 0 {
@@ -247,7 +251,20 @@ impl OutputFormatter for DiagnosticsReport {
         }
         out.push('\n');
 
-        for issue in &self.issues {
+        // Only show errors and warnings in detail; info/hints are noisy and informational only
+        let actionable_issues: Vec<&Issue> = self
+            .issues
+            .iter()
+            .filter(|i| matches!(i.severity, Severity::Error | Severity::Warning))
+            .collect();
+
+        let shown = if let Some(lim) = limit {
+            actionable_issues.len().min(lim)
+        } else {
+            actionable_issues.len()
+        };
+
+        for issue in actionable_issues.iter().take(shown) {
             out.push_str(&format!(
                 "{}: {} [{}] {}\n",
                 issue.format_location(),
@@ -272,7 +289,27 @@ impl OutputFormatter for DiagnosticsReport {
             }
         }
 
+        if shown < actionable {
+            out.push_str(&format!(
+                "  ... {} more not shown (use --limit or --pretty to see all)\n",
+                actionable - shown
+            ));
+        }
+        if infos + hints > 0 {
+            out.push_str(&format!(
+                "  {} info/hint suggestion{} (use --pretty to show)\n",
+                infos + hints,
+                if infos + hints == 1 { "" } else { "s" }
+            ));
+        }
+
         out
+    }
+}
+
+impl OutputFormatter for DiagnosticsReport {
+    fn format_text(&self) -> String {
+        self.format_text_limited(None)
     }
 
     fn format_pretty(&self) -> String {

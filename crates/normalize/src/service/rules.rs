@@ -11,6 +11,8 @@ use std::path::Path;
 pub struct RulesService {
     pretty: Cell<bool>,
     sarif: Cell<bool>,
+    /// Maximum issues to display (None = all). 0 also means all (per --limit 0 convention).
+    limit: Cell<Option<usize>>,
 }
 
 impl RulesService {
@@ -18,6 +20,7 @@ impl RulesService {
         Self {
             pretty: Cell::new(pretty.get()),
             sarif: Cell::new(false),
+            limit: Cell::new(None),
         }
     }
 
@@ -27,7 +30,12 @@ impl RulesService {
         } else if self.pretty.get() {
             r.format_pretty()
         } else {
-            r.format_text()
+            // 0 means show all; otherwise cap at the given limit
+            let lim = self
+                .limit
+                .get()
+                .and_then(|n| if n == 0 { None } else { Some(n) });
+            r.format_text_limited(lim)
         }
     }
 }
@@ -64,7 +72,7 @@ impl RulesService {
     pub fn list(
         &self,
         #[param(help = "Show source URLs for imported rules")] sources: bool,
-        #[param(short = 'e', help = "Filter by engine (all, syntax, fact)")] engine: Option<
+        #[param(short = 'e', help = "Filter by engine (all, syntax, fact, sarif)")] engine: Option<
             crate::commands::rules::RuleType,
         >,
         #[param(help = "Filter by tag")] tag: Option<String>,
@@ -103,9 +111,13 @@ impl RulesService {
         #[param(help = "Apply auto-fixes (syntax rules only)")] fix: bool,
         #[param(help = "Output in SARIF format")] sarif: bool,
         #[param(positional, help = "Target directory or file")] target: Option<String>,
-        #[param(short = 'e', help = "Filter by engine (all, syntax, fact)")] engine: Option<
+        #[param(short = 'e', help = "Filter by engine (all, syntax, fact, sarif)")] engine: Option<
             crate::commands::rules::RuleType,
         >,
+        #[param(help = "Maximum issues to display (0 = show all, default: 50)")] limit: Option<
+            usize,
+        >,
+        #[param(help = "Exit 0 even when error-severity issues are found")] no_fail: bool,
         #[param(help = "Debug flags (comma-separated)")] debug: Vec<String>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
@@ -126,6 +138,8 @@ impl RulesService {
         self.pretty
             .set(resolve_pretty(&target_root, pretty, compact));
         self.sarif.set(sarif);
+        // Default limit of 50 when not specified; 0 means show all
+        self.limit.set(Some(limit.unwrap_or(50)));
 
         // --fix is a separate mutation path: apply fixes and return a simple message
         if fix {
@@ -171,6 +185,12 @@ impl RulesService {
             &debug,
             &config,
         );
+
+        let error_count = report.count_by_severity(normalize_output::diagnostics::Severity::Error);
+        if !no_fail && error_count > 0 {
+            return Err(format!("{error_count} error(s) found"));
+        }
+
         Ok(report)
     }
 

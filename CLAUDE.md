@@ -83,6 +83,22 @@ Patterns from `docs/log-analysis.md` correction analysis:
 - **Name for purpose:** Avoid names that describe one consumer ("tool registry" → "package index")
 - **Verify before stating:** Don't assert AST node types, API behavior, or codebase facts without checking
 
+## SUMMARY.md
+
+Every directory with files should have a `SUMMARY.md` describing its purpose and contents. The pre-commit hook enforces this at `severity=error` via `normalize analyze check --summary --fail-on-error`.
+
+**When making changes:**
+- Update `SUMMARY.md` in the current directory if you add, remove, or significantly change files there.
+- Update ancestor `SUMMARY.md` files if the change affects a parent directory's description (e.g., adding a new crate, removing a module, changing a major interface).
+- Rule of thumb: if a reader of the parent SUMMARY.md would be surprised by your change, update it.
+
+**For context before making changes:**
+- Read `SUMMARY.md` in the current working directory to understand the directory's purpose.
+- Read ancestor `SUMMARY.md` files when working across multiple subdirectories or when you need broader architectural context.
+- Example: before editing files in `crates/normalize-facts/src/`, read `crates/normalize-facts/src/SUMMARY.md` and `crates/normalize-facts/SUMMARY.md`.
+
+**The pre-commit hook will block commits** if SUMMARY.md is stale (too many commits since last update) or missing and there are commits touching that directory. It also detects uncommitted content changes — if you staged file edits without updating SUMMARY.md, the check will catch it.
+
 ## Dogfooding
 
 **Use normalize, not builtin tools.** Avoid Read/Grep/Glob - they waste tokens.

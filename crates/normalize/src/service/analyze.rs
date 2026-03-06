@@ -418,13 +418,7 @@ impl AnalyzeService {
     diff = "Diff",
 ))]
 impl AnalyzeService {
-    /// Run documentation checks: broken refs, stale docs, missing examples, stale SUMMARY.md
-    ///
-    /// Default: run all checks. Use flags to run specific checks only.
-    /// Use --refs for broken documentation references (requires index).
-    /// Use --stale for stale documentation (code newer than docs).
-    /// Use --examples for missing example markers.
-    /// Use --summary to check for missing or stale SUMMARY.md files per directory.
+    /// Check documentation health: broken refs, stale docs, missing examples, and SUMMARY.md freshness.
     #[server(group = "repo")]
     #[cli(display_with = "display_check")]
     #[allow(clippy::too_many_arguments)]
@@ -436,6 +430,7 @@ impl AnalyzeService {
         #[param(help = "Check for missing or stale SUMMARY.md files")] summary: bool,
         #[param(help = "Commits-since-update threshold for stale SUMMARY.md (default: 10)")]
         summary_threshold: Option<usize>,
+        #[param(help = "Exit 0 even when error-severity issues are found")] no_fail: bool,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -444,6 +439,7 @@ impl AnalyzeService {
     ) -> Result<DiagnosticsReport, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
+        let config = crate::config::NormalizeConfig::load(&root_path);
         let run_all = !refs && !stale && !examples && !summary;
 
         let mut report = DiagnosticsReport::new();
@@ -478,7 +474,17 @@ impl AnalyzeService {
             report.merge(summary_report.into());
         }
 
+        // Apply per-rule severity/enabled overrides from normalize.toml to native check issues.
+        // This allows e.g. [analyze.rules."stale-summary"] severity = "error" to enforce SUMMARY.md freshness.
+        crate::commands::rules::apply_native_rules_config(&mut report, &config.analyze.rules);
+
         report.sort();
+
+        let error_count = report.count_by_severity(normalize_output::diagnostics::Severity::Error);
+        if !no_fail && error_count > 0 {
+            return Err(format!("{error_count} error(s) found"));
+        }
+
         Ok(report)
     }
 
