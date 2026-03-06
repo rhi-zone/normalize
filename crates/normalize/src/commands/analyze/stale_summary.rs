@@ -307,9 +307,15 @@ pub fn build_stale_summary_report(root: &Path, threshold: usize) -> StaleSummary
             },
         );
 
+        // Effective change count: committed changes + 1 if there are uncommitted content changes.
+        // This lets the threshold govern both: a directory is stale when
+        //   committed_changes + (has_uncommitted ? 1 : 0) > threshold
+        // so occasional uncommitted edits don't immediately trigger the check.
+        let effective_count = commits_count + usize::from(has_uncommitted);
+
         match last_summary_commit {
             Some(last_commit) => {
-                if commits_count > threshold || has_uncommitted {
+                if effective_count > threshold {
                     stale.push(StaleSummary {
                         dir: dir_label,
                         commits_since_update: commits_count,
@@ -319,7 +325,7 @@ pub fn build_stale_summary_report(root: &Path, threshold: usize) -> StaleSummary
                 }
             }
             None => {
-                if commits_count > 0 || has_uncommitted {
+                if effective_count > threshold {
                     missing.push(MissingSummary {
                         dir: dir_label,
                         total_commits: commits_count,

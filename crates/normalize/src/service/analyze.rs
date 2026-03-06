@@ -428,7 +428,9 @@ impl AnalyzeService {
         #[param(help = "Check for stale documentation")] stale: bool,
         #[param(help = "Check for missing example references")] examples: bool,
         #[param(help = "Check for missing or stale SUMMARY.md files")] summary: bool,
-        #[param(help = "Commits-since-update threshold for stale SUMMARY.md (default: 10)")]
+        #[param(
+            help = "Staleness threshold: flag when (commits_since_update + has_uncommitted) > N (default: 10)"
+        )]
         summary_threshold: Option<usize>,
         #[param(help = "Exit 0 even when error-severity issues are found")] no_fail: bool,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
