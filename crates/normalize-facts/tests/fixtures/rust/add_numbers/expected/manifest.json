@@ -1,6 +1,6 @@
 {
+  "dependencies": [],
   "ecosystem": "cargo",
   "name": "add_numbers",
-  "version": "0.1.0",
-  "dependencies": []
+  "version": "0.1.0"
 }

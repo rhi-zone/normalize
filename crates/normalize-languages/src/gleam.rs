@@ -57,7 +57,37 @@ impl Language for Gleam {
     }
 
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        extract_gleam_doc_comment(node, content)
+        let mut doc_lines: Vec<String> = Vec::new();
+        let mut prev = node.prev_sibling();
+
+        while let Some(sibling) = prev {
+            let kind = sibling.kind();
+            if kind == "comment" || kind == "statement_comment" {
+                let text = &content[sibling.byte_range()];
+                // Doc comments start with ///
+                if let Some(line) = text.strip_prefix("///") {
+                    let line = line.strip_prefix(' ').unwrap_or(line);
+                    doc_lines.push(line.to_string());
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+            prev = sibling.prev_sibling();
+        }
+
+        if doc_lines.is_empty() {
+            return None;
+        }
+
+        doc_lines.reverse();
+        let joined = doc_lines.join("\n").trim().to_string();
+        if joined.is_empty() {
+            None
+        } else {
+            Some(joined)
+        }
     }
 
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
@@ -88,42 +118,6 @@ impl Language for Gleam {
         inner_indent: &str,
     ) -> Option<ContainerBody> {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
-    }
-}
-
-/// Extract Gleam doc comments (`///`) preceding a declaration.
-/// The Gleam tree-sitter grammar may parse these as `statement_comment` or `comment` nodes.
-fn extract_gleam_doc_comment(node: &Node, content: &str) -> Option<String> {
-    let mut doc_lines: Vec<String> = Vec::new();
-    let mut prev = node.prev_sibling();
-
-    while let Some(sibling) = prev {
-        let kind = sibling.kind();
-        if kind == "comment" || kind == "statement_comment" {
-            let text = &content[sibling.byte_range()];
-            // Doc comments start with ///
-            if let Some(line) = text.strip_prefix("///") {
-                let line = line.strip_prefix(' ').unwrap_or(line);
-                doc_lines.push(line.to_string());
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
-        prev = sibling.prev_sibling();
-    }
-
-    if doc_lines.is_empty() {
-        return None;
-    }
-
-    doc_lines.reverse();
-    let joined = doc_lines.join("\n").trim().to_string();
-    if joined.is_empty() {
-        None
-    } else {
-        Some(joined)
     }
 }
 

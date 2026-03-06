@@ -77,7 +77,27 @@ impl Language for Erlang {
     }
 
     fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
-        extract_erlang_attributes(node, content)
+        let mut attrs = Vec::new();
+        let mut prev = node.prev_sibling();
+        while let Some(sibling) = prev {
+            if sibling.kind() == "module_attribute" {
+                let text = content[sibling.byte_range()].trim();
+                if text.starts_with("-spec(")
+                    || text.starts_with("-spec ")
+                    || text.starts_with("-callback(")
+                    || text.starts_with("-deprecated(")
+                    || text.starts_with("-deprecated.")
+                {
+                    attrs.insert(0, text.to_string());
+                }
+                prev = sibling.prev_sibling();
+            } else if sibling.kind() == "comment" {
+                prev = sibling.prev_sibling();
+            } else {
+                break;
+            }
+        }
+        attrs
     }
 
     fn build_signature(&self, node: &Node, content: &str) -> String {
@@ -110,31 +130,6 @@ impl Language for Erlang {
     fn test_file_globs(&self) -> &'static [&'static str] {
         &["**/*_SUITE.erl", "**/*_test.erl", "**/*_tests.erl"]
     }
-}
-
-/// Extract Erlang attributes (`-spec`, `-callback`, `-deprecated`) from preceding siblings.
-fn extract_erlang_attributes(node: &Node, content: &str) -> Vec<String> {
-    let mut attrs = Vec::new();
-    let mut prev = node.prev_sibling();
-    while let Some(sibling) = prev {
-        if sibling.kind() == "module_attribute" {
-            let text = content[sibling.byte_range()].trim();
-            if text.starts_with("-spec(")
-                || text.starts_with("-spec ")
-                || text.starts_with("-callback(")
-                || text.starts_with("-deprecated(")
-                || text.starts_with("-deprecated.")
-            {
-                attrs.insert(0, text.to_string());
-            }
-            prev = sibling.prev_sibling();
-        } else if sibling.kind() == "comment" {
-            prev = sibling.prev_sibling();
-        } else {
-            break;
-        }
-    }
-    attrs
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 {
+  "dependencies": [],
   "ecosystem": "go",
   "name": "add_numbers",
-  "version": "1.21",
-  "dependencies": []
+  "version": "1.21"
 }

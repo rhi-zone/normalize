@@ -1,17 +1,10 @@
 [
   {
-    "file": "Cargo.toml",
+    "file": "src/main.rs",
     "kind": "Module",
-    "name": "package",
+    "name": "math",
     "parent": null,
     "start_line": 1
-  },
-  {
-    "file": "Cargo.toml",
-    "kind": "Module",
-    "name": "workspace",
-    "parent": null,
-    "start_line": 6
   },
   {
     "file": "src/main.rs",

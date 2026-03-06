@@ -22,7 +22,33 @@ impl Language for Cpp {
     }
 
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        extract_cpp_doc_comment(node, content)
+        let mut prev = node.prev_sibling();
+        while let Some(sibling) = prev {
+            if sibling.kind() == "comment" {
+                let text = &content[sibling.byte_range()];
+                if text.starts_with("/**") {
+                    let lines: Vec<&str> = text
+                        .strip_prefix("/**")
+                        .unwrap_or(text)
+                        .strip_suffix("*/")
+                        .unwrap_or(text)
+                        .lines()
+                        .map(|l| l.trim().strip_prefix('*').unwrap_or(l).trim())
+                        .filter(|l| !l.is_empty())
+                        .collect();
+                    if !lines.is_empty() {
+                        return Some(lines.join(" "));
+                    }
+                }
+                return None;
+            }
+            if sibling.kind() == "template_declaration" {
+                prev = sibling.prev_sibling();
+                continue;
+            }
+            return None;
+        }
+        None
     }
 
     fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
@@ -145,37 +171,6 @@ fn find_identifier<'a>(node: &Node, content: &'a str) -> Option<&'a str> {
         if let Some(id) = find_identifier(&child, content) {
             return Some(id);
         }
-    }
-    None
-}
-
-/// Extract a Doxygen doc comment (`/** ... */`) preceding a node.
-fn extract_cpp_doc_comment(node: &Node, content: &str) -> Option<String> {
-    let mut prev = node.prev_sibling();
-    while let Some(sibling) = prev {
-        if sibling.kind() == "comment" {
-            let text = &content[sibling.byte_range()];
-            if text.starts_with("/**") {
-                let lines: Vec<&str> = text
-                    .strip_prefix("/**")
-                    .unwrap_or(text)
-                    .strip_suffix("*/")
-                    .unwrap_or(text)
-                    .lines()
-                    .map(|l| l.trim().strip_prefix('*').unwrap_or(l).trim())
-                    .filter(|l| !l.is_empty())
-                    .collect();
-                if !lines.is_empty() {
-                    return Some(lines.join(" "));
-                }
-            }
-            return None;
-        }
-        if sibling.kind() == "template_declaration" {
-            prev = sibling.prev_sibling();
-            continue;
-        }
-        return None;
     }
     None
 }

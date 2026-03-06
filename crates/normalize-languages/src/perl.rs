@@ -88,7 +88,35 @@ impl Language for Perl {
     }
 
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        extract_perl_doc_comment(node, content)
+        let mut doc_lines: Vec<String> = Vec::new();
+        let mut prev = node.prev_sibling();
+
+        while let Some(sibling) = prev {
+            if sibling.kind() == "comment" || sibling.kind() == "comments" {
+                let text = &content[sibling.byte_range()];
+                if let Some(line) = text.strip_prefix('#') {
+                    let line = line.strip_prefix(' ').unwrap_or(line);
+                    doc_lines.push(line.to_string());
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+            prev = sibling.prev_sibling();
+        }
+
+        if doc_lines.is_empty() {
+            return None;
+        }
+
+        doc_lines.reverse();
+        let joined = doc_lines.join("\n").trim().to_string();
+        if joined.is_empty() {
+            None
+        } else {
+            Some(joined)
+        }
     }
 
     fn analyze_container_body(
@@ -98,41 +126,6 @@ impl Language for Perl {
         inner_indent: &str,
     ) -> Option<ContainerBody> {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
-    }
-}
-
-/// Extract Perl doc comments (`#` comment blocks) preceding a node.
-/// POD blocks (`=pod`/`=cut`) are not typically modeled in the tree-sitter AST,
-/// so we use `#` comment blocks instead.
-fn extract_perl_doc_comment(node: &Node, content: &str) -> Option<String> {
-    let mut doc_lines: Vec<String> = Vec::new();
-    let mut prev = node.prev_sibling();
-
-    while let Some(sibling) = prev {
-        if sibling.kind() == "comment" || sibling.kind() == "comments" {
-            let text = &content[sibling.byte_range()];
-            if let Some(line) = text.strip_prefix('#') {
-                let line = line.strip_prefix(' ').unwrap_or(line);
-                doc_lines.push(line.to_string());
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
-        prev = sibling.prev_sibling();
-    }
-
-    if doc_lines.is_empty() {
-        return None;
-    }
-
-    doc_lines.reverse();
-    let joined = doc_lines.join("\n").trim().to_string();
-    if joined.is_empty() {
-        None
-    } else {
-        Some(joined)
     }
 }
 

@@ -78,45 +78,40 @@ impl Language for R {
     }
 
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        extract_r_doc_comment(node, content)
+        let mut doc_lines: Vec<String> = Vec::new();
+        let mut prev = node.prev_sibling();
+
+        while let Some(sibling) = prev {
+            if sibling.kind() == "comment" {
+                let text = &content[sibling.byte_range()];
+                // roxygen2 comments start with #'
+                if let Some(line) = text.strip_prefix("#'") {
+                    let line = line.strip_prefix(' ').unwrap_or(line);
+                    doc_lines.push(line.to_string());
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+            prev = sibling.prev_sibling();
+        }
+
+        if doc_lines.is_empty() {
+            return None;
+        }
+
+        doc_lines.reverse();
+        let joined = doc_lines.join("\n").trim().to_string();
+        if joined.is_empty() {
+            None
+        } else {
+            Some(joined)
+        }
     }
 
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
         None
-    }
-}
-
-/// Extract roxygen2 comments (`#'`) preceding a function definition.
-fn extract_r_doc_comment(node: &Node, content: &str) -> Option<String> {
-    let mut doc_lines: Vec<String> = Vec::new();
-    let mut prev = node.prev_sibling();
-
-    while let Some(sibling) = prev {
-        if sibling.kind() == "comment" {
-            let text = &content[sibling.byte_range()];
-            // roxygen2 comments start with #'
-            if let Some(line) = text.strip_prefix("#'") {
-                let line = line.strip_prefix(' ').unwrap_or(line);
-                doc_lines.push(line.to_string());
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
-        prev = sibling.prev_sibling();
-    }
-
-    if doc_lines.is_empty() {
-        return None;
-    }
-
-    doc_lines.reverse();
-    let joined = doc_lines.join("\n").trim().to_string();
-    if joined.is_empty() {
-        None
-    } else {
-        Some(joined)
     }
 }
 

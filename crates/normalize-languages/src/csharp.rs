@@ -22,7 +22,54 @@ impl Language for CSharp {
     }
 
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        extract_csharp_doc_comment(node, content)
+        let mut doc_lines: Vec<String> = Vec::new();
+        let mut prev = node.prev_sibling();
+
+        while let Some(sibling) = prev {
+            if sibling.kind() == "comment" {
+                let text = &content[sibling.byte_range()];
+                if text.starts_with("///") {
+                    let line = text.strip_prefix("///").unwrap_or("").trim();
+                    let line = strip_xml_tags(line);
+                    if !line.is_empty() {
+                        doc_lines.push(line);
+                    }
+                } else if text.starts_with("/**") {
+                    let lines: Vec<&str> = text
+                        .strip_prefix("/**")
+                        .unwrap_or(text)
+                        .strip_suffix("*/")
+                        .unwrap_or(text)
+                        .lines()
+                        .map(|l| l.trim().strip_prefix('*').unwrap_or(l).trim())
+                        .filter(|l| !l.is_empty())
+                        .collect();
+                    if !lines.is_empty() {
+                        return Some(lines.join(" "));
+                    }
+                    return None;
+                } else {
+                    break;
+                }
+            } else if sibling.kind() == "attribute_list" {
+                // Skip [Attribute] between doc comment and declaration
+            } else {
+                break;
+            }
+            prev = sibling.prev_sibling();
+        }
+
+        if doc_lines.is_empty() {
+            return None;
+        }
+
+        doc_lines.reverse();
+        let joined = doc_lines.join(" ").trim().to_string();
+        if joined.is_empty() {
+            None
+        } else {
+            Some(joined)
+        }
     }
 
     fn extract_implements(&self, node: &Node, content: &str) -> (bool, Vec<String>) {
@@ -151,7 +198,14 @@ impl Language for CSharp {
     }
 
     fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
-        extract_csharp_attributes(node, content)
+        let mut attrs = Vec::new();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "attribute_list" {
+                attrs.push(content[child.byte_range()].to_string());
+            }
+        }
+        attrs
     }
 
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
@@ -175,73 +229,6 @@ impl Language for CSharp {
         }
         // C# default visibility depends on context, but for skeleton purposes treat as public
         Visibility::Public
-    }
-}
-
-/// Extract attributes from a C# definition node.
-/// C# attributes are `attribute_list` children (e.g. `[Obsolete]`, `[DllImport("...")]`).
-fn extract_csharp_attributes(node: &Node, content: &str) -> Vec<String> {
-    let mut attrs = Vec::new();
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        if child.kind() == "attribute_list" {
-            attrs.push(content[child.byte_range()].to_string());
-        }
-    }
-    attrs
-}
-
-/// Extract a C# doc comment preceding a node.
-///
-/// Supports `///` XML doc comment lines and `/** ... */` block doc comments.
-fn extract_csharp_doc_comment(node: &Node, content: &str) -> Option<String> {
-    let mut doc_lines: Vec<String> = Vec::new();
-    let mut prev = node.prev_sibling();
-
-    while let Some(sibling) = prev {
-        if sibling.kind() == "comment" {
-            let text = &content[sibling.byte_range()];
-            if text.starts_with("///") {
-                let line = text.strip_prefix("///").unwrap_or("").trim();
-                let line = strip_xml_tags(line);
-                if !line.is_empty() {
-                    doc_lines.push(line);
-                }
-            } else if text.starts_with("/**") {
-                let lines: Vec<&str> = text
-                    .strip_prefix("/**")
-                    .unwrap_or(text)
-                    .strip_suffix("*/")
-                    .unwrap_or(text)
-                    .lines()
-                    .map(|l| l.trim().strip_prefix('*').unwrap_or(l).trim())
-                    .filter(|l| !l.is_empty())
-                    .collect();
-                if !lines.is_empty() {
-                    return Some(lines.join(" "));
-                }
-                return None;
-            } else {
-                break;
-            }
-        } else if sibling.kind() == "attribute_list" {
-            // Skip [Attribute] between doc comment and declaration
-        } else {
-            break;
-        }
-        prev = sibling.prev_sibling();
-    }
-
-    if doc_lines.is_empty() {
-        return None;
-    }
-
-    doc_lines.reverse();
-    let joined = doc_lines.join(" ").trim().to_string();
-    if joined.is_empty() {
-        None
-    } else {
-        Some(joined)
     }
 }
 

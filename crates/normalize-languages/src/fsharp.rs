@@ -18,7 +18,53 @@ impl Language for FSharp {
     }
 
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        extract_fsharp_xml_doc(node, content)
+        let mut doc_lines: Vec<String> = Vec::new();
+        let mut prev = node.prev_sibling();
+
+        while let Some(sibling) = prev {
+            if sibling.kind() == "line_comment" {
+                let text = &content[sibling.byte_range()];
+                if let Some(rest) = text.strip_prefix("///") {
+                    let line = rest.strip_prefix(' ').unwrap_or(rest);
+                    doc_lines.push(line.to_string());
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+            prev = sibling.prev_sibling();
+        }
+
+        if doc_lines.is_empty() {
+            return None;
+        }
+
+        doc_lines.reverse();
+
+        // Strip XML tags for a cleaner docstring
+        let joined: String = doc_lines
+            .iter()
+            .map(|l| {
+                let l = l.trim();
+                // Strip common XML doc tags like <summary>, </summary>, <param>, etc.
+                if l.starts_with('<') && l.ends_with('>') {
+                    // Pure tag line (e.g. <summary>), skip it
+                    ""
+                } else {
+                    l
+                }
+            })
+            .filter(|l| !l.is_empty())
+            .collect::<Vec<&str>>()
+            .join(" ");
+
+        let trimmed = joined.trim().to_string();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
     }
 
     fn build_signature(&self, node: &Node, content: &str) -> String {
@@ -91,59 +137,6 @@ impl Language for FSharp {
         node.child_by_field_name("name")
             .or_else(|| node.child_by_field_name("identifier"))
             .map(|n| &content[n.byte_range()])
-    }
-}
-
-/// Extract F# XML doc comments (`/// ...`) preceding a definition node.
-///
-/// Collects consecutive `line_comment` siblings that start with `///`.
-fn extract_fsharp_xml_doc(node: &Node, content: &str) -> Option<String> {
-    let mut doc_lines: Vec<String> = Vec::new();
-    let mut prev = node.prev_sibling();
-
-    while let Some(sibling) = prev {
-        if sibling.kind() == "line_comment" {
-            let text = &content[sibling.byte_range()];
-            if let Some(rest) = text.strip_prefix("///") {
-                let line = rest.strip_prefix(' ').unwrap_or(rest);
-                doc_lines.push(line.to_string());
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
-        prev = sibling.prev_sibling();
-    }
-
-    if doc_lines.is_empty() {
-        return None;
-    }
-
-    doc_lines.reverse();
-
-    // Strip XML tags for a cleaner docstring
-    let joined: String = doc_lines
-        .iter()
-        .map(|l| {
-            let l = l.trim();
-            // Strip common XML doc tags like <summary>, </summary>, <param>, etc.
-            if l.starts_with('<') && l.ends_with('>') {
-                // Pure tag line (e.g. <summary>), skip it
-                ""
-            } else {
-                l
-            }
-        })
-        .filter(|l| !l.is_empty())
-        .collect::<Vec<&str>>()
-        .join(" ");
-
-    let trimmed = joined.trim().to_string();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed)
     }
 }
 
