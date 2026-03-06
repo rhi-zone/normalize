@@ -1,10 +1,13 @@
 //! LSP (Language Server Protocol) server for normalize.
 //!
-//! Provides IDE integration with document symbols, workspace symbols, and hover.
+//! Provides IDE integration with document symbols, workspace symbols, hover,
+//! and diagnostics from syntax/fact rule engines.
 
 use crate::index::FileIndex;
 use crate::skeleton::SkeletonExtractor;
+use std::collections::HashSet;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
@@ -15,6 +18,10 @@ struct MossBackend {
     client: Client,
     root: Mutex<Option<PathBuf>>,
     index: Mutex<Option<FileIndex>>,
+    /// Files that had diagnostics in the last run (to clear stale ones).
+    diagnosed_files: Arc<Mutex<HashSet<Url>>>,
+    /// Generation counter for debouncing diagnostic runs.
+    diagnostics_generation: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl MossBackend {
@@ -23,6 +30,8 @@ impl MossBackend {
             client,
             root: Mutex::new(None),
             index: Mutex::new(None),
+            diagnosed_files: Arc::new(Mutex::new(HashSet::new())),
+            diagnostics_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
     }
 
@@ -31,7 +40,36 @@ impl MossBackend {
         if let Some(idx) = crate::index::open_if_enabled(&root).await {
             *self.index.lock().await = Some(idx);
         }
-        *self.root.lock().await = Some(root);
+        *self.root.lock().await = Some(root.clone());
+
+        // Run initial diagnostics
+        self.schedule_diagnostics().await;
+    }
+
+    /// Schedule a debounced diagnostics run (500ms delay).
+    async fn schedule_diagnostics(&self) {
+        let generation = self
+            .diagnostics_generation
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+            + 1;
+
+        let root = self.root.lock().await.clone();
+        let Some(root) = root else { return };
+
+        let client = self.client.clone();
+        let diagnosed_files = Arc::clone(&self.diagnosed_files);
+        let gen_ref = Arc::clone(&self.diagnostics_generation);
+
+        tokio::spawn(async move {
+            // Debounce: wait 500ms, then check if we're still the latest request
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            let current = gen_ref.load(std::sync::atomic::Ordering::SeqCst);
+            if current != generation {
+                return; // superseded by a newer request
+            }
+
+            run_and_publish_diagnostics(&client, &root, &diagnosed_files).await;
+        });
     }
 
     /// Convert normalize symbol kind to LSP SymbolKind.
@@ -70,8 +108,15 @@ impl LanguageServer for MossBackend {
 
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
-                text_document_sync: Some(TextDocumentSyncCapability::Kind(
-                    TextDocumentSyncKind::INCREMENTAL,
+                text_document_sync: Some(TextDocumentSyncCapability::Options(
+                    TextDocumentSyncOptions {
+                        open_close: Some(true),
+                        change: Some(TextDocumentSyncKind::INCREMENTAL),
+                        save: Some(TextDocumentSyncSaveOptions::SaveOptions(SaveOptions {
+                            include_text: Some(false),
+                        })),
+                        ..Default::default()
+                    },
                 )),
                 document_symbol_provider: Some(OneOf::Left(true)),
                 workspace_symbol_provider: Some(OneOf::Left(true)),
@@ -99,6 +144,10 @@ impl LanguageServer for MossBackend {
 
     async fn shutdown(&self) -> Result<()> {
         Ok(())
+    }
+
+    async fn did_save(&self, _params: DidSaveTextDocumentParams) {
+        self.schedule_diagnostics().await;
     }
 
     async fn document_symbol(
@@ -714,6 +763,151 @@ fn extract_word_at_position(line: &str, col: usize) -> String {
 /// Check if a character is valid in an identifier.
 fn is_identifier_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
+}
+
+/// Convert a normalize `Issue` to an LSP `Diagnostic`.
+fn issue_to_lsp_diagnostic(issue: &normalize_output::diagnostics::Issue) -> Diagnostic {
+    use normalize_output::diagnostics::Severity as S;
+
+    let start_line = issue.line.unwrap_or(1).saturating_sub(1) as u32;
+    let start_col = issue.column.unwrap_or(1).saturating_sub(1) as u32;
+    let end_line = issue
+        .end_line
+        .unwrap_or(issue.line.unwrap_or(1))
+        .saturating_sub(1) as u32;
+    let end_col = issue.end_column.unwrap_or(0) as u32;
+
+    let severity = Some(match issue.severity {
+        S::Error => DiagnosticSeverity::ERROR,
+        S::Warning => DiagnosticSeverity::WARNING,
+        S::Info => DiagnosticSeverity::INFORMATION,
+        S::Hint => DiagnosticSeverity::HINT,
+    });
+
+    let related_information = if issue.related.is_empty() {
+        None
+    } else {
+        Some(
+            issue
+                .related
+                .iter()
+                .filter_map(|rel| {
+                    let uri = Url::from_file_path(&rel.file).ok()?;
+                    let line = rel.line.unwrap_or(1).saturating_sub(1) as u32;
+                    Some(DiagnosticRelatedInformation {
+                        location: Location {
+                            uri,
+                            range: Range {
+                                start: Position { line, character: 0 },
+                                end: Position { line, character: 0 },
+                            },
+                        },
+                        message: rel.message.clone().unwrap_or_default(),
+                    })
+                })
+                .collect(),
+        )
+    };
+
+    Diagnostic {
+        range: Range {
+            start: Position {
+                line: start_line,
+                character: start_col,
+            },
+            end: Position {
+                line: end_line,
+                character: end_col,
+            },
+        },
+        severity,
+        code: Some(NumberOrString::String(issue.rule_id.clone())),
+        source: Some(format!("normalize/{}", issue.source)),
+        message: issue.message.clone(),
+        related_information,
+        ..Default::default()
+    }
+}
+
+/// Run all rule engines and publish diagnostics to the LSP client.
+async fn run_and_publish_diagnostics(
+    client: &Client,
+    root: &std::path::Path,
+    diagnosed_files: &Mutex<HashSet<Url>>,
+) {
+    // Run rules on a blocking thread (they do synchronous I/O + tree-sitter parsing)
+    let root_owned = root.to_path_buf();
+    let report = tokio::task::spawn_blocking(move || {
+        let config = crate::config::NormalizeConfig::load(&root_owned);
+        crate::commands::rules::run_rules_report(
+            &root_owned,
+            None,
+            None,
+            &crate::commands::rules::RuleType::All,
+            &[],
+            &config,
+        )
+    })
+    .await;
+
+    let report = match report {
+        Ok(r) => r,
+        Err(e) => {
+            client
+                .log_message(
+                    MessageType::ERROR,
+                    format!("Failed to run diagnostics: {e}"),
+                )
+                .await;
+            return;
+        }
+    };
+
+    // Group issues by file
+    let mut by_file: std::collections::HashMap<String, Vec<Diagnostic>> =
+        std::collections::HashMap::new();
+    for issue in &report.issues {
+        by_file
+            .entry(issue.file.clone())
+            .or_default()
+            .push(issue_to_lsp_diagnostic(issue));
+    }
+
+    // Clear diagnostics for files that no longer have issues
+    let mut prev = diagnosed_files.lock().await;
+    let mut new_diagnosed = HashSet::new();
+
+    for (file, diagnostics) in &by_file {
+        let file_path = if std::path::Path::new(file).is_absolute() {
+            std::path::PathBuf::from(file)
+        } else {
+            root.join(file)
+        };
+        if let Ok(uri) = Url::from_file_path(&file_path) {
+            client
+                .publish_diagnostics(uri.clone(), diagnostics.clone(), None)
+                .await;
+            new_diagnosed.insert(uri);
+        }
+    }
+
+    // Clear stale: files in prev but not in new_diagnosed
+    for uri in prev.difference(&new_diagnosed) {
+        client.publish_diagnostics(uri.clone(), vec![], None).await;
+    }
+
+    *prev = new_diagnosed;
+
+    client
+        .log_message(
+            MessageType::INFO,
+            format!(
+                "Diagnostics: {} issues in {} files",
+                report.issues.len(),
+                by_file.len()
+            ),
+        )
+        .await;
 }
 
 /// Start the LSP server on stdio.
