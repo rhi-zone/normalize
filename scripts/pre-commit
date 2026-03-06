@@ -26,8 +26,7 @@ if [ -x "./target/debug/normalize" ] || [ -x "./target/release/normalize" ]; the
         echo "Running normalize rules..."
         $NORMALIZE rules run --engine syntax --no-fail
 
-        # Check SUMMARY.md freshness (currently info severity — see TODO.md §Bootstrap SUMMARY.md).
-        # Once severity=error is re-enabled in .normalize/config.toml, this will block on errors.
+        # Check SUMMARY.md freshness — severity=error blocks commits on stale/missing files.
         echo "Running SUMMARY.md freshness check..."
         $NORMALIZE analyze check --summary
     fi

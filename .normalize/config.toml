@@ -95,13 +95,12 @@ enabled = true
 enabled = true
 
 # SUMMARY.md freshness: currently at info severity (TODO: re-escalate to "error" once all
-# SUMMARY.md files have been bootstrapped — see TODO.md §Bootstrap SUMMARY.md).
-# With severity=error, `normalize analyze check --summary` will exit 1 on stale/missing files.
+# SUMMARY.md enforcement — severity=error blocks commits when SUMMARY.md is stale/missing.
 [analyze.rules."stale-summary"]
-severity = "info"
+severity = "error"
 
 [analyze.rules."missing-summary"]
-severity = "info"
+severity = "error"
 
 [aliases]
 todo = ["TODO.md"]
