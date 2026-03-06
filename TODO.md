@@ -295,6 +295,12 @@ language that silently returns empty is misleading users who expect analysis and
       because the file has no symbols), surface a warning rather than silent empty output
 - [ ] Prioritize: Python, JavaScript/TypeScript, Go, Java, C, C++, Ruby, Rust (already good)
       are the high-value targets — full implementations, not boilerplate
+- [ ] Groovy: tags.scm references `class_definition`/`function_definition` but the tree-sitter
+      grammar produces different node kinds — extraction returns nothing (zero symbols, zero imports)
+- [ ] Kotlin: tree-sitter-kotlin fails to parse `val` declarations inside function bodies — any
+      function containing `val x = ...` silently breaks the entire file parse (no symbols extracted)
+- [ ] Kotlin/Scala/Groovy: import queries produce no results — import.scm patterns may not match
+      actual grammar node structure (needs AST inspection to verify node kinds)
 
 **Comprehensive language fixtures** (long-term, verification via nix flakes):
 Goal: for every language we support, a test suite that exercises the full extraction pipeline

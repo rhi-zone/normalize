@@ -1,0 +1,37 @@
+[
+  {
+    "file": "Main.scala",
+    "kind": "Module",
+    "name": "Main",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "Main.scala",
+    "kind": "Method",
+    "name": "main",
+    "parent": "Main",
+    "start_line": 4
+  },
+  {
+    "file": "MathUtils.scala",
+    "kind": "Module",
+    "name": "MathUtils",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "MathUtils.scala",
+    "kind": "Method",
+    "name": "add",
+    "parent": "MathUtils",
+    "start_line": 4
+  },
+  {
+    "file": "MathUtils.scala",
+    "kind": "Method",
+    "name": "multiply",
+    "parent": "MathUtils",
+    "start_line": 8
+  }
+]

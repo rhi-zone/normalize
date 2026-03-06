@@ -1,0 +1,30 @@
+[
+  {
+    "file": "Main.kt",
+    "kind": "Function",
+    "name": "main",
+    "parent": null,
+    "start_line": 4
+  },
+  {
+    "file": "MathUtils.kt",
+    "kind": "Class",
+    "name": "MathUtils",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "MathUtils.kt",
+    "kind": "Method",
+    "name": "add",
+    "parent": "MathUtils",
+    "start_line": 4
+  },
+  {
+    "file": "MathUtils.kt",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 9
+  }
+]
