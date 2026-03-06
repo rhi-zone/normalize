@@ -74,6 +74,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         content: include_str!("js_var_declaration.scm"),
     },
     BuiltinRule {
+        id: "js/typeof-string",
+        content: include_str!("js_typeof_string.scm"),
+    },
+    BuiltinRule {
         id: "typescript/tuple-return",
         content: include_str!("typescript_tuple_return.scm"),
     },
@@ -115,6 +119,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "go/package-var",
         content: include_str!("go_package_var.scm"),
     },
+    BuiltinRule {
+        id: "go/error-ignored",
+        content: include_str!("go_error_ignored.scm"),
+    },
     // Ruby rules
     BuiltinRule {
         id: "ruby/binding-pry",
@@ -127,6 +135,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
     BuiltinRule {
         id: "ruby/rescue-exception",
         content: include_str!("ruby_rescue_exception.scm"),
+    },
+    BuiltinRule {
+        id: "ruby/puts-in-lib",
+        content: include_str!("ruby_puts_in_lib.scm"),
     },
     // Cross-language rules
     BuiltinRule {
