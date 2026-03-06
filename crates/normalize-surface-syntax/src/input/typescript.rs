@@ -165,7 +165,7 @@ impl<'a> ReadContext<'a> {
         } else {
             text
         };
-        // TODO: proper escape handling
+        // NOTE: basic escape sequences only; full unicode escape handling not yet supported
         let unescaped = inner
             .replace("\\n", "\n")
             .replace("\\t", "\t")

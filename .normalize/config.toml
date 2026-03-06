@@ -90,6 +90,12 @@ enabled = true
 
 [analyze.rules."no-todo-comment"]
 enabled = true
+# config.rs doc comment shows example config with "TODO.md" as a filename (not a work item).
+# ast_grep/ is vendored from upstream ast-grep — inherited TODO comments are not our work items.
+allow = [
+    "crates/normalize/src/config.rs",
+    "crates/normalize/src/ast_grep/**",
+]
 
 # no-grammar-loader-new: allow in test modules and test files (tests may need custom loaders
 # with add_path() for isolated grammar directories, which requires GrammarLoader::new()).

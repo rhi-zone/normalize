@@ -4,7 +4,7 @@ use std::fs;
 use std::io::{self, BufRead, IsTerminal, Write};
 use std::path::Path;
 
-/// Common TODO file names to detect
+/// Common task-tracker file names to detect
 const TODO_CANDIDATES: &[&str] = &[
     "TODO.md",
     "TASKS.md",
@@ -27,7 +27,7 @@ pub fn cmd_init(root: &Path, do_index: bool, setup: bool) -> i32 {
         changes.push("Created .normalize/".to_string());
     }
 
-    // 2. Detect TODO files for sigil config
+    // 2. Detect task-tracking files for sigil config
     let todo_files = detect_todo_files(root);
 
     // 3. Create or update config.toml
@@ -364,7 +364,7 @@ fn paint_severity(severity: &str, use_colors: bool) -> String {
     }
 }
 
-/// Detect TODO files in the project root.
+/// Detect task-tracking files (TODO.md, TASKS.md, etc.) in the project root.
 fn detect_todo_files(root: &Path) -> Vec<String> {
     TODO_CANDIDATES
         .iter()
@@ -596,7 +596,7 @@ mod tests {
         cmd_init(tmp.path(), false, false);
 
         let config = fs::read_to_string(tmp.path().join(".normalize/config.toml")).unwrap();
-        // Should not have aliases section if no TODO files found
+        // Should not have aliases section if no todo-tracking files found
         assert!(!config.contains("[aliases]"));
     }
 }

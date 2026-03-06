@@ -116,7 +116,7 @@ async fn api_sessions(State(state): State<Arc<SessionsState>>) -> axum::response
     }
 
     // Sort by id (sessions are UUIDs, so this approximates time ordering)
-    // TODO: sort by mtime properly
+    // NOTE: mtime-based sort would be more accurate but id works well enough
     sessions.reverse();
     sessions.truncate(100);
 

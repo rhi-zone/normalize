@@ -498,7 +498,7 @@ def __dunder__(): pass
         // - TYPE: Type annotation nodes, not relevant for current analysis
         // - LEGACY: Python 2 compatibility, not worth supporting
         // - OPERATOR: Operators within expressions, too granular
-        // - TODO: Potentially useful, to be added when needed
+        // - MAYBE: Potentially useful, to be added when needed
 
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
@@ -555,7 +555,7 @@ def __dunder__(): pass
             "exec_statement",          // Python 2 exec
             "print_statement",         // Python 2 print
 
-            // TODO: Potentially useful
+            // MAYBE: Potentially useful
             "decorated_definition",    // wrapper for @decorator
             "delete_statement",        // del statement
             "future_import_statement", // from __future__

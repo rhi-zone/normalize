@@ -354,7 +354,7 @@ mod tests {
         // - MODIFIER: Visibility/async/unsafe modifiers
         // - PATTERN: Pattern matching internals
         // - MACRO: Macro-related nodes
-        // - TODO: Potentially useful
+        // - MAYBE: Potentially useful
 
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
