@@ -4,7 +4,6 @@
 
 use crate::ir::*;
 use crate::traits::Writer;
-use std::fmt::Write;
 
 /// Static instance of the TypeScript writer for registry.
 pub static TYPESCRIPT_WRITER: TypeScriptWriterImpl = TypeScriptWriterImpl;
@@ -73,11 +72,9 @@ impl TypeScriptWriter {
                 init,
                 mutable,
             } => {
-                if *mutable {
-                    write!(self.output, "let {}", name).unwrap();
-                } else {
-                    write!(self.output, "const {}", name).unwrap();
-                }
+                self.output
+                    .push_str(if *mutable { "let " } else { "const " });
+                self.output.push_str(name);
                 if let Some(init) = init {
                     self.output.push_str(" = ");
                     self.write_expr(init);
@@ -151,7 +148,9 @@ impl TypeScriptWriter {
                 iterable,
                 body,
             } => {
-                write!(self.output, "for (const {} of ", variable).unwrap();
+                self.output.push_str("for (const ");
+                self.output.push_str(variable);
+                self.output.push_str(" of ");
                 self.write_expr(iterable);
                 self.output.push_str(") ");
                 self.write_block_stmt(body);
@@ -226,11 +225,9 @@ impl TypeScriptWriter {
                 init,
                 mutable,
             } => {
-                if *mutable {
-                    write!(self.output, "let {}", name).unwrap();
-                } else {
-                    write!(self.output, "const {}", name).unwrap();
-                }
+                self.output
+                    .push_str(if *mutable { "let " } else { "const " });
+                self.output.push_str(name);
                 if let Some(init) = init {
                     self.output.push_str(" = ");
                     self.write_expr(init);
@@ -272,7 +269,9 @@ impl TypeScriptWriter {
         if f.name.is_empty() {
             self.output.push_str("function(");
         } else {
-            write!(self.output, "function {}(", f.name).unwrap();
+            self.output.push_str("function ");
+            self.output.push_str(&f.name);
+            self.output.push('(');
         }
         for (i, param) in f.params.iter().enumerate() {
             if i > 0 {
@@ -367,7 +366,9 @@ impl TypeScriptWriter {
                     if is_valid_identifier(key) {
                         self.output.push_str(key);
                     } else {
-                        write!(self.output, "\"{}\"", escape_string(key)).unwrap();
+                        self.output.push('"');
+                        self.output.push_str(&escape_string(key));
+                        self.output.push('"');
                     }
                     self.output.push_str(": ");
                     self.write_expr(value);
@@ -434,16 +435,20 @@ impl TypeScriptWriter {
     fn write_literal(&mut self, lit: &Literal) {
         match lit {
             Literal::Null => self.output.push_str("null"),
-            Literal::Bool(b) => write!(self.output, "{}", b).unwrap(),
+            Literal::Bool(b) => self.output.push_str(if *b { "true" } else { "false" }),
             Literal::Number(n) => {
                 // Format number cleanly (no trailing .0 for integers)
                 if n.fract() == 0.0 && n.abs() < 1e15 {
-                    write!(self.output, "{}", *n as i64).unwrap();
+                    self.output.push_str(&(*n as i64).to_string());
                 } else {
-                    write!(self.output, "{}", n).unwrap();
+                    self.output.push_str(&n.to_string());
                 }
             }
-            Literal::String(s) => write!(self.output, "\"{}\"", escape_string(s)).unwrap(),
+            Literal::String(s) => {
+                self.output.push('"');
+                self.output.push_str(&escape_string(s));
+                self.output.push('"');
+            }
         }
     }
 
@@ -491,15 +496,14 @@ fn escape_string(s: &str) -> String {
 }
 
 fn is_valid_identifier(s: &str) -> bool {
-    if s.is_empty() {
-        return false;
-    }
     let mut chars = s.chars();
-    let first = chars.next().unwrap();
-    if !first.is_alphabetic() && first != '_' && first != '$' {
-        return false;
+    match chars.next() {
+        None => false,
+        Some(first) => {
+            (first.is_alphabetic() || first == '_' || first == '$')
+                && chars.all(|c| c.is_alphanumeric() || c == '_' || c == '$')
+        }
     }
-    chars.all(|c| c.is_alphanumeric() || c == '_' || c == '$')
 }
 
 #[cfg(test)]

@@ -38,6 +38,7 @@ impl CliFormat for ClapFormat {
         }
 
         // Check for typical clap option format: "  -x, --xxx"
+        // normalize-syntax-allow: rust/unwrap-in-impl - literal regex; compile-time correctness guaranteed
         if Regex::new(r"^\s+-\w,\s+--\w").unwrap().is_match(help_text) {
             score += 0.2;
         }
@@ -187,6 +188,7 @@ fn parse_option_line(line: &str) -> Option<CliOption> {
     // Group 2: long flag (--xxx)
     // Group 3: value (<VALUE> or [VALUE])
     // Group 4: description (after 2+ spaces)
+    // normalize-syntax-allow: rust/unwrap-in-impl - literal regex; compile-time correctness guaranteed
     let re =
         Regex::new(r"^(-\w)?(?:,\s*)?(--[\w-]+)?(?:\s*(<[^>]+>|\[[^\]]+\]))?\s{2,}(.*)$").unwrap();
 

@@ -796,24 +796,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_simple_assignment() {
-        let ir = read_python("x = 42").unwrap();
+    fn test_simple_assignment() -> Result<(), ReadError> {
+        let ir = read_python("x = 42")?;
         assert_eq!(ir.body.len(), 1);
         match &ir.body[0] {
             Stmt::Let { name, .. } => assert_eq!(name, "x"),
             _ => panic!("expected Let"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_binary_expr() {
-        let ir = read_python("result = 1 + 2 * 3").unwrap();
+    fn test_binary_expr() -> Result<(), ReadError> {
+        let ir = read_python("result = 1 + 2 * 3")?;
         assert_eq!(ir.body.len(), 1);
+        Ok(())
     }
 
     #[test]
-    fn test_function_call() {
-        let ir = read_python("print(\"hello\", 42)").unwrap();
+    fn test_function_call() -> Result<(), ReadError> {
+        let ir = read_python("print(\"hello\", 42)")?;
         assert_eq!(ir.body.len(), 1);
         match &ir.body[0] {
             Stmt::Expr(Expr::Call { callee, args }) => {
@@ -822,11 +824,12 @@ mod tests {
             }
             _ => panic!("expected Call"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_function_declaration() {
-        let ir = read_python("def add(a, b):\n    return a + b").unwrap();
+    fn test_function_declaration() -> Result<(), ReadError> {
+        let ir = read_python("def add(a, b):\n    return a + b")?;
         assert_eq!(ir.body.len(), 1);
         match &ir.body[0] {
             Stmt::Function(f) => {
@@ -835,34 +838,39 @@ mod tests {
             }
             _ => panic!("expected Function"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_if_statement() {
-        let ir = read_python("if x > 0:\n    print(x)").unwrap();
+    fn test_if_statement() -> Result<(), ReadError> {
+        let ir = read_python("if x > 0:\n    print(x)")?;
         assert_eq!(ir.body.len(), 1);
         assert!(matches!(&ir.body[0], Stmt::If { .. }));
+        Ok(())
     }
 
     #[test]
-    fn test_for_loop() {
-        let ir = read_python("for i in items:\n    print(i)").unwrap();
+    fn test_for_loop() -> Result<(), ReadError> {
+        let ir = read_python("for i in items:\n    print(i)")?;
         assert_eq!(ir.body.len(), 1);
         match &ir.body[0] {
             Stmt::ForIn { variable, .. } => assert_eq!(variable, "i"),
             _ => panic!("expected ForIn"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_list_literal() {
-        let ir = read_python("arr = [1, 2, 3]").unwrap();
+    fn test_list_literal() -> Result<(), ReadError> {
+        let ir = read_python("arr = [1, 2, 3]")?;
         assert_eq!(ir.body.len(), 1);
+        Ok(())
     }
 
     #[test]
-    fn test_dict_literal() {
-        let ir = read_python("obj = {\"x\": 1, \"y\": 2}").unwrap();
+    fn test_dict_literal() -> Result<(), ReadError> {
+        let ir = read_python("obj = {\"x\": 1, \"y\": 2}")?;
         assert_eq!(ir.body.len(), 1);
+        Ok(())
     }
 }

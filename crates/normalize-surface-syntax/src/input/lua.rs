@@ -167,8 +167,11 @@ impl<'a> ReadContext<'a> {
                 .unwrap_or(text)
         } else if text.starts_with("[=[") {
             // Long string with equals [=[...]=]
-            let start = text.find('[').unwrap() + 1;
-            let end = text.rfind(']').unwrap();
+            // text starts with `[=[` so the opening `[` is always at byte 0.
+            let start = 1; // skip the leading `[`
+            let end = text
+                .rfind(']')
+                .ok_or_else(|| ReadError::Parse("unterminated long string".into()))?;
             let equals_count = text[start..].chars().take_while(|c| *c == '=').count();
             let actual_start = start + equals_count + 1;
             let actual_end = end - equals_count;
@@ -853,8 +856,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_simple_assignment() {
-        let program = read_lua("local x = 42").unwrap();
+    fn test_simple_assignment() -> Result<(), ReadError> {
+        let program = read_lua("local x = 42")?;
         assert_eq!(program.body.len(), 1);
         match &program.body[0] {
             Stmt::Let { name, init, .. } => {
@@ -863,11 +866,12 @@ mod tests {
             }
             _ => panic!("expected Let"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_binary_expr() {
-        let program = read_lua("local x = 1 + 2").unwrap();
+    fn test_binary_expr() -> Result<(), ReadError> {
+        let program = read_lua("local x = 1 + 2")?;
         match &program.body[0] {
             Stmt::Let {
                 init: Some(Expr::Binary { op, .. }),
@@ -877,11 +881,12 @@ mod tests {
             }
             _ => panic!("expected Binary"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_function_call() {
-        let program = read_lua("print('hello')").unwrap();
+    fn test_function_call() -> Result<(), ReadError> {
+        let program = read_lua("print('hello')")?;
         match &program.body[0] {
             Stmt::Expr(Expr::Call { callee, args }) => {
                 assert_eq!(args.len(), 1);
@@ -892,11 +897,12 @@ mod tests {
             }
             _ => panic!("expected Call"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_function_declaration() {
-        let program = read_lua("function add(a, b) return a + b end").unwrap();
+    fn test_function_declaration() -> Result<(), ReadError> {
+        let program = read_lua("function add(a, b) return a + b end")?;
         match &program.body[0] {
             Stmt::Function(f) => {
                 assert_eq!(f.name, "add");
@@ -904,11 +910,12 @@ mod tests {
             }
             _ => panic!("expected Function"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_if_statement() {
-        let program = read_lua("if x > 0 then return 1 else return 0 end").unwrap();
+    fn test_if_statement() -> Result<(), ReadError> {
+        let program = read_lua("if x > 0 then return 1 else return 0 end")?;
         match &program.body[0] {
             Stmt::If {
                 test, alternate, ..
@@ -924,11 +931,12 @@ mod tests {
             }
             _ => panic!("expected If"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_table_constructor() {
-        let program = read_lua("local t = { a = 1, b = 2 }").unwrap();
+    fn test_table_constructor() -> Result<(), ReadError> {
+        let program = read_lua("local t = { a = 1, b = 2 }")?;
         match &program.body[0] {
             Stmt::Let {
                 init: Some(Expr::Object(pairs)),
@@ -938,11 +946,12 @@ mod tests {
             }
             _ => panic!("expected Object"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_varargs_expression() {
-        let program = read_lua("function foo(...) return ... end").unwrap();
+    fn test_varargs_expression() -> Result<(), ReadError> {
+        let program = read_lua("function foo(...) return ... end")?;
         match &program.body[0] {
             Stmt::Function(f) => {
                 assert_eq!(f.params, vec!["..."]);
@@ -955,11 +964,12 @@ mod tests {
             }
             _ => panic!("expected Function"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_multiple_return() {
-        let program = read_lua("function swap(a, b) return b, a end").unwrap();
+    fn test_multiple_return() -> Result<(), ReadError> {
+        let program = read_lua("function swap(a, b) return b, a end")?;
         match &program.body[0] {
             Stmt::Function(f) => match &f.body[0] {
                 Stmt::Return(Some(Expr::Array(items))) => {
@@ -969,11 +979,12 @@ mod tests {
             },
             _ => panic!("expected Function"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_repeat_until() {
-        let program = read_lua("repeat x = x + 1 until x > 10").unwrap();
+    fn test_repeat_until() -> Result<(), ReadError> {
+        let program = read_lua("repeat x = x + 1 until x > 10")?;
         match &program.body[0] {
             Stmt::While { test, body } => {
                 // repeat-until becomes while(true) { body; if(cond) break }
@@ -987,16 +998,18 @@ mod tests {
             }
             _ => panic!("expected While"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_goto_label_skipped() {
-        let program = read_lua("::start::\nprint('hello')\ngoto start").unwrap();
+    fn test_goto_label_skipped() -> Result<(), ReadError> {
+        let program = read_lua("::start::\nprint('hello')\ngoto start")?;
         // goto and labels are skipped, only the print call remains
         assert_eq!(program.body.len(), 1);
         match &program.body[0] {
             Stmt::Expr(Expr::Call { .. }) => {}
             _ => panic!("expected Call"),
         }
+        Ok(())
     }
 }

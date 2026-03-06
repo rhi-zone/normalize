@@ -117,6 +117,7 @@ fn parse_option_line(line: &str) -> Option<CliOption> {
     };
 
     // Pattern: "-V, --version  description" or "-c, --config <FILE>  description"
+    // normalize-syntax-allow: rust/unwrap-in-impl - literal regex; compile-time correctness guaranteed
     let re = Regex::new(r"^(-\w)?(?:,\s*)?(--[\w-]+)?(?:\s+(<[^>]+>))?\s{2,}(.*)$").unwrap();
 
     if let Some(caps) = re.captures(trimmed) {
@@ -153,6 +154,7 @@ fn parse_command_line(line: &str) -> Option<CliCommand> {
         return None;
     }
 
+    // normalize-syntax-allow: rust/unwrap-in-impl - literal regex; compile-time correctness guaranteed
     let re = Regex::new(r"^(\S+)(?:\s+\[[\w.]+\])?\s{2,}(.*)$").unwrap();
     if let Some(caps) = re.captures(trimmed) {
         let name = caps.get(1)?.as_str().to_string();

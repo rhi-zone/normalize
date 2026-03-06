@@ -89,13 +89,13 @@ impl ManifestParser for CsprojParser {
             .descendants()
             .filter(|n| n.has_tag_name("PackageReference"))
         {
-            let pkg_name = node
+            let Some(pkg_name) = node
                 .attribute("Include")
-                .or_else(|| node.attribute("include"));
-            if pkg_name.is_none() {
+                .or_else(|| node.attribute("include"))
+            else {
                 continue;
-            }
-            let pkg_name = pkg_name.unwrap().to_string();
+            };
+            let pkg_name = pkg_name.to_string();
 
             // Version can be attribute or child element
             let version_req = node

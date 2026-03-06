@@ -166,6 +166,7 @@ fn parse_option_line(line: &str) -> Option<CliOption> {
     // Group 2: long flag (--xxx)
     // Group 3: value (FILE, PORT, etc. - no angle brackets in argparse)
     // Group 4: description
+    // normalize-syntax-allow: rust/unwrap-in-impl - literal regex; compile-time correctness guaranteed
     let re = Regex::new(r"^(-\w)?(?:,\s*)?(--[\w-]+)?(?:\s+([A-Z_]+))?\s{2,}(.*)$").unwrap();
 
     if let Some(caps) = re.captures(trimmed) {

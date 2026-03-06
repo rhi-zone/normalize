@@ -900,31 +900,30 @@ impl<'a> ReadContext<'a> {
         }
 
         // Build nested if-else from cases (reverse order to build from inside out)
-        let default_stmt = if default_body.is_empty() {
+        let default_stmt = if default_body.len() == 1 {
+            default_body.remove(0)
+        } else if default_body.is_empty() {
             Stmt::block(vec![])
-        } else if default_body.len() == 1 {
-            default_body.into_iter().next().unwrap()
         } else {
             Stmt::block(default_body)
         };
 
-        let result =
-            cases
-                .into_iter()
-                .rev()
-                .fold(default_stmt, |else_branch, (case_val, body_stmts)| {
-                    let body_stmt = if body_stmts.is_empty() {
-                        Stmt::block(vec![])
-                    } else if body_stmts.len() == 1 {
-                        body_stmts.into_iter().next().unwrap()
-                    } else {
-                        Stmt::block(body_stmts)
-                    };
+        let result = cases.into_iter().rev().fold(
+            default_stmt,
+            |else_branch, (case_val, mut body_stmts)| {
+                let body_stmt = if body_stmts.len() == 1 {
+                    body_stmts.remove(0)
+                } else if body_stmts.is_empty() {
+                    Stmt::block(vec![])
+                } else {
+                    Stmt::block(body_stmts)
+                };
 
-                    let condition = Expr::binary(value_expr.clone(), BinaryOp::Eq, case_val);
+                let condition = Expr::binary(value_expr.clone(), BinaryOp::Eq, case_val);
 
-                    Stmt::if_stmt(condition, body_stmt, Some(else_branch))
-                });
+                Stmt::if_stmt(condition, body_stmt, Some(else_branch))
+            },
+        );
 
         Ok(result)
     }
@@ -1023,8 +1022,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_simple_let() {
-        let program = read_typescript("let x = 42;").unwrap();
+    fn test_simple_let() -> Result<(), ReadError> {
+        let program = read_typescript("let x = 42;")?;
         assert_eq!(program.body.len(), 1);
         match &program.body[0] {
             Stmt::Let {
@@ -1038,22 +1037,24 @@ mod tests {
             }
             _ => panic!("expected Let"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_binary_expr() {
-        let program = read_typescript("1 + 2").unwrap();
+    fn test_binary_expr() -> Result<(), ReadError> {
+        let program = read_typescript("1 + 2")?;
         match &program.body[0] {
             Stmt::Expr(Expr::Binary { op, .. }) => {
                 assert_eq!(op, &BinaryOp::Add);
             }
             _ => panic!("expected Binary"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_function_call() {
-        let program = read_typescript("console.log('hello')").unwrap();
+    fn test_function_call() -> Result<(), ReadError> {
+        let program = read_typescript("console.log('hello')")?;
         match &program.body[0] {
             Stmt::Expr(Expr::Call { callee, args }) => {
                 assert_eq!(args.len(), 1);
@@ -1064,17 +1065,19 @@ mod tests {
             }
             _ => panic!("expected Call"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_arrow_function() {
-        let program = read_typescript("const add = (a, b) => a + b;").unwrap();
+    fn test_arrow_function() -> Result<(), ReadError> {
+        let program = read_typescript("const add = (a, b) => a + b;")?;
         assert_eq!(program.body.len(), 1);
+        Ok(())
     }
 
     #[test]
-    fn test_if_statement() {
-        let program = read_typescript("if (x > 0) { return 1; } else { return 0; }").unwrap();
+    fn test_if_statement() -> Result<(), ReadError> {
+        let program = read_typescript("if (x > 0) { return 1; } else { return 0; }")?;
         match &program.body[0] {
             Stmt::If {
                 test, alternate, ..
@@ -1090,5 +1093,6 @@ mod tests {
             }
             _ => panic!("expected If"),
         }
+        Ok(())
     }
 }

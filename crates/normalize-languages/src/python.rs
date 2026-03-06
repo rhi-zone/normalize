@@ -291,6 +291,7 @@ impl Language for Python {
                 .map(|i| i + 1)
                 .unwrap_or(child_start)
         } else if !children.is_empty() {
+            // normalize-syntax-allow: rust/unwrap-in-impl - !children.is_empty() guarantees last() is Some
             let last_end = children.last().unwrap().end_byte();
             if last_end < content.len() && content.as_bytes()[last_end] == b'\n' {
                 last_end + 1

@@ -187,6 +187,7 @@ fn extract_opam_version(constraint: &str) -> Option<String> {
                 current_op.push(ch);
                 // Collect the rest of the operator
                 while chars.peek().is_some_and(|&c| matches!(c, '>' | '<' | '=')) {
+                    // normalize-syntax-allow: rust/unwrap-in-impl - peek() confirmed Some; next() cannot fail
                     current_op.push(chars.next().unwrap());
                 }
                 // Skip whitespace

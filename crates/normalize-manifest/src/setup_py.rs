@@ -123,7 +123,11 @@ fn parse_string_list(body: &str) -> Vec<String> {
     let mut result = Vec::new();
     let mut remaining = body;
     while let Some(quote_pos) = remaining.find(['"', '\'']) {
-        let quote = remaining.chars().nth(quote_pos).unwrap();
+        let quote = if remaining.as_bytes()[quote_pos] == b'"' {
+            '"'
+        } else {
+            '\''
+        };
         let after_open = &remaining[quote_pos + 1..];
         // Find closing quote (not preceded by backslash — simple heuristic)
         match after_open.find(quote) {
@@ -149,7 +153,11 @@ fn parse_extras_require(body: &str) -> Vec<DeclaredDep> {
     let mut remaining = body;
 
     while let Some(quote_pos) = remaining.find(['"', '\'']) {
-        let quote = remaining.chars().nth(quote_pos).unwrap();
+        let quote = if remaining.as_bytes()[quote_pos] == b'"' {
+            '"'
+        } else {
+            '\''
+        };
         let after_open = &remaining[quote_pos + 1..];
         let key_end = match after_open.find(quote) {
             Some(e) => e,

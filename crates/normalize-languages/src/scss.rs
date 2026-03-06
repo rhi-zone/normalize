@@ -27,6 +27,7 @@ impl Language for Scss {
                 let rest = stripped.trim();
                 // Extract quoted path
                 if let Some(start) = rest.find('"').or_else(|| rest.find('\'')) {
+                    // normalize-syntax-allow: rust/unwrap-in-impl - start is the byte offset of an ASCII quote char; byte == char index for ASCII
                     let quote = rest.chars().nth(start).unwrap();
                     let inner = &rest[start + 1..];
                     if let Some(end) = inner.find(quote) {

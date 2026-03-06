@@ -4,7 +4,6 @@
 
 use crate::ir::*;
 use crate::traits::Writer;
-use std::fmt::Write;
 
 /// Static instance of the Lua writer for registry.
 pub static LUA_WRITER: LuaWriterImpl = LuaWriterImpl;
@@ -68,7 +67,8 @@ impl LuaWriter {
             }
 
             Stmt::Let { name, init, .. } => {
-                write!(self.output, "local {}", name).unwrap();
+                self.output.push_str("local ");
+                self.output.push_str(name);
                 if let Some(init) = init {
                     self.output.push_str(" = ");
                     self.write_expr(init);
@@ -156,7 +156,9 @@ impl LuaWriter {
                 iterable,
                 body,
             } => {
-                write!(self.output, "for _, {} in pairs(", variable).unwrap();
+                self.output.push_str("for _, ");
+                self.output.push_str(variable);
+                self.output.push_str(" in pairs(");
                 self.write_expr(iterable);
                 self.output.push_str(") do\n");
                 self.indent += 1;
@@ -240,7 +242,9 @@ impl LuaWriter {
         if f.name.is_empty() {
             self.output.push_str("function(");
         } else {
-            write!(self.output, "function {}(", f.name).unwrap();
+            self.output.push_str("function ");
+            self.output.push_str(&f.name);
+            self.output.push('(');
         }
         for (i, param) in f.params.iter().enumerate() {
             if i > 0 {
@@ -331,7 +335,9 @@ impl LuaWriter {
                     if i > 0 {
                         self.output.push_str(", ");
                     }
-                    write!(self.output, "[\"{}\"] = ", key).unwrap();
+                    self.output.push_str("[\"");
+                    self.output.push_str(key);
+                    self.output.push_str("\"] = ");
                     self.write_expr(value);
                 }
                 self.output.push('}');
@@ -367,9 +373,13 @@ impl LuaWriter {
     fn write_literal(&mut self, lit: &Literal) {
         match lit {
             Literal::Null => self.output.push_str("nil"),
-            Literal::Bool(b) => write!(self.output, "{}", b).unwrap(),
-            Literal::Number(n) => write!(self.output, "{}", n).unwrap(),
-            Literal::String(s) => write!(self.output, "\"{}\"", escape_string(s)).unwrap(),
+            Literal::Bool(b) => self.output.push_str(if *b { "true" } else { "false" }),
+            Literal::Number(n) => self.output.push_str(&n.to_string()),
+            Literal::String(s) => {
+                self.output.push('"');
+                self.output.push_str(&escape_string(s));
+                self.output.push('"');
+            }
         }
     }
 

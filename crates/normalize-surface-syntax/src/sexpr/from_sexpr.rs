@@ -386,9 +386,9 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn test_simple_let() {
+    fn test_simple_let() -> Result<(), SExprError> {
         let sexpr = json!(["std.let", "x", 42]);
-        let program = from_sexpr(&sexpr).unwrap();
+        let program = from_sexpr(&sexpr)?;
         assert_eq!(program.body.len(), 1);
         match &program.body[0] {
             Stmt::Let { name, init, .. } => {
@@ -397,24 +397,26 @@ mod tests {
             }
             _ => panic!("expected Let"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_binary_expr() {
+    fn test_binary_expr() -> Result<(), SExprError> {
         let sexpr = json!(["math.add", 1, 2]);
-        let program = from_sexpr(&sexpr).unwrap();
+        let program = from_sexpr(&sexpr)?;
         match &program.body[0] {
             Stmt::Expr(Expr::Binary { op, .. }) => {
                 assert_eq!(*op, BinaryOp::Add);
             }
             _ => panic!("expected Binary"),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_function_call() {
+    fn test_function_call() -> Result<(), SExprError> {
         let sexpr = json!(["console.log", "hello"]);
-        let program = from_sexpr(&sexpr).unwrap();
+        let program = from_sexpr(&sexpr)?;
         match &program.body[0] {
             Stmt::Expr(Expr::Call { callee, args }) => {
                 assert_eq!(args.len(), 1);
@@ -426,5 +428,6 @@ mod tests {
             }
             _ => panic!("expected Call"),
         }
+        Ok(())
     }
 }

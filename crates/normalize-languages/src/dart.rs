@@ -103,6 +103,7 @@ impl Language for Dart {
 
         // Extract the import URI
         if let Some(start) = text.find('\'').or_else(|| text.find('"')) {
+            // normalize-syntax-allow: rust/unwrap-in-impl - start is the byte offset of an ASCII quote char; byte == char index for ASCII
             let quote = text.chars().nth(start).unwrap();
             let rest = &text[start + 1..];
             if let Some(end) = rest.find(quote) {

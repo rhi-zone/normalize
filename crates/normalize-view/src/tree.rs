@@ -513,6 +513,7 @@ fn collect_injection_spans(
     if content_idx.is_none() {
         return spans;
     }
+    // normalize-syntax-allow: rust/unwrap-in-impl - is_none() early return above guarantees Some
     let content_idx = content_idx.unwrap() as u32;
 
     let mut matches = cursor.matches(query, root, source.as_bytes());
@@ -1432,6 +1433,7 @@ fn collect_single_chain_internal<'a>(
         if current.children.len() != 1 {
             break;
         }
+        // normalize-syntax-allow: rust/unwrap-in-impl - len() != 1 break above guarantees exactly one child
         let (child_name, child_node) = current.children.iter().next().unwrap();
         if !child_node.is_dir {
             break;

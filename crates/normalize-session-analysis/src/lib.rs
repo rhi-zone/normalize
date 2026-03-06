@@ -818,36 +818,40 @@ impl SessionAnalysis {
 
     /// Format as pretty text with colors and bar charts.
     pub fn format_pretty(&self) -> String {
-        use std::fmt::Write;
         let mut out = String::new();
+        // Writing to String via fmt::Write is infallible — String::write_fmt never returns Err.
+        self.write_pretty(&mut out).unwrap_or_default();
+        out
+    }
+
+    fn write_pretty(&self, out: &mut String) -> std::fmt::Result {
+        use std::fmt::Write;
 
         // Header
-        writeln!(out, "\x1b[1;36m━━━ Session Analysis ━━━\x1b[0m").unwrap();
-        writeln!(out).unwrap();
+        writeln!(out, "\x1b[1;36m━━━ Session Analysis ━━━\x1b[0m")?;
+        writeln!(out)?;
 
         // Summary
-        writeln!(out, "\x1b[1mFormat:\x1b[0m {}", self.format).unwrap();
+        writeln!(out, "\x1b[1mFormat:\x1b[0m {}", self.format)?;
         writeln!(
             out,
             "\x1b[1mTool calls:\x1b[0m {} ({:.1}% success)",
             self.total_tool_calls(),
             self.overall_success_rate() * 100.0
-        )
-        .unwrap();
-        writeln!(out, "\x1b[1mTurns:\x1b[0m {}", self.total_turns).unwrap();
+        )?;
+        writeln!(out, "\x1b[1mTurns:\x1b[0m {}", self.total_turns)?;
         if self.parallel_opportunities > 0 {
             writeln!(
                 out,
                 "\x1b[1mParallel opportunities:\x1b[0m {}",
                 self.parallel_opportunities
-            )
-            .unwrap();
+            )?;
         }
-        writeln!(out).unwrap();
+        writeln!(out)?;
 
         // Tool usage with bar charts
         if !self.tool_stats.is_empty() {
-            writeln!(out, "\x1b[1;36m━━━ Tool Usage ━━━\x1b[0m").unwrap();
+            writeln!(out, "\x1b[1;36m━━━ Tool Usage ━━━\x1b[0m")?;
 
             let mut tools: Vec<_> = self.tool_stats.values().collect();
             tools.sort_by(|a, b| b.calls.cmp(&a.calls));
@@ -878,47 +882,43 @@ impl SessionAnalysis {
                         String::new()
                     },
                     width = max_name_len
-                )
-                .unwrap();
+                )?;
             }
-            writeln!(out).unwrap();
+            writeln!(out)?;
         }
 
         // Token usage
         if self.token_stats.api_calls > 0 {
             let ts = &self.token_stats;
-            writeln!(out, "\x1b[1;36m━━━ Token Usage ━━━\x1b[0m").unwrap();
-            writeln!(out, "API calls: {}", ts.api_calls).unwrap();
-            writeln!(out, "Avg context: {} tokens", ts.avg_context()).unwrap();
+            writeln!(out, "\x1b[1;36m━━━ Token Usage ━━━\x1b[0m")?;
+            writeln!(out, "API calls: {}", ts.api_calls)?;
+            writeln!(out, "Avg context: {} tokens", ts.avg_context())?;
             writeln!(
                 out,
                 "Context range: {} - {}",
                 ts.min_context, ts.max_context
-            )
-            .unwrap();
+            )?;
             if ts.cache_read > 0 {
-                writeln!(out, "Cache read: {} tokens", format_tokens(ts.cache_read)).unwrap();
+                writeln!(out, "Cache read: {} tokens", format_tokens(ts.cache_read))?;
             }
             if ts.cache_create > 0 {
                 writeln!(
                     out,
                     "Cache create: {} tokens",
                     format_tokens(ts.cache_create)
-                )
-                .unwrap();
+                )?;
             }
-            writeln!(out).unwrap();
+            writeln!(out)?;
 
             // Cost breakdown
-            writeln!(out, "\x1b[1;36m━━━ Cost Estimate ━━━\x1b[0m").unwrap();
+            writeln!(out, "\x1b[1;36m━━━ Cost Estimate ━━━\x1b[0m")?;
 
             if let Some(actual) = self.actual_cost {
                 writeln!(
                     out,
                     "\x1b[1mActual cost:\x1b[0m \x1b[32m${:.2}\x1b[0m",
                     actual
-                )
-                .unwrap();
+                )?;
 
                 let sonnet = ModelPricing::SONNET_4_5.calculate_cost(ts);
                 let opus = ModelPricing::OPUS_4_5.calculate_cost(ts);
@@ -932,16 +932,14 @@ impl SessionAnalysis {
                     opus.total_cost,
                     haiku.model,
                     haiku.total_cost
-                )
-                .unwrap();
+                )?;
             } else {
                 let sonnet = ModelPricing::SONNET_4_5.calculate_cost(ts);
                 writeln!(
                     out,
                     "\x1b[1m{}\x1b[0m: \x1b[32m${:.2}\x1b[0m",
                     sonnet.model, sonnet.total_cost
-                )
-                .unwrap();
+                )?;
                 if sonnet.cache_savings > 0.0 {
                     let savings_pct =
                         (sonnet.cache_savings / (sonnet.total_cost + sonnet.cache_savings)) * 100.0;
@@ -949,15 +947,13 @@ impl SessionAnalysis {
                         out,
                         "  Cache savings: \x1b[33m${:.2}\x1b[0m ({:.1}%)",
                         sonnet.cache_savings, savings_pct
-                    )
-                    .unwrap();
+                    )?;
                 }
                 writeln!(
                     out,
                     "  Input: ${:.2} | Output: ${:.2}",
                     sonnet.input_cost, sonnet.output_cost
-                )
-                .unwrap();
+                )?;
 
                 let opus = ModelPricing::OPUS_4_5.calculate_cost(ts);
                 let haiku = ModelPricing::HAIKU_4_5.calculate_cost(ts);
@@ -970,47 +966,44 @@ impl SessionAnalysis {
                     haiku.model,
                     haiku.total_cost,
                     haiku.total_cost / sonnet.total_cost
-                )
-                .unwrap();
+                )?;
             }
 
             // Token efficiency
             if let Some(dedup) = &self.dedup_tokens {
-                writeln!(out).unwrap();
-                writeln!(out, "\x1b[1;36m━━━ Token Efficiency ━━━\x1b[0m").unwrap();
+                writeln!(out)?;
+                writeln!(out, "\x1b[1;36m━━━ Token Efficiency ━━━\x1b[0m")?;
                 writeln!(
                     out,
                     "Unique input: {} | Unique output: {}",
                     format_tokens(dedup.unique_input),
                     format_tokens(dedup.unique_output)
-                )
-                .unwrap();
+                )?;
                 writeln!(
                     out,
                     "Uniqueness: \x1b[33m{:.1}%\x1b[0m",
                     dedup.uniqueness_ratio * 100.0
-                )
-                .unwrap();
+                )?;
                 let redundant = dedup
                     .total_billed
                     .saturating_sub(dedup.unique_input + dedup.unique_output);
-                writeln!(out, "Redundant context: {}", format_tokens(redundant)).unwrap();
+                writeln!(out, "Redundant context: {}", format_tokens(redundant))?;
             }
-            writeln!(out).unwrap();
+            writeln!(out)?;
 
             // Token growth visualization
             if !self.context_per_turn.is_empty() && self.context_per_turn.iter().any(|&c| c > 0) {
-                writeln!(out, "\x1b[1;36m━━━ Context Growth ━━━\x1b[0m").unwrap();
+                writeln!(out, "\x1b[1;36m━━━ Context Growth ━━━\x1b[0m")?;
                 for line in token_growth_chart(&self.context_per_turn, 20) {
-                    writeln!(out, "{}", line).unwrap();
+                    writeln!(out, "{}", line)?;
                 }
-                writeln!(out).unwrap();
+                writeln!(out)?;
             }
         }
 
         // Command breakdown with bar charts
         if !self.command_stats.is_empty() {
-            writeln!(out, "\x1b[1;36m━━━ Command Breakdown ━━━\x1b[0m").unwrap();
+            writeln!(out, "\x1b[1;36m━━━ Command Breakdown ━━━\x1b[0m")?;
 
             let max_calls = self
                 .command_stats
@@ -1049,15 +1042,14 @@ impl SessionAnalysis {
                     error_str,
                     format_tokens(stat.output_tokens),
                     width = max_cat_len
-                )
-                .unwrap();
+                )?;
             }
-            writeln!(out).unwrap();
+            writeln!(out)?;
         }
 
         // Retry hotspots
         if !self.retry_hotspots.is_empty() {
-            writeln!(out, "\x1b[1;36m━━━ Retry Hotspots ━━━\x1b[0m").unwrap();
+            writeln!(out, "\x1b[1;36m━━━ Retry Hotspots ━━━\x1b[0m")?;
             for hotspot in &self.retry_hotspots {
                 writeln!(
                     out,
@@ -1066,15 +1058,14 @@ impl SessionAnalysis {
                     hotspot.failures,
                     hotspot.attempts,
                     format_tokens(hotspot.output_tokens)
-                )
-                .unwrap();
+                )?;
             }
-            writeln!(out).unwrap();
+            writeln!(out)?;
         }
 
         // File operations heatmap
         if !self.file_operations.is_empty() {
-            writeln!(out, "\x1b[1;36m━━━ File Operations ━━━\x1b[0m").unwrap();
+            writeln!(out, "\x1b[1;36m━━━ File Operations ━━━\x1b[0m")?;
             let mut ops: Vec<_> = self.file_operations.values().collect();
             ops.sort_by_key(|b| std::cmp::Reverse(b.total()));
 
@@ -1108,14 +1099,14 @@ impl SessionAnalysis {
                     ));
                 }
                 let ops_str = parts.join(", ");
-                writeln!(out, "{} {} {}", bar, ops_str, op.path).unwrap();
+                writeln!(out, "{} {} {}", bar, ops_str, op.path)?;
             }
-            writeln!(out).unwrap();
+            writeln!(out)?;
         }
 
         // Token hotspots
         if !self.file_tokens.is_empty() {
-            writeln!(out, "\x1b[1;36m━━━ Token Hotspots ━━━\x1b[0m").unwrap();
+            writeln!(out, "\x1b[1;36m━━━ Token Hotspots ━━━\x1b[0m")?;
             let mut paths: Vec<_> = self.file_tokens.iter().collect();
             paths.sort_by(|a, b| b.1.cmp(a.1));
 
@@ -1125,14 +1116,14 @@ impl SessionAnalysis {
                 let bar_width = 20;
                 let filled = (**tokens as f64 / max_tokens as f64 * bar_width as f64) as usize;
                 let bar: String = "█".repeat(filled) + &"░".repeat(bar_width - filled);
-                writeln!(out, "{} {:>8} {}", bar, format_tokens(**tokens), path).unwrap();
+                writeln!(out, "{} {:>8} {}", bar, format_tokens(**tokens), path)?;
             }
-            writeln!(out).unwrap();
+            writeln!(out)?;
         }
 
         // Message types (compact)
         if !self.message_counts.is_empty() {
-            writeln!(out, "\x1b[1;36m━━━ Message Types ━━━\x1b[0m").unwrap();
+            writeln!(out, "\x1b[1;36m━━━ Message Types ━━━\x1b[0m")?;
             let mut counts: Vec<_> = self.message_counts.iter().collect();
             counts.sort_by(|a, b| b.1.cmp(a.1));
 
@@ -1141,7 +1132,7 @@ impl SessionAnalysis {
                 .take(8)
                 .map(|(k, v)| format!("{}:{}", k, v))
                 .collect();
-            writeln!(out, "{}", items.join("  ")).unwrap();
+            writeln!(out, "{}", items.join("  "))?;
         }
 
         // Parallelization opportunities
@@ -1156,8 +1147,8 @@ impl SessionAnalysis {
                 .collect();
 
             if !top_opportunities.is_empty() {
-                writeln!(out).unwrap();
-                writeln!(out, "\x1b[1;36m━━━ Parallelization Hints ━━━\x1b[0m").unwrap();
+                writeln!(out)?;
+                writeln!(out, "\x1b[1;36m━━━ Parallelization Hints ━━━\x1b[0m")?;
 
                 let total_savings: usize =
                     self.tool_chains.iter().map(|c| c.potential_savings()).sum();
@@ -1165,8 +1156,7 @@ impl SessionAnalysis {
                     out,
                     "Potential savings: \x1b[33m{} API calls\x1b[0m",
                     total_savings
-                )
-                .unwrap();
+                )?;
 
                 for chain in &top_opportunities {
                     let safe_marker = if chain.is_safe_parallel() {
@@ -1182,41 +1172,38 @@ impl SessionAnalysis {
                         chain.turn_range.1,
                         chain.len(),
                         chain.potential_savings()
-                    )
-                    .unwrap();
+                    )?;
                     let tools_str = chain.tools.join(" → ");
-                    writeln!(out, "   {}", tools_str).unwrap();
+                    writeln!(out, "   {}", tools_str)?;
                 }
             }
         }
 
         // Tool patterns (multi-session aggregate)
         if !self.tool_patterns.is_empty() {
-            writeln!(out).unwrap();
-            writeln!(out, "\x1b[1;36m━━━ Common Tool Patterns ━━━\x1b[0m").unwrap();
-            writeln!(out, "Frequent sequences across all sessions:").unwrap();
-            writeln!(out).unwrap();
+            writeln!(out)?;
+            writeln!(out, "\x1b[1;36m━━━ Common Tool Patterns ━━━\x1b[0m")?;
+            writeln!(out, "Frequent sequences across all sessions:")?;
+            writeln!(out)?;
             for pattern in self.tool_patterns.iter().take(10) {
                 writeln!(
                     out,
                     "\x1b[33m{:>3}×\x1b[0m {}",
                     pattern.occurrences,
                     pattern.pattern_str()
-                )
-                .unwrap();
+                )?;
             }
         }
 
         // Tool chains
         if !self.tool_chains.is_empty() {
-            writeln!(out).unwrap();
-            writeln!(out, "\x1b[1;36m━━━ Tool Chains ━━━\x1b[0m").unwrap();
+            writeln!(out)?;
+            writeln!(out, "\x1b[1;36m━━━ Tool Chains ━━━\x1b[0m")?;
             writeln!(
                 out,
                 "Found {} sequences of consecutive single-tool calls:",
                 self.tool_chains.len()
-            )
-            .unwrap();
+            )?;
             for chain in self.tool_chains.iter().take(10) {
                 let tools_str = chain.tools.join(" → ");
                 writeln!(
@@ -1226,15 +1213,14 @@ impl SessionAnalysis {
                     chain.turn_range.1,
                     chain.len(),
                     tools_str
-                )
-                .unwrap();
+                )?;
             }
         }
 
         // Corrections
         if !self.corrections.is_empty() {
-            writeln!(out).unwrap();
-            writeln!(out, "\x1b[1;36m━━━ Corrections & Apologies ━━━\x1b[0m").unwrap();
+            writeln!(out)?;
+            writeln!(out, "\x1b[1;36m━━━ Corrections & Apologies ━━━\x1b[0m")?;
             for correction in &self.corrections {
                 writeln!(
                     out,
@@ -1242,12 +1228,11 @@ impl SessionAnalysis {
                     correction.turn,
                     correction.category.as_str(),
                     correction.text.chars().take(60).collect::<String>()
-                )
-                .unwrap();
+                )?;
             }
         }
 
-        out
+        Ok(())
     }
 }
 
@@ -1947,7 +1932,7 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
                 && chain.len() >= 3
             {
                 let tools: Vec<String> = chain.iter().map(|(_, name)| name.clone()).collect();
-                let turn_range = (chain.first().unwrap().0, chain.last().unwrap().0);
+                let turn_range = (chain[0].0, chain[chain.len() - 1].0);
                 analysis.tool_chains.push(ToolChain { tools, turn_range });
             }
         }
@@ -1958,7 +1943,7 @@ pub fn analyze_session(session: &Session) -> SessionAnalysis {
         && chain.len() >= 3
     {
         let tools: Vec<String> = chain.iter().map(|(_, name)| name.clone()).collect();
-        let turn_range = (chain.first().unwrap().0, chain.last().unwrap().0);
+        let turn_range = (chain[0].0, chain[chain.len() - 1].0);
         analysis.tool_chains.push(ToolChain { tools, turn_range });
     }
 

@@ -46,12 +46,14 @@ static INITIALIZED: OnceLock<()> = OnceLock::new();
 /// Call this before any parsing operations to add custom formats.
 /// Built-in formats are registered automatically on first use.
 pub fn register(format: &'static dyn CliFormat) {
+    // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
     FORMATS.write().unwrap().push(format);
 }
 
 /// Initialize built-in formats (called automatically on first use).
 fn init_builtin() {
     INITIALIZED.get_or_init(|| {
+        // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
         let mut formats = FORMATS.write().unwrap();
         formats.push(&ClapFormat);
         formats.push(&ArgparseFormat);
@@ -77,6 +79,7 @@ pub trait CliFormat: Send + Sync {
 /// Get a format by name from the global registry.
 pub fn get_format(name: &str) -> Option<&'static dyn CliFormat> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
     FORMATS
         .read()
         .unwrap()
@@ -88,12 +91,14 @@ pub fn get_format(name: &str) -> Option<&'static dyn CliFormat> {
 /// Auto-detect format from help text using the global registry.
 pub fn detect_format(help_text: &str) -> Option<&'static dyn CliFormat> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
     FORMATS
         .read()
         .unwrap()
         .iter()
         .map(|f| (*f, f.detect(help_text)))
         .filter(|(_, score)| *score > 0.5)
+        // normalize-syntax-allow: rust/unwrap-in-impl - detection scores are 0.0-1.0, NaN is a detector bug
         .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
         .map(|(f, _)| f)
 }
@@ -101,6 +106,7 @@ pub fn detect_format(help_text: &str) -> Option<&'static dyn CliFormat> {
 /// List all available format names from the global registry.
 pub fn list_formats() -> Vec<&'static str> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
     FORMATS.read().unwrap().iter().map(|f| f.name()).collect()
 }
 
@@ -153,6 +159,7 @@ impl FormatRegistry {
             .iter()
             .map(|f| (f, f.detect(help_text)))
             .filter(|(_, score)| *score > 0.5)
+            // normalize-syntax-allow: rust/unwrap-in-impl - detection scores are 0.0-1.0, NaN is a detector bug
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
             .map(|(f, _)| f.as_ref())
     }
@@ -231,6 +238,7 @@ pub(super) fn parse_command_from_trimmed_line(trimmed: &str) -> Option<CliComman
     if trimmed.is_empty() || trimmed.starts_with('-') {
         return None;
     }
+    // normalize-syntax-allow: rust/unwrap-in-impl - literal regex; compile-time correctness guaranteed
     let re = Regex::new(r"^(\S+)\s{2,}(.*)$").unwrap();
     if let Some(caps) = re.captures(trimmed) {
         let name = caps.get(1)?.as_str().to_string();

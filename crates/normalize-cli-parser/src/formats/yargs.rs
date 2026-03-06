@@ -136,6 +136,7 @@ fn parse_command_line(line: &str, prog_name: Option<&str>) -> Option<CliCommand>
     }
 
     // Yargs commands are "progname cmdname  Description"
+    // normalize-syntax-allow: rust/unwrap-in-impl - literal regex; compile-time correctness guaranteed
     let re = Regex::new(r"^(\S+)\s+(\S+)(?:\s+\[[^\]]+\])?\s{2,}(.*)$").unwrap();
     if let Some(caps) = re.captures(trimmed) {
         let prefix = caps.get(1)?.as_str();
@@ -180,6 +181,7 @@ fn parse_option_line(line: &str) -> Option<CliOption> {
 
     // Pattern: "-v, --verbose  Description  [boolean]"
     // Or: "    --help  Description  [boolean]"
+    // normalize-syntax-allow: rust/unwrap-in-impl - literal regex; compile-time correctness guaranteed
     let re = Regex::new(r"^(-\w)?(?:,\s*)?(--[\w-]+)\s{2,}(.+)$").unwrap();
 
     if let Some(caps) = re.captures(trimmed) {

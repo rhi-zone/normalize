@@ -323,6 +323,7 @@ fn to_snake_case(s: &str) -> String {
             if i > 0 {
                 result.push('_');
             }
+            // normalize-syntax-allow: rust/unwrap-in-impl - to_lowercase() always yields at least one char
             result.push(c.to_lowercase().next().unwrap());
         } else {
             result.push(c);
@@ -338,6 +339,7 @@ fn to_pascal_case(s: &str) -> String {
         if c == '_' || c == '-' || c == '.' {
             capitalize_next = true;
         } else if capitalize_next {
+            // normalize-syntax-allow: rust/unwrap-in-impl - to_uppercase() always yields at least one char
             result.push(c.to_uppercase().next().unwrap());
             capitalize_next = false;
         } else {

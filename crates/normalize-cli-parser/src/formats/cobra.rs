@@ -132,6 +132,7 @@ fn parse_command_line(line: &str) -> Option<CliCommand> {
         return None;
     }
 
+    // normalize-syntax-allow: rust/unwrap-in-impl - literal regex; compile-time correctness guaranteed
     let re = Regex::new(r"^(\S+)\s{2,}(.*)$").unwrap();
     if let Some(caps) = re.captures(trimmed) {
         let name = caps.get(1)?.as_str().to_string();
@@ -174,6 +175,7 @@ fn parse_flag_line(line: &str) -> Option<CliOption> {
 
     // Pattern: "-c, --config string  Description" or "--version  description"
     // Cobra puts type after flag name: "--config string" not "--config <string>"
+    // normalize-syntax-allow: rust/unwrap-in-impl - literal regex; compile-time correctness guaranteed
     let re = Regex::new(r"^(-\w)?(?:,\s*)?(--[\w-]+)(?:\s+(string|int|bool))?\s{2,}(.*)$").unwrap();
 
     if let Some(caps) = re.captures(trimmed) {

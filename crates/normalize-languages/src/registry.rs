@@ -18,6 +18,7 @@ static GRAMMAR_MAP: OnceLock<HashMap<&'static str, &'static dyn Language>> = Onc
 /// Register a language in the global registry.
 /// Called internally by language modules.
 pub fn register(lang: &'static dyn Language) {
+    // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
     LANGUAGES.write().unwrap().push(lang);
 }
 
@@ -229,6 +230,7 @@ fn extension_map() -> &'static HashMap<&'static str, &'static dyn Language> {
     init_builtin();
     EXTENSION_MAP.get_or_init(|| {
         let mut map = HashMap::new();
+        // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
         let langs = LANGUAGES.read().unwrap();
         for lang in langs.iter() {
             for ext in lang.extensions() {
@@ -243,6 +245,7 @@ fn grammar_map() -> &'static HashMap<&'static str, &'static dyn Language> {
     init_builtin();
     GRAMMAR_MAP.get_or_init(|| {
         let mut map = HashMap::new();
+        // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
         let langs = LANGUAGES.read().unwrap();
         for lang in langs.iter() {
             map.insert(lang.grammar_name(), *lang);
@@ -313,6 +316,7 @@ pub fn test_file_globs_for_path(path: &Path) -> &'static [&'static str] {
 /// Get all supported languages.
 pub fn supported_languages() -> Vec<&'static dyn Language> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
     LANGUAGES.read().unwrap().clone()
 }
 

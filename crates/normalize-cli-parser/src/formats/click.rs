@@ -120,6 +120,7 @@ fn parse_option_line(line: &str) -> Option<CliOption> {
     };
 
     // Pattern: "-s, --long VALUE  Description" or "--long VALUE  Description"
+    // normalize-syntax-allow: rust/unwrap-in-impl - literal regex; compile-time correctness guaranteed
     let re = Regex::new(r"^(-\w)?(?:,\s*)?(--[\w-]+)?(?:\s+([A-Z_]+))?\s{2,}(.*)$").unwrap();
 
     if let Some(caps) = re.captures(trimmed) {
@@ -145,6 +146,7 @@ fn parse_command_line(line: &str) -> Option<CliCommand> {
         return None;
     }
 
+    // normalize-syntax-allow: rust/unwrap-in-impl - literal regex; compile-time correctness guaranteed
     let re = Regex::new(r"^(\S+)\s{2,}(.*)$").unwrap();
     if let Some(caps) = re.captures(trimmed) {
         let name = caps.get(1)?.as_str().to_string();

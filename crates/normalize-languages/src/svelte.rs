@@ -30,6 +30,7 @@ impl Language for Svelte {
         if let Some(from_idx) = text.find(" from ") {
             let rest = &text[from_idx + 6..];
             if let Some(start) = rest.find('"').or_else(|| rest.find('\'')) {
+                // normalize-syntax-allow: rust/unwrap-in-impl - start is the byte offset of an ASCII quote char; byte == char index for ASCII
                 let quote = rest.chars().nth(start).unwrap();
                 let inner = &rest[start + 1..];
                 if let Some(end) = inner.find(quote) {

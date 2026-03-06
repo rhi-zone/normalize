@@ -305,6 +305,7 @@ impl Parser {
                 .filter_map(|s| self.parse_type(s).ok().flatten())
                 .collect();
             if types.len() == 1 {
+                // normalize-syntax-allow: rust/unwrap-in-impl - len() == 1 guarantees next() is Some
                 return Ok(Some(types.into_iter().next().unwrap()));
             }
             if !types.is_empty() {

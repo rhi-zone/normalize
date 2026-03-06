@@ -12,12 +12,14 @@ static INITIALIZED: OnceLock<()> = OnceLock::new();
 /// Call this before any generation operations to add custom backends.
 /// Built-in backends are registered automatically on first use.
 pub fn register_backend(backend: &'static dyn Backend) {
+    // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
     BACKENDS.write().unwrap().push(backend);
 }
 
 /// Initialize built-in backends (called automatically on first use).
 fn init_builtin() {
     INITIALIZED.get_or_init(|| {
+        // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
         let mut backends = BACKENDS.write().unwrap();
 
         #[cfg(feature = "backend-typescript")]
@@ -60,6 +62,7 @@ fn init_builtin() {
 /// Get a backend by name.
 pub fn get_backend(name: &str) -> Option<&'static dyn Backend> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
     BACKENDS
         .read()
         .unwrap()
@@ -71,6 +74,7 @@ pub fn get_backend(name: &str) -> Option<&'static dyn Backend> {
 /// Get all backends for a language.
 pub fn backends_for_language(language: &str) -> Vec<&'static dyn Backend> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
     BACKENDS
         .read()
         .unwrap()
@@ -83,6 +87,7 @@ pub fn backends_for_language(language: &str) -> Vec<&'static dyn Backend> {
 /// Get all backends in a category.
 pub fn backends_by_category(category: BackendCategory) -> Vec<&'static dyn Backend> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
     BACKENDS
         .read()
         .unwrap()
@@ -95,12 +100,14 @@ pub fn backends_by_category(category: BackendCategory) -> Vec<&'static dyn Backe
 /// List all registered backends.
 pub fn backends() -> Vec<&'static dyn Backend> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
     BACKENDS.read().unwrap().clone()
 }
 
 /// List all registered backend names.
 pub fn backend_names() -> Vec<&'static str> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
     BACKENDS.read().unwrap().iter().map(|b| b.name()).collect()
 }
 

@@ -140,6 +140,23 @@ crate, dispatch one subagent per crate (or per group of small crates), have each
 to get per-crate counts before dispatching agents):
 Expect heaviest: `normalize` (main), `normalize-facts`, `normalize-languages`, `normalize-manifest`
 
+**Audited crates** (production code clean, test-only unwraps allowed in config):
+- `normalize-path-resolve` — complete
+- `normalize-ecosystems` — complete
+- `normalize-facts` — complete
+- `normalize-manifest` — complete (248 → 0 production violations; 3 fixes applied:
+  nuget.rs if-let refactor, ocaml.rs peek-then-next inline suppress, setup_py.rs bytes-index refactor;
+  244 test-only unwraps allowed via config glob)
+- `normalize-typegen` — complete (35 → 0 production violations; all inline-suppressed with reasons:
+  RwLock poison, infallible iterator after len check, char case conversion always yields a char)
+- `normalize-cli-parser` — complete (30 → 0 production violations; all inline-suppressed with reasons:
+  RwLock poison, f64 partial_cmp NaN-is-detector-bug, literal Regex::new compile-time guaranteed)
+- `normalize-languages` — complete (25 → 0 production violations; all inline-suppressed with reasons:
+  RwLock poison, ASCII-quote chars().nth byte==char, non-empty guard before last())
+- `normalize-edit` — complete (16 violations; all in inline #[cfg(test)] blocks — allowed in config)
+- `normalize-view` — complete (12 → 2 production violations inline-suppressed: is_none guard before unwrap,
+  len==1 guard before iter().next())
+
 ### Feature-gate CLI behind `cli` feature (workspace-wide)
 
 Every crate should be usable both as a library and as a standalone CLI tool. Library consumers shouldn't pull in clap; CLI users get a binary. This is a workspace-wide convention, not a one-off.
@@ -734,6 +751,15 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 - Tool avoidance: grep instead of normalize, spawning Explore agents
 - Follow-up patterns: `--types-only` → immediately view symbol
 - Repeated queries: same file viewed multiple times
+
+### Global rules exclude in config
+
+`normalize rules run` has no global path exclude — every error rule needs `.claude/**` added
+to its `allow` list separately to prevent false positives from agent worktrees under `.claude/`.
+Added `.claude/**` to `rust/tuple-return`, `no-grammar-loader-new`, `rust/chained-if-let`,
+`rust/numeric-type-annotation` as a workaround. Need a `[rules] exclude = [...]` config key
+that applies before per-rule allow lists. Alternatively: pre-commit hook should pass
+`--root crates/` or an `--exclude .claude/` flag.
 
 ### CI/Infrastructure
 - [ ] Wire `normalize analyze duplicate-blocks --exclude '**/*.json' --exclude '**/*.lock'` into CI
