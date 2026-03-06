@@ -2256,6 +2256,39 @@ correctness without the PSI.
   `--rewrite` metavariable syntax) and compute indentation at emit time rather than
   capturing it from the source.
 
+### Corpus-based indentation model (normalize's planned direction)
+
+Rather than encoding indentation rules (like `indents.scm`) or relying on a single file's
+parse tree, normalize can derive correct indentation empirically from the **entire project
+corpus** — all source files already parsed during indexing.
+
+**Observation phase**: walk every parse tree in the project. For each parent→child edge,
+record `(parent_type, field_name_or_child_index, child_type)` → observed whitespace:
+- Was there a newline before the child? (bool)
+- If yes: column delta from parent start
+- If no: how many spaces?
+
+This is per-node-type, not a global indent unit. A `block`'s opening `{` may be same-line,
+its statements +2, its closing `}` +0 — each is a separate observation. No language rules
+are needed; the patterns are read directly from the user's actual code.
+
+**Application phase**: when serialising a fix output tree, look up each edge in the table
+and emit the most frequently observed whitespace. If a pattern hasn't been seen (new
+construct), fall back to the nearest structurally similar edge.
+
+**The one non-structural case — wrapped lines**: structural indentation (blocks, function
+bodies, if-consequences) is deterministic per node type and captured cleanly by the model.
+Argument lists, chained calls, and binary expressions are different: they appear both
+inline and wrapped depending on line length. The simple mode-based model will get these
+wrong when the instance being fixed happens to be long. The feature vector that predicts
+wrap/no-wrap is: cumulative line length up to this node, sibling count, max sibling text
+length. "Wrap if line > N columns" is the actual rule, and N is learnable from the corpus.
+
+**Stretch goal**: treat wrap/no-wrap as a binary classification problem per edge, trained
+on features above (e.g. gradient boosted trees). Probably unnecessary for 99% of fix
+cases — most structural rewrites move existing nodes rather than creating long new
+expressions — but the architecture naturally accommodates it if needed.
+
 ### Sorbet / Rubocop autocorrect / similar language-specific tools
 - Language-specific refactoring tools exist for most major languages (Roslyn for C#,
   etc.) — normalize's value prop is cross-language consistency and no-IDE, no-LSP
