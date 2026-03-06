@@ -15,4 +15,5 @@
 
 ; Type aliases: -type name() :: ...
 (type_alias
-  name: (atom) @name) @definition.type
+  name: (type_name
+    name: (atom) @name)) @definition.type

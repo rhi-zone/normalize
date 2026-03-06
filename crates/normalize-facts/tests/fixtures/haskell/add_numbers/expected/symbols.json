@@ -1,0 +1,37 @@
+[
+  {
+    "file": "Main.hs",
+    "kind": "Function",
+    "name": "main",
+    "parent": null,
+    "start_line": 5
+  },
+  {
+    "file": "MathUtils.hs",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "MathUtils.hs",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 4
+  },
+  {
+    "file": "MathUtils.hs",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 6
+  },
+  {
+    "file": "MathUtils.hs",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 7
+  }
+]

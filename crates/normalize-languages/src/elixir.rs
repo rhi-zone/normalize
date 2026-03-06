@@ -151,7 +151,37 @@ impl Language for Elixir {
         crate::body::analyze_do_end_body(body_node, content, inner_indent)
     }
 
-    fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
+    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
+        if node.kind() != "call" {
+            // Fall back to default (child_by_field_name("name"))
+            return node
+                .child_by_field_name("name")
+                .map(|n| &content[n.byte_range()]);
+        }
+        // For Elixir call nodes (def/defp/defmodule/defmacro/defprotocol/defimpl):
+        // - defmodule MathUtils → arguments > alias
+        // - def add(a, b) → arguments > call > target > identifier
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "arguments" {
+                let mut arg_cursor = child.walk();
+                for arg in child.children(&mut arg_cursor) {
+                    match arg.kind() {
+                        // defmodule/defprotocol/defimpl: (arguments (alias) ...)
+                        "alias" => return Some(&content[arg.byte_range()]),
+                        // def/defp/defmacro: (arguments (call target: (identifier) ...) ...)
+                        "call" => {
+                            if let Some(target) = arg.child_by_field_name("target") {
+                                return Some(&content[target.byte_range()]);
+                            }
+                        }
+                        // def with no args: (arguments (identifier) ...)
+                        "identifier" => return Some(&content[arg.byte_range()]),
+                        _ => {}
+                    }
+                }
+            }
+        }
         None
     }
 }

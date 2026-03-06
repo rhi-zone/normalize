@@ -1,0 +1,37 @@
+[
+  {
+    "file": "main.erl",
+    "kind": "Module",
+    "name": "main",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "main.erl",
+    "kind": "Function",
+    "name": "start",
+    "parent": null,
+    "start_line": 5
+  },
+  {
+    "file": "math_utils.erl",
+    "kind": "Module",
+    "name": "math_utils",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "math_utils.erl",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 4
+  },
+  {
+    "file": "math_utils.erl",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 7
+  }
+]
