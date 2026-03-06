@@ -35,12 +35,14 @@ static INITIALIZED: OnceLock<()> = OnceLock::new();
 /// Call this before any detection operations to add custom tools.
 /// Built-in tools are registered automatically on first use.
 pub fn register(tool: &'static dyn Tool) {
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     TOOLS.write().unwrap().push(tool);
 }
 
 /// Initialize built-in tools (called automatically on first use).
 fn init_builtin() {
     INITIALIZED.get_or_init(|| {
+        // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
         let mut tools = TOOLS.write().unwrap();
 
         // Python tools
@@ -148,6 +150,7 @@ fn init_builtin() {
 /// Get a tool by name from the global registry.
 pub fn get_tool(name: &str) -> Option<&'static dyn Tool> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     TOOLS
         .read()
         .unwrap()
@@ -159,6 +162,7 @@ pub fn get_tool(name: &str) -> Option<&'static dyn Tool> {
 /// List all available tool names from the global registry.
 pub fn list_tools() -> Vec<&'static str> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     TOOLS
         .read()
         .unwrap()
@@ -170,6 +174,7 @@ pub fn list_tools() -> Vec<&'static str> {
 /// Detect relevant tools for a project using the global registry.
 pub fn detect_tools(root: &Path) -> Vec<(&'static dyn Tool, f32)> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     let tools = TOOLS.read().unwrap();
 
     let mut relevant: Vec<_> = tools

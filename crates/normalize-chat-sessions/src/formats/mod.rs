@@ -57,12 +57,14 @@ static INITIALIZED: OnceLock<()> = OnceLock::new();
 /// Call this before any parsing operations to add custom formats.
 /// Built-in formats are registered automatically on first use.
 pub fn register(format: &'static dyn LogFormat) {
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     FORMATS.write().unwrap().push(format);
 }
 
 /// Initialize built-in formats (called automatically on first use).
 fn init_builtin() {
     INITIALIZED.get_or_init(|| {
+        // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
         let mut formats = FORMATS.write().unwrap();
         #[cfg(feature = "format-claude")]
         formats.push(&ClaudeCodeFormat);
@@ -104,6 +106,7 @@ pub trait LogFormat: Send + Sync {
 /// Get a format by name from the global registry.
 pub fn get_format(name: &str) -> Option<&'static dyn LogFormat> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     FORMATS
         .read()
         .unwrap()
@@ -115,11 +118,12 @@ pub fn get_format(name: &str) -> Option<&'static dyn LogFormat> {
 /// Auto-detect format for a file using the global registry.
 pub fn detect_format(path: &Path) -> Option<&'static dyn LogFormat> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     let formats = FORMATS.read().unwrap();
     let mut best: Option<(&'static dyn LogFormat, f64)> = None;
     for fmt in formats.iter() {
         let score = fmt.detect(path);
-        if score > 0.0 && (best.is_none() || score > best.unwrap().1) {
+        if score > 0.0 && best.is_none_or(|(_, best_score)| score > best_score) {
             best = Some((*fmt, score));
         }
     }
@@ -129,6 +133,7 @@ pub fn detect_format(path: &Path) -> Option<&'static dyn LogFormat> {
 /// List all available format names from the global registry.
 pub fn list_formats() -> Vec<&'static str> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     FORMATS.read().unwrap().iter().map(|f| f.name()).collect()
 }
 
@@ -196,7 +201,7 @@ impl FormatRegistry {
         let mut best: Option<(&dyn LogFormat, f64)> = None;
         for fmt in &self.formats {
             let score = fmt.detect(path);
-            if score > 0.0 && (best.is_none() || score > best.unwrap().1) {
+            if score > 0.0 && best.is_none_or(|(_, best_score)| score > best_score) {
                 best = Some((fmt.as_ref(), score));
             }
         }

@@ -394,6 +394,7 @@ mod tests {
     #[test]
     fn test_resolve_glob_pattern() {
         let config = AliasConfig::default();
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let filter =
             Filter::new(&["*.test.js".to_string()], &[], &config, &["javascript"]).unwrap();
 
@@ -405,6 +406,7 @@ mod tests {
     #[test]
     fn test_resolve_alias() {
         let config = AliasConfig::default();
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let filter = Filter::new(&["@tests".to_string()], &[], &config, &["go"]).unwrap();
 
         assert!(filter.is_active());
@@ -418,6 +420,7 @@ mod tests {
         let result = Filter::new(&["@unknown".to_string()], &[], &config, &[]);
 
         assert!(result.is_err());
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         assert!(result.unwrap_err().contains("unknown alias @unknown"));
     }
 
@@ -426,6 +429,7 @@ mod tests {
         let mut config = AliasConfig::default();
         config.entries.insert("tests".to_string(), vec![]);
 
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let filter = Filter::new(&["@tests".to_string()], &[], &config, &["go"]).unwrap();
 
         assert!(!filter.is_active()); // No patterns = not active
@@ -440,6 +444,7 @@ mod tests {
             .entries
             .insert("tests".to_string(), vec!["my_tests/**".to_string()]);
 
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let filter = Filter::new(&["@tests".to_string()], &[], &config, &["go"]).unwrap();
 
         assert!(filter.is_active());
@@ -450,6 +455,7 @@ mod tests {
     #[test]
     fn test_only_mode() {
         let config = AliasConfig::default();
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let filter = Filter::new(&[], &["*.rs".to_string()], &config, &[]).unwrap();
 
         assert!(filter.is_active());
@@ -467,12 +473,15 @@ mod tests {
 
         let aliases = list_aliases(&config, &["rust"]);
 
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let tests = aliases.iter().find(|a| a.name == "tests").unwrap();
         assert_eq!(tests.status, AliasStatus::Disabled);
 
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let vendor = aliases.iter().find(|a| a.name == "vendor").unwrap();
         assert_eq!(vendor.status, AliasStatus::Custom);
 
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let docs = aliases.iter().find(|a| a.name == "docs").unwrap();
         assert_eq!(docs.status, AliasStatus::Builtin);
     }

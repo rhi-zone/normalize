@@ -73,6 +73,7 @@ impl Ecosystem for Go {
 
             // Single-line require: require module/path v1.2.3
             if line.starts_with("require ") {
+                // normalize-syntax-allow: rust/unwrap-in-impl - guarded by starts_with check above
                 let rest = line.strip_prefix("require ").unwrap().trim();
                 if let Some((module, version)) = rest.split_once(' ') {
                     deps.push(Dependency::registry(

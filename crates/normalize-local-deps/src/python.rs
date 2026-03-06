@@ -151,6 +151,7 @@ fn get_python_cache(project_root: &Path) -> PythonPathCache {
         .canonicalize()
         .unwrap_or_else(|_| project_root.to_path_buf());
 
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a process-level cache is unrecoverable
     let mut cache_guard = PYTHON_CACHE.lock().unwrap();
 
     if let Some(ref cache) = *cache_guard

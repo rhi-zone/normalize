@@ -66,15 +66,64 @@ allow = ["**/tests/fixtures/**"]
 
 # Enable numeric literal suffix rule (disabled by default).
 # Exclude rule fixtures: those files intentionally contain the bad pattern to test detection.
+# .claude/worktrees/ contains agent work-in-progress not yet ready to commit.
 [analyze.rules."rust/numeric-type-annotation"]
 enabled = true
-allow = ["**/tests/fixtures/**"]
+allow = ["**/tests/fixtures/**", ".claude/**"]
 
 # Re-enable info-level rules for dogfooding (disabled by default for new users)
 # Disabled: 1608 hits in current codebase — needs audit to distinguish genuine smells
 # from legitimate unwrap use in parsing/infallible contexts. See TODO.md §Audit rust/unwrap-in-impl.
+# Partial audit complete for: normalize-path-resolve, normalize-ecosystems, normalize-facts, normalize-manifest.
+# Production code: inline suppressed with reasons. Test code in inline #[cfg(test)] modules
+# allowed below (split from separate tests/ dirs which are covered by **/tests/**).
 [analyze.rules."rust/unwrap-in-impl"]
 enabled = false
+allow = [
+    # Inline #[cfg(test)] modules in src/ files (not covered by **/tests/**)
+    "crates/normalize-path-resolve/src/lib.rs",
+    "crates/normalize-ecosystems/src/ecosystems/npm/lockfile_bun.rs",
+    "crates/normalize-ecosystems/src/ecosystems/npm/lockfile_npm.rs",
+    "crates/normalize-ecosystems/src/ecosystems/npm/lockfile_pnpm.rs",
+    "crates/normalize-ecosystems/src/ecosystems/npm/lockfile_yarn.rs",
+    "crates/normalize-ecosystems/src/ecosystems/npm/mod.rs",
+    "crates/normalize-ecosystems/src/ecosystems/python.rs",
+    "crates/normalize-facts/src/extract.rs",
+    "crates/normalize-facts/src/index.rs",
+    # normalize-manifest: audited — production violations fixed (nuget.rs if-let refactor,
+    # ocaml.rs peek-then-next inline suppressed, setup_py.rs bytes-index refactor).
+    # Remaining violations are all in inline #[cfg(test)] mod blocks.
+    "crates/normalize-manifest/src/*.rs",
+    "**/normalize-manifest/src/*.rs",
+    # normalize-facts-rules-interpret: audited — production lib.rs is clean;
+    # tests.rs extracted from inline mod to separate file, .unwrap() is idiomatic in tests.
+    "crates/normalize-facts-rules-interpret/src/tests.rs",
+    # normalize-typegen: audited — production violations inline-suppressed with reasons.
+    # Remaining violations are all in inline #[cfg(test)] mod blocks.
+    "crates/normalize-typegen/src/input/jsonschema.rs",
+    "crates/normalize-typegen/src/input/openapi.rs",
+    "crates/normalize-typegen/src/input/typescript.rs",
+    # normalize-cli-parser: audited — production violations inline-suppressed with reasons.
+    # Remaining violations are all in inline #[cfg(test)] mod blocks.
+    "crates/normalize-cli-parser/src/lib.rs",
+    "crates/normalize-cli-parser/src/formats/argparse.rs",
+    "crates/normalize-cli-parser/src/formats/clap.rs",
+    "crates/normalize-cli-parser/src/formats/click.rs",
+    "crates/normalize-cli-parser/src/formats/cobra.rs",
+    "crates/normalize-cli-parser/src/formats/commander.rs",
+    "crates/normalize-cli-parser/src/formats/yargs.rs",
+    # normalize-languages: audited — production violations inline-suppressed with reasons.
+    # Remaining violations are all in inline #[cfg(test)] mod blocks.
+    "crates/normalize-languages/src/external_packages.rs",
+    "crates/normalize-languages/src/grammar_loader.rs",
+    "crates/normalize-languages/src/python.rs",
+    # normalize-edit: audited — all violations are in inline #[cfg(test)] mod block.
+    "crates/normalize-edit/src/lib.rs",
+    # normalize-view: audited — production violations inline-suppressed with reasons.
+    # Remaining violations are all in inline #[cfg(test)] mod blocks.
+    "crates/normalize-view/src/skeleton.rs",
+    "crates/normalize-view/src/tree.rs",
+]
 
 [analyze.rules."rust/unnecessary-let"]
 severity = "warning"
@@ -93,8 +142,10 @@ severity = "warning"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
+# .claude/worktrees/ contains agent work-in-progress not yet ready to commit.
 [analyze.rules."rust/chained-if-let"]
 enabled = true
+allow = [".claude/**"]
 
 [analyze.rules."js/console-log"]
 enabled = true
@@ -135,15 +186,17 @@ allow = [
 # no-grammar-loader-new: allow in test modules and test files (tests may need custom loaders
 # with add_path() for isolated grammar directories, which requires GrammarLoader::new()).
 # normalize-scope/src/lib.rs test module uses add_path() which requires a mutable loader.
+# .claude/worktrees/ contains agent work-in-progress not yet ready to commit.
 [analyze.rules."no-grammar-loader-new"]
-allow = ["**/tests/**", "crates/*/tests/**", "crates/normalize-scope/src/lib.rs"]
+allow = ["**/tests/**", "crates/*/tests/**", "crates/normalize-scope/src/lib.rs", ".claude/**"]
 
 # rust/tuple-return: rg/ is vendored from ripgrep (do not modify); fixtures intentionally
 # contain the bad pattern. All other violations must be fixed.
+# .claude/worktrees/ contains agent work-in-progress not yet ready to commit.
 [analyze.rules."rust/tuple-return"]
 severity = "error"
 enabled = true
-allow = ["crates/normalize/src/rg/**", "**/tests/fixtures/**"]
+allow = ["crates/normalize/src/rg/**", "**/tests/fixtures/**", ".claude/**"]
 
 # SUMMARY.md freshness: currently at info severity (TODO: re-escalate to "error" once all
 # SUMMARY.md enforcement — severity=error blocks commits when SUMMARY.md is stale/missing.

@@ -237,8 +237,9 @@ pub fn tarjan_sccs(imports: &HashMap<String, HashSet<String>>) -> Vec<Vec<String
                             call_stack.push(Frame::Resume(node.clone(), neighbor.clone()));
                             call_stack.push(Frame::Enter(neighbor));
                         } else if on_stack.contains(&neighbor) {
-                            let nl = *lowlink.get(&node).unwrap();
-                            let ni = *indices.get(&neighbor).unwrap();
+                            // normalize-syntax-allow: rust/unwrap-in-impl - node inserted into indices/lowlink at Frame::Enter
+                            let nl = *lowlink.get(&node).unwrap(); // normalize-syntax-allow: rust/unwrap-in-impl - node inserted at Frame::Enter
+                            let ni = *indices.get(&neighbor).unwrap(); // normalize-syntax-allow: rust/unwrap-in-impl - neighbor was already visited (in indices)
                             lowlink.insert(node.clone(), nl.min(ni));
                         }
                     }
@@ -250,8 +251,9 @@ pub fn tarjan_sccs(imports: &HashMap<String, HashSet<String>>) -> Vec<Vec<String
                 Frame::Resume(node, neighbor) => {
                     if neighbor.is_empty() {
                         // Sentinel: all neighbors processed, check if root of SCC
+                        // normalize-syntax-allow: rust/unwrap-in-impl - node inserted into indices/lowlink at Frame::Enter
                         let nl = *lowlink.get(&node).unwrap();
-                        let ni = *indices.get(&node).unwrap();
+                        let ni = *indices.get(&node).unwrap(); // normalize-syntax-allow: rust/unwrap-in-impl - node inserted at Frame::Enter
                         if nl == ni {
                             let mut scc = Vec::new();
                             while let Some(w) = stack.pop() {
@@ -266,6 +268,7 @@ pub fn tarjan_sccs(imports: &HashMap<String, HashSet<String>>) -> Vec<Vec<String
                         }
                     } else {
                         // Resume after DFS into neighbor
+                        // normalize-syntax-allow: rust/unwrap-in-impl - node inserted into lowlink at Frame::Enter
                         let nl = *lowlink.get(&node).unwrap();
                         let neighbor_ll = *lowlink.get(&neighbor).unwrap_or(&usize::MAX);
                         lowlink.insert(node.clone(), nl.min(neighbor_ll));
@@ -384,8 +387,10 @@ pub fn find_bridges(imports: &HashMap<String, HashSet<String>>) -> Vec<BridgeEdg
     let mut directed_edges: HashSet<(usize, usize)> = HashSet::new();
 
     for (u, vs) in imports {
+        // normalize-syntax-allow: rust/unwrap-in-impl - node_idx built from the same node_list as imports keys
         let ui = *node_idx.get(u.as_str()).unwrap();
         for v in vs {
+            // normalize-syntax-allow: rust/unwrap-in-impl - node_idx built from the same node_list as imports values
             let vi = *node_idx.get(v.as_str()).unwrap();
             directed_edges.insert((ui, vi));
             if !adj[ui].contains(&vi) {

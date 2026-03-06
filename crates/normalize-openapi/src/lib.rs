@@ -46,12 +46,14 @@ static INITIALIZED: OnceLock<()> = OnceLock::new();
 /// Call this before any generation operations to add custom generators.
 /// Built-in generators are registered automatically on first use.
 pub fn register(generator: &'static dyn OpenApiClientGenerator) {
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     GENERATORS.write().unwrap().push(generator);
 }
 
 /// Initialize built-in generators (called automatically on first use).
 fn init_builtin() {
     INITIALIZED.get_or_init(|| {
+        // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
         let mut generators = GENERATORS.write().unwrap();
         static TS: TypeScriptFetch = TypeScriptFetch;
         static PY: PythonUrllib = PythonUrllib;
@@ -66,6 +68,7 @@ fn init_builtin() {
 pub fn get_generator(lang: &str) -> Option<&'static dyn OpenApiClientGenerator> {
     init_builtin();
     let lang_lower = lang.to_lowercase();
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     GENERATORS
         .read()
         .unwrap()
@@ -82,6 +85,7 @@ pub fn get_generator(lang: &str) -> Option<&'static dyn OpenApiClientGenerator> 
 /// List all available generators (language, variant) from the global registry.
 pub fn list_generators() -> Vec<(&'static str, &'static str)> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     GENERATORS
         .read()
         .unwrap()
@@ -115,6 +119,7 @@ impl OpenApiClientGenerator for GeneratorWrapper {
 /// Registry of available generators (returns boxed generators for compatibility).
 pub fn generators() -> Vec<Box<dyn OpenApiClientGenerator>> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     GENERATORS
         .read()
         .unwrap()
@@ -568,6 +573,7 @@ fn to_snake_case(s: &str) -> String {
             if i > 0 {
                 result.push('_');
             }
+            // normalize-syntax-allow: rust/unwrap-in-impl - char::to_lowercase() always yields at least one char
             result.push(c.to_lowercase().next().unwrap());
         } else {
             result.push(c);

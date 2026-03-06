@@ -391,6 +391,7 @@ pub fn resolve(
 
     // Handle file:symbol syntax (defer symbol resolution to Python for now)
     if query.contains(':') {
+        // normalize-syntax-allow: rust/unwrap-in-impl - split(':') always yields at least one element
         let file_part = query.split(':').next().unwrap();
         return resolve(file_part, root, path_source);
     }

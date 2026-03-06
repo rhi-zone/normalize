@@ -201,6 +201,7 @@ mod tests {
         let a: Option<HashMap<&str, i32>> = Some([("x", 1), ("y", 2)].into_iter().collect());
         let b: Option<HashMap<&str, i32>> = Some([("y", 3), ("z", 4)].into_iter().collect());
 
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let merged = a.merge(b).unwrap();
         assert_eq!(merged.get("x"), Some(&1)); // from a
         assert_eq!(merged.get("y"), Some(&3)); // b wins

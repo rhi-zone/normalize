@@ -15,6 +15,7 @@ static USER_CAPABILITIES: OnceLock<RwLock<HashMap<String, Capabilities>>> = Once
 pub fn capabilities_for(language_name: &str) -> Capabilities {
     // Check user-registered first
     if let Some(lock) = USER_CAPABILITIES.get()
+        // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
         && let Some(caps) = lock.read().unwrap().get(language_name)
     {
         return *caps;
@@ -29,6 +30,7 @@ pub fn capabilities_for(language_name: &str) -> Capabilities {
 /// This allows extending or overriding the built-in capabilities.
 pub fn register(language_name: impl Into<String>, capabilities: Capabilities) {
     let lock = USER_CAPABILITIES.get_or_init(|| RwLock::new(HashMap::new()));
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     lock.write()
         .unwrap()
         .insert(language_name.into(), capabilities);

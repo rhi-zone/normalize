@@ -423,6 +423,7 @@ require (
     golang.org/x/sync v0.3.0
 )
 "#;
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let module = normalize_manifest::go_module(content).unwrap();
         assert_eq!(module.path, "github.com/user/project");
         assert_eq!(module.go_version, Some("1.21".to_string()));

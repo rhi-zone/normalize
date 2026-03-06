@@ -186,6 +186,7 @@ impl DiagnosticsReport {
             }]
         });
 
+        // normalize-syntax-allow: rust/unwrap-in-impl - serde_json::Value is always serializable
         serde_json::to_string_pretty(&sarif).unwrap()
     }
 

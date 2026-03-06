@@ -720,6 +720,7 @@ mod tests {
     #[test]
     fn test_rust_source_parse_cargo_toml() {
         let temp_dir = std::env::temp_dir().join("moss_test_cargo_toml");
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         std::fs::create_dir_all(&temp_dir).unwrap();
         let cargo_path = temp_dir.join("Cargo.toml");
         let content = r#"
@@ -729,6 +730,7 @@ version = "0.1.0"
 edition = "2024"
 resolver = "2"
 "#;
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         std::fs::write(&cargo_path, content).unwrap();
         let result = RustSource::parse_cargo_toml(&cargo_path);
         assert_eq!(result.get("name"), Some(&"my-crate".to_string()));

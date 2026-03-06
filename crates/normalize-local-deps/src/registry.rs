@@ -9,6 +9,7 @@ static INITIALIZED: OnceLock<()> = OnceLock::new();
 
 /// Register a local deps implementation in the global registry.
 pub fn register(deps: &'static dyn LocalDeps) {
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     DEPS.write().unwrap().push(deps);
 }
 
@@ -44,12 +45,14 @@ fn init_builtin() {
 /// Get all registered local deps implementations.
 pub fn all_local_deps() -> Vec<&'static dyn LocalDeps> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     DEPS.read().unwrap().clone()
 }
 
 /// Find a local deps implementation by ecosystem key.
 pub fn deps_for_ecosystem(key: &str) -> Option<&'static dyn LocalDeps> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     let deps = DEPS.read().unwrap();
     deps.iter().find(|d| d.ecosystem_key() == key).copied()
 }
@@ -57,6 +60,7 @@ pub fn deps_for_ecosystem(key: &str) -> Option<&'static dyn LocalDeps> {
 /// Find a local deps implementation by language name.
 pub fn deps_for_language(name: &str) -> Option<&'static dyn LocalDeps> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     let deps = DEPS.read().unwrap();
     deps.iter().find(|d| d.language_name() == name).copied()
 }

@@ -85,12 +85,14 @@ static INITIALIZED: OnceLock<()> = OnceLock::new();
 /// Call this before any detection operations to add custom ecosystems.
 /// Built-in ecosystems are registered automatically on first use.
 pub fn register(ecosystem: &'static dyn Ecosystem) {
+    // normalize-syntax-allow: rust/unwrap-in-impl - static RwLock, never poisoned
     ECOSYSTEMS.write().unwrap().push(ecosystem);
 }
 
 /// Initialize built-in ecosystems (called automatically on first use).
 fn init_builtin() {
     INITIALIZED.get_or_init(|| {
+        // normalize-syntax-allow: rust/unwrap-in-impl - static RwLock, never poisoned
         let mut ecosystems = ECOSYSTEMS.write().unwrap();
         #[cfg(feature = "cargo")]
         ecosystems.push(&Cargo);
@@ -122,6 +124,7 @@ fn init_builtin() {
 /// Get an ecosystem by name from the global registry.
 pub fn get_ecosystem(name: &str) -> Option<&'static dyn Ecosystem> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - static RwLock, never poisoned
     ECOSYSTEMS
         .read()
         .unwrap()
@@ -133,6 +136,7 @@ pub fn get_ecosystem(name: &str) -> Option<&'static dyn Ecosystem> {
 /// List all available ecosystem names from the global registry.
 pub fn list_ecosystems() -> Vec<&'static str> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - static RwLock, never poisoned
     ECOSYSTEMS
         .read()
         .unwrap()
@@ -149,6 +153,7 @@ pub fn detect_ecosystem(project_root: &Path) -> Option<&'static dyn Ecosystem> {
 /// Detect all ecosystems from project files.
 pub fn detect_all_ecosystems(project_root: &Path) -> Vec<&'static dyn Ecosystem> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - static RwLock, never poisoned
     let ecosystems = ECOSYSTEMS.read().unwrap();
 
     let mut found = Vec::new();
@@ -184,5 +189,6 @@ pub fn detect_all_ecosystems(project_root: &Path) -> Vec<&'static dyn Ecosystem>
 /// Get all registered ecosystems.
 pub fn all_ecosystems() -> Vec<&'static dyn Ecosystem> {
     init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - static RwLock, never poisoned
     ECOSYSTEMS.read().unwrap().clone()
 }

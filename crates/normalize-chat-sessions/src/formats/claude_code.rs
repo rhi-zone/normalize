@@ -323,13 +323,15 @@ fn parse_message(entry: &Value, role: Role) -> Message {
                         .to_string();
                     let result_content = match block.get("content") {
                         Some(v) if v.is_string() => v.as_str().unwrap_or("").to_string(),
-                        Some(v) if v.is_array() => v
+                        Some(v) => v
                             .as_array()
-                            .unwrap()
-                            .iter()
-                            .filter_map(|b| b.get("text").and_then(|t| t.as_str()))
-                            .collect::<Vec<_>>()
-                            .join("\n"),
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|b| b.get("text").and_then(|t| t.as_str()))
+                                    .collect::<Vec<_>>()
+                                    .join("\n")
+                            })
+                            .unwrap_or_default(),
                         _ => String::new(),
                     };
                     let is_error = block

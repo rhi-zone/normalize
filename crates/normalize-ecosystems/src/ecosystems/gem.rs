@@ -73,6 +73,7 @@ impl Ecosystem for Gem {
                 // Extract gem name from quotes
                 let quote = rest.chars().next();
                 if quote == Some('\'') || quote == Some('"') {
+                    // normalize-syntax-allow: rust/unwrap-in-impl - guarded by == Some check above
                     let q = quote.unwrap();
                     if let Some(end) = rest[1..].find(q) {
                         let name = rest[1..=end].to_string();

@@ -114,9 +114,9 @@ impl Tool for Deno {
         let mut current_code: Option<String> = None;
 
         for line in stderr.lines() {
-            if line.starts_with("error:") {
+            if let Some(line_rest) = line.strip_prefix("error:") {
                 // Extract error code and message
-                let rest = line.strip_prefix("error:").unwrap().trim();
+                let rest = line_rest.trim();
                 if let Some(bracket_start) = rest.find('[') {
                     let code = rest[..bracket_start].trim().to_string();
                     if let Some(bracket_end) = rest.find(']') {
@@ -128,9 +128,12 @@ impl Tool for Deno {
                     current_code = Some("error".to_string());
                     current_message = Some(rest.to_string());
                 }
-            } else if line.trim().starts_with("at ") && current_message.is_some() {
+            } else if let Some(location_part) = line
+                .trim()
+                .strip_prefix("at ")
+                .filter(|_| current_message.is_some())
+            {
                 // Parse location: "    at file:///path/to/file.ts:10:5"
-                let location_part = line.trim().strip_prefix("at ").unwrap();
                 if let Some(file_path) = location_part.strip_prefix("file://") {
                     // Parse path:line:col
                     let parts: Vec<&str> = file_path.rsplitn(3, ':').collect();

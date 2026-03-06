@@ -407,14 +407,13 @@ pub fn discover_gradle_packages(gradle_cache: &Path, current: &Path) -> Vec<(Str
                             // Extract package info from path
                             if let Ok(rel) = current.strip_prefix(gradle_cache) {
                                 let parts: Vec<_> = rel.components().collect();
-                                if parts.len() >= 2 {
+                                if let (Some(artifact), true) = (parts.last(), parts.len() >= 2) {
                                     let group = parts[..parts.len() - 1]
                                         .iter()
                                         .map(|c| c.as_os_str().to_string_lossy())
                                         .collect::<Vec<_>>()
                                         .join(".");
-                                    let artifact =
-                                        parts.last().unwrap().as_os_str().to_string_lossy();
+                                    let artifact = artifact.as_os_str().to_string_lossy();
                                     let pkg_name = format!("{}:{}", group, artifact);
                                     packages.push((pkg_name, file.path()));
                                 }

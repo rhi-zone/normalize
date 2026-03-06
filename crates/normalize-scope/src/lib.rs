@@ -406,7 +406,9 @@ mod tests {
             return;
         };
         let mut parser = tree_sitter::Parser::new();
+        // normalize-syntax-allow: rust/unwrap-in-impl - test helper, panic is appropriate
         parser.set_language(&grammar).unwrap();
+        // normalize-syntax-allow: rust/unwrap-in-impl - test helper, panic is appropriate
         let tree = parser.parse(src, None).unwrap();
         fn walk(node: tree_sitter::Node, src: &[u8], indent: usize) {
             let text = node.utf8_text(src).unwrap_or("?");

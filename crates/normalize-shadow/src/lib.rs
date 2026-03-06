@@ -1039,6 +1039,7 @@ mod tests {
 
     #[test]
     fn test_shadow_new() {
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let dir = TempDir::new().unwrap();
         let shadow = Shadow::new(dir.path());
 
@@ -1051,10 +1052,12 @@ mod tests {
 
     #[test]
     fn test_shadow_init() {
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let dir = TempDir::new().unwrap();
         let shadow = Shadow::new(dir.path());
 
         // Initialize as if it's the first edit
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         shadow.init().unwrap();
 
         assert!(shadow.exists());
@@ -1063,18 +1066,22 @@ mod tests {
 
     #[test]
     fn test_shadow_before_after_edit() {
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let dir = TempDir::new().unwrap();
 
         // Create a test file
         let test_file = dir.path().join("test.rs");
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         std::fs::write(&test_file, "fn foo() {}").unwrap();
 
         let shadow = Shadow::new(dir.path());
 
         // Before edit
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         shadow.before_edit(&[&test_file]).unwrap();
 
         // Simulate edit
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         std::fs::write(&test_file, "fn bar() {}").unwrap();
 
         // After edit
@@ -1085,6 +1092,7 @@ mod tests {
             message: Some("Renamed foo to bar".to_string()),
             workflow: None,
         };
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         shadow.after_edit(&info).unwrap();
 
         assert_eq!(shadow.edit_count(), 1);

@@ -109,16 +109,13 @@ impl DepsExtractor {
     pub fn extract(&self, path: &Path, content: &str) -> DepsResult {
         let support = support_for_path(path);
 
-        let extracted = match support.map(|s| s.grammar_name()) {
+        let extracted = match support {
             // JS/TS need special handling for re-exports
-            Some("javascript") => self.extract_javascript(content),
-            Some("typescript") => self.extract_typescript(content),
-            Some("tsx") => self.extract_tsx(content),
+            Some(s) if s.grammar_name() == "javascript" => self.extract_javascript(content),
+            Some(s) if s.grammar_name() == "typescript" => self.extract_typescript(content),
+            Some(s) if s.grammar_name() == "tsx" => self.extract_tsx(content),
             // All other languages use trait-based extraction
-            Some(_) => {
-                let support = support.unwrap();
-                self.extract_with_trait(content, support)
-            }
+            Some(s) => self.extract_with_trait(content, s),
             None => ExtractedDeps {
                 imports: Vec::new(),
                 exports: Vec::new(),
@@ -721,6 +718,7 @@ export { foo, bar } from './specific';
         assert_eq!(result.reexports.len(), 3);
 
         // Star re-export
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let star = result
             .reexports
             .iter()
@@ -730,6 +728,7 @@ export { foo, bar } from './specific';
         assert!(star.names.is_empty());
 
         // Namespace re-export (export * as helpers)
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let namespace = result
             .reexports
             .iter()
@@ -738,6 +737,7 @@ export { foo, bar } from './specific';
         assert!(namespace.is_star);
 
         // Named re-export
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let named = result
             .reexports
             .iter()
@@ -841,6 +841,7 @@ const message = ref('Hello World');
         );
 
         // Verify line numbers are correctly offset
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let vue_import = result.imports.iter().find(|i| i.module == "vue").unwrap();
         assert!(
             vue_import.line >= 7,

@@ -545,7 +545,10 @@ pub fn apply_fixes(findings: &[Finding]) -> std::io::Result<usize> {
                 continue;
             }
 
-            let fix_template = finding.fix.as_ref().unwrap();
+            // fix.is_some() is guaranteed: by_file only includes findings where fix.is_some()
+            let Some(fix_template) = finding.fix.as_ref() else {
+                continue;
+            };
             let replacement = expand_fix_template(fix_template, &finding.captures);
 
             let before = &content[..finding.start_byte];
@@ -630,7 +633,9 @@ fn main() {
 "#;
 
         let mut parser = tree_sitter::Parser::new();
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         parser.set_language(&grammar).unwrap();
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let tree = parser.parse(test_code, None).unwrap();
 
         let mut cursor = tree_sitter::QueryCursor::new();
@@ -649,6 +654,7 @@ fn main() {
                 .find(|c| query.capture_names()[c.index as usize] == "match");
 
             if let Some(cap) = match_capture {
+                // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
                 let text = cap.node.utf8_text(test_code.as_bytes()).unwrap();
                 results.push((m.pattern_index, text.to_string()));
             }
@@ -713,7 +719,9 @@ fn main() {
 "#;
 
         let mut parser = tree_sitter::Parser::new();
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         parser.set_language(&grammar).unwrap();
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let tree = parser.parse(test_code, None).unwrap();
 
         let mut cursor = tree_sitter::QueryCursor::new();
