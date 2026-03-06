@@ -1,0 +1,86 @@
+[
+  {
+    "file": "main.cpp",
+    "kind": "Function",
+    "name": "main",
+    "parent": null,
+    "start_line": 4
+  },
+  {
+    "file": "math_utils.cpp",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 6
+  },
+  {
+    "file": "math_utils.cpp",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 10
+  },
+  {
+    "file": "math_utils.cpp",
+    "kind": "Method",
+    "name": "Calculator",
+    "parent": null,
+    "start_line": 14
+  },
+  {
+    "file": "math_utils.cpp",
+    "kind": "Method",
+    "name": "compute",
+    "parent": null,
+    "start_line": 16
+  },
+  {
+    "file": "math_utils.cpp",
+    "kind": "Method",
+    "name": "last_result",
+    "parent": null,
+    "start_line": 25
+  },
+  {
+    "file": "math_utils.hpp",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 6
+  },
+  {
+    "file": "math_utils.hpp",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 7
+  },
+  {
+    "file": "math_utils.hpp",
+    "kind": "Class",
+    "name": "Calculator",
+    "parent": null,
+    "start_line": 9
+  },
+  {
+    "file": "math_utils.hpp",
+    "kind": "Method",
+    "name": "Calculator",
+    "parent": "Calculator",
+    "start_line": 11
+  },
+  {
+    "file": "math_utils.hpp",
+    "kind": "Method",
+    "name": "compute",
+    "parent": "Calculator",
+    "start_line": 12
+  },
+  {
+    "file": "math_utils.hpp",
+    "kind": "Method",
+    "name": "last_result",
+    "parent": "Calculator",
+    "start_line": 13
+  }
+]

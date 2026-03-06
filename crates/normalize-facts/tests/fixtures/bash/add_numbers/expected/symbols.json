@@ -1,0 +1,30 @@
+[
+  {
+    "file": "main.sh",
+    "kind": "Function",
+    "name": "main",
+    "parent": null,
+    "start_line": 5
+  },
+  {
+    "file": "math_utils.sh",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "math_utils.sh",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 7
+  },
+  {
+    "file": "math_utils.sh",
+    "kind": "Function",
+    "name": "compute",
+    "parent": null,
+    "start_line": 11
+  }
+]
