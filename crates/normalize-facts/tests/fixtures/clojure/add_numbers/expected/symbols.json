@@ -1,1 +1,44 @@
-[]
+[
+  {
+    "file": "core.clj",
+    "kind": "Module",
+    "name": "core",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "core.clj",
+    "kind": "Function",
+    "name": "main",
+    "parent": null,
+    "start_line": 4
+  },
+  {
+    "file": "math_utils.clj",
+    "kind": "Module",
+    "name": "math-utils",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "math_utils.clj",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "math_utils.clj",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 6
+  },
+  {
+    "file": "math_utils.clj",
+    "kind": "Class",
+    "name": "Calculator",
+    "parent": null,
+    "start_line": 9
+  }
+]

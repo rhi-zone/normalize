@@ -20,7 +20,7 @@
   (list
     (symbol) @_lambda (#eq? @_lambda "lambda"))) @definition.function
 
-; (define name value)  — constant/variable
+; (define name value) — constant/variable
 (list
   (symbol) @_kw (#eq? @_kw "define")
   .
@@ -37,9 +37,3 @@
   (symbol) @_kw (#eq? @_kw "define-syntax")
   .
   (symbol) @name) @definition.macro
-
-; (define-library name ...)
-(list
-  (symbol) @_kw (#eq? @_kw "define-library")
-  .
-  (_) @name) @definition.module

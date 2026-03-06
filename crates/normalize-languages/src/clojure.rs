@@ -96,7 +96,25 @@ impl Language for Clojure {
         crate::body::analyze_paren_body(body_node, content, inner_indent)
     }
 
-    fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
+    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
+        // list_lit captured by @definition.* — the name is in the second sym_lit child
+        // (first sym_lit is the form: defn, defrecord, ns, etc.)
+        if node.kind() != "list_lit" {
+            return node
+                .child_by_field_name("name")
+                .map(|n| &content[n.byte_range()]);
+        }
+        let mut cursor = node.walk();
+        let mut seen_form = false;
+        for child in node.children(&mut cursor) {
+            if child.kind() == "sym_lit" {
+                if !seen_form {
+                    seen_form = true;
+                } else {
+                    return Some(&content[child.byte_range()]);
+                }
+            }
+        }
         None
     }
 }

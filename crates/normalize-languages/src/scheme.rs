@@ -79,7 +79,43 @@ impl Language for Scheme {
         crate::body::analyze_paren_body(body_node, content, inner_indent)
     }
 
-    fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
+    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
+        // The @definition.* captures a list for (define ...) forms.
+        // Two cases:
+        // 1. (define (name args) body) — second named-child is a list; its first
+        //    symbol child is the function name.
+        // 2. (define name ...) — second named-child is a symbol (the name directly).
+        if node.kind() != "list" {
+            return node
+                .child_by_field_name("name")
+                .map(|n| &content[n.byte_range()]);
+        }
+        let mut cursor = node.walk();
+        let mut seen_define = false;
+        for child in node.children(&mut cursor) {
+            match child.kind() {
+                "symbol" if !seen_define => {
+                    // First symbol is the form keyword (define, define-syntax, etc.)
+                    seen_define = true;
+                }
+                "symbol" if seen_define => {
+                    // Second symbol: (define name ...)
+                    return Some(&content[child.byte_range()]);
+                }
+                "list" if seen_define => {
+                    // Second child is a nested list: (define (name args) ...) form
+                    // The name is the first symbol inside this nested list.
+                    let mut inner_cursor = child.walk();
+                    for inner in child.children(&mut inner_cursor) {
+                        if inner.kind() == "symbol" {
+                            return Some(&content[inner.byte_range()]);
+                        }
+                    }
+                    return None;
+                }
+                _ => {}
+            }
+        }
         None
     }
 }

@@ -1,1 +1,23 @@
-[]
+[
+  {
+    "file": "math_utils.pro",
+    "kind": "Module",
+    "name": "module",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "math_utils.pro",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "math_utils.pro",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 6
+  }
+]

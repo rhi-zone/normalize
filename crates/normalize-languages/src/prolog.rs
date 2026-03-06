@@ -63,29 +63,36 @@ impl Language for Prolog {
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
-        // For clauses, get the predicate name
-        let head = if let Some(h) = node.child_by_field_name("head") {
-            h
-        } else {
-            let mut cursor = node.walk();
-            let mut found = None;
-            for child in node.children(&mut cursor) {
-                if child.kind() == "atom" || child.kind() == "compound_term" {
-                    found = Some(child);
-                    break;
+        // clause_term has no field names — children are atom, functional_notation,
+        // or operator_notation.
+        //
+        // For fact/rule:    clause_term → functional_notation { function: atom @name }
+        // For :- rule head: clause_term → operator_notation → functional_notation { function: atom }
+        // For simple fact:  clause_term → atom @name
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            match child.kind() {
+                "atom" => return Some(&content[child.byte_range()]),
+                "functional_notation" => {
+                    if let Some(name_node) = child.child_by_field_name("function") {
+                        return Some(&content[name_node.byte_range()]);
+                    }
                 }
-            }
-            found?
-        };
-
-        // Get first atom child as the predicate name
-        let mut cursor = head.walk();
-        for child in head.children(&mut cursor) {
-            if child.kind() == "atom" {
-                return Some(&content[child.byte_range()]);
+                "operator_notation" => {
+                    // Head is the first functional_notation inside operator_notation
+                    let mut inner = child.walk();
+                    for inner_child in child.children(&mut inner) {
+                        if inner_child.kind() == "functional_notation"
+                            && let Some(name_node) = inner_child.child_by_field_name("function")
+                        {
+                            return Some(&content[name_node.byte_range()]);
+                        }
+                    }
+                }
+                _ => {}
             }
         }
-        Some(&content[head.byte_range()])
+        None
     }
 }
 

@@ -139,8 +139,6 @@ fn init_builtin() {
         register(&crate::elisp::Elisp);
         #[cfg(feature = "lang-gleam")]
         register(&crate::gleam::Gleam);
-        #[cfg(feature = "lang-scheme")]
-        register(&crate::scheme::Scheme);
         #[cfg(feature = "lang-ini")]
         register(&crate::ini::Ini);
         #[cfg(feature = "lang-diff")]
@@ -195,6 +193,9 @@ fn init_builtin() {
         register(&crate::postscript::PostScript);
         #[cfg(feature = "lang-query")]
         register(&crate::query::Query);
+        // Scheme registered after Query so .scm → Scheme (not Query) in extension_map
+        #[cfg(feature = "lang-scheme")]
+        register(&crate::scheme::Scheme);
         #[cfg(feature = "lang-ron")]
         register(&crate::ron::Ron);
         #[cfg(feature = "lang-sparql")]

@@ -1,1 +1,44 @@
-[]
+[
+  {
+    "file": "main.zig",
+    "kind": "Function",
+    "name": "main",
+    "parent": null,
+    "start_line": 4
+  },
+  {
+    "file": "math_utils.zig",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "math_utils.zig",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 7
+  },
+  {
+    "file": "math_utils.zig",
+    "kind": "Function",
+    "name": "init",
+    "parent": null,
+    "start_line": 14
+  },
+  {
+    "file": "math_utils.zig",
+    "kind": "Function",
+    "name": "compute",
+    "parent": null,
+    "start_line": 18
+  },
+  {
+    "file": "math_utils.zig",
+    "kind": "Function",
+    "name": "lastResult",
+    "parent": null,
+    "start_line": 27
+  }
+]

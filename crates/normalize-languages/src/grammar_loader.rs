@@ -543,6 +543,8 @@ fn bundled_tags_query(name: &str) -> Option<&'static str> {
         "rescript" => Some(include_str!("queries/rescript.tags.scm")),
         "elm" => Some(include_str!("queries/elm.tags.scm")),
         "markdown" => Some(include_str!("queries/markdown.tags.scm")),
+        "nix" => Some(include_str!("queries/nix.tags.scm")),
+        "prolog" => Some(include_str!("queries/prolog.tags.scm")),
         _ => None,
     }
 }
@@ -1208,6 +1210,78 @@ mod tests {
         assert!(loader.get_tags("python").is_some());
         assert!(loader.get_tags("go").is_some());
         assert!(loader.get_tags("unknown-lang-xyz").is_none());
+    }
+
+    #[test]
+    fn test_tags_queries_compile() {
+        let loader = GrammarLoader::new();
+        let langs = ["zig", "clojure", "scheme", "nix", "prolog"];
+        for lang in langs {
+            let tags = loader.get_tags(lang);
+            assert!(
+                tags.is_some(),
+                "{lang}: no tags query found (missing from bundled_tags_query)"
+            );
+            let tags_str = tags.unwrap();
+            let grammar = loader.get(lang);
+            if grammar.is_none() {
+                eprintln!("{lang}: grammar .so not found, skipping compilation check");
+                continue;
+            }
+            let result = tree_sitter::Query::new(&grammar.unwrap(), &tags_str);
+            assert!(
+                result.is_ok(),
+                "{lang}: tags query compilation failed: {:?}",
+                result.err()
+            );
+        }
+    }
+
+    #[test]
+    fn test_scheme_node_kinds() {
+        let loader = GrammarLoader::new();
+        let grammar = loader.get("scheme");
+        if grammar.is_none() {
+            eprintln!("scheme: grammar .so not found or load failed");
+            return;
+        }
+        eprintln!("scheme: grammar loaded ok");
+        let g = grammar.unwrap();
+        // Test which node names compile in queries against the installed grammar
+        let test_cases = [
+            ("list", "(list) @x"),
+            ("symbol", "(symbol) @x"),
+            ("named_node", "(named_node) @x"),
+            ("identifier", "(identifier) @x"),
+        ];
+        for (name, query_str) in test_cases {
+            match tree_sitter::Query::new(&g, query_str) {
+                Ok(_) => eprintln!("scheme node '{name}': valid"),
+                Err(e) => eprintln!("scheme node '{name}': INVALID - {e:?}"),
+            }
+        }
+        // Now test parsing the fixture
+        use tree_sitter::Parser;
+        let src = "(define (add a b) (+ a b))\n(define (multiply a b) (* a b))\n";
+        let mut parser = Parser::new();
+        parser.set_language(&g).unwrap();
+        let tree = parser.parse(src, None).unwrap();
+        eprintln!("scheme sexp: {}", tree.root_node().to_sexp());
+        // Walk the tree and print node kinds
+        fn walk(node: tree_sitter::Node, depth: usize) {
+            let prefix = "  ".repeat(depth);
+            eprintln!(
+                "{prefix}kind={} named={} text_len={}",
+                node.kind(),
+                node.is_named(),
+                node.byte_range().len()
+            );
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                walk(child, depth + 1);
+            }
+        }
+        walk(tree.root_node(), 0);
     }
 
     #[test]

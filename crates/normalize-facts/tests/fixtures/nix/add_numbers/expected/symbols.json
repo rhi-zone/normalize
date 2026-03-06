@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "file": "math_utils.nix",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 2
+  },
+  {
+    "file": "math_utils.nix",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 4
+  }
+]

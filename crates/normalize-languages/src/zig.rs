@@ -79,6 +79,15 @@ impl Language for Zig {
         }
     }
 
+    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
+        // FnProto uses field "function" for the name identifier.
+        // VarDecl uses field "variable_type_function" for the name identifier.
+        let name_node = node
+            .child_by_field_name("function")
+            .or_else(|| node.child_by_field_name("variable_type_function"))?;
+        Some(&content[name_node.byte_range()])
+    }
+
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")
     }

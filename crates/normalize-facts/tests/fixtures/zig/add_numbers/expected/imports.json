@@ -1,1 +1,23 @@
-[]
+[
+  {
+    "alias": null,
+    "file": "main.zig",
+    "line": 1,
+    "module": null,
+    "name": "std"
+  },
+  {
+    "alias": null,
+    "file": "main.zig",
+    "line": 2,
+    "module": null,
+    "name": "math_utils.zig"
+  },
+  {
+    "alias": null,
+    "file": "math_utils.zig",
+    "line": 1,
+    "module": null,
+    "name": "std"
+  }
+]
