@@ -91,6 +91,64 @@ impl Language for Scala {
         }
     }
 
+    fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
+        if node.kind() != "import_declaration" {
+            return Vec::new();
+        }
+
+        let text = &content[node.byte_range()];
+        let line = node.start_position().row + 1;
+
+        // import pkg.Class or import pkg.{A, B} or import pkg._
+        if let Some(rest) = text.strip_prefix("import ") {
+            let rest = rest.trim();
+            let is_wildcard = rest.ends_with("._") || rest.ends_with(".*");
+            let has_selectors = rest.contains('{');
+
+            if has_selectors {
+                // import pkg.{A, B, C}
+                if let Some(brace) = rest.find('{') {
+                    let module = rest[..brace].trim_end_matches('.').to_string();
+                    let inner = &rest[brace + 1..];
+                    let inner = inner.strip_suffix('}').unwrap_or(inner);
+                    let names: Vec<String> = inner
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty() && s != "_")
+                        .collect();
+                    return vec![Import {
+                        module,
+                        names,
+                        alias: None,
+                        is_wildcard: inner.contains('_'),
+                        is_relative: false,
+                        line,
+                    }];
+                }
+            }
+
+            let module = if is_wildcard {
+                rest.strip_suffix("._")
+                    .or_else(|| rest.strip_suffix(".*"))
+                    .unwrap_or(rest)
+                    .to_string()
+            } else {
+                rest.to_string()
+            };
+
+            return vec![Import {
+                module,
+                names: Vec::new(),
+                alias: None,
+                is_wildcard,
+                is_relative: false,
+                line,
+            }];
+        }
+
+        Vec::new()
+    }
+
     fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
         // Scala: import pkg.Class or import pkg.{A, B, C}
         let names_to_use: Vec<&str> = names

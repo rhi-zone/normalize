@@ -1,1 +1,30 @@
-[]
+[
+  {
+    "file": "main.jl",
+    "kind": "Function",
+    "name": "main",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "math_utils.jl",
+    "kind": "Module",
+    "name": "MathUtils",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "math_utils.jl",
+    "kind": "Method",
+    "name": "add",
+    "parent": "MathUtils",
+    "start_line": 5
+  },
+  {
+    "file": "math_utils.jl",
+    "kind": "Method",
+    "name": "subtract",
+    "parent": "MathUtils",
+    "start_line": 9
+  }
+]

@@ -12,11 +12,9 @@
 (import_header
   (identifier) @import.path
   (import_alias
-    (type_alias
-      (user_type
-        (type_identifier) @import.alias)))) @import
+    (type_identifier) @import.alias)) @import
 
 ; import pkg.*
 (import_header
   (identifier) @import.path
-  "*" @import.glob) @import
+  (wildcard_import) @import.glob) @import

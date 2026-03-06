@@ -17,6 +17,32 @@ impl Language for Julia {
         "julia"
     }
 
+    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
+        // module_definition has a "name" field
+        if let Some(name_node) = node.child_by_field_name("name") {
+            return Some(&content[name_node.byte_range()]);
+        }
+        // function_definition/macro_definition: name in signature (no named children)
+        // struct_definition/abstract_definition: name in type_head
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "signature" || child.kind() == "type_head" {
+                let text = &content[child.byte_range()];
+                // "add(a, b)" → "add", "Foo <: Bar" → "Foo"
+                let end = text
+                    .find(|c: char| c == '(' || c == '<' || c == '{' || c.is_whitespace())
+                    .unwrap_or(text.len());
+                if end > 0 {
+                    return Some(&content[child.start_byte()..child.start_byte() + end]);
+                }
+            }
+            if child.kind() == "identifier" {
+                return Some(&content[child.byte_range()]);
+            }
+        }
+        None
+    }
+
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
         let prev = node.prev_sibling()?;
         if prev.kind() != "string_literal" {
@@ -136,7 +162,7 @@ mod tests {
             "macrocall_expression", "matrix_expression", "operator", "parametrized_type_expression",
             "parenthesized_expression", "public_statement", "quote_expression", "quote_statement",
             "range_expression", "return_statement", "selected_import", "splat_expression",
-            "tuple_expression", "type_head", "typed_expression", "unary_expression",
+            "tuple_expression", "typed_expression", "unary_expression",
             "unary_typed_expression", "vector_expression", "where_expression",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
             "const_statement",

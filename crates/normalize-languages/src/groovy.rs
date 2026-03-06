@@ -21,6 +21,13 @@ impl Language for Groovy {
         " {}"
     }
 
+    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
+        // function_definition uses "function" field instead of "name"
+        node.child_by_field_name("name")
+            .or_else(|| node.child_by_field_name("function"))
+            .map(|n| &content[n.byte_range()])
+    }
+
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
         extract_groovydoc(node, content)
     }

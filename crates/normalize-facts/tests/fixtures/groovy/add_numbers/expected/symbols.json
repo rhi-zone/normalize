@@ -1,1 +1,37 @@
-[]
+[
+  {
+    "file": "Main.groovy",
+    "kind": "Class",
+    "name": "Main",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "Main.groovy",
+    "kind": "Method",
+    "name": "main",
+    "parent": "Main",
+    "start_line": 4
+  },
+  {
+    "file": "MathUtils.groovy",
+    "kind": "Class",
+    "name": "MathUtils",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "MathUtils.groovy",
+    "kind": "Method",
+    "name": "add",
+    "parent": "MathUtils",
+    "start_line": 4
+  },
+  {
+    "file": "MathUtils.groovy",
+    "kind": "Method",
+    "name": "multiply",
+    "parent": "MathUtils",
+    "start_line": 8
+  }
+]

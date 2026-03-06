@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "alias": null,
+    "file": "Calculator.java",
+    "line": 1,
+    "module": null,
+    "name": "java.util.ArrayList"
+  },
+  {
+    "alias": null,
+    "file": "Calculator.java",
+    "line": 2,
+    "module": null,
+    "name": "java.util.List"
+  }
+]

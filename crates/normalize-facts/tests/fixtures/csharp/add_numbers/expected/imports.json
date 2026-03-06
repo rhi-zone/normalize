@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "alias": null,
+    "file": "Program.cs",
+    "line": 1,
+    "module": null,
+    "name": "System"
+  },
+  {
+    "alias": null,
+    "file": "Program.cs",
+    "line": 2,
+    "module": null,
+    "name": "AddNumbers"
+  }
+]

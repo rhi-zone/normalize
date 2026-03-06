@@ -17,6 +17,32 @@ impl Language for Elm {
         "elm"
     }
 
+    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
+        // value_declaration: name is in function_declaration_left > lower_case_identifier
+        if node.kind() == "value_declaration" {
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                if child.kind() == "function_declaration_left" {
+                    let mut inner = child.walk();
+                    for grandchild in child.children(&mut inner) {
+                        if grandchild.kind() == "lower_case_identifier" {
+                            return Some(&content[grandchild.byte_range()]);
+                        }
+                    }
+                }
+            }
+            return None;
+        }
+        // type_alias_declaration, type_declaration: direct upper_case_identifier child
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "upper_case_identifier" || child.kind() == "lower_case_identifier" {
+                return Some(&content[child.byte_range()]);
+            }
+        }
+        None
+    }
+
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "import_clause" {
             return Vec::new();
@@ -102,12 +128,12 @@ mod tests {
         let documented_unused: &[&str] = &[
             "as_clause", "block_comment", "case", "exposed_operator", "exposed_type",
             "exposed_union_constructors", "field_accessor_function_expr", "field_type",
-            "function_call_expr", "import", "infix_declaration", "lower_case_identifier",
+            "function_call_expr", "import", "infix_declaration",
             "lower_type_name", "module", "nullary_constructor_argument_pattern",
             "operator", "operator_as_function_expr", "operator_identifier",
             "record_base_identifier", "record_type", "tuple_type", "type",
             "type_annotation", "type_expression", "type_ref", "type_variable",
-            "upper_case_identifier", "upper_case_qid",
+            "upper_case_qid",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
             "if_else_expr",
             "import_clause",

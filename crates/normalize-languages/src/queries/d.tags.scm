@@ -12,3 +12,7 @@
 
 (enum_declaration
   (identifier) @name) @definition.type
+
+(func_declaration
+  (func_declarator
+    (identifier) @name)) @definition.function

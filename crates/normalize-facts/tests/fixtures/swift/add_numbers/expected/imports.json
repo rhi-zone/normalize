@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "alias": null,
+    "file": "MathUtils.swift",
+    "line": 1,
+    "module": null,
+    "name": "Foundation"
+  },
+  {
+    "alias": null,
+    "file": "main.swift",
+    "line": 1,
+    "module": null,
+    "name": "Foundation"
+  }
+]

@@ -1,9 +1,30 @@
 [
   {
+    "file": "main.d",
+    "kind": "Function",
+    "name": "main",
+    "parent": null,
+    "start_line": 3
+  },
+  {
     "file": "math_utils.d",
     "kind": "Class",
     "name": "MathUtils",
     "parent": null,
     "start_line": 3
+  },
+  {
+    "file": "math_utils.d",
+    "kind": "Method",
+    "name": "add",
+    "parent": "MathUtils",
+    "start_line": 4
+  },
+  {
+    "file": "math_utils.d",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 9
   }
 ]

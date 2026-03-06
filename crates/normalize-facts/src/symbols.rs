@@ -97,7 +97,8 @@ impl SymbolParser {
             return imports;
         }
 
-        Vec::new()
+        // Fallback: trait-based extraction via Language::extract_imports
+        Self::collect_imports_with_trait(root, content, support)
     }
 
     /// Query-based import extraction using `@import`, `@import.path`, `@import.name`,
@@ -165,7 +166,52 @@ impl SymbolParser {
                 });
             }
         }
-        Some(results)
+        if results.is_empty() {
+            None
+        } else {
+            Some(results)
+        }
+    }
+
+    /// Trait-based import extraction fallback.
+    /// Walks all nodes and calls `Language::extract_imports` on each.
+    fn collect_imports_with_trait(
+        root: tree_sitter::Node,
+        source: &str,
+        support: &dyn normalize_languages::Language,
+    ) -> Vec<FlatImport> {
+        let mut results = Vec::new();
+        let mut stack = vec![root];
+        while let Some(node) = stack.pop() {
+            for import in support.extract_imports(&node, source) {
+                if import.names.is_empty() {
+                    // Single import: module is the full path
+                    results.push(FlatImport {
+                        module: None,
+                        name: import.module.clone(),
+                        alias: import.alias.clone(),
+                        line: import.line,
+                    });
+                } else {
+                    // Named imports: one entry per name
+                    for n in &import.names {
+                        results.push(FlatImport {
+                            module: Some(import.module.clone()),
+                            name: n.clone(),
+                            alias: import.alias.clone(),
+                            line: import.line,
+                        });
+                    }
+                }
+            }
+            // Push children in reverse order for DFS
+            let mut cursor = node.walk();
+            let children: Vec<_> = node.children(&mut cursor).collect();
+            for child in children.into_iter().rev() {
+                stack.push(child);
+            }
+        }
+        results
     }
 
     /// Find a symbol by name in a file

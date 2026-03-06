@@ -1,1 +1,23 @@
-[]
+[
+  {
+    "file": "Main.elm",
+    "kind": "Function",
+    "name": "main",
+    "parent": null,
+    "start_line": 6
+  },
+  {
+    "file": "MathUtils.elm",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 5
+  },
+  {
+    "file": "MathUtils.elm",
+    "kind": "Function",
+    "name": "subtract",
+    "parent": null,
+    "start_line": 10
+  }
+]

@@ -150,11 +150,20 @@ impl Language for D {
         }
 
         let text = &content[node.byte_range()];
+        // Strip "import " prefix and trailing ";"
+        let module = text
+            .trim()
+            .strip_prefix("import ")
+            .unwrap_or(text.trim())
+            .trim_end_matches(';')
+            .trim()
+            .to_string();
+        let is_wildcard = module.contains(':');
         vec![Import {
-            module: text.trim().to_string(),
+            module,
             names: Vec::new(),
             alias: None,
-            is_wildcard: text.contains(':'),
+            is_wildcard,
             is_relative: false,
             line: node.start_position().row + 1,
         }]
@@ -214,6 +223,15 @@ impl Language for D {
             if child.kind() == "identifier" {
                 return Some(&content[child.byte_range()]);
             }
+            // func_declaration: name is inside func_declarator
+            if child.kind() == "func_declarator" {
+                let mut inner = child.walk();
+                for grandchild in child.children(&mut inner) {
+                    if grandchild.kind() == "identifier" {
+                        return Some(&content[grandchild.byte_range()]);
+                    }
+                }
+            }
         }
         None
     }
@@ -254,7 +272,7 @@ mod tests {
             "auto_func_declaration", "class_template_declaration",
             "conditional_declaration", "debug_specification", "destructor", "empty_declaration",
             "enum_body", "enum_member", "enum_member_attribute", "enum_member_attributes",
-            "enum_members", "func_declaration", "interface_template_declaration", "mixin_declaration",
+            "enum_members", "interface_template_declaration", "mixin_declaration",
             "module", "shared_static_constructor", "shared_static_destructor", "static_constructor",
             "static_destructor", "static_foreach_declaration", "struct_template_declaration",
             "template_declaration", "template_mixin_declaration", "union_declaration",

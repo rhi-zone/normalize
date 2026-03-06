@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "alias": null,
+    "file": "Main.kt",
+    "line": 1,
+    "module": null,
+    "name": "mathutils.MathUtils"
+  },
+  {
+    "alias": null,
+    "file": "Main.kt",
+    "line": 2,
+    "module": null,
+    "name": "mathutils.multiply"
+  }
+]
