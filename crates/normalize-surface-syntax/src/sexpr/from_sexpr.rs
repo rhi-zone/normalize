@@ -142,18 +142,18 @@ fn parse_opcode(opcode: &str, args: &[Value]) -> Result<Stmt, SExprError> {
             let mut finally_body = None;
 
             for arg in &args[1..] {
-                if let Value::Array(arr) = arg {
-                    if let Some(tag) = arr.first().and_then(|v| v.as_str()) {
-                        match tag {
-                            "catch" if arr.len() >= 3 => {
-                                catch_param = arr[1].as_str().map(String::from);
-                                catch_body = Some(value_to_stmt(&arr[2])?);
-                            }
-                            "finally" if arr.len() >= 2 => {
-                                finally_body = Some(value_to_stmt(&arr[1])?);
-                            }
-                            _ => {}
+                if let Value::Array(arr) = arg
+                    && let Some(tag) = arr.first().and_then(|v| v.as_str())
+                {
+                    match tag {
+                        "catch" if arr.len() >= 3 => {
+                            catch_param = arr[1].as_str().map(String::from);
+                            catch_body = Some(value_to_stmt(&arr[2])?);
                         }
+                        "finally" if arr.len() >= 2 => {
+                            finally_body = Some(value_to_stmt(&arr[1])?);
+                        }
+                        _ => {}
                     }
                 }
             }

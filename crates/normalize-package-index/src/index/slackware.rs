@@ -159,10 +159,10 @@ impl Slackware {
                 name
             );
 
-            if let Ok(response) = ureq::get(&info_url).call() {
-                if let Ok(body) = response.into_string() {
-                    return parse_sbo_info(&body, name, category, version);
-                }
+            if let Ok(response) = ureq::get(&info_url).call()
+                && let Ok(body) = response.into_string()
+            {
+                return parse_sbo_info(&body, name, category, version);
             }
         }
 

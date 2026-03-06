@@ -440,19 +440,19 @@ fn extract_version_from_html(html: &str) -> Option<String> {
     for line in html.lines() {
         if line.contains(".ebuild") {
             // Extract version from ebuild filename
-            if let Some(start) = line.rfind('-') {
-                if let Some(end) = line.find(".ebuild") {
-                    if start < end {
-                        let version = &line[start + 1..end];
-                        // Basic validation - version should start with digit
-                        if version
-                            .chars()
-                            .next()
-                            .map(|c| c.is_ascii_digit())
-                            .unwrap_or(false)
-                        {
-                            return Some(version.to_string());
-                        }
+            if let Some(start) = line.rfind('-')
+                && let Some(end) = line.find(".ebuild")
+            {
+                if start < end {
+                    let version = &line[start + 1..end];
+                    // Basic validation - version should start with digit
+                    if version
+                        .chars()
+                        .next()
+                        .map(|c| c.is_ascii_digit())
+                        .unwrap_or(false)
+                    {
+                        return Some(version.to_string());
                     }
                 }
             }

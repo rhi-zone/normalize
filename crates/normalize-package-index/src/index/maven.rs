@@ -333,12 +333,12 @@ impl PackageIndex for Maven {
                 group_id, artifact_id
             );
             if let Ok(response) = ureq::get(&url).call() {
-                if let Ok(json) = response.into_json::<serde_json::Value>() {
-                    if let Some(docs) = json["response"]["docs"].as_array() {
-                        for doc in docs {
-                            if let Some(v) = doc["v"].as_str() {
-                                all_versions.push((v.to_string(), MavenRepo::Central));
-                            }
+                if let Ok(json) = response.into_json::<serde_json::Value>()
+                    && let Some(docs) = json["response"]["docs"].as_array()
+                {
+                    for doc in docs {
+                        if let Some(v) = doc["v"].as_str() {
+                            all_versions.push((v.to_string(), MavenRepo::Central));
                         }
                     }
                 }
@@ -359,12 +359,12 @@ impl PackageIndex for Maven {
                 artifact_id
             );
 
-            if let Ok(response) = ureq::get(&metadata_url).call() {
-                if let Ok(body) = response.into_string() {
-                    for version in extract_versions_from_metadata(&body) {
-                        if !all_versions.iter().any(|(v, _)| v == &version) {
-                            all_versions.push((version, repo));
-                        }
+            if let Ok(response) = ureq::get(&metadata_url).call()
+                && let Ok(body) = response.into_string()
+            {
+                for version in extract_versions_from_metadata(&body) {
+                    if !all_versions.iter().any(|(v, _)| v == &version) {
+                        all_versions.push((version, repo));
                     }
                 }
             }

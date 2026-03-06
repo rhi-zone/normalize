@@ -496,8 +496,16 @@ pub fn expand_fix_template(template: &str, captures: &HashMap<String, String>) -
     result
 }
 
-/// Apply fixes to findings, returning the number of files modified.
-/// Fixes are applied in reverse order within each file to preserve byte offsets.
+/// Apply one pass of fixes to findings, returning the number of files modified.
+///
+/// Fixes are applied in descending byte-offset order within each file so that
+/// earlier offsets remain valid as later regions are replaced.
+///
+/// When findings overlap (e.g. a nested triple `if let` produces both an inner
+/// and an outer violation), the innermost finding (highest `start_byte`) is
+/// applied first and the outer one is skipped for this pass.  The caller
+/// should re-run the rules and call `apply_fixes` again until no files are
+/// modified; each pass peels one layer of nesting.
 pub fn apply_fixes(findings: &[Finding]) -> std::io::Result<usize> {
     // Group findings by file
     let mut by_file: HashMap<&PathBuf, Vec<&Finding>> = HashMap::new();
@@ -510,23 +518,43 @@ pub fn apply_fixes(findings: &[Finding]) -> std::io::Result<usize> {
     let mut files_modified = 0;
 
     for (file, mut file_findings) in by_file {
-        // Sort by start_byte descending so we can apply fixes without shifting offsets
+        // Descending start_byte: innermost (highest offset) findings are
+        // processed first, so their replacements don't shift the offsets of
+        // earlier findings in the same file.
         file_findings.sort_by(|a, b| b.start_byte.cmp(&a.start_byte));
 
         let mut content = std::fs::read_to_string(file)?;
+        // Track byte ranges that have already been replaced in this pass.
+        // Any finding whose range overlaps an applied range is skipped — it
+        // is an outer wrapper of an already-fixed inner finding, and its
+        // captures are stale.  The next pass will pick it up with fresh
+        // byte offsets.
+        let mut applied: Vec<(usize, usize)> = Vec::new();
+        let mut file_changed = false;
 
         for finding in file_findings {
+            let overlaps = applied
+                .iter()
+                .any(|&(s, e)| finding.start_byte < e && finding.end_byte > s);
+            if overlaps {
+                continue;
+            }
+
             let fix_template = finding.fix.as_ref().unwrap();
             let replacement = expand_fix_template(fix_template, &finding.captures);
 
-            // Replace the matched region with the fix
             let before = &content[..finding.start_byte];
             let after = &content[finding.end_byte..];
             content = format!("{}{}{}", before, replacement, after);
+
+            applied.push((finding.start_byte, finding.end_byte));
+            file_changed = true;
         }
 
-        std::fs::write(file, &content)?;
-        files_modified += 1;
+        if file_changed {
+            std::fs::write(file, &content)?;
+            files_modified += 1;
+        }
     }
 
     Ok(files_modified)

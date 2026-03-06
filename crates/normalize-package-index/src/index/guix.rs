@@ -163,10 +163,10 @@ impl PackageIndex for Guix {
     fn fetch(&self, name: &str) -> Result<PackageMeta, IndexError> {
         // Try each channel until we find the package
         for &channel in &self.channels {
-            if let Ok(packages) = Self::fetch_package_list(channel) {
-                if let Some(pkg) = packages.iter().find(|p| p["name"].as_str() == Some(name)) {
-                    return Ok(package_to_meta(pkg, name, channel));
-                }
+            if let Ok(packages) = Self::fetch_package_list(channel)
+                && let Some(pkg) = packages.iter().find(|p| p["name"].as_str() == Some(name))
+            {
+                return Ok(package_to_meta(pkg, name, channel));
             }
         }
 

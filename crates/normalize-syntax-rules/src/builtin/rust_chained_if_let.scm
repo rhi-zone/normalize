@@ -1,12 +1,13 @@
 # ---
 # id = "rust/chained-if-let"
-# severity = "info"
+# severity = "error"
 # tags = ["style"]
 # message = "Nested if-let can be chained with && in Rust 2024+"
 # languages = ["rust"]
 # requires = { "rust.edition" = ">=2024" }
 # allow = ["**/tests/**"]
-# enabled = false
+# enabled = true
+# fix = "if $outer_cond && $inner_cond $inner_body"
 # ---
 #
 # Rust 2024 edition supports chaining `if let` conditions with `&&` in a
@@ -19,6 +20,8 @@
 #
 # Combine the conditions: `if let A = x && let B = y { ... }`. This
 # flattens the nesting and makes both conditions visible on the same line.
+# The auto-fix handles this transformation. Run `cargo fmt` afterwards to
+# re-indent the body.
 #
 # ## When to disable
 #
@@ -26,10 +29,25 @@
 # frontmatter). It is disabled by default — enable it for 2024+ edition
 # codebases.
 
-; Match if-let containing another if-let as sole block content
+; Match if-let containing another if-let as the sole statement in the block,
+; where neither if has an else clause.
+;
+; Anchors (.) enforce no siblings — without them, the pattern would also
+; match blocks where the inner if-let is preceded or followed by other
+; statements, which cannot be safely chained.
+;
+; !alternative on both levels:
+; - inner: chaining would drop the else branch
+; - outer: if the outer has an else, chaining changes when the else fires
+;   (original: only when outer condition fails; chained: when either fails)
 ((if_expression
-  condition: (let_condition)
+  condition: (let_condition) @outer_cond
   consequence: (block
+    .
     (expression_statement
       (if_expression
-        condition: (let_condition))))) @match)
+        condition: (let_condition) @inner_cond
+        consequence: (block) @inner_body
+        !alternative))
+    .)
+  !alternative) @match)

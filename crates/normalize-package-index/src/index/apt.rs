@@ -324,10 +324,10 @@ impl Apt {
         for line in reader.lines().map_while(Result::ok) {
             if line.is_empty() {
                 // End of stanza
-                if let Some(builder) = current.take() {
-                    if let Some(pkg) = builder.build(repo) {
-                        packages.push(pkg);
-                    }
+                if let Some(builder) = current.take()
+                    && let Some(pkg) = builder.build(repo)
+                {
+                    packages.push(pkg);
                 }
                 continue;
             }
@@ -364,10 +364,10 @@ impl Apt {
         }
 
         // Handle last stanza
-        if let Some(builder) = current {
-            if let Some(pkg) = builder.build(repo) {
-                packages.push(pkg);
-            }
+        if let Some(builder) = current
+            && let Some(pkg) = builder.build(repo)
+        {
+            packages.push(pkg);
         }
 
         packages
@@ -758,12 +758,12 @@ impl Iterator for AptPackageIter {
             match reader.read_line(&mut line) {
                 Ok(0) => {
                     // EOF for this repo - flush builder and move to next
-                    if let Some(builder) = self.current_builder.take() {
-                        if let Some(pkg) = builder.build(repo) {
-                            // Move to next repo before returning
-                            self.current_reader = None;
-                            return Some(Ok(pkg));
-                        }
+                    if let Some(builder) = self.current_builder.take()
+                        && let Some(pkg) = builder.build(repo)
+                    {
+                        // Move to next repo before returning
+                        self.current_reader = None;
+                        return Some(Ok(pkg));
                     }
                     // No package to yield, advance to next repo
                     if !self.advance_to_next_repo() {
@@ -776,10 +776,10 @@ impl Iterator for AptPackageIter {
 
                     if line.is_empty() {
                         // End of stanza - yield package if complete
-                        if let Some(builder) = self.current_builder.take() {
-                            if let Some(pkg) = builder.build(repo) {
-                                return Some(Ok(pkg));
-                            }
+                        if let Some(builder) = self.current_builder.take()
+                            && let Some(pkg) = builder.build(repo)
+                        {
+                            return Some(Ok(pkg));
                         }
                         continue;
                     }

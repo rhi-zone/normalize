@@ -317,10 +317,10 @@ impl Ubuntu {
 
         for line in reader.lines().map_while(Result::ok) {
             if line.is_empty() {
-                if let Some(builder) = current.take() {
-                    if let Some(pkg) = builder.build(repo) {
-                        packages.push(pkg);
-                    }
+                if let Some(builder) = current.take()
+                    && let Some(pkg) = builder.build(repo)
+                {
+                    packages.push(pkg);
                 }
                 continue;
             }
@@ -354,10 +354,10 @@ impl Ubuntu {
             }
         }
 
-        if let Some(builder) = current {
-            if let Some(pkg) = builder.build(repo) {
-                packages.push(pkg);
-            }
+        if let Some(builder) = current
+            && let Some(pkg) = builder.build(repo)
+        {
+            packages.push(pkg);
         }
 
         packages

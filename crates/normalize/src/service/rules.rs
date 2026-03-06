@@ -141,19 +141,40 @@ impl RulesService {
         // Default limit of 50 when not specified; 0 means show all
         self.limit.set(Some(limit.unwrap_or(50)));
 
-        // --fix is a separate mutation path: apply fixes and return a simple message
+        // --fix is a separate mutation path: apply fixes and return a simple message.
+        // Loop until no fixable issues remain (each pass resolves the innermost
+        // layer of nested violations; outer violations are deferred and picked
+        // up by subsequent passes with fresh byte offsets).
         if fix {
             let debug_flags = normalize_syntax_rules::DebugFlags::from_args(&debug);
-            let findings = crate::commands::analyze::rules_cmd::run_syntax_rules(
-                &target_root,
-                rule.as_deref(),
-                tag.as_deref(),
-                None,
-                &config.analyze.rules,
-                &debug_flags,
-            );
-            let fixable: Vec<_> = findings.iter().filter(|f| f.fix.is_some()).collect();
-            if fixable.is_empty() {
+            let run = || {
+                crate::commands::analyze::rules_cmd::run_syntax_rules(
+                    &target_root,
+                    rule.as_deref(),
+                    tag.as_deref(),
+                    None,
+                    &config.analyze.rules,
+                    &debug_flags,
+                )
+            };
+            let mut total_fixed = 0;
+            let mut total_files = 0;
+            loop {
+                let findings = run();
+                let fixable_count = findings.iter().filter(|f| f.fix.is_some()).count();
+                if fixable_count == 0 {
+                    break;
+                }
+                match normalize_syntax_rules::apply_fixes(&findings) {
+                    Ok(0) => break,
+                    Ok(files_modified) => {
+                        total_fixed += fixable_count;
+                        total_files = files_modified;
+                    }
+                    Err(e) => return Err(format!("Error applying fixes: {e}")),
+                }
+            }
+            if total_fixed == 0 {
                 return Ok(DiagnosticsReport {
                     issues: Vec::new(),
                     files_checked: 0,
@@ -161,21 +182,15 @@ impl RulesService {
                     hints: Vec::new(),
                 });
             }
-            match normalize_syntax_rules::apply_fixes(&findings) {
-                Ok(files_modified) => {
-                    return Ok(DiagnosticsReport {
-                        issues: Vec::new(),
-                        files_checked: files_modified,
-                        sources_run: vec![format!(
-                            "syntax-rules (fixed {} issue(s) in {} file(s))",
-                            fixable.len(),
-                            files_modified
-                        )],
-                        hints: Vec::new(),
-                    });
-                }
-                Err(e) => return Err(format!("Error applying fixes: {e}")),
-            }
+            return Ok(DiagnosticsReport {
+                issues: Vec::new(),
+                files_checked: total_files,
+                sources_run: vec![format!(
+                    "syntax-rules (fixed {} issue(s) in {} file(s))",
+                    total_fixed, total_files
+                )],
+                hints: Vec::new(),
+            });
         }
 
         let engine_filter = engine.unwrap_or_default();

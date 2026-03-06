@@ -177,31 +177,25 @@ pub fn cmd_rules(
         return 0;
     }
 
-    let findings = run_syntax_rules(root, filter_rule, filter_tag, filter_ids, config, debug);
-
-    // Apply fixes if requested
+    // Apply fixes if requested.  Loop until no fixable issues remain: each
+    // pass handles the innermost violations; nested outer violations are
+    // deferred (their captures are stale until the inner fix is applied) and
+    // picked up by the next iteration with fresh byte offsets.
     if fix {
-        let fixable: Vec<_> = findings.iter().filter(|f| f.fix.is_some()).collect();
-        if fixable.is_empty() {
-            eprintln!("No auto-fixable issues found.");
-        } else {
+        let mut total_fixed = 0;
+        let mut total_files = 0;
+        loop {
+            let findings =
+                run_syntax_rules(root, filter_rule, filter_tag, filter_ids, config, debug);
+            let fixable_count = findings.iter().filter(|f| f.fix.is_some()).count();
+            if fixable_count == 0 {
+                break;
+            }
             match apply_fixes(&findings) {
+                Ok(0) => break, // no progress; guard against infinite loops
                 Ok(files_modified) => {
-                    if json {
-                        println!(
-                            "{}",
-                            serde_json::json!({
-                                "fixed": fixable.len(),
-                                "files_modified": files_modified
-                            })
-                        );
-                    } else {
-                        println!(
-                            "Fixed {} issue(s) in {} file(s).",
-                            fixable.len(),
-                            files_modified
-                        );
-                    }
+                    total_fixed += fixable_count;
+                    total_files = files_modified;
                 }
                 Err(e) => {
                     eprintln!("Error applying fixes: {}", e);
@@ -209,8 +203,23 @@ pub fn cmd_rules(
                 }
             }
         }
+        if total_fixed == 0 {
+            eprintln!("No auto-fixable issues found.");
+        } else if json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "fixed": total_fixed,
+                    "files_modified": total_files
+                })
+            );
+        } else {
+            println!("Fixed {} issue(s) in {} file(s).", total_fixed, total_files);
+        }
         return 0;
     }
+
+    let findings = run_syntax_rules(root, filter_rule, filter_tag, filter_ids, config, debug);
 
     if sarif {
         print_sarif(&rules, &findings, root);
