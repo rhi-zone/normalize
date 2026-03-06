@@ -2218,6 +2218,44 @@ normalize supports — zero false positives, full scope resolution, no IDE requi
 The path: locals.scm + scope engine + cross-file import resolution = JetBrains-level
 correctness without the PSI.
 
+### eglint (tjjfvi)
+- **Repo**: https://github.com/tjjfvi/eglint — ~2,700 lines TypeScript
+- **What it is**: Example-based formatter — you give it a "correctly formatted" reference
+  file, and it adapts the subject file to match the reference's formatting patterns.
+  Not a linter in the traditional sense; no rule YAML or `.scm` files.
+- **Core algorithm**: Parse both reference and subject into a custom `Node` tree (wrapping
+  `ts.Node` from the TypeScript compiler API). Walk them together via `subNode.adaptTo(refNode)`.
+  Output is regenerated from the adapted tree — not text replacement.
+- **Key insight: indentation is computed at stringify time, not baked into captured text.**
+  `NewlineNode(count, deltaIndent)` carries a `deltaIndent` field; `IndentationContext`
+  accumulates the current level through the tree walk and emits the right number of spaces
+  when `toString()` is called. This means a node extracted from deeply-nested source can be
+  re-serialised at the correct shallower indent without any post-processing (no `cargo fmt`
+  pass needed).
+- **Conflict resolution**: `InterchangeableNode` and `ForkNode` represent multiple
+  formatting alternatives. `ForkNode.chooseOption()` tries each alternative against the
+  reference; first match wins. There is no explicit merge step for overlapping edits —
+  selection narrowing (`FilterGroup` AND/OR logic) handles it naturally.
+- **What it is NOT**: Not tree-sitter based (uses `typescript` compiler API), not
+  multi-language (TypeScript/JavaScript only), not a rule engine (no pattern → fix
+  mapping). It's closer to a pretty-printer that derives its style from an example.
+
+**Relevance to normalize's fix system**:
+- The `IndentNode`/`NewlineNode` approach is the right answer to "why does text-replace
+  produce badly indented output" — the fix should carry structural intent, not literal
+  whitespace. For normalize, this would mean captures like `@inner_body` don't include
+  indentation from the original context; instead, the fix expression describes the output
+  shape and the serialiser computes indentation from nesting depth.
+- Adopting eglint wholesale is not feasible: its trivia handling (whitespace, comments) is
+  regex-based and TypeScript-specific; the `ts.Node` wrapper assumption runs through
+  everything; there are no hooks for other grammars. But the *concept* — fixes as output
+  AST patterns with context-aware indentation rather than text templates — is the right
+  direction for a future structural fix system in normalize.
+- **Concrete next step**: when normalize's fix system grows beyond simple deletions and
+  single-line substitutions, model the fix expression as a tree pattern (like ast-grep's
+  `--rewrite` metavariable syntax) and compute indentation at emit time rather than
+  capturing it from the source.
+
 ### Sorbet / Rubocop autocorrect / similar language-specific tools
 - Language-specific refactoring tools exist for most major languages (Roslyn for C#,
   etc.) — normalize's value prop is cross-language consistency and no-IDE, no-LSP
