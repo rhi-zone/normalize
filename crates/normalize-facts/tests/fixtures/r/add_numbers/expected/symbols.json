@@ -1,0 +1,23 @@
+[
+  {
+    "file": "main.R",
+    "kind": "Function",
+    "name": "main",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "math_utils.R",
+    "kind": "Function",
+    "name": "add_numbers",
+    "parent": null,
+    "start_line": 2
+  },
+  {
+    "file": "math_utils.R",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 7
+  }
+]

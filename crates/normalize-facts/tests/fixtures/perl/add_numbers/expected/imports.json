@@ -1,0 +1,23 @@
+[
+  {
+    "alias": null,
+    "file": "MathUtils.pm",
+    "line": 3,
+    "module": null,
+    "name": "strict"
+  },
+  {
+    "alias": null,
+    "file": "MathUtils.pm",
+    "line": 4,
+    "module": null,
+    "name": "warnings"
+  },
+  {
+    "alias": null,
+    "file": "MathUtils.pm",
+    "line": 5,
+    "module": null,
+    "name": "Exporter"
+  }
+]
