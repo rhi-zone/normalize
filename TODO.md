@@ -21,32 +21,17 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ## Immediate Fixes
 
-### Incremental caching for `normalize analyze check --summary` — HIGH PRIORITY
+### ~~Incremental caching for `normalize analyze check --summary`~~ DONE
 
-Currently re-runs `git log` and `git status` for every directory on every invocation. For large
-repos (265+ dirs), this is slow. Cache the per-directory results keyed by HEAD commit hash:
+Cache at `.normalize/cache/summary-freshness.json`, keyed by HEAD commit hash. Warm run:
+~3s (was ~20s). `git status` always re-run (cheap); `git log` skipped when HEAD unchanged.
 
-- Store last-checked `{dir: commit_hash, commits_since, has_uncommitted}` in `.normalize/cache/summary-freshness.json`
-- On each run: check if HEAD has changed. If not, reuse cached dir entries (skip git log).
-  Still re-check `git status --short` for uncommitted changes (cheap, always current).
-- Invalidate cache entries when the SUMMARY.md file itself is touched.
+### ~~Bootstrap all SUMMARY.md files~~ DONE
 
-The index (SQLite) is the right home for this data since it already tracks per-file commit info.
-
-### Bootstrap all SUMMARY.md files — HIGH PRIORITY
-
-Every directory with source files needs a `SUMMARY.md`. Once bootstrapped:
-1. Change severity back to `"error"` in `.normalize/config.toml` (`stale-summary`, `missing-summary`)
-2. Remove `--no-fail` from the pre-commit hook's `normalize analyze check --summary` call
-3. The hook will then block commits that don't update SUMMARY.md when content changes
-
-Approach: use parallel Sonnet subagents (one per crate or logical grouping). Each agent reads
-the directory structure and existing code, then writes a `SUMMARY.md` describing the directory's
-purpose, key modules/structs/functions, and how it fits into the broader ecosystem. Opus is an
-option for higher quality but gains may be marginal vs. cost; Sonnet is fine for initial bootstrap.
-
-Run `normalize analyze check --summary --no-fail` to see which directories need coverage.
-Currently ~265 directories are missing SUMMARY.md.
+272 SUMMARY.md files written (parallel Sonnet agents, one per crate group + fixture dirs).
+Severity re-escalated to `error`; hook blocks commits when SUMMARY.md is too stale.
+Staleness condition: `(commits_since_update + has_uncommitted) > threshold` (configurable,
+default 10). Single uncommitted change alone no longer blocks commits.
 
 ### Audit info/hint rule noise — HIGH PRIORITY
 
