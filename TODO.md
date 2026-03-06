@@ -21,6 +21,19 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ## Immediate Fixes
 
+### Incremental caching for `normalize analyze check --summary`
+
+Currently re-runs `git log` and `git status` for every directory on every invocation. For large
+repos (265+ dirs), this is slow. Cache the per-directory results keyed by HEAD commit hash:
+
+- Store last-checked `{dir: commit_hash, commits_since, has_uncommitted}` in `.normalize/cache/summary-freshness.json`
+- On each run: check if HEAD has changed. If not, reuse cached dir entries (skip git log).
+  Still re-check `git status --short` for uncommitted changes (cheap, always current).
+- Invalidate cache entries when the SUMMARY.md file itself is touched.
+
+The index (SQLite) is the right long-term home for this data since it already tracks per-file
+commit info. Short-term: a simple JSON cache file is fine.
+
 ### Bootstrap all SUMMARY.md files — HIGH PRIORITY
 
 Every directory with source files needs a `SUMMARY.md`. Once bootstrapped:
@@ -55,6 +68,30 @@ Info ≠ noise in principle, but 1827 of them is noise in practice right now.
 **Immediate:** `rust/unwrap-in-impl` disabled (1608 hits). Needs investigation — could be
 genuine architectural smell (unwrap-heavy code is a fragility signal) or could be legitimate
 in infallible/parsing contexts. Audit and triage before re-enabling. See §Audit rust/unwrap-in-impl.
+
+### Guided rule setup (`normalize rules setup`) — HIGH PRIORITY
+
+A guided setup flow for configuring rules on a new project. Two modes:
+
+**Human-interactive:** For each useful rule, show the top N violations from the codebase,
+then prompt "enable? [y/n/skip]". After user selects, run `normalize rules enable <id>` or
+`normalize rules disable <id>` to persist the config. Think: a wizard that walks through
+the rule catalogue once, pruning noise before it accumulates.
+
+**LLM-stateful:** Same flow but driven by an agent. The agent:
+1. Runs `normalize rules list` to enumerate candidates
+2. For each, runs `normalize rules run --rule <id>` and reviews top violations
+3. Decides enable/disable based on signal quality
+4. Calls `normalize rules enable/disable <id>` to update config (CLI entry point ensures
+   idempotent, human-reviewable config changes)
+
+The `normalize rules enable/disable` commands already exist — they're the right API for
+agents and humans alike. The missing piece is the "show me what this rule would flag,
+then let me decide" UX layer. Implement as `normalize rules setup` or `normalize rules configure`.
+
+Also: review the default-enabled rule set. Currently several rules are enabled project-wide
+that generate high noise without clear quality benefit at scale. Guided setup is the cure:
+make it easy for users/agents to audit and prune.
 
 ### Actionable output for all diagnostic commands — HIGH PRIORITY
 
