@@ -187,6 +187,11 @@ Every crate should be usable both as a library and as a standalone CLI tool. Lib
 - `normalize-syntax-rules` — standalone rule runner
 - Others as needed — each crate's CLI exposes its core functionality directly
 
+**server-less improvement:** Currently the `cli` feature requires listing both `dep:clap` and
+`dep:server-less` because server-less generates code that references clap types directly.
+server-less should re-export clap (or generate code via `server_less::clap::*`) so consumers
+only need `dep:server-less`. File this against the server-less repo.
+
 ### Language trait: migrate *_kinds() methods to .scm query files
 
 The `Language` trait has several methods that return `&'static [&'static str]` — lists of
