@@ -222,17 +222,3 @@ pub fn analyze_ownership(
 
     Ok(OwnershipReport { files, repos: None })
 }
-
-/// Analyze file ownership via git blame (CLI entry point)
-pub fn cmd_ownership(root: &Path, limit: usize, exclude_patterns: &[String]) -> i32 {
-    match analyze_ownership(root, limit, exclude_patterns) {
-        Ok(report) => {
-            println!("{}", report.format_text());
-            0
-        }
-        Err(e) => {
-            eprintln!("{}", e);
-            1
-        }
-    }
-}

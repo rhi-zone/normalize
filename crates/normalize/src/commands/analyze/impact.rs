@@ -7,30 +7,6 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
 
-/// Run impact analysis CLI command.
-pub fn cmd_impact(root: &Path, target: &str, _json: bool) -> i32 {
-    // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let idx = match rt.block_on(crate::index::ensure_ready(root)) {
-        Ok(i) => i,
-        Err(e) => {
-            eprintln!("{}", e);
-            return 1;
-        }
-    };
-
-    let report = match rt.block_on(analyze_impact(&idx, target)) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("Impact analysis failed: {}", e);
-            return 1;
-        }
-    };
-
-    println!("{}", report.format_text());
-    0
-}
-
 /// A file affected by a change to the target module.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ImpactEntry {

@@ -58,15 +58,6 @@ impl OutputFormatter for FileLengthReport {
     }
 }
 
-/// Run file length analysis
-pub fn cmd_files(root: &Path, limit: usize, exclude: &[String]) -> i32 {
-    let report = analyze_files(root, limit, exclude);
-
-    println!("{}", report.format_text());
-
-    0
-}
-
 /// Analyze file lengths
 pub fn analyze_files(root: &Path, limit: usize, exclude: &[String]) -> FileLengthReport {
     let all_files = path_resolve::all_files(root);

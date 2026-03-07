@@ -221,22 +221,3 @@ pub fn analyze_coupling(
 
     Ok(CouplingReport { pairs, repos: None })
 }
-
-/// Parse git log to get per-commit file sets, then compute co-change pairs (CLI entry point)
-pub fn cmd_coupling(
-    root: &Path,
-    min_commits: usize,
-    limit: usize,
-    exclude_patterns: &[String],
-) -> i32 {
-    match analyze_coupling(root, min_commits, limit, exclude_patterns) {
-        Ok(report) => {
-            println!("{}", report.format_text());
-            0
-        }
-        Err(e) => {
-            eprintln!("{}", e);
-            1
-        }
-    }
-}

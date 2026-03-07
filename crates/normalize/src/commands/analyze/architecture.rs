@@ -163,30 +163,6 @@ impl OutputFormatter for ArchitectureReport {
     }
 }
 
-/// Run architecture analysis
-pub fn cmd_architecture(root: &Path, _json: bool) -> i32 {
-    // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let idx = match rt.block_on(crate::index::ensure_ready(root)) {
-        Ok(i) => i,
-        Err(e) => {
-            eprintln!("{}", e);
-            return 1;
-        }
-    };
-
-    let report = match rt.block_on(analyze_architecture(&idx)) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("Analysis failed: {}", e);
-            return 1;
-        }
-    };
-
-    println!("{}", report.format_text());
-    0
-}
-
 pub async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, libsql::Error> {
     let graph = build_import_graph(idx).await?;
     let conn = idx.connection();

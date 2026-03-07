@@ -365,17 +365,3 @@ pub fn analyze_hotspots(
         repos: None,
     })
 }
-
-/// Analyze git history hotspots (CLI entry point)
-pub fn cmd_hotspots(root: &Path, exclude_patterns: &[String], recency: bool) -> i32 {
-    match analyze_hotspots(root, exclude_patterns, recency) {
-        Ok(report) => {
-            println!("{}", report.format_text());
-            0
-        }
-        Err(e) => {
-            eprintln!("{}", e);
-            1
-        }
-    }
-}
