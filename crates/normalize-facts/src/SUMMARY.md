@@ -7,3 +7,5 @@ Source files for fact extraction and storage.
 - `index.rs` — `FileIndex` (SQLite-backed store), `CallGraphStats`, `ChangedFiles`, `SymbolMatch`; all index queries (`find_callers`, `find_callees`, `resolve_all_imports`, etc.)
 - `parsers.rs` — `grammar_loader`, `parser_for`, `parse_with_grammar`, `available_external_grammars`; manages tree-sitter grammar loading
 - `symbols.rs` — `SymbolParser`: converts raw tree-sitter tag matches into `Symbol`/`FlatSymbol` records using `Language` trait hooks
+- `main.rs` — binary entry point for the standalone `normalize-facts` CLI (gated behind `cli` feature)
+- `service.rs` — `FactsCliService` with `#[cli]` impl: `rebuild`, `stats`, `files` subcommands (gated behind `cli` feature)

@@ -12,6 +12,9 @@ mod index;
 mod parsers;
 mod symbols;
 
+#[cfg(feature = "cli")]
+pub mod service;
+
 pub use extract::{ExtractOptions, ExtractResult, Extractor, InterfaceResolver, OnDemandResolver};
 pub use index::{CallGraphStats, ChangedFiles, FileIndex, IndexedFile, SymbolMatch};
 pub use parsers::{available_external_grammars, grammar_loader, parse_with_grammar, parser_for};

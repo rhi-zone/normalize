@@ -7,6 +7,9 @@
 //! Built-in aliases are language-aware (e.g., @tests includes `*_test.go` for Go,
 //! `test_*.py` for Python). Config can override or add new aliases via `[aliases]`.
 
+#[cfg(feature = "cli")]
+pub mod service;
+
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

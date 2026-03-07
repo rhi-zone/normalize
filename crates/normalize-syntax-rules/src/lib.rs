@@ -30,6 +30,9 @@ pub mod query;
 mod runner;
 mod sources;
 
+#[cfg(feature = "cli")]
+pub mod service;
+
 pub use builtin::BUILTIN_RULES;
 pub use loader::{RuleOverride, RulesConfig, load_all_rules, parse_rule_content};
 pub use query::{MatchResult, is_sexp_pattern, run_astgrep_query, run_sexp_query};

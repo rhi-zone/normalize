@@ -6,7 +6,21 @@ license.workspace = true
 repository.workspace = true
 description = "Code fact extraction and storage library"
 
+[[bin]]
+name = "normalize-facts"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[features]
+default = []
+cli = ["dep:clap", "dep:server-less", "dep:tokio", "dep:serde_json", "dep:schemars"]
+
 [dependencies]
+clap = { workspace = true, optional = true }
+server-less = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+schemars = { version = "1", optional = true }
 # Core types
 normalize-facts-core = { path = "../normalize-facts-core", version = "0.1.0" }
 normalize-languages = { path = "../normalize-languages", version = "0.1.0" }

@@ -6,10 +6,17 @@ license.workspace = true
 repository.workspace = true
 description = "File filtering with glob patterns and alias resolution for normalize"
 
+[[bin]]
+name = "normalize-filter"
+path = "src/main.rs"
+required-features = ["cli"]
+
 [features]
 default = []
 # Enable Merge + JsonSchema derives for config integration
 config = ["dep:normalize-core", "dep:schemars"]
+# Standalone CLI binary (clap + server-less)
+cli = ["dep:clap", "dep:server-less", "dep:schemars", "dep:serde_json", "dep:tokio"]
 
 [dependencies]
 ignore = "0.4"
@@ -19,3 +26,7 @@ serde = { version = "1", features = ["derive"] }
 # Optional config integration deps
 normalize-core = { path = "../normalize-core", version = "0.1.0", optional = true }
 schemars = { version = "1", optional = true }
+clap = { workspace = true, optional = true }
+server-less = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }

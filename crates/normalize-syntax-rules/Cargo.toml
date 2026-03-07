@@ -6,7 +6,20 @@ license.workspace = true
 repository.workspace = true
 description = "Syntax-based linting rules with tree-sitter queries"
 
+[[bin]]
+name = "normalize-syntax-rules"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[features]
+default = []
+cli = ["dep:clap", "dep:server-less", "dep:serde_json", "dep:tokio"]
+
 [dependencies]
+clap = { workspace = true, optional = true }
+server-less = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
 # Core
 serde.workspace = true
 dirs.workspace = true

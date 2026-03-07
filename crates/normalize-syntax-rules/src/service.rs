@@ -1,0 +1,275 @@
+//! Standalone CLI service for normalize-syntax-rules.
+//!
+//! Exposes rule management as a standalone binary:
+//! - `run` — run rules against a directory
+//! - `list` — list available rules
+
+use crate::{DebugFlags, Finding, Rule, Severity, apply_fixes, load_all_rules, run_rules};
+use normalize_languages::GrammarLoader;
+use schemars::JsonSchema;
+use serde::Serialize;
+use server_less::cli;
+use std::path::PathBuf;
+
+// =============================================================================
+// Output types
+// =============================================================================
+
+/// A single rule finding serialized for output.
+#[derive(Serialize, JsonSchema)]
+pub struct FindingItem {
+    pub rule_id: String,
+    pub file: String,
+    pub line: usize,
+    pub col: usize,
+    pub severity: String,
+    pub message: String,
+}
+
+impl From<&Finding> for FindingItem {
+    fn from(f: &Finding) -> Self {
+        Self {
+            rule_id: f.rule_id.clone(),
+            file: f.file.display().to_string(),
+            line: f.start_line,
+            col: f.start_col,
+            severity: f.severity.to_string(),
+            message: f.message.clone(),
+        }
+    }
+}
+
+/// Results from running rules.
+#[derive(Serialize, JsonSchema)]
+pub struct RunResult {
+    pub findings: Vec<FindingItem>,
+    pub total: usize,
+    pub errors: usize,
+    pub warnings: usize,
+    pub fixes_applied: usize,
+}
+
+impl std::fmt::Display for RunResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for finding in &self.findings {
+            writeln!(
+                f,
+                "{}:{}:{}: [{}] {} ({})",
+                finding.file,
+                finding.line,
+                finding.col,
+                finding.severity,
+                finding.message,
+                finding.rule_id
+            )?;
+        }
+        if self.total == 0 {
+            writeln!(f, "No findings.")?;
+        } else {
+            writeln!(
+                f,
+                "\n{} finding(s): {} error(s), {} warning(s)",
+                self.total, self.errors, self.warnings
+            )?;
+        }
+        if self.fixes_applied > 0 {
+            writeln!(f, "Applied {} fix(es).", self.fixes_applied)?;
+        }
+        Ok(())
+    }
+}
+
+/// A single rule entry for listing.
+#[derive(Serialize, JsonSchema)]
+pub struct RuleItem {
+    pub id: String,
+    pub severity: String,
+    pub enabled: bool,
+    pub builtin: bool,
+    pub languages: Vec<String>,
+    pub tags: Vec<String>,
+    pub message: String,
+}
+
+impl From<&Rule> for RuleItem {
+    fn from(r: &Rule) -> Self {
+        Self {
+            id: r.id.clone(),
+            severity: r.severity.to_string(),
+            enabled: r.enabled,
+            builtin: r.builtin,
+            languages: r.languages.clone(),
+            tags: r.tags.clone(),
+            message: r.message.clone(),
+        }
+    }
+}
+
+/// List of available rules.
+#[derive(Serialize, JsonSchema)]
+pub struct RuleList {
+    pub rules: Vec<RuleItem>,
+    pub total: usize,
+}
+
+impl std::fmt::Display for RuleList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for rule in &self.rules {
+            let status = if rule.enabled { "on" } else { "off" };
+            let langs = if rule.languages.is_empty() {
+                "all".to_string()
+            } else {
+                rule.languages.join(",")
+            };
+            writeln!(
+                f,
+                "{:40} [{:7}] [{:3}] [{}]  {}",
+                rule.id, rule.severity, status, langs, rule.message
+            )?;
+        }
+        writeln!(f, "\n{} rule(s) total", self.total)
+    }
+}
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+fn resolve_root(root: Option<String>) -> Result<PathBuf, String> {
+    root.map(PathBuf::from)
+        .map(Ok)
+        .unwrap_or_else(std::env::current_dir)
+        .map_err(|e| format!("Failed to get current directory: {}", e))
+}
+
+// =============================================================================
+// Service
+// =============================================================================
+
+/// Standalone CLI service for normalize-syntax-rules.
+pub struct SyntaxRulesService;
+
+impl SyntaxRulesService {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for SyntaxRulesService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cli(
+    name = "normalize-syntax-rules",
+    version = "0.1.0",
+    about = "Syntax-based linting rules with tree-sitter queries"
+)]
+impl SyntaxRulesService {
+    /// Run rules against files in a directory
+    pub fn run(
+        &self,
+        #[param(
+            positional,
+            help = "Target directory or file (defaults to current directory)"
+        )]
+        target: Option<String>,
+        #[param(short = 'r', help = "Project root (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Only run this specific rule ID")] rule: Option<String>,
+        #[param(short = 't', help = "Only run rules with this tag")] tag: Option<String>,
+        #[param(help = "Apply auto-fixes where available")] fix: bool,
+        #[param(help = "Debug flags (comma-separated: timing, all)")] debug: Vec<String>,
+    ) -> Result<RunResult, String> {
+        let project_root = resolve_root(root)?;
+        let target_root = target
+            .as_deref()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| project_root.clone());
+
+        let config = crate::RulesConfig::default();
+        let rules = load_all_rules(&project_root, &config);
+
+        let loader = GrammarLoader::new();
+        let debug_flags = DebugFlags::from_args(&debug);
+
+        let mut findings = run_rules(
+            &rules,
+            &target_root,
+            &project_root,
+            &loader,
+            rule.as_deref(),
+            tag.as_deref(),
+            None,
+            &debug_flags,
+        );
+
+        let fixes_applied = if fix {
+            apply_fixes(&mut findings).unwrap_or(0)
+        } else {
+            0
+        };
+
+        let errors = findings
+            .iter()
+            .filter(|f| f.severity == Severity::Error)
+            .count();
+        let warnings = findings
+            .iter()
+            .filter(|f| f.severity == Severity::Warning)
+            .count();
+        let total = findings.len();
+
+        let items: Vec<FindingItem> = findings.iter().map(FindingItem::from).collect();
+
+        Ok(RunResult {
+            findings: items,
+            total,
+            errors,
+            warnings,
+            fixes_applied,
+        })
+    }
+
+    /// List available rules
+    pub fn list(
+        &self,
+        #[param(short = 'r', help = "Project root (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 't', help = "Filter by tag")] tag: Option<String>,
+        #[param(help = "Show only enabled rules")] enabled: bool,
+        #[param(help = "Show only disabled rules")] disabled: bool,
+    ) -> Result<RuleList, String> {
+        let project_root = resolve_root(root)?;
+        let config = crate::RulesConfig::default();
+        let rules = load_all_rules(&project_root, &config);
+
+        let filtered: Vec<RuleItem> = rules
+            .iter()
+            .filter(|r| {
+                if enabled && !r.enabled {
+                    return false;
+                }
+                if disabled && r.enabled {
+                    return false;
+                }
+                if let Some(ref t) = tag {
+                    if !r.tags.iter().any(|rt| rt == t) {
+                        return false;
+                    }
+                }
+                true
+            })
+            .map(RuleItem::from)
+            .collect();
+
+        let total = filtered.len();
+        Ok(RuleList {
+            rules: filtered,
+            total,
+        })
+    }
+}

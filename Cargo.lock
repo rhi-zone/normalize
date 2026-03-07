@@ -3742,6 +3742,7 @@ dependencies = [
 name = "normalize-facts"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "dirs",
  "ignore",
  "libsql",
@@ -3750,8 +3751,10 @@ dependencies = [
  "normalize-local-deps",
  "normalize-manifest",
  "rayon",
+ "schemars",
  "serde",
  "serde_json",
+ "server-less",
  "streaming-iterator",
  "tempfile",
  "tokio",
@@ -3805,11 +3808,15 @@ dependencies = [
 name = "normalize-filter"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "ignore",
  "normalize-core",
  "normalize-language-meta",
  "schemars",
  "serde",
+ "serde_json",
+ "server-less",
+ "tokio",
 ]
 
 [[package]]
@@ -4069,6 +4076,7 @@ name = "normalize-syntax-rules"
 version = "0.1.0"
 dependencies = [
  "ast-grep-core",
+ "clap",
  "dirs",
  "glob",
  "ignore",
@@ -4077,8 +4085,11 @@ dependencies = [
  "regex",
  "schemars",
  "serde",
+ "serde_json",
+ "server-less",
  "streaming-iterator",
  "tempfile",
+ "tokio",
  "toml",
  "tree-sitter",
 ]
