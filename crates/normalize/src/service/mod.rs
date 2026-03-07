@@ -461,7 +461,7 @@ impl NormalizeService {
             changes.push("Created .normalize/".to_string());
         }
 
-        // 2. Detect task-list files (e.g. TODO.md) for alias config
+        // 2. Detect task-list files for alias config
         let todo_files = commands::init::detect_todo_files(&root);
 
         // 3. Create config.toml if missing
