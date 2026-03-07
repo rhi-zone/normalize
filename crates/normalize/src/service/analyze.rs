@@ -482,7 +482,12 @@ impl AnalyzeService {
 
         let error_count = report.count_by_severity(normalize_output::diagnostics::Severity::Error);
         if !no_fail && error_count > 0 {
-            return Err(format!("{error_count} error(s) found"));
+            let detail = if self.pretty.get() {
+                report.format_pretty()
+            } else {
+                report.format_text()
+            };
+            return Err(format!("{detail}\n{error_count} error(s) found"));
         }
 
         if !report.issues.is_empty() && !self.pretty.get() {
