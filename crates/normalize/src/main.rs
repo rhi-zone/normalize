@@ -30,7 +30,8 @@ fn reset_sigpipe() {
 #[cfg(not(unix))]
 fn reset_sigpipe() {}
 
-fn main() -> std::process::ExitCode {
+#[tokio::main]
+async fn main() -> std::process::ExitCode {
     reset_sigpipe();
 
     let argv: Vec<std::ffi::OsString> = std::env::args_os().collect();
@@ -87,7 +88,7 @@ fn main() -> std::process::ExitCode {
     }
 
     let service = normalize::service::NormalizeService::new();
-    match service.cli_run() {
+    match service.cli_run_async().await {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("{}", e);

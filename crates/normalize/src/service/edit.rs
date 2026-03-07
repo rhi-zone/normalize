@@ -1144,7 +1144,7 @@ impl EditService {
     ///
     /// Aborts if the new name already exists as a symbol in the definition file or as
     /// an import in any affected file. Use `--force` to override conflict checks.
-    pub fn rename(
+    pub async fn rename(
         &self,
         #[param(positional, help = "Target symbol (path/Symbol)")] target: String,
         #[param(positional, help = "New name for the symbol")] new_name: String,
@@ -1162,6 +1162,7 @@ impl EditService {
             force,
             message.as_deref(),
         )
+        .await
     }
 
     /// Undo the last N edits
@@ -1320,7 +1321,7 @@ impl EditService {
 /// `target` is in `path/SymbolName` format (same as other edit commands).
 /// Set `force` to proceed even when name conflicts are detected.
 #[allow(clippy::too_many_arguments)]
-fn do_rename(
+async fn do_rename(
     target: &str,
     new_name: &str,
     root: Option<&Path>,
@@ -1364,10 +1365,7 @@ fn do_rename(
         .ok_or_else(|| format!("Symbol '{}' not found in {}", old_name, def_rel_path))?;
 
     // Try to open index for cross-file awareness (graceful degradation)
-    let rt =
-        tokio::runtime::Runtime::new().map_err(|e| format!("Failed to create runtime: {}", e))?;
-
-    let (callers, importers) = rt.block_on(async {
+    let (callers, importers) = async {
         match crate::index::ensure_ready(&root).await {
             Ok(idx) => {
                 let callers = idx
@@ -1388,7 +1386,8 @@ fn do_rename(
                 (vec![], vec![])
             }
         }
-    });
+    }
+    .await;
 
     // ── Conflict detection ───────────────────────────────────────────────────
     // Check before touching any file so we can abort cleanly.
@@ -1407,16 +1406,14 @@ fn do_rename(
         }
 
         // 2. Does any importer file already import something named new_name?
-        if !importers.is_empty() {
-            rt.block_on(async {
-                if let Some(idx) = crate::index::open_if_enabled(&root).await {
-                    for (file, _, _, _) in &importers {
-                        if idx.has_import_named(file, new_name).await.unwrap_or(false) {
-                            conflicts.push(format!("{}: already imports '{}'", file, new_name));
-                        }
-                    }
+        if !importers.is_empty()
+            && let Some(idx) = crate::index::open_if_enabled(&root).await
+        {
+            for (file, _, _, _) in &importers {
+                if idx.has_import_named(file, new_name).await.unwrap_or(false) {
+                    conflicts.push(format!("{}: already imports '{}'", file, new_name));
                 }
-            });
+            }
         }
 
         if !conflicts.is_empty() {

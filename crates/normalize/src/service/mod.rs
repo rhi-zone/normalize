@@ -432,7 +432,7 @@ impl NormalizeService {
     }
 
     /// Initialize normalize in current directory
-    pub fn init(
+    pub async fn init(
         &self,
         #[param(help = "Index the codebase after initialization")] index: bool,
         #[param(help = "Run interactive rule setup wizard after initialization")] setup: bool,
@@ -513,13 +513,12 @@ impl NormalizeService {
         // 6. Optionally index
         if index {
             println!("\nIndexing codebase...");
-            let rt = tokio::runtime::Runtime::new()
-                .map_err(|e| format!("Failed to create runtime: {}", e))?;
-            let mut idx = rt
-                .block_on(crate::index::open(&root))
+            let mut idx = crate::index::open(&root)
+                .await
                 .map_err(|e| format!("Failed to open index: {}", e))?;
-            let count = rt
-                .block_on(idx.refresh())
+            let count = idx
+                .refresh()
+                .await
                 .map_err(|e| format!("Failed to index: {}", e))?;
             println!("Indexed {} files.", count);
         }

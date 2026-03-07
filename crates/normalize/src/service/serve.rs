@@ -25,7 +25,7 @@ impl ServeService {
     }
 
     /// Start HTTP server (REST API)
-    pub fn http(
+    pub async fn http(
         &self,
         #[param(short = 'p', help = "Port to listen on [default: 8080]")] port: Option<u16>,
         #[param(help = "Output OpenAPI spec and exit (don't start server)")] openapi: bool,
@@ -48,12 +48,7 @@ impl ServeService {
         let config = crate::config::NormalizeConfig::load(&root_path);
         let effective_port = port.unwrap_or_else(|| config.serve.http_port());
 
-        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let exit = rt.block_on(crate::serve::http::run_http_server(
-            &root_path,
-            effective_port,
-        ));
+        let exit = crate::serve::http::run_http_server(&root_path, effective_port).await;
         if exit != 0 {
             Err(format!("HTTP server exited with code {}", exit))
         } else {
@@ -62,16 +57,14 @@ impl ServeService {
     }
 
     /// Start LSP server for IDE integration
-    pub fn lsp(
+    pub async fn lsp(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
     ) -> Result<(), String> {
         let root_path = root.as_deref().map(PathBuf::from);
-        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let exit = rt.block_on(crate::serve::lsp::run_lsp_server(root_path.as_deref()));
+        let exit = crate::serve::lsp::run_lsp_server(root_path.as_deref()).await;
         if exit != 0 {
             Err(format!("LSP server exited with code {}", exit))
         } else {

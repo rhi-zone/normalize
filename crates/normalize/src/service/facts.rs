@@ -674,7 +674,7 @@ async fn packages_data(
 )]
 impl FactsService {
     /// Rebuild the file index
-    pub fn rebuild(
+    pub async fn rebuild(
         &self,
         #[param(help = "What to extract: symbols, calls, imports (comma-separated)")] include: Vec<
             String,
@@ -696,12 +696,11 @@ impl FactsService {
                 .collect::<Result<Vec<_>, _>>()?
         };
         let root_path = root.map(PathBuf::from);
-        let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-        rt.block_on(rebuild_data(root_path.as_deref(), &include))
+        rebuild_data(root_path.as_deref(), &include).await
     }
 
     /// Show index statistics (DB size vs codebase size)
-    pub fn stats(
+    pub async fn stats(
         &self,
         #[param(help = "Show storage usage for index and caches")] storage: bool,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -718,13 +717,13 @@ impl FactsService {
             )));
         }
         let root_path = root.map(PathBuf::from);
-        let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-        rt.block_on(stats_data(root_path.as_deref()))
+        stats_data(root_path.as_deref())
+            .await
             .map(FactsStatsOutput::Stats)
     }
 
     /// List indexed files (with optional prefix filter)
-    pub fn files(
+    pub async fn files(
         &self,
         #[param(positional, help = "Filter files by prefix")] prefix: Option<String>,
         #[param(short = 'l', help = "Maximum number of files to show")] limit: Option<usize>,
@@ -734,16 +733,11 @@ impl FactsService {
     ) -> Result<FileList, String> {
         let limit = limit.unwrap_or(100);
         let root_path = root.map(PathBuf::from);
-        let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-        rt.block_on(list_files_data(
-            prefix.as_deref(),
-            root_path.as_deref(),
-            limit,
-        ))
+        list_files_data(prefix.as_deref(), root_path.as_deref(), limit).await
     }
 
     /// Index external packages (stdlib, site-packages) into global cache
-    pub fn packages(
+    pub async fn packages(
         &self,
         #[param(help = "Ecosystems to index (comma-separated)")] only: Vec<String>,
         #[param(help = "Clear existing index before re-indexing")] clear: bool,
@@ -752,8 +746,7 @@ impl FactsService {
         >,
     ) -> Result<PackagesResult, String> {
         let root_path = root.map(PathBuf::from);
-        let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-        rt.block_on(packages_data(&only, clear, root_path.as_deref()))
+        packages_data(&only, clear, root_path.as_deref()).await
     }
 }
 

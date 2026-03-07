@@ -423,7 +423,7 @@ impl AnalyzeService {
     #[server(group = "repo")]
     #[cli(display_with = "display_check")]
     #[allow(clippy::too_many_arguments)]
-    pub fn check(
+    pub async fn check(
         &self,
         #[param(help = "Check broken documentation references")] refs: bool,
         #[param(help = "Check for stale documentation")] stale: bool,
@@ -448,11 +448,8 @@ impl AnalyzeService {
         let mut report = DiagnosticsReport::new();
 
         if run_all || refs {
-            let rt = tokio::runtime::Runtime::new()
-                .map_err(|e| format!("Failed to create runtime: {}", e))?;
-            let refs_report = rt.block_on(
-                crate::commands::analyze::check_refs::build_check_refs_report(&root_path),
-            )?;
+            let refs_report =
+                crate::commands::analyze::check_refs::build_check_refs_report(&root_path).await?;
             report.merge(refs_report.into());
         }
 
@@ -515,7 +512,7 @@ impl AnalyzeService {
     /// Show callers and/or callees of a symbol
     #[server(group = "graph")]
     #[cli(display_with = "display_call_graph")]
-    pub fn call_graph(
+    pub async fn call_graph(
         &self,
         #[param(positional, help = "Symbol to look up (or file#symbol)")] target: String,
         #[param(help = "Show callers")] callers: bool,
@@ -527,15 +524,14 @@ impl AnalyzeService {
     ) -> Result<Vec<CallEntry>, String> {
         let root_path = Self::root_path(root);
         let show_callers = callers || !callees;
-        let rt = tokio::runtime::Runtime::new()
-            .map_err(|e| format!("Failed to create runtime: {}", e))?;
-        rt.block_on(crate::commands::analyze::call_graph::build_call_graph(
+        crate::commands::analyze::call_graph::build_call_graph(
             &root_path,
             &target,
             show_callers,
             callees,
             case_insensitive,
-        ))
+        )
+        .await
     }
 
     /// Trace value provenance for a symbol
@@ -566,27 +562,23 @@ impl AnalyzeService {
     /// Show architecture analysis (coupling, cycles, hubs)
     #[server(group = "graph")]
     #[cli(display_with = "display_architecture")]
-    pub fn architecture(
+    pub async fn architecture(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
     ) -> Result<ArchitectureReport, String> {
         let root_path = Self::root_path(root);
-        let rt = tokio::runtime::Runtime::new()
-            .map_err(|e| format!("Failed to create runtime: {}", e))?;
-        rt.block_on(async {
-            let idx = crate::index::ensure_ready(&root_path).await?;
-            crate::commands::analyze::architecture::analyze_architecture(&idx)
-                .await
-                .map_err(|e| format!("Architecture analysis failed: {}", e))
-        })
+        let idx = crate::index::ensure_ready(&root_path).await?;
+        crate::commands::analyze::architecture::analyze_architecture(&idx)
+            .await
+            .map_err(|e| format!("Architecture analysis failed: {}", e))
     }
 
     /// What-if impact analysis: reverse-dependency closure + blast radius
     #[server(group = "graph")]
     #[cli(display_with = "display_impact")]
-    pub fn impact(
+    pub async fn impact(
         &self,
         #[param(positional, help = "Target file to analyze impact for")] target: String,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -597,14 +589,10 @@ impl AnalyzeService {
     ) -> Result<ImpactReport, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
-        let rt = tokio::runtime::Runtime::new()
-            .map_err(|e| format!("Failed to create runtime: {}", e))?;
-        rt.block_on(async {
-            let idx = crate::index::ensure_ready(&root_path).await?;
-            crate::commands::analyze::impact::analyze_impact(&idx, &target)
-                .await
-                .map_err(|e| format!("Impact analysis failed: {}", e))
-        })
+        let idx = crate::index::ensure_ready(&root_path).await?;
+        crate::commands::analyze::impact::analyze_impact(&idx, &target)
+            .await
+            .map_err(|e| format!("Impact analysis failed: {}", e))
     }
 
     /// Run health analysis (file counts, complexity stats, large file warnings)
