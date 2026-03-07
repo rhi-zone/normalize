@@ -13,10 +13,9 @@ required-features = ["cli"]
 
 [features]
 default = []
-cli = ["dep:clap", "dep:server-less", "dep:serde_json", "dep:tokio"]
+cli = ["dep:server-less", "dep:serde_json", "dep:tokio"]
 
 [dependencies]
-clap = { workspace = true, optional = true }
 server-less = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }

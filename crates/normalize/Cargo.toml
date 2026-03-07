@@ -18,8 +18,8 @@ required-features = ["cli"]
 [features]
 default = ["cli", "jq-cli", "rg-cli", "ast-grep-cli"]
 
-# CLI binary (clap + server-less proc macro)
-cli = ["dep:clap", "dep:server-less"]
+# CLI binary (server-less proc macro; clap re-exported from server-less)
+cli = ["dep:server-less"]
 
 # jq subcommand (embeds jaq as a drop-in jq replacement)
 jq-cli = []

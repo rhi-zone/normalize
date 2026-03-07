@@ -187,10 +187,17 @@ Every crate should be usable both as a library and as a standalone CLI tool. Lib
 - `normalize-syntax-rules` — standalone rule runner
 - Others as needed — each crate's CLI exposes its core functionality directly
 
-**server-less improvement:** Currently the `cli` feature requires listing both `dep:clap` and
-`dep:server-less` because server-less generates code that references clap types directly.
-server-less should re-export clap (or generate code via `server_less::clap::*`) so consumers
-only need `dep:server-less`. File this against the server-less repo.
+**server-less improvement — DONE (0.3.1):** server-less now does `pub use clap;`. Sub-crates
+that use only the `#[cli]` proc macro no longer need `dep:clap` (done for normalize-facts,
+normalize-filter, normalize-syntax-rules). The main `normalize` crate still needs `dep:clap`
+because `src/ast_grep/`, `src/commands/translate.rs`, and `src/serve/` directly import clap.
+
+**Next step (HIGH PRIORITY):** Port those files to use `server_less::clap::*` instead of
+`clap::*`, then drop `dep:clap` from normalize's Cargo.toml entirely. Key files:
+- `src/ast_grep/` (many files — embedded ast-grep integration)
+- `src/commands/translate.rs`
+- `src/serve/mod.rs`
+After porting, `normalize` the library is finally clap-free for library consumers.
 
 ### Language trait: migrate *_kinds() methods to .scm query files
 
