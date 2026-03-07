@@ -2,326 +2,8 @@
 
 use std::io::Read;
 
-/// Service-callable update command (returns structured result).
-#[cfg(feature = "cli")]
-pub fn cmd_update_service(check_only: bool) -> Result<crate::service::UpdateResult, String> {
-    const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
-    const GITHUB_REPO: &str = "rhi-zone/normalize";
-
-    let client = ureq::agent();
-
-    let url = format!(
-        "https://api.github.com/repos/{}/releases/latest",
-        GITHUB_REPO
-    );
-
-    let response = client
-        .get(&url)
-        .set("User-Agent", "normalize-cli")
-        .set("Accept", "application/vnd.github+json")
-        .call()
-        .map_err(|e| format!("Failed to check for updates: {}", e))?;
-
-    let body: serde_json::Value = response
-        .into_json()
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-    let latest_version = body["tag_name"]
-        .as_str()
-        .unwrap_or("unknown")
-        .trim_start_matches('v')
-        .to_string();
-
-    let is_update_available =
-        latest_version != CURRENT_VERSION && version_gt(&latest_version, CURRENT_VERSION);
-
-    if check_only || !is_update_available {
-        return Ok(crate::service::UpdateResult {
-            current_version: CURRENT_VERSION.to_string(),
-            latest_version,
-            update_available: is_update_available,
-            message: None,
-        });
-    }
-
-    // Perform the update
-    eprintln!("Downloading update...");
-
-    let target = get_target_triple();
-    let asset_name = get_asset_name(&target);
-
-    let assets = body["assets"].as_array();
-    let asset_url = assets
-        .and_then(|arr| {
-            arr.iter()
-                .find(|a| a["name"].as_str() == Some(&asset_name))
-                .and_then(|a| a["browser_download_url"].as_str())
-        })
-        .ok_or_else(|| format!("No binary available for your platform: {}", target))?;
-
-    eprintln!("  Downloading {}...", asset_name);
-    let archive_response = client
-        .get(asset_url)
-        .call()
-        .map_err(|e| format!("Failed to download update: {}", e))?;
-
-    let mut archive_data = Vec::new();
-    archive_response
-        .into_reader()
-        .read_to_end(&mut archive_data)
-        .map_err(|e| format!("Failed to read download: {}", e))?;
-
-    // Checksum verification
-    let checksum_url = assets.and_then(|arr| {
-        arr.iter()
-            .find(|a| a["name"].as_str() == Some("SHA256SUMS.txt"))
-            .and_then(|a| a["browser_download_url"].as_str())
-    });
-
-    if let Some(checksum_url) = checksum_url {
-        eprintln!("  Verifying checksum...");
-        if let Ok(resp) = client.get(checksum_url).call()
-            && let Ok(checksums) = resp.into_string()
-        {
-            let expected = checksums
-                .lines()
-                .find(|line| line.contains(&asset_name))
-                .and_then(|line| line.split_whitespace().next());
-
-            if let Some(expected) = expected {
-                let mut hasher = Sha256::new();
-                hasher.update(&archive_data);
-                let hash = hasher.finalize();
-                let actual: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
-
-                if actual != expected {
-                    return Err(format!(
-                        "Checksum mismatch!\n  Expected: {}\n  Got:      {}",
-                        expected, actual
-                    ));
-                }
-            }
-        }
-    }
-
-    // Extract binary
-    eprintln!("  Extracting...");
-    let binary_data = if asset_name.ends_with(".tar.gz") {
-        extract_tar_gz(&archive_data)
-    } else if asset_name.ends_with(".zip") {
-        extract_zip(&archive_data)
-    } else {
-        Err(format!("Unknown archive format: {}", asset_name))
-    }?;
-
-    // Replace current binary
-    eprintln!("  Installing...");
-    self_replace(&binary_data)?;
-
-    Ok(crate::service::UpdateResult {
-        current_version: CURRENT_VERSION.to_string(),
-        latest_version,
-        update_available: true,
-        message: Some(
-            "Updated successfully! Restart normalize to use the new version.".to_string(),
-        ),
-    })
-}
-
-/// Run the update command
-pub fn cmd_update(check_only: bool) -> i32 {
-    let json = false;
-    const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
-    const GITHUB_REPO: &str = "rhi-zone/normalize";
-
-    let client = ureq::agent();
-
-    // Fetch latest release from GitHub API
-    let url = format!(
-        "https://api.github.com/repos/{}/releases/latest",
-        GITHUB_REPO
-    );
-
-    let response = match client
-        .get(&url)
-        .set("User-Agent", "normalize-cli")
-        .set("Accept", "application/vnd.github+json")
-        .call()
-    {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("Failed to check for updates: {}", e);
-            return 1;
-        }
-    };
-
-    let body: serde_json::Value = match response.into_json() {
-        Ok(b) => b,
-        Err(e) => {
-            eprintln!("Failed to parse response: {}", e);
-            return 1;
-        }
-    };
-
-    let latest_version = body["tag_name"]
-        .as_str()
-        .unwrap_or("unknown")
-        .trim_start_matches('v');
-
-    let is_update_available =
-        latest_version != CURRENT_VERSION && version_gt(latest_version, CURRENT_VERSION);
-
-    if json && check_only {
-        println!(
-            "{}",
-            serde_json::json!({
-                "current_version": CURRENT_VERSION,
-                "latest_version": latest_version,
-                "update_available": is_update_available
-            })
-        );
-        return 0;
-    }
-
-    if !json {
-        println!("Current version: {}", CURRENT_VERSION);
-        println!("Latest version:  {}", latest_version);
-    }
-
-    if !is_update_available {
-        if !json {
-            println!("You are running the latest version.");
-        }
-        return 0;
-    }
-
-    if check_only {
-        if !json {
-            println!();
-            println!("Update available! Run 'normalize update' to install.");
-        }
-        return 0;
-    }
-
-    // Perform the update
-    println!();
-    println!("Downloading update...");
-
-    let target = get_target_triple();
-    let asset_name = get_asset_name(&target);
-
-    // Find the asset URL
-    let assets = body["assets"].as_array();
-    let asset_url = assets.and_then(|arr| {
-        arr.iter()
-            .find(|a| a["name"].as_str() == Some(&asset_name))
-            .and_then(|a| a["browser_download_url"].as_str())
-    });
-
-    let asset_url = match asset_url {
-        Some(url) => url,
-        None => {
-            eprintln!("No binary available for your platform: {}", target);
-            eprintln!("Available assets:");
-            if let Some(arr) = assets {
-                for a in arr {
-                    if let Some(name) = a["name"].as_str() {
-                        eprintln!("  - {}", name);
-                    }
-                }
-            }
-            return 1;
-        }
-    };
-
-    // Download the archive
-    println!("  Downloading {}...", asset_name);
-    let archive_response = match client.get(asset_url).call() {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("Failed to download update: {}", e);
-            return 1;
-        }
-    };
-
-    let mut archive_data = Vec::new();
-    if let Err(e) = archive_response
-        .into_reader()
-        .read_to_end(&mut archive_data)
-    {
-        eprintln!("Failed to read download: {}", e);
-        return 1;
-    }
-
-    // Download checksums
-    let checksum_url = assets.and_then(|arr| {
-        arr.iter()
-            .find(|a| a["name"].as_str() == Some("SHA256SUMS.txt"))
-            .and_then(|a| a["browser_download_url"].as_str())
-    });
-
-    if let Some(checksum_url) = checksum_url {
-        println!("  Verifying checksum...");
-        if let Ok(resp) = client.get(checksum_url).call()
-            && let Ok(checksums) = resp.into_string()
-        {
-            let expected = checksums
-                .lines()
-                .find(|line| line.contains(&asset_name))
-                .and_then(|line| line.split_whitespace().next());
-
-            if let Some(expected) = expected {
-                let mut hasher = Sha256::new();
-                hasher.update(&archive_data);
-                let hash = hasher.finalize();
-                let actual: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
-
-                if actual != expected {
-                    eprintln!("Checksum mismatch!");
-                    eprintln!("  Expected: {}", expected);
-                    eprintln!("  Got:      {}", actual);
-                    return 1;
-                }
-            }
-        }
-    }
-
-    // Extract binary from archive
-    println!("  Extracting...");
-    let binary_data = if asset_name.ends_with(".tar.gz") {
-        extract_tar_gz(&archive_data)
-    } else if asset_name.ends_with(".zip") {
-        extract_zip(&archive_data)
-    } else {
-        eprintln!("Unknown archive format: {}", asset_name);
-        return 1;
-    };
-
-    let binary_data = match binary_data {
-        Ok(data) => data,
-        Err(e) => {
-            eprintln!("Failed to extract archive: {}", e);
-            return 1;
-        }
-    };
-
-    // Replace current binary
-    println!("  Installing...");
-    if let Err(e) = self_replace(&binary_data) {
-        eprintln!("Failed to replace binary: {}", e);
-        eprintln!("You may need to run with elevated permissions.");
-        return 1;
-    }
-
-    println!();
-    println!("Updated successfully to v{}!", latest_version);
-    println!("Restart normalize to use the new version.");
-
-    0
-}
-
 /// Get the target triple for the current platform
-pub(crate) fn get_target_triple() -> String {
+pub fn get_target_triple() -> String {
     let arch = if cfg!(target_arch = "x86_64") {
         "x86_64"
     } else if cfg!(target_arch = "aarch64") {
@@ -344,7 +26,7 @@ pub(crate) fn get_target_triple() -> String {
 }
 
 /// Get the expected asset name for a target
-fn get_asset_name(target: &str) -> String {
+pub fn get_asset_name(target: &str) -> String {
     if target.contains("windows") {
         format!("normalize-{}.zip", target)
     } else {
@@ -376,7 +58,6 @@ impl Sha256 {
         self.total_len += data.len() as u64;
 
         while self.buffer.len() >= 64 {
-            // normalize-syntax-allow: rust/unwrap-in-impl - while-loop guarantees buffer.len() >= 64, so try_into always succeeds
             let block: [u8; 64] = self.buffer[..64].try_into().unwrap();
             self.process_block(&block);
             self.buffer.drain(..64);
@@ -397,7 +78,6 @@ impl Sha256 {
         // Process remaining blocks - clone buffer to avoid borrow conflict
         let buffer = std::mem::take(&mut self.buffer);
         for chunk in buffer.chunks(64) {
-            // normalize-syntax-allow: rust/unwrap-in-impl - buffer is padded to exact 64-byte multiple above, so all chunks are exactly 64 bytes
             let block: [u8; 64] = chunk.try_into().unwrap();
             self.process_block(&block);
         }
@@ -426,7 +106,6 @@ impl Sha256 {
 
         let mut w = [0u32; 64];
         for i in 0..16 {
-            // normalize-syntax-allow: rust/unwrap-in-impl - slice is exactly 4 bytes (i*4 to i*4+4, i in 0..16, block is [u8; 64])
             w[i] = u32::from_be_bytes(block[i * 4..(i + 1) * 4].try_into().unwrap());
         }
         for i in 16..64 {
@@ -474,7 +153,7 @@ impl Sha256 {
 }
 
 /// Extract the normalize binary from a tar.gz archive
-fn extract_tar_gz(data: &[u8]) -> Result<Vec<u8>, String> {
+pub fn extract_tar_gz(data: &[u8]) -> Result<Vec<u8>, String> {
     let decoder = flate2::read::GzDecoder::new(data);
     let mut archive = tar::Archive::new(decoder);
 
@@ -495,7 +174,7 @@ fn extract_tar_gz(data: &[u8]) -> Result<Vec<u8>, String> {
 }
 
 /// Extract the normalize binary from a zip archive
-fn extract_zip(data: &[u8]) -> Result<Vec<u8>, String> {
+pub fn extract_zip(data: &[u8]) -> Result<Vec<u8>, String> {
     use std::io::Cursor;
 
     let reader = Cursor::new(data);
@@ -516,7 +195,7 @@ fn extract_zip(data: &[u8]) -> Result<Vec<u8>, String> {
 }
 
 /// Replace the current binary with new data
-fn self_replace(new_binary: &[u8]) -> Result<(), String> {
+pub fn self_replace(new_binary: &[u8]) -> Result<(), String> {
     use std::fs;
     use std::io::Write;
 
@@ -559,8 +238,16 @@ fn self_replace(new_binary: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
+/// Compute the SHA256 hex digest of data.
+pub fn sha256_hex(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    let hash = hasher.finalize();
+    hash.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
 /// Simple version comparison (semver-like)
-fn version_gt(a: &str, b: &str) -> bool {
+pub fn version_gt(a: &str, b: &str) -> bool {
     let parse = |v: &str| -> Vec<u32> {
         v.split('.')
             .filter_map(|s| s.split('-').next()?.parse().ok())

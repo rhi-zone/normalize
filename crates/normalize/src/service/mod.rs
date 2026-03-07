@@ -34,8 +34,6 @@ pub mod tools;
 use crate::commands;
 use crate::commands::aliases::{AliasesReport, detect_project_languages};
 use crate::commands::context::{ContextListReport, ContextReport, collect_context_files};
-use crate::commands::find_references::ReferencesReport;
-use crate::commands::translate::{SourceLanguage, TargetLanguage};
 use crate::config::NormalizeConfig;
 use crate::output::OutputFormatter;
 use crate::text_search::{self, GrepResult};
@@ -56,7 +54,6 @@ pub struct NormalizeService {
     grammars: grammars::GrammarService,
     generate: generate::GenerateService,
     package: package::PackageService,
-    rules: rules::RulesService,
     serve: serve::ServeService,
     syntax: syntax::SyntaxService,
     sessions: sessions::SessionsService,
@@ -90,9 +87,8 @@ impl NormalizeService {
             grammars: grammars::GrammarService::new(&pretty),
             generate: generate::GenerateService,
             package: package::PackageService::new(&pretty),
-            rules: rules::RulesService::new(&pretty),
             serve: serve::ServeService,
-            syntax: syntax::SyntaxService::new(),
+            syntax: syntax::SyntaxService::new(&pretty),
             sessions: sessions::SessionsService::new(&pretty),
             tools: tools::ToolsService::new(),
             pretty,
@@ -160,11 +156,6 @@ impl NormalizeService {
         } else {
             format!("{}{}", prefix, text)
         }
-    }
-
-    /// Display bridge for ReferencesReport.
-    fn display_find_references(&self, value: &ReferencesReport) -> String {
-        self.display_output(value)
     }
 }
 
@@ -262,7 +253,7 @@ impl NormalizeService {
         #[param(short = 'n', help = "Show line numbers")] line_numbers: bool,
         #[param(help = "Show dependencies (imports/exports)")] deps: bool,
         #[param(short = 'k', help = "Filter by symbol kind: class, function, method")] kind: Option<
-            crate::commands::view::tree::SymbolKindFilter,
+            String,
         >,
         #[param(help = "Show only type definitions")] types_only: bool,
         #[param(help = "Include test functions and test modules")] tests: bool,
@@ -284,7 +275,6 @@ impl NormalizeService {
     ) -> Result<crate::commands::view::report::ViewOutput, String> {
         let root_path = root
             .map(PathBuf::from)
-            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
             .unwrap_or_else(|| std::env::current_dir().unwrap());
 
         self.resolve_format(pretty, compact, &root_path);
@@ -318,7 +308,7 @@ impl NormalizeService {
             depth,
             line_numbers,
             deps,
-            kind.as_ref(),
+            kind.as_deref(),
             types_only,
             tests,
             raw,
@@ -353,7 +343,6 @@ impl NormalizeService {
     ) -> Result<GrepResult, String> {
         let root_path = root
             .map(PathBuf::from)
-            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
             .unwrap_or_else(|| std::env::current_dir().unwrap());
 
         self.resolve_format(pretty, compact, &root_path);
@@ -384,7 +373,6 @@ impl NormalizeService {
     ) -> Result<AliasesReport, String> {
         let root_path = root
             .map(PathBuf::from)
-            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
             .unwrap_or_else(|| std::env::current_dir().unwrap());
 
         let config = NormalizeConfig::load(&root_path);
@@ -405,7 +393,6 @@ impl NormalizeService {
     ) -> Result<ContextOutput, String> {
         let root_path = root
             .map(PathBuf::from)
-            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
             .unwrap_or_else(|| std::env::current_dir().unwrap());
         let target_str = target.as_deref().unwrap_or(".");
         let target = root_path.join(target_str);
@@ -448,19 +435,102 @@ impl NormalizeService {
     pub fn init(
         &self,
         #[param(help = "Index the codebase after initialization")] index: bool,
-        #[param(help = "Run interactive rule setup wizard after initialization")] setup: bool,
     ) -> Result<InitResult, String> {
+        use std::fs;
+
         let root = std::env::current_dir()
             .map_err(|e| format!("Failed to get current directory: {}", e))?;
-        let exit_code = commands::init::cmd_init(&root, index, setup);
-        if exit_code == 0 {
-            Ok(InitResult {
-                success: true,
-                message: "Initialization complete.".to_string(),
-            })
-        } else {
-            Err("Initialization failed.".to_string())
+        let mut changes = Vec::new();
+
+        // 1. Create .normalize directory if needed
+        let normalize_dir = root.join(".normalize");
+        if !normalize_dir.exists() {
+            fs::create_dir_all(&normalize_dir)
+                .map_err(|e| format!("Failed to create .normalize directory: {}", e))?;
+            changes.push("Created .normalize/".to_string());
         }
+
+        // 2. Detect TODO files for alias config
+        let todo_files = commands::init::detect_todo_files(&root);
+
+        // 3. Create config.toml if missing
+        let config_path = normalize_dir.join("config.toml");
+        if !config_path.exists() {
+            let aliases_section = if todo_files.is_empty() {
+                String::new()
+            } else {
+                let files_str = todo_files
+                    .iter()
+                    .map(|f| format!("\"{}\"", f))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("\n[aliases]\ntodo = [{}]\n", files_str)
+            };
+
+            let default_config = format!(
+                r#"# Normalize configuration
+# See: https://github.com/rhi-zone/normalize
+
+[daemon]
+# enabled = true
+# auto_start = true
+
+[analyze]
+# clones = true
+
+# [analyze.weights]
+# health = 1.0
+# complexity = 0.5
+# security = 2.0
+# clones = 0.3
+{}"#,
+                aliases_section
+            );
+            fs::write(&config_path, default_config)
+                .map_err(|e| format!("Failed to create config.toml: {}", e))?;
+            changes.push("Created .normalize/config.toml".to_string());
+            for f in &todo_files {
+                changes.push(format!("Detected TODO file: {}", f));
+            }
+        }
+
+        // 4. Update .gitignore if needed
+        let gitignore_path = root.join(".gitignore");
+        let gitignore_changes = commands::init::update_gitignore(&gitignore_path);
+        changes.extend(gitignore_changes);
+
+        // 5. Report changes
+        if changes.is_empty() {
+            println!("Already initialized.");
+        } else {
+            println!("Initialized normalize:");
+            for change in &changes {
+                println!("  {}", change);
+            }
+        }
+
+        // 6. Optionally index
+        if index {
+            println!("\nIndexing codebase...");
+            let rt = tokio::runtime::Runtime::new()
+                .map_err(|e| format!("Failed to create runtime: {}", e))?;
+            let mut idx = rt
+                .block_on(crate::index::open(&root))
+                .map_err(|e| format!("Failed to open index: {}", e))?;
+            let count = rt
+                .block_on(idx.refresh())
+                .map_err(|e| format!("Failed to index: {}", e))?;
+            println!("Indexed {} files.", count);
+        }
+
+        Ok(InitResult {
+            success: true,
+            message: if changes.is_empty() {
+                "Already initialized.".to_string()
+            } else {
+                "Initialization complete.".to_string()
+            },
+        })
     }
 
     /// Check for and install updates
@@ -468,7 +538,125 @@ impl NormalizeService {
         &self,
         #[param(short = 'c', help = "Check for updates without installing")] check: bool,
     ) -> Result<UpdateResult, String> {
-        commands::update::cmd_update_service(check)
+        use std::io::Read;
+
+        const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
+        const GITHUB_REPO: &str = "rhi-zone/normalize";
+
+        let client = ureq::agent();
+
+        let url = format!(
+            "https://api.github.com/repos/{}/releases/latest",
+            GITHUB_REPO
+        );
+
+        let response = client
+            .get(&url)
+            .set("User-Agent", "normalize-cli")
+            .set("Accept", "application/vnd.github+json")
+            .call()
+            .map_err(|e| format!("Failed to check for updates: {}", e))?;
+
+        let body: serde_json::Value = response
+            .into_json()
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+        let latest_version = body["tag_name"]
+            .as_str()
+            .unwrap_or("unknown")
+            .trim_start_matches('v')
+            .to_string();
+
+        let is_update_available = latest_version != CURRENT_VERSION
+            && commands::update::version_gt(&latest_version, CURRENT_VERSION);
+
+        if check || !is_update_available {
+            return Ok(UpdateResult {
+                current_version: CURRENT_VERSION.to_string(),
+                latest_version,
+                update_available: is_update_available,
+                message: None,
+            });
+        }
+
+        // Perform the update
+        eprintln!("Downloading update...");
+
+        let target = commands::update::get_target_triple();
+        let asset_name = commands::update::get_asset_name(&target);
+
+        let assets = body["assets"].as_array();
+        let asset_url = assets
+            .and_then(|arr| {
+                arr.iter()
+                    .find(|a| a["name"].as_str() == Some(&asset_name))
+                    .and_then(|a| a["browser_download_url"].as_str())
+            })
+            .ok_or_else(|| format!("No binary available for your platform: {}", target))?;
+
+        eprintln!("  Downloading {}...", asset_name);
+        let archive_response = client
+            .get(asset_url)
+            .call()
+            .map_err(|e| format!("Failed to download update: {}", e))?;
+
+        let mut archive_data = Vec::new();
+        archive_response
+            .into_reader()
+            .read_to_end(&mut archive_data)
+            .map_err(|e| format!("Failed to read download: {}", e))?;
+
+        // Checksum verification
+        let checksum_url = assets.and_then(|arr| {
+            arr.iter()
+                .find(|a| a["name"].as_str() == Some("SHA256SUMS.txt"))
+                .and_then(|a| a["browser_download_url"].as_str())
+        });
+
+        if let Some(checksum_url) = checksum_url {
+            eprintln!("  Verifying checksum...");
+            if let Ok(resp) = client.get(checksum_url).call()
+                && let Ok(checksums) = resp.into_string()
+            {
+                let expected = checksums
+                    .lines()
+                    .find(|line| line.contains(&asset_name))
+                    .and_then(|line| line.split_whitespace().next());
+
+                if let Some(expected) = expected {
+                    let actual = commands::update::sha256_hex(&archive_data);
+                    if actual != expected {
+                        return Err(format!(
+                            "Checksum mismatch!\n  Expected: {}\n  Got:      {}",
+                            expected, actual
+                        ));
+                    }
+                }
+            }
+        }
+
+        // Extract binary
+        eprintln!("  Extracting...");
+        let binary_data = if asset_name.ends_with(".tar.gz") {
+            commands::update::extract_tar_gz(&archive_data)
+        } else if asset_name.ends_with(".zip") {
+            commands::update::extract_zip(&archive_data)
+        } else {
+            Err(format!("Unknown archive format: {}", asset_name))
+        }?;
+
+        // Replace current binary
+        eprintln!("  Installing...");
+        commands::update::self_replace(&binary_data)?;
+
+        Ok(UpdateResult {
+            current_version: CURRENT_VERSION.to_string(),
+            latest_version,
+            update_available: true,
+            message: Some(
+                "Updated successfully! Restart normalize to use the new version.".to_string(),
+            ),
+        })
     }
 
     /// Translate code between programming languages
@@ -486,35 +674,81 @@ impl NormalizeService {
             String,
         >,
     ) -> Result<TranslateResult, String> {
+        use commands::translate::{SourceLanguage, TargetLanguage};
+
         let to_lang: TargetLanguage = to.parse().map_err(|e: String| e)?;
         let from_lang: Option<SourceLanguage> =
             from.map(|s| s.parse().map_err(|e: String| e)).transpose()?;
 
-        commands::translate::cmd_translate_service(&input, from_lang, to_lang, output.as_deref())
-    }
+        let is_stdin = input == "-";
+        let input_path = std::path::PathBuf::from(&input);
 
-    /// Find all references to a symbol (within-file scope analysis + cross-file index)
-    #[cli(display_with = "display_find_references")]
-    pub fn find_references(
-        &self,
-        #[param(positional, help = "Symbol name to find references for")] symbol: String,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(short = 'f', help = "Restrict search to a single file")] file: Option<String>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<ReferencesReport, String> {
-        let root_path = root
-            .map(PathBuf::from)
-            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
-        self.resolve_format(pretty, compact, &root_path);
-        Ok(commands::find_references::cmd_find_references(
-            &root_path,
-            &symbol,
-            file.as_deref(),
-        ))
+        // Read input (file or stdin)
+        let content = if is_stdin {
+            use std::io::Read;
+            let mut buf = String::new();
+            std::io::stdin()
+                .read_to_string(&mut buf)
+                .map_err(|e| format!("Failed to read stdin: {}", e))?;
+            buf
+        } else {
+            std::fs::read_to_string(&input_path)
+                .map_err(|e| format!("Failed to read {}: {}", input, e))?
+        };
+
+        // Determine source language
+        let source_lang = match from_lang {
+            Some(lang) => lang.as_str(),
+            None => {
+                if is_stdin {
+                    return Err("--from is required when reading from stdin".to_string());
+                }
+                match input_path.extension().and_then(|e| e.to_str()) {
+                    Some("ts") | Some("tsx") | Some("js") | Some("jsx") => "typescript",
+                    Some("lua") => "lua",
+                    Some("py") => "python",
+                    _ => {
+                        return Err(
+                            "Cannot detect language from extension. Use --from to specify source language."
+                                .to_string(),
+                        );
+                    }
+                }
+            }
+        };
+
+        let reader = normalize_surface_syntax::registry::reader_for_language(source_lang)
+            .ok_or_else(|| format!("No reader available for language: {}", source_lang))?;
+
+        let target_lang = to_lang.as_str();
+        let writer = normalize_surface_syntax::registry::writer_for_language(target_lang)
+            .ok_or_else(|| format!("No writer available for language: {}", target_lang))?;
+
+        let ir = reader
+            .read(&content)
+            .map_err(|e| format!("Failed to parse {} as {}: {}", input, source_lang, e))?;
+
+        let code = writer.write(&ir);
+
+        if let Some(ref path) = output {
+            std::fs::write(path, &code).map_err(|e| format!("Failed to write {}: {}", path, e))?;
+            eprintln!("Translated {} -> {} ({})", input, path, target_lang);
+            Ok(TranslateResult {
+                code,
+                source_language: source_lang.to_string(),
+                target_language: target_lang.to_string(),
+                input_path: input,
+                output_path: Some(path.clone()),
+            })
+        } else {
+            Ok(TranslateResult {
+                code,
+                source_language: source_lang.to_string(),
+                target_language: target_lang.to_string(),
+                input_path: input,
+                output_path: None,
+            })
+        }
     }
 
     /// Manage the global normalize daemon
@@ -532,17 +766,12 @@ impl NormalizeService {
         &self.generate
     }
 
-    /// Manage the structural index (symbols, imports, calls)
-    pub fn structure(&self) -> &facts::FactsService {
+    /// Extract and query code facts (symbols, imports, calls)
+    pub fn facts(&self) -> &facts::FactsService {
         &self.facts
     }
 
-    /// Manage and run analysis rules (syntax + fact)
-    pub fn rules(&self) -> &rules::RulesService {
-        &self.rules
-    }
-
-    /// AST inspection
+    /// AST inspection and syntax rules
     pub fn syntax(&self) -> &syntax::SyntaxService {
         &self.syntax
     }
