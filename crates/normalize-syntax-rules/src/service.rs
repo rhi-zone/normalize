@@ -5,7 +5,7 @@
 //! - `list` — list available rules
 
 use crate::{DebugFlags, Finding, Rule, Severity, apply_fixes, load_all_rules, run_rules};
-use normalize_languages::GrammarLoader;
+use normalize_languages::parsers::grammar_loader;
 use schemars::JsonSchema;
 use serde::Serialize;
 use server_less::cli;
@@ -192,7 +192,8 @@ impl SyntaxRulesService {
         let config = crate::RulesConfig::default();
         let rules = load_all_rules(&project_root, &config);
 
-        let loader = GrammarLoader::new();
+        let loader_arc = grammar_loader();
+        let loader = &*loader_arc;
         let debug_flags = DebugFlags::from_args(&debug);
 
         let mut findings = run_rules(
