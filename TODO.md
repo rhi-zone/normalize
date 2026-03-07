@@ -14,11 +14,20 @@ extract, inline, move — correct, without LSPs, without false positives.
 2. **Comprehensive language fixtures** (long-term, nix flake verification)
    - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
 
-## Session Queue (2026-03-08)
+## Session Queue (2026-03-09)
 
 Ordered by impact × tractability. Pick from top.
 
-1. ~~**Eliminate `cmd_*` layer**~~ — DONE (2026-03-08). Dead wrappers in `commands/analyze/`,
+1. **Fix `normalize rules run` output** — broken in two ways:
+   - Multiple engines (syntax, fact) each print their own summary banner ("12 issues found:" then
+     "No issues found (8 rules checked). Done") — clearly two separate passes being concatenated
+     instead of merged into one `DiagnosticsReport` before rendering
+   - No colors — `format_pretty()` on `DiagnosticsReport` needs terminal color support
+   - Missing counts by severity (errors: N, warnings: N, info: N) in the summary line
+   Root cause: `run_rules_report()` in `service/rules.rs` — investigate how engines are merged.
+   See: `crates/normalize/src/service/rules.rs`, `crates/normalize/src/commands/rules_cmd.rs`
+
+2. ~~**Eliminate `cmd_*` layer**~~ — DONE (2026-03-08). Dead wrappers in `commands/analyze/`,
    `commands/view/`, and `commands/rules.rs` deleted. `commands/rules.rs` still has
    i32-returning inner functions (`cmd_list`, `cmd_run`, `cmd_enable_disable`, etc.) called by
    `service/rules.rs` via `exit_to_result()` — this is the remaining refactor if desired.
