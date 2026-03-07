@@ -439,7 +439,9 @@ async fn rebuild_data(
 ) -> Result<RebuildResult, String> {
     let root = root
         .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+        .map(Ok)
+        .unwrap_or_else(std::env::current_dir)
+        .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
     let mut idx = index::open(&root)
         .await
@@ -487,7 +489,9 @@ async fn rebuild_data(
 async fn stats_data(root: Option<&Path>) -> Result<FactsStats, String> {
     let root = root
         .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+        .map(Ok)
+        .unwrap_or_else(std::env::current_dir)
+        .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
     let moss_dir = get_normalize_dir(&root);
     let db_path = moss_dir.join("index.sqlite");
@@ -568,7 +572,9 @@ async fn list_files_data(
 ) -> Result<FileList, String> {
     let root = root
         .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+        .map(Ok)
+        .unwrap_or_else(std::env::current_dir)
+        .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
     let idx = index::open(&root)
         .await
@@ -711,7 +717,9 @@ impl FactsService {
             let effective_root = root
                 .as_deref()
                 .map(PathBuf::from)
-                .unwrap_or_else(|| std::env::current_dir().unwrap());
+                .map(Ok)
+                .unwrap_or_else(std::env::current_dir)
+                .map_err(|e| format!("Failed to get current directory: {e}"))?;
             return Ok(FactsStatsOutput::Storage(build_storage_report(
                 &effective_root,
             )));

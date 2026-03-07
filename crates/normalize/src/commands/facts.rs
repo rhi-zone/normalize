@@ -59,7 +59,7 @@ async fn cmd_rules(
 ) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
     // Load rule pack(s)
     let packs: Vec<rules::LoadedRulePack> = if let Some(path) = pack_path {
@@ -294,7 +294,9 @@ pub fn cmd_check_service(
 ) -> Result<CommandResult, String> {
     let effective_root = root
         .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+        .map(Ok)
+        .unwrap_or_else(std::env::current_dir)
+        .map_err(|e| format!("Failed to get current directory: {e}"))?;
     let config = crate::config::NormalizeConfig::load(&effective_root);
     let rules_file_path = rules_file.map(PathBuf::from);
     let exit_code = super::rules::cmd_run_facts(

@@ -58,6 +58,7 @@ impl Sha256 {
         self.total_len += data.len() as u64;
 
         while self.buffer.len() >= 64 {
+            // infallible: slice is exactly 64 bytes by the loop condition above
             let block: [u8; 64] = self.buffer[..64].try_into().unwrap();
             self.process_block(&block);
             self.buffer.drain(..64);
@@ -78,6 +79,7 @@ impl Sha256 {
         // Process remaining blocks - clone buffer to avoid borrow conflict
         let buffer = std::mem::take(&mut self.buffer);
         for chunk in buffer.chunks(64) {
+            // infallible: chunks(64) on a buffer padded to a multiple of 64 bytes always yields exactly 64-byte slices
             let block: [u8; 64] = chunk.try_into().unwrap();
             self.process_block(&block);
         }
@@ -106,6 +108,7 @@ impl Sha256 {
 
         let mut w = [0u32; 64];
         for i in 0..16 {
+            // infallible: slice is exactly 4 bytes (i * 4..(i + 1) * 4 where i < 16)
             w[i] = u32::from_be_bytes(block[i * 4..(i + 1) * 4].try_into().unwrap());
         }
         for i in 16..64 {

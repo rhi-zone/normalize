@@ -277,7 +277,9 @@ impl NormalizeService {
     ) -> Result<crate::commands::view::report::ViewOutput, String> {
         let root_path = root
             .map(PathBuf::from)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
         self.resolve_format(pretty, compact, &root_path);
 
@@ -345,7 +347,9 @@ impl NormalizeService {
     ) -> Result<GrepResult, String> {
         let root_path = root
             .map(PathBuf::from)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
         self.resolve_format(pretty, compact, &root_path);
 
@@ -375,7 +379,9 @@ impl NormalizeService {
     ) -> Result<AliasesReport, String> {
         let root_path = root
             .map(PathBuf::from)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
         let config = NormalizeConfig::load(&root_path);
         let languages = detect_project_languages(&root_path);
@@ -395,7 +401,9 @@ impl NormalizeService {
     ) -> Result<ContextOutput, String> {
         let root_path = root
             .map(PathBuf::from)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let target_str = target.as_deref().unwrap_or(".");
         let target = root_path.join(target_str);
 

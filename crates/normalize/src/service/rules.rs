@@ -66,7 +66,9 @@ impl RulesService {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let use_colors = resolve_pretty(
             root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
             pretty,
@@ -115,7 +117,9 @@ impl RulesService {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let config = crate::config::NormalizeConfig::load(&effective_root);
         let rule_type: crate::commands::rules::RuleType = r#type
             .as_deref()
@@ -158,7 +162,9 @@ impl RulesService {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let config = crate::config::NormalizeConfig::load(&effective_root);
         let exit_code = crate::commands::rules::cmd_enable_disable(
             &effective_root,
@@ -182,7 +188,9 @@ impl RulesService {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let config = crate::config::NormalizeConfig::load(&effective_root);
         let exit_code = crate::commands::rules::cmd_enable_disable(
             &effective_root,
@@ -207,7 +215,9 @@ impl RulesService {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let use_colors = resolve_pretty(
             root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
             pretty,
@@ -233,7 +243,9 @@ impl RulesService {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let use_colors = resolve_pretty(
             root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
             pretty,
