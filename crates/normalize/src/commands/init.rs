@@ -166,7 +166,7 @@ pub fn cmd_setup_wizard(root: &Path) -> i32 {
     }
 
     // Run all rules to collect violations
-    let report = run_rules_report(root, None, None, &RuleType::All, &[], &config);
+    let report = run_rules_report(root, root, None, None, &RuleType::All, &[], &config);
 
     // Group issues by rule_id
     let mut by_rule: HashMap<String, Vec<normalize_output::diagnostics::Issue>> = HashMap::new();

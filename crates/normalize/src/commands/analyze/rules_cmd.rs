@@ -40,12 +40,13 @@ pub struct RulesOutput {
 /// Build rules output without printing (for service layer).
 pub fn build_rules_output(
     root: &std::path::Path,
+    project_root: &std::path::Path,
     filter_rule: Option<&str>,
     list_only: bool,
     config: &normalize_syntax_rules::RulesConfig,
     debug: &normalize_syntax_rules::DebugFlags,
 ) -> Result<RulesOutput, String> {
-    let rules = load_all_rules(root, config);
+    let rules = load_all_rules(project_root, config);
 
     let rule_summaries: Vec<RuleSummary> = rules
         .iter()
@@ -72,7 +73,16 @@ pub fn build_rules_output(
     }
 
     let loader = grammar_loader();
-    let findings = run_rules(&rules, root, &loader, filter_rule, None, None, debug);
+    let findings = run_rules(
+        &rules,
+        root,
+        project_root,
+        &loader,
+        filter_rule,
+        None,
+        None,
+        debug,
+    );
 
     let finding_items: Vec<RuleFinding> = findings
         .iter()
@@ -96,13 +106,14 @@ pub fn build_rules_output(
 /// Run syntax rules and return raw findings (no printing).
 pub fn run_syntax_rules(
     root: &Path,
+    project_root: &Path,
     filter_rule: Option<&str>,
     filter_tag: Option<&str>,
     filter_ids: Option<&HashSet<String>>,
     config: &RulesConfig,
     debug: &DebugFlags,
 ) -> Vec<Finding> {
-    let rules = load_all_rules(root, config);
+    let rules = load_all_rules(project_root, config);
     if rules.is_empty() {
         return Vec::new();
     }
@@ -110,6 +121,7 @@ pub fn run_syntax_rules(
     run_rules(
         &rules,
         root,
+        project_root,
         &loader,
         filter_rule,
         filter_tag,
@@ -122,6 +134,7 @@ pub fn run_syntax_rules(
 #[allow(clippy::too_many_arguments)]
 pub fn cmd_rules(
     root: &Path,
+    project_root: &Path,
     filter_rule: Option<&str>,
     filter_tag: Option<&str>,
     filter_ids: Option<&std::collections::HashSet<String>>,
@@ -133,7 +146,7 @@ pub fn cmd_rules(
 ) -> i32 {
     let json = false;
     // Load rules from all sources (builtins + user global + project)
-    let rules = load_all_rules(root, config);
+    let rules = load_all_rules(project_root, config);
 
     if rules.is_empty() {
         if !list_only {
@@ -185,8 +198,15 @@ pub fn cmd_rules(
         let mut total_fixed = 0;
         let mut total_files = 0;
         loop {
-            let findings =
-                run_syntax_rules(root, filter_rule, filter_tag, filter_ids, config, debug);
+            let findings = run_syntax_rules(
+                root,
+                project_root,
+                filter_rule,
+                filter_tag,
+                filter_ids,
+                config,
+                debug,
+            );
             let fixable_count = findings.iter().filter(|f| f.fix.is_some()).count();
             if fixable_count == 0 {
                 break;
@@ -219,7 +239,15 @@ pub fn cmd_rules(
         return 0;
     }
 
-    let findings = run_syntax_rules(root, filter_rule, filter_tag, filter_ids, config, debug);
+    let findings = run_syntax_rules(
+        root,
+        project_root,
+        filter_rule,
+        filter_tag,
+        filter_ids,
+        config,
+        debug,
+    );
 
     if sarif {
         print_sarif(&rules, &findings, root);

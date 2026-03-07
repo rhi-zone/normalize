@@ -77,84 +77,51 @@ allow = ["**/tests/fixtures/**", ".claude/**"]
 severity = "warning"
 enabled = true
 allow = [
-    # NOTE: allow list entries need both "crates/X/src/..." (for running from project root
-    # without specifying a path) and "**/X/src/..." (for running with "crates/" as input,
-    # which strips the "crates/" prefix from displayed paths). normalize-manifest was the
-    # first to add both forms; all others now follow the same pattern.
-    #
     # Inline #[cfg(test)] modules in src/ files (not covered by **/tests/**)
     "crates/normalize-path-resolve/src/lib.rs",
-    "**/normalize-path-resolve/src/lib.rs",
     "crates/normalize-ecosystems/src/ecosystems/npm/lockfile_bun.rs",
-    "**/normalize-ecosystems/src/ecosystems/npm/lockfile_bun.rs",
     "crates/normalize-ecosystems/src/ecosystems/npm/lockfile_npm.rs",
-    "**/normalize-ecosystems/src/ecosystems/npm/lockfile_npm.rs",
     "crates/normalize-ecosystems/src/ecosystems/npm/lockfile_pnpm.rs",
-    "**/normalize-ecosystems/src/ecosystems/npm/lockfile_pnpm.rs",
     "crates/normalize-ecosystems/src/ecosystems/npm/lockfile_yarn.rs",
-    "**/normalize-ecosystems/src/ecosystems/npm/lockfile_yarn.rs",
     "crates/normalize-ecosystems/src/ecosystems/npm/mod.rs",
-    "**/normalize-ecosystems/src/ecosystems/npm/mod.rs",
     "crates/normalize-ecosystems/src/ecosystems/python.rs",
-    "**/normalize-ecosystems/src/ecosystems/python.rs",
     "crates/normalize-facts/src/extract.rs",
-    "**/normalize-facts/src/extract.rs",
     "crates/normalize-facts/src/index.rs",
-    "**/normalize-facts/src/index.rs",
     # normalize-manifest: audited — production violations fixed (nuget.rs if-let refactor,
     # ocaml.rs peek-then-next inline suppressed, setup_py.rs bytes-index refactor).
     # Remaining violations are all in inline #[cfg(test)] mod blocks.
     "crates/normalize-manifest/src/*.rs",
-    "**/normalize-manifest/src/*.rs",
     # normalize-facts-rules-interpret: audited — production lib.rs is clean;
     # tests.rs extracted from inline mod to separate file, .unwrap() is idiomatic in tests.
     "crates/normalize-facts-rules-interpret/src/tests.rs",
-    "**/normalize-facts-rules-interpret/src/tests.rs",
     # normalize-typegen: audited — production violations inline-suppressed with reasons.
     # Remaining violations are all in inline #[cfg(test)] mod blocks.
     "crates/normalize-typegen/src/input/jsonschema.rs",
-    "**/normalize-typegen/src/input/jsonschema.rs",
     "crates/normalize-typegen/src/input/openapi.rs",
-    "**/normalize-typegen/src/input/openapi.rs",
     "crates/normalize-typegen/src/input/typescript.rs",
-    "**/normalize-typegen/src/input/typescript.rs",
     # normalize-cli-parser: audited — production violations inline-suppressed with reasons.
     # Remaining violations are all in inline #[cfg(test)] mod blocks.
     "crates/normalize-cli-parser/src/lib.rs",
-    "**/normalize-cli-parser/src/lib.rs",
     "crates/normalize-cli-parser/src/formats/argparse.rs",
-    "**/normalize-cli-parser/src/formats/argparse.rs",
     "crates/normalize-cli-parser/src/formats/clap.rs",
-    "**/normalize-cli-parser/src/formats/clap.rs",
     "crates/normalize-cli-parser/src/formats/click.rs",
-    "**/normalize-cli-parser/src/formats/click.rs",
     "crates/normalize-cli-parser/src/formats/cobra.rs",
-    "**/normalize-cli-parser/src/formats/cobra.rs",
     "crates/normalize-cli-parser/src/formats/commander.rs",
-    "**/normalize-cli-parser/src/formats/commander.rs",
     "crates/normalize-cli-parser/src/formats/yargs.rs",
-    "**/normalize-cli-parser/src/formats/yargs.rs",
     # normalize-languages: audited — production violations inline-suppressed with reasons.
     # Remaining violations are all in inline #[cfg(test)] mod blocks.
     "crates/normalize-languages/src/external_packages.rs",
-    "**/normalize-languages/src/external_packages.rs",
     "crates/normalize-languages/src/grammar_loader.rs",
-    "**/normalize-languages/src/grammar_loader.rs",
     "crates/normalize-languages/src/python.rs",
-    "**/normalize-languages/src/python.rs",
     # normalize-edit: audited — all violations are in inline #[cfg(test)] mod block.
     "crates/normalize-edit/src/lib.rs",
-    "**/normalize-edit/src/lib.rs",
     # normalize-view: audited — production violations inline-suppressed with reasons.
     # Remaining violations are all in inline #[cfg(test)] mod blocks.
     "crates/normalize-view/src/skeleton.rs",
-    "**/normalize-view/src/skeleton.rs",
     "crates/normalize-view/src/tree.rs",
-    "**/normalize-view/src/tree.rs",
     # normalize (main crate) rg/: vendored from ripgrep — defs.rs has 500+ test assertions
     # using .unwrap() idiomatically; version.rs has writeln!() to String (infallible).
     "crates/normalize/src/rg/**",
-    "**/normalize/src/rg/**",
     # .claude/worktrees/ contains agent work-in-progress; walker follows symlinks into these
     # directories, creating duplicate paths that bypass crate-specific allow patterns.
     ".claude/**",
@@ -162,43 +129,30 @@ allow = [
     # are infallible (String::from_utf8 on ast-grep internal buffers, TypesBuilder constants,
     # mutex lock, test assertions). Not our code to refactor.
     "crates/normalize/src/ast_grep/**",
-    "**/normalize/src/ast_grep/**",
     # normalize (main crate): audited — production violations inline-suppressed with reasons.
     # Remaining violations are all in inline #[cfg(test)] mod blocks.
     "crates/normalize/src/analyze/complexity.rs",
-    "**/normalize/src/analyze/complexity.rs",
     "crates/normalize/src/config.rs",
-    "**/normalize/src/config.rs",
     "crates/normalize/src/paths.rs",
-    "**/normalize/src/paths.rs",
     "crates/normalize/src/skeleton.rs",
-    "**/normalize/src/skeleton.rs",
     "crates/normalize/src/commands/view/search.rs",
-    "**/normalize/src/commands/view/search.rs",
     "crates/normalize/src/commands/init.rs",
-    "**/normalize/src/commands/init.rs",
     "crates/normalize/src/tree.rs",
-    "**/normalize/src/tree.rs",
     # text_search.rs: format_text/format_pretty use writeln!(String,...).unwrap() which is infallible;
     # #[cfg(test)] block uses .unwrap() idiomatically.
     "crates/normalize/src/text_search.rs",
-    "**/normalize/src/text_search.rs",
     # tools/lint.rs: format_text uses writeln!(String,...).unwrap() which is infallible.
     "crates/normalize/src/commands/tools/lint.rs",
-    "**/normalize/src/commands/tools/lint.rs",
     # context.rs: all violations in #[cfg(test)] block — tempdir/fs::write idiom.
     "crates/normalize/src/commands/context.rs",
-    "**/normalize/src/commands/context.rs",
     # normalize-package-index: tests.rs is a dedicated test module; apk.rs test block.
     "crates/normalize-package-index/src/index/tests.rs",
-    "**/normalize-package-index/src/index/tests.rs",
     # xtask: build-tool binary, not a library — .unwrap() in build scripts is conventional.
     "xtask/src/main.rs",
     # update.rs: SHA-256 implementation — try_into().unwrap() calls are infallible:
     # buffer[..64] is guarded by while len>=64, chunks(64) on 64-byte-padded buffer,
     # and block[i*4..(i+1)*4] for i<16 always yields exactly 4 bytes.
     "crates/normalize/src/commands/update.rs",
-    "**/normalize/src/commands/update.rs",
 ]
 
 [analyze.rules."rust/unnecessary-let"]

@@ -130,11 +130,13 @@ impl RulesService {
             .as_deref()
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| effective_root.clone());
+        let project_root = effective_root.clone();
         // cmd_run internally creates a tokio Runtime for fact rules; spawn_blocking
         // gives it a thread without an active runtime so block_on() doesn't panic.
         let exit_code = tokio::task::spawn_blocking(move || {
             crate::commands::rules::cmd_run(
                 &target_root,
+                &project_root,
                 rule.as_deref(),
                 tag.as_deref(),
                 fix,

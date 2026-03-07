@@ -239,6 +239,7 @@ pub fn cmd_rules(action: RulesAction, root: Option<&Path>) -> i32 {
                 .unwrap_or_else(|| effective_root.clone());
             cmd_run(
                 &target_root,
+                &effective_root,
                 rule.as_deref(),
                 tag.as_deref(),
                 fix,
@@ -274,6 +275,7 @@ pub fn cmd_rules(action: RulesAction, root: Option<&Path>) -> i32 {
 #[allow(clippy::too_many_arguments)]
 pub fn cmd_run_syntax(
     root: &Path,
+    project_root: &Path,
     filter_rule: Option<&str>,
     list_only: bool,
     fix: bool,
@@ -283,6 +285,7 @@ pub fn cmd_run_syntax(
 ) -> i32 {
     crate::commands::analyze::rules_cmd::cmd_rules(
         root,
+        project_root,
         filter_rule,
         None,
         None,
@@ -1081,6 +1084,7 @@ pub(crate) fn cmd_tags(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_run(
     root: &Path,
+    project_root: &Path,
     filter_rule: Option<&str>,
     filter_tag: Option<&str>,
     fix: bool,
@@ -1120,6 +1124,7 @@ pub(crate) fn cmd_run(
         let debug_flags = DebugFlags::from_args(debug);
         let code = crate::commands::analyze::rules_cmd::cmd_rules(
             root,
+            project_root,
             filter_rule,
             effective_tag,
             filter_ids.as_ref(),
@@ -1225,6 +1230,7 @@ pub fn apply_native_rules_config(
 /// Run all rules (syntax + fact) and return a unified DiagnosticsReport.
 pub fn run_rules_report(
     root: &Path,
+    project_root: &Path,
     filter_rule: Option<&str>,
     filter_tag: Option<&str>,
     engine: &RuleType,
@@ -1261,6 +1267,7 @@ pub fn run_rules_report(
         let debug_flags = DebugFlags::from_args(debug);
         let findings = crate::commands::analyze::rules_cmd::run_syntax_rules(
             root,
+            project_root,
             filter_rule,
             effective_tag,
             filter_ids.as_ref(),
@@ -1955,6 +1962,7 @@ pub fn cmd_run_service(
         .unwrap_or_else(|| effective_root.clone());
     let exit_code = cmd_run(
         &target_root,
+        &effective_root,
         rule,
         tag,
         fix,

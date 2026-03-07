@@ -129,9 +129,11 @@ struct CombinedQuery<'a> {
 
 /// Run rules against files in a directory.
 /// Optimized: combines all rules into single query per grammar for single-traversal matching.
+#[allow(clippy::too_many_arguments)]
 pub fn run_rules(
     rules: &[Rule],
     root: &Path,
+    project_root: &Path,
     loader: &GrammarLoader,
     filter_rule: Option<&str>,
     filter_tag: Option<&str>,
@@ -139,6 +141,19 @@ pub fn run_rules(
     debug: &DebugFlags,
 ) -> Vec<Finding> {
     let start = std::time::Instant::now();
+    // Canonicalize for reliable strip_prefix comparisons.
+    let abs_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    let abs_project_root = project_root
+        .canonicalize()
+        .unwrap_or_else(|_| project_root.to_path_buf());
+    // Path of the scan root expressed relative to the project root.
+    // Used to prefix rel_path so allow-list patterns (which are always
+    // written relative to the project root) match correctly regardless of
+    // which subdirectory was passed as the scan target.
+    let root_in_project = abs_root
+        .strip_prefix(&abs_project_root)
+        .ok()
+        .map(|p| p.to_path_buf());
 
     let mut findings = Vec::new();
     let source_registry = builtin_registry();
@@ -161,7 +176,7 @@ pub fn run_rules(
         return findings;
     }
 
-    // Collect all source files and group by grammar
+    // Collect all source files and group by grammar.
     let files = collect_source_files(root);
     let mut files_by_grammar: HashMap<String, Vec<PathBuf>> = HashMap::new();
     for file in files {
@@ -273,14 +288,30 @@ pub fn run_rules(
         }
 
         for file in files {
+            // Scan-root-relative path: stored in Finding.file and used for display.
             let rel_path = file.strip_prefix(root).unwrap_or(file);
             let rel_path_str = rel_path.to_string_lossy();
+
+            // Project-root-relative path: used for allow-list matching.
+            // Allow list entries are always written relative to the project root
+            // (e.g. "crates/normalize/src/rg/**"), so we must construct a path
+            // relative to project_root, not the scan root, to make them match
+            // correctly regardless of which subdirectory was passed as the target.
+            let allow_path_buf;
+            let allow_path_str: std::borrow::Cow<str> = if let Some(ref prefix) = root_in_project {
+                allow_path_buf = prefix.join(rel_path);
+                allow_path_buf.to_string_lossy()
+            } else {
+                // Scan root is not under project root (or same as it): fall
+                // back to rel_path, which is the same as before.
+                std::borrow::Cow::Borrowed(&*rel_path_str)
+            };
 
             // Build source context for this file (used for requires evaluation)
             let source_ctx = SourceContext {
                 file_path: file,
                 rel_path: &rel_path_str,
-                project_root: root,
+                project_root: &abs_project_root,
             };
 
             let content = match std::fs::read_to_string(file) {
@@ -303,8 +334,11 @@ pub fn run_rules(
                     continue;
                 };
 
-                // Check allow patterns for this specific rule
-                if rule.allow.iter().any(|p| p.matches(&rel_path_str)) {
+                // Check allow patterns for this specific rule.
+                // Use allow_path_str (project-root-relative) so that patterns
+                // like "crates/normalize/src/rg/**" work regardless of whether
+                // the user ran `normalize rules run` or `normalize rules run crates/`.
+                if rule.allow.iter().any(|p| p.matches(&allow_path_str)) {
                     continue;
                 }
 

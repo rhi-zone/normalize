@@ -129,7 +129,16 @@ fn test_rule_fixtures() {
         }
 
         // Run against the entire fixture directory.
-        let findings = run_rules(&rules, fixture_dir, &loader, None, None, None, &debug);
+        let findings = run_rules(
+            &rules,
+            fixture_dir,
+            fixture_dir,
+            &loader,
+            None,
+            None,
+            None,
+            &debug,
+        );
 
         // Partition findings by fixture file type.
         let match_findings: Vec<_> = findings
@@ -251,7 +260,16 @@ fn run_fix_fixture(
     // Apply fixes in a loop until stable (handles multi-pass nested fixes).
     const MAX_PASSES: usize = 10;
     for pass in 0..MAX_PASSES {
-        let findings = run_rules(rules, tmp.path(), loader, None, None, None, debug);
+        let findings = run_rules(
+            rules,
+            tmp.path(),
+            tmp.path(),
+            loader,
+            None,
+            None,
+            None,
+            debug,
+        );
         let fixable: Vec<_> = findings.into_iter().filter(|f| f.fix.is_some()).collect();
         if fixable.is_empty() {
             break;

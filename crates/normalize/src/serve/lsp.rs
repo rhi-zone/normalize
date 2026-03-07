@@ -839,6 +839,7 @@ async fn run_and_publish_diagnostics(
         let config = crate::config::NormalizeConfig::load(&root_owned);
         crate::commands::rules::run_rules_report(
             &root_owned,
+            &root_owned,
             None,
             None,
             &crate::commands::rules::RuleType::All,
