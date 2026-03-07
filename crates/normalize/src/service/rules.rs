@@ -1,20 +1,26 @@
 //! Rules management service for server-less CLI.
 
 use super::resolve_pretty;
+use normalize_output::OutputFormatter;
+use normalize_output::diagnostics::DiagnosticsReport;
 use server_less::cli;
 use std::cell::Cell;
 use std::path::Path;
 
 /// Rules management sub-service.
 pub struct RulesService {
-    _pretty: Cell<bool>,
+    pretty: Cell<bool>,
 }
 
 impl RulesService {
     pub fn new(pretty: &Cell<bool>) -> Self {
         Self {
-            _pretty: Cell::new(pretty.get()),
+            pretty: Cell::new(pretty.get()),
         }
+    }
+
+    fn resolve_format(&self, pretty: bool, compact: bool, root: &Path) {
+        self.pretty.set(resolve_pretty(root, pretty, compact));
     }
 }
 
@@ -36,6 +42,16 @@ impl std::fmt::Display for RuleResult {
             write!(f, "Done")
         } else {
             write!(f, "Failed")
+        }
+    }
+}
+
+impl RulesService {
+    fn display_run(&self, r: &DiagnosticsReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
         }
     }
 }
@@ -98,6 +114,7 @@ impl RulesService {
     }
 
     /// Run rules against the codebase
+    #[cli(display_with = "display_run")]
     #[allow(clippy::too_many_arguments)]
     pub async fn run(
         &self,
@@ -113,13 +130,21 @@ impl RulesService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<RuleResult, String> {
+        #[param(help = "Exit 0 even when error-severity issues are found")] no_fail: bool,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<DiagnosticsReport, String> {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
+        self.resolve_format(
+            pretty,
+            compact,
+            root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
+        );
         let config = crate::config::NormalizeConfig::load(&effective_root);
         let rule_type: crate::commands::rules::RuleType = r#type
             .as_deref()
@@ -131,25 +156,61 @@ impl RulesService {
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| effective_root.clone());
         let project_root = effective_root.clone();
-        // cmd_run internally creates a tokio Runtime for fact rules; spawn_blocking
-        // gives it a thread without an active runtime so block_on() doesn't panic.
-        let exit_code = tokio::task::spawn_blocking(move || {
-            crate::commands::rules::cmd_run(
+
+        // --fix path: syntax-only, keep existing fix loop behaviour
+        if fix {
+            let debug_flags = normalize_syntax_rules::DebugFlags::from_args(&debug);
+            let exit_code = tokio::task::spawn_blocking(move || {
+                crate::commands::analyze::rules_cmd::cmd_rules(
+                    &target_root,
+                    &project_root,
+                    rule.as_deref(),
+                    tag.as_deref(),
+                    None,
+                    false,
+                    true,
+                    false,
+                    &config.analyze.rules,
+                    &debug_flags,
+                )
+            })
+            .await
+            .map_err(|e| format!("Task error: {e}"))?;
+            return if exit_code == 0 {
+                Ok(DiagnosticsReport::new())
+            } else {
+                Err("Fix failed".to_string())
+            };
+        }
+
+        // Normal run: unified report via run_rules_report() — one banner, colors, counts
+        let report = tokio::task::spawn_blocking(move || {
+            crate::commands::rules::run_rules_report(
                 &target_root,
                 &project_root,
                 rule.as_deref(),
                 tag.as_deref(),
-                fix,
-                sarif,
                 &rule_type,
                 &debug,
-                false,
                 &config,
             )
         })
         .await
         .map_err(|e| format!("Task error: {e}"))?;
-        crate::commands::rules::exit_to_result(exit_code)
+
+        // --sarif: print SARIF to stdout directly (bypasses display_run)
+        if sarif {
+            print!("{}", report.format_sarif());
+            return Ok(DiagnosticsReport::new());
+        }
+
+        let error_count = report.count_by_severity(normalize_output::diagnostics::Severity::Error);
+        if !no_fail && error_count > 0 {
+            let detail = self.display_run(&report);
+            return Err(format!("{detail}\n{error_count} error(s) found"));
+        }
+
+        Ok(report)
     }
 
     /// Enable a rule or all rules matching a tag

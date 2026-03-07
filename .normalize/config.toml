@@ -39,6 +39,10 @@ exclude = [
 # hotspots_exclude = ["*.md", "*.json"]  # example: exclude markdown and JSON
 
 # Per-rule configuration: { "rule-id" = { severity = "...", enabled = true/false } }
+# Global allow: skip violations in test fixture files for all rules.
+[analyze.rules]
+global-allow = ["**/tests/fixtures/**"]
+
 # Disable println-debug for CLI tools (we use println for output)
 [analyze.rules."rust/println-debug"]
 enabled = false

@@ -14,11 +14,18 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Configuration for syntax rules analysis.
-/// Maps rule ID to per-rule configuration.
-/// e.g., { "rust/unnecessary-let" = { severity = "warning" } }
 #[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, schemars::JsonSchema)]
-#[serde(transparent)]
-pub struct RulesConfig(pub HashMap<String, RuleOverride>);
+#[serde(default)]
+pub struct RulesConfig {
+    /// Allow patterns applied to every rule (e.g. `["**/tests/fixtures/**"]`).
+    /// Entries here skip violations in matching files across all rules.
+    #[serde(rename = "global-allow")]
+    pub global_allow: Vec<String>,
+    /// Per-rule configuration overrides, keyed by rule ID.
+    /// e.g., `{ "rust/unnecessary-let" = { severity = "warning" } }`
+    #[serde(flatten)]
+    pub rules: HashMap<String, RuleOverride>,
+}
 
 /// Per-rule configuration override.
 #[derive(Debug, Clone, Deserialize, Serialize, Default, schemars::JsonSchema)]
@@ -64,7 +71,7 @@ pub fn load_all_rules(project_root: &Path, config: &RulesConfig) -> Vec<Rule> {
     }
 
     // 4. Apply config overrides
-    for (rule_id, override_cfg) in &config.0 {
+    for (rule_id, override_cfg) in &config.rules {
         if let Some(rule) = rules_by_id.get_mut(rule_id) {
             if let Some(ref severity_str) = override_cfg.severity
                 && let Ok(severity) = severity_str.parse()
@@ -86,6 +93,18 @@ pub fn load_all_rules(project_root: &Path, config: &RulesConfig) -> Vec<Rule> {
                     rule.tags.push(tag.clone());
                 }
             }
+        }
+    }
+
+    // 5. Apply global allow patterns to every rule
+    let global_patterns: Vec<Pattern> = config
+        .global_allow
+        .iter()
+        .filter_map(|s| Pattern::new(s).ok())
+        .collect();
+    if !global_patterns.is_empty() {
+        for rule in rules_by_id.values_mut() {
+            rule.allow.extend_from_slice(&global_patterns);
         }
     }
 
@@ -275,4 +294,49 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         tags,
         doc,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rules_config_toml_deserialization() {
+        // Keys with '/' must be quoted in TOML table headers.
+        // In normalize.toml this appears as [analyze.rules."rust/foo"].
+        let toml_str = r#"
+global-allow = ["**/tests/fixtures/**", "**/test/**"]
+
+["rust/foo"]
+severity = "error"
+enabled = true
+allow = ["some/path/**"]
+
+["rust/bar"]
+severity = "warning"
+"#;
+        let config: RulesConfig = toml::from_str(toml_str).expect("failed to parse RulesConfig");
+        assert_eq!(
+            config.global_allow,
+            vec!["**/tests/fixtures/**", "**/test/**"]
+        );
+        assert!(config.rules.contains_key("rust/foo"));
+        assert!(config.rules.contains_key("rust/bar"));
+        assert_eq!(config.rules["rust/foo"].severity.as_deref(), Some("error"));
+        assert_eq!(
+            config.rules["rust/bar"].severity.as_deref(),
+            Some("warning")
+        );
+    }
+
+    #[test]
+    fn test_rules_config_empty_global_allow() {
+        let toml_str = r#"
+["rust/baz"]
+enabled = false
+"#;
+        let config: RulesConfig = toml::from_str(toml_str).expect("failed to parse RulesConfig");
+        assert!(config.global_allow.is_empty());
+        assert!(config.rules.contains_key("rust/baz"));
+    }
 }

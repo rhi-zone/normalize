@@ -1207,7 +1207,7 @@ pub fn apply_native_rules_config(
 ) {
     use normalize_output::diagnostics::Severity;
     report.issues.retain_mut(|issue| {
-        let Some(override_) = config.0.get(&issue.rule_id) else {
+        let Some(override_) = config.rules.get(&issue.rule_id) else {
             return true;
         };
         // enabled=false suppresses the issue entirely
