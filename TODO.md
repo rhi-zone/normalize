@@ -18,24 +18,16 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 Ordered by impact × tractability. Pick from top.
 
-1. **Eliminate `cmd_*` layer** — move logic into service methods, delete the `i32`-returning
-   wrappers. Unblocks `?` for error propagation throughout commands/. Bounded scope, high
-   correctness payoff. Start with `commands/analyze/` (heaviest), then `commands/rules.rs`.
+1. ~~**Eliminate `cmd_*` layer** — `commands/analyze/` done (dead wrappers deleted).~~
+   **Remaining:** `commands/rules.rs` still has i32-returning `cmd_*` functions called from
+   `service/rules.rs`. Convert to `Result<T, String>` to unblock `?` propagation.
    See: [Eliminate cmd_* layer](#eliminate-cmd_-layer--move-logic-into-service-methods)
 
-2. **Wire `tags.scm` into symbol extraction** — replace Language trait node-classification
-   methods with a generic query runner over `@name.definition.*` captures. Called out in
-   TODO.md as "single highest-leverage refactor remaining". Shrinks the trait from ~25 methods
-   to ~8 semantic ones and eliminates ~98 × N per-language node-kind lists.
-   See: [Language trait: migrate *_kinds() to .scm](#language-trait-migrate-_kinds-methods-to-scm-query-files)
+2. ~~**Wire `tags.scm` into symbol extraction**~~ — DONE. `collect_symbols_from_tags()` is the
+   primary path; Language trait has only 3 required methods. No node-kind lists remain.
 
-3. **Remaining info/warning noise (batch-fix)**
-   - `rust/chained-if-let` ×122 — `normalize rules run --fix` (auto-fix exists), verify output
-   - `rust/unnecessary-type-alias` ×36 — straightforward inline
-   - `rust/unnecessary-let` ×32 — straightforward inline (3 known FP: index-snapshot pattern)
-   - `no-todo-comment` ×17 — review for FP first, rename remaining
-   - `rust/tuple-return` ×54 — needs `ByteRange { start, end }` struct for `container_body()`
-     return type; create in `normalize-facts-core` or reuse an existing type
+3. ~~**Remaining info/warning noise (batch-fix)**~~ — DONE. Production code is clean (only
+   fixture files have violations, which is correct).
 
 4. **Language coverage: `.scm` query files**
    - `*.calls.scm` — every language without it silently produces zero call graph data

@@ -286,17 +286,14 @@ pub fn cmd_setup_wizard(root: &Path) -> i32 {
         match line.trim().to_lowercase().as_str() {
             "e" | "enable" => {
                 if !enabled {
-                    match crate::commands::rules::cmd_enable_disable_service(
-                        Some(root.to_str().unwrap_or(".")),
-                        rule_id,
-                        true,
-                        false,
-                    ) {
-                        Ok(_) => {
-                            println!("  → Enabled {}", rule_id);
-                            changed += 1;
-                        }
-                        Err(e) => eprintln!("  Error enabling {}: {}", rule_id, e),
+                    let code = crate::commands::rules::cmd_enable_disable(
+                        root, rule_id, true, false, &config,
+                    );
+                    if code == 0 {
+                        println!("  → Enabled {}", rule_id);
+                        changed += 1;
+                    } else {
+                        eprintln!("  Error enabling {}", rule_id);
                     }
                 } else {
                     println!("  → Already enabled");
@@ -304,17 +301,14 @@ pub fn cmd_setup_wizard(root: &Path) -> i32 {
             }
             "d" | "disable" => {
                 if enabled {
-                    match crate::commands::rules::cmd_enable_disable_service(
-                        Some(root.to_str().unwrap_or(".")),
-                        rule_id,
-                        false,
-                        false,
-                    ) {
-                        Ok(_) => {
-                            println!("  → Disabled {}", rule_id);
-                            changed += 1;
-                        }
-                        Err(e) => eprintln!("  Error disabling {}: {}", rule_id, e),
+                    let code = crate::commands::rules::cmd_enable_disable(
+                        root, rule_id, false, false, &config,
+                    );
+                    if code == 0 {
+                        println!("  → Disabled {}", rule_id);
+                        changed += 1;
+                    } else {
+                        eprintln!("  Error disabling {}", rule_id);
                     }
                 } else {
                     println!("  → Already disabled");
