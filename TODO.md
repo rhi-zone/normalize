@@ -14,6 +14,39 @@ extract, inline, move — correct, without LSPs, without false positives.
 2. **Comprehensive language fixtures** (long-term, nix flake verification)
    - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
 
+## Session Queue (2026-03-07)
+
+Ordered by impact × tractability. Pick from top.
+
+1. **Eliminate `cmd_*` layer** — move logic into service methods, delete the `i32`-returning
+   wrappers. Unblocks `?` for error propagation throughout commands/. Bounded scope, high
+   correctness payoff. Start with `commands/analyze/` (heaviest), then `commands/rules.rs`.
+   See: [Eliminate cmd_* layer](#eliminate-cmd_-layer--move-logic-into-service-methods)
+
+2. **Wire `tags.scm` into symbol extraction** — replace Language trait node-classification
+   methods with a generic query runner over `@name.definition.*` captures. Called out in
+   TODO.md as "single highest-leverage refactor remaining". Shrinks the trait from ~25 methods
+   to ~8 semantic ones and eliminates ~98 × N per-language node-kind lists.
+   See: [Language trait: migrate *_kinds() to .scm](#language-trait-migrate-_kinds-methods-to-scm-query-files)
+
+3. **Remaining info/warning noise (batch-fix)**
+   - `rust/chained-if-let` ×122 — `normalize rules run --fix` (auto-fix exists), verify output
+   - `rust/unnecessary-type-alias` ×36 — straightforward inline
+   - `rust/unnecessary-let` ×32 — straightforward inline (3 known FP: index-snapshot pattern)
+   - `no-todo-comment` ×17 — review for FP first, rename remaining
+   - `rust/tuple-return` ×54 — needs `ByteRange { start, end }` struct for `container_body()`
+     return type; create in `normalize-facts-core` or reuse an existing type
+
+4. **Language coverage: `.scm` query files**
+   - `*.calls.scm` — every language without it silently produces zero call graph data
+   - `*.complexity.scm` — missing for all languages that still use `complexity_nodes()` in Rust
+   - `*.types.scm` — missing for all typed languages (C#, Java, Kotlin, Swift, C, C++, Scala, Go)
+   Target: parity with `locals.scm` coverage (65 languages). One `.scm` + fixture test per language.
+
+5. **Feature-gate CLI behind `cli` feature** — library consumers shouldn't pull in clap.
+   Add standalone CLIs to `normalize-facts`, `normalize-filter`, `normalize-syntax-rules`.
+   See: [Feature-gate CLI](#feature-gate-cli-behind-cli-feature-workspace-wide)
+
 3. **normalize as LSP server** (stretch)
    - `textDocument/references`, `textDocument/rename`, `textDocument/definition` backed by normalize
    - Proxy mode: `normalize serve lsp --proxy 'rust-analyzer'`
