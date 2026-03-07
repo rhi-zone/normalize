@@ -24,7 +24,7 @@ cli = ["dep:server-less"]
 # Drop-in CLI replacements (each implies cli)
 jq-cli = ["cli"]
 rg-cli = ["cli"]
-ast-grep-cli = ["cli"]
+ast-grep-cli = ["cli", "dep:clap"]
 
 # Full battery: normalize CLI + all drop-in replacements
 cli-full = ["cli", "jq-cli", "rg-cli", "ast-grep-cli"]
