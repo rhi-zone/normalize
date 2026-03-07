@@ -16,19 +16,18 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [features]
-default = ["cli", "jq-cli", "rg-cli", "ast-grep-cli"]
+default = ["cli-full"]
 
-# CLI binary (server-less proc macro; clap re-exported from server-less)
+# Core normalize CLI (server-less proc macro; clap re-exported from server-less)
 cli = ["dep:server-less"]
 
-# jq subcommand (embeds jaq as a drop-in jq replacement)
-jq-cli = []
+# Drop-in CLI replacements (each implies cli)
+jq-cli = ["cli"]
+rg-cli = ["cli"]
+ast-grep-cli = ["cli"]
 
-# rg subcommand (embeds grep-* as a drop-in rg/ripgrep replacement)
-rg-cli = []
-
-# ast-grep subcommand (embeds ast-grep-core as a drop-in ast-grep/sg replacement)
-ast-grep-cli = []
+# Full battery: normalize CLI + all drop-in replacements
+cli-full = ["cli", "jq-cli", "rg-cli", "ast-grep-cli"]
 
 # Optional MCP server support
 mcp = ["rmcp"]
