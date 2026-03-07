@@ -1,41 +1,19 @@
 //! Rules management service for server-less CLI.
 
 use super::resolve_pretty;
-use normalize_output::OutputFormatter;
-use normalize_output::diagnostics::DiagnosticsReport;
 use server_less::cli;
 use std::cell::Cell;
 use std::path::Path;
 
 /// Rules management sub-service.
 pub struct RulesService {
-    pretty: Cell<bool>,
-    sarif: Cell<bool>,
-    /// Maximum issues to display (None = all). 0 also means all (per --limit 0 convention).
-    limit: Cell<Option<usize>>,
+    _pretty: Cell<bool>,
 }
 
 impl RulesService {
     pub fn new(pretty: &Cell<bool>) -> Self {
         Self {
-            pretty: Cell::new(pretty.get()),
-            sarif: Cell::new(false),
-            limit: Cell::new(None),
-        }
-    }
-
-    fn display_rules_run(&self, r: &DiagnosticsReport) -> String {
-        if self.sarif.get() {
-            r.format_sarif()
-        } else if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            // 0 means show all; otherwise cap at the given limit
-            let lim = self
-                .limit
-                .get()
-                .and_then(|n| if n == 0 { None } else { Some(n) });
-            r.format_text_limited(lim)
+            _pretty: Cell::new(pretty.get()),
         }
     }
 }
@@ -72,8 +50,8 @@ impl RulesService {
     pub fn list(
         &self,
         #[param(help = "Show source URLs for imported rules")] sources: bool,
-        #[param(short = 'e', help = "Filter by engine (all, syntax, fact, sarif)")] engine: Option<
-            crate::commands::rules::RuleType,
+        #[param(short = 't', help = "Filter by rule type (all, syntax, fact)")] r#type: Option<
+            String,
         >,
         #[param(help = "Filter by tag")] tag: Option<String>,
         #[param(help = "Filter to enabled rules only")] enabled: bool,
@@ -85,25 +63,40 @@ impl RulesService {
         pretty: bool,
         compact: bool,
     ) -> Result<RuleResult, String> {
-        crate::commands::rules::cmd_list_service(
-            root.as_deref(),
-            sources,
-            engine.unwrap_or_default(),
-            tag.as_deref(),
-            enabled,
-            disabled,
-            no_desc,
-            resolve_pretty(
-                root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
-                pretty,
-                compact,
-            ),
-        )
+        let effective_root = root
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let use_colors = resolve_pretty(
+            root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
+            pretty,
+            compact,
+        );
+        let config = crate::config::NormalizeConfig::load(&effective_root);
+        let rule_type: crate::commands::rules::RuleType = r#type
+            .as_deref()
+            .unwrap_or("all")
+            .parse()
+            .unwrap_or_default();
+        let exit_code = crate::commands::rules::cmd_list(
+            &effective_root,
+            crate::commands::rules::ListFilters {
+                sources,
+                type_filter: &rule_type,
+                tag: tag.as_deref(),
+                enabled,
+                disabled,
+                no_desc,
+                json: false,
+                use_colors,
+            },
+            &config,
+        );
+        crate::commands::rules::exit_to_result(exit_code)
     }
 
     /// Run rules against the codebase
     #[allow(clippy::too_many_arguments)]
-    #[cli(display_with = "display_rules_run")]
     pub fn run(
         &self,
         #[param(help = "Specific rule ID to run")] rule: Option<String>,
@@ -111,120 +104,40 @@ impl RulesService {
         #[param(help = "Apply auto-fixes (syntax rules only)")] fix: bool,
         #[param(help = "Output in SARIF format")] sarif: bool,
         #[param(positional, help = "Target directory or file")] target: Option<String>,
-        #[param(short = 'e', help = "Filter by engine (all, syntax, fact, sarif)")] engine: Option<
-            crate::commands::rules::RuleType,
+        #[param(short = 't', help = "Filter by rule type (all, syntax, fact)")] r#type: Option<
+            String,
         >,
-        #[param(help = "Maximum issues to display (0 = show all, default: 50)")] limit: Option<
-            usize,
-        >,
-        #[param(help = "Exit 0 even when error-severity issues are found")] no_fail: bool,
         #[param(help = "Debug flags (comma-separated)")] debug: Vec<String>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<DiagnosticsReport, String> {
+    ) -> Result<RuleResult, String> {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
-            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
             .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let config = crate::config::NormalizeConfig::load(&effective_root);
+        let rule_type: crate::commands::rules::RuleType = r#type
+            .as_deref()
+            .unwrap_or("all")
+            .parse()
+            .unwrap_or_default();
         let target_root = target
             .as_deref()
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| effective_root.clone());
-        let config = crate::config::NormalizeConfig::load(&effective_root);
-
-        self.pretty
-            .set(resolve_pretty(&target_root, pretty, compact));
-        self.sarif.set(sarif);
-        // Default limit of 50 when not specified; 0 means show all
-        self.limit.set(Some(limit.unwrap_or(50)));
-
-        // --fix is a separate mutation path: apply fixes and return a simple message.
-        // Loop until no fixable issues remain (each pass resolves the innermost
-        // layer of nested violations; outer violations are deferred and picked
-        // up by subsequent passes with fresh byte offsets).
-        if fix {
-            let debug_flags = normalize_syntax_rules::DebugFlags::from_args(&debug);
-            let run = || {
-                crate::commands::analyze::rules_cmd::run_syntax_rules(
-                    &target_root,
-                    rule.as_deref(),
-                    tag.as_deref(),
-                    None,
-                    &config.analyze.rules,
-                    &debug_flags,
-                )
-            };
-            let mut total_fixed = 0;
-            let mut total_files = 0;
-            loop {
-                let findings = run();
-                let fixable_count = findings.iter().filter(|f| f.fix.is_some()).count();
-                if fixable_count == 0 {
-                    break;
-                }
-                match normalize_syntax_rules::apply_fixes(&findings) {
-                    Ok(0) => break,
-                    Ok(files_modified) => {
-                        total_fixed += fixable_count;
-                        total_files = files_modified;
-                    }
-                    Err(e) => return Err(format!("Error applying fixes: {e}")),
-                }
-            }
-            if total_fixed == 0 {
-                return Ok(DiagnosticsReport {
-                    issues: Vec::new(),
-                    files_checked: 0,
-                    sources_run: vec!["syntax-rules (fix: no fixable issues)".into()],
-                    hints: Vec::new(),
-                });
-            }
-            return Ok(DiagnosticsReport {
-                issues: Vec::new(),
-                files_checked: total_files,
-                sources_run: vec![format!(
-                    "syntax-rules (fixed {} issue(s) in {} file(s))",
-                    total_fixed, total_files
-                )],
-                hints: Vec::new(),
-            });
-        }
-
-        let engine_filter = engine.unwrap_or_default();
-        let mut report = crate::commands::rules::run_rules_report(
+        let exit_code = crate::commands::rules::cmd_run(
             &target_root,
             rule.as_deref(),
             tag.as_deref(),
-            &engine_filter,
+            fix,
+            sarif,
+            &rule_type,
             &debug,
+            false,
             &config,
         );
-
-        let error_count = report.count_by_severity(normalize_output::diagnostics::Severity::Error);
-        if !no_fail && error_count > 0 {
-            return Err(format!("{error_count} error(s) found"));
-        }
-
-        if !report.issues.is_empty() && !self.pretty.get() && !self.sarif.get() {
-            report
-                .hints
-                .push("Run `normalize rules run --pretty` for a detailed view".to_string());
-            let has_syntax_engine = matches!(
-                engine_filter,
-                crate::commands::rules::RuleType::All | crate::commands::rules::RuleType::Syntax
-            );
-            if has_syntax_engine {
-                report.hints.push(
-                    "Run `normalize rules run --fix` to auto-fix style violations".to_string(),
-                );
-            }
-        }
-
-        Ok(report)
+        crate::commands::rules::exit_to_result(exit_code)
     }
 
     /// Enable a rule or all rules matching a tag
@@ -236,12 +149,19 @@ impl RulesService {
             String,
         >,
     ) -> Result<RuleResult, String> {
-        crate::commands::rules::cmd_enable_disable_service(
-            root.as_deref(),
+        let effective_root = root
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let config = crate::config::NormalizeConfig::load(&effective_root);
+        let exit_code = crate::commands::rules::cmd_enable_disable(
+            &effective_root,
             &id_or_tag,
             true,
             dry_run,
-        )
+            &config,
+        );
+        crate::commands::rules::exit_to_result(exit_code)
     }
 
     /// Disable a rule or all rules matching a tag
@@ -253,12 +173,19 @@ impl RulesService {
             String,
         >,
     ) -> Result<RuleResult, String> {
-        crate::commands::rules::cmd_enable_disable_service(
-            root.as_deref(),
+        let effective_root = root
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let config = crate::config::NormalizeConfig::load(&effective_root);
+        let exit_code = crate::commands::rules::cmd_enable_disable(
+            &effective_root,
             &id_or_tag,
             false,
             dry_run,
-        )
+            &config,
+        );
+        crate::commands::rules::exit_to_result(exit_code)
     }
 
     /// Show full documentation for a rule
@@ -271,15 +198,19 @@ impl RulesService {
         pretty: bool,
         compact: bool,
     ) -> Result<RuleResult, String> {
-        crate::commands::rules::cmd_show_service(
-            root.as_deref(),
-            &id,
-            resolve_pretty(
-                root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
-                pretty,
-                compact,
-            ),
-        )
+        let effective_root = root
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let use_colors = resolve_pretty(
+            root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
+            pretty,
+            compact,
+        );
+        let config = crate::config::NormalizeConfig::load(&effective_root);
+        let exit_code =
+            crate::commands::rules::cmd_show(&effective_root, &id, false, use_colors, &config);
+        crate::commands::rules::exit_to_result(exit_code)
     }
 
     /// List all tags and the rules they group
@@ -293,16 +224,25 @@ impl RulesService {
         pretty: bool,
         compact: bool,
     ) -> Result<RuleResult, String> {
-        crate::commands::rules::cmd_tags_service(
-            root.as_deref(),
+        let effective_root = root
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let use_colors = resolve_pretty(
+            root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
+            pretty,
+            compact,
+        );
+        let config = crate::config::NormalizeConfig::load(&effective_root);
+        let exit_code = crate::commands::rules::cmd_tags(
+            &effective_root,
             show_rules,
             tag.as_deref(),
-            resolve_pretty(
-                root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
-                pretty,
-                compact,
-            ),
-        )
+            false,
+            use_colors,
+            &config,
+        );
+        crate::commands::rules::exit_to_result(exit_code)
     }
 
     /// Add a rule from a URL
@@ -311,7 +251,8 @@ impl RulesService {
         #[param(positional, help = "URL to download the rule from")] url: String,
         #[param(help = "Install to global rules instead of project")] global: bool,
     ) -> Result<RuleResult, String> {
-        crate::commands::rules::cmd_add_service(&url, global)
+        let exit_code = crate::commands::rules::cmd_add(&url, global, false);
+        crate::commands::rules::exit_to_result(exit_code)
     }
 
     /// Update imported rules from their sources
@@ -323,7 +264,8 @@ impl RulesService {
         )]
         rule_id: Option<String>,
     ) -> Result<RuleResult, String> {
-        crate::commands::rules::cmd_update_service(rule_id.as_deref())
+        let exit_code = crate::commands::rules::cmd_update(rule_id.as_deref(), false);
+        crate::commands::rules::exit_to_result(exit_code)
     }
 
     /// Remove an imported rule
@@ -331,6 +273,7 @@ impl RulesService {
         &self,
         #[param(positional, help = "Rule ID to remove")] rule_id: String,
     ) -> Result<RuleResult, String> {
-        crate::commands::rules::cmd_remove_service(&rule_id)
+        let exit_code = crate::commands::rules::cmd_remove(&rule_id, false);
+        crate::commands::rules::exit_to_result(exit_code)
     }
 }

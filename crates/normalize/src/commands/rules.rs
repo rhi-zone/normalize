@@ -8,15 +8,13 @@ use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 
 /// Rule type filter for list/run commands.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(Clone, Debug, Default, clap::ValueEnum, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum RuleType {
     #[default]
     All,
     Syntax,
     Fact,
-    /// Run external tools that emit SARIF 2.1.0 output (configured via `[[analyze.sarif-tools]]`).
-    Sarif,
 }
 
 impl std::fmt::Display for RuleType {
@@ -25,7 +23,6 @@ impl std::fmt::Display for RuleType {
             Self::All => f.write_str("all"),
             Self::Syntax => f.write_str("syntax"),
             Self::Fact => f.write_str("fact"),
-            Self::Sarif => f.write_str("sarif"),
         }
     }
 }
@@ -37,127 +34,9 @@ impl std::str::FromStr for RuleType {
             "all" => Ok(Self::All),
             "syntax" => Ok(Self::Syntax),
             "fact" => Ok(Self::Fact),
-            "sarif" => Ok(Self::Sarif),
-            _ => Err(format!(
-                "unknown rule type: {s}; valid: all, syntax, fact, sarif"
-            )),
+            _ => Err(format!("unknown rule type: {s}")),
         }
     }
-}
-
-#[derive(Deserialize, schemars::JsonSchema)]
-pub enum RulesAction {
-    /// List all rules (syntax + fact, builtin + user)
-    List {
-        /// Show source URLs for imported rules
-        #[serde(default)]
-        sources: bool,
-
-        /// Filter by rule type
-        #[serde(default)]
-        r#type: RuleType,
-
-        /// Filter by tag (e.g. "debug-print", "security")
-        tag: Option<String>,
-
-        /// Filter to enabled rules only
-        #[serde(default)]
-        enabled: bool,
-
-        /// Filter to disabled rules only
-        #[serde(default)]
-        disabled: bool,
-
-        /// Hide the description line (compact one-line-per-rule output)
-        #[serde(default)]
-        no_desc: bool,
-    },
-
-    /// Run rules against the codebase
-    Run {
-        /// Specific rule ID to run
-        rule: Option<String>,
-
-        /// Filter by tag (e.g. "debug-print", "security")
-        tag: Option<String>,
-
-        /// Apply auto-fixes (syntax rules only)
-        #[serde(default)]
-        fix: bool,
-
-        /// Output in SARIF format
-        #[serde(default)]
-        sarif: bool,
-
-        /// Target directory or file
-        target: Option<String>,
-
-        /// Filter by rule type
-        #[serde(default)]
-        r#type: RuleType,
-
-        /// Debug flags (comma-separated)
-        #[serde(default)]
-        debug: Vec<String>,
-    },
-
-    /// Enable a rule or all rules matching a tag
-    Enable {
-        /// Rule ID or tag name
-        id_or_tag: String,
-
-        /// Preview changes without writing
-        #[serde(default)]
-        dry_run: bool,
-    },
-
-    /// Disable a rule or all rules matching a tag
-    Disable {
-        /// Rule ID or tag name
-        id_or_tag: String,
-
-        /// Preview changes without writing
-        #[serde(default)]
-        dry_run: bool,
-    },
-
-    /// Show full documentation for a rule
-    Show {
-        /// Rule ID to show
-        id: String,
-    },
-
-    /// List all tags and the rules they group
-    Tags {
-        /// Expand each tag to show its member rules
-        #[serde(default)]
-        show_rules: bool,
-
-        /// Show only this specific tag
-        tag: Option<String>,
-    },
-
-    /// Add a rule from a URL
-    Add {
-        /// URL to download the rule from
-        url: String,
-
-        /// Install to global rules (~/.config/normalize/rules/) instead of project
-        #[serde(default)]
-        global: bool,
-    },
-
-    /// Update imported rules from their sources
-    Update {
-        /// Specific rule ID to update (updates all if omitted)
-        rule_id: Option<String>,
-    },
-
-    /// Remove an imported rule
-    Remove {
-        /// Rule ID to remove
-        rule_id: String,
-    },
 }
 
 /// Lock file entry tracking an imported rule
@@ -192,109 +71,7 @@ impl RulesLock {
     }
 }
 
-/// Run the rules command
-pub fn cmd_rules(action: RulesAction, root: Option<&Path>) -> i32 {
-    let effective_root = root
-        .map(|p| p.to_path_buf())
-        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-    let config = crate::config::NormalizeConfig::load(&effective_root);
-    let json = false;
-    let use_colors = false;
-
-    match action {
-        RulesAction::List {
-            sources,
-            r#type,
-            tag,
-            enabled,
-            disabled,
-            no_desc,
-        } => cmd_list(
-            &effective_root,
-            ListFilters {
-                sources,
-                type_filter: &r#type,
-                tag: tag.as_deref(),
-                enabled,
-                disabled,
-                no_desc,
-                json,
-                use_colors,
-            },
-            &config,
-        ),
-        RulesAction::Run {
-            rule,
-            tag,
-            fix,
-            sarif,
-            target,
-            r#type,
-            debug,
-        } => {
-            let target_root = target
-                .as_ref()
-                .map(PathBuf::from)
-                .unwrap_or_else(|| effective_root.clone());
-            cmd_run(
-                &target_root,
-                rule.as_deref(),
-                tag.as_deref(),
-                fix,
-                sarif,
-                &r#type,
-                &debug,
-                json,
-                &config,
-            )
-        }
-        RulesAction::Enable { id_or_tag, dry_run } => {
-            cmd_enable_disable(&effective_root, &id_or_tag, true, dry_run, &config)
-        }
-        RulesAction::Disable { id_or_tag, dry_run } => {
-            cmd_enable_disable(&effective_root, &id_or_tag, false, dry_run, &config)
-        }
-        RulesAction::Show { id } => cmd_show(&effective_root, &id, json, use_colors, &config),
-        RulesAction::Tags { show_rules, tag } => cmd_tags(
-            &effective_root,
-            show_rules,
-            tag.as_deref(),
-            json,
-            use_colors,
-            &config,
-        ),
-        RulesAction::Add { url, global } => cmd_add(&url, global, json),
-        RulesAction::Update { rule_id } => cmd_update(rule_id.as_deref(), json),
-        RulesAction::Remove { rule_id } => cmd_remove(&rule_id, json),
-    }
-}
-
-/// Run syntax rules only (called from `normalize analyze rules`).
-#[allow(clippy::too_many_arguments)]
-pub fn cmd_run_syntax(
-    root: &Path,
-    filter_rule: Option<&str>,
-    list_only: bool,
-    fix: bool,
-    sarif: bool,
-    config: &normalize_syntax_rules::RulesConfig,
-    debug: &DebugFlags,
-) -> i32 {
-    crate::commands::analyze::rules_cmd::cmd_rules(
-        root,
-        filter_rule,
-        None,
-        None,
-        list_only,
-        fix,
-        sarif,
-        config,
-        debug,
-    )
-}
-
-/// Run fact rules only (called from `normalize rules run --engine fact`).
+/// Run fact rules only (called from `normalize facts check`).
 pub fn cmd_run_facts(
     root: &Path,
     rules_file: Option<&Path>,
@@ -302,7 +79,6 @@ pub fn cmd_run_facts(
     json: bool,
     config: &interpret::FactsRulesConfig,
 ) -> i32 {
-    // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(run_fact_rules(
         root, rules_file, list_only, json, config, None,
@@ -334,7 +110,7 @@ fn tag_color(tag: &str) -> nu_ansi_term::Color {
         Color::Fixed(73),  // cadet blue
     ];
     // FNV-1a hash for a stable, fast, dependency-free result
-    let mut hash = 0xcbf29ce484222325u64;
+    let mut hash: u64 = 0xcbf29ce484222325;
     for byte in tag.bytes() {
         hash ^= u64::from(byte);
         hash = hash.wrapping_mul(0x100000001b3);
@@ -438,18 +214,22 @@ struct UnifiedRule {
     tags: Vec<String>,
 }
 
-struct ListFilters<'a> {
-    sources: bool,
-    type_filter: &'a RuleType,
-    tag: Option<&'a str>,
-    enabled: bool,
-    disabled: bool,
-    no_desc: bool,
-    json: bool,
-    use_colors: bool,
+pub(crate) struct ListFilters<'a> {
+    pub(crate) sources: bool,
+    pub(crate) type_filter: &'a RuleType,
+    pub(crate) tag: Option<&'a str>,
+    pub(crate) enabled: bool,
+    pub(crate) disabled: bool,
+    pub(crate) no_desc: bool,
+    pub(crate) json: bool,
+    pub(crate) use_colors: bool,
 }
 
-fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &crate::config::NormalizeConfig) -> i32 {
+pub(crate) fn cmd_list(
+    root: &Path,
+    filters: ListFilters<'_>,
+    config: &crate::config::NormalizeConfig,
+) -> i32 {
     let ListFilters {
         sources,
         type_filter,
@@ -649,7 +429,7 @@ fn build_unified_rules(
         .collect()
 }
 
-fn cmd_enable_disable(
+pub(crate) fn cmd_enable_disable(
     root: &Path,
     id_or_tag: &str,
     enable: bool,
@@ -762,14 +542,12 @@ fn cmd_enable_disable(
 
     // Apply syntax rule changes → [analyze.rules."id"]
     if !changes_syntax.is_empty() {
-        // normalize-syntax-allow: rust/unwrap-in-impl - "analyze" was just inserted as a Table above; guaranteed to be a table
         let analyze = doc["analyze"].as_table_mut().unwrap();
         if !analyze.contains_key("rules") {
             let mut t = toml_edit::Table::new();
             t.set_implicit(true);
             analyze["rules"] = toml_edit::Item::Table(t);
         }
-        // normalize-syntax-allow: rust/unwrap-in-impl - "rules" was just inserted as a Table above; guaranteed to be a table
         let rules_table = analyze["rules"].as_table_mut().unwrap();
         for id in &changes_syntax {
             if !rules_table.contains_key(id) {
@@ -781,14 +559,12 @@ fn cmd_enable_disable(
 
     // Apply fact rule changes → [analyze.facts-rules."id"]
     if !changes_fact.is_empty() {
-        // normalize-syntax-allow: rust/unwrap-in-impl - "analyze" was just inserted as a Table above; guaranteed to be a table
         let analyze = doc["analyze"].as_table_mut().unwrap();
         if !analyze.contains_key("facts-rules") {
             let mut t = toml_edit::Table::new();
             t.set_implicit(true);
             analyze["facts-rules"] = toml_edit::Item::Table(t);
         }
-        // normalize-syntax-allow: rust/unwrap-in-impl - "facts-rules" was just inserted as a Table above; guaranteed to be a table
         let facts_table = analyze["facts-rules"].as_table_mut().unwrap();
         for id in &changes_fact {
             if !facts_table.contains_key(id) {
@@ -818,7 +594,7 @@ fn cmd_enable_disable(
 // Show
 // =============================================================================
 
-fn cmd_show(
+pub(crate) fn cmd_show(
     root: &Path,
     id: &str,
     json: bool,
@@ -961,7 +737,7 @@ fn cmd_show(
 // Tags
 // =============================================================================
 
-fn cmd_tags(
+pub(crate) fn cmd_tags(
     root: &Path,
     show_rules: bool,
     tag_filter: Option<&str>,
@@ -1075,7 +851,7 @@ fn cmd_tags(
 // =============================================================================
 
 #[allow(clippy::too_many_arguments)]
-fn cmd_run(
+pub(crate) fn cmd_run(
     root: &Path,
     filter_rule: Option<&str>,
     filter_tag: Option<&str>,
@@ -1132,7 +908,6 @@ fn cmd_run(
 
     // Run fact rules (pass filter_ids for tag-based filtering)
     if matches!(type_filter, RuleType::All | RuleType::Fact) {
-        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
         let rt = tokio::runtime::Runtime::new().unwrap();
         let code = rt.block_on(run_fact_rules(
             root,
@@ -1148,281 +923,6 @@ fn cmd_run(
     }
 
     exit_code
-}
-
-/// Collect fact rule diagnostics without printing (returns raw diagnostics).
-pub async fn collect_fact_diagnostics(
-    root: &Path,
-    config: &interpret::FactsRulesConfig,
-    filter_ids: Option<&HashSet<String>>,
-) -> Vec<normalize_facts_rules_api::Diagnostic> {
-    let all_rules_unfiltered = interpret::load_all_rules(root, config);
-    let all_rules: Vec<_> = all_rules_unfiltered
-        .into_iter()
-        .filter(|r| r.enabled)
-        .filter(|r| filter_ids.is_none_or(|ids| ids.contains(&r.id)))
-        .collect();
-
-    if all_rules.is_empty() {
-        return Vec::new();
-    }
-
-    let relations = match ensure_relations(root).await {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("Error building relations: {}", e);
-            return Vec::new();
-        }
-    };
-
-    let mut all_diagnostics = Vec::new();
-    for rule in &all_rules {
-        match interpret::run_rule(rule, &relations) {
-            Ok(diagnostics) => all_diagnostics.extend(diagnostics),
-            Err(e) => {
-                eprintln!("Error running rule '{}': {}", rule.id, e);
-            }
-        }
-    }
-
-    interpret::filter_inline_allowed(&mut all_diagnostics, root);
-    all_diagnostics
-}
-
-/// Apply `RulesConfig` severity/enabled overrides to issues in a `DiagnosticsReport`.
-/// This lets native checks (stale-summary, missing-summary, check-refs, etc.) be
-/// configured via `[analyze.rules."rule-id"]` in normalize.toml, just like syntax rules.
-pub fn apply_native_rules_config(
-    report: &mut normalize_output::diagnostics::DiagnosticsReport,
-    config: &normalize_syntax_rules::RulesConfig,
-) {
-    use normalize_output::diagnostics::Severity;
-    report.issues.retain_mut(|issue| {
-        let Some(override_) = config.0.get(&issue.rule_id) else {
-            return true;
-        };
-        // enabled=false suppresses the issue entirely
-        if override_.enabled == Some(false) {
-            return false;
-        }
-        if let Some(sev_str) = &override_.severity {
-            issue.severity = match sev_str.as_str() {
-                "error" => Severity::Error,
-                "warning" => Severity::Warning,
-                "info" => Severity::Info,
-                "hint" => Severity::Hint,
-                _ => issue.severity,
-            };
-        }
-        true
-    });
-}
-
-/// Run all rules (syntax + fact) and return a unified DiagnosticsReport.
-pub fn run_rules_report(
-    root: &Path,
-    filter_rule: Option<&str>,
-    filter_tag: Option<&str>,
-    engine: &RuleType,
-    debug: &[String],
-    config: &crate::config::NormalizeConfig,
-) -> normalize_output::diagnostics::DiagnosticsReport {
-    use crate::diagnostic_convert::{abi_diagnostic_to_issue, finding_to_issue};
-    use normalize_output::diagnostics::DiagnosticsReport;
-
-    let mut report = DiagnosticsReport::new();
-
-    // Expand user-defined tags to concrete rule IDs
-    let rule_tags = &config.rule_tags.0;
-    let filter_ids: Option<HashSet<String>> = filter_tag.and_then(|tag| {
-        if rule_tags.contains_key(tag) {
-            let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
-            let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
-            let all_unified = build_unified_rules(&syntax_rules, &fact_rules);
-            let mut visited = HashSet::new();
-            let ids = expand_tag(tag, rule_tags, &all_unified, &mut visited);
-            Some(ids.iter().map(|s| s.to_string()).collect())
-        } else {
-            None
-        }
-    });
-    let effective_tag = if filter_ids.is_some() {
-        None
-    } else {
-        filter_tag
-    };
-
-    // Syntax rules
-    if matches!(engine, RuleType::All | RuleType::Syntax) {
-        let debug_flags = DebugFlags::from_args(debug);
-        let findings = crate::commands::analyze::rules_cmd::run_syntax_rules(
-            root,
-            filter_rule,
-            effective_tag,
-            filter_ids.as_ref(),
-            &config.analyze.rules,
-            &debug_flags,
-        );
-        // Count unique files with violations for the report header.
-        let unique_files: HashSet<&std::path::Path> =
-            findings.iter().map(|f| f.file.as_path()).collect();
-        report.files_checked = report.files_checked.max(unique_files.len());
-        for f in &findings {
-            report.issues.push(finding_to_issue(f, root));
-        }
-        report.sources_run.push("syntax-rules".into());
-    }
-
-    // Fact rules
-    if matches!(engine, RuleType::All | RuleType::Fact) {
-        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let diagnostics = rt.block_on(collect_fact_diagnostics(
-            root,
-            &config.analyze.facts_rules,
-            filter_ids.as_ref(),
-        ));
-        for d in &diagnostics {
-            report.issues.push(abi_diagnostic_to_issue(d));
-        }
-        report.sources_run.push("fact-rules".into());
-    }
-
-    // SARIF passthrough: run external tools and merge their SARIF output
-    if matches!(engine, RuleType::Sarif) {
-        let sarif_report = run_sarif_tools(root, &config.analyze.sarif_tools);
-        report.merge(sarif_report);
-    }
-
-    report.sort();
-    report
-}
-
-/// Run external SARIF tools and merge their output into a DiagnosticsReport.
-/// Each tool's command is run with `{root}` replaced by the project root path.
-/// Tools must emit SARIF 2.1.0 JSON to stdout.
-pub fn run_sarif_tools(
-    root: &Path,
-    tools: &[crate::commands::analyze::SarifTool],
-) -> normalize_output::diagnostics::DiagnosticsReport {
-    use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
-
-    let mut report = DiagnosticsReport::new();
-    let root_str = root.to_string_lossy();
-
-    for tool in tools {
-        if tool.command.is_empty() {
-            continue;
-        }
-        let args: Vec<String> = tool
-            .command
-            .iter()
-            .map(|a| a.replace("{root}", &root_str))
-            .collect();
-
-        let output = std::process::Command::new(&args[0])
-            .args(&args[1..])
-            .current_dir(root)
-            .output();
-
-        let stdout = match output {
-            Ok(o) => String::from_utf8_lossy(&o.stdout).into_owned(),
-            Err(e) => {
-                eprintln!("normalize: SARIF tool '{}' failed to run: {}", tool.name, e);
-                continue;
-            }
-        };
-
-        let sarif: serde_json::Value = match serde_json::from_str(&stdout) {
-            Ok(v) => v,
-            Err(e) => {
-                eprintln!(
-                    "normalize: SARIF tool '{}' did not emit valid JSON: {}",
-                    tool.name, e
-                );
-                continue;
-            }
-        };
-
-        let runs = match sarif.get("runs").and_then(|v| v.as_array()) {
-            Some(r) => r,
-            None => {
-                eprintln!(
-                    "normalize: SARIF tool '{}' output missing 'runs' array",
-                    tool.name
-                );
-                continue;
-            }
-        };
-
-        for run in runs {
-            let driver_name = run
-                .pointer("/tool/driver/name")
-                .and_then(|v| v.as_str())
-                .unwrap_or(&tool.name);
-            let source = format!("sarif:{}", driver_name);
-
-            let results = run.get("results").and_then(|v| v.as_array());
-            let Some(results) = results else { continue };
-
-            for result in results {
-                let rule_id = result
-                    .get("ruleId")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown")
-                    .to_string();
-                let message = result
-                    .pointer("/message/text")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let level = result
-                    .get("level")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("warning");
-                let severity = match level {
-                    "error" => Severity::Error,
-                    "warning" => Severity::Warning,
-                    "note" | "none" => Severity::Info,
-                    _ => Severity::Warning,
-                };
-
-                // Extract location from first entry
-                let loc = result.pointer("/locations/0/physicalLocation");
-                let file = loc
-                    .and_then(|l| l.pointer("/artifactLocation/uri"))
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let line = loc
-                    .and_then(|l| l.pointer("/region/startLine"))
-                    .and_then(|v| v.as_u64())
-                    .map(|n| n as usize);
-                let column = loc
-                    .and_then(|l| l.pointer("/region/startColumn"))
-                    .and_then(|v| v.as_u64())
-                    .map(|n| n as usize);
-
-                report.issues.push(Issue {
-                    file,
-                    line,
-                    column,
-                    end_line: None,
-                    end_column: None,
-                    rule_id,
-                    message,
-                    severity,
-                    source: source.clone(),
-                    related: vec![],
-                    suggestion: None,
-                });
-            }
-
-            report.sources_run.push(source);
-        }
-    }
-
-    report
 }
 
 /// Run fact rules (interpreted) against the index.
@@ -1641,7 +1141,7 @@ fn detect_extension(url: &str) -> &'static str {
     if url.ends_with(".dl") { "dl" } else { "scm" }
 }
 
-fn cmd_add(url: &str, global: bool, json: bool) -> i32 {
+pub(crate) fn cmd_add(url: &str, global: bool, json: bool) -> i32 {
     let Some(rules_dir) = rules_dir(global) else {
         eprintln!("Could not determine rules directory");
         return 1;
@@ -1719,7 +1219,7 @@ fn cmd_add(url: &str, global: bool, json: bool) -> i32 {
     0
 }
 
-fn cmd_update(rule_id: Option<&str>, json: bool) -> i32 {
+pub(crate) fn cmd_update(rule_id: Option<&str>, json: bool) -> i32 {
     let mut updated = Vec::new();
     let mut errors = Vec::new();
 
@@ -1770,7 +1270,7 @@ fn cmd_update(rule_id: Option<&str>, json: bool) -> i32 {
     if errors.is_empty() { 0 } else { 1 }
 }
 
-fn cmd_remove(rule_id: &str, json: bool) -> i32 {
+pub(crate) fn cmd_remove(rule_id: &str, json: bool) -> i32 {
     let mut removed = false;
 
     for global in [false, true] {
@@ -1874,14 +1374,13 @@ fn sha256_hex(content: &str) -> String {
 }
 
 // =============================================================================
-// Service-callable functions
+// Service helpers
 // =============================================================================
 
-#[cfg(feature = "cli")]
 use crate::service::rules::RuleResult;
 
-#[cfg(feature = "cli")]
-fn exit_to_result(exit_code: i32) -> Result<RuleResult, String> {
+/// Convert an exit code to a `Result<RuleResult, String>`.
+pub(crate) fn exit_to_result(exit_code: i32) -> Result<RuleResult, String> {
     if exit_code == 0 {
         Ok(RuleResult {
             success: true,
@@ -1891,145 +1390,4 @@ fn exit_to_result(exit_code: i32) -> Result<RuleResult, String> {
     } else {
         Err("Command failed".to_string())
     }
-}
-
-/// Service-callable list.
-#[cfg(feature = "cli")]
-#[allow(clippy::too_many_arguments)]
-pub fn cmd_list_service(
-    root: Option<&str>,
-    sources: bool,
-    rule_type: RuleType,
-    tag: Option<&str>,
-    enabled: bool,
-    disabled: bool,
-    no_desc: bool,
-    use_colors: bool,
-) -> Result<RuleResult, String> {
-    let effective_root = root
-        .map(PathBuf::from)
-        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-    let config = crate::config::NormalizeConfig::load(&effective_root);
-    let exit_code = cmd_list(
-        &effective_root,
-        ListFilters {
-            sources,
-            type_filter: &rule_type,
-            tag,
-            enabled,
-            disabled,
-            no_desc,
-            json: false,
-            use_colors,
-        },
-        &config,
-    );
-    exit_to_result(exit_code)
-}
-
-/// Service-callable run.
-#[cfg(feature = "cli")]
-#[allow(clippy::too_many_arguments)]
-pub fn cmd_run_service(
-    root: Option<&str>,
-    rule: Option<&str>,
-    tag: Option<&str>,
-    fix: bool,
-    sarif: bool,
-    target: Option<&str>,
-    rule_type: RuleType,
-    debug: &[String],
-) -> Result<RuleResult, String> {
-    let effective_root = root
-        .map(PathBuf::from)
-        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-    let config = crate::config::NormalizeConfig::load(&effective_root);
-    let target_root = target
-        .map(PathBuf::from)
-        .unwrap_or_else(|| effective_root.clone());
-    let exit_code = cmd_run(
-        &target_root,
-        rule,
-        tag,
-        fix,
-        sarif,
-        &rule_type,
-        debug,
-        false,
-        &config,
-    );
-    exit_to_result(exit_code)
-}
-
-/// Service-callable enable/disable.
-#[cfg(feature = "cli")]
-pub fn cmd_enable_disable_service(
-    root: Option<&str>,
-    id_or_tag: &str,
-    enable: bool,
-    dry_run: bool,
-) -> Result<RuleResult, String> {
-    let effective_root = root
-        .map(PathBuf::from)
-        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-    let config = crate::config::NormalizeConfig::load(&effective_root);
-    let exit_code = cmd_enable_disable(&effective_root, id_or_tag, enable, dry_run, &config);
-    exit_to_result(exit_code)
-}
-
-/// Service-callable show.
-#[cfg(feature = "cli")]
-pub fn cmd_show_service(
-    root: Option<&str>,
-    id: &str,
-    use_colors: bool,
-) -> Result<RuleResult, String> {
-    let effective_root = root
-        .map(PathBuf::from)
-        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-    let config = crate::config::NormalizeConfig::load(&effective_root);
-    let exit_code = cmd_show(&effective_root, id, false, use_colors, &config);
-    exit_to_result(exit_code)
-}
-
-/// Service-callable tags.
-#[cfg(feature = "cli")]
-pub fn cmd_tags_service(
-    root: Option<&str>,
-    show_rules: bool,
-    tag: Option<&str>,
-    use_colors: bool,
-) -> Result<RuleResult, String> {
-    let effective_root = root
-        .map(PathBuf::from)
-        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-    let config = crate::config::NormalizeConfig::load(&effective_root);
-    let exit_code = cmd_tags(&effective_root, show_rules, tag, false, use_colors, &config);
-    exit_to_result(exit_code)
-}
-
-/// Service-callable add.
-#[cfg(feature = "cli")]
-pub fn cmd_add_service(url: &str, global: bool) -> Result<RuleResult, String> {
-    let exit_code = cmd_add(url, global, false);
-    exit_to_result(exit_code)
-}
-
-/// Service-callable update.
-#[cfg(feature = "cli")]
-pub fn cmd_update_service(rule_id: Option<&str>) -> Result<RuleResult, String> {
-    let exit_code = cmd_update(rule_id, false);
-    exit_to_result(exit_code)
-}
-
-/// Service-callable remove.
-#[cfg(feature = "cli")]
-pub fn cmd_remove_service(rule_id: &str) -> Result<RuleResult, String> {
-    let exit_code = cmd_remove(rule_id, false);
-    exit_to_result(exit_code)
 }
