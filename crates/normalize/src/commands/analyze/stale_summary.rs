@@ -284,6 +284,12 @@ pub fn build_stale_summary_report(root: &Path, threshold: usize) -> StaleSummary
         let summary_dirty = git_summary_has_uncommitted_changes(root, &summary_path);
         let has_uncommitted = content_dirty && !summary_dirty;
 
+        // If SUMMARY.md is staged (about to be committed), skip the staleness check: the
+        // pending commit will fix it. This prevents false positives during pre-commit hooks.
+        if summary_dirty {
+            continue;
+        }
+
         // Use cached git log result if available (same HEAD = commits haven't changed).
         let cached = cache.as_ref().and_then(|c| c.dirs.get(&dir_label));
         let (last_summary_commit, commits_count) = if let Some(entry) = cached {
