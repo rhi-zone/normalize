@@ -56,8 +56,22 @@ impl HistoryService {
             String,
         >,
     ) -> Result<HistoryListReport, String> {
+        use crate::shadow::Shadow;
+        use std::path::PathBuf;
+
         let limit = limit.unwrap_or(20);
-        crate::commands::history::cmd_list_service(root.as_deref(), file.as_deref(), limit)
+        let root = root
+            .map(PathBuf::from)
+            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let shadow = Shadow::new(&root);
+        if !shadow.exists() {
+            return Ok(HistoryListReport::empty());
+        }
+        let entries = shadow.history(file.as_deref(), limit);
+        let checkpoint = shadow.checkpoint();
+        let head = entries.first().map(|e| e.id);
+        Ok(HistoryListReport::new(head, checkpoint, entries))
     }
 
     /// Show diff for a specific commit
@@ -68,7 +82,18 @@ impl HistoryService {
             String,
         >,
     ) -> Result<HistoryDiffReport, String> {
-        crate::commands::history::cmd_diff_service(root.as_deref(), &commit_ref)
+        use crate::shadow::Shadow;
+        use std::path::PathBuf;
+
+        let root = root
+            .map(PathBuf::from)
+            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let shadow = Shadow::new(&root);
+        match shadow.diff(&commit_ref) {
+            Some(diff) => Ok(HistoryDiffReport::new(commit_ref, diff)),
+            None => Err(format!("Could not find commit: {}", commit_ref)),
+        }
     }
 
     /// Show uncommitted shadow edits since last git commit
@@ -78,7 +103,26 @@ impl HistoryService {
             String,
         >,
     ) -> Result<HistoryStatusReport, String> {
-        crate::commands::history::cmd_status_service(root.as_deref())
+        use crate::shadow::Shadow;
+        use std::path::PathBuf;
+
+        let root = root
+            .map(PathBuf::from)
+            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let shadow = Shadow::new(&root);
+        let entries = shadow.history(None, 100);
+        let checkpoint = shadow.checkpoint();
+        let count = entries
+            .iter()
+            .take_while(|e| {
+                checkpoint
+                    .as_ref()
+                    .map(|c| &e.git_head != c)
+                    .unwrap_or(true)
+            })
+            .count();
+        Ok(HistoryStatusReport::new(count, checkpoint))
     }
 
     /// Show full tree structure of all branches
@@ -89,8 +133,22 @@ impl HistoryService {
             String,
         >,
     ) -> Result<HistoryTreeReport, String> {
+        use crate::shadow::Shadow;
+        use std::path::PathBuf;
+
         let limit = limit.unwrap_or(20);
-        crate::commands::history::cmd_tree_service(root.as_deref(), limit)
+        let root = root
+            .map(PathBuf::from)
+            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let shadow = Shadow::new(&root);
+        match shadow.tree(limit) {
+            Some(tree_output) => {
+                let lines: Vec<String> = tree_output.lines().map(|l| l.to_string()).collect();
+                Ok(HistoryTreeReport::new(lines))
+            }
+            None => Err("Could not get tree view".to_string()),
+        }
     }
 
     /// Prune shadow history, keeping only the last N commits
@@ -101,6 +159,17 @@ impl HistoryService {
             String,
         >,
     ) -> Result<HistoryPruneReport, String> {
-        crate::commands::history::cmd_prune_service(root.as_deref(), keep)
+        use crate::shadow::Shadow;
+        use std::path::PathBuf;
+
+        let root = root
+            .map(PathBuf::from)
+            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
+            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let shadow = Shadow::new(&root);
+        match shadow.prune(keep) {
+            Ok(pruned_count) => Ok(HistoryPruneReport::new(pruned_count, keep)),
+            Err(e) => Err(format!("Prune failed: {}", e)),
+        }
     }
 }

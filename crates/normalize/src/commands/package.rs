@@ -448,49 +448,6 @@ fn available_ecosystems() -> Vec<&'static str> {
     all_ecosystems().iter().map(|e| e.name()).collect()
 }
 
-/// Service-callable package command.
-/// Dispatches to the appropriate subcommand based on `action` string.
-#[cfg(feature = "cli")]
-pub fn cmd_package_service(
-    action: &str,
-    package: Option<&str>,
-    ecosystem: Option<&str>,
-    root: Option<&str>,
-    _use_colors: bool,
-) -> Result<crate::service::package::PackageResult, String> {
-    let package_action = match action {
-        "info" => {
-            let pkg = package.ok_or("package name required")?;
-            PackageAction::Info {
-                package: pkg.to_string(),
-            }
-        }
-        "list" => PackageAction::List,
-        "tree" => PackageAction::Tree,
-        "why" => {
-            let pkg = package.ok_or("package name required")?;
-            PackageAction::Why {
-                package: pkg.to_string(),
-            }
-        }
-        "outdated" => PackageAction::Outdated,
-        "audit" => PackageAction::Audit,
-        _ => return Err(format!("unknown package action: {}", action)),
-    };
-
-    let root_path = root.map(std::path::Path::new);
-    let exit_code = cmd_package(package_action, ecosystem, root_path);
-    if exit_code == 0 {
-        Ok(crate::service::package::PackageResult {
-            success: true,
-            message: None,
-            data: None,
-        })
-    } else {
-        Err("Command failed".to_string())
-    }
-}
-
 fn print_human(info: &PackageInfo, ecosystem: &str) {
     println!("{} {} ({})", info.name, info.version, ecosystem);
 

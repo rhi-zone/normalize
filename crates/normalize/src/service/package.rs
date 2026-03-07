@@ -1,6 +1,6 @@
 //! Package management service for server-less CLI.
 
-use super::resolve_pretty;
+use crate::commands::package::{PackageAction, cmd_package};
 use server_less::cli;
 use std::cell::Cell;
 use std::path::Path;
@@ -40,9 +40,22 @@ impl std::fmt::Display for PackageResult {
     }
 }
 
-fn pretty_for(root: Option<&str>, pretty: bool, compact: bool) -> bool {
-    let root = root.map(Path::new).unwrap_or(Path::new("."));
-    resolve_pretty(root, pretty, compact)
+fn run_package(
+    action: PackageAction,
+    ecosystem: Option<&str>,
+    root: Option<&str>,
+) -> Result<PackageResult, String> {
+    let root_path = root.map(Path::new);
+    let exit_code = cmd_package(action, ecosystem, root_path);
+    if exit_code == 0 {
+        Ok(PackageResult {
+            success: true,
+            message: None,
+            data: None,
+        })
+    } else {
+        Err("Command failed".to_string())
+    }
 }
 
 #[cli(
@@ -63,12 +76,11 @@ impl PackageService {
         pretty: bool,
         compact: bool,
     ) -> Result<PackageResult, String> {
-        crate::commands::package::cmd_package_service(
-            "info",
-            Some(&package),
+        let _ = (pretty, compact);
+        run_package(
+            PackageAction::Info { package },
             ecosystem.as_deref(),
             root.as_deref(),
-            pretty_for(root.as_deref(), pretty, compact),
         )
     }
 
@@ -83,13 +95,8 @@ impl PackageService {
         pretty: bool,
         compact: bool,
     ) -> Result<PackageResult, String> {
-        crate::commands::package::cmd_package_service(
-            "list",
-            None,
-            ecosystem.as_deref(),
-            root.as_deref(),
-            pretty_for(root.as_deref(), pretty, compact),
-        )
+        let _ = (pretty, compact);
+        run_package(PackageAction::List, ecosystem.as_deref(), root.as_deref())
     }
 
     /// Show dependency tree from lockfile
@@ -103,13 +110,8 @@ impl PackageService {
         pretty: bool,
         compact: bool,
     ) -> Result<PackageResult, String> {
-        crate::commands::package::cmd_package_service(
-            "tree",
-            None,
-            ecosystem.as_deref(),
-            root.as_deref(),
-            pretty_for(root.as_deref(), pretty, compact),
-        )
+        let _ = (pretty, compact);
+        run_package(PackageAction::Tree, ecosystem.as_deref(), root.as_deref())
     }
 
     /// Show why a dependency is in the tree
@@ -124,12 +126,11 @@ impl PackageService {
         pretty: bool,
         compact: bool,
     ) -> Result<PackageResult, String> {
-        crate::commands::package::cmd_package_service(
-            "why",
-            Some(&package),
+        let _ = (pretty, compact);
+        run_package(
+            PackageAction::Why { package },
             ecosystem.as_deref(),
             root.as_deref(),
-            pretty_for(root.as_deref(), pretty, compact),
         )
     }
 
@@ -144,12 +145,11 @@ impl PackageService {
         pretty: bool,
         compact: bool,
     ) -> Result<PackageResult, String> {
-        crate::commands::package::cmd_package_service(
-            "outdated",
-            None,
+        let _ = (pretty, compact);
+        run_package(
+            PackageAction::Outdated,
             ecosystem.as_deref(),
             root.as_deref(),
-            pretty_for(root.as_deref(), pretty, compact),
         )
     }
 
@@ -164,12 +164,7 @@ impl PackageService {
         pretty: bool,
         compact: bool,
     ) -> Result<PackageResult, String> {
-        crate::commands::package::cmd_package_service(
-            "audit",
-            None,
-            ecosystem.as_deref(),
-            root.as_deref(),
-            pretty_for(root.as_deref(), pretty, compact),
-        )
+        let _ = (pretty, compact);
+        run_package(PackageAction::Audit, ecosystem.as_deref(), root.as_deref())
     }
 }
