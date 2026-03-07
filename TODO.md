@@ -107,38 +107,13 @@ Future improvements:
 
 ## Next Up
 
-### Audit `rust/unwrap-in-impl` (1,608 violations)
+### ~~Audit `rust/unwrap-in-impl`~~ — COMPLETE
 
-Rule is disabled — too noisy to enable without triage. Goal: categorize all violations,
-fix genuine ones, suppress legitimate ones inline or via allow, then enable at warning.
+Rule enabled at `severity = "warning"` (2026-03). All 1,608 violations resolved:
+production code inline-suppressed with reasons or properly fixed; test-only files
+allowed via config. See `.normalize/config.toml` for the full allow list.
 
-**Approach: parallel subagent audit by crate**
-
-Run `normalize rules run --engine syntax --rule rust/unwrap-in-impl <crate-path>` per
-crate, dispatch one subagent per crate (or per group of small crates), have each agent:
-1. Read every violation location
-2. Categorize as: (a) genuine smell — fix by returning `Result`/`Option`, (b) infallible
-   context — add `// normalize-syntax-allow: rust/unwrap-in-impl - <reason>`, (c) test
-   helper — move to `#[cfg(test)]` or test module (rule already excludes tests)
-3. Apply fixes/suppressions
-4. Report back summary (N fixed, N suppressed, N remaining)
-
-**Common legitimate patterns** (suppress, don't fix):
-- Lock acquisition: `.unwrap()` on `Mutex::lock()` — poison = programmer error, panic correct
-- Regex compilation: `Regex::new("...").unwrap()` in `OnceLock`/`lazy_static` context
-- `from_utf8` on known-good bytes (e.g. ASCII constants)
-- `parse::<u32>()` on validated input (e.g. from tree-sitter integer nodes)
-- `unwrap_or_else(|_| unreachable!())` equivalents
-
-**Common fixable patterns**:
-- `.unwrap()` on `Option` from map/find — propagate with `?` or `ok_or`
-- `.unwrap()` in a function that already returns `Result` — use `?`
-- `.unwrap()` on env vars — return `Result<_, VarError>` instead
-- Error formatting helpers that swallow errors silently
-
-**Crate breakdown** (run `normalize rules run --engine syntax --rule rust/unwrap-in-impl <crate>`
-to get per-crate counts before dispatching agents):
-Expect heaviest: `normalize` (main), `normalize-facts`, `normalize-languages`, `normalize-manifest`
+**Remaining follow-up: eliminate `cmd_*` layer** (see below).
 
 **Audited crates** (production code clean, test-only unwraps allowed in config):
 - `normalize-path-resolve` — complete
@@ -156,6 +131,26 @@ Expect heaviest: `normalize` (main), `normalize-facts`, `normalize-languages`, `
 - `normalize-edit` — complete (16 violations; all in inline #[cfg(test)] blocks — allowed in config)
 - `normalize-view` — complete (12 → 2 production violations inline-suppressed: is_none guard before unwrap,
   len==1 guard before iter().next())
+
+### Eliminate `cmd_*` layer — move logic into service methods
+
+`main()` calls `NormalizeService::cli_run()` (server-less), not `cmd_*` directly. The
+`cmd_*` functions are a vestigial layer: they return `i32` exit codes, which means errors
+can't be propagated with `?` and must either be printed inline or swallowed. This produces
+panics instead of clean error messages for things like `Runtime::new()` failures.
+
+The right fix is to delete `cmd_*` entirely and move logic directly into service methods:
+- Service methods return `Result<T, String>` — server-less handles exit codes and error
+  formatting automatically
+- `Runtime::new()?` works naturally (mapped to `String` error)
+- No more `eprintln + return 1` scattered across command files
+
+**Scope:** All files under `crates/normalize/src/commands/` that expose a `cmd_*` function.
+Each service method in `service/*.rs` calling `cmd_*` should inline the logic instead.
+
+**Note:** Some `cmd_*` functions have long parameter lists because they predate the service
+layer. As logic moves in, parameters become `&self` fields (pretty, compact, root, etc.)
+already available on `NormalizeService`.
 
 ### Feature-gate CLI behind `cli` feature (workspace-wide)
 

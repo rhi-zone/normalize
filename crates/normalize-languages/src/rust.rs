@@ -243,7 +243,12 @@ impl Language for Rust {
     }
 
     fn test_file_globs(&self) -> &'static [&'static str] {
-        &["**/tests/**/*.rs"]
+        &[
+            "**/tests/**",
+            "**/test_*.rs",
+            "**/*_test.rs",
+            "**/*_tests.rs",
+        ]
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

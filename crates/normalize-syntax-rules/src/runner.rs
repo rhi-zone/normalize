@@ -63,24 +63,21 @@ fn line_has_allow_comment(line: &str, rule_id: &str) -> bool {
 }
 
 /// Check if a finding should be allowed based on inline comments.
-/// Checks the line of the finding and the line before.
+/// Checks the line of the finding and up to 2 lines before (to handle
+/// multi-line expressions like `let x =\n    expr.unwrap()`).
 fn is_allowed_by_comment(content: &str, start_line: usize, rule_id: &str) -> bool {
     let lines: Vec<&str> = content.lines().collect();
     let line_idx = start_line.saturating_sub(1); // 0-indexed
 
-    // Check the line itself
-    if let Some(line) = lines.get(line_idx)
-        && line_has_allow_comment(line, rule_id)
-    {
-        return true;
-    }
-
-    // Check the line before (for standalone comment)
-    if line_idx > 0
-        && let Some(line) = lines.get(line_idx - 1)
-        && line_has_allow_comment(line, rule_id)
-    {
-        return true;
+    for offset in 0..=2usize {
+        let Some(idx) = line_idx.checked_sub(offset) else {
+            break;
+        };
+        if let Some(line) = lines.get(idx)
+            && line_has_allow_comment(line, rule_id)
+        {
+            return true;
+        }
     }
 
     false
@@ -740,5 +737,47 @@ fn main() {
             "should match pattern 0 (unwrap)"
         );
         assert!(pattern_indices.contains(&1), "should match pattern 1 (dbg)");
+    }
+}
+
+#[cfg(test)]
+mod glob_tests {
+    use glob::Pattern;
+    // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
+    #[test]
+    fn test_glob_allow_patterns() {
+        let cases = [
+            (
+                "crates/normalize/src/rg/**",
+                "crates/normalize/src/rg/flags/defs.rs",
+                true,
+            ),
+            (
+                "crates/normalize/src/rg/**",
+                "crates/normalize/src/rg/mod.rs",
+                true,
+            ),
+            ("**/tests/**", "crates/normalize/tests/foo.rs", true),
+            (
+                "**/tests/fixtures/**",
+                "crates/normalize-syntax-rules/tests/fixtures/rust/foo.rs",
+                true,
+            ),
+            (
+                "crates/normalize-facts-rules-interpret/src/tests.rs",
+                "crates/normalize-facts-rules-interpret/src/tests.rs",
+                true,
+            ),
+            (
+                "crates/normalize-manifest/src/*.rs",
+                "crates/normalize-manifest/src/nuget.rs",
+                true,
+            ),
+        ];
+        for (p, path, expected) in cases {
+            // normalize-syntax-allow: rust/unwrap-in-impl - test code, literal constant patterns
+            let pat = Pattern::new(p).unwrap();
+            assert_eq!(pat.matches(path), expected, "Pattern: {p}, Path: {path}");
+        }
     }
 }

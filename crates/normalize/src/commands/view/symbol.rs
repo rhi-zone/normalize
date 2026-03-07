@@ -1200,6 +1200,7 @@ pub fn build_view_symbol_service(
         .map_err(|e| format!("Error reading {}: {}", file_path, e))?;
 
     let mut parser = symbols::SymbolParser::new();
+    // normalize-syntax-allow: rust/unwrap-in-impl - symbol_path non-empty guaranteed by CLI parser
     let symbol_name = symbol_path.last().unwrap();
 
     let grammar =

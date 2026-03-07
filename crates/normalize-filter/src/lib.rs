@@ -394,8 +394,8 @@ mod tests {
     #[test]
     fn test_resolve_glob_pattern() {
         let config = AliasConfig::default();
-        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let filter =
+            // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
             Filter::new(&["*.test.js".to_string()], &[], &config, &["javascript"]).unwrap();
 
         assert!(filter.is_active());

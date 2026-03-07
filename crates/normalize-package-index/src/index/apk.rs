@@ -220,6 +220,7 @@ impl Apk {
 
             // Single-letter field format: "X:value"
             if line.len() >= 2 && line.chars().nth(1) == Some(':') {
+                // normalize-syntax-allow: rust/unwrap-in-impl - guarded by len() >= 2 check
                 let key = line.chars().next().unwrap();
                 let value = &line[2..];
 

@@ -198,6 +198,7 @@ pub fn cmd_check_examples(root: &Path) -> i32 {
     let marker_start_re = Regex::new(r"//\s*\[example:\s*([^\]]+)\]").unwrap();
 
     // Find all example references in docs: {{example: path#name}}
+    // normalize-syntax-allow: rust/unwrap-in-impl - compile-time constant regex pattern
     let ref_re = Regex::new(r"\{\{example:\s*([^}]+)\}\}").unwrap();
 
     // Collect all defined examples: (file, name)

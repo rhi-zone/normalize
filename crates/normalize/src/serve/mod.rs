@@ -99,6 +99,7 @@ pub fn run(args: ServeArgs) -> i32 {
             }
         }
         ServeProtocol::Lsp => {
+            // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(lsp::run_lsp_server(args.root.as_deref()))
         }

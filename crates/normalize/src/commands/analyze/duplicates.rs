@@ -2155,6 +2155,7 @@ mod tests {
 
     #[test]
     fn test_load_duplicate_functions_allowlist_empty() {
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
         let tmp = tempdir().unwrap();
         let allowlist = load_duplicate_functions_allowlist(tmp.path());
         assert!(allowlist.is_empty());

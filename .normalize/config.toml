@@ -71,14 +71,11 @@ allow = ["**/tests/fixtures/**"]
 enabled = true
 allow = ["**/tests/fixtures/**", ".claude/**"]
 
-# Re-enable info-level rules for dogfooding (disabled by default for new users)
-# Disabled: 1608 hits in current codebase — needs audit to distinguish genuine smells
-# from legitimate unwrap use in parsing/infallible contexts. See TODO.md §Audit rust/unwrap-in-impl.
-# Partial audit complete for: normalize-path-resolve, normalize-ecosystems, normalize-facts, normalize-manifest.
-# Production code: inline suppressed with reasons. Test code in inline #[cfg(test)] modules
-# allowed below (split from separate tests/ dirs which are covered by **/tests/**).
+# Audit complete: all 1608 violations resolved (inline suppressed with reasons or allow-listed).
+# Production .unwrap() uses are annotated; test code in inline #[cfg(test)] modules allowed below.
 [analyze.rules."rust/unwrap-in-impl"]
-enabled = false
+severity = "warning"
+enabled = true
 allow = [
     # Inline #[cfg(test)] modules in src/ files (not covered by **/tests/**)
     "crates/normalize-path-resolve/src/lib.rs",
@@ -123,6 +120,36 @@ allow = [
     # Remaining violations are all in inline #[cfg(test)] mod blocks.
     "crates/normalize-view/src/skeleton.rs",
     "crates/normalize-view/src/tree.rs",
+    # normalize (main crate) rg/: vendored from ripgrep — defs.rs has 500+ test assertions
+    # using .unwrap() idiomatically; version.rs has writeln!() to String (infallible).
+    "crates/normalize/src/rg/**",
+    # .claude/worktrees/ contains agent work-in-progress; walker follows symlinks into these
+    # directories, creating duplicate paths that bypass crate-specific allow patterns.
+    ".claude/**",
+    # normalize (main crate) ast_grep/: vendored from ast-grep 0.41.0 (MIT) — production violations
+    # are infallible (String::from_utf8 on ast-grep internal buffers, TypesBuilder constants,
+    # mutex lock, test assertions). Not our code to refactor.
+    "crates/normalize/src/ast_grep/**",
+    # normalize (main crate): audited — production violations inline-suppressed with reasons.
+    # Remaining violations are all in inline #[cfg(test)] mod blocks.
+    "crates/normalize/src/analyze/complexity.rs",
+    "crates/normalize/src/config.rs",
+    "crates/normalize/src/paths.rs",
+    "crates/normalize/src/skeleton.rs",
+    "crates/normalize/src/commands/view/search.rs",
+    "crates/normalize/src/commands/init.rs",
+    "crates/normalize/src/tree.rs",
+    # text_search.rs: format_text/format_pretty use writeln!(String,...).unwrap() which is infallible;
+    # #[cfg(test)] block uses .unwrap() idiomatically.
+    "crates/normalize/src/text_search.rs",
+    # tools/lint.rs: format_text uses writeln!(String,...).unwrap() which is infallible.
+    "crates/normalize/src/commands/tools/lint.rs",
+    # context.rs: all violations in #[cfg(test)] block — tempdir/fs::write idiom.
+    "crates/normalize/src/commands/context.rs",
+    # normalize-package-index: tests.rs is a dedicated test module; apk.rs test block.
+    "crates/normalize-package-index/src/index/tests.rs",
+    # xtask: build-tool binary, not a library — .unwrap() in build scripts is conventional.
+    "xtask/src/main.rs",
 ]
 
 [analyze.rules."rust/unnecessary-let"]
