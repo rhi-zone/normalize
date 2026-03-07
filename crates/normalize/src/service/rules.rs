@@ -97,7 +97,7 @@ impl RulesService {
 
     /// Run rules against the codebase
     #[allow(clippy::too_many_arguments)]
-    pub fn run(
+    pub async fn run(
         &self,
         #[param(help = "Specific rule ID to run")] rule: Option<String>,
         #[param(help = "Filter by tag")] tag: Option<String>,
@@ -126,17 +126,23 @@ impl RulesService {
             .as_deref()
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| effective_root.clone());
-        let exit_code = crate::commands::rules::cmd_run(
-            &target_root,
-            rule.as_deref(),
-            tag.as_deref(),
-            fix,
-            sarif,
-            &rule_type,
-            &debug,
-            false,
-            &config,
-        );
+        // cmd_run internally creates a tokio Runtime for fact rules; spawn_blocking
+        // gives it a thread without an active runtime so block_on() doesn't panic.
+        let exit_code = tokio::task::spawn_blocking(move || {
+            crate::commands::rules::cmd_run(
+                &target_root,
+                rule.as_deref(),
+                tag.as_deref(),
+                fix,
+                sarif,
+                &rule_type,
+                &debug,
+                false,
+                &config,
+            )
+        })
+        .await
+        .map_err(|e| format!("Task error: {e}"))?;
         crate::commands::rules::exit_to_result(exit_code)
     }
 

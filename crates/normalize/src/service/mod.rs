@@ -54,6 +54,7 @@ pub struct NormalizeService {
     grammars: grammars::GrammarService,
     generate: generate::GenerateService,
     package: package::PackageService,
+    rules: rules::RulesService,
     serve: serve::ServeService,
     syntax: syntax::SyntaxService,
     sessions: sessions::SessionsService,
@@ -87,6 +88,7 @@ impl NormalizeService {
             grammars: grammars::GrammarService::new(&pretty),
             generate: generate::GenerateService,
             package: package::PackageService::new(&pretty),
+            rules: rules::RulesService::new(&pretty),
             serve: serve::ServeService,
             syntax: syntax::SyntaxService::new(),
             sessions: sessions::SessionsService::new(&pretty),
@@ -804,6 +806,11 @@ impl NormalizeService {
     /// Analyze codebase (health, complexity, security, duplicates, docs)
     pub fn analyze(&self) -> &analyze::AnalyzeService {
         &self.analyze
+    }
+
+    /// Manage and run syntax/fact rules
+    pub fn rules(&self) -> &rules::RulesService {
+        &self.rules
     }
 
     /// Start a normalize server (MCP, HTTP, LSP)
