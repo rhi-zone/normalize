@@ -192,12 +192,12 @@ that use only the `#[cli]` proc macro no longer need `dep:clap` (done for normal
 normalize-filter, normalize-syntax-rules). The main `normalize` crate still needs `dep:clap`
 because `src/ast_grep/`, `src/commands/translate.rs`, and `src/serve/` directly import clap.
 
-**Next step (HIGH PRIORITY):** Port those files to use `server_less::clap::*` instead of
-`clap::*`, then drop `dep:clap` from normalize's Cargo.toml entirely. Key files:
+**Next step (HIGH PRIORITY):** Migrate remaining direct clap users to the server-less service
+pattern, eliminating the direct clap imports. Key files not yet on the `#[cli]` service layer:
 - `src/ast_grep/` (many files — embedded ast-grep integration)
 - `src/commands/translate.rs`
 - `src/serve/mod.rs`
-After porting, `normalize` the library is finally clap-free for library consumers.
+Once migrated, `dep:clap` drops from normalize's Cargo.toml and the library is clap-free.
 
 ### Language trait: migrate *_kinds() methods to .scm query files
 
