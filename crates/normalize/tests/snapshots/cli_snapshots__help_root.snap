@@ -8,27 +8,25 @@ Fast code intelligence CLI
 Usage: normalize [OPTIONS] [COMMAND]
 
 Commands:
-  view             View a node in the codebase tree (directory, file, or symbol)
-  grep             Search for text patterns in files (fast ripgrep-based search)
-  aliases          List filter aliases (used by --exclude/--only)
-  context          Show directory context (hierarchical .context.md files)
-  init             Initialize normalize in current directory
-  update           Check for and install updates
-  translate        Translate code between programming languages
-  find-references  Find all references to a symbol (within-file scope analysis + cross-file index)
-  daemon           Manage the global normalize daemon
-  grammars         Manage tree-sitter grammars for parsing
-  generate         Generate code from API spec
-  structure        Manage the structural index (symbols, imports, calls)
-  rules            Manage and run analysis rules (syntax + fact)
-  syntax           AST inspection
-  package          Package management: info, list, tree, outdated
-  sessions         Analyze agent session logs (Claude Code, Codex, Gemini)
-  tools            External ecosystem tools (linters, formatters, test runners)
-  edit             Structural editing of code symbols
-  analyze          Analyze codebase (health, complexity, security, duplicates, docs)
-  serve            Start a normalize server (MCP, HTTP, LSP)
-  help             Print this message or the help of the given subcommand(s)
+  view       View a node in the codebase tree (directory, file, or symbol)
+  grep       Search for text patterns in files (fast ripgrep-based search)
+  aliases    List filter aliases (used by --exclude/--only)
+  context    Show directory context (hierarchical .context.md files)
+  init       Initialize normalize in current directory
+  update     Check for and install updates
+  translate  Translate code between programming languages
+  daemon     Manage the global normalize daemon
+  grammars   Manage tree-sitter grammars for parsing
+  generate   Generate code from API spec
+  facts      Extract and query code facts (symbols, imports, calls)
+  syntax     AST inspection and syntax rules
+  package    Package management: info, list, tree, outdated
+  sessions   Analyze agent session logs (Claude Code, Codex, Gemini)
+  tools      External ecosystem tools (linters, formatters, test runners)
+  edit       Structural editing of code symbols
+  analyze    Analyze codebase (health, complexity, security, duplicates, docs)
+  serve      Start a normalize server (MCP, HTTP, LSP)
+  help       Print this message or the help of the given subcommand(s)
 
 Options:
       --pretty                     Human-friendly output with colors and formatting

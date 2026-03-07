@@ -88,7 +88,7 @@ impl NormalizeService {
             generate: generate::GenerateService,
             package: package::PackageService::new(&pretty),
             serve: serve::ServeService,
-            syntax: syntax::SyntaxService::new(&pretty),
+            syntax: syntax::SyntaxService::new(),
             sessions: sessions::SessionsService::new(&pretty),
             tools: tools::ToolsService::new(),
             pretty,
@@ -253,7 +253,7 @@ impl NormalizeService {
         #[param(short = 'n', help = "Show line numbers")] line_numbers: bool,
         #[param(help = "Show dependencies (imports/exports)")] deps: bool,
         #[param(short = 'k', help = "Filter by symbol kind: class, function, method")] kind: Option<
-            String,
+            crate::commands::view::tree::SymbolKindFilter,
         >,
         #[param(help = "Show only type definitions")] types_only: bool,
         #[param(help = "Include test functions and test modules")] tests: bool,
@@ -308,7 +308,7 @@ impl NormalizeService {
             depth,
             line_numbers,
             deps,
-            kind.as_deref(),
+            kind.as_ref(),
             types_only,
             tests,
             raw,
@@ -435,6 +435,7 @@ impl NormalizeService {
     pub fn init(
         &self,
         #[param(help = "Index the codebase after initialization")] index: bool,
+        #[param(help = "Run interactive rule setup wizard after initialization")] setup: bool,
     ) -> Result<InitResult, String> {
         use std::fs;
 
@@ -521,6 +522,11 @@ impl NormalizeService {
                 .block_on(idx.refresh())
                 .map_err(|e| format!("Failed to index: {}", e))?;
             println!("Indexed {} files.", count);
+        }
+
+        // 7. Optionally run setup wizard
+        if setup {
+            commands::init::cmd_setup_wizard(&root);
         }
 
         Ok(InitResult {
