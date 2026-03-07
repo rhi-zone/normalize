@@ -14,20 +14,20 @@ extract, inline, move — correct, without LSPs, without false positives.
 2. **Comprehensive language fixtures** (long-term, nix flake verification)
    - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
 
-## Session Queue (2026-03-07)
+## Session Queue (2026-03-08)
 
 Ordered by impact × tractability. Pick from top.
 
-1. ~~**Eliminate `cmd_*` layer** — `commands/analyze/` done (dead wrappers deleted).~~
-   **Remaining:** `commands/rules.rs` still has i32-returning `cmd_*` functions called from
-   `service/rules.rs`. Convert to `Result<T, String>` to unblock `?` propagation.
+1. ~~**Eliminate `cmd_*` layer**~~ — DONE (2026-03-08). Dead wrappers in `commands/analyze/`,
+   `commands/view/`, and `commands/rules.rs` deleted. `commands/rules.rs` still has
+   i32-returning inner functions (`cmd_list`, `cmd_run`, `cmd_enable_disable`, etc.) called by
+   `service/rules.rs` via `exit_to_result()` — this is the remaining refactor if desired.
    See: [Eliminate cmd_* layer](#eliminate-cmd_-layer--move-logic-into-service-methods)
 
-2. ~~**Wire `tags.scm` into symbol extraction**~~ — DONE. `collect_symbols_from_tags()` is the
-   primary path; Language trait has only 3 required methods. No node-kind lists remain.
+2. ~~**Wire `tags.scm` into symbol extraction**~~ — DONE (already complete before this session).
+   `collect_symbols_from_tags()` is the primary path; Language trait has only 3 required methods.
 
-3. ~~**Remaining info/warning noise (batch-fix)**~~ — DONE. Production code is clean (only
-   fixture files have violations, which is correct).
+3. ~~**Remaining info/warning noise (batch-fix)**~~ — DONE. Production code is clean.
 
 4. **Language coverage: `.scm` query files**
    - `*.calls.scm` — every language without it silently produces zero call graph data
