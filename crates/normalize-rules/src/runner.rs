@@ -1323,7 +1323,7 @@ pub fn run_rules_report(
         // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
         let rt = tokio::runtime::Runtime::new().unwrap();
         let diagnostics = rt.block_on(collect_fact_diagnostics(
-            root,
+            project_root,
             &config.facts_rules,
             filter_ids.as_ref(),
             filter_rule,

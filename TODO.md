@@ -28,17 +28,10 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 Ordered by impact × tractability. Pick from top.
 
-1. **Fix `normalize rules run` output** — broken in three ways:
-   - Multiple engines (syntax, fact) each print their own summary banner ("12 issues found:" then
-     "No issues found (8 rules checked). Done") — clearly two separate passes being concatenated
-     instead of merged into one `DiagnosticsReport` before rendering
-   - No colors — `format_pretty()` on `DiagnosticsReport` needs terminal color support
-   - Missing counts by severity (errors: N, warnings: N, info: N) in the summary line
-   - `**/tests/fixtures/**` violations show up in output — fixture files contain intentionally bad
-     code and must be globally excluded. Many rules already have `allow = ["**/tests/fixtures/**"]`
-     but not all. Add a global allow in `.normalize/config.toml` rather than per-rule.
-   Root cause: `run_rules_report()` in `service/rules.rs` — investigate how engines are merged.
-   See: `crates/normalize/src/service/rules.rs`, `crates/normalize/src/commands/rules_cmd.rs`
+1. ~~**Fix `normalize rules run` output**~~ — DONE (2026-03-08). Unified banner, colors, severity
+   counts, global allow pattern. Also fixed: fact rules used scan target instead of project root
+   for index lookup, causing "no such column: resolved_file" when running on a subdirectory
+   (fixed 2026-03-09: `collect_fact_diagnostics` now receives `project_root`).
 
 2. ~~**Eliminate `cmd_*` layer**~~ — DONE (2026-03-08). Dead wrappers in `commands/analyze/`,
    `commands/view/`, and `commands/rules.rs` deleted. `commands/rules.rs` still has
