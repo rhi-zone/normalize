@@ -635,6 +635,8 @@ fn bundled_complexity_query(name: &str) -> Option<&'static str> {
         "verilog" => Some(include_str!("queries/verilog.complexity.scm")),
         "vhdl" => Some(include_str!("queries/vhdl.complexity.scm")),
         "vue" => Some(include_str!("queries/vue.complexity.scm")),
+        "batch" => Some(include_str!("queries/batch.complexity.scm")),
+        "thrift" => Some(include_str!("queries/thrift.complexity.scm")),
         _ => None,
     }
 }
