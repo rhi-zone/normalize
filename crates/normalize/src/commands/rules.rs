@@ -1220,6 +1220,17 @@ pub fn apply_native_rules_config(
         if override_.enabled == Some(false) {
             return false;
         }
+        // allow patterns suppress matching issues
+        if !override_.allow.is_empty() {
+            let patterns: Vec<glob::Pattern> = override_
+                .allow
+                .iter()
+                .filter_map(|p| glob::Pattern::new(p).ok())
+                .collect();
+            if patterns.iter().any(|p| p.matches(&issue.file)) {
+                return false;
+            }
+        }
         if let Some(sev_str) = &override_.severity {
             issue.severity = match sev_str.as_str() {
                 "error" => Severity::Error,
