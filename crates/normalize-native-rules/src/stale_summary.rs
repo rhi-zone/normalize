@@ -377,11 +377,7 @@ impl From<StaleSummaryReport> for DiagnosticsReport {
                     )
                 };
                 Issue {
-                    file: if m.dir == "." {
-                        "SUMMARY.md".into()
-                    } else {
-                        format!("{}/SUMMARY.md", m.dir)
-                    },
+                    file: format!("{}/SUMMARY.md", m.dir),
                     line: None,
                     column: None,
                     end_line: None,
@@ -409,11 +405,7 @@ impl From<StaleSummaryReport> for DiagnosticsReport {
                 )
             };
             Issue {
-                file: if s.dir == "." {
-                    "SUMMARY.md".into()
-                } else {
-                    format!("{}/SUMMARY.md", s.dir)
-                },
+                file: format!("{}/SUMMARY.md", s.dir),
                 line: None,
                 column: None,
                 end_line: None,

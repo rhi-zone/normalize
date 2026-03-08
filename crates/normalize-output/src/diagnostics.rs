@@ -257,20 +257,29 @@ impl DiagnosticsReport {
         }
         out.push('\n');
 
-        // Only show errors and warnings in detail; info/hints are noisy and informational only
-        let actionable_issues: Vec<&Issue> = self
+        // Only show errors and warnings in detail; info/hints are noisy and informational only.
+        // Errors are always shown regardless of limit; limit applies only to warnings.
+        let error_issues: Vec<&Issue> = self
             .issues
             .iter()
-            .filter(|i| matches!(i.severity, Severity::Error | Severity::Warning))
+            .filter(|i| matches!(i.severity, Severity::Error))
+            .collect();
+        let warning_issues: Vec<&Issue> = self
+            .issues
+            .iter()
+            .filter(|i| matches!(i.severity, Severity::Warning))
             .collect();
 
-        let shown = if let Some(lim) = limit {
-            actionable_issues.len().min(lim)
-        } else {
-            actionable_issues.len()
-        };
+        let warning_limit = limit
+            .map(|l| l.saturating_sub(error_issues.len()))
+            .unwrap_or(warning_issues.len());
+        let shown_warnings = warning_issues.len().min(warning_limit);
+        let shown = error_issues.len() + shown_warnings;
 
-        for issue in actionable_issues.iter().take(shown) {
+        for issue in error_issues
+            .iter()
+            .chain(warning_issues.iter().take(shown_warnings))
+        {
             out.push_str(&format!(
                 "{}: {} [{}] {}\n",
                 issue.format_location(),
