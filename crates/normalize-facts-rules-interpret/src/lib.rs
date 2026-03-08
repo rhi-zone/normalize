@@ -34,9 +34,9 @@
 //! - `is_impl(file: String, name: String)` — symbol is a trait/interface implementation
 //! - `type_method(file: String, type_name: String, method_name: String)` — method signatures on types
 //!
-//! Output relations are read as diagnostics:
-//! - `warning(rule_id: String, message: String)` → produces warnings
-//! - `error(rule_id: String, message: String)` → produces errors
+//! Output relation — all diagnostics go here:
+//! - `diagnostic(severity, rule_id, file, line, message)` — severity = "warning"/"error"/"info"/"hint";
+//!   file = "" for no location; line = 0 when the source has no line info.
 
 use abi_stable::std_types::ROption;
 use ascent_eval::{Engine, Value};
@@ -64,8 +64,6 @@ relation symbol_range(String, String, u32, u32);
 relation implements(String, String, String);
 relation is_impl(String, String);
 relation type_method(String, String, String);
-relation warning(String, String);
-relation error(String, String);
 relation diagnostic(String, String, String, u32, String);
 "#;
 
@@ -516,9 +514,9 @@ pub fn run_rule(
     let mut diagnostics = run_rules_source(&rule.source, relations)?;
 
     // Filter out allowed diagnostics.
-    // For located diagnostics (from `diagnostic` relation), match the allow glob against
-    // the file path. For unlocated diagnostics (from `warning`/`error`), match against
-    // the message — file-level rules like orphan-file put the path in the message.
+    // For located diagnostics (file != ""), match the allow glob against the file path.
+    // For unlocated diagnostics, match against the message (e.g. hub-file puts module
+    // name in message).
     if !rule.allow.is_empty() {
         diagnostics.retain(|d| {
             let match_str = match d.location.as_ref() {
@@ -752,30 +750,15 @@ fn populate_facts(engine: &mut Engine, relations: &Relations) {
     }
 }
 
-/// Extract diagnostics from the warning/error output relations
+/// Extract diagnostics from the `diagnostic` output relation.
+///
+/// `diagnostic(severity, rule_id, file, line, message)`:
+/// - severity: "error", "warning", "info", "hint"
+/// - file: "" for no specific location
+/// - line: 0 when the fact source has no line info
 fn extract_diagnostics(engine: &Engine) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    if let Some(warnings) = engine.relation("warning") {
-        for tuple in warnings.iter() {
-            if let [Value::String(rule_id), Value::String(message)] = tuple {
-                diagnostics.push(Diagnostic::warning(rule_id, message));
-            }
-        }
-    }
-
-    if let Some(errors) = engine.relation("error") {
-        for tuple in errors.iter() {
-            if let [Value::String(rule_id), Value::String(message)] = tuple {
-                diagnostics.push(Diagnostic::error(rule_id, message));
-            }
-        }
-    }
-
-    // diagnostic(severity, rule_id, file, line, message) — located diagnostics.
-    // severity: "error", "warning", "info", "hint"
-    // file: "" for no specific location
-    // line: 0 when the fact source has no line info (e.g. the import relation)
     if let Some(diags) = engine.relation("diagnostic") {
         for tuple in diags.iter() {
             if let [

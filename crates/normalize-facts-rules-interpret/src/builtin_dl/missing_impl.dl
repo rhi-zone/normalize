@@ -30,7 +30,8 @@ impl_has_method(cls, method) <--
     implements(_, cls, _),
     parent(_, method, cls);
 
-warning("missing-impl", cls) <--
+diagnostic("warning", "missing-impl", file, line, cls) <--
     implements(_, cls, iface),
     interface_method(iface, method),
-    !impl_has_method(cls, method);
+    !impl_has_method(cls, method),
+    symbol(file, cls, _, line);

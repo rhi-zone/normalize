@@ -26,4 +26,4 @@ caller_fan_out(file, caller, c) <--
     call(file, caller, _, _),
     agg c = count() in call(file, caller, _, _);
 
-warning("fan-out", caller) <-- caller_fan_out(_, caller, c), if c > 50;
+diagnostic("warning", "fan-out", file, line, caller) <-- caller_fan_out(file, caller, c), if c > 50, symbol(file, caller, _, line);

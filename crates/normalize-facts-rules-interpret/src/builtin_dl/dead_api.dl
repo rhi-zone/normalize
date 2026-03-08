@@ -35,4 +35,4 @@ external_call(name) <--
     public_func(def_file, name),
     if caller_file != def_file;
 
-warning("dead-api", name) <-- public_func(_, name), !external_call(name);
+diagnostic("warning", "dead-api", file, line, name) <-- public_func(file, name), !external_call(name), symbol(file, name, _, line);

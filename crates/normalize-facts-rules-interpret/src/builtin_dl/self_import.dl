@@ -18,4 +18,4 @@
 # Almost never justified. There is no meaningful case where a file needs to
 # import itself.
 
-warning("self-import", file) <-- import(file, file, _);
+diagnostic("warning", "self-import", file, 0u32, file) <-- import(file, file, _);

@@ -23,5 +23,5 @@
 relation imports_file(String, String);
 imports_file(a, b) <-- import(a, b, _);
 
-warning("bidirectional-deps", a) <--
+diagnostic("warning", "bidirectional-deps", a, 0u32, a) <--
     imports_file(a, b), imports_file(b, a), if a < b;

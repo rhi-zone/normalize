@@ -26,4 +26,4 @@ import_count(to_module, c) <--
     import(_, to_module, _),
     agg c = count() in import(_, to_module, _);
 
-warning("hub-file", to_module) <-- import_count(to_module, c), if c > 30;
+diagnostic("warning", "hub-file", "", 0u32, to_module) <-- import_count(to_module, c), if c > 30;

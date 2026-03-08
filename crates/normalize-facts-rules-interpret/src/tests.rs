@@ -21,7 +21,7 @@ fn test_cycle_detection_interpreted() {
         reaches(from, to) <-- import(from, mid, _), reaches(mid, to);
         cycle(a, b) <-- reaches(a, b), reaches(b, a), if a < b;
 
-        warning("circular-deps", a) <-- cycle(a, _);
+        diagnostic("warning", "circular-deps", "", 0u32, a) <-- cycle(a, _);
     "#;
 
     let result = run_rules_source(rules, &relations).unwrap();
@@ -43,7 +43,7 @@ fn test_no_cycles() {
         reaches(from, to) <-- import(from, mid, _), reaches(mid, to);
         cycle(a, b) <-- reaches(a, b), reaches(b, a), if a < b;
 
-        warning("circular-deps", a) <-- cycle(a, _);
+        diagnostic("warning", "circular-deps", "", 0u32, a) <-- cycle(a, _);
     "#;
 
     let result = run_rules_source(rules, &relations).unwrap();
@@ -59,7 +59,7 @@ fn test_parse_rule_content_with_frontmatter() {
 # ---
 
 relation foo(String);
-warning("test-rule", x) <-- foo(x);
+diagnostic("warning", "test-rule", "", 0u32, x) <-- foo(x);
 "#;
 
     let rule = parse_rule_content(content, "fallback-id", false).unwrap();
@@ -72,7 +72,8 @@ warning("test-rule", x) <-- foo(x);
 
 #[test]
 fn test_parse_rule_content_without_frontmatter() {
-    let content = "relation foo(String);\nwarning(\"x\", y) <-- foo(y);";
+    let content =
+        "relation foo(String);\ndiagnostic(\"warning\", \"x\", \"\", 0u32, y) <-- foo(y);";
 
     let rule = parse_rule_content(content, "my-rule", false).unwrap();
     assert_eq!(rule.id, "my-rule");
@@ -88,7 +89,7 @@ fn test_parse_rule_content_disabled() {
 # enabled = false
 # ---
 
-warning("x", "y") <-- symbol(_, _, _, _);
+diagnostic("warning", "x", "", 0u32, "y") <-- symbol(_, _, _, _);
 "#;
 
     let rule = parse_rule_content(content, "x", false).unwrap();
@@ -114,7 +115,7 @@ fn test_allow_patterns() {
 # allow = ["**/tests/**", "**/*_test.py"]
 # ---
 
-warning("test-allow", file) <-- symbol(file, _, _, _);
+diagnostic("warning", "test-allow", "", 0u32, file) <-- symbol(file, _, _, _);
 "#;
 
     let mut relations = Relations::new();
@@ -149,7 +150,7 @@ fn test_negation() {
         called(name) <-- call(_, _, name, _);
         uncalled(name) <-- defined(name), !called(name);
 
-        warning("uncalled", name) <-- uncalled(name);
+        diagnostic("warning", "uncalled", "", 0u32, name) <-- uncalled(name);
     "#;
 
     let result = run_rules_source(rules, &relations).unwrap();
@@ -166,7 +167,7 @@ fn test_string_comparison_in_if() {
     let rules = r#"
         relation func(String, String);
         func(file, name) <-- symbol(file, name, kind, _), if kind == "function";
-        warning("func-found", name) <-- func(_, name);
+        diagnostic("warning", "func-found", "", 0u32, name) <-- func(_, name);
     "#;
 
     let result = run_rules_source(rules, &relations).unwrap();
@@ -185,7 +186,7 @@ fn test_aggregation_count() {
     let rules = r#"
         relation file_count(String, i32);
         file_count(file, c) <-- symbol(file, _, _, _), agg c = count() in symbol(file, _, _, _);
-        warning("big-file", file) <-- file_count(file, c), if c > 2;
+        diagnostic("warning", "big-file", "", 0u32, file) <-- file_count(file, c), if c > 2;
     "#;
 
     let result = run_rules_source(rules, &relations).unwrap();
@@ -258,10 +259,12 @@ fn test_god_file() {
 fn test_fan_out() {
     let mut relations = Relations::new();
     // Add 51 calls from the same function (threshold is >50)
+    relations.add_symbol("a.py", "orchestrator", "function", 1);
     for i in 0..51 {
         relations.add_call("a.py", "orchestrator", &format!("helper_{}", i), i);
     }
     // Add 3 calls from a simple function
+    relations.add_symbol("b.py", "simple", "function", 1);
     for i in 0..3 {
         relations.add_call("b.py", "simple", &format!("util_{}", i), i);
     }
@@ -319,8 +322,9 @@ fn test_duplicate_symbol_when_enabled() {
     let mut rule = parse_rule_content(builtin.content, builtin.id, true).unwrap();
     rule.enabled = true;
     let result = run_rule(&rule, &relations).unwrap();
-    assert_eq!(result.len(), 1);
-    assert_eq!(result[0].message.as_str(), "process");
+    // One diagnostic per file where the duplicate appears
+    assert_eq!(result.len(), 2);
+    assert!(result.iter().all(|d| d.message.as_str() == "process"));
 }
 
 #[test]
@@ -331,7 +335,7 @@ fn test_deny_promotes_warnings_to_errors() {
 # deny = true
 # ---
 
-warning("strict-rule", file) <-- symbol(file, _, _, _);
+diagnostic("warning", "strict-rule", "", 0u32, file) <-- symbol(file, _, _, _);
 "#;
 
     let mut relations = Relations::new();
@@ -483,7 +487,7 @@ fn test_visibility_relation() {
     let rules = r#"
         relation priv_func(String, String);
         priv_func(file, name) <-- visibility(file, name, vis), if vis == "private";
-        warning("private-func", name) <-- priv_func(_, name);
+        diagnostic("warning", "private-func", "", 0u32, name) <-- priv_func(_, name);
     "#;
 
     let result = run_rules_source(rules, &relations).unwrap();
@@ -501,7 +505,7 @@ fn test_attribute_relation() {
     let rules = r##"
         relation static_fn(String, String);
         static_fn(file, name) <-- attribute(file, name, attr), if attr == "@staticmethod";
-        warning("static-fn", name) <-- static_fn(_, name);
+        diagnostic("warning", "static-fn", "", 0u32, name) <-- static_fn(_, name);
     "##;
 
     let result = run_rules_source(rules, &relations).unwrap();
@@ -523,7 +527,7 @@ fn test_parent_relation() {
         method_count(file, cls, c) <--
             parent(file, _, cls),
             agg c = count() in parent(file, _, cls);
-        warning("big-class", cls) <-- method_count(_, cls, c), if c > 1;
+        diagnostic("warning", "big-class", "", 0u32, cls) <-- method_count(_, cls, c), if c > 1;
     "#;
 
     let result = run_rules_source(rules, &relations).unwrap();
@@ -541,7 +545,7 @@ fn test_qualifier_relation() {
     let rules = r#"
         relation self_call(String, String, String);
         self_call(file, caller, callee) <-- qualifier(file, caller, callee, q), if q == "self";
-        warning("self-call", callee) <-- self_call(_, _, callee);
+        diagnostic("warning", "self-call", "", 0u32, callee) <-- self_call(_, _, callee);
     "#;
 
     let result = run_rules_source(rules, &relations).unwrap();
@@ -563,7 +567,7 @@ fn test_symbol_range_relation() {
             symbol_range(file, name, start, end),
             let len = end - start,
             if len > 20u32;
-        warning("long-fn", name) <-- long_fn(_, name, _);
+        diagnostic("warning", "long-fn", "", 0u32, name) <-- long_fn(_, name, _);
     "#;
 
     let result = run_rules_source(rules, &relations).unwrap();
@@ -584,7 +588,7 @@ fn test_implements_relation() {
         impl_count(file, name, c) <--
             implements(file, name, _),
             agg c = count() in implements(file, name, _);
-        warning("multi-impl", name) <-- impl_count(_, name, c), if c > 1;
+        diagnostic("warning", "multi-impl", "", 0u32, name) <-- impl_count(_, name, c), if c > 1;
     "#;
 
     let result = run_rules_source(rules, &relations).unwrap();
@@ -600,7 +604,7 @@ fn test_is_impl_relation() {
     relations.add_is_impl("a.rs", "impl_method");
 
     let rules = r#"
-        warning("is-impl", name) <-- is_impl(_, name);
+        diagnostic("warning", "is-impl", "", 0u32, name) <-- is_impl(_, name);
     "#;
 
     let result = run_rules_source(rules, &relations).unwrap();
@@ -620,7 +624,7 @@ fn test_type_method_relation() {
         method_count(file, t, c) <--
             type_method(file, t, _),
             agg c = count() in type_method(file, t, _);
-        warning("rich-type", t) <-- method_count(_, t, c), if c > 1;
+        diagnostic("warning", "rich-type", "", 0u32, t) <-- method_count(_, t, c), if c > 1;
     "#;
 
     let result = run_rules_source(rules, &relations).unwrap();

@@ -28,4 +28,4 @@ nested4(file, d) <--
     parent(file, b, a),
     parent(file, a, _);
 
-warning("deep-nesting", d) <-- nested4(_, d);
+diagnostic("warning", "deep-nesting", file, line, d) <-- nested4(file, d), symbol(file, d, _, line);

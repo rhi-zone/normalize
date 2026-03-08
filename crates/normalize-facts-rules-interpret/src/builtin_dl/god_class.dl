@@ -32,4 +32,4 @@ type_method_count(file, cls, c) <--
     method_of(file, _, cls),
     agg c = count() in method_of(file, _, cls);
 
-warning("god-class", cls) <-- type_method_count(_, cls, c), if c > 20;
+diagnostic("warning", "god-class", file, line, cls) <-- type_method_count(file, cls, c), if c > 20, symbol(file, cls, _, line);

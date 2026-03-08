@@ -30,4 +30,5 @@ dup(name, file1, file2) <--
     if kind1 == "function",
     if kind2 == "function";
 
-warning("duplicate-symbol", name) <-- dup(name, _, _);
+diagnostic("warning", "duplicate-symbol", file1, line1, name) <-- dup(name, file1, _), symbol(file1, name, _, line1);
+diagnostic("warning", "duplicate-symbol", file2, line2, name) <-- dup(name, _, file2), symbol(file2, name, _, line2);

@@ -26,4 +26,4 @@ reaches(from, to) <-- import(from, to, _);
 reaches(from, to) <-- import(from, mid, _), reaches(mid, to);
 cycle(a, b) <-- reaches(a, b), reaches(b, a), if a < b;
 
-warning("circular-deps", a) <-- cycle(a, _);
+diagnostic("warning", "circular-deps", a, 0u32, a) <-- cycle(a, _);

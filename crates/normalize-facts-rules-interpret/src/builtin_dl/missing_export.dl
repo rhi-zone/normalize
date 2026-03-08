@@ -32,6 +32,6 @@ public_in_file(file, name) <--
 relation file_is_imported(String);
 file_is_imported(file) <-- import(_, file, _);
 
-warning("missing-export", file) <--
+diagnostic("warning", "missing-export", file, 0u32, file) <--
     public_in_file(file, _),
     !file_is_imported(file);

@@ -25,7 +25,7 @@
 relation is_test_symbol(String);
 is_test_symbol(file) <-- attribute(file, _, attr), if attr == "#[test]" || attr == "#[cfg(test)]" || attr == "@Test" || attr == "@test" || attr == "@pytest.mark";
 
-warning("layering-violation", from_file) <--
+diagnostic("warning", "layering-violation", from_file, 0u32, from_file) <--
     import(from_file, to_file, _),
     is_test_symbol(from_file),
     is_test_symbol(to_file),

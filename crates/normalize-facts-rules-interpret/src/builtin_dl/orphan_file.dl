@@ -29,4 +29,4 @@ has_symbols(file) <-- symbol(file, _, _, _);
 is_imported(to_module) <-- import(_, to_module, _);
 orphan(file) <-- has_symbols(file), !is_imported(file);
 
-warning("orphan-file", file) <-- orphan(file);
+diagnostic("warning", "orphan-file", file, 0u32, file) <-- orphan(file);
