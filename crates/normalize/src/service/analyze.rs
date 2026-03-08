@@ -620,6 +620,21 @@ impl AnalyzeService {
             .as_ref()
             .map(|t| root_path.join(t))
             .unwrap_or_else(|| root_path.clone());
+        if analysis_root.is_file() {
+            return crate::commands::analyze::complexity::analyze_file_complexity(&analysis_root)
+                .ok_or_else(|| {
+                    format!(
+                        "could not analyze '{}' — unsupported file type",
+                        analysis_root.display()
+                    )
+                });
+        }
+        if !analysis_root.is_dir() {
+            return Err(format!(
+                "'{}' is not a file or directory",
+                analysis_root.display()
+            ));
+        }
         Ok(
             crate::commands::analyze::complexity::analyze_codebase_complexity(
                 &analysis_root,
@@ -660,6 +675,21 @@ impl AnalyzeService {
             .as_ref()
             .map(|t| root_path.join(t))
             .unwrap_or_else(|| root_path.clone());
+        if analysis_root.is_file() {
+            return crate::commands::analyze::length::analyze_file_length(&analysis_root)
+                .ok_or_else(|| {
+                    format!(
+                        "could not analyze '{}' — unsupported file type",
+                        analysis_root.display()
+                    )
+                });
+        }
+        if !analysis_root.is_dir() {
+            return Err(format!(
+                "'{}' is not a file or directory",
+                analysis_root.display()
+            ));
+        }
         Ok(crate::commands::analyze::length::analyze_codebase_length(
             &analysis_root,
             effective_limit,

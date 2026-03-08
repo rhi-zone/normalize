@@ -289,12 +289,41 @@ fn resolve_patterns(
                     warnings.push(format!("@{} is disabled (matches nothing)", name));
                 }
             }
+        } else if looks_like_language_name(pattern) {
+            // Bare words like "rust" or "Rust" are not valid glob patterns and will
+            // silently match nothing. Detect this early and emit a helpful error.
+            let matched_lang = languages
+                .iter()
+                .find(|l| l.eq_ignore_ascii_case(pattern))
+                .copied();
+            if let Some(lang) = matched_lang {
+                return Err(format!(
+                    "'{pattern}' is not a valid pattern — use a glob like '*.ext' or an alias like '@tests' (run 'normalize aliases' to list available aliases; detected language: {lang})"
+                ));
+            } else {
+                return Err(format!(
+                    "'{pattern}' is not a valid pattern — use a glob like '*.rs' or an alias like '@tests' (run 'normalize aliases' to list available aliases)"
+                ));
+            }
         } else {
             result.push(pattern.clone());
         }
     }
 
     Ok(result)
+}
+
+/// Returns true if `pattern` looks like a bare language name rather than a glob.
+///
+/// A bare language name has no glob metacharacters (`*`, `?`, `{`, `[`),
+/// no path separator (`/`), and no file-extension dot (`.`). These patterns
+/// are unambiguously user errors — they will silently match nothing as globs.
+fn looks_like_language_name(pattern: &str) -> bool {
+    !pattern.is_empty()
+        && !pattern.contains(['*', '?', '{', '[', '/', '.'])
+        && pattern
+            .chars()
+            .all(|c| c.is_alphabetic() || c == '-' || c == '_')
 }
 
 /// Resolve a single alias name to patterns.
@@ -464,6 +493,35 @@ mod tests {
         assert!(filter.is_active());
         assert!(filter.matches(Path::new("foo.rs")));
         assert!(!filter.matches(Path::new("foo.go")));
+    }
+
+    #[test]
+    fn test_bare_language_name_error() {
+        let config = AliasConfig::default();
+        // "rust" looks like a language name — should error with a helpful message
+        let result = Filter::new(&[], &["rust".to_string()], &config, &["Rust"]);
+        assert!(result.is_err());
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
+        let err = result.unwrap_err();
+        assert!(err.contains("'rust' is not a valid pattern"), "got: {err}");
+        assert!(
+            err.contains("Rust"),
+            "should mention detected language, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_bare_language_name_no_detected_language() {
+        let config = AliasConfig::default();
+        // "python" not in detected languages — still errors with generic hint
+        let result = Filter::new(&[], &["python".to_string()], &config, &["Rust"]);
+        assert!(result.is_err());
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("'python' is not a valid pattern"),
+            "got: {err}"
+        );
     }
 
     #[test]

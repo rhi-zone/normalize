@@ -14,6 +14,26 @@ extract, inline, move — correct, without LSPs, without false positives.
 2. **Comprehensive language fixtures** (long-term, nix flake verification)
    - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
 
+## CLI UX Audit (2026-03-08)
+
+An external agent audited the CLI for usability and discoverability. Full report:
+`docs/cli-ux-audit.md`. Actionable bugs found:
+
+1. **`sessions stats --group-by` flag not wired up** — documented in ecosystem CLAUDE.md,
+   backend implemented, but missing from clap args. High impact: breaks daily log workflow.
+2. **`sessions show`/`sessions analyze` ignore `CLAUDE_SESSIONS_DIR`, no `--project` flag** —
+   must run from correct cwd. `sessions list` has `--project`; these don't.
+3. ~~**`--only <lang>` silently returns nothing**~~ — FIXED (2026-03-08). Bare language names now
+   emit a helpful error: `'rust' is not a valid pattern — use a glob like '*.ext' or an alias like
+   '@tests'`. Implemented in `normalize-filter/src/lib.rs` via `looks_like_language_name()` check
+   in `resolve_patterns()`. When the bare word matches a detected language, the error names it.
+4. ~~**`analyze complexity <single-file>` silently returns nothing**~~ — FIXED (2026-03-08).
+   `analyze complexity` and `analyze length` now detect single-file input and call `analyze_file_*`
+   directly; nonexistent paths return a clear error. Fixed in `service/analyze.rs`.
+5. **`view --full` appears to be a no-op** — help says "show full source" but output is still an outline.
+
+See `docs/cli-ux-audit.md` for reproduction steps and suggested fixes.
+
 ## Session Queue (2026-03-09)
 
 Ordered by impact × tractability. Pick from top.

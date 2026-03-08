@@ -59,7 +59,7 @@ pub async fn build_view_service(
     raw: bool,
     _focus: Option<&str>,
     _resolve_imports: bool,
-    _full: bool,
+    full: bool,
     docstring_mode: DocstringDisplay,
     context: bool,
     show_parent: bool,
@@ -214,6 +214,20 @@ pub async fn build_view_service(
             raw,
             filter.as_ref(),
         )
+    } else if full && unified.symbol_path.is_empty() {
+        // --full: emit the raw source of the entire file
+        let full_path = root.join(&unified.file_path);
+        let content = std::fs::read_to_string(&full_path)
+            .map_err(|e| format!("Error reading {}: {}", unified.file_path, e))?;
+        let grammar =
+            normalize_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
+        Ok(report::ViewOutput::FileContent(
+            report::ViewFileContentReport {
+                path: unified.file_path,
+                content,
+                grammar,
+            },
+        ))
     } else if unified.symbol_path.is_empty() {
         file::build_view_file_service(
             &unified.file_path,
