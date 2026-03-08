@@ -7,9 +7,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 Production-grade refactoring across all ~98 languages. Goal: rename, find-references,
 extract, inline, move — correct, without LSPs, without false positives.
 
-1. **locals.scm for remaining languages** — Write `locals.scm` for 77+ languages still missing it.
-   Each must be accompanied by fixture tests before it counts as done (unverified = worse than none).
-   - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
+1. ~~**locals.scm for remaining languages**~~ — DONE (2026-03-09). 65 locals.scm files written,
+   all grammar-backed languages covered with 159 fixture tests. The 6 languages with tags.scm but
+   no locals.scm (graphql, markdown, nginx, scss, svelte, vue) are intentionally skipped — data
+   formats or injection languages with no meaningful scope semantics. See `docs/locals-scm.md`.
 
 2. **Comprehensive language fixtures** (long-term, nix flake verification)
    - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
@@ -19,10 +20,8 @@ extract, inline, move — correct, without LSPs, without false positives.
 An external agent audited the CLI for usability and discoverability. Full report:
 `docs/cli-ux-audit.md`. Actionable bugs found:
 
-1. **`sessions stats --group-by` flag not wired up** — documented in ecosystem CLAUDE.md,
-   backend implemented, but missing from clap args. High impact: breaks daily log workflow.
-2. **`sessions show`/`sessions analyze` ignore `CLAUDE_SESSIONS_DIR`, no `--project` flag** —
-   must run from correct cwd. `sessions list` has `--project`; these don't.
+1. ~~**`sessions stats --group-by` flag not wired up**~~ — DONE (2026-03-09).
+2. ~~**`sessions show`/`sessions analyze` ignore `CLAUDE_SESSIONS_DIR`, no `--project` flag**~~ — DONE (2026-03-09).
 3. ~~**`--only <lang>` silently returns nothing**~~ — FIXED (2026-03-08). Bare language names now
    emit a helpful error: `'rust' is not a valid pattern — use a glob like '*.ext' or an alias like
    '@tests'`. Implemented in `normalize-filter/src/lib.rs` via `looks_like_language_name()` check
@@ -30,7 +29,7 @@ An external agent audited the CLI for usability and discoverability. Full report
 4. ~~**`analyze complexity <single-file>` silently returns nothing**~~ — FIXED (2026-03-08).
    `analyze complexity` and `analyze length` now detect single-file input and call `analyze_file_*`
    directly; nonexistent paths return a clear error. Fixed in `service/analyze.rs`.
-5. **`view --full` appears to be a no-op** — help says "show full source" but output is still an outline.
+5. ~~**`view --full` appears to be a no-op**~~ — DONE (2026-03-09). Now correctly emits raw file source.
 
 See `docs/cli-ux-audit.md` for reproduction steps and suggested fixes.
 
@@ -437,21 +436,11 @@ for within-file scope/reference resolution, facts index for cross-file import/ex
   tree-sitter does not support. One level of object/array destructuring IS covered for JS/TS/TSX.
   Fixing deeper nesting would require engine-level recursion (walk into nested patterns).
 
-**Write locals.scm for remaining languages** (scope/reference queries — not type inference,
-just: which declaration does this identifier refer to?):
-- Each locals.scm must be accompanied by fixtures before it counts as done.
-  An unverified locals.scm is worse than none — it produces silent wrong renames.
-- [ ] High-value tier (most-used, well-understood grammars): rust, python, go, java, c, cpp,
-      c_sharp, kotlin, ruby, php, bash, zig, dart, elixir, erlang, haskell (already done), clojure
-- [ ] Medium tier: julia, nim, crystal, d, groovy, perl, fortran, cobol, pascal, prolog, racket,
-      scheme, common_lisp, janet, fennel, haxe, actionscript, coffeescript, purescript, reason,
-      solidity, move, wren, v
-- [ ] Config/DSL tier (simpler scoping rules): toml, yaml, json (trivially no locals), css, scss,
-      less, graphql, proto, thrift (already done), wasm, wat
-- [ ] Markup/template tier (inject into embedded languages): html, markdown, jinja, liquid, erb,
-      vue (already done), svelte (already done), astro
-- [ ] Niche/legacy tier: awk, sed (trivial), make, cmake, meson, nix (already done), dhall,
-      cue, nickel, kdl, ron
+~~**Write locals.scm for remaining languages**~~ — DONE (2026-03-09). 65 locals.scm files
+written covering all grammar-backed languages (159 fixture tests). 6 languages have tags.scm
+but no locals.scm and are intentionally skipped: graphql, markdown, nginx, scss, svelte, vue
+(data formats or injection languages with no meaningful scope semantics). See `docs/locals-scm.md`
+for the full coverage table and rationale for each skip.
 
 **Language implementation depth** (not a known limitation — a bug):
 Most of the 98 language impls return empty for imports, complexity, docstrings, type extraction,
