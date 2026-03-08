@@ -2,16 +2,6 @@
 
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
-## Current Threads
-
-Three active work streams, roughly in parallel:
-
-1. **Graph / index query exposure** — extend `analyze graph` with dead-symbol detection, cycle surfacing, reverse-dependency queries, Ca/Ce coupling metrics. Data already in index; mostly query + output work. See [Index query exposure](#index-query-exposure--extend-analyze-graph-data-already-in-index) below.
-
-2. **Rules engine consolidation** — finish unifying output (one `DiagnosticsReport`, one banner), migrate more `analyze` checks into rules as appropriate, parallelize engine passes, improve asymptotic complexity (currently rebuilds full index each run). See [Rules Unification](#rules-unification--facts--structure-rename) below.
-
-3. **Language trait + .scm coverage** — proper support for all ~98 languages means: all `.scm` files (`tags.scm`, `locals.scm`, `highlights.scm`, etc.) wired up correctly, AND all Language trait methods fully implemented (symbols, imports, calls, visibility, test detection, etc.), each backed by fixture tests. Unverified = worse than none. See [Language Capability Traits](#language-capability-traits) and [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure) below.
-
 ## Priorities
 
 Production-grade refactoring across all ~98 languages. Goal: rename, find-references,
@@ -28,26 +18,17 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 Ordered by impact × tractability. Pick from top.
 
-0. ~~**Rules config consolidation**~~ — DONE (2026-03-09). One canonical `RulesConfig`/`RuleOverride`
-   in `normalize-rules`, one `[rules]` TOML section, conversion to sub-crate types at
-   the boundary. `facts_rules` field removed from `RulesRunConfig` and `AnalyzeConfig`.
-
-0a. **CLI usability / discoverability audit** — An agent working in a different directory had to
-    grep source code to figure out that rule overrides go under `[rules."rule-id"]`.
-    Goal: every command should be self-documenting enough that users never need to read source.
-    Concretely:
-    - `normalize rules list` should show the config key for each rule (e.g. `[rules."rust/foo"]`)
-    - `normalize rules show <id>` should print exactly what TOML to add to configure it
-    - `normalize init --setup` should emit config snippets, not just enable/disable IDs
-    - `normalize rules --help` (and all subcommands) should reference the config file section
-    - Consider `normalize config show` / `normalize config explain <rule-id>` commands
-    - Audit every top-level and sub-level `--help` output for missing/confusing entries
-    Friction = improvement opportunity; document all discovered gaps in `docs/usability.md`.
-
-1. ~~**Fix `normalize rules run` output**~~ — DONE (2026-03-08). Unified banner, colors, severity
-   counts, global allow pattern. Also fixed: fact rules used scan target instead of project root
-   for index lookup, causing "no such column: resolved_file" when running on a subdirectory
-   (fixed 2026-03-09: `collect_fact_diagnostics` now receives `project_root`).
+1. **Fix `normalize rules run` output** — broken in three ways:
+   - Multiple engines (syntax, fact) each print their own summary banner ("12 issues found:" then
+     "No issues found (8 rules checked). Done") — clearly two separate passes being concatenated
+     instead of merged into one `DiagnosticsReport` before rendering
+   - No colors — `format_pretty()` on `DiagnosticsReport` needs terminal color support
+   - Missing counts by severity (errors: N, warnings: N, info: N) in the summary line
+   - `**/tests/fixtures/**` violations show up in output — fixture files contain intentionally bad
+     code and must be globally excluded. Many rules already have `allow = ["**/tests/fixtures/**"]`
+     but not all. Add a global allow in `.normalize/config.toml` rather than per-rule.
+   Root cause: `run_rules_report()` in `service/rules.rs` — investigate how engines are merged.
+   See: `crates/normalize/src/service/rules.rs`, `crates/normalize/src/commands/rules_cmd.rs`
 
 2. ~~**Eliminate `cmd_*` layer**~~ — DONE (2026-03-08). Dead wrappers in `commands/analyze/`,
    `commands/view/`, and `commands/rules.rs` deleted. `commands/rules.rs` still has
@@ -59,7 +40,7 @@ Ordered by impact × tractability. Pick from top.
    `collect_symbols_from_tags()` is the primary path; Language trait has only 3 required methods.
    ~~**tags.scm migration cleanup**~~ — DONE. `definition.var` mapped to `SymbolKind::Variable` in
    `tags_capture_to_kind` (parity with normalize-deps). Stale `container_kinds`/`function_kinds`
-   references removed from normalize-edit, markdown.rs, registry.rs, and 65 language audit comments.
+   references removed from normalize-edit, markdown.rs, registry.rs, and 68 language audit comments.
 
 3. ~~**Remaining info/warning noise (batch-fix)**~~ — DONE. Production code is clean.
 
@@ -164,15 +145,6 @@ Future improvements:
 - Configurable debounce interval
 - Progress reporting during long runs
 
-## `unused-import` rule: improve indexer coverage
-
-Currently suppressed for `*.rs`, `*.ts`, `*.tsx`, `*.scm` files because the `call` relation doesn't capture:
-- **Rust**: type references, trait bounds, derive macro usage (`#[derive(Serialize)]` doesn't generate a `call` for `Serialize`)
-- **TypeScript/TSX**: JSX component usage (`<For>`) and namespace-qualified calls (`vscode.X` doesn't generate a `call` for `vscode`)
-- **SCM**: tree-sitter query files indexed as if they had imports
-
-Fix: extend the fact indexer to emit additional relations for type-reference and JSX usage, or add a `used_as_type(file, name)` relation that `unused-import.dl` checks alongside `used_name`.
-
 ## Next Up
 
 ### ~~Audit `rust/unwrap-in-impl`~~ — COMPLETE
@@ -246,50 +218,28 @@ The `Language` trait has several methods that return `&'static [&'static str]` �
 tree-sitter node type names. These are tree-sitter queries expressed as Rust data instead of
 using the query system. See `docs/architecture-decisions.md` ("scm Query Files over Rust").
 
-**Current state (2026-03-08 audit):** 69 languages total. Per query type:
-- `*.tags.scm`:       68 files, **49 registered** — 20 files exist but unregistered (dead code!)
-- `*.calls.scm`:      68 files, 68 registered — complete (graphql added)
-- `*.complexity.scm`: 69 files, 69 registered — complete
-- `*.imports.scm`:    69 files, 69 registered — complete
-- `*.types.scm`:      47 files, **42 registered** — 6 files unregistered; gaps in lua/perl/scheme/etc.
+**CRITICAL: Flesh out language coverage** — current counts are abysmal:
+- `*.complexity.scm`: Missing: all others that have `complexity_nodes()` in their Language impl.
+  Every language that has a grammar should have one.
+- `*.calls.scm`: Missing every other language with function calls — a language without calls.scm
+  produces zero call graph data — silently broken.
+- `*.types.scm`: Missing every typed language — c_sharp, java, kotlin, swift, c, cpp, scala, go, etc.
 
-**Fixture tests added (2026-03-08):** 75 tests (15 langs × 5 query types); skips when `target/grammars/` absent. Covers rust, python, go, typescript, java, ruby, kotlin, swift, scala, php, dart, elixir, c, cpp, c-sharp. Tests only verify presence of expected names — every .scm file could produce wrong captures and tests would pass for unlisted symbols.
+For each: write the `.scm`, add to `bundled_*_query()` in `grammar_loader.rs`, verify with a
+fixture test. Target: coverage matching `locals.scm` (65 languages).
 
-#### Step 0: Register existing unregistered files — IMMEDIATE, trivial
-Files exist in `queries/` but are missing from `bundled_*_query()` in `grammar_loader.rs`.
-Just add `include_str!` lines. No new files needed.
-
-**tags.scm** (20 unregistered): `agda`, `awk`, `cmake`, `glsl`, `hcl`, `hlsl`, `jq`,
-`matlab`, `meson`, `nginx`, `scss`, `sql`, `starlark`, `svelte`, `tlaplus`, `typst`,
-`verilog`, `vhdl`, `vim`, `vue`
-
-**types.scm** (6 unregistered): `clojure`, `commonlisp`, `elisp`, `javascript`, `lua`, `scheme`
-
-- [x] Wire all 26 into `bundled_tags_query` / `bundled_types_query`
-
-#### Step 1: Fixture test framework — HIGH VALUE
-No test verifies query correctness — only presence. Need:
-- Sample code files per language under `crates/normalize-languages/tests/fixtures/<lang>/sample.<ext>`
-- Tests that run each query type against sample code and assert expected captures
-- Snapshot or explicit expected output
-- Start with the 5 highest-use languages (rust, go, python, typescript, java), expand from there
-
-- [x] Design and implement fixture test framework for .scm queries — `crates/normalize-languages/tests/query_fixtures.rs`; 25 tests (5 langs × 5 query types); skips when `target/grammars/` absent; run with `cargo xtask build-grammars && cargo test -p normalize-languages`
-- [x] Add fixture tests for rust, go, python, typescript, java (all 5 query types each) — done as part of above
-
-#### Step 2: Remaining content gaps
-- [x] `graphql.calls.scm` — only real programming language still missing calls (field selections, directives, fragment spreads)
-- [ ] `types.scm` for `lua`, `perl`, `bash`/`zsh` (judgment call — dynamic langs have limited types)
-- [ ] `prolog.types.scm`, `vim.types.scm` — niche but tractable
-
-#### Step 3: Wire tags.scm into symbol extraction — replace Language trait node-classification methods
-`tags.scm` makes these trait methods redundant once step 0 is complete:
-`container_kinds()`, `function_kinds()`, `type_kinds()`, `public_symbol_kinds()`,
-`extract_function()`, `extract_container()`, `extract_type()`. Replace extractor's
-node-kind dispatch with generic query runner over `@name.definition.*` captures.
-Language trait shrinks from ~25 methods to ~8 genuinely semantic ones.
-**This is the single highest-leverage refactor remaining in the codebase.**
-
+- [ ] **Wire tags.scm into symbol extraction — replace Language trait node-classification
+  methods entirely.** `tags.scm` makes the following trait methods redundant:
+  `container_kinds()`, `function_kinds()`, `type_kinds()`, `public_symbol_kinds()`,
+  `extract_function()`, `extract_container()`, `extract_type()`. Replace the extractor's
+  node-kind dispatch with a generic query runner: load `get_tags(grammar)`, run it, derive
+  `Symbol` from each `@name.definition.*` capture (kind from capture name, lines from
+  parent node, name from capture text). The Language trait shrinks from ~25 methods to
+  ~8 genuinely semantic ones:
+  - Keep: `extract_docstring()`, `get_visibility()`, `is_public()`, `is_test_symbol()`,
+    `test_file_globs()`, `format_import()`, `signature_suffix()`, `embedded_content()`
+  - Delete: everything that just encodes node type names as `&'static [&'static str]`
+  This is the single highest-leverage refactor remaining in the codebase.
 - [ ] **`*.imports.scm`** — import/require statement extraction. Would replace `import_kinds()`
   + `extract_imports()` across ~98 language impls. Captures: `@import.path`, `@import.name`.
 - [ ] Implement calls.scm for all languages that have call extraction
@@ -481,20 +431,7 @@ See `docs/design/rules-unification.md` for full design.
    ```
    Tools that emit JSON (not SARIF) need a `format = "json"` adapter — stretch goal.
 
-6. **Delete `normalize analyze check`** — subsumed by `normalize rules run --engine native`.
-   `service/analyze.rs::check()` and associated `commands/analyze/check_refs.rs` logic already
-   run as part of the native engine (`service/rules.rs`). Steps:
-   - Remove `pub async fn check(...)` from `service/analyze.rs` and its `display_check` helper
-   - Remove `AnalyzeCommand::Check` arm from `args.rs` dispatch
-   - The `build_*_report` functions in `commands/analyze/` stay — they're called by `service/rules.rs`
-   - Update any docs referencing `normalize analyze check`
-   Pre-commit already updated to use `normalize rules run` (2026-03-08).
-
-7. **Extract native checks to `normalize-native-rules` crate** — `build_check_refs_report`,
-   `build_stale_summary_report`, `build_stale_docs_report`, `build_check_examples_report` live
-   in `normalize/src/commands/analyze/`. Per architecture: reusable domain logic belongs in a
-   domain crate, not the main binary. Target: `normalize-native-rules` crate, depended on by
-   both `normalize` (service/rules.rs) and any future consumers (LSP, CI tool).
+6. **`normalize analyze check` help text is scuff** — "Use flags to run specific checks only" appears in the doc comment and gets repeated as-is. Rewrite the doc comment as a single clean sentence; the individual `--flag` help strings carry the per-flag detail. No need to enumerate flags in the top-level description.
 
 2. **Lift `rules` to top level** — DONE. `normalize rules` is now top-level. `--type` → `--engine`. `normalize facts rules` and `normalize facts check` removed. `normalize syntax` retains only `ast` and `query`.
 
@@ -605,20 +542,6 @@ See `docs/lint-architecture.md` for full design discussion.
 - CodeQL: deep analysis (types, data flow, taint), ~12 languages
 - normalize: structural/architectural analysis, ~98 languages
 - Focus areas: circular deps, unused exports, module boundaries, import graph metrics
-
-**Index query exposure — extend `analyze graph` (data already in index):**
-
-These belong under `analyze graph` as new `--on` modes or flags, not as separate top-level commands. Keeps surface area down; they're all graph operations.
-
-- [x] `analyze graph --on modules --dead` — DONE (2026-03-09). `dead_nodes` field in `GraphReport`; rendered in both text/pretty output; `dead_node_count` in stats summary line.
-- [ ] `analyze graph --on modules --cycles` — surface SCCs as human-readable cycle lists. Already computed (`nontrivial_scc_count`, `sccs`); just needs a clearer dedicated output mode.
-- [x] `analyze graph --dependents <file>` — DONE (2026-03-09). New `normalize analyze dependents --file <path>` command; uses reverse BFS over module import graph; `DependentsReport` with pretty/text output.
-- [ ] `analyze graph --on modules --coupling` — Ca (afferent), Ce (efferent), instability `I = Ce/(Ca+Ce)` per file. Standard SE metrics; index has the data. Check if existing `coupling` command already exposes these.
-- [ ] `analyze graph --on modules --hotspots` — most-imported files, most-called functions. Check if existing `hotspots` command uses index or just git churn.
-
-**Index query exposure — requires new extraction:**
-- [ ] Cohesion (LCOM) — needs method→field access tracking per class/struct. `analyze graph --on symbols` has symbol-level edges but LCOM requires knowing which methods access which fields within a container — finer-grained than current graph.
-- [ ] Churn correlation — needs git log integration; correlate high-coupling files with high churn to surface real debt hotspots.
 
 **Backlog - Deep Analysis (CodeQL-style):**
 - [ ] Type extraction for top languages (TS, Python, Rust, Go)
