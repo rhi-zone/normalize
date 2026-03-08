@@ -16,6 +16,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 server-less = { workspace = true, optional = true }
+normalize-core = { path = "../normalize-core", version = "0.1.0" }
 normalize-output = { path = "../normalize-output", version = "0.1.0" }
 normalize-syntax-rules = { path = "../normalize-syntax-rules", version = "0.1.0" }
 normalize-facts-rules-interpret = { path = "../normalize-facts-rules-interpret", version = "0.1.0" }

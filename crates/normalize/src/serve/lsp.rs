@@ -840,7 +840,6 @@ async fn run_and_publish_diagnostics(
         let rules_config = normalize_rules::RulesRunConfig {
             rule_tags: config.rule_tags.0.clone(),
             rules: config.analyze.rules.clone(),
-            facts_rules: config.analyze.facts_rules.clone(),
             sarif_tools: config
                 .analyze
                 .sarif_tools

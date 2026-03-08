@@ -4043,6 +4043,7 @@ dependencies = [
  "dirs",
  "glob",
  "libsql",
+ "normalize-core",
  "normalize-facts",
  "normalize-facts-rules-api",
  "normalize-facts-rules-interpret",

@@ -45,7 +45,7 @@ pub mod uniqueness;
 
 use crate::filter::Filter;
 use normalize_core::Merge;
-pub use normalize_syntax_rules::{RuleOverride, RulesConfig};
+pub use normalize_rules::{RuleOverride, RulesConfig};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -73,12 +73,9 @@ pub struct AnalyzeConfig {
     /// Patterns to exclude from hotspots analysis (e.g., generated code, lock files)
     #[serde(default)]
     pub hotspots_exclude: Vec<String>,
-    /// Syntax rules configuration
+    /// Rules configuration (syntax + fact + native engines)
     #[serde(default)]
     pub rules: RulesConfig,
-    /// Fact rules (Datalog) configuration
-    #[serde(default, rename = "facts-rules")]
-    pub facts_rules: normalize_facts_rules_interpret::FactsRulesConfig,
     /// Default lines of context to show in query preview
     #[serde(rename = "query-context-lines")]
     pub query_context_lines: Option<usize>,

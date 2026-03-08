@@ -28,13 +28,21 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 Ordered by impact × tractability. Pick from top.
 
-0. **Rules config consolidation** — CRITICAL. Three engines use parallel duplicate config types:
-   - Syntax + native: `normalize_syntax_rules::RulesConfig` / `RuleOverride` → `[analyze.rules]`
-   - Fact: `normalize_facts_rules_interpret::FactsRulesConfig` / `FactsRuleOverride` → `[analyze.facts-rules]`
-   - Native has no section; borrows syntax's `[analyze.rules]` as an accident
-   Goal: one `RuleOverride` type in `normalize-rules` (the crate already owns orchestration),
-   one `[analyze.rules]` section covering all engines, loaded once, applied uniformly.
-   The "unified" engine is only unified in name until the config is unified too.
+0. ~~**Rules config consolidation**~~ — DONE (2026-03-09). One canonical `RulesConfig`/`RuleOverride`
+   in `normalize-rules`, one `[analyze.rules]` TOML section, conversion to sub-crate types at
+   the boundary. `facts_rules` field removed from `RulesRunConfig` and `AnalyzeConfig`.
+
+0a. **CLI usability / discoverability audit** — An agent working in a different directory had to
+    grep source code to figure out that rule overrides go under `[analyze.rules."rule-id"]`.
+    Goal: every command should be self-documenting enough that users never need to read source.
+    Concretely:
+    - `normalize rules list` should show the config key for each rule (e.g. `[analyze.rules."rust/foo"]`)
+    - `normalize rules show <id>` should print exactly what TOML to add to configure it
+    - `normalize init --setup` should emit config snippets, not just enable/disable IDs
+    - `normalize rules --help` (and all subcommands) should reference the config file section
+    - Consider `normalize config show` / `normalize config explain <rule-id>` commands
+    - Audit every top-level and sub-level `--help` output for missing/confusing entries
+    Friction = improvement opportunity; document all discovered gaps in `docs/usability.md`.
 
 1. ~~**Fix `normalize rules run` output**~~ — DONE (2026-03-08). Unified banner, colors, severity
    counts, global allow pattern. Also fixed: fact rules used scan target instead of project root

@@ -189,6 +189,7 @@ impl RulesService {
         if fix {
             let debug_flags = normalize_syntax_rules::DebugFlags::from_args(&debug);
             let exit_code = tokio::task::spawn_blocking(move || {
+                let syntax_cfg = crate::runner::to_syntax_config(&config.rules);
                 crate::cmd_rules::cmd_rules(
                     &target_root,
                     &project_root,
@@ -198,7 +199,7 @@ impl RulesService {
                     false,
                     true,
                     false,
-                    &config.rules,
+                    &syntax_cfg,
                     &debug_flags,
                 )
             })
@@ -425,9 +426,7 @@ pub fn load_rules_config(root: &Path) -> RulesRunConfig {
     #[derive(serde::Deserialize, Default)]
     #[serde(default)]
     struct AnalyzeSection {
-        rules: normalize_syntax_rules::RulesConfig,
-        #[serde(rename = "facts-rules")]
-        facts_rules: normalize_facts_rules_interpret::FactsRulesConfig,
+        rules: crate::runner::RulesConfig,
         #[serde(rename = "sarif-tools")]
         sarif_tools: Vec<crate::runner::SarifTool>,
     }
@@ -455,11 +454,6 @@ pub fn load_rules_config(root: &Path) -> RulesRunConfig {
     } else {
         project.analyze.rules
     };
-    let facts_rules = if content.is_empty() {
-        global.analyze.facts_rules
-    } else {
-        project.analyze.facts_rules
-    };
     let sarif_tools = if project.analyze.sarif_tools.is_empty() {
         global.analyze.sarif_tools
     } else {
@@ -469,7 +463,6 @@ pub fn load_rules_config(root: &Path) -> RulesRunConfig {
     RulesRunConfig {
         rule_tags,
         rules,
-        facts_rules,
         sarif_tools,
     }
 }

@@ -15,11 +15,11 @@ pub mod runner;
 pub mod service;
 
 pub use runner::{
-    ListFilters, RuleEntry, RuleType, RulesListReport, RulesRunConfig, SarifTool,
-    abi_diagnostic_to_issue, apply_native_rules_config, build_list_report,
+    ListFilters, RuleEntry, RuleOverride, RuleType, RulesConfig, RulesListReport, RulesRunConfig,
+    SarifTool, abi_diagnostic_to_issue, apply_native_rules_config, build_list_report,
     build_relations_from_index, cmd_add, cmd_enable_disable, cmd_list, cmd_remove, cmd_show,
     cmd_tags, cmd_update, collect_fact_diagnostics, finding_to_issue, run_rules_report,
-    run_sarif_tools,
+    run_sarif_tools, to_facts_config, to_syntax_config,
 };
 
 #[cfg(feature = "cli")]
