@@ -40,7 +40,6 @@ pub mod grammars;
 pub mod history;
 pub mod init;
 pub mod package;
-pub mod rules;
 pub mod sessions;
 pub mod text_search;
 pub mod tools;

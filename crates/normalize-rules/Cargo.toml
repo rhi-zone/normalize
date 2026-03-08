@@ -1,0 +1,36 @@
+[package]
+name = "normalize-rules"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Rule orchestration and CLI service for normalize (syntax + fact + native + SARIF engines)"
+
+[features]
+default = []
+# Enable CLI service registration via server-less proc macro
+cli = ["dep:server-less"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+server-less = { workspace = true, optional = true }
+normalize-output = { path = "../normalize-output", version = "0.1.0" }
+normalize-syntax-rules = { path = "../normalize-syntax-rules", version = "0.1.0" }
+normalize-facts-rules-interpret = { path = "../normalize-facts-rules-interpret", version = "0.1.0" }
+normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.1.0" }
+normalize-native-rules = { path = "../normalize-native-rules", version = "0.1.0" }
+normalize-facts = { path = "../normalize-facts", version = "0.1.0" }
+normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
+normalize-rules-loader = { path = "../normalize-rules-loader", version = "0.1.0" }
+abi_stable = "0.11"
+glob = "0.3.3"
+toml = { workspace = true }
+toml_edit = "0.22"
+nu-ansi-term = "0.50"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+ureq = { version = "2", features = ["json"] }
+dirs = "5"
+libsql = { workspace = true }
+schemars = "1"

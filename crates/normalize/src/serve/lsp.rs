@@ -837,14 +837,28 @@ async fn run_and_publish_diagnostics(
     let root_owned = root.to_path_buf();
     let report = tokio::task::spawn_blocking(move || {
         let config = crate::config::NormalizeConfig::load(&root_owned);
-        crate::commands::rules::run_rules_report(
+        let rules_config = normalize_rules::RulesRunConfig {
+            rule_tags: config.rule_tags.0.clone(),
+            rules: config.analyze.rules.clone(),
+            facts_rules: config.analyze.facts_rules.clone(),
+            sarif_tools: config
+                .analyze
+                .sarif_tools
+                .iter()
+                .map(|t| normalize_rules::SarifTool {
+                    name: t.name.clone(),
+                    command: t.command.clone(),
+                })
+                .collect(),
+        };
+        normalize_rules::run_rules_report(
             &root_owned,
             &root_owned,
             None,
             None,
-            &crate::commands::rules::RuleType::All,
+            &normalize_rules::RuleType::All,
             &[],
-            &config,
+            &rules_config,
         )
     })
     .await;

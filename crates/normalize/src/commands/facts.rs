@@ -299,7 +299,7 @@ pub fn cmd_check_service(
         .map_err(|e| format!("Failed to get current directory: {e}"))?;
     let config = crate::config::NormalizeConfig::load(&effective_root);
     let rules_file_path = rules_file.map(PathBuf::from);
-    let exit_code = super::rules::cmd_run_facts(
+    let exit_code = normalize_rules::runner::cmd_run_facts(
         &effective_root,
         rules_file_path.as_deref(),
         list,

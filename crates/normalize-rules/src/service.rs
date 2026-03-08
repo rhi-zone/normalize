@@ -1,11 +1,20 @@
 //! Rules management service for server-less CLI.
 
-use super::resolve_pretty;
 use normalize_output::OutputFormatter;
 use normalize_output::diagnostics::DiagnosticsReport;
 use server_less::cli;
 use std::cell::Cell;
 use std::path::Path;
+
+use crate::runner::{
+    ListFilters, RuleType, RulesRunConfig, apply_native_rules_config, cmd_add, cmd_enable_disable,
+    cmd_list, cmd_remove, cmd_show, cmd_tags, cmd_update, exit_to_result, run_rules_report,
+};
+
+/// Resolve pretty mode: enabled when TTY (or forced via flag), disabled if compact.
+fn resolve_pretty(pretty: bool, compact: bool) -> bool {
+    !compact && pretty
+}
 
 /// Rules management sub-service.
 pub struct RulesService {
@@ -25,8 +34,8 @@ impl RulesService {
         }
     }
 
-    fn resolve_format(&self, pretty: bool, compact: bool, root: &Path) {
-        self.pretty.set(resolve_pretty(root, pretty, compact));
+    fn resolve_format(&self, pretty: bool, compact: bool) {
+        self.pretty.set(resolve_pretty(pretty, compact));
     }
 }
 
@@ -94,20 +103,16 @@ impl RulesService {
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        let use_colors = resolve_pretty(
-            root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
-            pretty,
-            compact,
-        );
-        let config = crate::config::NormalizeConfig::load(&effective_root);
-        let rule_type: crate::commands::rules::RuleType = r#type
+        let use_colors = resolve_pretty(pretty, compact);
+        let config = load_rules_config(&effective_root);
+        let rule_type: RuleType = r#type
             .as_deref()
             .unwrap_or("all")
             .parse()
             .unwrap_or_default();
-        let exit_code = crate::commands::rules::cmd_list(
+        let exit_code = cmd_list(
             &effective_root,
-            crate::commands::rules::ListFilters {
+            ListFilters {
                 sources,
                 type_filter: &rule_type,
                 tag: tag.as_deref(),
@@ -119,7 +124,7 @@ impl RulesService {
             },
             &config,
         );
-        crate::commands::rules::exit_to_result(exit_code)
+        exit_to_result(exit_code)
     }
 
     /// Run rules against the codebase
@@ -154,15 +159,11 @@ impl RulesService {
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        self.resolve_format(
-            pretty,
-            compact,
-            root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
-        );
+        self.resolve_format(pretty, compact);
         self.sarif.set(sarif);
         self.limit.set(limit.unwrap_or(50));
-        let config = crate::config::NormalizeConfig::load(&effective_root);
-        let rule_type: crate::commands::rules::RuleType = r#type
+        let config = load_rules_config(&effective_root);
+        let rule_type: RuleType = r#type
             .as_deref()
             .unwrap_or("all")
             .parse()
@@ -177,7 +178,7 @@ impl RulesService {
         if fix {
             let debug_flags = normalize_syntax_rules::DebugFlags::from_args(&debug);
             let exit_code = tokio::task::spawn_blocking(move || {
-                crate::commands::analyze::rules_cmd::cmd_rules(
+                crate::cmd_rules::cmd_rules(
                     &target_root,
                     &project_root,
                     rule.as_deref(),
@@ -186,7 +187,7 @@ impl RulesService {
                     false,
                     true,
                     false,
-                    &config.analyze.rules,
+                    &config.rules,
                     &debug_flags,
                 )
             })
@@ -199,14 +200,11 @@ impl RulesService {
             };
         }
 
-        let run_native = matches!(
-            rule_type,
-            crate::commands::rules::RuleType::All | crate::commands::rules::RuleType::Native
-        );
+        let run_native = matches!(rule_type, RuleType::All | RuleType::Native);
 
         // Syntax + fact + SARIF engines via run_rules_report() (blocking)
         let mut report = tokio::task::spawn_blocking(move || {
-            crate::commands::rules::run_rules_report(
+            run_rules_report(
                 &target_root,
                 &project_root,
                 rule.as_deref(),
@@ -224,7 +222,7 @@ impl RulesService {
         // All four checks are independent — run them in parallel.
         if run_native {
             let native_root = effective_root.clone();
-            let native_config = crate::config::NormalizeConfig::load(&native_root);
+            let native_config = load_rules_config(&native_root);
             let threshold = 10;
 
             let (summary_res, stale_res, examples_res, refs_res) = tokio::join!(
@@ -255,10 +253,7 @@ impl RulesService {
                 report.merge(r.into());
             }
 
-            crate::commands::rules::apply_native_rules_config(
-                &mut report,
-                &native_config.analyze.rules,
-            );
+            apply_native_rules_config(&mut report, &native_config.rules);
             report.sources_run.push("native".into());
         }
 
@@ -288,15 +283,9 @@ impl RulesService {
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        let config = crate::config::NormalizeConfig::load(&effective_root);
-        let exit_code = crate::commands::rules::cmd_enable_disable(
-            &effective_root,
-            &id_or_tag,
-            true,
-            dry_run,
-            &config,
-        );
-        crate::commands::rules::exit_to_result(exit_code)
+        let config = load_rules_config(&effective_root);
+        let exit_code = cmd_enable_disable(&effective_root, &id_or_tag, true, dry_run, &config);
+        exit_to_result(exit_code)
     }
 
     /// Disable a rule or all rules matching a tag
@@ -314,15 +303,9 @@ impl RulesService {
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        let config = crate::config::NormalizeConfig::load(&effective_root);
-        let exit_code = crate::commands::rules::cmd_enable_disable(
-            &effective_root,
-            &id_or_tag,
-            false,
-            dry_run,
-            &config,
-        );
-        crate::commands::rules::exit_to_result(exit_code)
+        let config = load_rules_config(&effective_root);
+        let exit_code = cmd_enable_disable(&effective_root, &id_or_tag, false, dry_run, &config);
+        exit_to_result(exit_code)
     }
 
     /// Show full documentation for a rule
@@ -341,15 +324,10 @@ impl RulesService {
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        let use_colors = resolve_pretty(
-            root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
-            pretty,
-            compact,
-        );
-        let config = crate::config::NormalizeConfig::load(&effective_root);
-        let exit_code =
-            crate::commands::rules::cmd_show(&effective_root, &id, false, use_colors, &config);
-        crate::commands::rules::exit_to_result(exit_code)
+        let use_colors = resolve_pretty(pretty, compact);
+        let config = load_rules_config(&effective_root);
+        let exit_code = cmd_show(&effective_root, &id, false, use_colors, &config);
+        exit_to_result(exit_code)
     }
 
     /// List all tags and the rules they group
@@ -369,13 +347,9 @@ impl RulesService {
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        let use_colors = resolve_pretty(
-            root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
-            pretty,
-            compact,
-        );
-        let config = crate::config::NormalizeConfig::load(&effective_root);
-        let exit_code = crate::commands::rules::cmd_tags(
+        let use_colors = resolve_pretty(pretty, compact);
+        let config = load_rules_config(&effective_root);
+        let exit_code = cmd_tags(
             &effective_root,
             show_rules,
             tag.as_deref(),
@@ -383,7 +357,7 @@ impl RulesService {
             use_colors,
             &config,
         );
-        crate::commands::rules::exit_to_result(exit_code)
+        exit_to_result(exit_code)
     }
 
     /// Add a rule from a URL
@@ -392,8 +366,8 @@ impl RulesService {
         #[param(positional, help = "URL to download the rule from")] url: String,
         #[param(help = "Install to global rules instead of project")] global: bool,
     ) -> Result<RuleResult, String> {
-        let exit_code = crate::commands::rules::cmd_add(&url, global, false);
-        crate::commands::rules::exit_to_result(exit_code)
+        let exit_code = cmd_add(&url, global, false);
+        exit_to_result(exit_code)
     }
 
     /// Update imported rules from their sources
@@ -405,8 +379,8 @@ impl RulesService {
         )]
         rule_id: Option<String>,
     ) -> Result<RuleResult, String> {
-        let exit_code = crate::commands::rules::cmd_update(rule_id.as_deref(), false);
-        crate::commands::rules::exit_to_result(exit_code)
+        let exit_code = cmd_update(rule_id.as_deref(), false);
+        exit_to_result(exit_code)
     }
 
     /// Remove an imported rule
@@ -414,7 +388,77 @@ impl RulesService {
         &self,
         #[param(positional, help = "Rule ID to remove")] rule_id: String,
     ) -> Result<RuleResult, String> {
-        let exit_code = crate::commands::rules::cmd_remove(&rule_id, false);
-        crate::commands::rules::exit_to_result(exit_code)
+        let exit_code = cmd_remove(&rule_id, false);
+        exit_to_result(exit_code)
+    }
+}
+
+/// Load `RulesRunConfig` from the project config files.
+///
+/// This mirrors the structure of `NormalizeConfig` but only pulls out the
+/// fields needed by the rules machinery, avoiding a circular dependency on the
+/// main `normalize` crate.
+pub fn load_rules_config(root: &Path) -> RulesRunConfig {
+    // We parse a minimal subset of normalize.toml — just the rules-related sections.
+    let project_path = root.join(".normalize").join("config.toml");
+    let content = std::fs::read_to_string(&project_path).unwrap_or_default();
+
+    #[derive(serde::Deserialize, Default)]
+    #[serde(default)]
+    struct RulesOnlyConfig {
+        analyze: AnalyzeSection,
+        #[serde(rename = "rule-tags")]
+        rule_tags: std::collections::HashMap<String, Vec<String>>,
+    }
+
+    #[derive(serde::Deserialize, Default)]
+    #[serde(default)]
+    struct AnalyzeSection {
+        rules: normalize_syntax_rules::RulesConfig,
+        #[serde(rename = "facts-rules")]
+        facts_rules: normalize_facts_rules_interpret::FactsRulesConfig,
+        #[serde(rename = "sarif-tools")]
+        sarif_tools: Vec<crate::runner::SarifTool>,
+    }
+
+    // Load global config first
+    let global_content = dirs::config_dir()
+        .map(|d| d.join("normalize").join("config.toml"))
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .unwrap_or_default();
+
+    let global: RulesOnlyConfig = toml::from_str(&global_content).unwrap_or_default();
+    let project: RulesOnlyConfig = toml::from_str(&content).unwrap_or_default();
+
+    // Merge: project overrides global for simple fields; for rule configs, project wins entirely
+    // (mirrors normalize_core::Merge behaviour for these sections)
+    let rule_tags = {
+        let mut merged = global.rule_tags;
+        merged.extend(project.rule_tags);
+        merged
+    };
+
+    // Project config wins for rules (same semantics as normalize's config merge)
+    let rules = if content.is_empty() {
+        global.analyze.rules
+    } else {
+        project.analyze.rules
+    };
+    let facts_rules = if content.is_empty() {
+        global.analyze.facts_rules
+    } else {
+        project.analyze.facts_rules
+    };
+    let sarif_tools = if project.analyze.sarif_tools.is_empty() {
+        global.analyze.sarif_tools
+    } else {
+        project.analyze.sarif_tools
+    };
+
+    RulesRunConfig {
+        rule_tags,
+        rules,
+        facts_rules,
+        sarif_tools,
     }
 }

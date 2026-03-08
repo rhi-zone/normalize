@@ -2,7 +2,7 @@
 //!
 //! Uses normalize_syntax_rules for core functionality, handles CLI output.
 
-use crate::parsers::grammar_loader;
+use normalize_languages::parsers::grammar_loader;
 use normalize_syntax_rules::{
     DebugFlags, Finding, Rule, RulesConfig, Severity, apply_fixes, load_all_rules, run_rules,
 };
@@ -130,7 +130,7 @@ pub fn run_syntax_rules(
     )
 }
 
-/// Run the rules command.
+/// Run the syntax rules command.
 #[allow(clippy::too_many_arguments)]
 pub fn cmd_rules(
     root: &Path,

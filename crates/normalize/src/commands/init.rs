@@ -123,8 +123,8 @@ pub fn cmd_init(root: &Path, do_index: bool, setup: bool) -> i32 {
 /// Runs all rules against the codebase, groups violations by rule, and walks the user
 /// through each rule that has violations — showing examples and prompting enable/disable.
 pub fn cmd_setup_wizard(root: &Path) -> i32 {
-    use crate::commands::rules::{RuleType, run_rules_report};
     use normalize_facts_rules_interpret as interpret;
+    use normalize_rules::{RuleType, RulesRunConfig, run_rules_report};
     use normalize_syntax_rules;
     use std::collections::HashMap;
 
@@ -166,7 +166,21 @@ pub fn cmd_setup_wizard(root: &Path) -> i32 {
     }
 
     // Run all rules to collect violations
-    let report = run_rules_report(root, root, None, None, &RuleType::All, &[], &config);
+    let rules_config = RulesRunConfig {
+        rule_tags: config.rule_tags.0.clone(),
+        rules: config.analyze.rules.clone(),
+        facts_rules: config.analyze.facts_rules.clone(),
+        sarif_tools: config
+            .analyze
+            .sarif_tools
+            .iter()
+            .map(|t| normalize_rules::SarifTool {
+                name: t.name.clone(),
+                command: t.command.clone(),
+            })
+            .collect(),
+    };
+    let report = run_rules_report(root, root, None, None, &RuleType::All, &[], &rules_config);
 
     // Group issues by rule_id
     let mut by_rule: HashMap<String, Vec<normalize_output::diagnostics::Issue>> = HashMap::new();
@@ -286,8 +300,12 @@ pub fn cmd_setup_wizard(root: &Path) -> i32 {
         match line.trim().to_lowercase().as_str() {
             "e" | "enable" => {
                 if !enabled {
-                    let code = crate::commands::rules::cmd_enable_disable(
-                        root, rule_id, true, false, &config,
+                    let code = normalize_rules::cmd_enable_disable(
+                        root,
+                        rule_id,
+                        true,
+                        false,
+                        &rules_config,
                     );
                     if code == 0 {
                         println!("  → Enabled {}", rule_id);
@@ -301,8 +319,12 @@ pub fn cmd_setup_wizard(root: &Path) -> i32 {
             }
             "d" | "disable" => {
                 if enabled {
-                    let code = crate::commands::rules::cmd_enable_disable(
-                        root, rule_id, false, false, &config,
+                    let code = normalize_rules::cmd_enable_disable(
+                        root,
+                        rule_id,
+                        false,
+                        false,
+                        &rules_config,
                     );
                     if code == 0 {
                         println!("  → Disabled {}", rule_id);

@@ -40,6 +40,7 @@ members = [
     "crates/normalize-analyze",
     "crates/normalize-architecture",
     "crates/normalize-native-rules",
+    "crates/normalize-rules",
     "xtask",
 ]
 

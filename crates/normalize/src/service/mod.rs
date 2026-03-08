@@ -25,7 +25,7 @@ pub mod generate;
 pub mod grammars;
 pub mod history;
 pub mod package;
-pub mod rules;
+// rules module moved to normalize-rules crate; re-exported for internal use
 pub mod serve;
 pub mod sessions;
 pub mod syntax;
@@ -54,7 +54,7 @@ pub struct NormalizeService {
     grammars: grammars::GrammarService,
     generate: generate::GenerateService,
     package: package::PackageService,
-    rules: rules::RulesService,
+    rules: normalize_rules::RulesService,
     serve: serve::ServeService,
     syntax: syntax::SyntaxService,
     sessions: sessions::SessionsService,
@@ -88,7 +88,7 @@ impl NormalizeService {
             grammars: grammars::GrammarService::new(&pretty),
             generate: generate::GenerateService,
             package: package::PackageService::new(&pretty),
-            rules: rules::RulesService::new(&pretty),
+            rules: normalize_rules::RulesService::new(&pretty),
             serve: serve::ServeService,
             syntax: syntax::SyntaxService::new(),
             sessions: sessions::SessionsService::new(&pretty),
@@ -817,7 +817,7 @@ impl NormalizeService {
     }
 
     /// Manage and run syntax/fact rules
-    pub fn rules(&self) -> &rules::RulesService {
+    pub fn rules(&self) -> &normalize_rules::RulesService {
         &self.rules
     }
 

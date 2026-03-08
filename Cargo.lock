@@ -3604,6 +3604,7 @@ dependencies = [
  "normalize-openapi",
  "normalize-output",
  "normalize-path-resolve",
+ "normalize-rules",
  "normalize-rules-loader",
  "normalize-scope",
  "normalize-session-analysis",
@@ -4031,6 +4032,34 @@ dependencies = [
  "ignore",
  "nucleo-matcher",
  "tempfile",
+]
+
+[[package]]
+name = "normalize-rules"
+version = "0.1.0"
+dependencies = [
+ "abi_stable",
+ "chrono",
+ "dirs",
+ "glob",
+ "libsql",
+ "normalize-facts",
+ "normalize-facts-rules-api",
+ "normalize-facts-rules-interpret",
+ "normalize-languages",
+ "normalize-native-rules",
+ "normalize-output",
+ "normalize-rules-loader",
+ "normalize-syntax-rules",
+ "nu-ansi-term",
+ "schemars",
+ "serde",
+ "serde_json",
+ "server-less",
+ "tokio",
+ "toml",
+ "toml_edit",
+ "ureq",
 ]
 
 [[package]]

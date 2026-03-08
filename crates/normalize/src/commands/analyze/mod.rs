@@ -32,7 +32,6 @@ pub mod provenance;
 pub mod query;
 pub mod repo_coupling;
 pub mod report;
-pub mod rules_cmd;
 pub mod security;
 pub mod size;
 pub mod skeleton_diff;

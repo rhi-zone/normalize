@@ -196,13 +196,35 @@ impl RulesLock {
     }
 }
 
-/// Run the rules command
-pub fn cmd_rules(action: RulesAction, root: Option<&Path>) -> i32 {
+/// Configuration needed by the rules runner (extracted from NormalizeConfig).
+#[derive(Clone, Debug)]
+pub struct RulesRunConfig {
+    /// User-defined rule tag groups (`[rule-tags]` section).
+    pub rule_tags: HashMap<String, Vec<String>>,
+    /// Syntax rules configuration.
+    pub rules: normalize_syntax_rules::RulesConfig,
+    /// Fact rules (Datalog) configuration.
+    pub facts_rules: interpret::FactsRulesConfig,
+    /// External SARIF tools to run.
+    pub sarif_tools: Vec<SarifTool>,
+}
+
+/// An external tool that emits SARIF 2.1.0 output.
+#[derive(Debug, Clone, Deserialize, Serialize, Default, schemars::JsonSchema)]
+pub struct SarifTool {
+    /// Display name for this tool (used as `source` in DiagnosticsReport).
+    pub name: String,
+    /// Command to run. `{root}` is replaced with the project root path.
+    /// Example: `["npx", "eslint", "--format", "json", "{root}"]`
+    pub command: Vec<String>,
+}
+
+/// Run the rules command (for backward-compatible callers that dispatch manually).
+pub fn cmd_rules(action: RulesAction, root: Option<&Path>, config: RulesRunConfig) -> i32 {
     let effective_root = root
         .map(|p| p.to_path_buf())
         // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
         .unwrap_or_else(|| std::env::current_dir().unwrap());
-    let config = crate::config::NormalizeConfig::load(&effective_root);
     let json = false;
     let use_colors = false;
 
@@ -287,7 +309,7 @@ pub fn cmd_run_syntax(
     config: &normalize_syntax_rules::RulesConfig,
     debug: &DebugFlags,
 ) -> i32 {
-    crate::commands::analyze::rules_cmd::cmd_rules(
+    crate::cmd_rules::cmd_rules(
         root,
         project_root,
         filter_rule,
@@ -445,22 +467,18 @@ struct UnifiedRule {
     tags: Vec<String>,
 }
 
-pub(crate) struct ListFilters<'a> {
-    pub(crate) sources: bool,
-    pub(crate) type_filter: &'a RuleType,
-    pub(crate) tag: Option<&'a str>,
-    pub(crate) enabled: bool,
-    pub(crate) disabled: bool,
-    pub(crate) no_desc: bool,
-    pub(crate) json: bool,
-    pub(crate) use_colors: bool,
+pub struct ListFilters<'a> {
+    pub sources: bool,
+    pub type_filter: &'a RuleType,
+    pub tag: Option<&'a str>,
+    pub enabled: bool,
+    pub disabled: bool,
+    pub no_desc: bool,
+    pub json: bool,
+    pub use_colors: bool,
 }
 
-pub(crate) fn cmd_list(
-    root: &Path,
-    filters: ListFilters<'_>,
-    config: &crate::config::NormalizeConfig,
-) -> i32 {
+pub fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &RulesRunConfig) -> i32 {
     let ListFilters {
         sources,
         type_filter,
@@ -475,7 +493,7 @@ pub(crate) fn cmd_list(
 
     // Load syntax rules
     if matches!(type_filter, RuleType::All | RuleType::Syntax) {
-        let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
+        let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
         for r in &syntax_rules {
             let source = if r.builtin { "builtin" } else { "project" };
             all_rules.push(UnifiedRule {
@@ -492,7 +510,7 @@ pub(crate) fn cmd_list(
 
     // Load fact rules
     if matches!(type_filter, RuleType::All | RuleType::Fact) {
-        let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
+        let fact_rules = interpret::load_all_rules(root, &config.facts_rules);
         for r in &fact_rules {
             let source = if r.builtin { "builtin" } else { "project" };
             all_rules.push(UnifiedRule {
@@ -509,7 +527,7 @@ pub(crate) fn cmd_list(
 
     // Apply filters (all compose via AND)
     if let Some(tag) = tag_filter {
-        let rule_tags = &config.rule_tags.0;
+        let rule_tags = &config.rule_tags;
         let mut visited = HashSet::new();
         let matching_ids: HashSet<String> = expand_tag(tag, rule_tags, &all_rules, &mut visited)
             .into_iter()
@@ -660,20 +678,20 @@ fn build_unified_rules(
         .collect()
 }
 
-pub(crate) fn cmd_enable_disable(
+pub fn cmd_enable_disable(
     root: &Path,
     id_or_tag: &str,
     enable: bool,
     dry_run: bool,
-    config: &crate::config::NormalizeConfig,
+    config: &RulesRunConfig,
 ) -> i32 {
     // Resolve which rule IDs to affect
-    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
-    let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
+    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
+    let fact_rules = interpret::load_all_rules(root, &config.facts_rules);
     let all_unified = build_unified_rules(&syntax_rules, &fact_rules);
 
     // Exact ID match takes priority; otherwise expand as tag (includes user-defined groups)
-    let rule_tags = &config.rule_tags.0;
+    let rule_tags = &config.rule_tags;
     let matched_ids: HashSet<&str> = {
         if all_unified.iter().any(|r| r.id == id_or_tag) {
             // Exact ID match
@@ -829,16 +847,16 @@ pub(crate) fn cmd_enable_disable(
 // Show
 // =============================================================================
 
-pub(crate) fn cmd_show(
+pub fn cmd_show(
     root: &Path,
     id: &str,
     json: bool,
     use_colors: bool,
-    config: &crate::config::NormalizeConfig,
+    config: &RulesRunConfig,
 ) -> i32 {
     // Search syntax rules first, then fact rules
-    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
-    let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
+    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
+    let fact_rules = interpret::load_all_rules(root, &config.facts_rules);
 
     // Find by ID
     let found_syntax = syntax_rules.iter().find(|r| r.id == id);
@@ -972,17 +990,17 @@ pub(crate) fn cmd_show(
 // Tags
 // =============================================================================
 
-pub(crate) fn cmd_tags(
+pub fn cmd_tags(
     root: &Path,
     show_rules: bool,
     tag_filter: Option<&str>,
     json: bool,
     use_colors: bool,
-    config: &crate::config::NormalizeConfig,
+    config: &RulesRunConfig,
 ) -> i32 {
     // Collect all rules from both tiers
-    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
-    let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
+    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
+    let fact_rules = interpret::load_all_rules(root, &config.facts_rules);
 
     // Build the unified list for expansion
     let all_unified = build_unified_rules(&syntax_rules, &fact_rules);
@@ -1013,7 +1031,7 @@ pub(crate) fn cmd_tags(
     }
 
     // 2. User-defined tag groups from [rule-tags]
-    let rule_tags = &config.rule_tags.0;
+    let rule_tags = &config.rule_tags;
     for tag_name in rule_tags.keys() {
         let entry = tag_map
             .entry(tag_name.clone())
@@ -1086,7 +1104,7 @@ pub(crate) fn cmd_tags(
 // =============================================================================
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn cmd_run(
+pub fn cmd_run(
     root: &Path,
     project_root: &Path,
     filter_rule: Option<&str>,
@@ -1096,18 +1114,18 @@ pub(crate) fn cmd_run(
     type_filter: &RuleType,
     debug: &[String],
     json: bool,
-    config: &crate::config::NormalizeConfig,
+    config: &RulesRunConfig,
 ) -> i32 {
     let mut exit_code = 0;
 
     // If the tag is user-defined, expand it to a concrete set of rule IDs so that
     // both the syntax and fact runners can filter against it.
-    let rule_tags = &config.rule_tags.0;
+    let rule_tags = &config.rule_tags;
     let filter_ids: Option<HashSet<String>> = filter_tag.and_then(|tag| {
         if rule_tags.contains_key(tag) {
             // Build unified list for expansion
-            let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
-            let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
+            let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
+            let fact_rules = interpret::load_all_rules(root, &config.facts_rules);
             let all_unified = build_unified_rules(&syntax_rules, &fact_rules);
             let mut visited = HashSet::new();
             let ids = expand_tag(tag, rule_tags, &all_unified, &mut visited);
@@ -1126,7 +1144,7 @@ pub(crate) fn cmd_run(
     // Run syntax rules
     if matches!(type_filter, RuleType::All | RuleType::Syntax) {
         let debug_flags = DebugFlags::from_args(debug);
-        let code = crate::commands::analyze::rules_cmd::cmd_rules(
+        let code = crate::cmd_rules::cmd_rules(
             root,
             project_root,
             filter_rule,
@@ -1135,7 +1153,7 @@ pub(crate) fn cmd_run(
             false,
             fix,
             sarif,
-            &config.analyze.rules,
+            &config.rules,
             &debug_flags,
         );
         if code != 0 {
@@ -1152,7 +1170,7 @@ pub(crate) fn cmd_run(
             None,
             false,
             json,
-            &config.analyze.facts_rules,
+            &config.facts_rules,
             filter_ids.as_ref(),
         ));
         if code != 0 {
@@ -1252,19 +1270,18 @@ pub fn run_rules_report(
     filter_tag: Option<&str>,
     engine: &RuleType,
     debug: &[String],
-    config: &crate::config::NormalizeConfig,
+    config: &RulesRunConfig,
 ) -> normalize_output::diagnostics::DiagnosticsReport {
-    use crate::diagnostic_convert::{abi_diagnostic_to_issue, finding_to_issue};
     use normalize_output::diagnostics::DiagnosticsReport;
 
     let mut report = DiagnosticsReport::new();
 
     // Expand user-defined tags to concrete rule IDs
-    let rule_tags = &config.rule_tags.0;
+    let rule_tags = &config.rule_tags;
     let filter_ids: Option<HashSet<String>> = filter_tag.and_then(|tag| {
         if rule_tags.contains_key(tag) {
-            let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
-            let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
+            let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
+            let fact_rules = interpret::load_all_rules(root, &config.facts_rules);
             let all_unified = build_unified_rules(&syntax_rules, &fact_rules);
             let mut visited = HashSet::new();
             let ids = expand_tag(tag, rule_tags, &all_unified, &mut visited);
@@ -1282,13 +1299,13 @@ pub fn run_rules_report(
     // Syntax rules
     if matches!(engine, RuleType::All | RuleType::Syntax) {
         let debug_flags = DebugFlags::from_args(debug);
-        let findings = crate::commands::analyze::rules_cmd::run_syntax_rules(
+        let findings = crate::cmd_rules::run_syntax_rules(
             root,
             project_root,
             filter_rule,
             effective_tag,
             filter_ids.as_ref(),
-            &config.analyze.rules,
+            &config.rules,
             &debug_flags,
         );
         // Count unique files with violations for the report header.
@@ -1307,26 +1324,23 @@ pub fn run_rules_report(
         let rt = tokio::runtime::Runtime::new().unwrap();
         let diagnostics = rt.block_on(collect_fact_diagnostics(
             root,
-            &config.analyze.facts_rules,
+            &config.facts_rules,
             filter_ids.as_ref(),
             filter_rule,
         ));
         // Apply global-allow patterns from [analyze.rules] to fact-rule diagnostics.
         // Syntax rules apply global_allow during load_all_rules(); fact rules need it here.
         let global_allow: Vec<glob::Pattern> = config
-            .analyze
             .rules
             .global_allow
             .iter()
             .filter_map(|s| glob::Pattern::new(s).ok())
             .collect();
         for d in &diagnostics {
-            let file = d
-                .location
-                .as_ref()
-                .map(|loc| loc.file.as_str())
-                .into_option()
-                .unwrap_or(d.message.as_str());
+            let file = match &d.location {
+                abi_stable::std_types::ROption::RSome(loc) => loc.file.as_str(),
+                abi_stable::std_types::ROption::RNone => d.message.as_str(),
+            };
             if global_allow.is_empty() || !global_allow.iter().any(|p| p.matches(file)) {
                 report.issues.push(abi_diagnostic_to_issue(d));
             }
@@ -1336,7 +1350,7 @@ pub fn run_rules_report(
 
     // SARIF passthrough: run external tools and merge their SARIF output
     if matches!(engine, RuleType::Sarif) {
-        let sarif_report = run_sarif_tools(root, &config.analyze.sarif_tools);
+        let sarif_report = run_sarif_tools(root, &config.sarif_tools);
         report.merge(sarif_report);
     }
 
@@ -1349,7 +1363,7 @@ pub fn run_rules_report(
 /// Tools must emit SARIF 2.1.0 JSON to stdout.
 pub fn run_sarif_tools(
     root: &Path,
-    tools: &[crate::commands::analyze::SarifTool],
+    tools: &[SarifTool],
 ) -> normalize_output::diagnostics::DiagnosticsReport {
     use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 
@@ -1575,7 +1589,7 @@ async fn run_fact_rules(
         println!("No issues found ({} rules checked).", all_rules.len());
     } else {
         for diag in &all_diagnostics {
-            println!("{}", crate::rules::format_diagnostic(diag, use_colors));
+            println!("{}", format_diagnostic(diag, use_colors));
         }
         println!(
             "\n{} issue(s) found ({} rules checked).",
@@ -1596,11 +1610,13 @@ async fn run_fact_rules(
 
 /// Build relations from the index, auto-building the index if it doesn't exist.
 async fn ensure_relations(root: &Path) -> Result<normalize_facts_rules_api::Relations, String> {
-    match super::facts::build_relations_from_index(root).await {
+    match build_relations_from_index(root).await {
         Ok(r) => Ok(r),
         Err(_) => {
             eprintln!("Facts index not found. Building...");
-            let mut idx = crate::index::open(root)
+            let normalize_dir = get_normalize_dir(root);
+            let db_path = normalize_dir.join("index.sqlite");
+            let mut idx = normalize_facts::FileIndex::open(&db_path, root)
                 .await
                 .map_err(|e| format!("Failed to open index: {}", e))?;
             let count = idx
@@ -1616,9 +1632,117 @@ async fn ensure_relations(root: &Path) -> Result<normalize_facts_rules_api::Rela
                 "Indexed {} symbols, {} calls, {} imports.",
                 stats.symbols, stats.calls, stats.imports
             );
-            super::facts::build_relations_from_index(root).await
+            build_relations_from_index(root).await
         }
     }
+}
+
+/// Get the normalize data directory for a project.
+fn get_normalize_dir(root: &Path) -> std::path::PathBuf {
+    if let Ok(index_dir) = std::env::var("NORMALIZE_INDEX_DIR") {
+        let path = std::path::PathBuf::from(&index_dir);
+        if path.is_absolute() {
+            return path;
+        }
+        // Relative path: use XDG_DATA_HOME/normalize/<relative>
+        let data_home = std::env::var("XDG_DATA_HOME")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| {
+                dirs::home_dir()
+                    .unwrap_or_else(|| std::path::PathBuf::from("."))
+                    .join(".local/share")
+            });
+        return data_home.join("normalize").join(&index_dir);
+    }
+    root.join(".normalize")
+}
+
+/// Build Relations from the file index.
+pub async fn build_relations_from_index(
+    root: &Path,
+) -> Result<normalize_facts_rules_api::Relations, String> {
+    use normalize_facts_rules_api::Relations;
+
+    let normalize_dir = get_normalize_dir(root);
+    let db_path = normalize_dir.join("index.sqlite");
+    let idx = normalize_facts::FileIndex::open(&db_path, root)
+        .await
+        .map_err(|e| format!("Failed to open index: {}", e))?;
+
+    let mut relations = Relations::new();
+
+    // Get symbols (file, name, kind, start_line, end_line, parent, visibility)
+    let symbols = idx
+        .all_symbols_with_details()
+        .await
+        .map_err(|e| format!("Failed to get symbols: {}", e))?;
+
+    for (file, name, kind, start_line, end_line, parent, visibility, is_impl) in &symbols {
+        relations.add_symbol(file, name, kind, *start_line as u32);
+        relations.add_symbol_range(file, name, *start_line as u32, *end_line as u32);
+        relations.add_visibility(file, name, visibility);
+        if let Some(parent_name) = parent {
+            relations.add_parent(file, name, parent_name);
+        }
+        if *is_impl {
+            relations.add_is_impl(file, name);
+        }
+    }
+
+    // Get symbol attributes
+    let attrs = idx
+        .all_symbol_attributes()
+        .await
+        .map_err(|e| format!("Failed to get symbol attributes: {}", e))?;
+
+    for (file, name, attribute) in &attrs {
+        relations.add_attribute(file, name, attribute);
+    }
+
+    // Get symbol implements
+    let implements = idx
+        .all_symbol_implements()
+        .await
+        .map_err(|e| format!("Failed to get symbol implements: {}", e))?;
+
+    for (file, name, interface) in &implements {
+        relations.add_implements(file, name, interface);
+    }
+
+    // Get type methods
+    let type_methods = idx
+        .all_type_methods()
+        .await
+        .map_err(|e| format!("Failed to get type methods: {}", e))?;
+
+    for (file, type_name, method_name) in &type_methods {
+        relations.add_type_method(file, type_name, method_name);
+    }
+
+    // Get imports (file, module, name, line)
+    let imports = idx
+        .all_imports()
+        .await
+        .map_err(|e| format!("Failed to get imports: {}", e))?;
+
+    for (file, module, name, _line) in imports {
+        relations.add_import(&file, &module, &name);
+    }
+
+    // Get calls with qualifiers (caller_file, caller_symbol, callee_name, qualifier, line)
+    let calls = idx
+        .all_calls_with_qualifiers()
+        .await
+        .map_err(|e| format!("Failed to get calls: {}", e))?;
+
+    for (file, caller, callee, qualifier, line) in &calls {
+        relations.add_call(file, caller, callee, *line);
+        if let Some(qual) = qualifier {
+            relations.add_qualifier(file, caller, callee, qual);
+        }
+    }
+
+    Ok(relations)
 }
 
 /// Run a single .dl file directly (explicit path mode)
@@ -1647,7 +1771,7 @@ async fn run_fact_rules_file(root: &Path, rules_file: &Path, json: bool) -> i32 
         println!("No issues found.");
     } else {
         for diag in &diagnostics {
-            println!("{}", crate::rules::format_diagnostic(diag, use_colors));
+            println!("{}", format_diagnostic(diag, use_colors));
         }
         println!("\n{} issue(s) found.", diagnostics.len());
     }
@@ -1687,7 +1811,7 @@ fn detect_extension(url: &str) -> &'static str {
     if url.ends_with(".dl") { "dl" } else { "scm" }
 }
 
-pub(crate) fn cmd_add(url: &str, global: bool, json: bool) -> i32 {
+pub fn cmd_add(url: &str, global: bool, json: bool) -> i32 {
     let Some(rules_dir) = rules_dir(global) else {
         eprintln!("Could not determine rules directory");
         return 1;
@@ -1765,7 +1889,7 @@ pub(crate) fn cmd_add(url: &str, global: bool, json: bool) -> i32 {
     0
 }
 
-pub(crate) fn cmd_update(rule_id: Option<&str>, json: bool) -> i32 {
+pub fn cmd_update(rule_id: Option<&str>, json: bool) -> i32 {
     let mut updated = Vec::new();
     let mut errors = Vec::new();
 
@@ -1816,7 +1940,7 @@ pub(crate) fn cmd_update(rule_id: Option<&str>, json: bool) -> i32 {
     if errors.is_empty() { 0 } else { 1 }
 }
 
-pub(crate) fn cmd_remove(rule_id: &str, json: bool) -> i32 {
+pub fn cmd_remove(rule_id: &str, json: bool) -> i32 {
     let mut removed = false;
 
     for global in [false, true] {
@@ -1920,16 +2044,115 @@ fn sha256_hex(content: &str) -> String {
 }
 
 // =============================================================================
+// Diagnostic conversion helpers (from normalize's diagnostic_convert.rs)
+// =============================================================================
+
+/// Convert a syntax-rules `Finding` into a unified `Issue`.
+pub fn finding_to_issue(
+    f: &normalize_syntax_rules::Finding,
+    root: &std::path::Path,
+) -> normalize_output::diagnostics::Issue {
+    use normalize_output::diagnostics::Issue;
+    let rel_path = f.file.strip_prefix(root).unwrap_or(&f.file);
+    Issue {
+        file: rel_path.to_string_lossy().to_string(),
+        line: Some(f.start_line),
+        column: Some(f.start_col),
+        end_line: Some(f.end_line),
+        end_column: Some(f.end_col),
+        rule_id: f.rule_id.clone(),
+        message: f.message.clone(),
+        severity: syntax_severity(f.severity),
+        source: "syntax-rules".into(),
+        related: Vec::new(),
+        suggestion: f.fix.clone(),
+    }
+}
+
+/// Convert syntax-rules `Severity` to output `Severity`.
+fn syntax_severity(s: normalize_syntax_rules::Severity) -> normalize_output::diagnostics::Severity {
+    use normalize_output::diagnostics::Severity;
+    match s {
+        normalize_syntax_rules::Severity::Error => Severity::Error,
+        normalize_syntax_rules::Severity::Warning => Severity::Warning,
+        normalize_syntax_rules::Severity::Info => Severity::Info,
+    }
+}
+
+/// Convert a facts-rules-api `Diagnostic` into a unified `Issue`.
+pub fn abi_diagnostic_to_issue(
+    d: &normalize_facts_rules_api::Diagnostic,
+) -> normalize_output::diagnostics::Issue {
+    use abi_stable::std_types::ROption;
+    use normalize_output::diagnostics::{Issue, RelatedLocation};
+
+    let (file, line, column) = match &d.location {
+        ROption::RSome(loc) => (
+            loc.file.to_string(),
+            Some(loc.line as usize),
+            match &loc.column {
+                ROption::RSome(c) => Some(*c as usize),
+                ROption::RNone => None,
+            },
+        ),
+        ROption::RNone => (String::new(), None, None),
+    };
+
+    let related = d
+        .related
+        .iter()
+        .map(|loc| RelatedLocation {
+            file: loc.file.to_string(),
+            line: Some(loc.line as usize),
+            message: None,
+        })
+        .collect();
+
+    let suggestion = match &d.suggestion {
+        ROption::RSome(s) => Some(s.to_string()),
+        ROption::RNone => None,
+    };
+
+    Issue {
+        file,
+        line,
+        column,
+        end_line: None,
+        end_column: None,
+        rule_id: d.rule_id.to_string(),
+        message: d.message.to_string(),
+        severity: abi_level(d.level),
+        source: "fact-rules".into(),
+        related,
+        suggestion,
+    }
+}
+
+/// Convert facts-rules-api `DiagnosticLevel` to output `Severity`.
+fn abi_level(
+    level: normalize_facts_rules_api::DiagnosticLevel,
+) -> normalize_output::diagnostics::Severity {
+    use normalize_output::diagnostics::Severity;
+    match level {
+        normalize_facts_rules_api::DiagnosticLevel::Hint => Severity::Hint,
+        normalize_facts_rules_api::DiagnosticLevel::Warning => Severity::Warning,
+        normalize_facts_rules_api::DiagnosticLevel::Error => Severity::Error,
+    }
+}
+
+/// Format a diagnostic for terminal display.
+pub fn format_diagnostic(diag: &normalize_facts_rules_api::Diagnostic, use_colors: bool) -> String {
+    normalize_rules_loader::format_diagnostic(diag, use_colors)
+}
+
+// =============================================================================
 // Service-callable functions
 // =============================================================================
 
 #[cfg(feature = "cli")]
-use crate::service::rules::RuleResult;
-
-#[cfg(feature = "cli")]
-pub(crate) fn exit_to_result(exit_code: i32) -> Result<RuleResult, String> {
+pub fn exit_to_result(exit_code: i32) -> Result<crate::service::RuleResult, String> {
     if exit_code == 0 {
-        Ok(RuleResult {
+        Ok(crate::service::RuleResult {
             success: true,
             message: None,
             data: None,

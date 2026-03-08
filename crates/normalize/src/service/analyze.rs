@@ -471,7 +471,7 @@ impl AnalyzeService {
 
         // Apply per-rule severity/enabled overrides from normalize.toml to native check issues.
         // This allows e.g. [analyze.rules."stale-summary"] severity = "error" to enforce SUMMARY.md freshness.
-        crate::commands::rules::apply_native_rules_config(&mut report, &config.analyze.rules);
+        normalize_rules::apply_native_rules_config(&mut report, &config.analyze.rules);
 
         report.sort();
 
