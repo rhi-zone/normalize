@@ -14,7 +14,6 @@
 use crate::index::FileIndex;
 use normalize_graph::{analyze_graph_data, find_dependents};
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
 
 pub use normalize_graph::{DependentsReport, GraphReport, GraphTarget};
 
@@ -116,20 +115,6 @@ pub async fn analyze_graph(
     Ok(analyze_graph_data(&adj, target, limit))
 }
 
-/// CLI entry point (sync wrapper).
-pub fn analyze_graph_sync(
-    root: &Path,
-    limit: usize,
-    target: GraphTarget,
-) -> Result<GraphReport, String> {
-    crate::runtime::block_on(async {
-        let idx = crate::index::ensure_ready(root).await?;
-        analyze_graph(&idx, limit, target)
-            .await
-            .map_err(|e| format!("Graph analysis failed: {}", e))
-    })
-}
-
 /// Find all modules/symbols that (transitively) depend on a given file.
 pub async fn analyze_dependents(
     idx: &FileIndex,
@@ -151,19 +136,5 @@ pub async fn analyze_dependents(
         target: file.to_string(),
         graph_target: target,
         dependents,
-    })
-}
-
-/// CLI entry point for dependents query (sync wrapper).
-pub fn analyze_dependents_sync(
-    root: &Path,
-    file: &str,
-    target: GraphTarget,
-) -> Result<DependentsReport, String> {
-    crate::runtime::block_on(async {
-        let idx = crate::index::ensure_ready(root).await?;
-        analyze_dependents(&idx, file, target)
-            .await
-            .map_err(|e| format!("Dependents query failed: {}", e))
     })
 }

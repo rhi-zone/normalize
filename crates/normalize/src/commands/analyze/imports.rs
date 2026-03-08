@@ -98,80 +98,78 @@ impl OutputFormatter for ImportCentralityReport {
 }
 
 /// Analyze import centrality using the facts index.
-pub fn analyze_import_centrality(
+pub async fn analyze_import_centrality(
     root: &Path,
     limit: usize,
     internal_only: bool,
 ) -> Result<ImportCentralityReport, String> {
-    crate::runtime::block_on(async {
-        let idx = crate::index::ensure_ready(root).await?;
+    let idx = crate::index::ensure_ready(root).await?;
 
-        let raw = idx
-            .all_imports()
-            .await
-            .map_err(|e| format!("Failed to read imports: {}", e))?;
+    let raw = idx
+        .all_imports()
+        .await
+        .map_err(|e| format!("Failed to read imports: {}", e))?;
 
-        let total_imports = raw.len();
+    let total_imports = raw.len();
 
-        // module → set of importing files, and set of names
-        let mut fan_in_map: HashMap<String, std::collections::HashSet<String>> = HashMap::new();
-        let mut names_map: HashMap<String, Vec<String>> = HashMap::new();
+    // module → set of importing files, and set of names
+    let mut fan_in_map: HashMap<String, std::collections::HashSet<String>> = HashMap::new();
+    let mut names_map: HashMap<String, Vec<String>> = HashMap::new();
 
-        for (file, module, name, _line) in &raw {
-            if module.is_empty() {
-                continue;
-            }
-
-            // Skip noise: bare relative imports that aren't useful for centrality
-            if module == "super" || module == "super::*" || module == "crate" {
-                continue;
-            }
-
-            if internal_only && !is_internal_module(module) {
-                continue;
-            }
-
-            fan_in_map
-                .entry(module.clone())
-                .or_default()
-                .insert(file.clone());
-
-            let names = names_map.entry(module.clone()).or_default();
-            if !name.is_empty() && name != "*" && !names.contains(name) {
-                names.push(name.clone());
-            }
+    for (file, module, name, _line) in &raw {
+        if module.is_empty() {
+            continue;
         }
 
-        let total_modules = fan_in_map.len();
+        // Skip noise: bare relative imports that aren't useful for centrality
+        if module == "super" || module == "super::*" || module == "crate" {
+            continue;
+        }
 
-        let mut entries: Vec<ImportEntry> = fan_in_map
-            .into_iter()
-            .map(|(module, files)| {
-                let fan_in = files.len();
-                let mut names = names_map.remove(&module).unwrap_or_default();
-                names.sort();
-                names.truncate(5);
-                ImportEntry {
-                    module,
-                    fan_in,
-                    names,
-                }
-            })
-            .collect();
+        if internal_only && !is_internal_module(module) {
+            continue;
+        }
 
-        normalize_analyze::ranked::rank_and_truncate(
-            &mut entries,
-            limit,
-            |a, b| b.fan_in.cmp(&a.fan_in).then(a.module.cmp(&b.module)),
-            |e| e.fan_in as f64,
-        );
+        fan_in_map
+            .entry(module.clone())
+            .or_default()
+            .insert(file.clone());
 
-        Ok(ImportCentralityReport {
-            total_modules,
-            total_imports,
-            internal_only,
-            entries,
+        let names = names_map.entry(module.clone()).or_default();
+        if !name.is_empty() && name != "*" && !names.contains(name) {
+            names.push(name.clone());
+        }
+    }
+
+    let total_modules = fan_in_map.len();
+
+    let mut entries: Vec<ImportEntry> = fan_in_map
+        .into_iter()
+        .map(|(module, files)| {
+            let fan_in = files.len();
+            let mut names = names_map.remove(&module).unwrap_or_default();
+            names.sort();
+            names.truncate(5);
+            ImportEntry {
+                module,
+                fan_in,
+                names,
+            }
         })
+        .collect();
+
+    normalize_analyze::ranked::rank_and_truncate(
+        &mut entries,
+        limit,
+        |a, b| b.fan_in.cmp(&a.fan_in).then(a.module.cmp(&b.module)),
+        |e| e.fan_in as f64,
+    );
+
+    Ok(ImportCentralityReport {
+        total_modules,
+        total_imports,
+        internal_only,
+        entries,
     })
 }
 
