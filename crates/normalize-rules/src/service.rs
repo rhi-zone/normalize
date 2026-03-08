@@ -6,10 +6,13 @@ use server_less::cli;
 use std::cell::Cell;
 use std::path::Path;
 
+use normalize_syntax_rules::apply_fixes;
+
+use crate::cmd_rules::run_syntax_rules;
 use crate::runner::{
-    ListFilters, RuleType, RulesListReport, RulesRunConfig, apply_native_rules_config,
-    build_list_report, cmd_add, cmd_enable_disable, cmd_remove, cmd_show, cmd_tags, cmd_update,
-    exit_to_result, run_rules_report,
+    ListFilters, RuleType, RulesListReport, RulesRunConfig, add_rule, apply_native_rules_config,
+    build_list_report, enable_disable, list_tags, remove_rule, run_rules_report, show_rule,
+    update_rules,
 };
 
 /// Resolve pretty mode: enabled on TTY (or forced via --pretty), disabled by --compact.
@@ -185,30 +188,45 @@ impl RulesService {
             .unwrap_or_else(|| effective_root.clone());
         let project_root = effective_root.clone();
 
-        // --fix path: syntax-only, keep existing fix loop behaviour
+        // --fix path: syntax-only, loop until no fixable issues remain
         if fix {
             let debug_flags = normalize_syntax_rules::DebugFlags::from_args(&debug);
-            let exit_code = tokio::task::spawn_blocking(move || {
-                crate::cmd_rules::cmd_rules(
-                    &target_root,
-                    &project_root,
-                    rule.as_deref(),
-                    tag.as_deref(),
-                    None,
-                    false,
-                    true,
-                    false,
-                    &config.rules,
-                    &debug_flags,
-                )
+            tokio::task::spawn_blocking(move || {
+                let mut total_fixed = 0usize;
+                let mut total_files = 0usize;
+                loop {
+                    let findings = run_syntax_rules(
+                        &target_root,
+                        &project_root,
+                        rule.as_deref(),
+                        tag.as_deref(),
+                        None,
+                        &config.rules,
+                        &debug_flags,
+                    );
+                    let fixable_count = findings.iter().filter(|f| f.fix.is_some()).count();
+                    if fixable_count == 0 {
+                        break;
+                    }
+                    match apply_fixes(&findings) {
+                        Ok(0) => break,
+                        Ok(files_modified) => {
+                            total_fixed += fixable_count;
+                            total_files = files_modified;
+                        }
+                        Err(e) => return Err(format!("Error applying fixes: {e}")),
+                    }
+                }
+                if total_fixed == 0 {
+                    eprintln!("No auto-fixable issues found.");
+                } else {
+                    println!("Fixed {} issue(s) in {} file(s).", total_fixed, total_files);
+                }
+                Ok(())
             })
             .await
-            .map_err(|e| format!("Task error: {e}"))?;
-            return if exit_code == 0 {
-                Ok(DiagnosticsReport::new())
-            } else {
-                Err("Fix failed".to_string())
-            };
+            .map_err(|e| format!("Task error: {e}"))??;
+            return Ok(DiagnosticsReport::new());
         }
 
         let run_native = matches!(rule_type, RuleType::All | RuleType::Native);
@@ -295,8 +313,11 @@ impl RulesService {
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let config = load_rules_config(&effective_root);
-        let exit_code = cmd_enable_disable(&effective_root, &id_or_tag, true, dry_run, &config);
-        exit_to_result(exit_code)
+        enable_disable(&effective_root, &id_or_tag, true, dry_run, &config).map(|_| RuleResult {
+            success: true,
+            message: None,
+            data: None,
+        })
     }
 
     /// Disable a rule or all rules matching a tag
@@ -315,8 +336,11 @@ impl RulesService {
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let config = load_rules_config(&effective_root);
-        let exit_code = cmd_enable_disable(&effective_root, &id_or_tag, false, dry_run, &config);
-        exit_to_result(exit_code)
+        enable_disable(&effective_root, &id_or_tag, false, dry_run, &config).map(|_| RuleResult {
+            success: true,
+            message: None,
+            data: None,
+        })
     }
 
     /// Show full documentation for a rule
@@ -337,8 +361,11 @@ impl RulesService {
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let use_colors = resolve_pretty(pretty, compact);
         let config = load_rules_config(&effective_root);
-        let exit_code = cmd_show(&effective_root, &id, false, use_colors, &config);
-        exit_to_result(exit_code)
+        show_rule(&effective_root, &id, false, use_colors, &config).map(|_| RuleResult {
+            success: true,
+            message: None,
+            data: None,
+        })
     }
 
     /// List all tags and the rules they group
@@ -360,15 +387,19 @@ impl RulesService {
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let use_colors = resolve_pretty(pretty, compact);
         let config = load_rules_config(&effective_root);
-        let exit_code = cmd_tags(
+        list_tags(
             &effective_root,
             show_rules,
             tag.as_deref(),
             false,
             use_colors,
             &config,
-        );
-        exit_to_result(exit_code)
+        )
+        .map(|_| RuleResult {
+            success: true,
+            message: None,
+            data: None,
+        })
     }
 
     /// Add a rule from a URL
@@ -377,8 +408,11 @@ impl RulesService {
         #[param(positional, help = "URL to download the rule from")] url: String,
         #[param(help = "Install to global rules instead of project")] global: bool,
     ) -> Result<RuleResult, String> {
-        let exit_code = cmd_add(&url, global, false);
-        exit_to_result(exit_code)
+        add_rule(&url, global).map(|_| RuleResult {
+            success: true,
+            message: None,
+            data: None,
+        })
     }
 
     /// Update imported rules from their sources
@@ -390,8 +424,11 @@ impl RulesService {
         )]
         rule_id: Option<String>,
     ) -> Result<RuleResult, String> {
-        let exit_code = cmd_update(rule_id.as_deref(), false);
-        exit_to_result(exit_code)
+        update_rules(rule_id.as_deref()).map(|_| RuleResult {
+            success: true,
+            message: None,
+            data: None,
+        })
     }
 
     /// Remove an imported rule
@@ -399,8 +436,11 @@ impl RulesService {
         &self,
         #[param(positional, help = "Rule ID to remove")] rule_id: String,
     ) -> Result<RuleResult, String> {
-        let exit_code = cmd_remove(&rule_id, false);
-        exit_to_result(exit_code)
+        remove_rule(&rule_id).map(|_| RuleResult {
+            success: true,
+            message: None,
+            data: None,
+        })
     }
 }
 

@@ -288,18 +288,13 @@ pub fn run_setup_wizard(root: &Path) -> i32 {
         match line.trim().to_lowercase().as_str() {
             "e" | "enable" => {
                 if !enabled {
-                    let code = normalize_rules::cmd_enable_disable(
-                        root,
-                        rule_id,
-                        true,
-                        false,
-                        &rules_config,
-                    );
-                    if code == 0 {
-                        println!("  → Enabled {}", rule_id);
-                        changed += 1;
-                    } else {
-                        eprintln!("  Error enabling {}", rule_id);
+                    match normalize_rules::enable_disable(root, rule_id, true, false, &rules_config)
+                    {
+                        Ok(_) => {
+                            println!("  → Enabled {}", rule_id);
+                            changed += 1;
+                        }
+                        Err(e) => eprintln!("  Error enabling {}: {}", rule_id, e),
                     }
                 } else {
                     println!("  → Already enabled");
@@ -307,18 +302,18 @@ pub fn run_setup_wizard(root: &Path) -> i32 {
             }
             "d" | "disable" => {
                 if enabled {
-                    let code = normalize_rules::cmd_enable_disable(
+                    match normalize_rules::enable_disable(
                         root,
                         rule_id,
                         false,
                         false,
                         &rules_config,
-                    );
-                    if code == 0 {
-                        println!("  → Disabled {}", rule_id);
-                        changed += 1;
-                    } else {
-                        eprintln!("  Error disabling {}", rule_id);
+                    ) {
+                        Ok(_) => {
+                            println!("  → Disabled {}", rule_id);
+                            changed += 1;
+                        }
+                        Err(e) => eprintln!("  Error disabling {}: {}", rule_id, e),
                     }
                 } else {
                     println!("  → Already disabled");

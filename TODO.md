@@ -42,9 +42,11 @@ Ordered by impact × tractability. Pick from top.
    `DiagnosticsReport` with single banner, colors, severity counts, and global allow for
    `**/tests/fixtures/**` in `.normalize/config.toml`.
 
-2. ~~**Eliminate `cmd_*` layer**~~ — DONE (2026-03-08). All `cmd_*` functions removed from
-   `commands/`. Dead wrappers deleted; active ones renamed (e.g. `run_setup_wizard`,
-   `serve_mcp`, `show_stats_grouped`, `run_package_action`) with all call sites updated.
+2. ~~**Eliminate `cmd_*` layer**~~ — DONE. All `cmd_*` functions removed from `commands/`
+   (2026-03-08) and from `normalize-rules` (2026-03-08). Dead wrappers deleted; active ones
+   renamed (`run_setup_wizard`, `serve_mcp`, `show_stats_grouped`, `run_package_action`,
+   `enable_disable`, `show_rule`, `list_tags`, `add_rule`, `update_rules`, `remove_rule`).
+   Service methods now use `Result<T, String>` with `?` propagation; `exit_to_result` deleted.
 
 2. ~~**Wire `tags.scm` into symbol extraction**~~ — DONE (already complete before this session).
    `collect_symbols_from_tags()` is the primary path; Language trait has only 3 required methods.
@@ -179,7 +181,7 @@ Rule enabled at `severity = "warning"` (2026-03). All 1,608 violations resolved:
 production code inline-suppressed with reasons or properly fixed; test-only files
 allowed via config. See `.normalize/config.toml` for the full allow list.
 
-**Remaining follow-up: eliminate `cmd_*` layer** (see below).
+~~**Remaining follow-up: eliminate `cmd_*` layer**~~ — DONE (see above).
 
 **Audited crates** (production code clean, test-only unwraps allowed in config):
 - `normalize-path-resolve` — complete
@@ -198,25 +200,10 @@ allowed via config. See `.normalize/config.toml` for the full allow list.
 - `normalize-view` — complete (12 → 2 production violations inline-suppressed: is_none guard before unwrap,
   len==1 guard before iter().next())
 
-### Eliminate `cmd_*` layer — move logic into service methods
+~~### Eliminate `cmd_*` layer — move logic into service methods~~ — DONE (2026-03-08)
 
-`main()` calls `NormalizeService::cli_run()` (server-less), not `cmd_*` directly. The
-`cmd_*` functions are a vestigial layer: they return `i32` exit codes, which means errors
-can't be propagated with `?` and must either be printed inline or swallowed. This produces
-panics instead of clean error messages for things like `Runtime::new()` failures.
-
-The right fix is to delete `cmd_*` entirely and move logic directly into service methods:
-- Service methods return `Result<T, String>` — server-less handles exit codes and error
-  formatting automatically
-- `Runtime::new()?` works naturally (mapped to `String` error)
-- No more `eprintln + return 1` scattered across command files
-
-**Scope:** All files under `crates/normalize/src/commands/` that expose a `cmd_*` function.
-Each service method in `service/*.rs` calling `cmd_*` should inline the logic instead.
-
-**Note:** Some `cmd_*` functions have long parameter lists because they predate the service
-layer. As logic moves in, parameters become `&self` fields (pretty, compact, root, etc.)
-already available on `NormalizeService`.
+All `cmd_*` functions eliminated from both `normalize/src/commands/` and `normalize-rules/src/`.
+Service methods return `Result<T, String>` with natural `?` propagation. `exit_to_result` deleted.
 
 ### Feature-gate CLI behind `cli` feature (workspace-wide)
 
