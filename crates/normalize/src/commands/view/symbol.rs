@@ -13,7 +13,7 @@ use std::path::Path;
 
 /// View a symbol directly by file and name
 #[allow(clippy::too_many_arguments)]
-pub fn cmd_view_symbol_direct(
+pub async fn cmd_view_symbol_direct(
     file_path: &str,
     symbol_name: &str,
     parent_name: Option<&str>,
@@ -40,11 +40,12 @@ pub fn cmd_view_symbol_direct(
         context,
         case_insensitive,
     )
+    .await
 }
 
 /// View the symbol containing a specific line number
 #[allow(clippy::too_many_arguments)]
-pub fn cmd_view_symbol_at_line(
+pub async fn cmd_view_symbol_at_line(
     file_path: &str,
     line: usize,
     root: &Path,
@@ -186,7 +187,8 @@ pub fn cmd_view_symbol_at_line(
                 use_colors,
                 root,
                 &resolved.file_path,
-            );
+            )
+            .await;
         }
     }
     0
@@ -448,7 +450,7 @@ fn format_smart_imports_str(
 
 /// View a symbol within a file
 #[allow(clippy::too_many_arguments)]
-pub fn cmd_view_symbol(
+pub async fn cmd_view_symbol(
     file_path: &str,
     symbol_path: &[String],
     root: &Path,
@@ -582,7 +584,8 @@ pub fn cmd_view_symbol(
                     use_colors,
                     root,
                     file_path,
-                );
+                )
+                .await;
             }
         }
         0
@@ -655,7 +658,8 @@ pub fn cmd_view_symbol(
                             use_colors,
                             root,
                             file_path,
-                        );
+                        )
+                        .await;
                     }
                 }
                 return 0;
@@ -915,7 +919,7 @@ fn find_type_definitions<'a>(
 
 /// Display referenced type definitions for --context feature.
 /// Shows types from the same file first, then cross-file types via index.
-fn display_referenced_types(
+async fn display_referenced_types(
     source: &str,
     grammar: &str,
     symbols: &[normalize_languages::Symbol],
@@ -945,9 +949,9 @@ fn display_referenced_types(
 
     #[allow(clippy::collapsible_if)]
     if !remaining.is_empty() {
-        if let Some(idx) = crate::runtime::block_on(crate::index::open_if_enabled(root)) {
+        if let Some(idx) = crate::index::open_if_enabled(root).await {
             for type_name in &remaining {
-                if let Ok(matches) = crate::runtime::block_on(idx.find_symbol(type_name)) {
+                if let Ok(matches) = idx.find_symbol(type_name).await {
                     // Find first match that's a type definition (not from current file)
                     for (file, kind, start_line, _end_line) in matches {
                         // Skip if from current file (already checked locally)

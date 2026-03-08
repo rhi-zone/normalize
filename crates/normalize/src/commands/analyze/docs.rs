@@ -104,7 +104,7 @@ impl OutputFormatter for DocCoverageReport {
 }
 
 /// Analyze documentation coverage
-pub fn analyze_docs(
+pub async fn analyze_docs(
     root: &Path,
     limit: usize,
     exclude_interface_impls: bool,
@@ -128,7 +128,7 @@ pub fn analyze_docs(
         .collect();
 
     // Try to load index for cross-file resolution, fall back to on-demand parsing
-    let index = crate::runtime::block_on(crate::index::open(root)).ok();
+    let index = crate::index::open(root).await.ok();
     let resolver: Box<dyn InterfaceResolver> = match &index {
         Some(idx) => Box::new(IndexedResolver::new(idx)),
         None => Box::new(OnDemandResolver::new(root)),

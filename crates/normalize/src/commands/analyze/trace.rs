@@ -480,7 +480,7 @@ fn trace_returns(
 }
 
 /// Build trace output as a String without printing (for service layer).
-pub fn build_trace_text(
+pub async fn build_trace_text(
     symbol: &str,
     target: Option<&str>,
     root: &std::path::Path,
@@ -489,7 +489,7 @@ pub fn build_trace_text(
     case_insensitive: bool,
 ) -> Result<String, String> {
     let mut output = Vec::new();
-    let exit_code = crate::runtime::block_on(cmd_trace_text_async(
+    let exit_code = cmd_trace_text_async(
         symbol,
         target,
         root,
@@ -497,7 +497,8 @@ pub fn build_trace_text(
         recursive,
         case_insensitive,
         &mut output,
-    ));
+    )
+    .await;
     if exit_code != 0 {
         return Err(format!("Trace failed with exit code {}", exit_code));
     }
@@ -651,7 +652,8 @@ async fn cmd_trace_text_async(
                             let returns =
                                 trace_returns(&tree.root_node(), source_bytes, start, end);
                             (returns, None)
-                        } else if let Some(cross) = trace_cross_file_returns(&call.name, root) {
+                        } else if let Some(cross) = trace_cross_file_returns(&call.name, root).await
+                        {
                             (cross.returns, Some(cross.file))
                         } else {
                             continue;
@@ -684,8 +686,11 @@ async fn cmd_trace_text_async(
 }
 
 /// Look up a function in the index and trace its returns (cross-file).
-fn trace_cross_file_returns(call_name: &str, root: &std::path::Path) -> Option<CrossFileReturns> {
-    crate::runtime::block_on(trace_cross_file_returns_async(call_name, root))
+async fn trace_cross_file_returns(
+    call_name: &str,
+    root: &std::path::Path,
+) -> Option<CrossFileReturns> {
+    trace_cross_file_returns_async(call_name, root).await
 }
 
 async fn trace_cross_file_returns_async(

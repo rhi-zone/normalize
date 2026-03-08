@@ -237,7 +237,7 @@ impl NormalizeService {
     /// View a node in the codebase tree (directory, file, or symbol)
     #[cli(display_with = "display_view")]
     #[allow(clippy::too_many_arguments)]
-    pub fn view(
+    pub async fn view(
         &self,
         #[param(
             positional,
@@ -327,6 +327,7 @@ impl NormalizeService {
             case_insensitive,
             history,
         )
+        .await
     }
 
     /// Search for text patterns in files (fast ripgrep-based search)

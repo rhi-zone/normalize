@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 292
 expression: "snapshot_help(&[\"analyze\", \"stale-docs\"])"
 ---
 Analyze codebase (health, complexity, security, duplicates, docs)
@@ -64,6 +63,7 @@ Graph analysis:
   impact             What-if impact analysis: reverse-dependency closure + blast radius
   repo-coupling      Analyze cross-repo coupling
   graph              Graph-theoretic properties of the dependency graph
+  dependents         Find all modules or symbols that transitively depend on a given file or symbol
 
 Git history:
   coupling           Temporal coupling: file pairs that change together in git history

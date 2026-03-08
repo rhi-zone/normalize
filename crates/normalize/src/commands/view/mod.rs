@@ -47,7 +47,7 @@ impl ViewConfig {
 /// Routes to the appropriate sub-function based on the target and options,
 /// returning a typed ViewOutput instead of writing directly to stdout.
 #[allow(clippy::too_many_arguments)]
-pub fn build_view_service(
+pub async fn build_view_service(
     target: Option<&str>,
     root: &Path,
     depth: i32,
@@ -135,11 +135,11 @@ pub fn build_view_service(
         };
 
     let (matches, symbol_matches) = if is_symbol_query {
-        (Vec::new(), search::search_symbols(target_str, root))
+        (Vec::new(), search::search_symbols(target_str, root).await)
     } else {
         let matches = path_resolve::resolve_unified_all(target_str, root);
         let symbol_matches = if matches.is_empty() && !dir_only {
-            search::search_symbols(target_str, root)
+            search::search_symbols(target_str, root).await
         } else {
             Vec::new()
         };

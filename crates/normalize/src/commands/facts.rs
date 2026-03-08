@@ -263,7 +263,7 @@ pub async fn build_relations_from_index(root: &Path) -> Result<Relations, String
 use crate::service::facts::CommandResult;
 
 /// Service-callable facts rules (compiled dylibs).
-pub fn cmd_facts_rules_service(
+pub async fn cmd_facts_rules_service(
     root: Option<&str>,
     rule: Option<&str>,
     pack: Option<&str>,
@@ -273,7 +273,7 @@ pub fn cmd_facts_rules_service(
     let root_ref = root_path.as_deref();
     let pack_path = pack.map(PathBuf::from);
     let pack_ref = pack_path.as_deref();
-    let exit_code = crate::runtime::block_on(cmd_rules(root_ref, rule, pack_ref, list, false));
+    let exit_code = cmd_rules(root_ref, rule, pack_ref, list, false).await;
     if exit_code == 0 {
         Ok(CommandResult {
             success: true,

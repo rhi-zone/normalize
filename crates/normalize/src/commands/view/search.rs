@@ -20,8 +20,8 @@ pub fn has_language_support(path: &str) -> bool {
 
 /// Search for symbols in the index by name.
 /// Supports qualified names like "ClassName/method" or "file.rs/ClassName/method"
-pub fn search_symbols(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
-    crate::runtime::block_on(search_symbols_async(query, root))
+pub async fn search_symbols(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
+    search_symbols_async(query, root).await
 }
 
 async fn search_symbols_async(query: &str, root: &Path) -> Vec<index::SymbolMatch> {

@@ -80,14 +80,14 @@ fn build_concerns(health: &HealthReport, module_health: &ModuleHealthReport) -> 
 }
 
 /// Run the full summary analysis.
-pub fn analyze_summary(root: &Path, module_limit: usize) -> SummaryReport {
+pub async fn analyze_summary(root: &Path, module_limit: usize) -> SummaryReport {
     let ((health, budget), module_health) = rayon::join(
         || rayon::join(|| analyze_health(root), || analyze_budget(root, 0)),
         || analyze_module_health(root, module_limit, 100),
     );
 
     // Architecture requires the facts index — best-effort.
-    let arch = try_architecture(root).unwrap_or_default();
+    let arch = try_architecture(root).await.unwrap_or_default();
 
     let concerns = build_concerns(&health, &module_health);
 
@@ -106,9 +106,9 @@ pub fn analyze_summary(root: &Path, module_limit: usize) -> SummaryReport {
     }
 }
 
-fn try_architecture(root: &Path) -> Option<ArchStats> {
-    let idx = crate::runtime::block_on(crate::index::ensure_ready(root)).ok()?;
-    let report = crate::runtime::block_on(analyze_architecture(&idx)).ok()?;
+async fn try_architecture(root: &Path) -> Option<ArchStats> {
+    let idx = crate::index::ensure_ready(root).await.ok()?;
+    let report = analyze_architecture(&idx).await.ok()?;
     Some(extract_arch_stats(&report))
 }
 

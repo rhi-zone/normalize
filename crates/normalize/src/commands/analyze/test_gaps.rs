@@ -33,7 +33,7 @@ struct PublicFunction {
 }
 
 /// Run test gaps analysis.
-pub fn analyze_test_gaps(
+pub async fn analyze_test_gaps(
     root: &Path,
     target: Option<&str>,
     show_all: bool,
@@ -43,17 +43,17 @@ pub fn analyze_test_gaps(
     allowlist: &[String],
 ) -> TestGapsReport {
     // Step 1: Open index for call graph data
-    let index = crate::runtime::block_on(crate::index::open(root)).ok();
+    let index = crate::index::open(root).await.ok();
 
     // Step 2: Load all call edges into HashMap<callee_name, Vec<(caller_file, caller_symbol)>>
     let callee_to_callers: HashMap<String, Vec<(String, String)>> = if let Some(ref idx) = index {
-        let stats = crate::runtime::block_on(idx.call_graph_stats()).unwrap_or_default();
+        let stats = idx.call_graph_stats().await.unwrap_or_default();
         if stats.calls == 0 {
             eprintln!("Warning: Call graph empty or not indexed. Run: normalize index reindex");
             eprintln!("Results will show 0 callers for all functions.");
             HashMap::new()
         } else {
-            match crate::runtime::block_on(idx.all_call_edges()) {
+            match idx.all_call_edges().await {
                 Ok(edges) => {
                     let mut map: HashMap<String, Vec<(String, String)>> = HashMap::new();
                     for (caller_file, caller_symbol, callee_name) in edges {

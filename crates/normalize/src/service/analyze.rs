@@ -545,7 +545,7 @@ impl AnalyzeService {
     /// Trace value provenance for a symbol
     #[server(group = "graph")]
     #[cli(display_with = "display_trace")]
-    pub fn trace(
+    pub async fn trace(
         &self,
         #[param(positional, help = "Symbol to trace (file/symbol or symbol name)")] symbol: String,
         #[param(short = 't', help = "Target file containing the symbol")] target: Option<String>,
@@ -565,6 +565,7 @@ impl AnalyzeService {
             recursive,
             case_insensitive,
         )
+        .await
     }
 
     /// Show architecture analysis (coupling, cycles, hubs)
@@ -769,7 +770,7 @@ impl AnalyzeService {
     /// Analyze documentation coverage
     #[server(group = "repo")]
     #[cli(display_with = "display_doc_coverage")]
-    pub fn docs(
+    pub async fn docs(
         &self,
         #[param(short = 'l', help = "Maximum number of files to show (0=no limit)")] limit: Option<
             usize,
@@ -788,7 +789,8 @@ impl AnalyzeService {
             limit.unwrap_or(10),
             config.analyze.exclude_interface_impls(),
             filter.as_ref(),
-        ))
+        )
+        .await)
     }
 
     /// Show longest files in codebase
@@ -1245,7 +1247,7 @@ impl AnalyzeService {
     #[server(group = "test")]
     #[cli(display_with = "display_test_gaps")]
     #[allow(clippy::too_many_arguments)]
-    pub fn test_gaps(
+    pub async fn test_gaps(
         &self,
         #[param(positional, help = "Target file or directory")] target: Option<String>,
         #[param(help = "Show all functions including tested")] all: bool,
@@ -1276,7 +1278,8 @@ impl AnalyzeService {
             effective_limit,
             filter.as_ref(),
             &allowlist,
-        ))
+        )
+        .await)
     }
 
     /// Line budget breakdown by purpose (business logic, tests, docs, config, etc.)
@@ -1439,7 +1442,7 @@ impl AnalyzeService {
 
     /// Auto-generated single-page codebase overview
     #[cli(display_with = "display_summary")]
-    pub fn summary(
+    pub async fn summary(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
@@ -1458,10 +1461,7 @@ impl AnalyzeService {
             0 => usize::MAX,
             n => n,
         };
-        Ok(crate::commands::analyze::summary::analyze_summary(
-            &root_path,
-            effective_limit,
-        ))
+        Ok(crate::commands::analyze::summary::analyze_summary(&root_path, effective_limit).await)
     }
 
     /// Rank modules by import fan-in (requires facts index)
@@ -1619,7 +1619,7 @@ impl AnalyzeService {
     #[server(group = "git")]
     #[cli(display_with = "display_provenance")]
     #[allow(clippy::too_many_arguments)]
-    pub fn provenance(
+    pub async fn provenance(
         &self,
         #[param(positional, help = "Target file or directory scope")] target: Option<String>,
         #[param(help = "Include call graph edges (requires facts index)")] calls: bool,
@@ -1645,9 +1645,7 @@ impl AnalyzeService {
             sessions_path: sessions,
             limit: effective_limit,
         };
-        Ok(crate::commands::analyze::provenance::analyze_provenance(
-            &root_path, &opts,
-        ))
+        Ok(crate::commands::analyze::provenance::analyze_provenance(&root_path, &opts).await)
     }
 
     /// Show structural changes between a base ref and HEAD

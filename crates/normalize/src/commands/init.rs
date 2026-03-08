@@ -14,7 +14,7 @@ const TODO_CANDIDATES: &[&str] = &[
     "TASKS",
 ];
 
-pub fn cmd_init(root: &Path, do_index: bool, setup: bool) -> i32 {
+pub async fn cmd_init(root: &Path, do_index: bool, setup: bool) -> i32 {
     let mut changes = Vec::new();
 
     // 1. Create .normalize directory if needed
@@ -91,14 +91,14 @@ pub fn cmd_init(root: &Path, do_index: bool, setup: bool) -> i32 {
     // 5. Optionally index
     if do_index {
         println!("\nIndexing codebase...");
-        let mut idx = match crate::runtime::block_on(crate::index::open(root)) {
+        let mut idx = match crate::index::open(root).await {
             Ok(idx) => idx,
             Err(e) => {
                 eprintln!("Failed to open index: {}", e);
                 return 1;
             }
         };
-        match crate::runtime::block_on(idx.refresh()) {
+        match idx.refresh().await {
             Ok(count) => println!("Indexed {} files.", count),
             Err(e) => {
                 eprintln!("Failed to index: {}", e);
@@ -501,42 +501,42 @@ mod tests {
     use std::fs;
     use tempfile::tempdir;
 
-    #[test]
-    fn test_init_creates_moss_dir() {
+    #[tokio::test]
+    async fn test_init_creates_moss_dir() {
         let tmp = tempdir().unwrap();
-        let result = cmd_init(tmp.path(), false, false);
+        let result = cmd_init(tmp.path(), false, false).await;
         assert_eq!(result, 0);
         assert!(tmp.path().join(".normalize").exists());
         assert!(tmp.path().join(".normalize/config.toml").exists());
     }
 
-    #[test]
-    fn test_init_idempotent() {
+    #[tokio::test]
+    async fn test_init_idempotent() {
         let tmp = tempdir().unwrap();
-        let result1 = cmd_init(tmp.path(), false, false);
-        let result2 = cmd_init(tmp.path(), false, false);
+        let result1 = cmd_init(tmp.path(), false, false).await;
+        let result2 = cmd_init(tmp.path(), false, false).await;
         assert_eq!(result1, 0);
         assert_eq!(result2, 0);
     }
 
-    #[test]
-    fn test_init_updates_gitignore() {
+    #[tokio::test]
+    async fn test_init_updates_gitignore() {
         let tmp = tempdir().unwrap();
         fs::write(tmp.path().join(".gitignore"), "node_modules\n").unwrap();
 
-        cmd_init(tmp.path(), false, false);
+        cmd_init(tmp.path(), false, false).await;
 
         let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         assert!(content.contains(".normalize/*"));
         assert!(content.contains("!.normalize/config.toml"));
     }
 
-    #[test]
-    fn test_init_skips_commented_entries() {
+    #[tokio::test]
+    async fn test_init_skips_commented_entries() {
         let tmp = tempdir().unwrap();
         fs::write(tmp.path().join(".gitignore"), "# .normalize\n").unwrap();
 
-        cmd_init(tmp.path(), false, false);
+        cmd_init(tmp.path(), false, false).await;
 
         let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         let lines: Vec<&str> = content.lines().collect();
@@ -559,8 +559,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_init_inserts_near_existing() {
+    #[tokio::test]
+    async fn test_init_inserts_near_existing() {
         let tmp = tempdir().unwrap();
         // Existing .gitignore already has .normalize/*
         fs::write(
@@ -569,7 +569,7 @@ mod tests {
         )
         .unwrap();
 
-        cmd_init(tmp.path(), false, false);
+        cmd_init(tmp.path(), false, false).await;
 
         let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         let lines: Vec<&str> = content.lines().collect();
@@ -590,13 +590,13 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_init_detects_todo_files() {
+    #[tokio::test]
+    async fn test_init_detects_todo_files() {
         let tmp = tempdir().unwrap();
         fs::write(tmp.path().join("TODO.md"), "# TODO\n").unwrap();
         fs::write(tmp.path().join("TASKS.md"), "# Tasks\n").unwrap();
 
-        cmd_init(tmp.path(), false, false);
+        cmd_init(tmp.path(), false, false).await;
 
         let config = fs::read_to_string(tmp.path().join(".normalize/config.toml")).unwrap();
         assert!(config.contains("[aliases]"));
@@ -604,11 +604,11 @@ mod tests {
         assert!(config.contains("TASKS.md"));
     }
 
-    #[test]
-    fn test_init_no_todo_files() {
+    #[tokio::test]
+    async fn test_init_no_todo_files() {
         let tmp = tempdir().unwrap();
 
-        cmd_init(tmp.path(), false, false);
+        cmd_init(tmp.path(), false, false).await;
 
         let config = fs::read_to_string(tmp.path().join(".normalize/config.toml")).unwrap();
         // Should not have aliases section if no todo-tracking files found

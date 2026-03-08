@@ -337,8 +337,8 @@ fn build_co_change_edges(root: &Path, files: &HashSet<String>) -> Vec<Provenance
 
 // ── Import graph extraction ──────────────────────────────────────
 
-fn build_import_edges(root: &Path, files: &HashSet<String>) -> Vec<ProvenanceEdge> {
-    crate::runtime::block_on(async {
+async fn build_import_edges(root: &Path, files: &HashSet<String>) -> Vec<ProvenanceEdge> {
+    {
         let idx = match crate::index::open_if_enabled(root).await {
             Some(idx) => idx,
             None => return Vec::new(),
@@ -366,13 +366,13 @@ fn build_import_edges(root: &Path, files: &HashSet<String>) -> Vec<ProvenanceEdg
             }
         }
         edges
-    })
+    }
 }
 
 // ── Call graph extraction ────────────────────────────────────────
 
-fn build_call_edges(root: &Path) -> Vec<(ProvenanceEdge, ProvenanceNode, ProvenanceNode)> {
-    crate::runtime::block_on(async {
+async fn build_call_edges(root: &Path) -> Vec<(ProvenanceEdge, ProvenanceNode, ProvenanceNode)> {
+    {
         let idx = match crate::index::open_if_enabled(root).await {
             Some(idx) => idx,
             None => return Vec::new(),
@@ -417,7 +417,7 @@ fn build_call_edges(root: &Path) -> Vec<(ProvenanceEdge, ProvenanceNode, Provena
         }
 
         results
-    })
+    }
 }
 
 // ── Graph assembly ───────────────────────────────────────────────
@@ -432,7 +432,7 @@ pub struct ProvenanceOptions {
 }
 
 /// Main entry point: assemble the provenance graph.
-pub fn analyze_provenance(root: &Path, opts: &ProvenanceOptions) -> ProvenanceReport {
+pub async fn analyze_provenance(root: &Path, opts: &ProvenanceOptions) -> ProvenanceReport {
     let mut nodes: Vec<ProvenanceNode> = Vec::new();
     let mut edges: Vec<ProvenanceEdge> = Vec::new();
     let mut warnings: Vec<String> = Vec::new();
@@ -553,14 +553,14 @@ pub fn analyze_provenance(root: &Path, opts: &ProvenanceOptions) -> ProvenanceRe
     }
 
     // 4. Import edges
-    let import_edges = build_import_edges(root, &file_set);
+    let import_edges = build_import_edges(root, &file_set).await;
     let import_count = import_edges.len();
     edges.extend(import_edges);
 
     // 5. Call edges (optional)
     let mut call_count = 0;
     if opts.include_calls {
-        let call_data = build_call_edges(root);
+        let call_data = build_call_edges(root).await;
         call_count = call_data.len();
         if call_count == 0 {
             warnings.push("No call graph data found (is the facts index built?)".to_string());
