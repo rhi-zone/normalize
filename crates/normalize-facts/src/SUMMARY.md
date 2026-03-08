@@ -6,6 +6,6 @@ Source files for fact extraction and storage.
 - `extract.rs` — `Extractor`, `ExtractOptions`, `ExtractResult`, `InterfaceResolver`, `OnDemandResolver`; drives per-file extraction using tree-sitter grammars and language trait hooks
 - `index.rs` — `FileIndex` (SQLite-backed store), `CallGraphStats`, `ChangedFiles`, `SymbolMatch`; all index queries (`find_callers`, `find_callees`, `resolve_all_imports`, etc.)
 - `parsers.rs` — `grammar_loader`, `parser_for`, `parse_with_grammar`, `available_external_grammars`; manages tree-sitter grammar loading
-- `symbols.rs` — `SymbolParser`: converts raw tree-sitter tag matches into `Symbol`/`FlatSymbol` records using `Language` trait hooks; `find_type_refs()` extracts type-to-type relationships (field_type, param_type, return_type, extends, implements, generic_bound, type_alias) for Rust, TypeScript/TSX, Python, Go, and Java
+- `symbols.rs` — `SymbolParser`: converts raw tree-sitter tag matches into `Symbol`/`FlatSymbol` records using `Language` trait hooks; `find_type_refs()` extracts type-to-type relationships (field_type, param_type, return_type, extends, implements, generic_bound, type_alias) for Rust, TypeScript/TSX, Python, Go, Java, C#, Kotlin, Swift, C++, and Ruby
 - `main.rs` — binary entry point for the standalone `normalize-facts` CLI (gated behind `cli` feature)
 - `service.rs` — `FactsCliService` with `#[cli]` impl: `rebuild`, `stats`, `files` subcommands (gated behind `cli` feature)

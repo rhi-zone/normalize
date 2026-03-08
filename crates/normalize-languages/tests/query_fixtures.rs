@@ -6046,3 +6046,59 @@ fn vue_complexity_query_runs_cleanly() {
         "vue complexity query should run cleanly, got: {complexity:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Kotlin parse diagnostics
+// ---------------------------------------------------------------------------
+
+#[test]
+fn kotlin_parse_diagnostic() {
+    let loader = normalize_languages::GrammarLoader::new();
+    let Some(lang) = loader.get("kotlin") else {
+        eprintln!(
+            "Skipping kotlin_parse_diagnostic: kotlin grammar not found in ~/.config/normalize/grammars/"
+        );
+        return;
+    };
+
+    let source_simple = "fun classify(n: Int): String { return \"x\" }";
+    let source_with_val = "fun classify(n: Int): String { val x = 1; return \"x\" }";
+
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&lang).unwrap();
+
+    let tree_simple = parser.parse(source_simple, None).unwrap();
+    let tree_with_val = parser.parse(source_with_val, None).unwrap();
+
+    println!(
+        "Simple (no val): root={}, has_error={}",
+        tree_simple.root_node().kind(),
+        tree_simple.root_node().has_error()
+    );
+    println!(
+        "With val: root={}, has_error={}",
+        tree_with_val.root_node().kind(),
+        tree_with_val.root_node().has_error()
+    );
+
+    let query_str = loader
+        .get_tags("kotlin")
+        .expect("kotlin tags query missing");
+    let names_simple = collect_captures(&lang, source_simple, &query_str, "name");
+    let names_with_val = collect_captures(&lang, source_with_val, &query_str, "name");
+
+    println!("Simple names: {names_simple:?}");
+    println!("With val names: {names_with_val:?}");
+
+    // Full sample
+    let names_full = collect_captures(&lang, KOTLIN_SAMPLE, &query_str, "name");
+    println!("Full sample names: {names_full:?}");
+
+    let mut parser2 = tree_sitter::Parser::new();
+    parser2.set_language(&lang).unwrap();
+    let tree_full = parser2.parse(KOTLIN_SAMPLE, None).unwrap();
+    println!(
+        "Full sample: has_error={}",
+        tree_full.root_node().has_error()
+    );
+}

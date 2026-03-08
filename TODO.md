@@ -257,14 +257,14 @@ All languages with grammars have .scm files. Fixture test framework: 257 tests a
 **Implemented:**
 - `type_refs` table in index schema: `(file, source_symbol, target_type, kind, line)` — kind ∈ {field_type, param_type, return_type, extends, implements, generic_bound, type_alias}
 - `TypeRef` + `TypeRefKind` in `normalize-facts-core`
-- Extraction in `normalize-facts/src/symbols.rs::find_type_refs()` for Rust, TypeScript/TSX, Python, Go, Java
+- Extraction in `normalize-facts/src/symbols.rs::find_type_refs()` for Rust, TypeScript/TSX, Python, Go, Java, C#, Kotlin, Swift, C++, Ruby
 - `build_type_graph()` in `commands/analyze/graph.rs` queries `type_refs` table
 - Covers: struct field types, fn params/returns, impl/extends/implements, where bounds, type aliases
 
 **Remaining (future work):**
 - [x] Extend to Go and Java via the same pattern in `find_type_refs()` — done 2026-03-08
 - [x] Unit tests for type ref extraction per language — done (8 tests: 4 Go, 4 Java)
-- [ ] Extend to C#, Kotlin, Swift, Ruby, C++ for broader language coverage
+- [x] Extend to C#, Kotlin, Swift, Ruby, C++ — done 2026-03-09 (10 new tests, 2 per language)
 
 ### Git Analysis Enhancements
 
