@@ -8,4 +8,4 @@ Sample source files for query fixture tests. Each subdirectory contains a `sampl
 - **imports** — import/use statements with paths and names
 - **types** — type/struct/class/interface definitions
 
-Languages covered: `rust/`, `python/`, `go/`, `typescript/`, `java/`.
+Languages covered: `rust/`, `python/`, `go/`, `typescript/`, `java/`, `ruby/`, `kotlin/`, `swift/`, `scala/`, `php/`, `dart/`, `elixir/`, `c/`, `cpp/`, `c-sharp/`.

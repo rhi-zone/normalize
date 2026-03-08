@@ -688,6 +688,7 @@ fn bundled_calls_query(name: &str) -> Option<&'static str> {
         "elixir" => Some(include_str!("queries/elixir.calls.scm")),
         "lua" => Some(include_str!("queries/lua.calls.scm")),
         "dart" => Some(include_str!("queries/dart.calls.scm")),
+        "graphql" => Some(include_str!("queries/graphql.calls.scm")),
         "ocaml" => Some(include_str!("queries/ocaml.calls.scm")),
         "erlang" => Some(include_str!("queries/erlang.calls.scm")),
         "zig" => Some(include_str!("queries/zig.calls.scm")),
