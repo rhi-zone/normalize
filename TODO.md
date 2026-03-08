@@ -268,9 +268,7 @@ fixture test. Target: coverage matching `locals.scm` (65 languages).
   `extract_type()` methods. The trait has ~10 genuinely semantic methods
   (`extract_docstring`, `get_visibility`, `is_test_symbol`, `test_file_globs`,
   `format_import`, `signature_suffix`, `embedded_content`, `refine_kind`, etc.).
-- [ ] **`*.imports.scm`** — import/require statement extraction. Would replace trait-based
-  `extract_imports()` fallback in `symbols.rs::collect_imports_with_trait()` across ~98 language
-  impls. Captures: `@import.path`, `@import.name`.
+- [x] **`*.imports.scm`** — import/require statement extraction. Wired into `DepsExtractor::extract_with_trait` as query-first path (DONE 2026-03-08). `collect_imports_from_query` runs the `.scm` query (captures `@import`, `@import.path`, `@import.name`, `@import.alias`, `@import.glob`); falls back to `Language::extract_imports` trait when query absent or fails to compile against installed grammar. Note: some grammars (Python, Rust at current installed version) have query compile errors — those fall back correctly. Long-term: fix the .scm patterns to match installed grammar node kinds.
 - [x] Implement calls.scm for all languages that have call extraction — DONE (68/68 registered)
 - [x] All tags.scm, complexity.scm, imports.scm, types.scm fully registered — DONE (2026-03-08)
 - [x] Fixture test framework — DONE: 257 tests across 68 languages in `crates/normalize-languages/tests/`
@@ -285,13 +283,14 @@ fixture test. Target: coverage matching `locals.scm` (65 languages).
 **Implemented:**
 - `type_refs` table in index schema: `(file, source_symbol, target_type, kind, line)` — kind ∈ {field_type, param_type, return_type, extends, implements, generic_bound, type_alias}
 - `TypeRef` + `TypeRefKind` in `normalize-facts-core`
-- Extraction in `normalize-facts/src/symbols.rs::find_type_refs()` for Rust, TypeScript/TSX, Python
+- Extraction in `normalize-facts/src/symbols.rs::find_type_refs()` for Rust, TypeScript/TSX, Python, Go, Java
 - `build_type_graph()` in `commands/analyze/graph.rs` queries `type_refs` table
 - Covers: struct field types, fn params/returns, impl/extends/implements, where bounds, type aliases
 
 **Remaining (future work):**
-- [ ] Extend to more languages (Go, Java, etc.) via the same pattern in `find_type_refs()`
-- [ ] Unit tests for type ref extraction per language
+- [x] Extend to Go and Java via the same pattern in `find_type_refs()` — done 2026-03-08
+- [x] Unit tests for type ref extraction per language — done (8 tests: 4 Go, 4 Java)
+- [ ] Extend to C#, Kotlin, Swift, Ruby, C++ for broader language coverage
 
 ### Git Analysis Enhancements
 

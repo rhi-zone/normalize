@@ -371,6 +371,8 @@ impl SymbolParser {
             "Rust" => Self::find_rust_type_refs(content),
             "TypeScript" | "TSX" => Self::find_typescript_type_refs(content, lang.name() == "TSX"),
             "Python" => Self::find_python_type_refs(content),
+            "Go" => Self::find_go_type_refs(content),
+            "Java" => Self::find_java_type_refs(content),
             _ => Vec::new(),
         }
     }
@@ -754,6 +756,579 @@ impl SymbolParser {
         }
     }
 
+    /// Extract type references from Go source code.
+    fn find_go_type_refs(content: &str) -> Vec<TypeRef> {
+        let tree = match parsers::parse_with_grammar("go", content) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+
+        let mut refs = Vec::new();
+        let mut cursor = tree.root_node().walk();
+        Self::collect_go_type_refs(&mut cursor, content, &mut refs);
+        refs
+    }
+
+    fn collect_go_type_refs(
+        cursor: &mut tree_sitter::TreeCursor,
+        content: &str,
+        refs: &mut Vec<TypeRef>,
+    ) {
+        loop {
+            let node = cursor.node();
+            let kind = node.kind();
+
+            match kind {
+                // type Foo struct { Bar Baz }
+                // type MyInterface interface { OtherInterface }
+                // type Alias = Original
+                "type_declaration" => {
+                    let mut child_cursor = node.walk();
+                    if child_cursor.goto_first_child() {
+                        loop {
+                            let child = child_cursor.node();
+                            match child.kind() {
+                                "type_spec" => {
+                                    Self::collect_go_type_spec(&child, content, refs);
+                                }
+                                "type_alias" => {
+                                    Self::collect_go_type_alias(&child, content, refs);
+                                }
+                                _ => {}
+                            }
+                            if !child_cursor.goto_next_sibling() {
+                                break;
+                            }
+                        }
+                    }
+                    // Don't recurse into type_declaration children below
+                    if !cursor.goto_next_sibling() {
+                        break;
+                    }
+                    continue;
+                }
+                // func (r *Recv) Method(x Bar) Baz
+                "method_declaration" => {
+                    let fn_name = node
+                        .child_by_field_name("name")
+                        .map(|n| content[n.byte_range()].to_string())
+                        .unwrap_or_default();
+                    // Receiver type → field_type edge from recv_type → fn_name (skip, not typical)
+                    // Params
+                    if let Some(params) = node.child_by_field_name("parameters") {
+                        Self::collect_go_param_types(&params, content, &fn_name, refs);
+                    }
+                    // Return type(s)
+                    if let Some(result) = node.child_by_field_name("result") {
+                        Self::collect_go_result_types(&result, content, &fn_name, refs);
+                    }
+                }
+                // func Foo(x Bar) Baz
+                "function_declaration" => {
+                    let fn_name = node
+                        .child_by_field_name("name")
+                        .map(|n| content[n.byte_range()].to_string())
+                        .unwrap_or_default();
+                    if let Some(params) = node.child_by_field_name("parameters") {
+                        Self::collect_go_param_types(&params, content, &fn_name, refs);
+                    }
+                    if let Some(result) = node.child_by_field_name("result") {
+                        Self::collect_go_result_types(&result, content, &fn_name, refs);
+                    }
+                }
+                _ => {}
+            }
+
+            if cursor.goto_first_child() {
+                Self::collect_go_type_refs(cursor, content, refs);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+
+    /// Collect type refs from a Go `type_spec` node (struct or interface).
+    fn collect_go_type_spec(node: &tree_sitter::Node, content: &str, refs: &mut Vec<TypeRef>) {
+        let type_name = node
+            .child_by_field_name("name")
+            .map(|n| content[n.byte_range()].to_string())
+            .unwrap_or_default();
+        if type_name.is_empty() {
+            return;
+        }
+
+        let type_body = match node.child_by_field_name("type") {
+            Some(t) => t,
+            None => return,
+        };
+
+        match type_body.kind() {
+            // struct fields
+            "struct_type" => {
+                let mut cur = type_body.walk();
+                if cur.goto_first_child() {
+                    loop {
+                        let child = cur.node();
+                        if child.kind() == "field_declaration_list" {
+                            let mut fc = child.walk();
+                            if fc.goto_first_child() {
+                                loop {
+                                    let field = fc.node();
+                                    if field.kind() == "field_declaration"
+                                        && let Some(ft) = field.child_by_field_name("type")
+                                    {
+                                        // qualified_type (io.Reader) or type_identifier
+                                        let type_name_str = Self::go_type_name(&ft, content);
+                                        if !type_name_str.is_empty()
+                                            && !Self::is_primitive_type(&type_name_str)
+                                            && !Self::is_go_primitive(&type_name_str)
+                                        {
+                                            refs.push(TypeRef {
+                                                source_symbol: type_name.clone(),
+                                                target_type: type_name_str,
+                                                kind: TypeRefKind::FieldType,
+                                                line: ft.start_position().row + 1,
+                                            });
+                                        }
+                                    }
+                                    if !fc.goto_next_sibling() {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if !cur.goto_next_sibling() {
+                            break;
+                        }
+                    }
+                }
+            }
+            // interface embedded types
+            "interface_type" => {
+                let mut cur = type_body.walk();
+                if cur.goto_first_child() {
+                    loop {
+                        let child = cur.node();
+                        // type_elem = embedded interface constraint
+                        if child.kind() == "type_elem" {
+                            let mut ec = child.walk();
+                            if ec.goto_first_child() {
+                                loop {
+                                    let elem = ec.node();
+                                    if elem.kind() == "type_identifier" {
+                                        let embedded = content[elem.byte_range()].to_string();
+                                        if !Self::is_primitive_type(&embedded)
+                                            && !Self::is_go_primitive(&embedded)
+                                        {
+                                            refs.push(TypeRef {
+                                                source_symbol: type_name.clone(),
+                                                target_type: embedded,
+                                                kind: TypeRefKind::Implements,
+                                                line: elem.start_position().row + 1,
+                                            });
+                                        }
+                                    }
+                                    if !ec.goto_next_sibling() {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if !cur.goto_next_sibling() {
+                            break;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Collect type refs from a Go `type_alias` node (`type Alias = Original`).
+    fn collect_go_type_alias(node: &tree_sitter::Node, content: &str, refs: &mut Vec<TypeRef>) {
+        let alias_name = node
+            .child_by_field_name("name")
+            .map(|n| content[n.byte_range()].to_string())
+            .unwrap_or_default();
+        if alias_name.is_empty() {
+            return;
+        }
+        if let Some(type_node) = node.child_by_field_name("type") {
+            let target = Self::go_type_name(&type_node, content);
+            if !target.is_empty()
+                && !Self::is_primitive_type(&target)
+                && !Self::is_go_primitive(&target)
+            {
+                refs.push(TypeRef {
+                    source_symbol: alias_name,
+                    target_type: target,
+                    kind: TypeRefKind::TypeAlias,
+                    line: type_node.start_position().row + 1,
+                });
+            }
+        }
+    }
+
+    /// Extract a readable type name from a Go type node.
+    /// For `qualified_type` (io.Reader), returns just the name part.
+    /// For `type_identifier`, returns the identifier directly.
+    fn go_type_name(node: &tree_sitter::Node, content: &str) -> String {
+        match node.kind() {
+            "type_identifier" => content[node.byte_range()].to_string(),
+            "qualified_type" => {
+                // package.Name — return just Name
+                node.child_by_field_name("name")
+                    .map(|n| content[n.byte_range()].to_string())
+                    .unwrap_or_default()
+            }
+            "pointer_type" => {
+                // *Foo — look through the pointer
+                let mut c = node.walk();
+                if c.goto_first_child() {
+                    loop {
+                        let child = c.node();
+                        if child.kind() == "type_identifier" || child.kind() == "qualified_type" {
+                            return Self::go_type_name(&child, content);
+                        }
+                        if !c.goto_next_sibling() {
+                            break;
+                        }
+                    }
+                }
+                String::new()
+            }
+            "slice_type" | "array_type" => {
+                // []Foo or [N]Foo — look at element type
+                node.child_by_field_name("element")
+                    .map(|n| Self::go_type_name(&n, content))
+                    .unwrap_or_default()
+            }
+            _ => String::new(),
+        }
+    }
+
+    /// Extract parameter types from a Go parameter list.
+    fn collect_go_param_types(
+        params: &tree_sitter::Node,
+        content: &str,
+        fn_name: &str,
+        refs: &mut Vec<TypeRef>,
+    ) {
+        let mut cursor = params.walk();
+        if cursor.goto_first_child() {
+            loop {
+                let child = cursor.node();
+                if child.kind() == "parameter_declaration"
+                    && let Some(type_node) = child.child_by_field_name("type")
+                {
+                    let type_name = Self::go_type_name(&type_node, content);
+                    if !type_name.is_empty()
+                        && !Self::is_primitive_type(&type_name)
+                        && !Self::is_go_primitive(&type_name)
+                    {
+                        refs.push(TypeRef {
+                            source_symbol: fn_name.to_string(),
+                            target_type: type_name,
+                            kind: TypeRefKind::ParamType,
+                            line: type_node.start_position().row + 1,
+                        });
+                    }
+                }
+                if !cursor.goto_next_sibling() {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Extract return types from a Go result field (single type or parameter_list).
+    fn collect_go_result_types(
+        result: &tree_sitter::Node,
+        content: &str,
+        fn_name: &str,
+        refs: &mut Vec<TypeRef>,
+    ) {
+        match result.kind() {
+            "type_identifier" | "qualified_type" | "pointer_type" | "slice_type" | "array_type" => {
+                let type_name = Self::go_type_name(result, content);
+                if !type_name.is_empty()
+                    && !Self::is_primitive_type(&type_name)
+                    && !Self::is_go_primitive(&type_name)
+                {
+                    refs.push(TypeRef {
+                        source_symbol: fn_name.to_string(),
+                        target_type: type_name,
+                        kind: TypeRefKind::ReturnType,
+                        line: result.start_position().row + 1,
+                    });
+                }
+            }
+            // Multiple return values: (Foo, Bar, error)
+            "parameter_list" => {
+                let mut cursor = result.walk();
+                if cursor.goto_first_child() {
+                    loop {
+                        let child = cursor.node();
+                        if child.kind() == "parameter_declaration"
+                            && let Some(type_node) = child.child_by_field_name("type")
+                        {
+                            let type_name = Self::go_type_name(&type_node, content);
+                            if !type_name.is_empty()
+                                && !Self::is_primitive_type(&type_name)
+                                && !Self::is_go_primitive(&type_name)
+                            {
+                                refs.push(TypeRef {
+                                    source_symbol: fn_name.to_string(),
+                                    target_type: type_name,
+                                    kind: TypeRefKind::ReturnType,
+                                    line: type_node.start_position().row + 1,
+                                });
+                            }
+                        }
+                        if !cursor.goto_next_sibling() {
+                            break;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Go-specific primitive/builtin types to skip.
+    fn is_go_primitive(name: &str) -> bool {
+        matches!(
+            name,
+            "int"
+                | "int8"
+                | "int16"
+                | "int32"
+                | "int64"
+                | "uint"
+                | "uint8"
+                | "uint16"
+                | "uint32"
+                | "uint64"
+                | "uintptr"
+                | "float32"
+                | "float64"
+                | "complex64"
+                | "complex128"
+                | "bool"
+                | "string"
+                | "byte"
+                | "rune"
+                | "error"
+        )
+    }
+
+    /// Extract type references from Java source code.
+    fn find_java_type_refs(content: &str) -> Vec<TypeRef> {
+        let tree = match parsers::parse_with_grammar("java", content) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+
+        let mut refs = Vec::new();
+        let mut cursor = tree.root_node().walk();
+        Self::collect_java_type_refs(&mut cursor, content, &mut refs);
+        refs
+    }
+
+    fn collect_java_type_refs(
+        cursor: &mut tree_sitter::TreeCursor,
+        content: &str,
+        refs: &mut Vec<TypeRef>,
+    ) {
+        loop {
+            let node = cursor.node();
+            let kind = node.kind();
+
+            match kind {
+                // class Foo extends Bar implements Baz, Qux { ... }
+                "class_declaration" => {
+                    let class_name = node
+                        .child_by_field_name("name")
+                        .map(|n| content[n.byte_range()].to_string())
+                        .unwrap_or_default();
+                    // extends
+                    if let Some(superclass) = node.child_by_field_name("superclass") {
+                        for type_name in Self::extract_type_identifiers(&superclass, content) {
+                            refs.push(TypeRef {
+                                source_symbol: class_name.clone(),
+                                target_type: type_name,
+                                kind: TypeRefKind::Extends,
+                                line: superclass.start_position().row + 1,
+                            });
+                        }
+                    }
+                    // implements
+                    if let Some(interfaces) = node.child_by_field_name("interfaces") {
+                        for type_name in Self::extract_type_identifiers(&interfaces, content) {
+                            refs.push(TypeRef {
+                                source_symbol: class_name.clone(),
+                                target_type: type_name,
+                                kind: TypeRefKind::Implements,
+                                line: interfaces.start_position().row + 1,
+                            });
+                        }
+                    }
+                }
+                // interface MyInterface extends OtherInterface { ... }
+                "interface_declaration" => {
+                    let iface_name = node
+                        .child_by_field_name("name")
+                        .map(|n| content[n.byte_range()].to_string())
+                        .unwrap_or_default();
+                    // extends_interfaces child (not a named field)
+                    let mut child_cursor = node.walk();
+                    if child_cursor.goto_first_child() {
+                        loop {
+                            let child = child_cursor.node();
+                            if child.kind() == "extends_interfaces" {
+                                for type_name in Self::extract_type_identifiers(&child, content) {
+                                    refs.push(TypeRef {
+                                        source_symbol: iface_name.clone(),
+                                        target_type: type_name,
+                                        kind: TypeRefKind::Extends,
+                                        line: child.start_position().row + 1,
+                                    });
+                                }
+                            }
+                            if !child_cursor.goto_next_sibling() {
+                                break;
+                            }
+                        }
+                    }
+                }
+                // private Bar field;
+                "field_declaration" => {
+                    let container = Self::ancestor_name(&node, content);
+                    if let Some(type_node) = node.child_by_field_name("type") {
+                        for type_name in Self::extract_type_identifiers(&type_node, content) {
+                            refs.push(TypeRef {
+                                source_symbol: container.clone(),
+                                target_type: type_name,
+                                kind: TypeRefKind::FieldType,
+                                line: type_node.start_position().row + 1,
+                            });
+                        }
+                    }
+                }
+                // public Bar method(Baz param) { ... }
+                "method_declaration" => {
+                    let fn_name = node
+                        .child_by_field_name("name")
+                        .map(|n| content[n.byte_range()].to_string())
+                        .unwrap_or_default();
+                    // Return type
+                    if let Some(ret) = node.child_by_field_name("type") {
+                        for type_name in Self::extract_type_identifiers(&ret, content) {
+                            refs.push(TypeRef {
+                                source_symbol: fn_name.clone(),
+                                target_type: type_name,
+                                kind: TypeRefKind::ReturnType,
+                                line: ret.start_position().row + 1,
+                            });
+                        }
+                    }
+                    // Parameters
+                    if let Some(params) = node.child_by_field_name("parameters") {
+                        Self::collect_java_param_types(&params, content, &fn_name, refs);
+                    }
+                    // Generic bounds: <T extends Bound>
+                    if let Some(type_params) = node.child_by_field_name("type_parameters") {
+                        Self::collect_java_generic_bounds(&type_params, content, &fn_name, refs);
+                    }
+                }
+                _ => {}
+            }
+
+            if cursor.goto_first_child() {
+                Self::collect_java_type_refs(cursor, content, refs);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+
+    /// Extract parameter types from Java formal_parameters.
+    fn collect_java_param_types(
+        params: &tree_sitter::Node,
+        content: &str,
+        fn_name: &str,
+        refs: &mut Vec<TypeRef>,
+    ) {
+        let mut cursor = params.walk();
+        if cursor.goto_first_child() {
+            loop {
+                let child = cursor.node();
+                if child.kind() == "formal_parameter"
+                    && let Some(type_node) = child.child_by_field_name("type")
+                {
+                    for type_name in Self::extract_type_identifiers(&type_node, content) {
+                        refs.push(TypeRef {
+                            source_symbol: fn_name.to_string(),
+                            target_type: type_name,
+                            kind: TypeRefKind::ParamType,
+                            line: type_node.start_position().row + 1,
+                        });
+                    }
+                }
+                if !cursor.goto_next_sibling() {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Extract generic bounds from Java type_parameters (<T extends Bound>).
+    fn collect_java_generic_bounds(
+        type_params: &tree_sitter::Node,
+        content: &str,
+        fn_name: &str,
+        refs: &mut Vec<TypeRef>,
+    ) {
+        let mut cursor = type_params.walk();
+        if cursor.goto_first_child() {
+            loop {
+                let child = cursor.node();
+                if child.kind() == "type_parameter" {
+                    // type_bound child: extends SomeType
+                    let mut tc = child.walk();
+                    if tc.goto_first_child() {
+                        loop {
+                            let tc_child = tc.node();
+                            if tc_child.kind() == "type_bound" {
+                                for type_name in Self::extract_type_identifiers(&tc_child, content)
+                                {
+                                    refs.push(TypeRef {
+                                        source_symbol: fn_name.to_string(),
+                                        target_type: type_name,
+                                        kind: TypeRefKind::GenericBound,
+                                        line: tc_child.start_position().row + 1,
+                                    });
+                                }
+                            }
+                            if !tc.goto_next_sibling() {
+                                break;
+                            }
+                        }
+                    }
+                }
+                if !cursor.goto_next_sibling() {
+                    break;
+                }
+            }
+        }
+    }
+
     /// Extract type references from Python source code.
     fn find_python_type_refs(content: &str) -> Vec<TypeRef> {
         let tree = match parsers::parse_with_grammar("python", content) {
@@ -1046,6 +1621,18 @@ impl SymbolParser {
                 | "self"
                 | "Self"
                 | "cls"
+                // Java boxed primitives and root types (not user-defined)
+                | "Integer"
+                | "Long"
+                | "Double"
+                | "Float"
+                | "Short"
+                | "Byte"
+                | "Character"
+                | "Boolean"
+                | "Void"
+                | "Number"
+                | "Object"
         )
     }
 
@@ -1171,5 +1758,196 @@ def bar():
         let source = parser.extract_symbol_source(&PathBuf::from("test.py"), content, "foo");
         assert!(source.is_some());
         assert!(source.unwrap().contains("return 42"));
+    }
+
+    #[test]
+    fn test_go_type_refs_struct_fields() {
+        let mut parser = SymbolParser::new();
+        let content = r#"package main
+
+type Server struct {
+    Handler RequestHandler
+    Logger  Logger
+}
+"#;
+        let refs = parser.find_type_refs(&PathBuf::from("main.go"), content);
+        let field_refs: Vec<_> = refs
+            .iter()
+            .filter(|r| r.kind == TypeRefKind::FieldType)
+            .collect();
+        assert!(
+            field_refs
+                .iter()
+                .any(|r| r.source_symbol == "Server" && r.target_type == "RequestHandler"),
+            "expected Server→RequestHandler field_type"
+        );
+        assert!(
+            field_refs
+                .iter()
+                .any(|r| r.source_symbol == "Server" && r.target_type == "Logger"),
+            "expected Server→Logger field_type"
+        );
+    }
+
+    #[test]
+    fn test_go_type_refs_interface_embed() {
+        let mut parser = SymbolParser::new();
+        let content = r#"package main
+
+type ReadWriter interface {
+    Reader
+    Writer
+}
+"#;
+        let refs = parser.find_type_refs(&PathBuf::from("main.go"), content);
+        let impl_refs: Vec<_> = refs
+            .iter()
+            .filter(|r| r.kind == TypeRefKind::Implements)
+            .collect();
+        assert!(
+            impl_refs
+                .iter()
+                .any(|r| r.source_symbol == "ReadWriter" && r.target_type == "Reader"),
+            "expected ReadWriter→Reader implements"
+        );
+        assert!(
+            impl_refs
+                .iter()
+                .any(|r| r.source_symbol == "ReadWriter" && r.target_type == "Writer"),
+            "expected ReadWriter→Writer implements"
+        );
+    }
+
+    #[test]
+    fn test_go_type_refs_func_params_return() {
+        let mut parser = SymbolParser::new();
+        let content = r#"package main
+
+func Process(req Request) Response {
+    return Response{}
+}
+"#;
+        let refs = parser.find_type_refs(&PathBuf::from("main.go"), content);
+        assert!(
+            refs.iter().any(|r| r.kind == TypeRefKind::ParamType
+                && r.source_symbol == "Process"
+                && r.target_type == "Request"),
+            "expected Process→Request param_type"
+        );
+        assert!(
+            refs.iter().any(|r| r.kind == TypeRefKind::ReturnType
+                && r.source_symbol == "Process"
+                && r.target_type == "Response"),
+            "expected Process→Response return_type"
+        );
+    }
+
+    #[test]
+    fn test_go_type_refs_alias() {
+        let mut parser = SymbolParser::new();
+        let content = r#"package main
+
+type MyHandler = http.Handler
+"#;
+        let refs = parser.find_type_refs(&PathBuf::from("main.go"), content);
+        assert!(
+            refs.iter().any(|r| r.kind == TypeRefKind::TypeAlias
+                && r.source_symbol == "MyHandler"
+                && r.target_type == "Handler"),
+            "expected MyHandler→Handler type_alias (qualified type, leaf name)"
+        );
+    }
+
+    #[test]
+    fn test_java_type_refs_class_hierarchy() {
+        let mut parser = SymbolParser::new();
+        let content = r#"public class Foo extends Bar implements Baz, Qux {
+}
+"#;
+        let refs = parser.find_type_refs(&PathBuf::from("Foo.java"), content);
+        assert!(
+            refs.iter()
+                .any(|r| r.kind == TypeRefKind::Extends && r.target_type == "Bar"),
+            "expected Foo extends Bar"
+        );
+        assert!(
+            refs.iter()
+                .any(|r| r.kind == TypeRefKind::Implements && r.target_type == "Baz"),
+            "expected Foo implements Baz"
+        );
+        assert!(
+            refs.iter()
+                .any(|r| r.kind == TypeRefKind::Implements && r.target_type == "Qux"),
+            "expected Foo implements Qux"
+        );
+    }
+
+    #[test]
+    fn test_java_type_refs_field_and_method() {
+        let mut parser = SymbolParser::new();
+        let content = r#"public class Service {
+    private Repository repo;
+
+    public Response handle(Request req) {
+        return null;
+    }
+}
+"#;
+        let refs = parser.find_type_refs(&PathBuf::from("Service.java"), content);
+        assert!(
+            refs.iter().any(|r| r.kind == TypeRefKind::FieldType
+                && r.source_symbol == "Service"
+                && r.target_type == "Repository"),
+            "expected Service→Repository field_type"
+        );
+        assert!(
+            refs.iter().any(|r| r.kind == TypeRefKind::ReturnType
+                && r.source_symbol == "handle"
+                && r.target_type == "Response"),
+            "expected handle→Response return_type"
+        );
+        assert!(
+            refs.iter().any(|r| r.kind == TypeRefKind::ParamType
+                && r.source_symbol == "handle"
+                && r.target_type == "Request"),
+            "expected handle→Request param_type"
+        );
+    }
+
+    #[test]
+    fn test_java_type_refs_generic_bound() {
+        let mut parser = SymbolParser::new();
+        let content = r#"public class Sorter {
+    public <T extends Comparable> void sort(T[] arr) {}
+}
+"#;
+        let refs = parser.find_type_refs(&PathBuf::from("Sorter.java"), content);
+        assert!(
+            refs.iter().any(|r| r.kind == TypeRefKind::GenericBound
+                && r.source_symbol == "sort"
+                && r.target_type == "Comparable"),
+            "expected sort→Comparable generic_bound"
+        );
+    }
+
+    #[test]
+    fn test_java_type_refs_interface_extends() {
+        let mut parser = SymbolParser::new();
+        let content = r#"interface ReadWriter extends Reader, Writer {
+}
+"#;
+        let refs = parser.find_type_refs(&PathBuf::from("ReadWriter.java"), content);
+        assert!(
+            refs.iter().any(|r| r.kind == TypeRefKind::Extends
+                && r.source_symbol == "ReadWriter"
+                && r.target_type == "Reader"),
+            "expected ReadWriter extends Reader"
+        );
+        assert!(
+            refs.iter().any(|r| r.kind == TypeRefKind::Extends
+                && r.source_symbol == "ReadWriter"
+                && r.target_type == "Writer"),
+            "expected ReadWriter extends Writer"
+        );
     }
 }

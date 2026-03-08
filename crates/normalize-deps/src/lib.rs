@@ -207,7 +207,8 @@ impl DepsExtractor {
 
     /// Extract using the Language trait
     fn extract_with_trait(&self, content: &str, support: &dyn Language) -> ExtractedDeps {
-        let tree = match parse_with_grammar(support.grammar_name(), content) {
+        let grammar_name = support.grammar_name();
+        let tree = match parse_with_grammar(grammar_name, content) {
             Some(t) => t,
             None => {
                 return ExtractedDeps {
@@ -218,20 +219,139 @@ impl DepsExtractor {
             }
         };
 
-        let mut imports = Vec::new();
-        let root = tree.root_node();
-        let mut cursor = root.walk();
+        let loader = grammar_loader();
+        let imports = loader
+            .get_imports(grammar_name)
+            .and_then(|query_str| {
+                // Query-first: use the .scm file; None means fall back to trait
+                Self::collect_imports_from_query(&tree, content, grammar_name, &query_str, &loader)
+            })
+            .unwrap_or_else(|| {
+                // Fallback: walk AST with Language trait (no .scm or query failed to compile)
+                let mut imports = Vec::new();
+                let root = tree.root_node();
+                let mut cursor = root.walk();
+                Self::collect_imports_with_trait(&mut cursor, content, support, &mut imports);
+                imports
+            });
 
-        Self::collect_imports_with_trait(&mut cursor, content, support, &mut imports);
-
-        let exports =
-            Self::extract_exports_from_tags(&tree, content, support, support.grammar_name());
+        let exports = Self::extract_exports_from_tags(&tree, content, support, grammar_name);
 
         ExtractedDeps {
             imports,
             exports,
             reexports: Vec::new(),
         }
+    }
+
+    /// Extract imports from an imports.scm query.
+    ///
+    /// Returns `None` when the grammar or query is unavailable (triggering trait fallback).
+    /// Returns `Some(vec)` when the query compiled and ran (vec may be empty if no imports).
+    ///
+    /// Captures used:
+    /// - `@import`      — the whole import node (provides the line number anchor)
+    /// - `@import.path` — the module path (quotes stripped if present)
+    /// - `@import.name` — a single imported name (may repeat per match for multi-name imports)
+    /// - `@import.alias`— alias for the name or path
+    /// - `@import.glob` — presence means `is_wildcard = true`
+    ///
+    /// Multiple matches may share the same `@import` node (e.g. Rust `use path::{A, B}` emits
+    /// one match per name). They are aggregated into a single `Import` by source position.
+    fn collect_imports_from_query(
+        tree: &tree_sitter::Tree,
+        content: &str,
+        grammar_name: &str,
+        query_str: &str,
+        loader: &normalize_languages::GrammarLoader,
+    ) -> Option<Vec<Import>> {
+        let ts_lang = loader.get(grammar_name)?;
+        let query = tree_sitter::Query::new(&ts_lang, query_str).ok()?;
+
+        let capture_names = query.capture_names().to_vec();
+        let root = tree.root_node();
+        let mut qcursor = tree_sitter::QueryCursor::new();
+        let mut matches = qcursor.matches(&query, root, content.as_bytes());
+
+        // Use an ordered map (keyed by byte offset of @import node) so we can aggregate
+        // multiple matches that belong to the same import statement.
+        let mut seen: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+        let mut result: Vec<Import> = Vec::new();
+
+        while let Some(m) = matches.next() {
+            let mut anchor_byte: Option<usize> = None;
+            let mut anchor_line = 0usize;
+            let mut path: Option<String> = None;
+            let mut name: Option<String> = None;
+            let mut alias: Option<String> = None;
+            let mut is_glob = false;
+
+            for cap in m.captures {
+                let cn = &capture_names[cap.index as usize];
+                let text = content[cap.node.byte_range()].to_string();
+                match *cn {
+                    "import" => {
+                        anchor_byte = Some(cap.node.start_byte());
+                        anchor_line = cap.node.start_position().row + 1;
+                    }
+                    "import.path" => {
+                        // Strip surrounding quotes if present (Go, JS/TS use quoted strings)
+                        path = Some(
+                            text.trim_matches(|c| c == '"' || c == '\'' || c == '`')
+                                .to_string(),
+                        );
+                    }
+                    "import.name" => {
+                        name = Some(text);
+                    }
+                    "import.alias" => {
+                        alias = Some(text);
+                    }
+                    "import.glob" => {
+                        is_glob = true;
+                    }
+                    _ => {}
+                }
+            }
+
+            // Determine the grouping key: anchor byte if we have one, else path byte start
+            let key = match anchor_byte {
+                Some(b) => b,
+                None => continue, // No @import capture — skip malformed match
+            };
+
+            let module = path.unwrap_or_default();
+            let is_relative = module.starts_with('.');
+
+            if let Some(&idx) = seen.get(&key) {
+                // This is an additional name for an existing import (e.g. use path::{A, B})
+                if let Some(name) = name {
+                    result[idx].names.push(name);
+                }
+                if alias.is_some() {
+                    result[idx].alias = alias;
+                }
+                if is_glob {
+                    result[idx].is_wildcard = true;
+                }
+            } else {
+                let mut imp = Import {
+                    module,
+                    names: Vec::new(),
+                    alias,
+                    is_wildcard: is_glob,
+                    is_relative,
+                    line: anchor_line,
+                };
+                if let Some(name) = name {
+                    imp.names.push(name);
+                }
+                seen.insert(key, result.len());
+                result.push(imp);
+            }
+        }
+
+        Some(result)
     }
 
     fn collect_imports_with_trait(
