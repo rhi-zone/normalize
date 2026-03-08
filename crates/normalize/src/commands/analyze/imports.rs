@@ -103,10 +103,7 @@ pub fn analyze_import_centrality(
     limit: usize,
     internal_only: bool,
 ) -> Result<ImportCentralityReport, String> {
-    let rt = tokio::runtime::Runtime::new()
-        .map_err(|e| format!("Failed to create async runtime: {}", e))?;
-
-    rt.block_on(async {
+    crate::runtime::block_on(async {
         let idx = crate::index::ensure_ready(root).await?;
 
         let raw = idx

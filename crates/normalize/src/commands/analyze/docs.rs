@@ -128,9 +128,7 @@ pub fn analyze_docs(
         .collect();
 
     // Try to load index for cross-file resolution, fall back to on-demand parsing
-    // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let index = rt.block_on(crate::index::open(root)).ok();
+    let index = crate::runtime::block_on(crate::index::open(root)).ok();
     let resolver: Box<dyn InterfaceResolver> = match &index {
         Some(idx) => Box::new(IndexedResolver::new(idx)),
         None => Box::new(OnDemandResolver::new(root)),

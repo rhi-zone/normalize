@@ -273,8 +273,7 @@ pub fn cmd_facts_rules_service(
     let root_ref = root_path.as_deref();
     let pack_path = pack.map(PathBuf::from);
     let pack_ref = pack_path.as_deref();
-    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-    let exit_code = rt.block_on(cmd_rules(root_ref, rule, pack_ref, list, false));
+    let exit_code = crate::runtime::block_on(cmd_rules(root_ref, rule, pack_ref, list, false));
     if exit_code == 0 {
         Ok(CommandResult {
             success: true,

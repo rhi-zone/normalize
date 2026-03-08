@@ -199,10 +199,7 @@ pub async fn analyze_layering(
 
 /// CLI entry point.
 pub fn analyze_layering_sync(root: &Path, limit: usize) -> Result<LayeringReport, String> {
-    let rt = tokio::runtime::Runtime::new()
-        .map_err(|e| format!("Failed to create async runtime: {}", e))?;
-
-    rt.block_on(async {
+    crate::runtime::block_on(async {
         let idx = crate::index::ensure_ready(root).await?;
         analyze_layering(&idx, limit)
             .await

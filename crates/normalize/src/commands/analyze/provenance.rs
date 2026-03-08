@@ -338,12 +338,7 @@ fn build_co_change_edges(root: &Path, files: &HashSet<String>) -> Vec<Provenance
 // ── Import graph extraction ──────────────────────────────────────
 
 fn build_import_edges(root: &Path, files: &HashSet<String>) -> Vec<ProvenanceEdge> {
-    let rt = match tokio::runtime::Runtime::new() {
-        Ok(rt) => rt,
-        Err(_) => return Vec::new(),
-    };
-
-    rt.block_on(async {
+    crate::runtime::block_on(async {
         let idx = match crate::index::open_if_enabled(root).await {
             Some(idx) => idx,
             None => return Vec::new(),
@@ -377,12 +372,7 @@ fn build_import_edges(root: &Path, files: &HashSet<String>) -> Vec<ProvenanceEdg
 // ── Call graph extraction ────────────────────────────────────────
 
 fn build_call_edges(root: &Path) -> Vec<(ProvenanceEdge, ProvenanceNode, ProvenanceNode)> {
-    let rt = match tokio::runtime::Runtime::new() {
-        Ok(rt) => rt,
-        Err(_) => return Vec::new(),
-    };
-
-    rt.block_on(async {
+    crate::runtime::block_on(async {
         let idx = match crate::index::open_if_enabled(root).await {
             Some(idx) => idx,
             None => return Vec::new(),

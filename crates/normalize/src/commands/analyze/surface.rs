@@ -145,10 +145,7 @@ pub async fn analyze_surface(
 
 /// CLI entry point.
 pub fn analyze_surface_sync(root: &Path, limit: usize) -> Result<SurfaceReport, String> {
-    let rt = tokio::runtime::Runtime::new()
-        .map_err(|e| format!("Failed to create async runtime: {}", e))?;
-
-    rt.block_on(async {
+    crate::runtime::block_on(async {
         let idx = crate::index::ensure_ready(root).await?;
         analyze_surface(&idx, limit)
             .await

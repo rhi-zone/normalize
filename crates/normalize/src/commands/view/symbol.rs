@@ -944,11 +944,9 @@ fn display_referenced_types(
     let mut external_types: Vec<(String, String, String, usize)> = Vec::new(); // (name, file, signature, line)
 
     if !remaining.is_empty() {
-        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        if let Some(idx) = rt.block_on(crate::index::open_if_enabled(root)) {
+        if let Some(idx) = crate::runtime::block_on(crate::index::open_if_enabled(root)) {
             for type_name in &remaining {
-                if let Ok(matches) = rt.block_on(idx.find_symbol(type_name)) {
+                if let Ok(matches) = crate::runtime::block_on(idx.find_symbol(type_name)) {
                     // Find first match that's a type definition (not from current file)
                     for (file, kind, start_line, _end_line) in matches {
                         // Skip if from current file (already checked locally)

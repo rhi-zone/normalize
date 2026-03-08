@@ -107,9 +107,8 @@ pub fn analyze_summary(root: &Path, module_limit: usize) -> SummaryReport {
 }
 
 fn try_architecture(root: &Path) -> Option<ArchStats> {
-    let rt = tokio::runtime::Runtime::new().ok()?;
-    let idx = rt.block_on(crate::index::ensure_ready(root)).ok()?;
-    let report = rt.block_on(analyze_architecture(&idx)).ok()?;
+    let idx = crate::runtime::block_on(crate::index::ensure_ready(root)).ok()?;
+    let report = crate::runtime::block_on(analyze_architecture(&idx)).ok()?;
     Some(extract_arch_stats(&report))
 }
 

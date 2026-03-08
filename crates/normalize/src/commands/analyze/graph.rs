@@ -122,10 +122,7 @@ pub fn analyze_graph_sync(
     limit: usize,
     target: GraphTarget,
 ) -> Result<GraphReport, String> {
-    let rt = tokio::runtime::Runtime::new()
-        .map_err(|e| format!("Failed to create async runtime: {}", e))?;
-
-    rt.block_on(async {
+    crate::runtime::block_on(async {
         let idx = crate::index::ensure_ready(root).await?;
         analyze_graph(&idx, limit, target)
             .await

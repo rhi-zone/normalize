@@ -488,10 +488,8 @@ pub fn build_trace_text(
     recursive: bool,
     case_insensitive: bool,
 ) -> Result<String, String> {
-    let rt =
-        tokio::runtime::Runtime::new().map_err(|e| format!("Failed to create runtime: {}", e))?;
     let mut output = Vec::new();
-    let exit_code = rt.block_on(cmd_trace_text_async(
+    let exit_code = crate::runtime::block_on(cmd_trace_text_async(
         symbol,
         target,
         root,
@@ -687,8 +685,7 @@ async fn cmd_trace_text_async(
 
 /// Look up a function in the index and trace its returns (cross-file).
 fn trace_cross_file_returns(call_name: &str, root: &std::path::Path) -> Option<CrossFileReturns> {
-    let rt = tokio::runtime::Runtime::new().ok()?;
-    rt.block_on(trace_cross_file_returns_async(call_name, root))
+    crate::runtime::block_on(trace_cross_file_returns_async(call_name, root))
 }
 
 async fn trace_cross_file_returns_async(
