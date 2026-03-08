@@ -542,6 +542,10 @@ impl normalize_output::OutputFormatter for RulesListReport {
                 out.push_str(&format!("            {}\n", r.message));
             }
         }
+        out.push_str("\nConfigure: [analyze.rules.\"<id>\"] in .normalize/config.toml\n");
+        out.push_str("  severity, enabled, allow — or: normalize rules enable/disable <id>\n");
+        out.push_str("  Global patterns: [analyze.rules] global-allow = [\"**/fixtures/**\"]\n");
+        out.push_str("  Custom tag groups: [rule-tags] my-group = [\"tag1\", \"tag2\"]\n");
         out
     }
 
@@ -640,6 +644,24 @@ impl normalize_output::OutputFormatter for RulesListReport {
                 out.push_str(&format!("            {desc}\n"));
             }
         }
+        let dim = Color::DarkGray;
+        out.push('\n');
+        out.push_str(
+            &dim.paint("Configure: [analyze.rules.\"<id>\"] in .normalize/config.toml\n")
+                .to_string(),
+        );
+        out.push_str(
+            &dim.paint("  severity, enabled, allow — or: normalize rules enable/disable <id>\n")
+                .to_string(),
+        );
+        out.push_str(
+            &dim.paint("  Global patterns: [analyze.rules] global-allow = [\"**/fixtures/**\"]\n")
+                .to_string(),
+        );
+        out.push_str(
+            &dim.paint("  Custom tag groups: [rule-tags] my-group = [\"tag1\", \"tag2\"]\n")
+                .to_string(),
+        );
         out
     }
 }
@@ -1131,6 +1153,8 @@ pub fn cmd_show(
                 println!();
                 println!("(no documentation — add a markdown comment block after the frontmatter)");
             }
+            println!();
+            print_config_snippet(&r.id, config.rules.rules.get(&r.id));
         }
         (_, Some(r)) => {
             println!("{} [fact]", r.id);
@@ -1160,6 +1184,8 @@ pub fn cmd_show(
                 println!();
                 println!("(no documentation — add a markdown comment block after the frontmatter)");
             }
+            println!();
+            print_config_snippet(&r.id, config.rules.rules.get(&r.id));
         }
         _ => {
             eprintln!("Rule not found: {}", id);
@@ -1168,6 +1194,37 @@ pub fn cmd_show(
     }
 
     0
+}
+
+fn print_config_snippet(id: &str, override_: Option<&normalize_rules_config::RuleOverride>) {
+    println!("Configuration (.normalize/config.toml):");
+    if let Some(o) = override_ {
+        println!("  [analyze.rules.\"{id}\"]");
+        if let Some(ref sev) = o.severity {
+            println!("  severity = \"{sev}\"");
+        }
+        if let Some(enabled) = o.enabled {
+            println!("  enabled = {enabled}");
+        }
+        if !o.allow.is_empty() {
+            let patterns = o
+                .allow
+                .iter()
+                .map(|p| format!("\"{p}\""))
+                .collect::<Vec<_>>()
+                .join(", ");
+            println!("  allow = [{patterns}]");
+        }
+    } else {
+        println!("  # No overrides set. Example:");
+        println!("  [analyze.rules.\"{id}\"]");
+        println!("  severity = \"error\"          # error | warning | info | hint");
+        println!("  enabled = false              # disable this rule");
+        println!("  allow = [\"**/tests/**\"]      # skip matching files");
+    }
+    println!();
+    println!("  # Or use: normalize rules enable {id}");
+    println!("  #         normalize rules disable {id}");
 }
 
 // =============================================================================

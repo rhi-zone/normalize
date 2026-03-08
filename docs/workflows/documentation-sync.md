@@ -55,22 +55,23 @@ Keeping documentation in sync with code: preventing stale docs, broken examples.
 
 | Phase | Tools |
 |-------|-------|
-| Detect | `normalize analyze check` (runs all doc checks) |
+| Detect | `normalize rules run --engine native` (runs all doc checks) |
 | Locate | `grep`, `view` |
 | Update | `edit`, write tools |
-| Verify | `normalize analyze check --examples`, manual testing |
+| Verify | `normalize rules run --engine native`, manual testing |
 
 ## Detection Methods
 
 ### Automated Checks
 ```bash
-# Run all documentation checks (broken refs, stale docs, missing examples)
-normalize analyze check
+# Run all documentation checks (broken refs, stale docs, missing examples, SUMMARY.md)
+normalize rules run --engine native
 
-# Or run specific checks:
-normalize analyze check --refs      # broken doc references
-normalize analyze check --stale     # stale docs (code newer than docs)
-normalize analyze check --examples  # missing example markers
+# Filter to specific rule IDs:
+normalize rules run --rule check-refs       # broken doc references
+normalize rules run --rule stale-docs       # stale docs (code newer than docs)
+normalize rules run --rule check-examples   # missing example markers
+normalize rules run --rule stale-summary    # missing/stale SUMMARY.md files
 ```
 
 ### Manual Checks

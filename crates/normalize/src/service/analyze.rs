@@ -41,7 +41,6 @@ use crate::commands::analyze::test_ratio::TestRatioReport;
 use crate::commands::analyze::trend::TrendReport;
 use crate::commands::analyze::uniqueness::UniquenessReport;
 use crate::output::OutputFormatter;
-use normalize_output::diagnostics::DiagnosticsReport;
 use server_less::cli;
 use std::cell::Cell;
 use std::path::PathBuf;
@@ -73,14 +72,6 @@ impl AnalyzeService {
         let config = NormalizeConfig::load(root);
         let is_pretty = !compact && (pretty || config.pretty.enabled());
         self.pretty.set(is_pretty);
-    }
-
-    fn display_check(&self, r: &DiagnosticsReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
     }
 
     fn display_call_graph(&self, entries: &[CallEntry]) -> String {
@@ -427,96 +418,6 @@ impl AnalyzeService {
     diff = "Diff",
 ))]
 impl AnalyzeService {
-    /// Check documentation health: broken refs, stale docs, missing examples, and SUMMARY.md freshness.
-    #[server(group = "repo")]
-    #[cli(display_with = "display_check")]
-    #[allow(clippy::too_many_arguments)]
-    pub async fn check(
-        &self,
-        #[param(help = "Check broken documentation references")] refs: bool,
-        #[param(help = "Check for stale documentation")] stale: bool,
-        #[param(help = "Check for missing example references")] examples: bool,
-        #[param(help = "Check for missing or stale SUMMARY.md files")] summary: bool,
-        #[param(
-            help = "Staleness threshold: flag when (commits_since_update + has_uncommitted) > N (default: 10)"
-        )]
-        summary_threshold: Option<usize>,
-        #[param(help = "Exit 0 even when error-severity issues are found")] no_fail: bool,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<DiagnosticsReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        let config = crate::config::NormalizeConfig::load(&root_path);
-        let run_all = !refs && !stale && !examples && !summary;
-
-        let mut report = DiagnosticsReport::new();
-
-        if run_all || refs {
-            let refs_report = normalize_native_rules::build_check_refs_report(&root_path).await?;
-            report.merge(refs_report.into());
-        }
-
-        if run_all || stale {
-            let stale_report = normalize_native_rules::build_stale_docs_report(&root_path);
-            report.merge(stale_report.into());
-        }
-
-        if run_all || examples {
-            let examples_report = normalize_native_rules::build_check_examples_report(&root_path);
-            report.merge(examples_report.into());
-        }
-
-        if run_all || summary {
-            let threshold = summary_threshold.unwrap_or(10);
-            let summary_report =
-                normalize_native_rules::build_stale_summary_report(&root_path, threshold);
-            report.merge(summary_report.into());
-        }
-
-        // Apply per-rule severity/enabled overrides from normalize.toml to native check issues.
-        // This allows e.g. [analyze.rules."stale-summary"] severity = "error" to enforce SUMMARY.md freshness.
-        normalize_rules::apply_native_rules_config(&mut report, &config.analyze.rules);
-
-        report.sort();
-
-        let error_count = report.count_by_severity(normalize_output::diagnostics::Severity::Error);
-        if !no_fail && error_count > 0 {
-            let detail = if self.pretty.get() {
-                report.format_pretty()
-            } else {
-                report.format_text()
-            };
-            return Err(format!("{detail}\n{error_count} error(s) found"));
-        }
-
-        if !report.issues.is_empty() && !self.pretty.get() {
-            // Determine which check(s) were run to build a precise suggestion.
-            let flag = if run_all {
-                "normalize analyze check".to_string()
-            } else {
-                let flags: Vec<&str> = [
-                    refs.then_some("--refs"),
-                    stale.then_some("--stale"),
-                    examples.then_some("--examples"),
-                    summary.then_some("--summary"),
-                ]
-                .into_iter()
-                .flatten()
-                .collect();
-                format!("normalize analyze check {}", flags.join(" "))
-            };
-            report
-                .hints
-                .push(format!("Run `{flag} --pretty` for a detailed view"));
-        }
-
-        Ok(report)
-    }
-
     /// Show callers and/or callees of a symbol
     #[server(group = "graph")]
     #[cli(display_with = "display_call_graph")]
