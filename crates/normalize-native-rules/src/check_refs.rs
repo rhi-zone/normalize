@@ -1,7 +1,6 @@
 //! Check documentation references for broken links
 
-use crate::index;
-use crate::output::OutputFormatter;
+use normalize_output::OutputFormatter;
 use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 use serde::Serialize;
 use std::path::Path;
@@ -49,12 +48,39 @@ impl OutputFormatter for CheckRefsReport {
     }
 }
 
+/// Derive the normalize data directory for a project root.
+///
+/// Resolution order:
+/// 1. If `NORMALIZE_INDEX_DIR` is set to an absolute path, use it directly.
+/// 2. If `NORMALIZE_INDEX_DIR` is set to a relative path, use `$XDG_DATA_HOME/normalize/<relative>`.
+/// 3. Otherwise, use `<root>/.normalize`.
+fn normalize_dir(root: &Path) -> std::path::PathBuf {
+    if let Ok(index_dir) = std::env::var("NORMALIZE_INDEX_DIR") {
+        let path = std::path::PathBuf::from(&index_dir);
+        if path.is_absolute() {
+            return path;
+        }
+        let data_home = std::env::var("XDG_DATA_HOME")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| {
+                dirs::home_dir()
+                    .unwrap_or_else(|| std::path::PathBuf::from("."))
+                    .join(".local/share")
+            });
+        return data_home.join("normalize").join(path);
+    }
+    root.join(".normalize")
+}
+
 /// Build a CheckRefsReport without printing (for service layer).
 pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, String> {
     use regex::Regex;
 
     // Open index to get known symbols
-    let idx = index::ensure_ready(root).await?;
+    let db_path = normalize_dir(root).join("index.sqlite");
+    let idx = normalize_facts::FileIndex::open(&db_path, root)
+        .await
+        .map_err(|e| format!("Failed to open index: {e}"))?;
 
     // Get all symbol names from index
     let all_symbols = idx.all_symbol_names().await.unwrap_or_default();
@@ -64,7 +90,7 @@ pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, Str
     }
 
     // Find markdown files
-    let md_files: Vec<_> = super::walk::gitignore_walk(root)
+    let md_files: Vec<_> = crate::walk::gitignore_walk(root)
         .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("md"))
         .map(|e| e.path().to_path_buf())
         .collect();
@@ -98,43 +124,27 @@ pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, Str
 
         let md_dir = md_file.parent().unwrap_or(root);
 
+        let mut in_code_block = false;
         for (line_num, line) in content.lines().enumerate() {
+            if line.trim().starts_with("```") {
+                in_code_block = !in_code_block;
+                continue;
+            }
+            if in_code_block {
+                continue;
+            }
+
             for cap in code_ref_re.captures_iter(line) {
                 let reference = &cap[1];
 
-                // If the reference contains a dot, try to resolve it as a file path first.
-                // README.md, Architecture.md, etc. are valid references if the file exists.
-                // Only fall through to symbol check if the file isn't found.
-                if reference.contains('.') {
-                    if md_dir.join(reference).exists() || root.join(reference).exists() {
-                        continue;
-                    }
-                    // If it looks like a file reference (lowercase extension) but doesn't
-                    // exist, flag it as a broken link rather than an unknown symbol.
-                    if looks_like_file_path(reference) {
-                        broken_refs.push(BrokenRef {
-                            file: rel_path.clone(),
-                            line: line_num + 1,
-                            reference: reference.to_string(),
-                            context: line.trim().to_string(),
-                        });
-                        continue;
-                    }
-                }
-
-                // Extract symbol name (last part after :: or .)
-                let symbol_name = reference.rsplit([':', '.']).next().unwrap_or(reference);
-
-                // Skip common non-symbol patterns
-                if is_common_non_symbol(symbol_name) {
+                if is_common_non_symbol(reference) {
                     continue;
                 }
 
-                // Check if symbol exists
-                if !all_symbols.contains(symbol_name) {
-                    // Also check the full reference
-                    let full_name = reference.replace("::", ".").replace(".", "::");
-                    if !all_symbols.contains(&full_name) && !all_symbols.contains(reference) {
+                if looks_like_file_path(reference) {
+                    // Check if the file exists relative to the markdown file
+                    let file_path = md_dir.join(reference.replace("::", "/"));
+                    if !file_path.exists() && !root.join(reference.replace("::", "/")).exists() {
                         broken_refs.push(BrokenRef {
                             file: rel_path.clone(),
                             line: line_num + 1,
@@ -142,6 +152,13 @@ pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, Str
                             context: line.trim().to_string(),
                         });
                     }
+                } else if !all_symbols.contains(reference) {
+                    broken_refs.push(BrokenRef {
+                        file: rel_path.clone(),
+                        line: line_num + 1,
+                        reference: reference.to_string(),
+                        context: line.trim().to_string(),
+                    });
                 }
             }
         }

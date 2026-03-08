@@ -1,6 +1,6 @@
 //! Find stale documentation where covered code has changed
 
-use crate::output::OutputFormatter;
+use normalize_output::OutputFormatter;
 use normalize_output::diagnostics::{DiagnosticsReport, Issue, RelatedLocation, Severity};
 use serde::Serialize;
 use std::path::Path;
@@ -68,7 +68,7 @@ pub fn build_stale_docs_report(root: &Path) -> StaleDocsReport {
     // normalize-syntax-allow: rust/unwrap-in-impl - compile-time constant regex pattern
     let covers_re = Regex::new(r"<!--\s*covers:\s*(.+?)\s*-->").unwrap();
 
-    let md_files: Vec<_> = super::walk::gitignore_walk(root)
+    let md_files: Vec<_> = crate::walk::gitignore_walk(root)
         .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("md"))
         .map(|e| e.path().to_path_buf())
         .collect();
@@ -236,7 +236,7 @@ fn find_covered_files(root: &Path, pattern: &str) -> Vec<String> {
             vec![pattern.to_string()]
         } else if target.is_dir() {
             // Find all files in directory
-            super::walk::gitignore_walk(&target)
+            crate::walk::gitignore_walk(&target)
                 .filter(|e| e.file_type().is_some_and(|ft| ft.is_file()))
                 .filter_map(|e| {
                     e.path()

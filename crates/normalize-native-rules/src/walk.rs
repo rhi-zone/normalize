@@ -12,7 +12,7 @@ use std::path::Path;
 /// by `.gitignore`, the walker never descends into it regardless of this list.
 /// Add entries here for directories that are sometimes committed or created outside
 /// the repo's gitignore scope.
-pub(crate) fn is_excluded_dir(name: &str) -> bool {
+pub fn is_excluded_dir(name: &str) -> bool {
     matches!(
         name,
         // JavaScript / TypeScript
@@ -39,7 +39,7 @@ pub(crate) fn is_excluded_dir(name: &str) -> bool {
 /// - Visits hidden files/directories (filtering delegated to gitignore and caller).
 ///
 /// Returns a flat iterator of successfully-read `DirEntry` values.
-pub(crate) fn gitignore_walk(root: &Path) -> impl Iterator<Item = ignore::DirEntry> {
+pub fn gitignore_walk(root: &Path) -> impl Iterator<Item = ignore::DirEntry> {
     let mut builder = ignore::WalkBuilder::new(root);
     builder
         .hidden(false)

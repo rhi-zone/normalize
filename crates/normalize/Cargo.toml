@@ -74,6 +74,7 @@ normalize-code-similarity = { path = "../normalize-code-similarity", version = "
 normalize-tools = { path = "../normalize-tools", version = "0.1.0" }
 normalize-analyze = { path = "../normalize-analyze", version = "0.1.0" }
 normalize-architecture = { path = "../normalize-architecture", version = "0.1.0" }
+normalize-native-rules = { path = "../normalize-native-rules", version = "0.1.0" }
 server-less = { workspace = true, optional = true }
 normalize-cli-parser = { path = "../normalize-cli-parser", version = "0.1.0" }
 normalize-surface-syntax = { path = "../normalize-surface-syntax", version = "0.1.0", features = ["read-typescript", "read-lua", "read-python", "write-typescript", "write-lua", "write-python"] }

@@ -448,29 +448,24 @@ impl AnalyzeService {
         let mut report = DiagnosticsReport::new();
 
         if run_all || refs {
-            let refs_report =
-                crate::commands::analyze::check_refs::build_check_refs_report(&root_path).await?;
+            let refs_report = normalize_native_rules::build_check_refs_report(&root_path).await?;
             report.merge(refs_report.into());
         }
 
         if run_all || stale {
-            let stale_report =
-                crate::commands::analyze::stale_docs::build_stale_docs_report(&root_path);
+            let stale_report = normalize_native_rules::build_stale_docs_report(&root_path);
             report.merge(stale_report.into());
         }
 
         if run_all || examples {
-            let examples_report =
-                crate::commands::analyze::check_examples::build_check_examples_report(&root_path);
+            let examples_report = normalize_native_rules::build_check_examples_report(&root_path);
             report.merge(examples_report.into());
         }
 
         if run_all || summary {
             let threshold = summary_threshold.unwrap_or(10);
             let summary_report =
-                crate::commands::analyze::stale_summary::build_stale_summary_report(
-                    &root_path, threshold,
-                );
+                normalize_native_rules::build_stale_summary_report(&root_path, threshold);
             report.merge(summary_report.into());
         }
 

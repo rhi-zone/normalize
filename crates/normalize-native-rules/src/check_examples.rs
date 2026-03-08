@@ -1,6 +1,6 @@
 //! Validate example references in documentation
 
-use crate::output::OutputFormatter;
+use normalize_output::OutputFormatter;
 use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 use serde::Serialize;
 use std::path::Path;
@@ -59,7 +59,7 @@ pub fn build_check_examples_report(root: &Path) -> CheckExamplesReport {
     let mut defined_examples: HashSet<String> = HashSet::new();
 
     for entry in
-        super::walk::gitignore_walk(root).filter(|e| e.file_type().is_some_and(|ft| ft.is_file()))
+        crate::walk::gitignore_walk(root).filter(|e| e.file_type().is_some_and(|ft| ft.is_file()))
     {
         let path = entry.path();
 
@@ -88,7 +88,7 @@ pub fn build_check_examples_report(root: &Path) -> CheckExamplesReport {
     let mut missing: Vec<MissingExample> = Vec::new();
     let mut refs_found = 0;
 
-    for entry in super::walk::gitignore_walk(root)
+    for entry in crate::walk::gitignore_walk(root)
         .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("md"))
     {
         let path = entry.path();

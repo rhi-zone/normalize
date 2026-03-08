@@ -230,23 +230,17 @@ impl RulesService {
             let (summary_res, stale_res, examples_res, refs_res) = tokio::join!(
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
-                    move || {
-                        crate::commands::analyze::stale_summary::build_stale_summary_report(
-                            &root, threshold,
-                        )
-                    }
+                    move || normalize_native_rules::build_stale_summary_report(&root, threshold)
                 }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
-                    move || crate::commands::analyze::stale_docs::build_stale_docs_report(&root)
+                    move || normalize_native_rules::build_stale_docs_report(&root)
                 }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
-                    move || {
-                        crate::commands::analyze::check_examples::build_check_examples_report(&root)
-                    }
+                    move || normalize_native_rules::build_check_examples_report(&root)
                 }),
-                crate::commands::analyze::check_refs::build_check_refs_report(&native_root),
+                normalize_native_rules::build_check_refs_report(&native_root),
             );
             if let Ok(r) = summary_res {
                 report.merge(r.into());

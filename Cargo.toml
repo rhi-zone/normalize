@@ -39,6 +39,7 @@ members = [
     "crates/normalize-code-similarity",
     "crates/normalize-analyze",
     "crates/normalize-architecture",
+    "crates/normalize-native-rules",
     "xtask",
 ]
 

@@ -3600,6 +3600,7 @@ dependencies = [
  "normalize-graph",
  "normalize-languages",
  "normalize-local-deps",
+ "normalize-native-rules",
  "normalize-openapi",
  "normalize-output",
  "normalize-path-resolve",
@@ -3967,6 +3968,23 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+]
+
+[[package]]
+name = "normalize-native-rules"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "glob",
+ "ignore",
+ "normalize-facts",
+ "normalize-languages",
+ "normalize-output",
+ "regex",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

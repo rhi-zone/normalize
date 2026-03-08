@@ -1,4 +1,5 @@
-use crate::output::OutputFormatter;
+use crate::walk::is_excluded_dir;
+use normalize_output::OutputFormatter;
 use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -74,8 +75,6 @@ impl OutputFormatter for StaleSummaryReport {
         lines.join("\n")
     }
 }
-
-use super::walk::is_excluded_dir;
 
 // --- Incremental cache ---
 
@@ -224,7 +223,7 @@ pub fn build_stale_summary_report(root: &Path, threshold: usize) -> StaleSummary
         .and_then(|h| load_cache(root).filter(|c| c.head == h));
     let mut updated_dirs: HashMap<String, CacheEntry> = HashMap::new();
 
-    let dirs: Vec<_> = super::walk::gitignore_walk(root)
+    let dirs: Vec<_> = crate::walk::gitignore_walk(root)
         .filter(|e| e.file_type().is_some_and(|ft| ft.is_dir()))
         .filter(|e| {
             !e.path()
