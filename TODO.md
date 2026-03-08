@@ -32,7 +32,7 @@ Ordered by impact × tractability. Pick from top.
    - Syntax + native: `normalize_syntax_rules::RulesConfig` / `RuleOverride` → `[analyze.rules]`
    - Fact: `normalize_facts_rules_interpret::FactsRulesConfig` / `FactsRuleOverride` → `[analyze.facts-rules]`
    - Native has no section; borrows syntax's `[analyze.rules]` as an accident
-   Goal: one `RuleOverride` type in `normalize-output` (or a new `normalize-rules-config` crate),
+   Goal: one `RuleOverride` type in `normalize-rules` (the crate already owns orchestration),
    one `[analyze.rules]` section covering all engines, loaded once, applied uniformly.
    The "unified" engine is only unified in name until the config is unified too.
 
