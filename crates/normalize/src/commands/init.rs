@@ -135,8 +135,8 @@ pub fn cmd_setup_wizard(root: &Path) -> i32 {
     let config = crate::config::NormalizeConfig::load(root);
 
     // Load rule metadata for descriptions
-    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
-    let fact_rules = interpret::load_all_rules(root, &config.analyze.rules);
+    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
+    let fact_rules = interpret::load_all_rules(root, &config.rules);
 
     // Build map: rule_id -> (description, severity, enabled, type)
     let mut rule_meta: HashMap<String, RuleMeta> = HashMap::new();
@@ -166,16 +166,7 @@ pub fn cmd_setup_wizard(root: &Path) -> i32 {
     // Run all rules to collect violations
     let rules_config = RulesRunConfig {
         rule_tags: config.rule_tags.0.clone(),
-        rules: config.analyze.rules.clone(),
-        sarif_tools: config
-            .analyze
-            .sarif_tools
-            .iter()
-            .map(|t| normalize_rules::SarifTool {
-                name: t.name.clone(),
-                command: t.command.clone(),
-            })
-            .collect(),
+        rules: config.rules.clone(),
     };
     let report = run_rules_report(root, root, None, None, &RuleType::All, &[], &rules_config);
 

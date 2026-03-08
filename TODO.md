@@ -29,14 +29,14 @@ extract, inline, move — correct, without LSPs, without false positives.
 Ordered by impact × tractability. Pick from top.
 
 0. ~~**Rules config consolidation**~~ — DONE (2026-03-09). One canonical `RulesConfig`/`RuleOverride`
-   in `normalize-rules`, one `[analyze.rules]` TOML section, conversion to sub-crate types at
+   in `normalize-rules`, one `[rules]` TOML section, conversion to sub-crate types at
    the boundary. `facts_rules` field removed from `RulesRunConfig` and `AnalyzeConfig`.
 
 0a. **CLI usability / discoverability audit** — An agent working in a different directory had to
-    grep source code to figure out that rule overrides go under `[analyze.rules."rule-id"]`.
+    grep source code to figure out that rule overrides go under `[rules."rule-id"]`.
     Goal: every command should be self-documenting enough that users never need to read source.
     Concretely:
-    - `normalize rules list` should show the config key for each rule (e.g. `[analyze.rules."rust/foo"]`)
+    - `normalize rules list` should show the config key for each rule (e.g. `[rules."rust/foo"]`)
     - `normalize rules show <id>` should print exactly what TOML to add to configure it
     - `normalize init --setup` should emit config snippets, not just enable/disable IDs
     - `normalize rules --help` (and all subcommands) should reference the config file section

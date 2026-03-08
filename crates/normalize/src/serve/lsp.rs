@@ -839,16 +839,7 @@ async fn run_and_publish_diagnostics(
         let config = crate::config::NormalizeConfig::load(&root_owned);
         let rules_config = normalize_rules::RulesRunConfig {
             rule_tags: config.rule_tags.0.clone(),
-            rules: config.analyze.rules.clone(),
-            sarif_tools: config
-                .analyze
-                .sarif_tools
-                .iter()
-                .map(|t| normalize_rules::SarifTool {
-                    name: t.name.clone(),
-                    command: t.command.clone(),
-                })
-                .collect(),
+            rules: config.rules.clone(),
         };
         normalize_rules::run_rules_report(
             &root_owned,

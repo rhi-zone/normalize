@@ -273,7 +273,7 @@ mod tests {
     #[test]
     fn test_rules_config_toml_deserialization() {
         // Keys with '/' must be quoted in TOML table headers.
-        // In normalize.toml this appears as [analyze.rules."rust/foo"].
+        // In normalize.toml this appears as [rules."rust/foo"].
         let toml_str = r#"
 global-allow = ["**/tests/fixtures/**", "**/test/**"]
 

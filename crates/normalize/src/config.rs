@@ -37,6 +37,17 @@
 //! threshold = 10              # only show functions with complexity >= 10
 //! compact = true              # use compact output for --overview
 //!
+//! [rules]
+//! global-allow = ["**/tests/fixtures/**"]
+//!
+//! [rules."rust/unwrap-in-impl"]
+//! severity = "error"
+//! allow = ["crates/*/src/lib.rs"]
+//!
+//! [[rules.sarif-tools]]
+//! name = "eslint"
+//! command = ["npx", "eslint", "--format", "json", "{root}"]
+//!
 //! [text-search]
 //! limit = 50                  # default max results
 //! ignore_case = true          # case-insensitive by default
@@ -55,6 +66,7 @@ use crate::filter::AliasConfig;
 use crate::output::PrettyConfig;
 use crate::shadow::ShadowConfig;
 use normalize_core::Merge;
+use normalize_rules::RulesConfig;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -99,6 +111,9 @@ pub struct NormalizeConfig {
     pub aliases: AliasConfig,
     pub view: ViewConfig,
     pub analyze: AnalyzeConfig,
+    /// Rules configuration: per-rule overrides, global-allow, and sarif-tools.
+    /// Configured via `[rules]`, `[rules."rule-id"]`, and `[[rules.sarif-tools]]`.
+    pub rules: RulesConfig,
     #[serde(rename = "text-search")]
     pub text_search: TextSearchConfig,
     pub pretty: PrettyConfig,

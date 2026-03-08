@@ -1,13 +1,26 @@
 //! Shared rule configuration types for all normalize rule engines.
 //!
 //! Both syntax rules and fact rules use `RulesConfig` as their configuration type,
-//! loaded from `[analyze.rules]` in `.normalize/config.toml`.
+//! loaded from `[rules]` in `.normalize/config.toml`.
 
 use std::collections::HashMap;
 
+/// An external tool that emits SARIF 2.1.0 output (used with `--engine sarif`).
+///
+/// Configured via `[[rules.sarif-tools]]` in `.normalize/config.toml`.
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, Default, schemars::JsonSchema)]
+#[serde(default)]
+pub struct SarifTool {
+    /// Display name for this tool (used as `source` in DiagnosticsReport).
+    pub name: String,
+    /// Command to run. `{root}` is replaced with the project root path.
+    /// Example: `["npx", "eslint", "--format", "json", "{root}"]`
+    pub command: Vec<String>,
+}
+
 /// Per-rule configuration override.
 ///
-/// Used under `[analyze.rules."rule-id"]` in `.normalize/config.toml`.
+/// Used under `[rules."rule-id"]` in `.normalize/config.toml`.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, Default, schemars::JsonSchema)]
 #[serde(default)]
 pub struct RuleOverride {
@@ -42,9 +55,9 @@ impl normalize_core::Merge for RuleOverride {
     }
 }
 
-/// Rules configuration covering all engines (syntax, fact, native).
+/// Rules configuration covering all engines (syntax, fact, native, sarif).
 ///
-/// Deserialized from `[analyze.rules]` in `.normalize/config.toml`.
+/// Deserialized from `[rules]` in `.normalize/config.toml`.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, Default, schemars::JsonSchema)]
 #[serde(default)]
 pub struct RulesConfig {
@@ -52,6 +65,9 @@ pub struct RulesConfig {
     /// Entries here skip violations in matching files across all rules.
     #[serde(rename = "global-allow")]
     pub global_allow: Vec<String>,
+    /// External tools that emit SARIF 2.1.0 output (the `sarif` engine).
+    #[serde(rename = "sarif-tools")]
+    pub sarif_tools: Vec<SarifTool>,
     /// Per-rule configuration overrides, keyed by rule ID.
     #[serde(flatten)]
     pub rules: HashMap<String, RuleOverride>,
@@ -64,10 +80,16 @@ impl normalize_core::Merge for RulesConfig {
         } else {
             other.global_allow
         };
+        let sarif_tools = if other.sarif_tools.is_empty() {
+            self.sarif_tools
+        } else {
+            other.sarif_tools
+        };
         let mut merged_rules = self.rules;
         merged_rules.extend(other.rules);
         Self {
             global_allow,
+            sarif_tools,
             rules: merged_rules,
         }
     }

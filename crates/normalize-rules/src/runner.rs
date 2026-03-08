@@ -1,7 +1,7 @@
 //! Unified rule management - list, run, add, update, remove rules (syntax + fact).
 
 use normalize_facts_rules_interpret as interpret;
-pub use normalize_rules_config::{RuleOverride, RulesConfig};
+pub use normalize_rules_config::{RuleOverride, RulesConfig, SarifTool};
 use normalize_syntax_rules::{self, DebugFlags};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -18,7 +18,7 @@ pub enum RuleType {
     Fact,
     /// Native checks: stale-summary, missing-summary, check-refs, stale-docs, check-examples.
     Native,
-    /// Run external tools that emit SARIF 2.1.0 output (configured via `[[analyze.sarif-tools]]`).
+    /// Run external tools that emit SARIF 2.1.0 output (configured via `[[rules.sarif-tools]]`).
     Sarif,
 }
 
@@ -202,20 +202,9 @@ impl RulesLock {
 pub struct RulesRunConfig {
     /// User-defined rule tag groups (`[rule-tags]` section).
     pub rule_tags: HashMap<String, Vec<String>>,
-    /// Rules configuration covering all engines (syntax, fact, native).
+    /// Rules configuration covering all engines (syntax, fact, native, sarif).
+    /// Per-rule overrides, global-allow patterns, and sarif-tools all live here.
     pub rules: RulesConfig,
-    /// External SARIF tools to run.
-    pub sarif_tools: Vec<SarifTool>,
-}
-
-/// An external tool that emits SARIF 2.1.0 output.
-#[derive(Debug, Clone, Deserialize, Serialize, Default, schemars::JsonSchema)]
-pub struct SarifTool {
-    /// Display name for this tool (used as `source` in DiagnosticsReport).
-    pub name: String,
-    /// Command to run. `{root}` is replaced with the project root path.
-    /// Example: `["npx", "eslint", "--format", "json", "{root}"]`
-    pub command: Vec<String>,
 }
 
 /// Run the rules command (for backward-compatible callers that dispatch manually).
@@ -542,9 +531,9 @@ impl normalize_output::OutputFormatter for RulesListReport {
                 out.push_str(&format!("            {}\n", r.message));
             }
         }
-        out.push_str("\nConfigure: [analyze.rules.\"<id>\"] in .normalize/config.toml\n");
+        out.push_str("\nConfigure: [rules.\"<id>\"] in .normalize/config.toml\n");
         out.push_str("  severity, enabled, allow — or: normalize rules enable/disable <id>\n");
-        out.push_str("  Global patterns: [analyze.rules] global-allow = [\"**/fixtures/**\"]\n");
+        out.push_str("  Global patterns: [rules] global-allow = [\"**/fixtures/**\"]\n");
         out.push_str("  Custom tag groups: [rule-tags] my-group = [\"tag1\", \"tag2\"]\n");
         out
     }
@@ -647,7 +636,7 @@ impl normalize_output::OutputFormatter for RulesListReport {
         let dim = Color::DarkGray;
         out.push('\n');
         out.push_str(
-            &dim.paint("Configure: [analyze.rules.\"<id>\"] in .normalize/config.toml\n")
+            &dim.paint("Configure: [rules.\"<id>\"] in .normalize/config.toml\n")
                 .to_string(),
         );
         out.push_str(
@@ -655,7 +644,7 @@ impl normalize_output::OutputFormatter for RulesListReport {
                 .to_string(),
         );
         out.push_str(
-            &dim.paint("  Global patterns: [analyze.rules] global-allow = [\"**/fixtures/**\"]\n")
+            &dim.paint("  Global patterns: [rules] global-allow = [\"**/fixtures/**\"]\n")
                 .to_string(),
         );
         out.push_str(
@@ -929,8 +918,8 @@ pub fn cmd_enable_disable(
     let config_path = root.join(".normalize").join("config.toml");
 
     // Collect all changes to apply: (section, rule_id)
-    // syntax rules → [analyze.rules."id"]
-    // fact rules   → [analyze.rules."id"] (unified config section)
+    // syntax rules → [rules."id"]
+    // fact rules   → [rules."id"] (unified config section)
     let changes_syntax: Vec<&str> = matched_syntax
         .iter()
         .filter(|r| r.enabled != enable)
@@ -988,24 +977,17 @@ pub fn cmd_enable_disable(
     let content = std::fs::read_to_string(&config_path).unwrap_or_default();
     let mut doc: toml_edit::DocumentMut = content.parse().unwrap_or_default();
 
-    // Ensure [analyze] is an implicit table (no standalone [analyze] header)
-    if !doc.contains_key("analyze") {
+    // Ensure [rules] exists as an implicit table
+    if !doc.contains_key("rules") {
         let mut t = toml_edit::Table::new();
         t.set_implicit(true);
-        doc["analyze"] = toml_edit::Item::Table(t);
+        doc["rules"] = toml_edit::Item::Table(t);
     }
 
-    // Apply syntax rule changes → [analyze.rules."id"]
+    // Apply syntax rule changes → [rules."id"]
     if !changes_syntax.is_empty() {
-        // normalize-syntax-allow: rust/unwrap-in-impl - "analyze" was just inserted as a Table above; guaranteed to be a table
-        let analyze = doc["analyze"].as_table_mut().unwrap();
-        if !analyze.contains_key("rules") {
-            let mut t = toml_edit::Table::new();
-            t.set_implicit(true);
-            analyze["rules"] = toml_edit::Item::Table(t);
-        }
         // normalize-syntax-allow: rust/unwrap-in-impl - "rules" was just inserted as a Table above; guaranteed to be a table
-        let rules_table = analyze["rules"].as_table_mut().unwrap();
+        let rules_table = doc["rules"].as_table_mut().unwrap();
         for id in &changes_syntax {
             if !rules_table.contains_key(id) {
                 rules_table[id] = toml_edit::Item::Table(toml_edit::Table::new());
@@ -1014,17 +996,10 @@ pub fn cmd_enable_disable(
         }
     }
 
-    // Apply fact rule changes → [analyze.rules."id"] (same section as syntax rules)
+    // Apply fact rule changes → [rules."id"] (same section as syntax rules)
     if !changes_fact.is_empty() {
-        // normalize-syntax-allow: rust/unwrap-in-impl - "analyze" was just inserted as a Table above; guaranteed to be a table
-        let analyze = doc["analyze"].as_table_mut().unwrap();
-        if !analyze.contains_key("rules") {
-            let mut t = toml_edit::Table::new();
-            t.set_implicit(true);
-            analyze["rules"] = toml_edit::Item::Table(t);
-        }
         // normalize-syntax-allow: rust/unwrap-in-impl - "rules" was just inserted as a Table above; guaranteed to be a table
-        let rules_table = analyze["rules"].as_table_mut().unwrap();
+        let rules_table = doc["rules"].as_table_mut().unwrap();
         for id in &changes_fact {
             if !rules_table.contains_key(id) {
                 rules_table[id] = toml_edit::Item::Table(toml_edit::Table::new());
@@ -1199,7 +1174,7 @@ pub fn cmd_show(
 fn print_config_snippet(id: &str, override_: Option<&normalize_rules_config::RuleOverride>) {
     println!("Configuration (.normalize/config.toml):");
     if let Some(o) = override_ {
-        println!("  [analyze.rules.\"{id}\"]");
+        println!("  [rules.\"{id}\"]");
         if let Some(ref sev) = o.severity {
             println!("  severity = \"{sev}\"");
         }
@@ -1217,7 +1192,7 @@ fn print_config_snippet(id: &str, override_: Option<&normalize_rules_config::Rul
         }
     } else {
         println!("  # No overrides set. Example:");
-        println!("  [analyze.rules.\"{id}\"]");
+        println!("  [rules.\"{id}\"]");
         println!("  severity = \"error\"          # error | warning | info | hint");
         println!("  enabled = false              # disable this rule");
         println!("  allow = [\"**/tests/**\"]      # skip matching files");
@@ -1465,7 +1440,7 @@ pub async fn collect_fact_diagnostics(
 
 /// Apply `RulesConfig` severity/enabled overrides to issues in a `DiagnosticsReport`.
 /// This lets native checks (stale-summary, missing-summary, check-refs, etc.) be
-/// configured via `[analyze.rules."rule-id"]` in normalize.toml, just like syntax rules.
+/// configured via `[rules."rule-id"]` in normalize.toml, just like syntax rules.
 pub fn apply_native_rules_config(
     report: &mut normalize_output::diagnostics::DiagnosticsReport,
     config: &RulesConfig,
@@ -1569,7 +1544,7 @@ pub fn run_rules_report(
             filter_ids.as_ref(),
             filter_rule,
         ));
-        // Apply global-allow patterns from [analyze.rules] to fact-rule diagnostics.
+        // Apply global-allow patterns from [rules] to fact-rule diagnostics.
         // Syntax rules apply global_allow during load_all_rules(); fact rules need it here.
         let global_allow: Vec<glob::Pattern> = config
             .rules
@@ -1591,7 +1566,7 @@ pub fn run_rules_report(
 
     // SARIF passthrough: run external tools and merge their SARIF output
     if matches!(engine, RuleType::Sarif) {
-        let sarif_report = run_sarif_tools(root, &config.sarif_tools);
+        let sarif_report = run_sarif_tools(root, &config.rules.sarif_tools);
         report.merge(sarif_report);
     }
 

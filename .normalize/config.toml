@@ -40,28 +40,28 @@ exclude = [
 
 # Per-rule configuration: { "rule-id" = { severity = "...", enabled = true/false } }
 # Global allow: skip violations in test fixture files for all rules.
-[analyze.rules]
+[rules]
 global-allow = ["**/tests/fixtures/**", "**/fixtures/**"]
 
 # Disable println-debug for CLI tools (we use println for output)
-[analyze.rules."rust/println-debug"]
+[rules."rust/println-debug"]
 enabled = false
 
 # dbg!/todo!/expect("") should never reach committed code.
-[analyze.rules."rust/dbg-macro"]
+[rules."rust/dbg-macro"]
 severity = "error"
 allow = ["**/tests/fixtures/**"]
 
-[analyze.rules."rust/todo-macro"]
+[rules."rust/todo-macro"]
 severity = "error"
 allow = ["**/tests/fixtures/**"]
 
-[analyze.rules."rust/expect-empty"]
+[rules."rust/expect-empty"]
 severity = "error"
 allow = ["**/tests/fixtures/**"]
 
 # static mut is an unsafe footgun; always wrong outside of FFI/embedded.
-[analyze.rules."rust/static-mut"]
+[rules."rust/static-mut"]
 severity = "error"
 enabled = true
 allow = ["**/tests/fixtures/**"]
@@ -71,13 +71,13 @@ allow = ["**/tests/fixtures/**"]
 # Enable numeric literal suffix rule (disabled by default).
 # Exclude rule fixtures: those files intentionally contain the bad pattern to test detection.
 # .claude/worktrees/ contains agent work-in-progress not yet ready to commit.
-[analyze.rules."rust/numeric-type-annotation"]
+[rules."rust/numeric-type-annotation"]
 enabled = true
 allow = ["**/tests/fixtures/**", ".claude/**"]
 
 # Audit complete: all 1608 violations resolved (inline suppressed with reasons or allow-listed).
 # Production .unwrap() uses are annotated; test code in inline #[cfg(test)] modules allowed below.
-[analyze.rules."rust/unwrap-in-impl"]
+[rules."rust/unwrap-in-impl"]
 severity = "warning"
 enabled = true
 allow = [
@@ -159,7 +159,7 @@ allow = [
     "crates/normalize/src/commands/update.rs",
 ]
 
-[analyze.rules."rust/unnecessary-let"]
+[rules."rust/unnecessary-let"]
 severity = "warning"
 enabled = true
 # normalize-manifest parsers use let x = i; while i < ... (index-snapshot pattern:
@@ -171,44 +171,44 @@ allow = [
     "**/tests/fixtures/**",
 ]
 
-[analyze.rules."rust/unnecessary-type-alias"]
+[rules."rust/unnecessary-type-alias"]
 severity = "warning"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
 # .claude/worktrees/ contains agent work-in-progress not yet ready to commit.
-[analyze.rules."rust/chained-if-let"]
+[rules."rust/chained-if-let"]
 enabled = true
 allow = [".claude/**"]
 
-[analyze.rules."js/console-log"]
+[rules."js/console-log"]
 enabled = true
 # editors/vscode/: console.log is intentional lifecycle logging for VSCode extension host
 allow = ["**/fixtures/**", "editors/vscode/**"]
 
-[analyze.rules."js/unnecessary-const"]
+[rules."js/unnecessary-const"]
 enabled = true
 
-[analyze.rules."python/print-debug"]
-enabled = true
-# cli-parser fixtures are example scripts showing what the parser handles, not production code
-allow = ["**/fixtures/**"]
-
-[analyze.rules."python/tuple-return"]
-enabled = true
-
-[analyze.rules."go/fmt-print"]
+[rules."python/print-debug"]
 enabled = true
 # cli-parser fixtures are example scripts showing what the parser handles, not production code
 allow = ["**/fixtures/**"]
 
-[analyze.rules."go/many-returns"]
+[rules."python/tuple-return"]
 enabled = true
 
-[analyze.rules."typescript/tuple-return"]
+[rules."go/fmt-print"]
+enabled = true
+# cli-parser fixtures are example scripts showing what the parser handles, not production code
+allow = ["**/fixtures/**"]
+
+[rules."go/many-returns"]
 enabled = true
 
-[analyze.rules."no-todo-comment"]
+[rules."typescript/tuple-return"]
+enabled = true
+
+[rules."no-todo-comment"]
 enabled = true
 # config.rs doc comment shows example config with "TODO.md" as a filename (not a work item).
 # ast_grep/ is vendored from upstream ast-grep — inherited TODO comments are not our work items.
@@ -221,75 +221,75 @@ allow = [
 # with add_path() for isolated grammar directories, which requires GrammarLoader::new()).
 # normalize-scope/src/lib.rs test module uses add_path() which requires a mutable loader.
 # .claude/worktrees/ contains agent work-in-progress not yet ready to commit.
-[analyze.rules."no-grammar-loader-new"]
+[rules."no-grammar-loader-new"]
 allow = ["**/tests/**", "crates/*/tests/**", "crates/normalize-scope/src/lib.rs", ".claude/**"]
 
 # rust/tuple-return: rg/ is vendored from ripgrep (do not modify); fixtures intentionally
 # contain the bad pattern. All other violations must be fixed.
 # .claude/worktrees/ contains agent work-in-progress not yet ready to commit.
-[analyze.rules."rust/tuple-return"]
+[rules."rust/tuple-return"]
 severity = "error"
 enabled = true
 allow = ["crates/normalize/src/rg/**", "**/tests/fixtures/**", ".claude/**"]
 
 # SUMMARY.md freshness: currently at info severity (TODO: re-escalate to "error" once all
 # SUMMARY.md enforcement — severity=error blocks commits when SUMMARY.md is stale/missing.
-[analyze.rules."stale-summary"]
+[rules."stale-summary"]
 severity = "error"
 
-[analyze.rules."missing-summary"]
+[rules."missing-summary"]
 severity = "error"
 
 # Error-severity: genuine bugs / serious antipatterns — clean in current codebase.
-[analyze.rules."python/mutable-default-arg"]
+[rules."python/mutable-default-arg"]
 severity = "error"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
-[analyze.rules."python/bare-except"]
+[rules."python/bare-except"]
 severity = "error"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
-[analyze.rules."ruby/rescue-exception"]
+[rules."ruby/rescue-exception"]
 severity = "error"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
-[analyze.rules."go/error-ignored"]
+[rules."go/error-ignored"]
 severity = "error"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
 # Warning-severity: bad practice but sometimes intentional.
-[analyze.rules."js/var-declaration"]
+[rules."js/var-declaration"]
 severity = "warning"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
-[analyze.rules."js/typeof-string"]
+[rules."js/typeof-string"]
 severity = "warning"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
-[analyze.rules."ruby/puts-in-lib"]
+[rules."ruby/puts-in-lib"]
 severity = "warning"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
 # Info-severity (already enabled).
-[analyze.rules."js/eq-null"]
+[rules."js/eq-null"]
 enabled = true
 
-[analyze.rules."python/assert-in-non-test"]
+[rules."python/assert-in-non-test"]
 enabled = true
 
-[analyze.rules."js/no-await-in-loop"]
+[rules."js/no-await-in-loop"]
 enabled = true
 
 # CHANGELOG.md references types that have since been renamed or deleted.
 # These are historical records, not live code references.
-[analyze.rules."broken-ref"]
+[rules."broken-ref"]
 allow = ["CHANGELOG.md"]
 
 [aliases]

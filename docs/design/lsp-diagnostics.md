@@ -66,7 +66,7 @@ diagnostics_cancel: Mutex<Option<tokio::sync::watch::Sender<()>>>,
 
 ### Config
 
-No new config needed initially. The existing `normalize.toml` rule configuration (`analyze.rules`, `analyze.facts_rules`) applies. The LSP server reads it the same way the CLI does.
+No new config needed initially. The existing `normalize.toml` rule configuration (`rules`) applies. The LSP server reads it the same way the CLI does.
 
 ### Future: per-file syntax rules
 

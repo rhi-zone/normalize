@@ -242,11 +242,11 @@ The comment can be on the same line as the finding or the line immediately befor
 Override rule settings in `.normalize/config.toml`:
 
 ```toml
-[analyze.rules."rust/println-debug"]
+[rules."rust/println-debug"]
 severity = "warning"    # Upgrade severity
 enabled = false         # Disable rule
 
-[analyze.rules."rust/unwrap-in-impl"]
+[rules."rust/unwrap-in-impl"]
 allow = ["**/cmd/**"]   # Additional allow patterns
 ```
 

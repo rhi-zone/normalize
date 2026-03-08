@@ -417,17 +417,9 @@ pub fn load_rules_config(root: &Path) -> RulesRunConfig {
     #[derive(serde::Deserialize, Default)]
     #[serde(default)]
     struct RulesOnlyConfig {
-        analyze: AnalyzeSection,
+        rules: crate::runner::RulesConfig,
         #[serde(rename = "rule-tags")]
         rule_tags: std::collections::HashMap<String, Vec<String>>,
-    }
-
-    #[derive(serde::Deserialize, Default)]
-    #[serde(default)]
-    struct AnalyzeSection {
-        rules: crate::runner::RulesConfig,
-        #[serde(rename = "sarif-tools")]
-        sarif_tools: Vec<crate::runner::SarifTool>,
     }
 
     // Load global config first
@@ -439,8 +431,6 @@ pub fn load_rules_config(root: &Path) -> RulesRunConfig {
     let global: RulesOnlyConfig = toml::from_str(&global_content).unwrap_or_default();
     let project: RulesOnlyConfig = toml::from_str(&content).unwrap_or_default();
 
-    // Merge: project overrides global for simple fields; for rule configs, project wins entirely
-    // (mirrors normalize_core::Merge behaviour for these sections)
     let rule_tags = {
         let mut merged = global.rule_tags;
         merged.extend(project.rule_tags);
@@ -449,19 +439,9 @@ pub fn load_rules_config(root: &Path) -> RulesRunConfig {
 
     // Project config wins for rules (same semantics as normalize's config merge)
     let rules = if content.is_empty() {
-        global.analyze.rules
+        global.rules
     } else {
-        project.analyze.rules
+        project.rules
     };
-    let sarif_tools = if project.analyze.sarif_tools.is_empty() {
-        global.analyze.sarif_tools
-    } else {
-        project.analyze.sarif_tools
-    };
-
-    RulesRunConfig {
-        rule_tags,
-        rules,
-        sarif_tools,
-    }
+    RulesRunConfig { rule_tags, rules }
 }

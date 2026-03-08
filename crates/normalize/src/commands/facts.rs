@@ -303,7 +303,7 @@ pub fn cmd_check_service(
         rules_file_path.as_deref(),
         list,
         false,
-        &config.analyze.rules,
+        &config.rules,
     );
     if exit_code == 0 {
         Ok(CommandResult {

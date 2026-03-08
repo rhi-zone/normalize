@@ -79,7 +79,7 @@ Imported rules are tracked in `.normalize/rules.lock`.
 Override rule settings in `.normalize/config.toml`:
 
 ```toml
-[analyze.rules."rust/unwrap-in-impl"]
+[rules."rust/unwrap-in-impl"]
 severity = "error"          # Change severity
 enabled = false             # Disable rule
 allow = ["**/tests/**"]     # Skip these paths
