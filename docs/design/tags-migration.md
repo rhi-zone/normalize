@@ -1,6 +1,6 @@
 # tags.scm Symbol Extraction Migration
 
-## Status: Infrastructure complete — cleanup remaining
+## Status: COMPLETE
 
 The migration from Language trait node-kind methods (`container_kinds`, `function_kinds`,
 `type_kinds`, `public_symbol_kinds`, `extract_function`, `extract_container`, `extract_type`)
@@ -54,53 +54,14 @@ Extractor::extract_with_support(content, support, resolver, file)
 - `is_test_symbol()`, `test_file_globs()`, `embedded_content()`
 - `container_body()`, `body_has_docstring()`, `analyze_container_body()`
 
-## Remaining Cleanup (4 items)
+## Cleanup Items — All Done
 
-### Item 1: `definition.var` not mapped — BEHAVIORAL FIX
+All four cleanup items tracked here are complete:
 
-**File:** `crates/normalize-facts/src/extract.rs` — `tags_capture_to_kind()`
-
-`definition.var` appears in 7 tags.scm files (go, hcl, meson, nix, typst, others) but falls
-through to `_ => None` in `tags_capture_to_kind`, silently discarding those definitions.
-`normalize-deps` already handles it (`→ SymbolKind::Variable`), so this is a parity fix.
-
-```rust
-// Add to tags_capture_to_kind match:
-"definition.var" => Some(SymbolKind::Variable),
-```
-
-`is_container_kind` correctly excludes `Variable`, so variables won't swallow child nodes.
-
-**Risk:** Low. Languages with `definition.var` (Go, HCL, Meson, Nix, Typst) will newly emit
-`Variable`-kinded symbols for top-level declarations. Semantically correct.
-
-### Item 2: Stale `unused_node_kinds_audit` comments — 65 language files
-
-Comments reading `// Previously in container/function/type_kinds, covered by tags.scm or
-needs review` are stale. Replace with accurate descriptions:
-- `// control flow — not extracted as symbols`
-- `// covered by tags.scm` (for node types now handled by the query)
-- `// structural node, no symbol representation`
-
-**Risk:** Zero — comment-only changes.
-
-### Item 3: Stale comment in `normalize-edit/src/lib.rs`
-
-Line ~485: "Used when the language has no `container_kinds()` but has a `*.tags.scm`."
-→ Rewrite: "Used when the language has a `*.tags.scm`."
-
-### Item 4: Stale comment in `markdown.rs`
-
-"Note: section and atx_heading are now used via container_kinds/extract_container."
-→ Rewrite: "section and atx_heading are captured via markdown.tags.scm (`@definition.heading`)."
-
-## Implementation Order
-
-1. Fix `definition.var` in `extract.rs` (behavioral)
-2. Fix comments in `normalize-edit/src/lib.rs` and `markdown.rs` (2 files)
-3. Sweep stale audit comments across 65 language files (comment-only)
-
-All four items are independent. Can be one commit or split.
+1. **`definition.var` mapped** — `tags_capture_to_kind` in `extract.rs` maps `"definition.var"` to `SymbolKind::Variable`.
+2. **Stale "Previously in container/function/type_kinds" comments** — removed from all language files.
+3. **Stale comment in `normalize-edit/src/lib.rs`** — fixed.
+4. **Stale comment in `markdown.rs`** — fixed.
 
 ## What Does NOT Need to Change
 

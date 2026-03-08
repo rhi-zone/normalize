@@ -7,9 +7,7 @@ use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 
 /// What to extract during indexing (files are always indexed).
-#[derive(
-    Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum, serde::Deserialize, schemars::JsonSchema,
-)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum FactsContent {
     /// Skip content extraction (files only)
@@ -260,9 +258,11 @@ pub async fn build_relations_from_index(root: &Path) -> Result<Relations, String
 // Service-callable functions
 // =============================================================================
 
+#[cfg(feature = "cli")]
 use crate::service::facts::CommandResult;
 
 /// Service-callable facts rules (compiled dylibs).
+#[cfg(feature = "cli")]
 pub async fn cmd_facts_rules_service(
     root: Option<&str>,
     rule: Option<&str>,
@@ -286,6 +286,7 @@ pub async fn cmd_facts_rules_service(
 }
 
 /// Service-callable facts check (interpreted Datalog).
+#[cfg(feature = "cli")]
 pub fn cmd_check_service(
     root: Option<&str>,
     rules_file: Option<&str>,

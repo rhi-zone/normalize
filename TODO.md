@@ -238,13 +238,14 @@ Every crate should be usable both as a library and as a standalone CLI tool. Lib
 
 **server-less improvement — DONE (0.3.1):** server-less now does `pub use clap;`. Sub-crates
 that use only the `#[cli]` proc macro no longer need `dep:clap` (done for normalize-facts,
-normalize-filter, normalize-syntax-rules). The main `normalize` crate still needs `dep:clap`
-because `src/ast_grep/`, `src/commands/translate.rs`, and `src/serve/` directly import clap.
+normalize-filter, normalize-syntax-rules).
 
-**Next step:** Migrate `translate` and `serve` to the server-less service pattern (they're
-normalize's own commands, not drop-in wrappers — natural fit). `src/ast_grep/` stays as-is:
-it's a drop-in CLI replacement for `sg`; reimplementing its arg surface in the service layer
-is churn with no benefit. `dep:clap` stays as an optional dep gated behind `cli` feature.
+**Feature-gate clap — DONE:** `dep:clap` in the main `normalize` crate is now optional, gated
+behind the `ast-grep-cli` feature (only `src/ast_grep/` uses clap directly). `serve` was already
+migrated to server-less. `commands/translate.rs` clap derives removed (dead legacy code — the
+service layer had already reimplemented translate logic directly). `commands/facts.rs`
+`clap::ValueEnum` derive removed; service-callable helpers gated with `#[cfg(feature = "cli")]`.
+`cargo build --no-default-features` succeeds clean.
 
 ### Language trait: migrate *_kinds() methods to .scm query files
 
@@ -262,40 +263,37 @@ using the query system. See `docs/architecture-decisions.md` ("scm Query Files o
 For each: write the `.scm`, add to `bundled_*_query()` in `grammar_loader.rs`, verify with a
 fixture test. Target: coverage matching `locals.scm` (65 languages).
 
-- [ ] **Wire tags.scm into symbol extraction — replace Language trait node-classification
-  methods entirely.** `tags.scm` makes the following trait methods redundant:
-  `container_kinds()`, `function_kinds()`, `type_kinds()`, `public_symbol_kinds()`,
-  `extract_function()`, `extract_container()`, `extract_type()`. Replace the extractor's
-  node-kind dispatch with a generic query runner: load `get_tags(grammar)`, run it, derive
-  `Symbol` from each `@name.definition.*` capture (kind from capture name, lines from
-  parent node, name from capture text). The Language trait shrinks from ~25 methods to
-  ~8 genuinely semantic ones:
-  - Keep: `extract_docstring()`, `get_visibility()`, `is_public()`, `is_test_symbol()`,
-    `test_file_globs()`, `format_import()`, `signature_suffix()`, `embedded_content()`
-  - Delete: everything that just encodes node type names as `&'static [&'static str]`
-  This is the single highest-leverage refactor remaining in the codebase.
-- [ ] **`*.imports.scm`** — import/require statement extraction. Would replace `import_kinds()`
-  + `extract_imports()` across ~98 language impls. Captures: `@import.path`, `@import.name`.
+- [x] **Wire tags.scm into symbol extraction — replace Language trait node-classification
+  methods entirely.** — DONE. `collect_symbols_from_tags()` is the sole extraction path in
+  `extract_with_support()`. The Language trait has no `container_kinds()`, `function_kinds()`,
+  `type_kinds()`, `public_symbol_kinds()`, `extract_function()`, `extract_container()`, or
+  `extract_type()` methods. The trait has ~10 genuinely semantic methods
+  (`extract_docstring`, `get_visibility`, `is_test_symbol`, `test_file_globs`,
+  `format_import`, `signature_suffix`, `embedded_content`, `refine_kind`, etc.).
+- [ ] **`*.imports.scm`** — import/require statement extraction. Would replace trait-based
+  `extract_imports()` fallback in `symbols.rs::collect_imports_with_trait()` across ~98 language
+  impls. Captures: `@import.path`, `@import.name`.
 - [x] Implement calls.scm for all languages that have call extraction — DONE (68/68 registered)
 - [x] All tags.scm, complexity.scm, imports.scm, types.scm fully registered — DONE (2026-03-08)
 - [x] Fixture test framework — DONE: 257 tests across 68 languages in `crates/normalize-languages/tests/`
-- [ ] Replace per-language inline walkers in `symbols.rs` with a generic walker over `call_node_kinds()`
+- [x] Replace per-language inline walkers in `symbols.rs` with a generic walker over calls.scm — DONE.
+  `find_callees_for_symbol()` uses `loader.get_calls(grammar)` + `collect_calls_with_query()`.
+  No `call_node_kinds()` method ever existed; calls.scm was always the path.
 
-### Type relationship extraction (facts index) — HIGH PRIORITY
+### Type relationship extraction (facts index) — DONE (2026-03-08)
 
-Currently `analyze graph --on types` works but only uses shallow symbol-level relationships (impl/extends). Deeper type edges are needed for meaningful structural analysis.
+`analyze graph --on types` uses the `type_refs` table for deep type edges.
 
-**Needed edges (beyond current impl/extends):**
-- **Field types**: struct A has a field of type B → A depends on B
-- **Signature types**: fn takes A / returns B → caller's type depends on A, B
-- **Type aliases**: `type Foo = Bar` → Foo depends on Bar
-- **Generic bounds**: `T: SomeTrait` → depends on SomeTrait
+**Implemented:**
+- `type_refs` table in index schema: `(file, source_symbol, target_type, kind, line)` — kind ∈ {field_type, param_type, return_type, extends, implements, generic_bound, type_alias}
+- `TypeRef` + `TypeRefKind` in `normalize-facts-core`
+- Extraction in `normalize-facts/src/symbols.rs::find_type_refs()` for Rust, TypeScript/TSX, Python
+- `build_type_graph()` in `commands/analyze/graph.rs` queries `type_refs` table
+- Covers: struct field types, fn params/returns, impl/extends/implements, where bounds, type aliases
 
-**Implementation:**
-- New `type_refs` table: `(file, source_type, target_type, kind, line)` where kind ∈ {field, param, return, impl, alias, bound}
-- Extract via `Language` trait method (new required method or `LocalDeps` extension — TBD)
-- Start with Rust + TypeScript/Python (richest type systems in the current grammar set)
-- Once extracted, `analyze graph --on types` will use these edges alongside existing impl/extends relationships
+**Remaining (future work):**
+- [ ] Extend to more languages (Go, Java, etc.) via the same pattern in `find_type_refs()`
+- [ ] Unit tests for type ref extraction per language
 
 ### Git Analysis Enhancements
 

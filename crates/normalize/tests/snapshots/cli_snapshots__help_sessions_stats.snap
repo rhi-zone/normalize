@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 338
 expression: "snapshot_help(&[\"sessions\", \"stats\"])"
 ---
 Show aggregate statistics across sessions
@@ -23,5 +24,6 @@ Options:
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
       --format <format>            Force specific format: claude, codex, gemini, normalize
   -n, --limit <limit>              Maximum number of sessions
+      --group-by <group-by>        Group results by comma-separated fields: project, day (e.g. project,day)
   -r, --root <root>                Root directory (defaults to current directory)
   -h, --help                       Print help
