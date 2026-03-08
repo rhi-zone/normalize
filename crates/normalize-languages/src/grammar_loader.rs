@@ -706,6 +706,9 @@ fn bundled_calls_query(name: &str) -> Option<&'static str> {
         "glsl" => Some(include_str!("queries/glsl.calls.scm")),
         "hlsl" => Some(include_str!("queries/hlsl.calls.scm")),
         "typst" => Some(include_str!("queries/typst.calls.scm")),
+        "svelte" => Some(include_str!("queries/svelte.calls.scm")),
+        "vue" => Some(include_str!("queries/vue.calls.scm")),
+        "jq" => Some(include_str!("queries/jq.calls.scm")),
         _ => None,
     }
 }
