@@ -1,6 +1,6 @@
 //! Show/analyze a specific session.
 
-use super::analyze::{cmd_sessions_analyze, cmd_sessions_analyze_multi, cmd_sessions_jq};
+use super::analyze::{print_session_analysis, print_session_jq, print_sessions_analysis};
 use super::{resolve_session_paths, resolve_session_paths_literal};
 use crate::output::OutputFormatter;
 use normalize_chat_sessions::{ContentBlock, Role, Session};
@@ -696,7 +696,7 @@ fn format_block_pretty(out: &mut String, block: &ContentBlock) {
 
 /// Show/analyze a specific session or sessions matching a pattern.
 #[allow(clippy::too_many_arguments)]
-pub fn cmd_sessions_show(
+pub fn print_session_show(
     session_id: &str,
     project: Option<&Path>,
     jq_filter: Option<&str>,
@@ -724,19 +724,19 @@ pub fn cmd_sessions_show(
 
     // If --analyze with multiple sessions, aggregate
     if analyze && paths.len() > 1 {
-        return cmd_sessions_analyze_multi(&paths, format);
+        return print_sessions_analysis(&paths, format);
     }
 
     // If --analyze with single session
     if analyze {
-        return cmd_sessions_analyze(&paths[0], format);
+        return print_session_analysis(&paths[0], format);
     }
 
     // If --jq with multiple sessions, apply to all
     if let Some(jq) = jq_filter {
         let mut exit_code = 0;
         for path in &paths {
-            let code = cmd_sessions_jq(path, jq);
+            let code = print_session_jq(path, jq);
             if code != 0 {
                 exit_code = code;
             }
@@ -776,10 +776,10 @@ pub fn cmd_sessions_show(
         };
 
         if let Some(n) = ngrams {
-            return cmd_sessions_ngrams(&session, n, case_insensitive);
+            return print_session_ngrams(&session, n, case_insensitive);
         }
 
-        return cmd_sessions_filter(&session, filter, grep_pattern, errors_only);
+        return print_session_filter(&session, filter, grep_pattern, errors_only);
     }
 
     // Default: parse and display via OutputFormatter
@@ -815,7 +815,7 @@ fn parse_session_for_show(path: &Path, format: Option<&str>) -> Result<Session, 
 }
 
 /// Filter and display messages from a session.
-fn cmd_sessions_filter(
+fn print_session_filter(
     session: &Session,
     filter: Option<&str>,
     grep_pattern: Option<&str>,
@@ -941,7 +941,7 @@ fn format_role_and_type(role: &Role, block: &ContentBlock) -> String {
 }
 
 /// Extract and display common n-grams (word sequences) from session messages.
-fn cmd_sessions_ngrams(session: &Session, n: usize, case_insensitive: bool) -> i32 {
+fn print_session_ngrams(session: &Session, n: usize, case_insensitive: bool) -> i32 {
     // Validate n is in reasonable range
     if !(2..=4).contains(&n) {
         eprintln!("N-gram length must be 2-4");

@@ -29,7 +29,11 @@ pub enum PackageAction {
     Audit,
 }
 
-pub fn cmd_package(action: PackageAction, ecosystem: Option<&str>, root: Option<&Path>) -> i32 {
+pub fn run_package_action(
+    action: PackageAction,
+    ecosystem: Option<&str>,
+    root: Option<&Path>,
+) -> i32 {
     let project_root = root.unwrap_or(Path::new("."));
     let use_colors = false;
 
@@ -89,16 +93,16 @@ fn run_for_ecosystem(
     use_colors: bool,
 ) -> i32 {
     match action {
-        PackageAction::Info { package } => cmd_info(eco, package, project_root),
-        PackageAction::List => cmd_list(eco, project_root, use_colors),
-        PackageAction::Tree => cmd_tree(eco, project_root, use_colors),
-        PackageAction::Why { package } => cmd_why(eco, package, project_root, use_colors),
-        PackageAction::Outdated => cmd_outdated(eco, project_root, use_colors),
-        PackageAction::Audit => cmd_audit(eco, project_root),
+        PackageAction::Info { package } => show_info(eco, package, project_root),
+        PackageAction::List => show_list(eco, project_root, use_colors),
+        PackageAction::Tree => show_tree(eco, project_root, use_colors),
+        PackageAction::Why { package } => show_why(eco, package, project_root, use_colors),
+        PackageAction::Outdated => show_outdated(eco, project_root, use_colors),
+        PackageAction::Audit => show_audit(eco, project_root),
     }
 }
 
-fn cmd_info(eco: &dyn normalize_ecosystems::Ecosystem, package: &str, project_root: &Path) -> i32 {
+fn show_info(eco: &dyn normalize_ecosystems::Ecosystem, package: &str, project_root: &Path) -> i32 {
     match eco.query(package, project_root) {
         Ok(info) => {
             print_human(&info, eco.name());
@@ -126,7 +130,7 @@ fn cmd_info(eco: &dyn normalize_ecosystems::Ecosystem, package: &str, project_ro
     }
 }
 
-fn cmd_list(
+fn show_list(
     eco: &dyn normalize_ecosystems::Ecosystem,
     project_root: &Path,
     use_colors: bool,
@@ -154,7 +158,7 @@ fn cmd_list(
     }
 }
 
-fn cmd_tree(
+fn show_tree(
     eco: &dyn normalize_ecosystems::Ecosystem,
     project_root: &Path,
     use_colors: bool,
@@ -194,7 +198,7 @@ fn print_node(node: &normalize_ecosystems::TreeNode, depth: usize, use_colors: b
     }
 }
 
-fn cmd_why(
+fn show_why(
     eco: &dyn normalize_ecosystems::Ecosystem,
     package: &str,
     project_root: &Path,
@@ -273,7 +277,7 @@ fn find_paths_recursive(
     }
 }
 
-fn cmd_outdated(
+fn show_outdated(
     eco: &dyn normalize_ecosystems::Ecosystem,
     project_root: &Path,
     use_colors: bool,
@@ -357,7 +361,7 @@ fn cmd_outdated(
     0
 }
 
-fn cmd_audit(eco: &dyn normalize_ecosystems::Ecosystem, project_root: &Path) -> i32 {
+fn show_audit(eco: &dyn normalize_ecosystems::Ecosystem, project_root: &Path) -> i32 {
     match eco.audit(project_root) {
         Ok(result) => {
             print_audit_human(&result, eco.name());

@@ -13,7 +13,7 @@ use std::path::Path;
 
 /// View a symbol directly by file and name
 #[allow(clippy::too_many_arguments)]
-pub async fn cmd_view_symbol_direct(
+pub async fn view_symbol_direct(
     file_path: &str,
     symbol_name: &str,
     parent_name: Option<&str>,
@@ -29,7 +29,7 @@ pub async fn cmd_view_symbol_direct(
         Some(p) => vec![p.to_string(), symbol_name.to_string()],
         None => vec![symbol_name.to_string()],
     };
-    cmd_view_symbol(
+    view_symbol(
         file_path,
         &symbol_path,
         root,
@@ -45,7 +45,7 @@ pub async fn cmd_view_symbol_direct(
 
 /// View the symbol containing a specific line number
 #[allow(clippy::too_many_arguments)]
-pub async fn cmd_view_symbol_at_line(
+pub async fn view_symbol_at_line(
     file_path: &str,
     line: usize,
     root: &Path,
@@ -450,7 +450,7 @@ fn format_smart_imports_str(
 
 /// View a symbol within a file
 #[allow(clippy::too_many_arguments)]
-pub async fn cmd_view_symbol(
+pub async fn view_symbol(
     file_path: &str,
     symbol_path: &[String],
     root: &Path,
@@ -1008,88 +1008,6 @@ async fn display_referenced_types(
         };
         println!("//   {} ({}:{})", highlighted.trim(), file, line);
     }
-}
-
-/// View multiple symbols matching a glob pattern
-#[allow(clippy::too_many_arguments)]
-pub fn cmd_view_symbol_glob(
-    file_path: &str,
-    pattern: &str,
-    root: &Path,
-    _depth: i32,
-    _full: bool,
-    _docstring_mode: DocstringDisplay,
-    _case_insensitive: bool,
-) -> i32 {
-    let json = false;
-    let full_path = root.join(file_path);
-    let content = match std::fs::read_to_string(&full_path) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("Error reading {}: {}", file_path, e);
-            return 1;
-        }
-    };
-
-    let matches = path_resolve::resolve_symbol_glob(&full_path, &content, pattern);
-
-    if matches.is_empty() {
-        eprintln!("No symbols match pattern: {}", pattern);
-        return 1;
-    }
-
-    if json {
-        let file_lines: Vec<&str> = content.lines().collect();
-        let report = ViewOutput::GlobMatches(ViewGlobReport {
-            file: file_path.to_string(),
-            pattern: pattern.to_string(),
-            count: matches.len(),
-            matches: matches
-                .iter()
-                .map(|m| {
-                    let start = m.symbol.start_line.saturating_sub(1);
-                    let end = m.symbol.end_line.min(file_lines.len());
-                    let source = file_lines[start..end].join("\n");
-                    ViewGlobMatch {
-                        path: format!("{}/{}", file_path, m.path),
-                        name: m.symbol.name.clone(),
-                        kind: m.symbol.kind.as_str().to_string(),
-                        start_line: m.symbol.start_line,
-                        end_line: m.symbol.end_line,
-                        source,
-                    }
-                })
-                .collect(),
-        });
-        println!("{}", report.format_text());
-        return 0;
-    }
-
-    println!("# {}/{} ({} matches)", file_path, pattern, matches.len());
-    println!();
-
-    let lines: Vec<&str> = content.lines().collect();
-
-    // Show each matched symbol
-    for m in &matches {
-        println!(
-            "## {} ({}, L{}-{})",
-            m.path,
-            m.symbol.kind.as_str(),
-            m.symbol.start_line,
-            m.symbol.end_line
-        );
-
-        // Show symbol source lines
-        for i in m.symbol.start_line..=m.symbol.end_line {
-            if i > 0 && i <= lines.len() {
-                println!("{}", lines[i - 1]);
-            }
-        }
-        println!();
-    }
-
-    0
 }
 
 // ─── Service-layer build functions ──────────────────────────────────────────

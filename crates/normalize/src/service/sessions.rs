@@ -225,7 +225,7 @@ impl SessionsService {
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect();
-            let exit_code = crate::commands::sessions::cmd_sessions_stats(
+            let exit_code = crate::commands::sessions::show_stats_grouped(
                 root_path,
                 limit,
                 format.as_deref(),

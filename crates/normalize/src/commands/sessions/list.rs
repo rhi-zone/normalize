@@ -336,38 +336,3 @@ pub fn build_session_list(
         pretty,
     })
 }
-
-/// List available sessions for a format.
-pub fn cmd_sessions_list(
-    project: Option<&Path>,
-    limit: usize,
-    format_name: Option<&str>,
-    grep: Option<&str>,
-) -> i32 {
-    match build_session_list(
-        project,
-        limit,
-        format_name,
-        grep,
-        None,
-        None,
-        None,
-        None,
-        false,
-        false,
-    ) {
-        Ok(report) => {
-            if report.sessions.is_empty() {
-                eprintln!("No {} sessions found", format_name.unwrap_or("Claude Code"));
-                return 0;
-            }
-            use crate::output::OutputFormatter;
-            println!("{}", report.format_text());
-            0
-        }
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            1
-        }
-    }
-}

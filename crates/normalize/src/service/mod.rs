@@ -536,7 +536,7 @@ impl NormalizeService {
 
         // 7. Optionally run setup wizard
         if setup {
-            commands::init::cmd_setup_wizard(&root);
+            commands::init::run_setup_wizard(&root);
         }
 
         Ok(InitResult {

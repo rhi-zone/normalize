@@ -16,7 +16,7 @@ impl ServeService {
         >,
     ) -> Result<(), String> {
         let root_path = root.as_deref().map(PathBuf::from);
-        let exit = crate::serve::mcp::cmd_serve_mcp(root_path.as_deref());
+        let exit = crate::serve::mcp::serve_mcp(root_path.as_deref());
         if exit != 0 {
             Err(format!("MCP server exited with code {}", exit))
         } else {

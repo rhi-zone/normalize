@@ -1,12 +1,8 @@
 //! Line range viewing for view command.
 
 use super::report::{ViewLineRangeReport, ViewOutput};
-use crate::output::OutputFormatter;
-use crate::tree::DocstringDisplay;
-use crate::{parsers, path_resolve, tree};
-use normalize_languages::support_for_path;
+use crate::parsers;
 use std::collections::HashSet;
-use std::path::Path;
 
 /// Parse a line target like "file.rs:30" or "file.rs:30-55".
 /// Returns (file_path, start, end) where end is None for single line.
@@ -29,114 +25,6 @@ pub fn parse_line_target(target: &str) -> Option<(String, usize, Option<usize>)>
         return None;
     }
     Some((path.to_string(), line, None))
-}
-
-/// View a range of lines from a file.
-#[allow(clippy::too_many_arguments)]
-pub fn cmd_view_line_range(
-    file_path: &str,
-    start: usize,
-    end: usize,
-    root: &Path,
-    docstring_mode: DocstringDisplay,
-) -> i32 {
-    let json = false;
-    let pretty = false;
-    let use_colors = false;
-    let matches = path_resolve::resolve_unified_all(file_path, root);
-    let resolved = match matches.len() {
-        0 => {
-            eprintln!("File not found: {}", file_path);
-            return 1;
-        }
-        1 => &matches[0],
-        _ => {
-            eprintln!("Multiple matches for '{}' - be more specific:", file_path);
-            for m in &matches {
-                println!("  {}", m.file_path);
-            }
-            return 1;
-        }
-    };
-
-    if resolved.is_directory {
-        eprintln!("Cannot use line range with directory: {}", file_path);
-        return 1;
-    }
-
-    let full_path = root.join(&resolved.file_path);
-    let display_path = &resolved.file_path;
-
-    let content = match std::fs::read_to_string(&full_path) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("Failed to read file: {}", e);
-            return 1;
-        }
-    };
-
-    let lines: Vec<&str> = content.lines().collect();
-    let total_lines = lines.len();
-
-    let actual_start = start.min(total_lines);
-    let actual_end = end.min(total_lines);
-
-    if actual_start > total_lines {
-        eprintln!("Line {} is past end of file ({} lines)", start, total_lines);
-        return 1;
-    }
-
-    let range_start = actual_start.saturating_sub(1);
-    let range_end = actual_end.min(lines.len());
-
-    let grammar = support_for_path(&full_path).map(|s| s.grammar_name().to_string());
-    let source: String = if docstring_mode != DocstringDisplay::Full {
-        if let Some(ref g) = grammar {
-            let doc_lines = find_doc_comment_lines(&content, g, actual_start, actual_end);
-            lines[range_start..range_end]
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| !doc_lines.contains(&(actual_start + i)))
-                .map(|(_, line)| *line)
-                .collect::<Vec<_>>()
-                .join("\n")
-        } else {
-            lines[range_start..range_end].join("\n")
-        }
-    } else {
-        lines[range_start..range_end].join("\n")
-    };
-
-    if json {
-        let report = ViewOutput::LineRange(ViewLineRangeReport {
-            file: display_path.to_string(),
-            start: actual_start,
-            end: actual_end,
-            content: source.clone(),
-            grammar: None,
-        });
-        println!("{}", report.format_text());
-        return 0;
-    }
-
-    println!("# {}:{}-{}", display_path, actual_start, actual_end);
-    println!();
-
-    let output = if pretty {
-        if let Some(ref g) = grammar {
-            tree::highlight_source(&source, g, use_colors)
-        } else {
-            source
-        }
-    } else {
-        source
-    };
-    print!("{}", output);
-    if !output.ends_with('\n') {
-        println!();
-    }
-
-    0
 }
 
 /// Build a line range view for the service layer.

@@ -1,6 +1,6 @@
 //! Package management service for server-less CLI.
 
-use crate::commands::package::{PackageAction, cmd_package};
+use crate::commands::package::{PackageAction, run_package_action};
 use server_less::cli;
 use std::cell::Cell;
 use std::path::Path;
@@ -46,7 +46,7 @@ fn run_package(
     root: Option<&str>,
 ) -> Result<PackageResult, String> {
     let root_path = root.map(Path::new);
-    let exit_code = cmd_package(action, ecosystem, root_path);
+    let exit_code = run_package_action(action, ecosystem, root_path);
     if exit_code == 0 {
         Ok(PackageResult {
             success: true,

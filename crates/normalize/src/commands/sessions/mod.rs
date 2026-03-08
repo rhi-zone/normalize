@@ -9,13 +9,13 @@ mod serve;
 pub mod show;
 pub mod stats;
 
-pub use list::{SessionListReport, build_session_list, cmd_sessions_list};
+pub use list::{SessionListReport, build_session_list};
 pub use messages::{MessagesReport, build_messages_report};
 pub use plans::{PlanContent, PlansListReport, build_plan_content, build_plans_list};
 #[cfg(feature = "sessions-web")]
-pub use serve::cmd_sessions_serve;
-pub use show::{SessionShowReport, build_analyze_report, build_show_report, cmd_sessions_show};
-pub use stats::{build_stats_data, cmd_sessions_stats};
+pub use serve::serve_sessions;
+pub use show::{SessionShowReport, build_analyze_report, build_show_report};
+pub use stats::{build_stats_data, show_stats_grouped};
 
 use std::fs::File;
 use std::io::{BufRead, BufReader};

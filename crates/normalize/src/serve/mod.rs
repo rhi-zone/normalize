@@ -75,7 +75,7 @@ pub fn run(args: ServeArgs) -> i32 {
     let config = NormalizeConfig::load(&root);
 
     match args.protocol {
-        ServeProtocol::Mcp => mcp::cmd_serve_mcp(args.root.as_deref()),
+        ServeProtocol::Mcp => mcp::serve_mcp(args.root.as_deref()),
         ServeProtocol::Http { port, openapi } => {
             if openapi {
                 // Output OpenAPI spec and exit

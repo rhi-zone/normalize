@@ -1,7 +1,7 @@
 //! Aggregate statistics across sessions.
 
 use super::{
-    analyze::{aggregate_sessions, cmd_sessions_analyze_multi},
+    analyze::{aggregate_sessions, print_sessions_analysis},
     session_matches_grep,
 };
 use crate::sessions::{FormatRegistry, LogFormat, SessionFile};
@@ -49,7 +49,7 @@ pub(crate) fn parse_date(s: &str) -> Option<SystemTime> {
 
 /// Show aggregate statistics across all sessions.
 #[allow(clippy::too_many_arguments)]
-pub fn cmd_sessions_stats(
+pub fn show_stats_grouped(
     root: Option<&Path>,
     limit: usize,
     format_name: Option<&str>,
@@ -201,12 +201,12 @@ pub fn cmd_sessions_stats(
 
     // Group and analyze
     if group_project || group_day {
-        return cmd_sessions_stats_grouped(&sessions, group_project, group_day, format_name);
+        return show_stats_grouped_by_key(&sessions, group_project, group_day, format_name);
     }
 
     // No grouping — analyze all together
     let paths: Vec<_> = sessions.iter().map(|s| s.path.clone()).collect();
-    cmd_sessions_analyze_multi(&paths, format_name)
+    print_sessions_analysis(&paths, format_name)
 }
 
 /// Build stats analysis (data only, no printing).
@@ -418,7 +418,7 @@ fn extract_day(mtime: &SystemTime) -> String {
 }
 
 /// Show statistics grouped by one or more dimensions.
-fn cmd_sessions_stats_grouped(
+fn show_stats_grouped_by_key(
     sessions: &[SessionFile],
     by_project: bool,
     by_day: bool,
@@ -461,7 +461,7 @@ fn cmd_sessions_stats_grouped(
     for (key, paths) in sorted {
         println!("=== {} ({} sessions) ===\n", key, paths.len());
 
-        let result = cmd_sessions_analyze_multi(&paths, format_name);
+        let result = print_sessions_analysis(&paths, format_name);
         if result != 0 {
             eprintln!("Failed to analyze sessions for {}", key);
             return result;

@@ -86,12 +86,12 @@ impl OutputFormatter for ReferencesReport {
     }
 }
 
-/// Run the find-references command.
+/// Run the find-references analysis.
 ///
 /// - `root`: project root for path display and facts index lookup
 /// - `symbol`: symbol name to search for
 /// - `file`: if Some, restrict scope search to this file; cross-file always covers all files
-pub fn cmd_find_references(root: &Path, symbol: &str, file: Option<&str>) -> ReferencesReport {
+pub fn find_references_report(root: &Path, symbol: &str, file: Option<&str>) -> ReferencesReport {
     let loader = grammar_loader();
     let engine = ScopeEngine::new(&loader);
 

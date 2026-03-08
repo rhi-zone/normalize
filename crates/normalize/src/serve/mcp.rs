@@ -162,8 +162,8 @@ mod implementation {
     }
 }
 
-/// Command handler for `normalize serve mcp`.
-pub fn cmd_serve_mcp(root: Option<&std::path::Path>) -> i32 {
+/// Run the MCP server for `normalize serve mcp`.
+pub fn serve_mcp(root: Option<&std::path::Path>) -> i32 {
     #[cfg(feature = "mcp")]
     {
         let root = root

@@ -9,7 +9,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
 /// Analyze a session and output statistics.
-pub fn cmd_sessions_analyze(path: &Path, format: Option<&str>) -> i32 {
+pub fn print_session_analysis(path: &Path, format: Option<&str>) -> i32 {
     // Parse the session
     let session = if let Some(fmt) = format {
         parse_session_with_format(path, fmt)
@@ -31,8 +31,8 @@ pub fn cmd_sessions_analyze(path: &Path, format: Option<&str>) -> i32 {
     0
 }
 
-/// Analyze multiple sessions and aggregate statistics.
-pub fn cmd_sessions_analyze_multi(paths: &[PathBuf], format: Option<&str>) -> i32 {
+/// Analyze multiple sessions and aggregate statistics, printing results.
+pub fn print_sessions_analysis(paths: &[PathBuf], format: Option<&str>) -> i32 {
     match aggregate_sessions(paths, format) {
         Some(aggregate) => {
             println!("{}", aggregate.format_text());
@@ -206,7 +206,7 @@ pub fn aggregate_sessions(paths: &[PathBuf], format: Option<&str>) -> Option<Ses
 }
 
 /// Apply jq filter to each line of a JSONL file.
-pub fn cmd_sessions_jq(path: &Path, filter: &str) -> i32 {
+pub fn print_session_jq(path: &Path, filter: &str) -> i32 {
     use jaq_core::load::{Arena, File as JaqFile, Loader};
     use jaq_core::{Compiler, Ctx, Vars, data::JustLut};
     use jaq_json::Val;

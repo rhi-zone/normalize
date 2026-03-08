@@ -21,7 +21,7 @@ const SPA_JS_GZ: &[u8] = include_bytes!("../../../../../web/sessions/dist/app.js
 const SPA_CSS_GZ: &[u8] = include_bytes!("../../../../../web/sessions/dist/index.css.gz");
 
 /// Start the sessions web server.
-pub async fn cmd_sessions_serve(project: Option<&Path>, port: u16) -> i32 {
+pub async fn serve_sessions(project: Option<&Path>, port: u16) -> i32 {
     let state = Arc::new(SessionsState {
         project: project.map(|p| p.to_path_buf()),
     });

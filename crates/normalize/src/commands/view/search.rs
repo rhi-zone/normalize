@@ -322,9 +322,9 @@ mod tests {
 
     #[test]
     fn test_trigram_containment() {
-        let q = "xmd_view_smbl";
+        let q = "iew_smbl";
         let q_tri = trigrams(&q.to_lowercase());
-        let score = trigram_containment(&q_tri, "cmd_view_symbol_direct");
+        let score = trigram_containment(&q_tri, "view_symbol_direct");
         assert!(score >= 0.5, "expected >= 0.5, got {}", score);
     }
 
@@ -349,22 +349,22 @@ mod tests {
 
     #[test]
     fn test_suggest_symbols_finds_typo() {
-        // Run from workspace root — find cmd_view_symbol_direct via typo query
+        // Run from workspace root — find view_symbol_direct via typo query
         let root = std::env::current_dir()
             .unwrap()
             .ancestors()
             .find(|p| p.join("Cargo.toml").exists() && p.join("crates").exists())
             .unwrap_or(&std::env::current_dir().unwrap())
             .to_path_buf();
-        let suggestions = suggest_symbols_trigram("xmd_view_smbl", &root, 0.5, 10);
+        let suggestions = suggest_symbols_trigram("iew_smbl", &root, 0.5, 10);
         assert!(
             !suggestions.is_empty(),
             "expected at least one trigram suggestion for typo query"
         );
         let names: Vec<_> = suggestions.iter().map(|(s, _)| s.name.as_str()).collect();
         assert!(
-            names.iter().any(|n| n.contains("cmd_view")),
-            "expected a cmd_view_* symbol in suggestions, got: {:?}",
+            names.iter().any(|n| n.contains("view_symbol")),
+            "expected a view_symbol_* symbol in suggestions, got: {:?}",
             names
         );
     }

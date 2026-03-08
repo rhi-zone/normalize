@@ -42,9 +42,9 @@ Ordered by impact × tractability. Pick from top.
    `DiagnosticsReport` with single banner, colors, severity counts, and global allow for
    `**/tests/fixtures/**` in `.normalize/config.toml`.
 
-2. **Eliminate `cmd_*` layer** — PARTIAL. Dead wrappers in `commands/analyze/` deleted
-   (2026-03-08). ~21 cmd_* functions remain in view/, sessions/, tools/, facts.rs, etc.
-   See: [Eliminate cmd_* layer](#eliminate-cmd_-layer--move-logic-into-service-methods)
+2. ~~**Eliminate `cmd_*` layer**~~ — DONE (2026-03-08). All `cmd_*` functions removed from
+   `commands/`. Dead wrappers deleted; active ones renamed (e.g. `run_setup_wizard`,
+   `serve_mcp`, `show_stats_grouped`, `run_package_action`) with all call sites updated.
 
 2. ~~**Wire `tags.scm` into symbol extraction**~~ — DONE (already complete before this session).
    `collect_symbols_from_tags()` is the primary path; Language trait has only 3 required methods.
