@@ -96,6 +96,13 @@ Added `--project <path>` to both `show` and `analyze` service methods. Both now 
 `CLAUDE_SESSIONS_DIR` is handled at the format level (`sessions_dir()` in claude_code.rs),
 both commands now correctly respect it when a project path is passed.
 
+### ~~`normalize view --full` was a no-op~~ DONE
+
+`--full` was accepted but ignored (`_full: bool` in `build_view_service`). Fixed: when `--full`
+is passed for a file target, `build_view_service` now reads the file and returns
+`ViewOutput::FileContent` (raw source), bypassing the skeleton view. Matches the behavior of
+the `file.rs:1-N` line-range syntax.
+
 ### ~~Incremental caching for `normalize analyze check --summary`~~ DONE
 
 Cache at `.normalize/cache/summary-freshness.json`, keyed by HEAD commit hash. Warm run:
