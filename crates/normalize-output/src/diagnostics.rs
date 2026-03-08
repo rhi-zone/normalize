@@ -387,6 +387,9 @@ impl OutputFormatter for DiagnosticsReport {
         }
         out.push('\n');
 
+        // Group issues by file, printing the filename once as a bold header.
+        // Locationless issues (file == "") are shown flat before the file groups.
+        let mut current_file: Option<&str> = None;
         for issue in &self.issues {
             let sev_color = match issue.severity {
                 Severity::Error => Color::Red,
@@ -394,13 +397,38 @@ impl OutputFormatter for DiagnosticsReport {
                 Severity::Info => Color::Cyan,
                 Severity::Hint => Color::DarkGray,
             };
-            out.push_str(&format!(
-                "{}: {} {} {}\n",
-                Color::White.bold().paint(issue.format_location()),
-                sev_color.bold().paint(issue.severity.to_string()),
-                Color::DarkGray.paint(format!("[{}]", issue.rule_id)),
-                issue.message,
-            ));
+
+            if issue.file.is_empty() {
+                // Locationless: flat format, no file grouping.
+                out.push_str(&format!(
+                    "{} {} {}\n",
+                    sev_color.bold().paint(issue.severity.to_string()),
+                    Color::DarkGray.paint(format!("[{}]", issue.rule_id)),
+                    issue.message,
+                ));
+            } else {
+                // File-located: print file header when file changes, then indent.
+                if current_file != Some(issue.file.as_str()) {
+                    current_file = Some(issue.file.as_str());
+                    out.push_str(&format!(
+                        "{}\n",
+                        Color::White.bold().paint(issue.file.as_str())
+                    ));
+                }
+                let line_str = match (issue.line, issue.column) {
+                    (Some(line), Some(col)) => format!("{line}:{col}"),
+                    (Some(line), None) => format!("{line}"),
+                    _ => String::new(),
+                };
+                out.push_str(&format!(
+                    "  {}  {} {} {}\n",
+                    Color::DarkGray.paint(&line_str),
+                    sev_color.bold().paint(issue.severity.to_string()),
+                    Color::DarkGray.paint(format!("[{}]", issue.rule_id)),
+                    issue.message,
+                ));
+            }
+
             for rel in &issue.related {
                 let rloc = if let Some(line) = rel.line {
                     format!("{}:{line}", rel.file)
@@ -409,17 +437,17 @@ impl OutputFormatter for DiagnosticsReport {
                 };
                 if let Some(msg) = &rel.message {
                     out.push_str(&format!(
-                        "  {} {}: {msg}\n",
+                        "    {} {}: {msg}\n",
                         Color::DarkGray.paint("-->"),
                         rloc
                     ));
                 } else {
-                    out.push_str(&format!("  {} {}\n", Color::DarkGray.paint("-->"), rloc));
+                    out.push_str(&format!("    {} {}\n", Color::DarkGray.paint("-->"), rloc));
                 }
             }
             if let Some(suggestion) = &issue.suggestion {
                 out.push_str(&format!(
-                    "  {} {suggestion}\n",
+                    "    {} {suggestion}\n",
                     Color::Green.paint("suggestion:")
                 ));
             }

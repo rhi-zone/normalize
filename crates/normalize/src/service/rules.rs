@@ -221,30 +221,44 @@ impl RulesService {
 
         // Native engine (stale-summary, check-refs, stale-docs, check-examples)
         // runs in async context; included in All and Native engine types.
+        // All four checks are independent — run them in parallel.
         if run_native {
             let native_root = effective_root.clone();
             let native_config = crate::config::NormalizeConfig::load(&native_root);
             let threshold = 10;
 
-            let summary_report =
-                crate::commands::analyze::stale_summary::build_stale_summary_report(
-                    &native_root,
-                    threshold,
-                );
-            report.merge(summary_report.into());
-
-            let stale_report =
-                crate::commands::analyze::stale_docs::build_stale_docs_report(&native_root);
-            report.merge(stale_report.into());
-
-            let examples_report =
-                crate::commands::analyze::check_examples::build_check_examples_report(&native_root);
-            report.merge(examples_report.into());
-
-            if let Ok(refs_report) =
-                crate::commands::analyze::check_refs::build_check_refs_report(&native_root).await
-            {
-                report.merge(refs_report.into());
+            let (summary_res, stale_res, examples_res, refs_res) = tokio::join!(
+                tokio::task::spawn_blocking({
+                    let root = native_root.clone();
+                    move || {
+                        crate::commands::analyze::stale_summary::build_stale_summary_report(
+                            &root, threshold,
+                        )
+                    }
+                }),
+                tokio::task::spawn_blocking({
+                    let root = native_root.clone();
+                    move || crate::commands::analyze::stale_docs::build_stale_docs_report(&root)
+                }),
+                tokio::task::spawn_blocking({
+                    let root = native_root.clone();
+                    move || {
+                        crate::commands::analyze::check_examples::build_check_examples_report(&root)
+                    }
+                }),
+                crate::commands::analyze::check_refs::build_check_refs_report(&native_root),
+            );
+            if let Ok(r) = summary_res {
+                report.merge(r.into());
+            }
+            if let Ok(r) = stale_res {
+                report.merge(r.into());
+            }
+            if let Ok(r) = examples_res {
+                report.merge(r.into());
+            }
+            if let Ok(r) = refs_res {
+                report.merge(r.into());
             }
 
             crate::commands::rules::apply_native_rules_config(
