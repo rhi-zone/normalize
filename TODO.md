@@ -269,7 +269,7 @@ All languages with grammars have .scm files. Fixture test framework: 257 tests a
 ### Git Analysis Enhancements
 
 **Remaining:**
-- [ ] **Cross-repo hotspots**: aggregate churn/complexity/coupling across repos. Which repo has the most tech debt?
+- [x] **Cross-repo hotspots**: `normalize analyze hotspots --repos <dir>` added; aggregates per-repo churn/complexity — DONE
 
 **Commands:**
 - [ ] **Run commands across repos**: `normalize --repos ~/git/org/ tools lint`, `normalize --repos ~/git/org/ analyze hotspots`. Discover projects, run in parallel, aggregate output.

@@ -854,6 +854,8 @@ impl AnalyzeService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(help = "Run across all git repos under DIR")] repos: Option<String>,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
         pretty: bool,
         compact: bool,
     ) -> Result<HotspotsReport, String> {
@@ -865,6 +867,43 @@ impl AnalyzeService {
             &root_path,
             "hotspots-allow",
         ));
+        if let Some(repos_dir) = repos {
+            let repo_paths = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
+            let entries: Vec<crate::commands::analyze::hotspots::HotspotsRepoEntry> = repo_paths
+                .into_iter()
+                .map(|repo_path| {
+                    let name = repo_path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+                    match crate::commands::analyze::hotspots::analyze_hotspots(
+                        &repo_path, &excludes, recency,
+                    ) {
+                        Ok(r) => crate::commands::analyze::hotspots::HotspotsRepoEntry {
+                            name,
+                            error: None,
+                            hotspots: r.hotspots,
+                            has_complexity: r.has_complexity,
+                            recency_weighted: r.recency_weighted,
+                        },
+                        Err(e) => crate::commands::analyze::hotspots::HotspotsRepoEntry {
+                            name,
+                            error: Some(e),
+                            hotspots: vec![],
+                            has_complexity: false,
+                            recency_weighted: recency,
+                        },
+                    }
+                })
+                .collect();
+            return Ok(HotspotsReport {
+                hotspots: vec![],
+                has_complexity: false,
+                recency_weighted: recency,
+                repos: Some(entries),
+            });
+        }
         crate::commands::analyze::hotspots::analyze_hotspots(&root_path, &excludes, recency)
     }
 
