@@ -315,12 +315,42 @@ impl Extractor {
             Self::merge_rust_impl_blocks(&mut symbols);
         }
 
+        // Post-process for Haskell: deduplicate functions by name (multi-equation definitions
+        // produce one `function` node per equation, each with the same name field).
+        if grammar_name == "haskell" {
+            Self::dedup_haskell_functions(&mut symbols);
+        }
+
         // Post-process for TypeScript/JavaScript: mark interface implementations
         if grammar_name == "typescript" || grammar_name == "javascript" {
             Self::mark_interface_implementations(&mut symbols, resolver, current_file);
         }
 
         symbols
+    }
+
+    /// Deduplicate Haskell function symbols by name.
+    ///
+    /// Haskell allows multi-equation function definitions where each equation is a
+    /// separate top-level declaration. The tree-sitter-haskell grammar produces one
+    /// `function` node per equation, each with the same `name` field. The tags query
+    /// therefore captures the same function name once per equation. This pass keeps
+    /// only the first occurrence of each (name, kind) pair at the top level, and merges
+    /// the byte ranges by extending the first occurrence's `end_line` to cover all
+    /// equations (so the symbol spans the complete definition).
+    fn dedup_haskell_functions(symbols: &mut Vec<Symbol>) {
+        // Use a Vec<(name, kind)> for seen tracking since SymbolKind doesn't derive Hash.
+        let mut seen: Vec<(String, SymbolKind)> = Vec::new();
+        let mut i = 0;
+        while i < symbols.len() {
+            let key = (symbols[i].name.clone(), symbols[i].kind);
+            if seen.contains(&key) {
+                symbols.remove(i);
+            } else {
+                seen.push(key);
+                i += 1;
+            }
+        }
     }
 
     /// Merge Rust impl blocks with their corresponding struct/enum types

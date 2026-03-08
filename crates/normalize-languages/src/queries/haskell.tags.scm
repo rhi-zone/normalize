@@ -2,11 +2,9 @@
 ; Covers: functions, data types, newtypes, type synonyms, typeclasses, instances
 
 ; Function definitions (bind + equation sets)
+; Type signatures are intentionally excluded: they are not definition sites and
+; would produce duplicate symbols when a function has both a signature and a body.
 (function
-  name: (variable) @name) @definition.function
-
-; Type signatures (declarations without bodies)
-(signature
   name: (variable) @name) @definition.function
 
 ; Data type declarations

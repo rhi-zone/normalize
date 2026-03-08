@@ -13,10 +13,13 @@
 (function_declaration
   (simple_identifier) @name) @definition.function
 
-; Properties
-(property_declaration
-  (variable_declaration
-    (simple_identifier) @name)) @definition.constant
+; Properties (class-level only via class body filter)
+; NOTE: property_declaration is intentionally omitted here because the Kotlin
+; grammar uses the same node kind for class-level properties AND local val/var
+; declarations inside function bodies. The extraction layer has no way to
+; distinguish them without ancestor traversal, and including them causes all
+; symbols to be silently dropped (the first property_declaration with an
+; un-resolvable name causes collect_symbols_from_tags to return None).
 
 ; Enum entries
 (enum_entry

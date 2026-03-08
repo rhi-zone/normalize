@@ -368,7 +368,15 @@ mod tests {
             "variance_modifier",       // in, out
 
             // OTHER
-            "finally_block",           // finally    // var/val decl
+            "finally_block",           // finally
+            // property_declaration and variable_declaration are intentionally excluded from
+            // tags.scm: the Kotlin grammar uses the same node kind for class-level properties
+            // AND local val/var declarations inside function bodies. Including them in tags
+            // causes collect_symbols_from_tags to fail because node_name() returns None for
+            // property_declaration (name is nested inside variable_declaration, not a direct
+            // "name" field), silently dropping all symbols in the file.
+            "property_declaration",
+            "variable_declaration",
             // control flow — not extracted as symbols
             "if_expression",
             "anonymous_function",

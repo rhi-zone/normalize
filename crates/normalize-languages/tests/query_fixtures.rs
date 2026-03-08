@@ -6048,57 +6048,145 @@ fn vue_complexity_query_runs_cleanly() {
 }
 
 // ---------------------------------------------------------------------------
-// Kotlin parse diagnostics
+// Groovy / Elixir / Haskell live grammar tests (use ~/.config/normalize/grammars/)
 // ---------------------------------------------------------------------------
 
 #[test]
-fn kotlin_parse_diagnostic() {
+fn groovy_tags_live() {
     let loader = normalize_languages::GrammarLoader::new();
-    let Some(lang) = loader.get("kotlin") else {
-        eprintln!(
-            "Skipping kotlin_parse_diagnostic: kotlin grammar not found in ~/.config/normalize/grammars/"
-        );
+    let Some(lang) = loader.get("groovy") else {
+        eprintln!("Skipping groovy_tags_live: groovy grammar not found");
         return;
     };
-
-    let source_simple = "fun classify(n: Int): String { return \"x\" }";
-    let source_with_val = "fun classify(n: Int): String { val x = 1; return \"x\" }";
-
-    let mut parser = tree_sitter::Parser::new();
-    parser.set_language(&lang).unwrap();
-
-    let tree_simple = parser.parse(source_simple, None).unwrap();
-    let tree_with_val = parser.parse(source_with_val, None).unwrap();
-
-    println!(
-        "Simple (no val): root={}, has_error={}",
-        tree_simple.root_node().kind(),
-        tree_simple.root_node().has_error()
+    let query_str = loader
+        .get_tags("groovy")
+        .expect("groovy tags query missing");
+    let names = collect_captures(&lang, GROOVY_SAMPLE, &query_str, "name");
+    assert!(
+        names.contains(&"Point".to_string()),
+        "expected 'Point' class, got: {names:?}"
     );
-    println!(
-        "With val: root={}, has_error={}",
-        tree_with_val.root_node().kind(),
-        tree_with_val.root_node().has_error()
+    assert!(
+        names.contains(&"distanceTo".to_string()),
+        "expected 'distanceTo' method, got: {names:?}"
     );
+    assert!(
+        names.contains(&"MathUtils".to_string()),
+        "expected 'MathUtils' class, got: {names:?}"
+    );
+    assert!(
+        names.contains(&"classify".to_string()),
+        "expected 'classify' method, got: {names:?}"
+    );
+    assert!(
+        names.contains(&"greet".to_string()),
+        "expected 'greet' function, got: {names:?}"
+    );
+}
 
+#[test]
+fn elixir_tags_no_args_function() {
+    let loader = normalize_languages::GrammarLoader::new();
+    let Some(lang) = loader.get("elixir") else {
+        eprintln!("Skipping elixir_tags_no_args_function: elixir grammar not found");
+        return;
+    };
+    let query_str = loader
+        .get_tags("elixir")
+        .expect("elixir tags query missing");
+    // Test the no-args function form: "def name do ... end"
+    let source = r#"defmodule Foo do
+  def initialize do
+    :ok
+  end
+
+  def greet(name) do
+    name
+  end
+end"#;
+    let names = collect_captures(&lang, source, &query_str, "name");
+    assert!(
+        names.contains(&"initialize".to_string()),
+        "expected 'initialize' (no-args def), got: {names:?}"
+    );
+    assert!(
+        names.contains(&"greet".to_string()),
+        "expected 'greet' (with-args def), got: {names:?}"
+    );
+}
+
+const HASKELL_SAMPLE: &str = include_str!("fixtures/haskell/sample.hs");
+
+#[test]
+fn haskell_tags_no_duplicate_signatures() {
+    let loader = normalize_languages::GrammarLoader::new();
+    let Some(lang) = loader.get("haskell") else {
+        eprintln!("Skipping haskell_tags_no_duplicate_signatures: haskell grammar not found");
+        return;
+    };
+    let query_str = loader
+        .get_tags("haskell")
+        .expect("haskell tags query missing");
+    let names = collect_captures(&lang, HASKELL_SAMPLE, &query_str, "name");
+    // "classify" has one equation; with type signatures removed, it should appear exactly once
+    // (before fix: appeared twice — once for signature, once for definition).
+    let classify_count = names.iter().filter(|n| *n == "classify").count();
+    assert_eq!(
+        classify_count, 1,
+        "expected 'classify' exactly once (type signature removed), got: {names:?}"
+    );
+    // "insert" has two equations (multi-equation function); the grammar produces one `function`
+    // node per equation, so it legitimately appears twice in the raw query output.
+    // Deduplication to a single symbol happens in the extraction layer (normalize-facts).
+    let insert_count = names.iter().filter(|n| *n == "insert").count();
+    assert!(
+        insert_count <= 2 && insert_count >= 1,
+        "expected 'insert' 1-2 times (multi-equation), got: {names:?}"
+    );
+    // Type names from data/newtype/type should also be present
+    assert!(
+        names.contains(&"Tree".to_string()),
+        "expected 'Tree' data type, got: {names:?}"
+    );
+    assert!(
+        names.contains(&"Count".to_string()),
+        "expected 'Count' newtype, got: {names:?}"
+    );
+}
+
+const GROOVY_SAMPLE: &str = include_str!("fixtures/groovy/sample.groovy");
+
+#[test]
+fn kotlin_tags_live() {
+    let loader = normalize_languages::GrammarLoader::new();
+    let Some(lang) = loader.get("kotlin") else {
+        eprintln!("Skipping kotlin_tags_live: kotlin grammar not found");
+        return;
+    };
     let query_str = loader
         .get_tags("kotlin")
         .expect("kotlin tags query missing");
-    let names_simple = collect_captures(&lang, source_simple, &query_str, "name");
-    let names_with_val = collect_captures(&lang, source_with_val, &query_str, "name");
-
-    println!("Simple names: {names_simple:?}");
-    println!("With val names: {names_with_val:?}");
-
-    // Full sample
-    let names_full = collect_captures(&lang, KOTLIN_SAMPLE, &query_str, "name");
-    println!("Full sample names: {names_full:?}");
-
-    let mut parser2 = tree_sitter::Parser::new();
-    parser2.set_language(&lang).unwrap();
-    let tree_full = parser2.parse(KOTLIN_SAMPLE, None).unwrap();
-    println!(
-        "Full sample: has_error={}",
-        tree_full.root_node().has_error()
+    let names = collect_captures(&lang, KOTLIN_SAMPLE, &query_str, "name");
+    // After fix: should find classes and functions, NOT local val declarations
+    assert!(
+        names.contains(&"Point".to_string()),
+        "expected 'Point' class, got: {names:?}"
+    );
+    assert!(
+        names.contains(&"classify".to_string()),
+        "expected 'classify' function, got: {names:?}"
+    );
+    assert!(
+        names.contains(&"sumEvens".to_string()),
+        "expected 'sumEvens' function, got: {names:?}"
+    );
+    // Local val declarations should NOT appear
+    assert!(
+        !names.contains(&"dx".to_string()),
+        "local 'dx' should not appear in tags, got: {names:?}"
+    );
+    assert!(
+        !names.contains(&"total".to_string()),
+        "local 'total' should not appear in tags, got: {names:?}"
     );
 }

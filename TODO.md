@@ -479,17 +479,23 @@ language that silently returns empty is misleading users who expect analysis and
       because the file has no symbols), surface a warning rather than silent empty output
 - [ ] Prioritize: Python, JavaScript/TypeScript, Go, Java, C, C++, Ruby, Rust (already good)
       are the high-value targets — full implementations, not boilerplate
-- [ ] Groovy: tags.scm references `class_definition`/`function_definition` but the tree-sitter
-      grammar produces different node kinds — extraction returns nothing (zero symbols, zero imports)
-- [ ] Kotlin: tree-sitter-kotlin fails to parse `val` declarations inside function bodies — any
-      function containing `val x = ...` silently breaks the entire file parse (no symbols extracted)
+- [x] Groovy: tags.scm references `class_definition`/`function_definition` — verified CORRECT;
+      grammar does use these node kinds with `function` field for function name. Extraction works.
+      Live fixture tests added in query_fixtures.rs. — DONE 2026-03-09
+- [x] Kotlin: `property_declaration` pattern in tags.scm caused `collect_symbols_from_tags` to
+      return None for the entire file because `node_name()` returns None for property_declaration
+      (name is nested inside variable_declaration, not a direct "name" field). Removed
+      property_declaration from tags.scm entirely; documented in kotlin.rs unused kinds audit.
+      Root cause: Kotlin grammar uses same node kind for class-level properties AND local val/var
+      declarations inside function bodies — can't distinguish without ancestor traversal. — DONE 2026-03-09
 - [ ] Kotlin/Scala/Groovy: import queries produce no results — import.scm patterns may not match
       actual grammar node structure (needs AST inspection to verify node kinds)
-- [ ] Elixir: tags.scm doesn't match `def name do ... end` (no-args functions) — only matches
-      `def name(args) do ... end` pattern. The `(arguments (call target: (identifier) @name))`
-      pattern requires a call node, but no-args defs use `(arguments (identifier))`
-- [ ] Haskell: type signatures and function definitions produce duplicate symbols (same name
-      appears twice — once for `signature`, once for `function`). Should deduplicate.
+- [x] Elixir: added `(arguments (identifier) @name)` patterns for no-args function defs
+      (`def name do ... end`, `defp name do ...`, `defmacro name do ...`, `defmacrop name do ...`).
+      Removed `identifier` from documented_unused in elixir.rs. Live test added. — DONE 2026-03-09
+- [x] Haskell: removed `(signature ...)` pattern from haskell.tags.scm; type signatures are not
+      definition sites. Multi-equation function deduplication added in normalize-facts/extract.rs
+      via `dedup_haskell_functions()` post-processing pass. Live tests added. — DONE 2026-03-09
 
 **Comprehensive language fixtures** (long-term, verification via nix flakes):
 Goal: for every language we support, a test suite that exercises the full extraction pipeline

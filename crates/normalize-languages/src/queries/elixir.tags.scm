@@ -14,12 +14,26 @@
       target: (identifier) @name))
   (#eq? @_kw "def")) @definition.function
 
+; Public functions (no-args): def name do ... end
+(call
+  target: (identifier) @_kw
+  (arguments
+    (identifier) @name)
+  (#eq? @_kw "def")) @definition.function
+
 ; Private functions: defp <name>(...)
 (call
   target: (identifier) @_kw
   (arguments
     (call
       target: (identifier) @name))
+  (#eq? @_kw "defp")) @definition.function
+
+; Private functions (no-args): defp name do ... end
+(call
+  target: (identifier) @_kw
+  (arguments
+    (identifier) @name)
   (#eq? @_kw "defp")) @definition.function
 
 ; Public macros: defmacro <name>(...)
@@ -30,12 +44,26 @@
       target: (identifier) @name))
   (#eq? @_kw "defmacro")) @definition.macro
 
+; Public macros (no-args): defmacro name do ... end
+(call
+  target: (identifier) @_kw
+  (arguments
+    (identifier) @name)
+  (#eq? @_kw "defmacro")) @definition.macro
+
 ; Private macros: defmacrop <name>(...)
 (call
   target: (identifier) @_kw
   (arguments
     (call
       target: (identifier) @name))
+  (#eq? @_kw "defmacrop")) @definition.macro
+
+; Private macros (no-args): defmacrop name do ... end
+(call
+  target: (identifier) @_kw
+  (arguments
+    (identifier) @name)
   (#eq? @_kw "defmacrop")) @definition.macro
 
 ; Modules: defmodule <Alias>

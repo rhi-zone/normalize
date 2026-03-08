@@ -212,7 +212,7 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             "after_block", "block", "body", "catch_block", "charlist",
-            "else_block", "identifier", "interpolation", "operator_identifier",
+            "else_block", "interpolation", "operator_identifier",
             "rescue_block", "sigil_modifiers", "stab_clause", "struct",
             "unary_operator",
             // control flow — not extracted as symbols
