@@ -5,7 +5,7 @@ use normalize_tools::{ToolCategory, registry_with_custom};
 use rayon::prelude::*;
 use serde::Serialize;
 use std::fmt::Write as _;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Tool info for lint list output
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -129,12 +129,27 @@ pub fn build_lint_list(root: Option<&Path>) -> LintListResult {
     LintListResult { tools }
 }
 
+/// Per-repo lint result for multi-repo mode.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct RepoLintResult {
+    pub name: String,
+    pub path: PathBuf,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    pub error_count: usize,
+    pub warning_count: usize,
+    pub diagnostics: Vec<LintDiagnostic>,
+}
+
 /// Lint run result with structured diagnostics.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct LintRunResult {
     pub error_count: usize,
     pub warning_count: usize,
     pub diagnostics: Vec<LintDiagnostic>,
+    /// Populated in multi-repo mode (--repos-dir).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repos: Option<Vec<RepoLintResult>>,
 }
 
 /// A lint diagnostic for service output.
@@ -151,25 +166,119 @@ pub struct LintDiagnostic {
     pub help_url: Option<String>,
 }
 
+impl OutputFormatter for LintRunResult {
+    fn format_text(&self) -> String {
+        let mut out = String::new();
+        if let Some(repos) = &self.repos {
+            // Multi-repo mode
+            if repos.is_empty() {
+                return "No repositories found".to_string();
+            }
+            for repo in repos {
+                writeln!(out, "=== {} ===", repo.name).unwrap();
+                if let Some(err) = &repo.error {
+                    writeln!(out, "Error: {}", err).unwrap();
+                } else {
+                    for diag in &repo.diagnostics {
+                        writeln!(
+                            out,
+                            "{}:{}:{}: {} [{}] {}",
+                            diag.file,
+                            diag.line,
+                            diag.column,
+                            diag.severity,
+                            diag.rule_id,
+                            diag.message
+                        )
+                        .unwrap();
+                    }
+                    if repo.error_count > 0 || repo.warning_count > 0 {
+                        writeln!(out).unwrap();
+                        writeln!(
+                            out,
+                            "Found {} error(s) and {} warning(s)",
+                            repo.error_count, repo.warning_count
+                        )
+                        .unwrap();
+                    }
+                }
+                writeln!(out).unwrap();
+            }
+        } else {
+            // Single-repo mode
+            for diag in &self.diagnostics {
+                writeln!(
+                    out,
+                    "{}:{}:{}: {} [{}] {}",
+                    diag.file, diag.line, diag.column, diag.severity, diag.rule_id, diag.message
+                )
+                .unwrap();
+            }
+            if self.error_count > 0 || self.warning_count > 0 {
+                writeln!(out).unwrap();
+                write!(
+                    out,
+                    "Found {} error(s) and {} warning(s)",
+                    self.error_count, self.warning_count
+                )
+                .unwrap();
+            }
+        }
+        out
+    }
+}
+
 impl std::fmt::Display for LintRunResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for diag in &self.diagnostics {
-            writeln!(
-                f,
-                "{}:{}:{}: {} [{}] {}",
-                diag.file, diag.line, diag.column, diag.severity, diag.rule_id, diag.message
-            )?;
-        }
-        if self.error_count > 0 || self.warning_count > 0 {
-            writeln!(f)?;
-            write!(
-                f,
-                "Found {} error(s) and {} warning(s)",
-                self.error_count, self.warning_count
-            )?;
-        }
-        Ok(())
+        write!(f, "{}", self.format_text())
     }
+}
+
+/// Run lints across multiple repos and return aggregated results.
+pub fn build_lint_run_multi(
+    repos: &[PathBuf],
+    fix: bool,
+    tools: Option<&str>,
+    category: Option<&str>,
+) -> Result<LintRunResult, String> {
+    let entries: Vec<RepoLintResult> = repos
+        .par_iter()
+        .map(|repo_path| {
+            let name = repo_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+            match build_lint_run(None, Some(repo_path), fix, tools, category) {
+                Ok(r) => RepoLintResult {
+                    name,
+                    path: repo_path.clone(),
+                    error: None,
+                    error_count: r.error_count,
+                    warning_count: r.warning_count,
+                    diagnostics: r.diagnostics,
+                },
+                Err(e) => RepoLintResult {
+                    name,
+                    path: repo_path.clone(),
+                    error: Some(e),
+                    error_count: 0,
+                    warning_count: 0,
+                    diagnostics: vec![],
+                },
+            }
+        })
+        .collect();
+
+    let total_errors: usize = entries.iter().map(|r| r.error_count).sum();
+    let total_warnings: usize = entries.iter().map(|r| r.warning_count).sum();
+
+    Ok(LintRunResult {
+        error_count: total_errors,
+        warning_count: total_warnings,
+        diagnostics: vec![],
+        repos: Some(entries),
+    })
 }
 
 /// Run lints and return structured results (data only).
@@ -218,6 +327,7 @@ pub fn build_lint_run(
             error_count: 0,
             warning_count: 0,
             diagnostics: vec![],
+            repos: None,
         });
     }
 
@@ -249,5 +359,6 @@ pub fn build_lint_run(
         error_count,
         warning_count,
         diagnostics,
+        repos: None,
     })
 }

@@ -4,6 +4,7 @@ use crate::commands::tools::lint::{LintListResult, LintRunResult};
 use crate::commands::tools::test::{TestListResult, TestRunResult};
 use crate::output::OutputFormatter;
 use server_less::cli;
+use std::path::PathBuf;
 
 /// Tools management service (lint + test subcommands).
 pub struct ToolsService {
@@ -38,6 +39,10 @@ impl std::fmt::Display for LintListResult {
     }
 }
 
+fn discover_repos(dir: &str, depth: usize) -> Result<Vec<PathBuf>, String> {
+    crate::multi_repo::discover_repos_depth(&PathBuf::from(dir), depth)
+}
+
 #[cli(name = "tools", about = "Run linters, formatters, and test runners")]
 impl ToolsService {
     /// Run linters, formatters, and type checkers
@@ -54,6 +59,7 @@ impl ToolsService {
 #[cli(name = "lint", about = "Run linters, formatters, and type checkers")]
 impl LintService {
     /// Run linters on the codebase
+    #[allow(clippy::too_many_arguments)]
     pub fn run(
         &self,
         #[param(positional, help = "Target path to check")] target: Option<String>,
@@ -67,14 +73,26 @@ impl LintService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(help = "Run across all git repos under DIR")] repos_dir: Option<String>,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
     ) -> Result<LintRunResult, String> {
-        crate::commands::tools::lint::build_lint_run(
-            target.as_deref(),
-            root.as_deref().map(std::path::Path::new),
-            fix,
-            tools.as_deref(),
-            category.as_deref(),
-        )
+        if let Some(dir) = repos_dir {
+            let repo_paths = discover_repos(&dir, repos_depth.unwrap_or(1))?;
+            crate::commands::tools::lint::build_lint_run_multi(
+                &repo_paths,
+                fix,
+                tools.as_deref(),
+                category.as_deref(),
+            )
+        } else {
+            crate::commands::tools::lint::build_lint_run(
+                target.as_deref(),
+                root.as_deref().map(std::path::Path::new),
+                fix,
+                tools.as_deref(),
+                category.as_deref(),
+            )
+        }
     }
 
     /// List available linting tools
@@ -100,12 +118,23 @@ impl TestService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(help = "Run across all git repos under DIR")] repos_dir: Option<String>,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
     ) -> Result<TestRunResult, String> {
-        crate::commands::tools::test::build_test_run(
-            root.as_deref().map(std::path::Path::new),
-            runner.as_deref(),
-            &args,
-        )
+        if let Some(dir) = repos_dir {
+            let repo_paths = discover_repos(&dir, repos_depth.unwrap_or(1))?;
+            crate::commands::tools::test::build_test_run_multi(
+                &repo_paths,
+                runner.as_deref(),
+                &args,
+            )
+        } else {
+            crate::commands::tools::test::build_test_run(
+                root.as_deref().map(std::path::Path::new),
+                runner.as_deref(),
+                &args,
+            )
+        }
     }
 
     /// List available test runners

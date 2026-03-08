@@ -272,7 +272,7 @@ All languages with grammars have .scm files. Fixture test framework: 257 tests a
 - [x] **Cross-repo hotspots**: `normalize analyze hotspots --repos <dir>` added; aggregates per-repo churn/complexity — DONE
 
 **Commands:**
-- [ ] **Run commands across repos**: `normalize --repos ~/git/org/ tools lint`, `normalize --repos ~/git/org/ analyze hotspots`. Discover projects, run in parallel, aggregate output.
+- [x] **Run commands across repos**: `normalize tools lint --repos-dir ~/git/org/` and `normalize tools test --repos-dir ~/git/org/` added; discover repos in parallel, aggregate output — DONE (analyze methods already had this)
 
 ## Remaining Work
 
