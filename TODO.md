@@ -232,15 +232,8 @@ The `Language` trait has several methods that return `&'static [&'static str]` �
 tree-sitter node type names. These are tree-sitter queries expressed as Rust data instead of
 using the query system. See `docs/architecture-decisions.md` ("scm Query Files over Rust").
 
-**CRITICAL: Flesh out language coverage** — current counts are abysmal:
-- `*.complexity.scm`: Missing: all others that have `complexity_nodes()` in their Language impl.
-  Every language that has a grammar should have one.
-- `*.calls.scm`: Missing every other language with function calls — a language without calls.scm
-  produces zero call graph data — silently broken.
-- `*.types.scm`: Missing every typed language — c_sharp, java, kotlin, swift, c, cpp, scala, go, etc.
-
-For each: write the `.scm`, add to `bundled_*_query()` in `grammar_loader.rs`, verify with a
-fixture test. Target: coverage matching `locals.scm` (65 languages).
+**Coverage — DONE (2026-03-08):** 68 calls, 69 complexity, 69 imports, 52 types registered.
+All languages with grammars have .scm files. Fixture test framework: 257 tests across 68 languages.
 
 - [x] **Wire tags.scm into symbol extraction — replace Language trait node-classification
   methods entirely.** — DONE. `collect_symbols_from_tags()` is the sole extraction path in
