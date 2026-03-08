@@ -54,16 +54,10 @@ Ordered by impact × tractability. Pick from top.
 
 3. ~~**Remaining info/warning noise (batch-fix)**~~ — DONE. Production code is clean.
 
-4. **Language coverage: `.scm` query files**
-   - `*.calls.scm` — every language without it silently produces zero call graph data
-   - `*.complexity.scm` — missing for all languages that still use `complexity_nodes()` in Rust
-   - `*.types.scm` — missing for all typed languages (C#, Java, Kotlin, Swift, C, C++, Scala, Go)
-     - Added graphql, nix, starlark, matlab, tlaplus (2026-03-08): graphql captures `named_type` references; nix/starlark/tlaplus are dynamically typed (minimal comment files); matlab captures superclass references
-   Target: parity with `locals.scm` coverage (65 languages). One `.scm` + fixture test per language.
+4. ~~**Language coverage: `.scm` query files**~~ — DONE. 68 calls, 69 complexity, 69 imports,
+   52 types registered. See Next Up for remaining imports.scm wiring work.
 
-5. **Feature-gate CLI behind `cli` feature** — library consumers shouldn't pull in clap.
-   Add standalone CLIs to `normalize-facts`, `normalize-filter`, `normalize-syntax-rules`.
-   See: [Feature-gate CLI](#feature-gate-cli-behind-cli-feature-workspace-wide)
+5. ~~**Feature-gate CLI behind `cli` feature**~~ — DONE. See Next Up section.
 
 3. **normalize as LSP server** (stretch)
    - `textDocument/references`, `textDocument/rename`, `textDocument/definition` backed by normalize
