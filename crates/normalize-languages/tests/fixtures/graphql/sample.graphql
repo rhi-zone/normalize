@@ -1,0 +1,64 @@
+scalar DateTime
+scalar UUID
+
+interface Node {
+  id: ID!
+}
+
+interface Timestamped {
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type User implements Node & Timestamped {
+  id: ID!
+  name: String!
+  email: String!
+  role: UserRole!
+  posts: [Post!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Post implements Node & Timestamped {
+  id: ID!
+  title: String!
+  body: String!
+  author: User!
+  tags: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+union SearchResult = User | Post
+
+input CreateUserInput {
+  name: String!
+  email: String!
+  role: UserRole = VIEWER
+}
+
+input UpdatePostInput {
+  title: String
+  body: String
+  tags: [String!]
+}
+
+type Query {
+  user(id: ID!): User
+  users(role: UserRole): [User!]!
+  post(id: ID!): Post
+  search(query: String!): [SearchResult!]!
+}
+
+type Mutation {
+  createUser(input: CreateUserInput!): User!
+  updatePost(id: ID!, input: UpdatePostInput!): Post!
+  deletePost(id: ID!): Boolean!
+}
