@@ -12,9 +12,10 @@ use crate::runner::{
     exit_to_result, run_rules_report,
 };
 
-/// Resolve pretty mode: enabled when TTY (or forced via flag), disabled if compact.
+/// Resolve pretty mode: enabled on TTY (or forced via --pretty), disabled by --compact.
 fn resolve_pretty(pretty: bool, compact: bool) -> bool {
-    !compact && pretty
+    use std::io::IsTerminal;
+    !compact && (pretty || std::io::stdout().is_terminal())
 }
 
 /// Rules management sub-service.
