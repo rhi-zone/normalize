@@ -486,6 +486,8 @@ fn bundled_types_query(name: &str) -> Option<&'static str> {
         "vhdl" => Some(include_str!("queries/vhdl.types.scm")),
         "sql" => Some(include_str!("queries/sql.types.scm")),
         "hcl" => Some(include_str!("queries/hcl.types.scm")),
+        "glsl" => Some(include_str!("queries/glsl.types.scm")),
+        "hlsl" => Some(include_str!("queries/hlsl.types.scm")),
         _ => None,
     }
 }
@@ -701,6 +703,9 @@ fn bundled_calls_query(name: &str) -> Option<&'static str> {
         "vb" => Some(include_str!("queries/vb.calls.scm")),
         "commonlisp" => Some(include_str!("queries/commonlisp.calls.scm")),
         "scss" => Some(include_str!("queries/scss.calls.scm")),
+        "glsl" => Some(include_str!("queries/glsl.calls.scm")),
+        "hlsl" => Some(include_str!("queries/hlsl.calls.scm")),
+        "typst" => Some(include_str!("queries/typst.calls.scm")),
         _ => None,
     }
 }
