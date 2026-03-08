@@ -139,6 +139,7 @@ impl SessionsService {
         #[param(help = "Force specific format: claude, codex, gemini, normalize")] format: Option<
             String,
         >,
+        #[param(help = "Filter by specific project path")] project: Option<String>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -146,11 +147,13 @@ impl SessionsService {
         compact: bool,
     ) -> Result<SessionShowReport, String> {
         let root_path = root.as_deref().map(std::path::Path::new);
+        let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
         let is_pretty = super::resolve_pretty(resolved_root, pretty, compact);
+        let effective_project = project_path.or(root_path);
         let report = crate::commands::sessions::build_show_report(
             &session,
-            root_path,
+            effective_project,
             format.as_deref(),
             full,
             exact,
@@ -168,6 +171,7 @@ impl SessionsService {
         #[param(help = "Force specific format: claude, codex, gemini, normalize")] format: Option<
             String,
         >,
+        #[param(help = "Filter by specific project path")] project: Option<String>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -175,12 +179,14 @@ impl SessionsService {
         compact: bool,
     ) -> Result<SessionAnalysis, String> {
         let root_path = root.as_deref().map(std::path::Path::new);
+        let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
         self.pretty
             .set(super::resolve_pretty(resolved_root, pretty, compact));
+        let effective_project = project_path.or(root_path);
         crate::commands::sessions::build_analyze_report(
             &session,
-            root_path,
+            effective_project,
             format.as_deref(),
             exact,
         )
@@ -200,20 +206,49 @@ impl SessionsService {
             String,
         >,
         #[param(short = 'n', help = "Maximum number of sessions")] limit: Option<usize>,
+        #[param(help = "Group results by comma-separated fields: project, day (e.g. project,day)")]
+        group_by: Option<String>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
     ) -> Result<SessionAnalysis, String> {
         let limit = limit.unwrap_or(20);
+        let root_path = root.as_deref().map(std::path::Path::new);
+        let project_path = project.as_deref().map(std::path::Path::new);
+
+        // When group_by is specified, delegate to the grouped command path which prints
+        // per-group output directly. This uses process::exit to avoid double-printing
+        // from the service framework.
+        if let Some(ref group_by_str) = group_by {
+            let group_by_fields: Vec<String> = group_by_str
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            let exit_code = crate::commands::sessions::cmd_sessions_stats(
+                root_path,
+                limit,
+                format.as_deref(),
+                grep.as_deref(),
+                days,
+                since.as_deref(),
+                until.as_deref(),
+                project_path,
+                all_projects,
+                &group_by_fields,
+            );
+            std::process::exit(exit_code);
+        }
+
         crate::commands::sessions::build_stats_data(
-            root.as_deref().map(std::path::Path::new),
+            root_path,
             limit,
             format.as_deref(),
             grep.as_deref(),
             days,
             since.as_deref(),
             until.as_deref(),
-            project.as_deref().map(std::path::Path::new),
+            project_path,
             all_projects,
         )
     }

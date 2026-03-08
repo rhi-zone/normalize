@@ -82,6 +82,20 @@ Ordered by impact × tractability. Pick from top.
 
 ## Immediate Fixes
 
+### ~~`sessions stats --group-by` not wired up~~ DONE
+
+Added `--group-by <fields>` param to `stats` service method. When present, parses
+comma-separated fields (`project`, `day`) and delegates to `cmd_sessions_stats` which
+calls `cmd_sessions_stats_grouped`. Uses `std::process::exit` to avoid double-printing
+from the service framework.
+
+### ~~`sessions show` / `sessions analyze` ignore `CLAUDE_SESSIONS_DIR`, missing `--project`~~ DONE
+
+Added `--project <path>` to both `show` and `analyze` service methods. Both now compute
+`effective_project = project_path.or(root_path)` (matching how `list` works). Since
+`CLAUDE_SESSIONS_DIR` is handled at the format level (`sessions_dir()` in claude_code.rs),
+both commands now correctly respect it when a project path is passed.
+
 ### ~~Incremental caching for `normalize analyze check --summary`~~ DONE
 
 Cache at `.normalize/cache/summary-freshness.json`, keyed by HEAD commit hash. Warm run:
