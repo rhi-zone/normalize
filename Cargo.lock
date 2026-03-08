@@ -3799,6 +3799,7 @@ dependencies = [
  "glob",
  "normalize-core",
  "normalize-facts-rules-api",
+ "normalize-rules-config",
  "schemars",
  "serde",
  "serde_json",
@@ -4050,6 +4051,7 @@ dependencies = [
  "normalize-languages",
  "normalize-native-rules",
  "normalize-output",
+ "normalize-rules-config",
  "normalize-rules-loader",
  "normalize-syntax-rules",
  "nu-ansi-term",
@@ -4061,6 +4063,15 @@ dependencies = [
  "toml",
  "toml_edit",
  "ureq",
+]
+
+[[package]]
+name = "normalize-rules-config"
+version = "0.1.0"
+dependencies = [
+ "normalize-core",
+ "schemars",
+ "serde",
 ]
 
 [[package]]
@@ -4128,6 +4139,7 @@ dependencies = [
  "ignore",
  "normalize-core",
  "normalize-languages",
+ "normalize-rules-config",
  "regex",
  "schemars",
  "serde",

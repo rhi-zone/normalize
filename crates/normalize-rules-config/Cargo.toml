@@ -1,0 +1,12 @@
+[package]
+name = "normalize-rules-config"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Shared rule configuration types (RulesConfig, RuleOverride) for normalize rule engines"
+
+[dependencies]
+serde.workspace = true
+schemars = "1"
+normalize-core = { path = "../normalize-core", version = "0.1.0" }

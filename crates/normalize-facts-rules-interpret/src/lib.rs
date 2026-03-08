@@ -43,9 +43,7 @@ use ascent_eval::{Engine, Value};
 use ascent_ir::Program;
 use ascent_syntax::AscentProgram;
 use glob::Pattern;
-use normalize_core::Merge;
 use normalize_facts_rules_api::{Diagnostic, DiagnosticLevel, Relations};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -71,37 +69,10 @@ relation diagnostic(String, String, String, u32, String);
 // Configuration
 // =============================================================================
 
-/// Per-rule configuration override from config.toml.
-///
-/// ```toml
-/// [facts-rules."god-file"]
-/// deny = true
-/// allow = ["src/generated/**"]
-///
-/// [facts-rules."fan-out"]
-/// enabled = true
-/// ```
-#[derive(Debug, Clone, Deserialize, Serialize, Default, schemars::JsonSchema)]
-#[serde(default)]
-pub struct FactsRuleOverride {
-    /// Promote all warnings from this rule to errors (deprecated: use severity).
-    pub deny: Option<bool>,
-    /// Override the rule's severity (error, warning, info).
-    pub severity: Option<String>,
-    /// Enable or disable the rule.
-    pub enabled: Option<bool>,
-    /// Additional patterns to allow (suppress matching diagnostics).
-    #[serde(default)]
-    pub allow: Vec<String>,
-    /// Additional tags to add to this rule (appends to built-in tags).
-    #[serde(default)]
-    pub tags: Vec<String>,
-}
-
-/// Configuration for fact rules. Maps rule ID to per-rule overrides.
-#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, schemars::JsonSchema)]
-#[serde(transparent)]
-pub struct FactsRulesConfig(pub HashMap<String, FactsRuleOverride>);
+/// Type alias for backward compatibility. Use `normalize_rules_config::RuleOverride` directly.
+pub use normalize_rules_config::RuleOverride as FactsRuleOverride;
+/// Type alias for backward compatibility. Use `normalize_rules_config::RulesConfig` directly.
+pub use normalize_rules_config::RulesConfig as FactsRulesConfig;
 
 // =============================================================================
 // Rule types and loading
@@ -270,15 +241,12 @@ pub fn load_all_rules(project_root: &Path, config: &FactsRulesConfig) -> Vec<Fac
     }
 
     // 4. Apply config overrides
-    for (rule_id, override_cfg) in &config.0 {
+    for (rule_id, override_cfg) in &config.rules {
         if let Some(rule) = rules_by_id.get_mut(rule_id) {
-            // severity takes precedence over deny
-            if let Some(ref sev_str) = override_cfg.severity {
-                if let Ok(sev) = sev_str.parse::<Severity>() {
-                    rule.severity = sev;
-                }
-            } else if override_cfg.deny == Some(true) {
-                rule.severity = Severity::Error;
+            if let Some(ref sev_str) = override_cfg.severity
+                && let Ok(sev) = sev_str.parse::<Severity>()
+            {
+                rule.severity = sev;
             }
             if let Some(enabled) = override_cfg.enabled {
                 rule.enabled = enabled;

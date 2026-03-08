@@ -122,9 +122,7 @@ pub async fn cmd_init(root: &Path, do_index: bool, setup: bool) -> i32 {
 /// through each rule that has violations — showing examples and prompting enable/disable.
 pub fn cmd_setup_wizard(root: &Path) -> i32 {
     use normalize_facts_rules_interpret as interpret;
-    use normalize_rules::{
-        RuleType, RulesRunConfig, run_rules_report, to_facts_config, to_syntax_config,
-    };
+    use normalize_rules::{RuleType, RulesRunConfig, run_rules_report};
     use normalize_syntax_rules;
     use std::collections::HashMap;
 
@@ -137,9 +135,8 @@ pub fn cmd_setup_wizard(root: &Path) -> i32 {
     let config = crate::config::NormalizeConfig::load(root);
 
     // Load rule metadata for descriptions
-    let syntax_rules =
-        normalize_syntax_rules::load_all_rules(root, &to_syntax_config(&config.analyze.rules));
-    let fact_rules = interpret::load_all_rules(root, &to_facts_config(&config.analyze.rules));
+    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
+    let fact_rules = interpret::load_all_rules(root, &config.analyze.rules);
 
     // Build map: rule_id -> (description, severity, enabled, type)
     let mut rule_meta: HashMap<String, RuleMeta> = HashMap::new();

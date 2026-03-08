@@ -8,40 +8,10 @@
 use crate::builtin::BUILTIN_RULES;
 use crate::{Rule, Severity};
 use glob::Pattern;
-use normalize_core::Merge;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-/// Configuration for syntax rules analysis.
-#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, schemars::JsonSchema)]
-#[serde(default)]
-pub struct RulesConfig {
-    /// Allow patterns applied to every rule (e.g. `["**/tests/fixtures/**"]`).
-    /// Entries here skip violations in matching files across all rules.
-    #[serde(rename = "global-allow")]
-    pub global_allow: Vec<String>,
-    /// Per-rule configuration overrides, keyed by rule ID.
-    /// e.g., `{ "rust/unnecessary-let" = { severity = "warning" } }`
-    #[serde(flatten)]
-    pub rules: HashMap<String, RuleOverride>,
-}
-
-/// Per-rule configuration override.
-#[derive(Debug, Clone, Deserialize, Serialize, Default, schemars::JsonSchema)]
-#[serde(default)]
-pub struct RuleOverride {
-    /// Override the rule's severity.
-    pub severity: Option<String>,
-    /// Enable or disable the rule.
-    pub enabled: Option<bool>,
-    /// Additional file patterns to allow (skip) for this rule.
-    #[serde(default)]
-    pub allow: Vec<String>,
-    /// Additional tags to add to this rule (appends to built-in tags).
-    #[serde(default)]
-    pub tags: Vec<String>,
-}
+pub use normalize_rules_config::{RuleOverride, RulesConfig};
 
 /// Load all rules from all sources, merged by ID.
 /// Order: builtins → ~/.config/normalize/rules/ → .normalize/rules/

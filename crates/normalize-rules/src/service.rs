@@ -189,7 +189,6 @@ impl RulesService {
         if fix {
             let debug_flags = normalize_syntax_rules::DebugFlags::from_args(&debug);
             let exit_code = tokio::task::spawn_blocking(move || {
-                let syntax_cfg = crate::runner::to_syntax_config(&config.rules);
                 crate::cmd_rules::cmd_rules(
                     &target_root,
                     &project_root,
@@ -199,7 +198,7 @@ impl RulesService {
                     false,
                     true,
                     false,
-                    &syntax_cfg,
+                    &config.rules,
                     &debug_flags,
                 )
             })

@@ -1,6 +1,7 @@
 //! Unified rule management - list, run, add, update, remove rules (syntax + fact).
 
 use normalize_facts_rules_interpret as interpret;
+pub use normalize_rules_config::{RuleOverride, RulesConfig};
 use normalize_syntax_rules::{self, DebugFlags};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -196,71 +197,6 @@ impl RulesLock {
     }
 }
 
-/// Canonical per-rule configuration override, used across all rule engines.
-/// Stored under `[analyze.rules."rule-id"]` in `.normalize/config.toml`.
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, Default, schemars::JsonSchema)]
-#[serde(default)]
-pub struct RuleOverride {
-    /// Override the rule's severity.
-    pub severity: Option<String>,
-    /// Enable or disable the rule.
-    pub enabled: Option<bool>,
-    /// Additional file patterns to allow (skip) for this rule.
-    #[serde(default)]
-    pub allow: Vec<String>,
-    /// Additional tags to add to this rule (appends to built-in tags).
-    #[serde(default)]
-    pub tags: Vec<String>,
-}
-
-impl normalize_core::Merge for RuleOverride {
-    fn merge(self, other: Self) -> Self {
-        Self {
-            severity: other.severity.or(self.severity),
-            enabled: other.enabled.or(self.enabled),
-            allow: if other.allow.is_empty() {
-                self.allow
-            } else {
-                other.allow
-            },
-            tags: if other.tags.is_empty() {
-                self.tags
-            } else {
-                other.tags
-            },
-        }
-    }
-}
-
-/// Canonical rules configuration covering all engines (syntax, fact, native).
-/// Deserialized from `[analyze.rules]` in `.normalize/config.toml`.
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, Default, schemars::JsonSchema)]
-#[serde(default)]
-pub struct RulesConfig {
-    /// Allow patterns applied to every rule (e.g. `["**/tests/fixtures/**"]`).
-    #[serde(rename = "global-allow")]
-    pub global_allow: Vec<String>,
-    /// Per-rule configuration overrides, keyed by rule ID.
-    #[serde(flatten)]
-    pub rules: HashMap<String, RuleOverride>,
-}
-
-impl normalize_core::Merge for RulesConfig {
-    fn merge(self, other: Self) -> Self {
-        let global_allow = if other.global_allow.is_empty() {
-            self.global_allow
-        } else {
-            other.global_allow
-        };
-        let mut merged_rules = self.rules;
-        merged_rules.extend(other.rules);
-        Self {
-            global_allow,
-            rules: merged_rules,
-        }
-    }
-}
-
 /// Configuration needed by the rules runner (extracted from NormalizeConfig).
 #[derive(Clone, Debug)]
 pub struct RulesRunConfig {
@@ -270,49 +206,6 @@ pub struct RulesRunConfig {
     pub rules: RulesConfig,
     /// External SARIF tools to run.
     pub sarif_tools: Vec<SarifTool>,
-}
-
-/// Convert canonical RulesConfig to normalize-syntax-rules config.
-pub fn to_syntax_config(cfg: &RulesConfig) -> normalize_syntax_rules::RulesConfig {
-    normalize_syntax_rules::RulesConfig {
-        global_allow: cfg.global_allow.clone(),
-        rules: cfg
-            .rules
-            .iter()
-            .map(|(k, v)| {
-                (
-                    k.clone(),
-                    normalize_syntax_rules::RuleOverride {
-                        severity: v.severity.clone(),
-                        enabled: v.enabled,
-                        allow: v.allow.clone(),
-                        tags: v.tags.clone(),
-                    },
-                )
-            })
-            .collect(),
-    }
-}
-
-/// Convert canonical RulesConfig to fact-rules config.
-pub fn to_facts_config(cfg: &RulesConfig) -> interpret::FactsRulesConfig {
-    interpret::FactsRulesConfig(
-        cfg.rules
-            .iter()
-            .map(|(k, v)| {
-                (
-                    k.clone(),
-                    interpret::FactsRuleOverride {
-                        deny: None,
-                        severity: v.severity.clone(),
-                        enabled: v.enabled,
-                        allow: v.allow.clone(),
-                        tags: v.tags.clone(),
-                    },
-                )
-            })
-            .collect(),
-    )
 }
 
 /// An external tool that emits SARIF 2.1.0 output.
@@ -412,7 +305,7 @@ pub fn cmd_run_syntax(
     list_only: bool,
     fix: bool,
     sarif: bool,
-    config: &normalize_syntax_rules::RulesConfig,
+    config: &RulesConfig,
     debug: &DebugFlags,
 ) -> i32 {
     crate::cmd_rules::cmd_rules(
@@ -440,12 +333,7 @@ pub fn cmd_run_facts(
     // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(run_fact_rules(
-        root,
-        rules_file,
-        list_only,
-        json,
-        &to_facts_config(config),
-        None,
+        root, rules_file, list_only, json, config, None,
     ))
 }
 
@@ -802,8 +690,7 @@ pub fn build_list_report(
 
     // Load syntax rules
     if matches!(filters.type_filter, RuleType::All | RuleType::Syntax) {
-        let syntax_rules =
-            normalize_syntax_rules::load_all_rules(root, &to_syntax_config(&config.rules));
+        let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
         for r in &syntax_rules {
             let source = if r.builtin { "builtin" } else { "project" };
             all_rules.push(UnifiedRule {
@@ -820,7 +707,7 @@ pub fn build_list_report(
 
     // Load fact rules
     if matches!(filters.type_filter, RuleType::All | RuleType::Fact) {
-        let fact_rules = interpret::load_all_rules(root, &to_facts_config(&config.rules));
+        let fact_rules = interpret::load_all_rules(root, &config.rules);
         for r in &fact_rules {
             let source = if r.builtin { "builtin" } else { "project" };
             all_rules.push(UnifiedRule {
@@ -983,9 +870,8 @@ pub fn cmd_enable_disable(
     config: &RulesRunConfig,
 ) -> i32 {
     // Resolve which rule IDs to affect
-    let syntax_rules =
-        normalize_syntax_rules::load_all_rules(root, &to_syntax_config(&config.rules));
-    let fact_rules = interpret::load_all_rules(root, &to_facts_config(&config.rules));
+    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
+    let fact_rules = interpret::load_all_rules(root, &config.rules);
     let all_unified = build_unified_rules(&syntax_rules, &fact_rules);
 
     // Exact ID match takes priority; otherwise expand as tag (includes user-defined groups)
@@ -1153,9 +1039,8 @@ pub fn cmd_show(
     config: &RulesRunConfig,
 ) -> i32 {
     // Search syntax rules first, then fact rules
-    let syntax_rules =
-        normalize_syntax_rules::load_all_rules(root, &to_syntax_config(&config.rules));
-    let fact_rules = interpret::load_all_rules(root, &to_facts_config(&config.rules));
+    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
+    let fact_rules = interpret::load_all_rules(root, &config.rules);
 
     // Find by ID
     let found_syntax = syntax_rules.iter().find(|r| r.id == id);
@@ -1298,9 +1183,8 @@ pub fn cmd_tags(
     config: &RulesRunConfig,
 ) -> i32 {
     // Collect all rules from both tiers
-    let syntax_rules =
-        normalize_syntax_rules::load_all_rules(root, &to_syntax_config(&config.rules));
-    let fact_rules = interpret::load_all_rules(root, &to_facts_config(&config.rules));
+    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
+    let fact_rules = interpret::load_all_rules(root, &config.rules);
 
     // Build the unified list for expansion
     let all_unified = build_unified_rules(&syntax_rules, &fact_rules);
@@ -1424,9 +1308,8 @@ pub fn cmd_run(
     let filter_ids: Option<HashSet<String>> = filter_tag.and_then(|tag| {
         if rule_tags.contains_key(tag) {
             // Build unified list for expansion
-            let syntax_rules =
-                normalize_syntax_rules::load_all_rules(root, &to_syntax_config(&config.rules));
-            let fact_rules = interpret::load_all_rules(root, &to_facts_config(&config.rules));
+            let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
+            let fact_rules = interpret::load_all_rules(root, &config.rules);
             let all_unified = build_unified_rules(&syntax_rules, &fact_rules);
             let mut visited = HashSet::new();
             let ids = expand_tag(tag, rule_tags, &all_unified, &mut visited);
@@ -1454,7 +1337,7 @@ pub fn cmd_run(
             false,
             fix,
             sarif,
-            &to_syntax_config(&config.rules),
+            &config.rules,
             &debug_flags,
         );
         if code != 0 {
@@ -1471,7 +1354,7 @@ pub fn cmd_run(
             None,
             false,
             json,
-            &to_facts_config(&config.rules),
+            &config.rules,
             filter_ids.as_ref(),
         ));
         if code != 0 {
@@ -1485,7 +1368,7 @@ pub fn cmd_run(
 /// Collect fact rule diagnostics without printing (returns raw diagnostics).
 pub async fn collect_fact_diagnostics(
     root: &Path,
-    config: &interpret::FactsRulesConfig,
+    config: &RulesConfig,
     filter_ids: Option<&HashSet<String>>,
     filter_rule: Option<&str>,
 ) -> Vec<normalize_facts_rules_api::Diagnostic> {
@@ -1581,9 +1464,8 @@ pub fn run_rules_report(
     let rule_tags = &config.rule_tags;
     let filter_ids: Option<HashSet<String>> = filter_tag.and_then(|tag| {
         if rule_tags.contains_key(tag) {
-            let syntax_rules =
-                normalize_syntax_rules::load_all_rules(root, &to_syntax_config(&config.rules));
-            let fact_rules = interpret::load_all_rules(root, &to_facts_config(&config.rules));
+            let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
+            let fact_rules = interpret::load_all_rules(root, &config.rules);
             let all_unified = build_unified_rules(&syntax_rules, &fact_rules);
             let mut visited = HashSet::new();
             let ids = expand_tag(tag, rule_tags, &all_unified, &mut visited);
@@ -1607,7 +1489,7 @@ pub fn run_rules_report(
             filter_rule,
             effective_tag,
             filter_ids.as_ref(),
-            &to_syntax_config(&config.rules),
+            &config.rules,
             &debug_flags,
         );
         // Count unique files with violations for the report header.
@@ -1626,7 +1508,7 @@ pub fn run_rules_report(
         let rt = tokio::runtime::Runtime::new().unwrap();
         let diagnostics = rt.block_on(collect_fact_diagnostics(
             project_root,
-            &to_facts_config(&config.rules),
+            &config.rules,
             filter_ids.as_ref(),
             filter_rule,
         ));
@@ -1793,7 +1675,7 @@ async fn run_fact_rules(
     rules_file: Option<&Path>,
     list_only: bool,
     json: bool,
-    config: &interpret::FactsRulesConfig,
+    config: &RulesConfig,
     filter_ids: Option<&HashSet<String>>,
 ) -> i32 {
     // If a specific file is given, run just that file

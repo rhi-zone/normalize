@@ -358,12 +358,12 @@ fn test_config_override_deny() {
     let rule = find_builtin("self-import");
     assert_eq!(rule.severity, Severity::Warning);
 
-    // Apply config override with deny=true (legacy)
+    // Apply config override with severity=error
     let mut config = FactsRulesConfig::default();
-    config.0.insert(
+    config.rules.insert(
         "self-import".to_string(),
         FactsRuleOverride {
-            deny: Some(true),
+            severity: Some("error".to_string()),
             ..Default::default()
         },
     );
@@ -406,7 +406,7 @@ fn test_config_override_enable() {
 
     // Enable via config
     let mut config = FactsRulesConfig::default();
-    config.0.insert(
+    config.rules.insert(
         "fan-out".to_string(),
         FactsRuleOverride {
             enabled: Some(true),
