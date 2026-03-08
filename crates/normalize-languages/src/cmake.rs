@@ -94,10 +94,9 @@ mod tests {
             "elseif", "endblock", "endblock_command", "endforeach", "endforeach_command",
             "endfunction", "endfunction_command", "endif", "endif_command", "endwhile",
             "endwhile_command", "foreach", "foreach_command", "function",
-            "function_command", "identifier", "if", "if_command", "while",
+            "identifier", "if", "if_command", "while",
             "while_command",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
-            "function_def",
             "if_condition",
             "foreach_loop",
             "while_loop",

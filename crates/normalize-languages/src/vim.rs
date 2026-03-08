@@ -80,7 +80,7 @@ mod tests {
     fn unused_node_kinds_audit() {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
-            "aboveleft_statement", "autocmd_statement", "augroup_statement",
+            "aboveleft_statement", "autocmd_statement",
             "bang_filter_statement", "belowright_statement", "body", "botright_statement",
             "break_statement", "call_expression", "call_statement", "catch_statement",
             "cnext_statement", "colorscheme_statement", "comclear_statement",
@@ -90,7 +90,7 @@ mod tests {
             "else_statement", "enew_statement", "eval_statement", "ex_statement",
             "execute_statement", "field_expression", "file_format", "filetype",
             "filetype_statement", "filetypes", "finally_statement", "find_statement",
-            "function_declaration", "global_statement", "highlight_statement", "identifier",
+            "global_statement", "highlight_statement", "identifier",
             "index_expression", "lambda_expression", "let_statement", "lua_statement",
             "map_statement", "marker_definition", "match_case", "method_expression",
             "normal_statement", "options_statement", "perl_statement", "python_statement",
@@ -106,7 +106,7 @@ mod tests {
             "elseif_statement", "for_loop", "if_statement", "source_statement",
             "try_statement", "runtime_statement", "while_loop",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
-            "function_definition",
+
         ];
         validate_unused_kinds_audit(&Vim, documented_unused)
             .expect("Vim unused node kinds audit failed");

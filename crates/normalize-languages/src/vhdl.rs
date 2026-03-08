@@ -229,14 +229,8 @@ mod tests {
             "PSL_VUnit", "PSL_VProp", "PSL_VMode",
             "PSL_Hierarchical_HDL_Name", "PSL_Inherit_Spec",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
-            "entity_declaration",
-            "package_declaration",
-            "procedure_body",
             "loop_statement",
-            "architecture_body",
-            "function_body",
             "use_clause",
-            "full_type_declaration",
             "case_statement",
             "if_statement",
         ];

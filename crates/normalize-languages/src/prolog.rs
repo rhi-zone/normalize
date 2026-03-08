@@ -105,10 +105,7 @@ mod tests {
     fn unused_node_kinds_audit() {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
-            "binary_operator", "functional_notation",
-            "operator_notation", "prefix_operator", "prexif_operator",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
-            "clause_term",
+            "binary_operator", "prefix_operator", "prexif_operator",
         ];
         validate_unused_kinds_audit(&Prolog, documented_unused)
             .expect("Prolog unused node kinds audit failed");

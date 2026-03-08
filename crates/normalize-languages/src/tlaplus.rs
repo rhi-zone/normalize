@@ -131,8 +131,7 @@ mod tests {
             // Control flow — not definition constructs
             "case", "if_then_else",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
-            "module",
-            "operator_definition",
+
         ];
         validate_unused_kinds_audit(&TlaPlus, documented_unused)
             .expect("TLA+ unused node kinds audit failed");

@@ -73,7 +73,7 @@ mod tests {
     fn unused_node_kinds_audit() {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
-            "catch", "elif", "else", "format", "identifier", "import_", "moduleheader",
+            "catch", "elif", "else", "format", "import_", "moduleheader",
             "programbody",
         ];
         validate_unused_kinds_audit(&Jq, documented_unused)

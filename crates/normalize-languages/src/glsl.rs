@@ -73,8 +73,6 @@ mod tests {
             "type_descriptor", "type_identifier", "type_qualifier", "unary_expression",
             "union_specifier", "update_expression",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
-            "function_definition",
-            "struct_specifier",
             "switch_statement",
             "if_statement",
             "while_statement",

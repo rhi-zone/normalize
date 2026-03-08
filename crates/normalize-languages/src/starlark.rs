@@ -85,7 +85,6 @@ mod tests {
             // Other
             "identifier",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
-            "function_definition",
             "for_statement",
             "load_statement",
             "if_statement",

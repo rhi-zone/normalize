@@ -43,7 +43,7 @@ mod tests {
             "frame_definition", "function_argument", "function_arguments",
             "function_body", "function_cost", "function_declaration", "function_language",
             "function_leakproof", "function_rows", "function_safety", "function_security",
-            "function_strictness", "function_support", "function_volatility", "identifier",
+            "function_strictness", "function_support", "function_volatility",
             "keyword_before", "keyword_case", "keyword_else", "keyword_enum",
             "keyword_except", "keyword_for", "keyword_force", "keyword_force_not_null",
             "keyword_force_null", "keyword_force_quote", "keyword_foreign",
@@ -58,9 +58,6 @@ mod tests {
             "window_function", "window_specification",
             // Control flow in SQL procedural code — not definition kinds
             "case",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
-            "create_function",
-            "create_type",
         ];
         validate_unused_kinds_audit(&Sql, documented_unused)
             .expect("SQL unused node kinds audit failed");

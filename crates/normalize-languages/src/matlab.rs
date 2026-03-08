@@ -109,8 +109,6 @@ mod tests {
             "function_call", "function_output", "function_signature", "identifier", "lambda",
             "parfor_options", "validation_functions",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
-            "class_definition",
-            "function_definition",
             "if_statement",
             "catch_clause",
             "switch_statement",

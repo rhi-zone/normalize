@@ -132,15 +132,12 @@ mod tests {
             "using_declaration", "variadic_parameter_declaration",
             "variadic_type_parameter_declaration", "virtual_specifier",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
-            "function_definition",
-            "struct_specifier",
             "conditional_expression",
             "case_statement",
             "for_statement",
             "compound_statement",
             "if_statement",
             "switch_statement",
-            "cbuffer_specifier",
             "while_statement",
         ];
         validate_unused_kinds_audit(&Hlsl, documented_unused)

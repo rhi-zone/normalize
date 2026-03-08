@@ -119,19 +119,16 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             // Function and lambda definitions
-            "catchall_pragma", "forall", "function_name", "lambda",
+            "catchall_pragma", "forall", "lambda",
             "lambda_clause_absurd", "type_signature",
             // Module-related
             "import_directive", "module_application", "module_assignment", "module_macro",
-            "module_name",
             // Record definitions
             "record_constructor", "record_constructor_instance", "record_declarations_block",
             // Bindings
             "typed_binding", "untyped_binding", "with_expressions",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
-            "function",
             "lambda_clause",
-            "module",
             "import",
         ];
         validate_unused_kinds_audit(&Agda, documented_unused)

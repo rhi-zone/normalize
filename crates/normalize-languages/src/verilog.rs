@@ -114,7 +114,7 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             // Declarations
-            "class_declaration", "interface_declaration", "checker_declaration",
+            "interface_declaration", "checker_declaration",
             "udp_declaration", "clocking_declaration", "property_declaration",
             "net_declaration", "data_declaration", "parameter_declaration",
             "specparam_declaration", "type_declaration", "genvar_declaration",
@@ -123,15 +123,14 @@ mod tests {
             "overload_declaration", "interface_class_declaration", "anonymous_program",
             "package_declaration",
             // Module/interface headers
-            "module_ansi_header", "module_nonansi_header", "module_header",
+            "module_ansi_header", "module_nonansi_header",
             "interface_ansi_header", "interface_nonansi_header",
             // Items
             "module_or_generate_item", "interface_or_generate_item", "class_item",
             "interface_class_item", "checker_or_generate_item_declaration",
             "tf_item_declaration", "block_item_declaration", "anonymous_program_item",
             // Identifiers
-            "simple_identifier", "function_identifier", "task_identifier",
-            "interface_identifier", "class_identifier", "package_identifier",
+            "interface_identifier", "package_identifier",
             "property_identifier", "checker_identifier",
             "covergroup_identifier", "cover_point_identifier", "constraint_identifier",
             "clocking_identifier", "modport_identifier", "generate_block_identifier",
@@ -188,9 +187,9 @@ mod tests {
             "class_scope", "class_constructor_declaration", "interface_class_method",
             "class_qualifier", "class_new", "implicit_class_handle", "random_qualifier",
             // Functions/tasks
-            "function_body_declaration", "function_prototype", "task_prototype",
+            "function_prototype", "task_prototype",
             "tf_port_declaration", "extern_tf_declaration", "function_subroutine_call",
-            "dpi_function_proto", "task_body_declaration", "function_data_type_or_implicit1",
+            "dpi_function_proto", "function_data_type_or_implicit1",
             "dpi_function_import_property", "dpi_task_proto", "tf_call", "tf_port_list",
             "tf_port_item1", "tf_port_direction",
             // Ports
@@ -358,11 +357,8 @@ mod tests {
             "package_or_generate_item_declaration", "notifier",
             "ps_or_hierarchical_array_identifier", "value_range",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
-            "module_declaration",
-            "function_declaration",
             "case_generate_construct",
             "conditional_statement",
-            "task_declaration",
             "loop_statement",
             "package_import_declaration",
             "case_statement",

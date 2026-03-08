@@ -112,8 +112,7 @@ mod tests {
             // Module system — handled in extract_imports, not as symbols
             "forward_statement", "import_statement", "use_statement",
                     // Previously in container/function/type_kinds, covered by tags.scm or needs review
-            "function_statement",
-            "mixin_statement",
+
         ];
         validate_unused_kinds_audit(&Scss, documented_unused)
             .expect("SCSS unused node kinds audit failed");

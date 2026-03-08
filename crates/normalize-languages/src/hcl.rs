@@ -131,14 +131,12 @@ mod tests {
             "binary_operation", "body", "collection_value", "expression",
             "for_cond", "for_intro", "for_object_expr", "for_tuple_expr",
             "function_arguments", "function_call", "get_attr", "heredoc_identifier",
-            "identifier", "index", "literal_value", "object_elem", "quoted_template",
+            "index", "literal_value", "object_elem", "quoted_template",
             "template_else_intro", "template_for", "template_for_end", "template_for_start",
             "template_if", "template_if_end", "template_if_intro", "tuple",
             "block_end", "block_start",
             // Comprehension — not a definition construct
             "for_expr",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
-            "block",
         ];
         validate_unused_kinds_audit(&Hcl, documented_unused)
             .expect("HCL unused node kinds audit failed");
