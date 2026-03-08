@@ -96,9 +96,31 @@ pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, Str
             .display()
             .to_string();
 
+        let md_dir = md_file.parent().unwrap_or(root);
+
         for (line_num, line) in content.lines().enumerate() {
             for cap in code_ref_re.captures_iter(line) {
                 let reference = &cap[1];
+
+                // If the reference contains a dot, try to resolve it as a file path first.
+                // README.md, Architecture.md, etc. are valid references if the file exists.
+                // Only fall through to symbol check if the file isn't found.
+                if reference.contains('.') {
+                    if md_dir.join(reference).exists() || root.join(reference).exists() {
+                        continue;
+                    }
+                    // If it looks like a file reference (lowercase extension) but doesn't
+                    // exist, flag it as a broken link rather than an unknown symbol.
+                    if looks_like_file_path(reference) {
+                        broken_refs.push(BrokenRef {
+                            file: rel_path.clone(),
+                            line: line_num + 1,
+                            reference: reference.to_string(),
+                            context: line.trim().to_string(),
+                        });
+                        continue;
+                    }
+                }
 
                 // Extract symbol name (last part after :: or .)
                 let symbol_name = reference.rsplit([':', '.']).next().unwrap_or(reference);
@@ -145,7 +167,11 @@ impl From<CheckRefsReport> for DiagnosticsReport {
                     end_line: None,
                     end_column: None,
                     rule_id: "broken-ref".into(),
-                    message: format!("unknown symbol `{}`", r.reference),
+                    message: if looks_like_file_path(&r.reference) {
+                        format!("broken file link `{}`", r.reference)
+                    } else {
+                        format!("unknown symbol `{}`", r.reference)
+                    },
                     severity: Severity::Warning,
                     source: "check-refs".into(),
                     related: vec![],
@@ -157,6 +183,18 @@ impl From<CheckRefsReport> for DiagnosticsReport {
             hints: Vec::new(),
         }
     }
+}
+
+/// Check if a reference looks like a file path.
+///
+/// Heuristic: the part after the last `.` is lowercase-only (a file extension),
+/// not a capitalized method name or field access.
+fn looks_like_file_path(s: &str) -> bool {
+    let Some(dot) = s.rfind('.') else {
+        return false;
+    };
+    let ext = &s[dot + 1..];
+    !ext.is_empty() && ext.len() <= 5 && ext.chars().all(|c| c.is_ascii_lowercase())
 }
 
 /// Check if a string is a common non-symbol pattern (command, path, etc.)
