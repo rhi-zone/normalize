@@ -101,32 +101,16 @@ Severity re-escalated to `error`; hook blocks commits when SUMMARY.md is too sta
 Staleness condition: `(commits_since_update + has_uncommitted) > threshold` (configurable,
 default 10). Single uncommitted change alone no longer blocks commits.
 
-### ~~Audit info/hint rule noise~~ PARTIAL (pre-commit --no-fail removed)
+### ~~Audit info/hint rule noise~~ DONE
 
-Pre-commit now enforces zero error-severity violations. Resolved (9ae3b496):
-- `no-grammar-loader-new`: 2 production fixes; allow pattern for test modules needing `add_path()`
-- `rust/numeric-type-annotation`: 15 violations fixed; allow pattern for test fixtures
-- `rust/tuple-return`: Lowered from error → warning (54 violations remain — see below)
+Pre-commit enforces zero error-severity violations. All production code clean:
+- `no-grammar-loader-new`: 2 production fixes; allow for test modules needing `add_path()`
+- `rust/numeric-type-annotation`: 15 violations fixed; allow for test fixtures
+- `rust/tuple-return`: severity=error; 0 violations (all fixed or in allowed paths)
+- `rust/chained-if-let`, `rust/unnecessary-type-alias`, `rust/unnecessary-let`, `no-todo-comment`: 0 production violations
+- `tools/test.rs` `writeln!(...).unwrap()` on String (infallible) → `let _ = writeln!(...)` — fixed
 
-**Remaining info noise (219 issues):** Not yet addressed. Current breakdown:
-- `rust/chained-if-let`: 122 violations (info)
-- `rust/unnecessary-type-alias`: 36 violations (info)
-- `rust/unnecessary-let`: 32 violations (info)
-- `no-todo-comment`: 17 violations (info)
-- Other: 12 violations across 6 rules
-
-Strategy: batch-fix by rule. Priority order:
-1. `rust/unnecessary-type-alias` ×36 — straightforward inline
-2. `rust/unnecessary-let` ×32 — straightforward inline
-3. `no-todo-comment` ×17 — review for false positives first
-4. `rust/chained-if-let` ×122 — run `normalize rules run --fix` (auto-fix exists)
-
-**rust/tuple-return (54 warnings):** Need `ByteRange { start, end }` struct or similar in
-normalize-languages for `container_body()` return type. Also affects normalize-manifest and
-normalize-package-index parsers. Plan: create shared `normalize-ranges` or reuse existing type.
-
-The exclude patterns in `[analyze]` still don't apply to rules. Adding a global
-`[rules.exclude]` section analogous to `[analyze].exclude` would clean up fixture violations.
+Remaining 510 warnings are structural (`long-function`, `god-class`, `broken-ref` in docs) — not blocking.
 
 ### Guided rule setup — DONE (`normalize init --setup`)
 

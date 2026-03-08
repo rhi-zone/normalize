@@ -74,20 +74,20 @@ impl OutputFormatter for TestRunResult {
             let mut out = String::new();
             for repo in repos {
                 use std::fmt::Write as _;
-                writeln!(out, "=== {} ===", repo.name).unwrap();
+                // writeln! on a String is infallible
+                let _ = writeln!(out, "=== {} ===", repo.name);
                 if let Some(err) = &repo.error {
-                    writeln!(out, "Error: {}", err).unwrap();
+                    let _ = writeln!(out, "Error: {}", err);
                 } else if repo.success {
-                    writeln!(out, "Tests passed ({})", repo.runner).unwrap();
+                    let _ = writeln!(out, "Tests passed ({})", repo.runner);
                 } else {
-                    writeln!(
+                    let _ = writeln!(
                         out,
                         "Tests failed ({}, exit code {})",
                         repo.runner, repo.exit_code
-                    )
-                    .unwrap();
+                    );
                 }
-                writeln!(out).unwrap();
+                let _ = writeln!(out);
             }
             out
         } else if self.success {
