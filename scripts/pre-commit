@@ -20,14 +20,11 @@ if [ -x "./target/debug/normalize" ] || [ -x "./target/release/normalize" ]; the
     [ -x "$NORMALIZE" ] || NORMALIZE="./target/release/normalize"
 
     if [ -x "$NORMALIZE" ]; then
-        # Syntax rules: errors block commits; warnings and info are informational.
-        # Use `normalize rules run --limit 0` for full list.
+        # All rule engines: syntax, native (SUMMARY.md, broken refs, etc.), fact (if index ready).
+        # severity=error issues block commits; warnings are informational.
+        # Use `normalize rules run --limit 0` to see full list.
         echo "Running normalize rules..."
-        $NORMALIZE rules run --engine syntax
-
-        # Check SUMMARY.md freshness — severity=error blocks commits on stale/missing files.
-        echo "Running SUMMARY.md freshness check..."
-        $NORMALIZE analyze check --summary
+        $NORMALIZE rules run
     fi
 fi
 

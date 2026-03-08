@@ -447,7 +447,20 @@ See `docs/design/rules-unification.md` for full design.
    ```
    Tools that emit JSON (not SARIF) need a `format = "json"` adapter — stretch goal.
 
-6. **`normalize analyze check` help text is scuff** — "Use flags to run specific checks only" appears in the doc comment and gets repeated as-is. Rewrite the doc comment as a single clean sentence; the individual `--flag` help strings carry the per-flag detail. No need to enumerate flags in the top-level description.
+6. **Delete `normalize analyze check`** — subsumed by `normalize rules run --engine native`.
+   `service/analyze.rs::check()` and associated `commands/analyze/check_refs.rs` logic already
+   run as part of the native engine (`service/rules.rs`). Steps:
+   - Remove `pub async fn check(...)` from `service/analyze.rs` and its `display_check` helper
+   - Remove `AnalyzeCommand::Check` arm from `args.rs` dispatch
+   - The `build_*_report` functions in `commands/analyze/` stay — they're called by `service/rules.rs`
+   - Update any docs referencing `normalize analyze check`
+   Pre-commit already updated to use `normalize rules run` (2026-03-08).
+
+7. **Extract native checks to `normalize-native-rules` crate** — `build_check_refs_report`,
+   `build_stale_summary_report`, `build_stale_docs_report`, `build_check_examples_report` live
+   in `normalize/src/commands/analyze/`. Per architecture: reusable domain logic belongs in a
+   domain crate, not the main binary. Target: `normalize-native-rules` crate, depended on by
+   both `normalize` (service/rules.rs) and any future consumers (LSP, CI tool).
 
 2. **Lift `rules` to top level** — DONE. `normalize rules` is now top-level. `--type` → `--engine`. `normalize facts rules` and `normalize facts check` removed. `normalize syntax` retains only `ast` and `query`.
 
