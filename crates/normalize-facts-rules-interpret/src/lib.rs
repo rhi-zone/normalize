@@ -516,8 +516,8 @@ pub fn run_rule(
     let mut diagnostics = run_rules_source(&rule.source, relations)?;
 
     // Filter out allowed diagnostics.
-    // For diagnostics with a file location (from `diagnostic` relation), match the allow glob
-    // against the file path. For unlocated diagnostics (from `warning`/`error`), match against
+    // For located diagnostics (from `diagnostic` relation), match the allow glob against
+    // the file path. For unlocated diagnostics (from `warning`/`error`), match against
     // the message — file-level rules like orphan-file put the path in the message.
     if !rule.allow.is_empty() {
         diagnostics.retain(|d| {
@@ -776,30 +776,23 @@ fn extract_diagnostics(engine: &Engine) -> Vec<Diagnostic> {
     // severity: "error", "warning", "info", "hint"
     // file: "" for no specific location
     // line: 0 when the fact source has no line info (e.g. the import relation)
-    // The ascent-interpreter evaluates unsuffixed integer literals as i32 (Rust default),
-    // so accept both I32 and U32 for line until the interpreter adds type-aware coercion.
     if let Some(diags) = engine.relation("diagnostic") {
         for tuple in diags.iter() {
             if let [
                 Value::String(severity),
                 Value::String(rule_id),
                 Value::String(file),
-                line_val,
+                Value::U32(line),
                 Value::String(message),
             ] = tuple
             {
-                let line = match line_val {
-                    Value::U32(n) => *n,
-                    Value::I32(n) => (*n).max(0) as u32,
-                    _ => continue,
-                };
                 let mut d = match severity.as_str() {
                     "error" => Diagnostic::error(rule_id, message),
                     "info" | "hint" => Diagnostic::hint(rule_id, message),
                     _ => Diagnostic::warning(rule_id, message),
                 };
                 if !file.is_empty() {
-                    d = d.at(file, line);
+                    d = d.at(file, *line);
                 }
                 diagnostics.push(d);
             }

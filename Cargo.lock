@@ -1312,7 +1312,7 @@ dependencies = [
 [[package]]
 name = "ascent-eval"
 version = "0.1.0"
-source = "git+https://github.com/pterror/ascent-interpreter#bd0c8236d3fb1cabbec793f317357335b96bd9ff"
+source = "git+https://github.com/pterror/ascent-interpreter#4b2e0abc3ad5feca00fffc2ccf9c0a670082d9e5"
 dependencies = [
  "ascent-ir",
  "ascent-syntax",
@@ -1325,7 +1325,7 @@ dependencies = [
 [[package]]
 name = "ascent-ir"
 version = "0.1.0"
-source = "git+https://github.com/pterror/ascent-interpreter#bd0c8236d3fb1cabbec793f317357335b96bd9ff"
+source = "git+https://github.com/pterror/ascent-interpreter#4b2e0abc3ad5feca00fffc2ccf9c0a670082d9e5"
 dependencies = [
  "ascent-syntax",
  "itertools 0.14.0",
@@ -1337,7 +1337,7 @@ dependencies = [
 [[package]]
 name = "ascent-syntax"
 version = "0.1.0"
-source = "git+https://github.com/pterror/ascent-interpreter#bd0c8236d3fb1cabbec793f317357335b96bd9ff"
+source = "git+https://github.com/pterror/ascent-interpreter#4b2e0abc3ad5feca00fffc2ccf9c0a670082d9e5"
 dependencies = [
  "derive-syn-parse",
  "itertools 0.14.0",
