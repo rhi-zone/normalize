@@ -479,6 +479,7 @@ pub struct RulesListReport {
     pub total: usize,
     pub syntax_count: usize,
     pub fact_count: usize,
+    pub native_count: usize,
     pub disabled_count: usize,
     pub sources: bool,
     pub no_desc: bool,
@@ -497,6 +498,9 @@ impl normalize_output::OutputFormatter for RulesListReport {
             }
             if self.fact_count > 0 {
                 parts.push(format!("{} fact", self.fact_count));
+            }
+            if self.native_count > 0 {
+                parts.push(format!("{} native", self.native_count));
             }
             parts.join(", ")
         };
@@ -556,6 +560,9 @@ impl normalize_output::OutputFormatter for RulesListReport {
             }
             if self.fact_count > 0 {
                 parts.push(format!("{} fact", self.fact_count));
+            }
+            if self.native_count > 0 {
+                parts.push(format!("{} native", self.native_count));
             }
             parts.join(", ")
         };
@@ -645,6 +652,7 @@ fn paint_rule_type(rule_type: &str) -> String {
     let col = match rule_type {
         "syntax" => Color::Cyan,
         "fact" => Color::Blue,
+        "native" => Color::Green,
         _ => Color::DarkGray,
     };
     // Pad plain text to 6 chars, then wrap in color so visible width is preserved
@@ -715,6 +723,31 @@ pub fn build_list_report(
         }
     }
 
+    // Load native rules (static descriptors with config overrides applied)
+    if matches!(filters.type_filter, RuleType::All | RuleType::Native) {
+        for desc in normalize_native_rules::NATIVE_RULES {
+            let override_ = config.rules.rules.get(desc.id);
+            let severity = override_
+                .and_then(|o| o.severity.as_deref())
+                .unwrap_or(desc.default_severity)
+                .to_string();
+            let enabled = override_.and_then(|o| o.enabled).unwrap_or(true);
+            let mut tags: Vec<String> = desc.tags.iter().map(|t| t.to_string()).collect();
+            if let Some(o) = override_ {
+                tags.extend(o.tags.iter().cloned());
+            }
+            all_rules.push(UnifiedRule {
+                id: desc.id.to_string(),
+                rule_type: "native",
+                severity,
+                source: "builtin",
+                message: desc.message.to_string(),
+                enabled,
+                tags,
+            });
+        }
+    }
+
     // Apply filters (all compose via AND)
     if let Some(tag) = filters.tag {
         let rule_tags = &config.rule_tags;
@@ -737,6 +770,7 @@ pub fn build_list_report(
 
     let syntax_count = all_rules.iter().filter(|r| r.rule_type == "syntax").count();
     let fact_count = all_rules.iter().filter(|r| r.rule_type == "fact").count();
+    let native_count = all_rules.iter().filter(|r| r.rule_type == "native").count();
     let disabled_count = all_rules.iter().filter(|r| !r.enabled).count();
     let total = all_rules.len();
 
@@ -758,6 +792,7 @@ pub fn build_list_report(
         total,
         syntax_count,
         fact_count,
+        native_count,
         disabled_count,
         sources: filters.sources,
         no_desc: filters.no_desc,
