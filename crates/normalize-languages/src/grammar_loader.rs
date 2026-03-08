@@ -494,6 +494,11 @@ fn bundled_types_query(name: &str) -> Option<&'static str> {
         "javascript" => Some(include_str!("queries/javascript.types.scm")),
         "lua" => Some(include_str!("queries/lua.types.scm")),
         "scheme" => Some(include_str!("queries/scheme.types.scm")),
+        "graphql" => Some(include_str!("queries/graphql.types.scm")),
+        "nix" => Some(include_str!("queries/nix.types.scm")),
+        "starlark" => Some(include_str!("queries/starlark.types.scm")),
+        "matlab" => Some(include_str!("queries/matlab.types.scm")),
+        "tlaplus" => Some(include_str!("queries/tlaplus.types.scm")),
         _ => None,
     }
 }

@@ -48,6 +48,7 @@ Ordered by impact × tractability. Pick from top.
    - `*.calls.scm` — every language without it silently produces zero call graph data
    - `*.complexity.scm` — missing for all languages that still use `complexity_nodes()` in Rust
    - `*.types.scm` — missing for all typed languages (C#, Java, Kotlin, Swift, C, C++, Scala, Go)
+     - Added graphql, nix, starlark, matlab, tlaplus (2026-03-08): graphql captures `named_type` references; nix/starlark/tlaplus are dynamically typed (minimal comment files); matlab captures superclass references
    Target: parity with `locals.scm` coverage (65 languages). One `.scm` + fixture test per language.
 
 5. **Feature-gate CLI behind `cli` feature** — library consumers shouldn't pull in clap.
