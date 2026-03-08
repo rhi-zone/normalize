@@ -348,19 +348,21 @@ pub fn cmd_run_facts(
 /// Red and yellow are reserved for severity indicators and are never used.
 fn tag_color(tag: &str) -> nu_ansi_term::Color {
     use nu_ansi_term::Color;
-    // Curated palette: readable on both dark and light terminals.
+    // Curated palette for consistent perceived lightness (OKLCH L≈0.65).
     // Red / Yellow omitted — reserved for error / warning severity.
+    // All Fixed() values chosen from the 256-color cube at medium-high brightness
+    // so hue varies but lightness stays consistent across terminals.
     const PALETTE: &[Color] = &[
-        Color::Cyan,
-        Color::Green,
-        Color::Blue,
-        Color::Magenta,
-        Color::Fixed(93),  // purple
-        Color::Fixed(37),  // teal
-        Color::Fixed(67),  // steel blue
-        Color::Fixed(107), // olive green
-        Color::Fixed(135), // medium purple
-        Color::Fixed(73),  // cadet blue
+        Color::Cyan,       // #00ffff — bright cyan
+        Color::Green,      // bright green
+        Color::Magenta,    // bright magenta
+        Color::Fixed(80),  // #5fd7d7 — teal (brighter than Fixed(37))
+        Color::Fixed(111), // #87afff — cornflower (brighter than Fixed(67))
+        Color::Fixed(141), // #af87ff — light purple
+        Color::Fixed(78),  // #5fd787 — spring green (brighter than Fixed(107))
+        Color::Fixed(117), // #87d7ff — sky blue (brighter than Fixed(73))
+        Color::Fixed(183), // #d7afff — lavender
+        Color::Fixed(159), // #afffd7 — mint
     ];
     // FNV-1a hash for a stable, fast, dependency-free result
     let mut hash = 0xcbf29ce484222325u64;
@@ -455,8 +457,201 @@ fn expand_tag<'a>(
 // =============================================================================
 // Unified List
 // =============================================================================
+// Rules list report
+// =============================================================================
 
-/// Unified rule descriptor for display.
+/// A single rule entry in a list report.
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+pub struct RuleEntry {
+    pub id: String,
+    pub rule_type: String,
+    pub severity: String,
+    pub source: String,
+    pub message: String,
+    pub enabled: bool,
+    pub tags: Vec<String>,
+}
+
+/// Report returned by `normalize rules list`.
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+pub struct RulesListReport {
+    pub rules: Vec<RuleEntry>,
+    pub total: usize,
+    pub syntax_count: usize,
+    pub fact_count: usize,
+    pub disabled_count: usize,
+    pub sources: bool,
+    pub no_desc: bool,
+}
+
+impl normalize_output::OutputFormatter for RulesListReport {
+    fn format_text(&self) -> String {
+        let mut out = String::new();
+        if self.rules.is_empty() {
+            return "No rules found.\n".to_string();
+        }
+        let breakdown = {
+            let mut parts = Vec::new();
+            if self.syntax_count > 0 {
+                parts.push(format!("{} syntax", self.syntax_count));
+            }
+            if self.fact_count > 0 {
+                parts.push(format!("{} fact", self.fact_count));
+            }
+            parts.join(", ")
+        };
+        if self.disabled_count > 0 {
+            out.push_str(&format!(
+                "{} rules ({}) — {} disabled\n\n",
+                self.total, breakdown, self.disabled_count
+            ));
+        } else {
+            out.push_str(&format!("{} rules ({})\n\n", self.total, breakdown));
+        }
+        for r in &self.rules {
+            let type_col = format!("{:<8}", format!("[{}]", r.rule_type));
+            let sev_col = format!("{:<8}", r.severity);
+            let state_col = if r.enabled { "   " } else { "off" };
+            let tags_str = if r.tags.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "  {}",
+                    r.tags
+                        .iter()
+                        .map(|t| format!("[{t}]"))
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                )
+            };
+            if self.sources {
+                out.push_str(&format!(
+                    "  {}  {:<30}  {}  {}  {:<7}{}\n",
+                    type_col, r.id, sev_col, state_col, r.source, tags_str
+                ));
+            } else {
+                out.push_str(&format!(
+                    "  {}  {:<30}  {}  {}{}\n",
+                    type_col, r.id, sev_col, state_col, tags_str
+                ));
+            }
+            if !self.no_desc {
+                out.push_str(&format!("            {}\n", r.message));
+            }
+        }
+        out
+    }
+
+    fn format_pretty(&self) -> String {
+        use nu_ansi_term::{Color, Style};
+
+        let mut out = String::new();
+        if self.rules.is_empty() {
+            return "No rules found.\n".to_string();
+        }
+        let breakdown = {
+            let mut parts = Vec::new();
+            if self.syntax_count > 0 {
+                parts.push(format!("{} syntax", self.syntax_count));
+            }
+            if self.fact_count > 0 {
+                parts.push(format!("{} fact", self.fact_count));
+            }
+            parts.join(", ")
+        };
+        let header = if self.disabled_count > 0 {
+            format!(
+                "{} rules ({}) — {} disabled",
+                Color::White.bold().paint(self.total.to_string()),
+                breakdown,
+                Color::DarkGray.paint(self.disabled_count.to_string())
+            )
+        } else {
+            format!(
+                "{} rules ({})",
+                Color::White.bold().paint(self.total.to_string()),
+                breakdown
+            )
+        };
+        out.push_str(&format!("{header}\n\n"));
+
+        // Column headers
+        let gray = Color::DarkGray;
+        if self.sources {
+            out.push_str(&format!(
+                "{}\n",
+                gray.paint(format!(
+                    "  {:<6}  {:<30}  {:<8}  ST  {:<7}  TAGS",
+                    "TYPE", "ID", "SEVERITY", "SOURCE"
+                ))
+            ));
+        } else {
+            out.push_str(&format!(
+                "{}\n",
+                gray.paint(format!(
+                    "  {:<6}  {:<30}  {:<8}  ST  TAGS",
+                    "TYPE", "ID", "SEVERITY"
+                ))
+            ));
+        }
+
+        for r in &self.rules {
+            let type_col = paint_rule_type(&r.rule_type);
+            let sev_col = paint_severity(&format!("{:<8}", r.severity), true);
+            let state_col = if r.enabled {
+                Style::new().paint(" ● ").to_string()
+            } else {
+                Color::DarkGray.paint(" ○ ").to_string()
+            };
+            let tags_str = if r.tags.is_empty() {
+                String::new()
+            } else {
+                format!("  {}", paint_tags(&r.tags, true))
+            };
+            // Pad plain text BEFORE colorizing to preserve column widths
+            let id_padded = format!("{:<30}", r.id);
+            let id_col = if r.enabled {
+                id_padded
+            } else {
+                Color::DarkGray.paint(id_padded).to_string()
+            };
+            if self.sources {
+                out.push_str(&format!(
+                    "  {type_col}  {id_col}  {sev_col}  {state_col}  {:<7}{tags_str}\n",
+                    r.source
+                ));
+            } else {
+                out.push_str(&format!(
+                    "  {type_col}  {id_col}  {sev_col}  {state_col}{tags_str}\n",
+                ));
+            }
+            if !self.no_desc {
+                let desc = if r.enabled {
+                    Color::DarkGray.paint(&r.message).to_string()
+                } else {
+                    Color::DarkGray.dimmed().paint(&r.message).to_string()
+                };
+                out.push_str(&format!("            {desc}\n"));
+            }
+        }
+        out
+    }
+}
+
+/// Color the rule type indicator: `fact` in blue, `syntax` in cyan.
+/// Pad the plain text FIRST so ANSI codes don't corrupt column widths.
+fn paint_rule_type(rule_type: &str) -> String {
+    use nu_ansi_term::Color;
+    let col = match rule_type {
+        "syntax" => Color::Cyan,
+        "fact" => Color::Blue,
+        _ => Color::DarkGray,
+    };
+    // Pad plain text to 6 chars, then wrap in color so visible width is preserved
+    col.paint(format!("{:<6}", rule_type)).to_string()
+}
+
+/// Unified rule descriptor for display (private).
 struct UnifiedRule {
     id: String,
     rule_type: &'static str,
@@ -478,21 +673,16 @@ pub struct ListFilters<'a> {
     pub use_colors: bool,
 }
 
-pub fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &RulesRunConfig) -> i32 {
-    let ListFilters {
-        sources,
-        type_filter,
-        tag: tag_filter,
-        enabled: enabled_filter,
-        disabled: disabled_filter,
-        no_desc,
-        json,
-        use_colors,
-    } = filters;
-    let mut all_rules = Vec::new();
+/// Build a `RulesListReport` from the index, applying the given filters.
+pub fn build_list_report(
+    root: &Path,
+    filters: &ListFilters<'_>,
+    config: &RulesRunConfig,
+) -> RulesListReport {
+    let mut all_rules: Vec<UnifiedRule> = Vec::new();
 
     // Load syntax rules
-    if matches!(type_filter, RuleType::All | RuleType::Syntax) {
+    if matches!(filters.type_filter, RuleType::All | RuleType::Syntax) {
         let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
         for r in &syntax_rules {
             let source = if r.builtin { "builtin" } else { "project" };
@@ -509,7 +699,7 @@ pub fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &RulesRunConfig) 
     }
 
     // Load fact rules
-    if matches!(type_filter, RuleType::All | RuleType::Fact) {
+    if matches!(filters.type_filter, RuleType::All | RuleType::Fact) {
         let fact_rules = interpret::load_all_rules(root, &config.facts_rules);
         for r in &fact_rules {
             let source = if r.builtin { "builtin" } else { "project" };
@@ -526,7 +716,7 @@ pub fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &RulesRunConfig) 
     }
 
     // Apply filters (all compose via AND)
-    if let Some(tag) = tag_filter {
+    if let Some(tag) = filters.tag {
         let rule_tags = &config.rule_tags;
         let mut visited = HashSet::new();
         let matching_ids: HashSet<String> = expand_tag(tag, rule_tags, &all_rules, &mut visited)
@@ -535,18 +725,55 @@ pub fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &RulesRunConfig) 
             .collect();
         all_rules.retain(|r| matching_ids.contains(&r.id));
     }
-    if enabled_filter {
+    if filters.enabled {
         all_rules.retain(|r| r.enabled);
     }
-    if disabled_filter {
+    if filters.disabled {
         all_rules.retain(|r| !r.enabled);
     }
 
     // Sort by type then id for stable output
     all_rules.sort_by(|a, b| a.rule_type.cmp(b.rule_type).then(a.id.cmp(&b.id)));
 
+    let syntax_count = all_rules.iter().filter(|r| r.rule_type == "syntax").count();
+    let fact_count = all_rules.iter().filter(|r| r.rule_type == "fact").count();
+    let disabled_count = all_rules.iter().filter(|r| !r.enabled).count();
+    let total = all_rules.len();
+
+    let rules = all_rules
+        .into_iter()
+        .map(|r| RuleEntry {
+            id: r.id,
+            rule_type: r.rule_type.to_string(),
+            severity: r.severity,
+            source: r.source.to_string(),
+            message: r.message,
+            enabled: r.enabled,
+            tags: r.tags,
+        })
+        .collect();
+
+    RulesListReport {
+        rules,
+        total,
+        syntax_count,
+        fact_count,
+        disabled_count,
+        sources: filters.sources,
+        no_desc: filters.no_desc,
+    }
+}
+
+pub fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &RulesRunConfig) -> i32 {
+    use normalize_output::OutputFormatter;
+
+    let json = filters.json;
+    let use_colors = filters.use_colors;
+    let report = build_list_report(root, &filters, config);
+
     if json {
-        let rules_json: Vec<_> = all_rules
+        let rules_json: Vec<_> = report
+            .rules
             .iter()
             .map(|r| {
                 serde_json::json!({
@@ -561,87 +788,10 @@ pub fn cmd_list(root: &Path, filters: ListFilters<'_>, config: &RulesRunConfig) 
             })
             .collect();
         println!("{}", serde_json::to_string_pretty(&rules_json).unwrap());
-    } else if all_rules.is_empty() {
-        println!("No rules found.");
+    } else if use_colors {
+        print!("{}", report.format_pretty());
     } else {
-        let syntax_count = all_rules.iter().filter(|r| r.rule_type == "syntax").count();
-        let fact_count = all_rules.iter().filter(|r| r.rule_type == "fact").count();
-        let disabled_count = all_rules.iter().filter(|r| !r.enabled).count();
-
-        let mut parts = Vec::new();
-        if syntax_count > 0 {
-            parts.push(format!("{} syntax", syntax_count));
-        }
-        if fact_count > 0 {
-            parts.push(format!("{} fact", fact_count));
-        }
-        let breakdown = parts.join(", ");
-        if disabled_count > 0 {
-            println!(
-                "{} rules ({}) — {} disabled\n",
-                all_rules.len(),
-                breakdown,
-                disabled_count
-            );
-        } else {
-            println!("{} rules ({})\n", all_rules.len(), breakdown);
-        }
-
-        // Column headers (pretty mode only)
-        if use_colors {
-            let gray = nu_ansi_term::Color::DarkGray;
-            if sources {
-                println!(
-                    "{}",
-                    gray.paint(format!(
-                        "  {:<8}  {:<30}  {:<8}  {:<3}  {:<7}  TAGS",
-                        "TYPE", "ID", "SEVERITY", "ST", "SOURCE"
-                    ))
-                );
-            } else {
-                println!(
-                    "{}",
-                    gray.paint(format!(
-                        "  {:<8}  {:<30}  {:<8}  ST   TAGS",
-                        "TYPE", "ID", "SEVERITY"
-                    ))
-                );
-            }
-        }
-
-        for r in &all_rules {
-            // Pad plain text BEFORE colorizing so ANSI codes don't corrupt column widths
-            let type_col = format!("{:<8}", format!("[{}]", r.rule_type));
-            let sev_col = paint_severity(&format!("{:<8}", r.severity), use_colors);
-            let state_col = if r.enabled {
-                "   ".to_string()
-            } else if use_colors {
-                nu_ansi_term::Color::DarkGray.paint("off").to_string()
-            } else {
-                "off".to_string()
-            };
-            let tags_str = if r.tags.is_empty() {
-                String::new()
-            } else {
-                format!("  {}", paint_tags(&r.tags, use_colors))
-            };
-            // First line: type, id, severity, state, (source), tags
-            if sources {
-                println!(
-                    "  {}  {:<30}  {}  {}  {:<7}{}",
-                    type_col, r.id, sev_col, state_col, r.source, tags_str
-                );
-            } else {
-                println!(
-                    "  {}  {:<30}  {}  {}{}",
-                    type_col, r.id, sev_col, state_col, tags_str
-                );
-            }
-            // Second line: description (suppressed by --no-desc)
-            if !no_desc {
-                println!("            {}", r.message);
-            }
-        }
+        print!("{}", report.format_text());
     }
 
     0

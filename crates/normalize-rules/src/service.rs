@@ -7,8 +7,9 @@ use std::cell::Cell;
 use std::path::Path;
 
 use crate::runner::{
-    ListFilters, RuleType, RulesRunConfig, apply_native_rules_config, cmd_add, cmd_enable_disable,
-    cmd_list, cmd_remove, cmd_show, cmd_tags, cmd_update, exit_to_result, run_rules_report,
+    ListFilters, RuleType, RulesListReport, RulesRunConfig, apply_native_rules_config,
+    build_list_report, cmd_add, cmd_enable_disable, cmd_remove, cmd_show, cmd_tags, cmd_update,
+    exit_to_result, run_rules_report,
 };
 
 /// Resolve pretty mode: enabled when TTY (or forced via flag), disabled if compact.
@@ -72,6 +73,14 @@ impl RulesService {
             r.format_text_limited(Some(self.limit.get()))
         }
     }
+
+    fn display_list(&self, r: &RulesListReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
 }
 
 #[cli(
@@ -80,6 +89,7 @@ impl RulesService {
 )]
 impl RulesService {
     /// List all rules (syntax + fact, builtin + user)
+    #[cli(display_with = "display_list")]
     #[allow(clippy::too_many_arguments)]
     pub fn list(
         &self,
@@ -96,23 +106,23 @@ impl RulesService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<RuleResult, String> {
+    ) -> Result<RulesListReport, String> {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        let use_colors = resolve_pretty(pretty, compact);
+        self.resolve_format(pretty, compact);
         let config = load_rules_config(&effective_root);
         let rule_type: RuleType = r#type
             .as_deref()
             .unwrap_or("all")
             .parse()
             .unwrap_or_default();
-        let exit_code = cmd_list(
+        let report = build_list_report(
             &effective_root,
-            ListFilters {
+            &ListFilters {
                 sources,
                 type_filter: &rule_type,
                 tag: tag.as_deref(),
@@ -120,11 +130,11 @@ impl RulesService {
                 disabled,
                 no_desc,
                 json: false,
-                use_colors,
+                use_colors: false, // not used by build_list_report
             },
             &config,
         );
-        exit_to_result(exit_code)
+        Ok(report)
     }
 
     /// Run rules against the codebase
