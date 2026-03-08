@@ -243,7 +243,9 @@ fixture test. Target: coverage matching `locals.scm` (65 languages).
   This is the single highest-leverage refactor remaining in the codebase.
 - [ ] **`*.imports.scm`** — import/require statement extraction. Would replace `import_kinds()`
   + `extract_imports()` across ~98 language impls. Captures: `@import.path`, `@import.name`.
-- [ ] Implement calls.scm for all languages that have call extraction
+- [x] Implement calls.scm for all languages that have call extraction — DONE (68/68 registered)
+- [x] All tags.scm, complexity.scm, imports.scm, types.scm fully registered — DONE (2026-03-08)
+- [x] Fixture test framework — DONE: 257 tests across 68 languages in `crates/normalize-languages/tests/`
 - [ ] Replace per-language inline walkers in `symbols.rs` with a generic walker over `call_node_kinds()`
 
 ### Type relationship extraction (facts index) — HIGH PRIORITY

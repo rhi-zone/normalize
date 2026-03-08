@@ -128,6 +128,8 @@ After editing multiple files, run the full check once — not after each edit. F
 
 **Always commit completed work.** The final step of any implementation task is `git commit`. After clippy + tests pass, commit immediately — don't wait to be asked. Uncommitted work is lost work.
 
+**Always update TODO.md at task end.** Mark completed items as done, add newly discovered follow-up items, remove stale entries. A task is not complete until TODO.md reflects the new state.
+
 ## Session Handoff
 
 Use plan mode as a handoff mechanism when:
