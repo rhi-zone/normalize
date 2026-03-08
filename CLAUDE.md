@@ -126,9 +126,11 @@ After editing multiple files, run the full check once — not after each edit. F
 
 **Minimize file churn.** When editing a file, read it once, plan all changes, and apply them in one pass. Avoid read-edit-build-fail-read-fix cycles by thinking through the complete change before starting.
 
-**Always commit completed work.** The final step of any implementation task is `git commit`. After clippy + tests pass, commit immediately — don't wait to be asked. Uncommitted work is lost work.
+**Always commit completed work.** The final step of any implementation task is `git commit`. After clippy + tests pass, commit immediately — don't wait to be asked. Uncommitted work is lost work. **The repo must be clean (`git status` = nothing to commit) when you finish a task.**
 
-**Always update TODO.md at task end.** Mark completed items as done, add newly discovered follow-up items, remove stale entries. A task is not complete until TODO.md reflects the new state.
+**Always update TODO.md at task end.** Mark completed items as done (use ~~strikethrough~~ or append `— DONE`), add newly discovered follow-up items, remove stale entries. A task is not complete until TODO.md reflects the new state. **Do this before the commit, not after** — the commit should include the updated TODO.md.
+
+**These two steps are non-negotiable end conditions.** "I finished the implementation" is not done. Done = committed + TODO.md updated + `git status` clean. If you skip either step, you have left the repo in a worse state than you found it.
 
 ## Session Handoff
 
@@ -178,7 +180,8 @@ Do not:
 - Hardcode file extensions anywhere — ever. Extension → language mapping belongs in the `Language` registry. Any `match ext { "rs" => ..., "ts" => ..., _ => default }` in non-registry code is wrong. Use `registry.language_for_extension(ext)` or equivalent.
 - Ship mutating commands without `--dry-run` - every command that writes, deletes, or modifies anything must support `--dry-run` to preview what would happen
 - Announce actions ("I will now...") - just do them
-- Leave work uncommitted — after completing a task and tests pass, commit immediately without asking
+- Leave work uncommitted — after completing a task and tests pass, commit immediately without asking. End state: `git status` shows nothing to commit.
+- Skip TODO.md updates — every task ends with TODO.md committed alongside the implementation. Items that are done get marked done; new follow-ups get added. Never leave TODO.md stale.
 - Create special cases - design to avoid them
 - Create legacy APIs - one API, update all callers
 - Add to the monolith - split by domain into sub-crates
