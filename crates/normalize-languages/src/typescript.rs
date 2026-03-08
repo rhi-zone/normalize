@@ -345,7 +345,7 @@ mod tests {
             "using_declaration",       // using x = ...
             "variable_declaration",    // var x
             "with_statement",          // with (obj) - deprecated
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "for_in_statement",
             "switch_case",
             "continue_statement",

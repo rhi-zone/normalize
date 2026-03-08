@@ -184,7 +184,7 @@ mod tests {
             "iterator_specification", "multiplying_operator", "procedure_specification", "quantifier",
             "real_range_specification", "record_definition", "reduction_specification",
             "relational_operator", "subpool_specification", "unary_adding_operator",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "declare_expression",
             "if_expression",
             "quantified_expression",

@@ -107,7 +107,7 @@ mod tests {
             "switch_clause", "switch_clause_condition", "switch_clauses", "trap_statement",
             "type_identifier", "type_literal", "type_name", "type_spec", "unary_expression",
             "while_condition",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "if_statement",
             "try_statement",
             "catch_clause",

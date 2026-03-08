@@ -72,7 +72,7 @@ mod tests {
             "storage_class_specifier", "subscript_expression", "type_definition",
             "type_descriptor", "type_identifier", "type_qualifier", "unary_expression",
             "union_specifier", "update_expression",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "switch_statement",
             "if_statement",
             "while_statement",

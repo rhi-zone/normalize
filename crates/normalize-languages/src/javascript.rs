@@ -161,7 +161,7 @@ mod tests {
 
             // JSX
             "jsx_expression",          // {expr} in JSX
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "break_statement",
             "while_statement",
             "throw_statement",

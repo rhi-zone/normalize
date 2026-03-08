@@ -47,7 +47,7 @@ mod tests {
         let documented_unused: &[&str] = &[
             "identifier", "struct_name", "unit_struct", "enum_variant",
             "map_entry", "block_comment",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // structural node, not extracted as symbols
             "struct",
             "struct_entry",
         ];

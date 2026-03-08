@@ -78,7 +78,7 @@ mod tests {
             "resource_method",
             // Other
             "definitions", "body", "block_comment",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // covered by tags.scm
             "interface_item",
             "type_item",
         ];

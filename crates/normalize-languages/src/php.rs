@@ -221,7 +221,7 @@ mod tests {
             // STATEMENT
             "echo_statement", "empty_statement", "exit_statement", "expression_statement",
             "global_declaration", "goto_statement", "named_label_statement", "unset_statement",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "do_statement",
             "break_statement",
             "arrow_function",

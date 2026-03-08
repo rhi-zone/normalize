@@ -80,7 +80,7 @@ mod tests {
             "fastcgi_option_try_files", "encode_format", "log_option_format",
             // Blocks
             "global_options_block",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // structural node, not extracted as symbols
             "directive_block",
             "site_block",
         ];

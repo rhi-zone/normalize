@@ -178,7 +178,7 @@ mod tests {
             "type_family_injectivity", "type_family_result", "type_instance",
             "type_params", "type_patterns", "type_role",
             "typed_quote",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "lambda",
             "case",
             "match",

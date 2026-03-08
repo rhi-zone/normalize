@@ -163,7 +163,7 @@ mod tests {
             "stub_expression", "substitution_regexp_modifiers", "transliteration_expression",
             "transliteration_modifiers", "try_statement", "unary_expression", "undef_expression",
             "use_version_statement", "variable_declaration",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "for_statement",
             "conditional_statement",
             "loop_statement",

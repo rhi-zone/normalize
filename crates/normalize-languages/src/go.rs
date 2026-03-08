@@ -277,7 +277,7 @@ mod tests {
             "labeled_statement",       // label:
             "receive_statement",       // <-ch
             "send_statement",          // ch <- x
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "return_statement",
             "continue_statement",
             "break_statement",

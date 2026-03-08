@@ -100,7 +100,7 @@ mod tests {
             "do_return",
             // Classes
             "class_inductive",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "if_then_else",
             "match_alt",
             "match",

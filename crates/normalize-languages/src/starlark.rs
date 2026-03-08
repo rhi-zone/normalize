@@ -84,7 +84,7 @@ mod tests {
             "lambda", "lambda_parameters",
             // Other
             "identifier",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "for_statement",
             "load_statement",
             "if_statement",

@@ -127,7 +127,7 @@ mod tests {
             "record_constructor", "record_constructor_instance", "record_declarations_block",
             // Bindings
             "typed_binding", "untyped_binding", "with_expressions",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "lambda_clause",
             "import",
         ];

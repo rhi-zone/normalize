@@ -130,7 +130,7 @@ mod tests {
             "lambda", "iff", "format", "subexpression",
             // Control flow — not definition constructs
             "case", "if_then_else",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
 
         ];
         validate_unused_kinds_audit(&TlaPlus, documented_unused)

@@ -134,7 +134,7 @@ mod tests {
             "record_base_identifier", "record_type", "tuple_type", "type",
             "type_annotation", "type_expression", "type_ref", "type_variable",
             "upper_case_qid",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "if_else_expr",
             "import_clause",
             "anonymous_function_expr",

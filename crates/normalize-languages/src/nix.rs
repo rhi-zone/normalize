@@ -79,7 +79,7 @@ mod tests {
             "variable_expression",
             // Control flow / application — not definition constructs
             "apply_expression", "if_expression", "with_expression",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // structural node, not extracted as symbols
             "let_expression",
             "attrset_expression",
             "rec_attrset_expression",

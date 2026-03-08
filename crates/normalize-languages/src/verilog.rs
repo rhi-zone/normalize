@@ -356,7 +356,7 @@ mod tests {
             "property_formal_type1", "sequence_formal_type1", "let_formal_type1",
             "package_or_generate_item_declaration", "notifier",
             "ps_or_hierarchical_array_identifier", "value_range",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "case_generate_construct",
             "conditional_statement",
             "loop_statement",

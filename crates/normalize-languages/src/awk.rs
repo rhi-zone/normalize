@@ -40,7 +40,7 @@ mod tests {
             "ns_qualified_name", "piped_io_statement", "print_statement", "printf_statement",
             "redirected_io_statement", "return_statement", "switch_body", "switch_case",
             "switch_statement",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "if_statement",
             "for_in_statement",
             "for_statement",

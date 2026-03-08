@@ -78,7 +78,7 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             "lua_block", "lua_block_directive", "modifier",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // structural node, not extracted as symbols
             "block",
         ];
         validate_unused_kinds_audit(&Nginx, documented_unused)

@@ -247,7 +247,7 @@ mod tests {
             "types", "union_type_case", "union_type_cases", "union_type_field",
             "union_type_fields", "value_declaration", "value_declaration_left",
             "with_field_expression",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // covered by tags.scm
             "union_type_defn",
             "for_expression",
             "application_expression",

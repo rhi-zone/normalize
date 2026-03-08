@@ -55,7 +55,7 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             "identifier",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // covered by tags.scm
             "function_definition",
             "variable_declaration",
         ];

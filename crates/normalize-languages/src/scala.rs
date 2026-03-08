@@ -294,7 +294,7 @@ mod tests {
             "literal_type", "match_type", "named_tuple_type", "parameter_types",
             "projected_type", "repeated_parameter_type", "singleton_type", "stable_identifier",
             "stable_type_identifier", "structural_type", "tuple_type", "type_arguments", "type_identifier", "type_lambda", "type_parameters", "typed_pattern",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "while_expression",
             "match_expression",
             "catch_clause",

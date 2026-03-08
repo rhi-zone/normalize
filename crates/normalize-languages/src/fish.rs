@@ -68,7 +68,7 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             "else_clause", "negated_statement", "redirect_statement", "return",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "begin_statement",
             "switch_statement",
             "for_statement",

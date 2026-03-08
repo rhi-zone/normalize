@@ -243,7 +243,7 @@ mod tests {
             "prefix_expression", "range_expression", "selector_expression", "try_expression",
             // TYPE
             "array_type", "dictionary_type", "function_type",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // covered by tags.scm
             "init_declaration",
             "repeat_while_statement",
             "while_statement",

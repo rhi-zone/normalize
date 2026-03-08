@@ -345,7 +345,7 @@ mod tests {
             "seh_finally_clause",      // __finally
             "seh_leave_statement",     // __leave
             "seh_try_statement",       // __try
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // covered by tags.scm
             "function_definition",
             "case_statement",
             "for_range_loop",

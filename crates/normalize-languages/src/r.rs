@@ -126,7 +126,7 @@ mod tests {
         let documented_unused: &[&str] = &[
             "extract_operator", "identifier",
             "namespace_operator", "parenthesized_expression", "return", "unary_operator",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "braced_expression",
             "if_statement",
             "while_statement",

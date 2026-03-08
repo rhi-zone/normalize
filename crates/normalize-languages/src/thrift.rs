@@ -75,7 +75,7 @@ mod tests {
             "function_modifier", "field_modifier", "exception_modifier",
             // Other
             "throws", "struct_literal",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // covered by tags.scm
             "enum_definition",
             "function_definition",
             "service_definition",

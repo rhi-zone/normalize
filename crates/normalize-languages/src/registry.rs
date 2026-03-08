@@ -403,7 +403,7 @@ pub fn validate_unused_kinds_audit(
     // Collect all kinds used by Language trait methods
     let used_kinds: HashSet<&str> = HashSet::new();
 
-    // Also collect kinds referenced in tags.scm (these replace container/function/type_kinds)
+    // Also collect kinds referenced in tags.scm
     let tags_kinds: HashSet<String> = {
         let mut kinds = HashSet::new();
         if let Some(tags_content) = loader.get_tags(lang.grammar_name()) {

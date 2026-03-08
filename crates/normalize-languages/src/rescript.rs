@@ -103,7 +103,7 @@ mod tests {
             "else_clause", "else_if_clause",
             // Other
             "function", "expression_statement", "formal_parameters",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "if_expression",
             "block",
             "switch_expression",

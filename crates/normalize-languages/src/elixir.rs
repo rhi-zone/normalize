@@ -215,7 +215,7 @@ mod tests {
             "else_block", "identifier", "interpolation", "operator_identifier",
             "rescue_block", "sigil_modifiers", "stab_clause", "struct",
             "unary_operator",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "binary_operator",
             "do_block",
             "anonymous_function",

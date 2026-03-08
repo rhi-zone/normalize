@@ -341,7 +341,7 @@ mod tests {
             "resource_specification", // try-with-resources
             "synchronized_statement",  // synchronized
             "try_with_resources_statement", // try-with
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "do_statement",
             "return_statement",
             "constructor_declaration",

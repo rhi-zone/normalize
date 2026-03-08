@@ -81,7 +81,7 @@ mod tests {
             "block_macro_name", "block_macro_attr",
             // Other content
             "body", "ident_block_line", "admonition_important",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // structural node, not extracted as symbols
             "section_block",
             "block_macro",
         ];

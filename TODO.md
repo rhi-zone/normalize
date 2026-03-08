@@ -57,6 +57,9 @@ Ordered by impact × tractability. Pick from top.
 
 2. ~~**Wire `tags.scm` into symbol extraction**~~ — DONE (already complete before this session).
    `collect_symbols_from_tags()` is the primary path; Language trait has only 3 required methods.
+   ~~**tags.scm migration cleanup**~~ — DONE. `definition.var` mapped to `SymbolKind::Variable` in
+   `tags_capture_to_kind` (parity with normalize-deps). Stale `container_kinds`/`function_kinds`
+   references removed from normalize-edit, markdown.rs, registry.rs, and 65 language audit comments.
 
 3. ~~**Remaining info/warning noise (batch-fix)**~~ — DONE. Production code is clean.
 
@@ -245,13 +248,12 @@ using the query system. See `docs/architecture-decisions.md` ("scm Query Files o
 
 **Current state (2026-03-08 audit):** 69 languages total. Per query type:
 - `*.tags.scm`:       68 files, **49 registered** — 20 files exist but unregistered (dead code!)
-- `*.calls.scm`:      67 files, 67 registered — graphql is the only real gap remaining
+- `*.calls.scm`:      68 files, 68 registered — complete (graphql added)
 - `*.complexity.scm`: 69 files, 69 registered — complete
 - `*.imports.scm`:    69 files, 69 registered — complete
 - `*.types.scm`:      47 files, **42 registered** — 6 files unregistered; gaps in lua/perl/scheme/etc.
 
-**No fixture tests exist.** Tests only verify presence (non-empty), not correctness.
-Every .scm file could be silently wrong and tests would pass.
+**Fixture tests added (2026-03-08):** 75 tests (15 langs × 5 query types); skips when `target/grammars/` absent. Covers rust, python, go, typescript, java, ruby, kotlin, swift, scala, php, dart, elixir, c, cpp, c-sharp. Tests only verify presence of expected names — every .scm file could produce wrong captures and tests would pass for unlisted symbols.
 
 #### Step 0: Register existing unregistered files — IMMEDIATE, trivial
 Files exist in `queries/` but are missing from `bundled_*_query()` in `grammar_loader.rs`.
@@ -276,7 +278,7 @@ No test verifies query correctness — only presence. Need:
 - [x] Add fixture tests for rust, go, python, typescript, java (all 5 query types each) — done as part of above
 
 #### Step 2: Remaining content gaps
-- [ ] `graphql.calls.scm` — only real programming language still missing calls
+- [x] `graphql.calls.scm` — only real programming language still missing calls (field selections, directives, fragment spreads)
 - [ ] `types.scm` for `lua`, `perl`, `bash`/`zsh` (judgment call — dynamic langs have limited types)
 - [ ] `prolog.types.scm`, `vim.types.scm` — niche but tractable
 

@@ -369,7 +369,7 @@ mod tests {
 
             // OTHER
             "finally_block",           // finally    // var/val decl
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "if_expression",
             "anonymous_function",
             "when_entry",

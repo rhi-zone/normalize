@@ -96,7 +96,7 @@ mod tests {
             "endwhile_command", "foreach", "foreach_command", "function",
             "identifier", "if", "if_command", "while",
             "while_command",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "if_condition",
             "foreach_loop",
             "while_loop",

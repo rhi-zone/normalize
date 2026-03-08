@@ -117,7 +117,7 @@ mod tests {
             // Other
             "identifier", "attribute_block", "option_statements",
             "relational_operator", "lambda_parameter",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "case_clause",
             "while_statement",
             "for_statement",

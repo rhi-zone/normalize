@@ -131,7 +131,7 @@ mod tests {
             "type_requirement", "unary_expression", "union_specifier", "update_expression",
             "using_declaration", "variadic_parameter_declaration",
             "variadic_type_parameter_declaration", "virtual_specifier",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "conditional_expression",
             "case_statement",
             "for_statement",

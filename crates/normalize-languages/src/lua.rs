@@ -153,7 +153,7 @@ mod tests {
             "empty_statement", "for_generic_clause",
             "for_numeric_clause", "identifier", "label_statement", "parenthesized_expression", "table_constructor",
             "unary_expression", "vararg_expression", "variable_declaration",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "return_statement",
             "while_statement",
             "elseif_statement",

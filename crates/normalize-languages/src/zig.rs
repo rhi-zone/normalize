@@ -111,7 +111,7 @@ mod tests {
             "LoopTypeExpr", "ParamType", "PrefixTypeOp", "PtrTypeStart",
             "SliceTypeStart", "Statement", "SwitchCase", "WhileContinueExpr",
             "WhileExpr", "WhilePrefix", "WhileTypeExpr",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "ForStatement",
             "WhileStatement",
             "Block",

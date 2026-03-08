@@ -228,7 +228,7 @@ mod tests {
             "PSL_Bounding_FL_Property", "PSL_Suffix_Implication_FL_Property",
             "PSL_VUnit", "PSL_VProp", "PSL_VMode",
             "PSL_Hierarchical_HDL_Name", "PSL_Inherit_Spec",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "loop_statement",
             "use_clause",
             "case_statement",

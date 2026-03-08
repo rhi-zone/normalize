@@ -67,7 +67,7 @@ mod tests {
             "const_identifier", "generic_identifier", "annotation_identifier",
             "annotation_definition_identifier", "unique_id_statement",
             "top_level_annotation_body", "block_text",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // covered by tags.scm
             "enum",
             "interface",
             "method",

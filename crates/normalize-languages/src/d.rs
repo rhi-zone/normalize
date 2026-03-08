@@ -313,7 +313,7 @@ mod tests {
             "struct_member_initializer", "struct_member_initializers", "super_class_or_interface",
             "traits_arguments", "traits_keyword", "var_declarator_identifier", "vector_base_type",
             "attribute_specifier",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // structural node, not extracted as symbols
             "alias_declaration",
             "auto_declaration",
             "module_declaration",

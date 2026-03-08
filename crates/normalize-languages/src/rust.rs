@@ -460,7 +460,7 @@ mod tests {
             "unsafe_block",            // unsafe { }
             "use_as_clause",           // use foo as bar
             "empty_statement",         // ;
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "closure_expression",
             "continue_expression",
             "match_expression",

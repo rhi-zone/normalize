@@ -563,7 +563,7 @@ def __dunder__(): pass
             "global_statement",        // scope modifier
             "nonlocal_statement",      // scope modifier
             "pass_statement",          // no-op, detect empty bodies
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "lambda",
             "import_statement",
             "continue_statement",

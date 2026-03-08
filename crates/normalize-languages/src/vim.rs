@@ -105,7 +105,7 @@ mod tests {
             // Control flow — not definition constructs
             "elseif_statement", "for_loop", "if_statement", "source_statement",
             "try_statement", "runtime_statement", "while_loop",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
 
         ];
         validate_unused_kinds_audit(&Vim, documented_unused)

@@ -164,7 +164,7 @@ mod tests {
             "range_expression", "return_statement", "selected_import", "splat_expression",
             "tuple_expression", "typed_expression", "unary_expression",
             "unary_typed_expression", "vector_expression", "where_expression",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // covered by tags.scm
             "const_statement",
             "arrow_function_expression",
             "if_statement",

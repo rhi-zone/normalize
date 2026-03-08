@@ -74,7 +74,7 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             "else_clause",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "case_item",
             "if_statement",
             "elif_clause",

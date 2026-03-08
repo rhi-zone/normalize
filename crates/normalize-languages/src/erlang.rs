@@ -151,7 +151,7 @@ mod tests {
             "range_type", "remote_module", "replacement_cr_clauses",
             "replacement_function_clauses", "ssr_definition", "try_after",
             "try_class", "try_stack", "type_guards", "type_name", "type_sig",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "cr_clause",
             "try_expr",
             "fun_clause",

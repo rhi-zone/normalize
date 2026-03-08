@@ -76,7 +76,7 @@ mod tests {
             "else_command", "elseif_command",
             // Expression-related
             "formatunit", "identifier", "operatorunit", "ternaryoperator",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "expression_statement",
             "foreach_command",
             "if_condition",

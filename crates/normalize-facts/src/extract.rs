@@ -520,6 +520,7 @@ fn tags_capture_to_kind(capture_name: &str) -> Option<SymbolKind> {
         // No Macro variant — map to Function (closest semantic equivalent)
         "definition.macro" => Some(SymbolKind::Function),
         "definition.constant" => Some(SymbolKind::Constant),
+        "definition.var" => Some(SymbolKind::Variable),
         _ => None,
     }
 }

@@ -264,7 +264,7 @@ mod tests {
             "type_parameter", "type_parameters", "type_test", "type_test_expression",
             "typed_identifier", "unary_expression", "void_type", "yield_each_statement",
             "yield_statement",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "logical_and_expression",
             "for_statement",
             "do_statement",

@@ -156,7 +156,7 @@ mod tests {
             "rescue_modifier", "unless_modifier", "until_modifier", "while_modifier",
             // EXPRESSION
             "yield",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "case",
             "while",
             "block",

@@ -111,7 +111,7 @@ mod tests {
             "block", "each_statement", "for_statement", "if_statement", "while_statement",
             // Module system — handled in extract_imports, not as symbols
             "forward_statement", "import_statement", "use_statement",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
 
         ];
         validate_unused_kinds_audit(&Scss, documented_unused)

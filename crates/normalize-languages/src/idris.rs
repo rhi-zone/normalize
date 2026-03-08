@@ -104,7 +104,7 @@ mod tests {
             "with", "with_pat", "with_arg",
             // Pragmas
             "pragma_export", "pragma_foreign", "pragma_foreign_impl", "pragma_transform",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "exp_if",
             "exp_case",
             "import",

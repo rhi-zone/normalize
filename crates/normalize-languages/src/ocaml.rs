@@ -231,7 +231,7 @@ mod tests {
             "type_parameter_constraint", "type_variable", "typed_class_expression",
             "typed_expression", "typed_module_expression", "typed_pattern",
             "value_specification", "variant_declaration", "while_expression",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "match_expression",
             "open_module",
             "let_expression",

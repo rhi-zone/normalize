@@ -39,7 +39,7 @@ mod tests {
         let documented_unused: &[&str] = &[
             "block_mapping_pair", "block_node", "block_scalar",
             "block_sequence", "block_sequence_item",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // structural node, not extracted as symbols
             "block_mapping",
         ];
         validate_unused_kinds_audit(&Yaml, documented_unused)

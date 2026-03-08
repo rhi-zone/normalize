@@ -146,7 +146,7 @@ mod tests {
             "unqualified_import", "unqualified_imports",
             // Comments and identifiers
             "identifier", "module", "module_comment", "statement_comment",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // structural node, not extracted as symbols
             "block",
             "import",
             "anonymous_function",

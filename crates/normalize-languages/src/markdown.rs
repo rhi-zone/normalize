@@ -72,7 +72,7 @@ mod tests {
             "fenced_code_block", "fenced_code_block_delimiter",
             "html_block", "indented_code_block", "link_reference_definition",
         ];
-        // Note: section and atx_heading are now used via container_kinds/extract_container.
+        // Note: section and atx_heading are captured via markdown.tags.scm (`@definition.heading`).
 
         validate_unused_kinds_audit(&Markdown, documented_unused)
             .expect("Markdown unused node kinds audit failed");

@@ -482,7 +482,7 @@ fn replace_all_words(text: &str, old: &str, new_word: &str) -> String {
 
 /// Find a container body using a tags query.
 ///
-/// Used when the language has no `container_kinds()` but has a `*.tags.scm`.
+/// Used when the language has a `*.tags.scm`.
 /// Runs the tags query to find `@definition.class`, `@definition.module`, or
 /// `@definition.interface` nodes whose name matches `name`, then delegates to
 /// the Language trait's `container_body` / `analyze_container_body` methods.

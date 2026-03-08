@@ -94,7 +94,7 @@ mod tests {
             "label_instruction", "maintainer_instruction", "onbuild_instruction",
             "run_instruction", "shell_instruction", "stopsignal_instruction",
             "user_instruction", "volume_instruction", "workdir_instruction",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // structural node, not extracted as symbols
             "from_instruction",
         ];
 

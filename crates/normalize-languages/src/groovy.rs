@@ -197,7 +197,7 @@ mod tests {
             "identifier", "juxt_function_call", "modifier",
             "parenthesized_expression", "qualified_name", "return", "switch_block",
             "type_with_generics", "wildcard_import",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "switch_statement",
             "if_statement",
             "groovy_import",

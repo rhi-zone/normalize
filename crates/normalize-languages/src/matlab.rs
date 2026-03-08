@@ -108,7 +108,7 @@ mod tests {
             "block", "field_expression", "formatting_sequence", "function_arguments",
             "function_call", "function_output", "function_signature", "identifier", "lambda",
             "parfor_options", "validation_functions",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "if_statement",
             "catch_clause",
             "switch_statement",

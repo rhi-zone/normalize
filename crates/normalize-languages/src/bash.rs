@@ -65,7 +65,7 @@ mod tests {
             "heredoc_body", "parenthesized_expression", "postfix_expression",
             "redirected_statement", "ternary_expression", "test_operator",
             "unary_expression",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // control flow — not extracted as symbols
             "if_statement",
             "for_statement",
             "case_statement",

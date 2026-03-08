@@ -192,7 +192,7 @@ mod tests {
             // Other
             "method_parameter", "block_pointer_declarator", "abstract_function_declarator",
             "bitfield_clause", "struct_declarator", "gnu_asm_qualifier",
-                    // Previously in container/function/type_kinds, covered by tags.scm or needs review
+            // covered by tags.scm
             "method_declaration",
             "while_statement",
             "for_statement",
