@@ -1837,3 +1837,1060 @@ fn csharp_types_finds_type_references() {
         "expected type reference in c-sharp sample, got: {refs:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Haskell
+// ---------------------------------------------------------------------------
+
+const HASKELL_SAMPLE: &str = include_str!("fixtures/haskell/sample.hs");
+
+#[test]
+fn haskell_tags_finds_functions_and_types() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping haskell_tags: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("haskell") else {
+        eprintln!("Skipping haskell_tags: haskell grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_tags("haskell")
+        .expect("haskell tags query missing");
+    let names = collect_captures(&lang, HASKELL_SAMPLE, &query_str, "name");
+    assert!(
+        names.contains(&"Tree".to_string()),
+        "expected 'Tree' data type in haskell tags, got: {names:?}"
+    );
+    assert!(
+        names
+            .iter()
+            .any(|n| n == "classify" || n == "insert" || n == "member"),
+        "expected a function name in haskell tags, got: {names:?}"
+    );
+}
+
+#[test]
+fn haskell_calls_finds_function_applications() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping haskell_calls: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("haskell") else {
+        eprintln!("Skipping haskell_calls: haskell grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_calls("haskell")
+        .expect("haskell calls query missing");
+    let calls = collect_captures(&lang, HASKELL_SAMPLE, &query_str, "call");
+    assert!(
+        calls
+            .iter()
+            .any(|c| c == "length" || c == "insert" || c == "member" || c == "foldr"),
+        "expected a function call in haskell sample, got: {calls:?}"
+    );
+}
+
+#[test]
+fn haskell_imports_finds_module_imports() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping haskell_imports: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("haskell") else {
+        eprintln!("Skipping haskell_imports: haskell grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_imports("haskell")
+        .expect("haskell imports query missing");
+    let paths = collect_captures(&lang, HASKELL_SAMPLE, &query_str, "import.path");
+    assert!(
+        paths.iter().any(|p| p == "Data" || p.contains("Data")),
+        "expected 'Data' module import path in haskell sample, got: {paths:?}"
+    );
+}
+
+#[test]
+fn haskell_complexity_finds_control_flow() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping haskell_complexity: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("haskell") else {
+        eprintln!("Skipping haskell_complexity: haskell grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_complexity("haskell")
+        .expect("haskell complexity query missing");
+    let complexity = collect_captures(&lang, HASKELL_SAMPLE, &query_str, "complexity");
+    assert!(
+        complexity.len() >= 1,
+        "expected at least 1 complexity node in haskell sample, got {} ({complexity:?})",
+        complexity.len()
+    );
+}
+
+#[test]
+fn haskell_types_finds_type_constructors() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping haskell_types: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("haskell") else {
+        eprintln!("Skipping haskell_types: haskell grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_types("haskell")
+        .expect("haskell types query missing");
+    let refs = collect_captures(&lang, HASKELL_SAMPLE, &query_str, "type");
+    assert!(
+        refs.iter()
+            .any(|r| r == "Tree" || r == "Map" || r == "Int" || r == "String"),
+        "expected a type reference in haskell sample, got: {refs:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// OCaml
+// ---------------------------------------------------------------------------
+
+const OCAML_SAMPLE: &str = include_str!("fixtures/ocaml/sample.ml");
+
+#[test]
+fn ocaml_tags_finds_functions_and_types() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping ocaml_tags: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("ocaml") else {
+        eprintln!("Skipping ocaml_tags: ocaml grammar .so not found");
+        return;
+    };
+    let query_str = loader.get_tags("ocaml").expect("ocaml tags query missing");
+    let names = collect_captures(&lang, OCAML_SAMPLE, &query_str, "name");
+    assert!(
+        names.contains(&"Stack".to_string()),
+        "expected 'Stack' module in ocaml tags, got: {names:?}"
+    );
+    assert!(
+        names
+            .iter()
+            .any(|n| n == "classify" || n == "insert" || n == "sum_evens"),
+        "expected a function name in ocaml tags, got: {names:?}"
+    );
+}
+
+#[test]
+fn ocaml_calls_finds_function_applications() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping ocaml_calls: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("ocaml") else {
+        eprintln!("Skipping ocaml_calls: ocaml grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_calls("ocaml")
+        .expect("ocaml calls query missing");
+    let calls = collect_captures(&lang, OCAML_SAMPLE, &query_str, "call");
+    assert!(
+        calls
+            .iter()
+            .any(|c| c == "classify" || c == "create" || c == "push" || c == "fold_left"),
+        "expected a function call in ocaml sample, got: {calls:?}"
+    );
+}
+
+#[test]
+fn ocaml_imports_finds_open_statements() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping ocaml_imports: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("ocaml") else {
+        eprintln!("Skipping ocaml_imports: ocaml grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_imports("ocaml")
+        .expect("ocaml imports query missing");
+    let paths = collect_captures(&lang, OCAML_SAMPLE, &query_str, "import.path");
+    assert!(
+        paths.iter().any(|p| p == "List" || p == "Printf"),
+        "expected 'List' or 'Printf' in ocaml import paths, got: {paths:?}"
+    );
+}
+
+#[test]
+fn ocaml_complexity_finds_control_flow() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping ocaml_complexity: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("ocaml") else {
+        eprintln!("Skipping ocaml_complexity: ocaml grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_complexity("ocaml")
+        .expect("ocaml complexity query missing");
+    let complexity = collect_captures(&lang, OCAML_SAMPLE, &query_str, "complexity");
+    assert!(
+        complexity.len() >= 2,
+        "expected at least 2 complexity nodes in ocaml sample, got {} ({complexity:?})",
+        complexity.len()
+    );
+}
+
+#[test]
+fn ocaml_types_finds_type_references() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping ocaml_types: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("ocaml") else {
+        eprintln!("Skipping ocaml_types: ocaml grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_types("ocaml")
+        .expect("ocaml types query missing");
+    let refs = collect_captures(&lang, OCAML_SAMPLE, &query_str, "type");
+    assert!(
+        refs.iter().any(|r| r == "tree" || r == "t" || r == "int"),
+        "expected a type reference in ocaml sample, got: {refs:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Erlang
+// ---------------------------------------------------------------------------
+
+const ERLANG_SAMPLE: &str = include_str!("fixtures/erlang/sample.erl");
+
+#[test]
+fn erlang_tags_finds_functions_and_module() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping erlang_tags: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("erlang") else {
+        eprintln!("Skipping erlang_tags: erlang grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_tags("erlang")
+        .expect("erlang tags query missing");
+    let names = collect_captures(&lang, ERLANG_SAMPLE, &query_str, "name");
+    assert!(
+        names.contains(&"sample".to_string()),
+        "expected 'sample' module in erlang tags, got: {names:?}"
+    );
+    assert!(
+        names
+            .iter()
+            .any(|n| n == "classify" || n == "factorial" || n == "member"),
+        "expected a function name in erlang tags, got: {names:?}"
+    );
+}
+
+#[test]
+fn erlang_calls_finds_function_calls() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping erlang_calls: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("erlang") else {
+        eprintln!("Skipping erlang_calls: erlang grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_calls("erlang")
+        .expect("erlang calls query missing");
+    let calls = collect_captures(&lang, ERLANG_SAMPLE, &query_str, "call");
+    assert!(
+        calls
+            .iter()
+            .any(|c| c == "factorial" || c == "filter" || c == "foldl" || c == "member"),
+        "expected a function call in erlang sample, got: {calls:?}"
+    );
+}
+
+#[test]
+fn erlang_imports_finds_import_attributes() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping erlang_imports: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("erlang") else {
+        eprintln!("Skipping erlang_imports: erlang grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_imports("erlang")
+        .expect("erlang imports query missing");
+    let paths = collect_captures(&lang, ERLANG_SAMPLE, &query_str, "import.path");
+    assert!(
+        paths.iter().any(|p| p == "lists"),
+        "expected 'lists' in erlang import paths, got: {paths:?}"
+    );
+}
+
+#[test]
+fn erlang_complexity_finds_control_flow() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping erlang_complexity: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("erlang") else {
+        eprintln!("Skipping erlang_complexity: erlang grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_complexity("erlang")
+        .expect("erlang complexity query missing");
+    let complexity = collect_captures(&lang, ERLANG_SAMPLE, &query_str, "complexity");
+    assert!(
+        complexity.len() >= 1,
+        "expected at least 1 complexity node in erlang sample, got {} ({complexity:?})",
+        complexity.len()
+    );
+}
+
+#[test]
+fn erlang_types_finds_type_names() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping erlang_types: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("erlang") else {
+        eprintln!("Skipping erlang_types: erlang grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_types("erlang")
+        .expect("erlang types query missing");
+    let refs = collect_captures(&lang, ERLANG_SAMPLE, &query_str, "type");
+    assert!(
+        refs.iter().any(|r| r == "integer" || r == "coordinate"),
+        "expected a type reference in erlang sample, got: {refs:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Lua
+// ---------------------------------------------------------------------------
+
+const LUA_SAMPLE: &str = include_str!("fixtures/lua/sample.lua");
+
+#[test]
+fn lua_tags_finds_functions() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping lua_tags: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("lua") else {
+        eprintln!("Skipping lua_tags: lua grammar .so not found");
+        return;
+    };
+    let query_str = loader.get_tags("lua").expect("lua tags query missing");
+    let names = collect_captures(&lang, LUA_SAMPLE, &query_str, "name");
+    assert!(
+        names
+            .iter()
+            .any(|n| n == "classify" || n == "sum_evens" || n == "new"),
+        "expected a function name in lua tags, got: {names:?}"
+    );
+}
+
+#[test]
+fn lua_calls_finds_function_calls() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping lua_calls: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("lua") else {
+        eprintln!("Skipping lua_calls: lua grammar .so not found");
+        return;
+    };
+    let query_str = loader.get_calls("lua").expect("lua calls query missing");
+    let calls = collect_captures(&lang, LUA_SAMPLE, &query_str, "call");
+    assert!(
+        calls
+            .iter()
+            .any(|c| c == "require" || c == "setmetatable" || c == "print"),
+        "expected a function call in lua sample, got: {calls:?}"
+    );
+}
+
+#[test]
+fn lua_imports_finds_require_calls() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping lua_imports: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("lua") else {
+        eprintln!("Skipping lua_imports: lua grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_imports("lua")
+        .expect("lua imports query missing");
+    let paths = collect_captures(&lang, LUA_SAMPLE, &query_str, "import.path");
+    assert!(
+        paths
+            .iter()
+            .any(|p| p.contains("json") || p.contains("utils")),
+        "expected a require path in lua sample, got: {paths:?}"
+    );
+}
+
+#[test]
+fn lua_complexity_finds_control_flow() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping lua_complexity: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("lua") else {
+        eprintln!("Skipping lua_complexity: lua grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_complexity("lua")
+        .expect("lua complexity query missing");
+    let complexity = collect_captures(&lang, LUA_SAMPLE, &query_str, "complexity");
+    assert!(
+        complexity.len() >= 3,
+        "expected at least 3 complexity nodes in lua sample, got {} ({complexity:?})",
+        complexity.len()
+    );
+}
+
+#[test]
+fn lua_types_query_runs_without_error() {
+    // Lua is dynamically typed — the types query returns no captures.
+    // This test verifies the query compiles and runs cleanly.
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping lua_types: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("lua") else {
+        eprintln!("Skipping lua_types: lua grammar .so not found");
+        return;
+    };
+    let query_str = loader.get_types("lua").expect("lua types query missing");
+    // Just verify it runs without panicking
+    let _refs = collect_captures(&lang, LUA_SAMPLE, &query_str, "type");
+}
+
+// ---------------------------------------------------------------------------
+// Groovy
+// ---------------------------------------------------------------------------
+
+const GROOVY_SAMPLE: &str = include_str!("fixtures/groovy/sample.groovy");
+
+#[test]
+fn groovy_tags_finds_classes_and_functions() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping groovy_tags: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("groovy") else {
+        eprintln!("Skipping groovy_tags: groovy grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_tags("groovy")
+        .expect("groovy tags query missing");
+    let names = collect_captures(&lang, GROOVY_SAMPLE, &query_str, "name");
+    assert!(
+        names.contains(&"MathUtils".to_string()),
+        "expected 'MathUtils' class in groovy tags, got: {names:?}"
+    );
+    assert!(
+        names
+            .iter()
+            .any(|n| n == "classify" || n == "sumEvens" || n == "greet"),
+        "expected a function name in groovy tags, got: {names:?}"
+    );
+}
+
+#[test]
+fn groovy_calls_finds_method_calls() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping groovy_calls: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("groovy") else {
+        eprintln!("Skipping groovy_calls: groovy grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_calls("groovy")
+        .expect("groovy calls query missing");
+    let calls = collect_captures(&lang, GROOVY_SAMPLE, &query_str, "call");
+    assert!(
+        calls
+            .iter()
+            .any(|c| c == "classify" || c == "println" || c == "greet" || c == "factorial"),
+        "expected a method call in groovy sample, got: {calls:?}"
+    );
+}
+
+#[test]
+fn groovy_imports_finds_import_statements() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping groovy_imports: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("groovy") else {
+        eprintln!("Skipping groovy_imports: groovy grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_imports("groovy")
+        .expect("groovy imports query missing");
+    let paths = collect_captures(&lang, GROOVY_SAMPLE, &query_str, "import.path");
+    assert!(
+        paths
+            .iter()
+            .any(|p| p.contains("groovy") || p.contains("java")),
+        "expected an import path in groovy sample, got: {paths:?}"
+    );
+}
+
+#[test]
+fn groovy_complexity_finds_control_flow() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping groovy_complexity: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("groovy") else {
+        eprintln!("Skipping groovy_complexity: groovy grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_complexity("groovy")
+        .expect("groovy complexity query missing");
+    let complexity = collect_captures(&lang, GROOVY_SAMPLE, &query_str, "complexity");
+    assert!(
+        complexity.len() >= 2,
+        "expected at least 2 complexity nodes in groovy sample, got {} ({complexity:?})",
+        complexity.len()
+    );
+}
+
+#[test]
+fn groovy_types_finds_type_references() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping groovy_types: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("groovy") else {
+        eprintln!("Skipping groovy_types: groovy grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_types("groovy")
+        .expect("groovy types query missing");
+    let refs = collect_captures(&lang, GROOVY_SAMPLE, &query_str, "type");
+    assert!(
+        refs.iter()
+            .any(|r| r.contains("List") || r.contains("Integer") || r.contains("String")),
+        "expected a type reference in groovy sample, got: {refs:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Julia
+// ---------------------------------------------------------------------------
+
+const JULIA_SAMPLE: &str = include_str!("fixtures/julia/sample.jl");
+
+#[test]
+fn julia_tags_finds_functions_and_module() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping julia_tags: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("julia") else {
+        eprintln!("Skipping julia_tags: julia grammar .so not found");
+        return;
+    };
+    let query_str = loader.get_tags("julia").expect("julia tags query missing");
+    let names = collect_captures(&lang, JULIA_SAMPLE, &query_str, "name");
+    assert!(
+        names.contains(&"MathTools".to_string()),
+        "expected 'MathTools' module in julia tags, got: {names:?}"
+    );
+    assert!(
+        names.iter().any(|n| n == "square" || n == "classify"),
+        "expected a function name in julia tags, got: {names:?}"
+    );
+}
+
+#[test]
+fn julia_calls_finds_function_calls() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping julia_calls: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("julia") else {
+        eprintln!("Skipping julia_calls: julia grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_calls("julia")
+        .expect("julia calls query missing");
+    let calls = collect_captures(&lang, JULIA_SAMPLE, &query_str, "call");
+    assert!(
+        calls
+            .iter()
+            .any(|c| c == "factorial" || c == "norm" || c == "classify"),
+        "expected a function call in julia sample, got: {calls:?}"
+    );
+}
+
+#[test]
+fn julia_imports_finds_import_statements() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping julia_imports: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("julia") else {
+        eprintln!("Skipping julia_imports: julia grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_imports("julia")
+        .expect("julia imports query missing");
+    let paths = collect_captures(&lang, JULIA_SAMPLE, &query_str, "import.path");
+    assert!(
+        paths
+            .iter()
+            .any(|p| p.contains("Statistics") || p.contains("LinearAlgebra")),
+        "expected 'Statistics' or 'LinearAlgebra' in julia import paths, got: {paths:?}"
+    );
+}
+
+#[test]
+fn julia_complexity_finds_control_flow() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping julia_complexity: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("julia") else {
+        eprintln!("Skipping julia_complexity: julia grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_complexity("julia")
+        .expect("julia complexity query missing");
+    let complexity = collect_captures(&lang, JULIA_SAMPLE, &query_str, "complexity");
+    assert!(
+        complexity.len() >= 3,
+        "expected at least 3 complexity nodes in julia sample, got {} ({complexity:?})",
+        complexity.len()
+    );
+}
+
+#[test]
+fn julia_types_finds_type_annotations() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping julia_types: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("julia") else {
+        eprintln!("Skipping julia_types: julia grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_types("julia")
+        .expect("julia types query missing");
+    let refs = collect_captures(&lang, JULIA_SAMPLE, &query_str, "type");
+    assert!(
+        refs.iter()
+            .any(|r| r == "Int" || r == "String" || r == "Float64"),
+        "expected a type annotation in julia sample, got: {refs:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// R
+// ---------------------------------------------------------------------------
+
+const R_SAMPLE: &str = include_str!("fixtures/r/sample.r");
+
+#[test]
+fn r_tags_finds_functions() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping r_tags: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("r") else {
+        eprintln!("Skipping r_tags: r grammar .so not found");
+        return;
+    };
+    let query_str = loader.get_tags("r").expect("r tags query missing");
+    let names = collect_captures(&lang, R_SAMPLE, &query_str, "name");
+    assert!(
+        names.contains(&"classify".to_string()),
+        "expected 'classify' function in r tags, got: {names:?}"
+    );
+    assert!(
+        names.iter().any(|n| n == "sum_evens" || n == "factorial_r"),
+        "expected a function name in r tags, got: {names:?}"
+    );
+}
+
+#[test]
+fn r_calls_finds_function_calls() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping r_calls: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("r") else {
+        eprintln!("Skipping r_calls: r grammar .so not found");
+        return;
+    };
+    let query_str = loader.get_calls("r").expect("r calls query missing");
+    let calls = collect_captures(&lang, R_SAMPLE, &query_str, "call");
+    assert!(
+        calls
+            .iter()
+            .any(|c| c == "print" || c == "classify" || c == "factorial_r" || c == "return"),
+        "expected a function call in r sample, got: {calls:?}"
+    );
+}
+
+#[test]
+fn r_imports_finds_library_calls() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping r_imports: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("r") else {
+        eprintln!("Skipping r_imports: r grammar .so not found");
+        return;
+    };
+    let query_str = loader.get_imports("r").expect("r imports query missing");
+    let paths = collect_captures(&lang, R_SAMPLE, &query_str, "import.path");
+    assert!(
+        paths.iter().any(|p| p == "stats" || p == "utils"),
+        "expected 'stats' or 'utils' in r import paths, got: {paths:?}"
+    );
+}
+
+#[test]
+fn r_complexity_finds_control_flow() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping r_complexity: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("r") else {
+        eprintln!("Skipping r_complexity: r grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_complexity("r")
+        .expect("r complexity query missing");
+    let complexity = collect_captures(&lang, R_SAMPLE, &query_str, "complexity");
+    assert!(
+        complexity.len() >= 3,
+        "expected at least 3 complexity nodes in r sample, got {} ({complexity:?})",
+        complexity.len()
+    );
+}
+
+#[test]
+fn r_types_query_runs_without_error() {
+    // R is dynamically typed — the types query returns no captures.
+    // This test verifies the query compiles and runs cleanly.
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping r_types: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("r") else {
+        eprintln!("Skipping r_types: r grammar .so not found");
+        return;
+    };
+    let query_str = loader.get_types("r").expect("r types query missing");
+    // Just verify it runs without panicking
+    let _refs = collect_captures(&lang, R_SAMPLE, &query_str, "type");
+}
+
+// ---------------------------------------------------------------------------
+// F#
+// ---------------------------------------------------------------------------
+
+const FSHARP_SAMPLE: &str = include_str!("fixtures/fsharp/sample.fs");
+
+#[test]
+fn fsharp_tags_finds_functions_and_types() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping fsharp_tags: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("fsharp") else {
+        eprintln!("Skipping fsharp_tags: fsharp grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_tags("fsharp")
+        .expect("fsharp tags query missing");
+    let names = collect_captures(&lang, FSHARP_SAMPLE, &query_str, "name");
+    assert!(
+        names
+            .iter()
+            .any(|n| n == "classify" || n == "sumEvens" || n == "factorial"),
+        "expected a function name in fsharp tags, got: {names:?}"
+    );
+}
+
+#[test]
+fn fsharp_calls_finds_function_calls() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping fsharp_calls: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("fsharp") else {
+        eprintln!("Skipping fsharp_calls: fsharp grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_calls("fsharp")
+        .expect("fsharp calls query missing");
+    let calls = collect_captures(&lang, FSHARP_SAMPLE, &query_str, "call");
+    assert!(
+        calls
+            .iter()
+            .any(|c| c == "classify" || c == "factorial" || c == "sumEvens" || c == "printfn"),
+        "expected a function call in fsharp sample, got: {calls:?}"
+    );
+}
+
+#[test]
+fn fsharp_imports_finds_open_declarations() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping fsharp_imports: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("fsharp") else {
+        eprintln!("Skipping fsharp_imports: fsharp grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_imports("fsharp")
+        .expect("fsharp imports query missing");
+    let paths = collect_captures(&lang, FSHARP_SAMPLE, &query_str, "import.path");
+    assert!(
+        paths.iter().any(|p| p.contains("System")),
+        "expected 'System' in fsharp import paths, got: {paths:?}"
+    );
+}
+
+#[test]
+fn fsharp_complexity_finds_control_flow() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping fsharp_complexity: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("fsharp") else {
+        eprintln!("Skipping fsharp_complexity: fsharp grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_complexity("fsharp")
+        .expect("fsharp complexity query missing");
+    let complexity = collect_captures(&lang, FSHARP_SAMPLE, &query_str, "complexity");
+    assert!(
+        complexity.len() >= 2,
+        "expected at least 2 complexity nodes in fsharp sample, got {} ({complexity:?})",
+        complexity.len()
+    );
+}
+
+#[test]
+fn fsharp_types_finds_type_references() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping fsharp_types: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("fsharp") else {
+        eprintln!("Skipping fsharp_types: fsharp grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_types("fsharp")
+        .expect("fsharp types query missing");
+    let refs = collect_captures(&lang, FSHARP_SAMPLE, &query_str, "type");
+    assert!(
+        refs.iter()
+            .any(|r| r.contains("float") || r.contains("int") || r.contains("string")),
+        "expected a type reference in fsharp sample, got: {refs:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Gleam
+// ---------------------------------------------------------------------------
+
+const GLEAM_SAMPLE: &str = include_str!("fixtures/gleam/sample.gleam");
+
+#[test]
+fn gleam_tags_finds_functions_and_types() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping gleam_tags: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("gleam") else {
+        eprintln!("Skipping gleam_tags: gleam grammar .so not found");
+        return;
+    };
+    let query_str = loader.get_tags("gleam").expect("gleam tags query missing");
+    let names = collect_captures(&lang, GLEAM_SAMPLE, &query_str, "name");
+    assert!(
+        names.contains(&"Shape".to_string()),
+        "expected 'Shape' type in gleam tags, got: {names:?}"
+    );
+    assert!(
+        names
+            .iter()
+            .any(|n| n == "classify" || n == "factorial" || n == "greet"),
+        "expected a function name in gleam tags, got: {names:?}"
+    );
+}
+
+#[test]
+fn gleam_calls_finds_function_calls() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping gleam_calls: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("gleam") else {
+        eprintln!("Skipping gleam_calls: gleam grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_calls("gleam")
+        .expect("gleam calls query missing");
+    let calls = collect_captures(&lang, GLEAM_SAMPLE, &query_str, "call");
+    assert!(
+        calls
+            .iter()
+            .any(|c| c == "factorial" || c == "greet" || c == "classify"),
+        "expected a function call in gleam sample, got: {calls:?}"
+    );
+}
+
+#[test]
+fn gleam_imports_finds_import_statements() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping gleam_imports: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("gleam") else {
+        eprintln!("Skipping gleam_imports: gleam grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_imports("gleam")
+        .expect("gleam imports query missing");
+    let paths = collect_captures(&lang, GLEAM_SAMPLE, &query_str, "import.path");
+    assert!(
+        paths.iter().any(|p| p.contains("gleam")),
+        "expected 'gleam' module in gleam import paths, got: {paths:?}"
+    );
+}
+
+#[test]
+fn gleam_complexity_finds_case_expressions() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping gleam_complexity: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("gleam") else {
+        eprintln!("Skipping gleam_complexity: gleam grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_complexity("gleam")
+        .expect("gleam complexity query missing");
+    let complexity = collect_captures(&lang, GLEAM_SAMPLE, &query_str, "complexity");
+    assert!(
+        complexity.len() >= 2,
+        "expected at least 2 complexity nodes in gleam sample, got {} ({complexity:?})",
+        complexity.len()
+    );
+}
+
+#[test]
+fn gleam_types_finds_type_references() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping gleam_types: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("gleam") else {
+        eprintln!("Skipping gleam_types: gleam grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_types("gleam")
+        .expect("gleam types query missing");
+    let refs = collect_captures(&lang, GLEAM_SAMPLE, &query_str, "type");
+    assert!(
+        refs.iter()
+            .any(|r| r == "Shape" || r == "Int" || r == "String" || r == "Float"),
+        "expected a type reference in gleam sample, got: {refs:?}"
+    );
+}
