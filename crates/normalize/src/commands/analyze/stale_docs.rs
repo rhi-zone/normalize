@@ -68,16 +68,8 @@ pub fn build_stale_docs_report(root: &Path) -> StaleDocsReport {
     // normalize-syntax-allow: rust/unwrap-in-impl - compile-time constant regex pattern
     let covers_re = Regex::new(r"<!--\s*covers:\s*(.+?)\s*-->").unwrap();
 
-    let md_files: Vec<_> = walkdir::WalkDir::new(root)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path().extension().and_then(|s| s.to_str()) == Some("md")
-                && !e
-                    .path()
-                    .components()
-                    .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
-        })
+    let md_files: Vec<_> = super::walk::gitignore_walk(root)
+        .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("md"))
         .map(|e| e.path().to_path_buf())
         .collect();
 
@@ -244,10 +236,8 @@ fn find_covered_files(root: &Path, pattern: &str) -> Vec<String> {
             vec![pattern.to_string()]
         } else if target.is_dir() {
             // Find all files in directory
-            walkdir::WalkDir::new(&target)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .filter(|e| e.path().is_file())
+            super::walk::gitignore_walk(&target)
+                .filter(|e| e.file_type().is_some_and(|ft| ft.is_file()))
                 .filter_map(|e| {
                     e.path()
                         .strip_prefix(root)

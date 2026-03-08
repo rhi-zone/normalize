@@ -64,16 +64,8 @@ pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, Str
     }
 
     // Find markdown files
-    let md_files: Vec<_> = walkdir::WalkDir::new(root)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path().extension().and_then(|s| s.to_str()) == Some("md")
-                && !e
-                    .path()
-                    .components()
-                    .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
-        })
+    let md_files: Vec<_> = super::walk::gitignore_walk(root)
+        .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("md"))
         .map(|e| e.path().to_path_buf())
         .collect();
 

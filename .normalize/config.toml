@@ -41,7 +41,7 @@ exclude = [
 # Per-rule configuration: { "rule-id" = { severity = "...", enabled = true/false } }
 # Global allow: skip violations in test fixture files for all rules.
 [analyze.rules]
-global-allow = ["**/tests/fixtures/**", "**/fixtures/**", "**/node_modules/**"]
+global-allow = ["**/tests/fixtures/**", "**/fixtures/**"]
 
 # Disable println-debug for CLI tools (we use println for output)
 [analyze.rules."rust/println-debug"]
@@ -286,6 +286,11 @@ enabled = true
 
 [analyze.rules."js/no-await-in-loop"]
 enabled = true
+
+# CHANGELOG.md references types that have since been renamed or deleted.
+# These are historical records, not live code references.
+[analyze.rules."broken-ref"]
+allow = ["CHANGELOG.md"]
 
 [aliases]
 todo = ["TODO.md"]

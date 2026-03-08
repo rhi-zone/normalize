@@ -58,16 +58,8 @@ pub fn build_check_examples_report(root: &Path) -> CheckExamplesReport {
 
     let mut defined_examples: HashSet<String> = HashSet::new();
 
-    for entry in walkdir::WalkDir::new(root)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            let path = e.path();
-            path.is_file()
-                && !path
-                    .components()
-                    .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
-        })
+    for entry in
+        super::walk::gitignore_walk(root).filter(|e| e.file_type().is_some_and(|ft| ft.is_file()))
     {
         let path = entry.path();
 
@@ -96,16 +88,8 @@ pub fn build_check_examples_report(root: &Path) -> CheckExamplesReport {
     let mut missing: Vec<MissingExample> = Vec::new();
     let mut refs_found = 0;
 
-    for entry in walkdir::WalkDir::new(root)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path().extension().and_then(|s| s.to_str()) == Some("md")
-                && !e
-                    .path()
-                    .components()
-                    .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
-        })
+    for entry in super::walk::gitignore_walk(root)
+        .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("md"))
     {
         let path = entry.path();
         let content = match std::fs::read_to_string(path) {

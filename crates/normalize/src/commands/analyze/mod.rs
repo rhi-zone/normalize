@@ -47,6 +47,7 @@ pub mod test_ratio;
 pub mod trace;
 pub mod trend;
 pub mod uniqueness;
+pub(crate) mod walk;
 
 use crate::filter::Filter;
 use normalize_core::Merge;

@@ -75,12 +75,7 @@ impl OutputFormatter for StaleSummaryReport {
     }
 }
 
-fn is_excluded_dir(name: &str) -> bool {
-    matches!(
-        name,
-        "target" | "node_modules" | ".git" | ".claude" | "dist" | "build" | "__pycache__"
-    ) || name.starts_with('.')
-}
+use super::walk::is_excluded_dir;
 
 // --- Incremental cache ---
 
@@ -229,11 +224,8 @@ pub fn build_stale_summary_report(root: &Path, threshold: usize) -> StaleSummary
         .and_then(|h| load_cache(root).filter(|c| c.head == h));
     let mut updated_dirs: HashMap<String, CacheEntry> = HashMap::new();
 
-    let dirs: Vec<_> = walkdir::WalkDir::new(root)
-        .min_depth(0)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_dir())
+    let dirs: Vec<_> = super::walk::gitignore_walk(root)
+        .filter(|e| e.file_type().is_some_and(|ft| ft.is_dir()))
         .filter(|e| {
             !e.path()
                 .components()
