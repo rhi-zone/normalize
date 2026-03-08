@@ -2,6 +2,16 @@
 
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
+## Current Threads
+
+Three active work streams, roughly in parallel:
+
+1. **Graph / index query exposure** — extend `analyze graph` with dead-symbol detection, cycle surfacing, reverse-dependency queries, Ca/Ce coupling metrics. Data already in index; mostly query + output work. See [Index query exposure](#index-query-exposure--extend-analyze-graph-data-already-in-index) below.
+
+2. **Rules engine consolidation** — finish unifying output (one `DiagnosticsReport`, one banner), migrate more `analyze` checks into rules as appropriate, parallelize engine passes, improve asymptotic complexity (currently rebuilds full index each run). See [Rules Unification](#rules-unification--facts--structure-rename) below.
+
+3. **Language trait + .scm coverage** — proper support for all ~98 languages means: all `.scm` files (`tags.scm`, `locals.scm`, `highlights.scm`, etc.) wired up correctly, AND all Language trait methods fully implemented (symbols, imports, calls, visibility, test detection, etc.), each backed by fixture tests. Unverified = worse than none. See [Language Capability Traits](#language-capability-traits) and [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure) below.
+
 ## Priorities
 
 Production-grade refactoring across all ~98 languages. Goal: rename, find-references,
@@ -548,6 +558,20 @@ See `docs/lint-architecture.md` for full design discussion.
 - CodeQL: deep analysis (types, data flow, taint), ~12 languages
 - normalize: structural/architectural analysis, ~98 languages
 - Focus areas: circular deps, unused exports, module boundaries, import graph metrics
+
+**Index query exposure — extend `analyze graph` (data already in index):**
+
+These belong under `analyze graph` as new `--on` modes or flags, not as separate top-level commands. Keeps surface area down; they're all graph operations.
+
+- [ ] `analyze graph --on modules --dead` (or `--on symbols --dead`) — symbols/files with no inbound edges. Set-difference query over resolved imports + call sites. Cross-language differentiator.
+- [ ] `analyze graph --on modules --cycles` — surface SCCs as human-readable cycle lists. Already computed (`nontrivial_scc_count`, `sccs`); just needs a clearer dedicated output mode.
+- [ ] `analyze graph --dependents <file>` — reverse dependency query: what breaks if this file changes. Complement to `find-references`.
+- [ ] `analyze graph --on modules --coupling` — Ca (afferent), Ce (efferent), instability `I = Ce/(Ca+Ce)` per file. Standard SE metrics; index has the data. Check if existing `coupling` command already exposes these.
+- [ ] `analyze graph --on modules --hotspots` — most-imported files, most-called functions. Check if existing `hotspots` command uses index or just git churn.
+
+**Index query exposure — requires new extraction:**
+- [ ] Cohesion (LCOM) — needs method→field access tracking per class/struct. `analyze graph --on symbols` has symbol-level edges but LCOM requires knowing which methods access which fields within a container — finer-grained than current graph.
+- [ ] Churn correlation — needs git log integration; correlate high-coupling files with high churn to surface real debt hotspots.
 
 **Backlog - Deep Analysis (CodeQL-style):**
 - [ ] Type extraction for top languages (TS, Python, Rust, Go)
