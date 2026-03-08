@@ -134,7 +134,7 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 `DiagnosticsReport` now has `hints: Vec<String>`. Service methods populate hints
 based on context and output mode:
 - `rules run` (non-pretty, non-sarif): "Run with --pretty for detailed view" + "--fix to auto-fix"
-- `analyze check` (non-pretty): "Run `normalize analyze check [flags] --pretty` for detailed view"
+- `analyze check` subcommand deleted — subsumed by `normalize rules run --engine native`
 
 Remaining gaps:
 - `rules run --engine sarif` could show which SARIF tools had errors (not done)
@@ -419,7 +419,7 @@ See `docs/design/rules-unification.md` for full design.
    ```
    Tools that emit JSON (not SARIF) need a `format = "json"` adapter — stretch goal.
 
-6. **`normalize analyze check` help text is scuff** — "Use flags to run specific checks only" appears in the doc comment and gets repeated as-is. Rewrite the doc comment as a single clean sentence; the individual `--flag` help strings carry the per-flag detail. No need to enumerate flags in the top-level description.
+6. ~~**`normalize analyze check` help text is scuff**~~ — DELETED: `analyze check` subcommand removed; use `normalize rules run --engine native`.
 
 2. **Lift `rules` to top level** — DONE. `normalize rules` is now top-level. `--type` → `--engine`. `normalize facts rules` and `normalize facts check` removed. `normalize syntax` retains only `ast` and `query`.
 

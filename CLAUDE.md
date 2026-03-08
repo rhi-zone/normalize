@@ -85,7 +85,7 @@ Patterns from `docs/log-analysis.md` correction analysis:
 
 ## SUMMARY.md
 
-Every directory with files should have a `SUMMARY.md` describing its purpose and contents. The pre-commit hook enforces this at `severity=error` via `normalize analyze check --summary --fail-on-error`.
+Every directory with files should have a `SUMMARY.md` describing its purpose and contents. The pre-commit hook enforces this at `severity=error` via `normalize rules run --engine native` (stale-summary rule).
 
 **When making changes:**
 - Update `SUMMARY.md` in the current directory if you add, remove, or significantly change files there.
