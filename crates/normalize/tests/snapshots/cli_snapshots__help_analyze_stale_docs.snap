@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 292
 expression: "snapshot_help(&[\"analyze\", \"stale-docs\"])"
 ---
 Analyze codebase (health, complexity, security, duplicates, docs)
@@ -52,7 +53,6 @@ Module structure:
   layering           Per-module import layering compliance — are imports flowing downward?
 
 Repository:
-  check              Check documentation health: broken refs, stale docs, missing examples, and SUMMARY.md freshness.
   docs               Analyze documentation coverage
   files              Show longest files in codebase
 
