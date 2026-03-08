@@ -771,6 +771,15 @@ fn test_unused_import_fires() {
     let result = run_rule(&rule, &relations).unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].message.as_str(), "helper");
+    // warning_file provides file location
+    assert_eq!(
+        result[0]
+            .location
+            .as_ref()
+            .map(|l| l.file.as_str())
+            .into_option(),
+        Some("a.py")
+    );
 }
 
 #[test]

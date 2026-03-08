@@ -359,6 +359,11 @@ impl FileIndex {
         )
         .await
         .ok();
+        // resolved_file was added to imports after schema version 5 was already set;
+        // run unconditionally so existing v5 DBs without the column get migrated.
+        conn.execute("ALTER TABLE imports ADD COLUMN resolved_file TEXT", ())
+            .await
+            .ok();
 
         // Check schema version
         let mut rows = conn

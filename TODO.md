@@ -142,6 +142,21 @@ Future improvements:
 - Configurable debounce interval
 - Progress reporting during long runs
 
+## ascent-interpreter: type-aware integer coercion
+
+The interpreter evaluates unsuffixed integer literals (e.g. `0`, `42`) as `i32` (Rust default), but relation declarations may specify `u32`. When a `diagnostic(_, _, _, 0, _)` head uses literal `0`, it inserts `Value::I32(0)` into a `u32` column. Currently worked around in `extract_diagnostics` by accepting both `I32` and `U32` for the line field.
+
+Fix needed in `pterror/ascent-interpreter` `crates/ascent-eval/src/expr.rs`: in `eval_lit`, when the suffix is absent and the registry (or parent context) specifies a column type, coerce the integer to match. Alternatively, look up the relation's declared column types in `eval_head_tuple` and coerce after evaluation.
+
+## `unused-import` rule: improve indexer coverage
+
+Currently suppressed for `*.rs`, `*.ts`, `*.tsx`, `*.scm` files because the `call` relation doesn't capture:
+- **Rust**: type references, trait bounds, derive macro usage (`#[derive(Serialize)]` doesn't generate a `call` for `Serialize`)
+- **TypeScript/TSX**: JSX component usage (`<For>`) and namespace-qualified calls (`vscode.X` doesn't generate a `call` for `vscode`)
+- **SCM**: tree-sitter query files indexed as if they had imports
+
+Fix: extend the fact indexer to emit additional relations for type-reference and JSX usage, or add a `used_as_type(file, name)` relation that `unused-import.dl` checks alongside `used_name`.
+
 ## Next Up
 
 ### ~~Audit `rust/unwrap-in-impl`~~ — COMPLETE

@@ -38,6 +38,7 @@
 //! - `warning(rule_id: String, message: String)` → produces warnings
 //! - `error(rule_id: String, message: String)` → produces errors
 
+use abi_stable::std_types::ROption;
 use ascent_eval::{Engine, Value};
 use ascent_ir::Program;
 use ascent_syntax::AscentProgram;
@@ -65,6 +66,7 @@ relation is_impl(String, String);
 relation type_method(String, String, String);
 relation warning(String, String);
 relation error(String, String);
+relation diagnostic(String, String, String, u32, String);
 "#;
 
 // =============================================================================
@@ -513,9 +515,18 @@ pub fn run_rule(
 ) -> Result<Vec<Diagnostic>, InterpretError> {
     let mut diagnostics = run_rules_source(&rule.source, relations)?;
 
-    // Filter out allowed diagnostics
+    // Filter out allowed diagnostics.
+    // For diagnostics with a file location (from `diagnostic` relation), match the allow glob
+    // against the file path. For unlocated diagnostics (from `warning`/`error`), match against
+    // the message — file-level rules like orphan-file put the path in the message.
     if !rule.allow.is_empty() {
-        diagnostics.retain(|d| !rule.allow.iter().any(|p| p.matches(d.message.as_str())));
+        diagnostics.retain(|d| {
+            let match_str = match d.location.as_ref() {
+                ROption::RSome(loc) => loc.file.as_str(),
+                ROption::RNone => d.message.as_str(),
+            };
+            !rule.allow.iter().any(|p| p.matches(match_str))
+        });
     }
 
     // Apply severity: promote or demote diagnostics
@@ -546,7 +557,13 @@ pub fn run_rule(
 /// from syntax-rules.
 pub fn filter_inline_allowed(diagnostics: &mut Vec<Diagnostic>, root: &Path) {
     diagnostics.retain(|d| {
-        let path = root.join(d.message.as_str());
+        // For file-located diagnostics, check the location file directly.
+        // For unlocated diagnostics, try interpreting the message as a file path.
+        let file_str = match d.location.as_ref() {
+            ROption::RSome(loc) => loc.file.as_str(),
+            ROption::RNone => d.message.as_str(),
+        };
+        let path = root.join(file_str);
         if path.is_file() {
             !file_has_allow_comment(&path, d.rule_id.as_str())
         } else {
@@ -751,6 +768,40 @@ fn extract_diagnostics(engine: &Engine) -> Vec<Diagnostic> {
         for tuple in errors.iter() {
             if let [Value::String(rule_id), Value::String(message)] = tuple {
                 diagnostics.push(Diagnostic::error(rule_id, message));
+            }
+        }
+    }
+
+    // diagnostic(severity, rule_id, file, line, message) — located diagnostics.
+    // severity: "error", "warning", "info", "hint"
+    // file: "" for no specific location
+    // line: 0 when the fact source has no line info (e.g. the import relation)
+    // The ascent-interpreter evaluates unsuffixed integer literals as i32 (Rust default),
+    // so accept both I32 and U32 for line until the interpreter adds type-aware coercion.
+    if let Some(diags) = engine.relation("diagnostic") {
+        for tuple in diags.iter() {
+            if let [
+                Value::String(severity),
+                Value::String(rule_id),
+                Value::String(file),
+                line_val,
+                Value::String(message),
+            ] = tuple
+            {
+                let line = match line_val {
+                    Value::U32(n) => *n,
+                    Value::I32(n) => (*n).max(0) as u32,
+                    _ => continue,
+                };
+                let mut d = match severity.as_str() {
+                    "error" => Diagnostic::error(rule_id, message),
+                    "info" | "hint" => Diagnostic::hint(rule_id, message),
+                    _ => Diagnostic::warning(rule_id, message),
+                };
+                if !file.is_empty() {
+                    d = d.at(file, line);
+                }
+                diagnostics.push(d);
             }
         }
     }

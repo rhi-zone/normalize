@@ -15,6 +15,8 @@ pub enum RuleType {
     All,
     Syntax,
     Fact,
+    /// Native checks: stale-summary, missing-summary, check-refs, stale-docs, check-examples.
+    Native,
     /// Run external tools that emit SARIF 2.1.0 output (configured via `[[analyze.sarif-tools]]`).
     Sarif,
 }
@@ -25,6 +27,7 @@ impl std::fmt::Display for RuleType {
             Self::All => f.write_str("all"),
             Self::Syntax => f.write_str("syntax"),
             Self::Fact => f.write_str("fact"),
+            Self::Native => f.write_str("native"),
             Self::Sarif => f.write_str("sarif"),
         }
     }
@@ -37,9 +40,10 @@ impl std::str::FromStr for RuleType {
             "all" => Ok(Self::All),
             "syntax" => Ok(Self::Syntax),
             "fact" => Ok(Self::Fact),
+            "native" => Ok(Self::Native),
             "sarif" => Ok(Self::Sarif),
             _ => Err(format!(
-                "unknown rule type: {s}; valid: all, syntax, fact, sarif"
+                "unknown rule type: {s}; valid: all, syntax, fact, native, sarif"
             )),
         }
     }
@@ -1164,12 +1168,14 @@ pub async fn collect_fact_diagnostics(
     root: &Path,
     config: &interpret::FactsRulesConfig,
     filter_ids: Option<&HashSet<String>>,
+    filter_rule: Option<&str>,
 ) -> Vec<normalize_facts_rules_api::Diagnostic> {
     let all_rules_unfiltered = interpret::load_all_rules(root, config);
     let all_rules: Vec<_> = all_rules_unfiltered
         .into_iter()
         .filter(|r| r.enabled)
         .filter(|r| filter_ids.is_none_or(|ids| ids.contains(&r.id)))
+        .filter(|r| filter_rule.is_none_or(|id| r.id == id))
         .collect();
 
     if all_rules.is_empty() {
@@ -1292,9 +1298,27 @@ pub fn run_rules_report(
             root,
             &config.analyze.facts_rules,
             filter_ids.as_ref(),
+            filter_rule,
         ));
+        // Apply global-allow patterns from [analyze.rules] to fact-rule diagnostics.
+        // Syntax rules apply global_allow during load_all_rules(); fact rules need it here.
+        let global_allow: Vec<glob::Pattern> = config
+            .analyze
+            .rules
+            .global_allow
+            .iter()
+            .filter_map(|s| glob::Pattern::new(s).ok())
+            .collect();
         for d in &diagnostics {
-            report.issues.push(abi_diagnostic_to_issue(d));
+            let file = d
+                .location
+                .as_ref()
+                .map(|loc| loc.file.as_str())
+                .into_option()
+                .unwrap_or(d.message.as_str());
+            if global_allow.is_empty() || !global_allow.iter().any(|p| p.matches(file)) {
+                report.issues.push(abi_diagnostic_to_issue(d));
+            }
         }
         report.sources_run.push("fact-rules".into());
     }

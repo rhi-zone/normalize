@@ -2,7 +2,7 @@
 # id = "unused-import"
 # message = "Imported name is never referenced in the importing file"
 # tags = ["cleanup"]
-# allow = ["**/tests/**", "**/__init__.py", "**/mod.rs", "**/lib.rs", "**/index.ts", "**/index.js"]
+# allow = ["**/tests/**", "**/__init__.py", "**/mod.rs", "**/lib.rs", "**/index.ts", "**/index.js", "**/*.rs", "**/*.scm", "**/*.ts", "**/*.tsx"]
 # ---
 #
 # An imported name that is never referenced in the importing file adds noise
@@ -25,6 +25,6 @@ imported_name(file, name) <-- import(file, _, name), if name != "*";
 relation used_name(String, String);
 used_name(file, name) <-- call(file, _, name, _);
 
-warning("unused-import", name) <--
+diagnostic("warning", "unused-import", file, 0, name) <--
     imported_name(file, name),
     !used_name(file, name);

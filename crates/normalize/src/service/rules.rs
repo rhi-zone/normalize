@@ -10,12 +10,18 @@ use std::path::Path;
 /// Rules management sub-service.
 pub struct RulesService {
     pretty: Cell<bool>,
+    /// Set to true when --sarif is active; display_run emits SARIF instead of text.
+    sarif: Cell<bool>,
+    /// Issue display limit for text output (default 50).
+    limit: Cell<usize>,
 }
 
 impl RulesService {
     pub fn new(pretty: &Cell<bool>) -> Self {
         Self {
             pretty: Cell::new(pretty.get()),
+            sarif: Cell::new(false),
+            limit: Cell::new(50),
         }
     }
 
@@ -48,17 +54,20 @@ impl std::fmt::Display for RuleResult {
 
 impl RulesService {
     fn display_run(&self, r: &DiagnosticsReport) -> String {
+        if self.sarif.get() {
+            return r.format_sarif();
+        }
         if self.pretty.get() {
             r.format_pretty()
         } else {
-            r.format_text()
+            r.format_text_limited(Some(self.limit.get()))
         }
     }
 }
 
 #[cli(
     name = "rules",
-    about = "Manage and run analysis rules (syntax + fact)"
+    about = "Manage and run analysis rules (syntax + fact + native)"
 )]
 impl RulesService {
     /// List all rules (syntax + fact, builtin + user)
@@ -123,14 +132,19 @@ impl RulesService {
         #[param(help = "Apply auto-fixes (syntax rules only)")] fix: bool,
         #[param(help = "Output in SARIF format")] sarif: bool,
         #[param(positional, help = "Target directory or file")] target: Option<String>,
-        #[param(short = 't', help = "Filter by rule type (all, syntax, fact)")] r#type: Option<
-            String,
-        >,
+        #[param(
+            short = 't',
+            help = "Filter by rule type (all, syntax, fact, native, sarif)"
+        )]
+        r#type: Option<String>,
         #[param(help = "Debug flags (comma-separated)")] debug: Vec<String>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
         #[param(help = "Exit 0 even when error-severity issues are found")] no_fail: bool,
+        #[param(help = "Maximum number of issues to show in detail (default: 50)")] limit: Option<
+            usize,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<DiagnosticsReport, String> {
@@ -145,6 +159,8 @@ impl RulesService {
             compact,
             root.as_deref().map(Path::new).unwrap_or(Path::new(".")),
         );
+        self.sarif.set(sarif);
+        self.limit.set(limit.unwrap_or(50));
         let config = crate::config::NormalizeConfig::load(&effective_root);
         let rule_type: crate::commands::rules::RuleType = r#type
             .as_deref()
@@ -183,8 +199,13 @@ impl RulesService {
             };
         }
 
-        // Normal run: unified report via run_rules_report() — one banner, colors, counts
-        let report = tokio::task::spawn_blocking(move || {
+        let run_native = matches!(
+            rule_type,
+            crate::commands::rules::RuleType::All | crate::commands::rules::RuleType::Native
+        );
+
+        // Syntax + fact + SARIF engines via run_rules_report() (blocking)
+        let mut report = tokio::task::spawn_blocking(move || {
             crate::commands::rules::run_rules_report(
                 &target_root,
                 &project_root,
@@ -198,11 +219,42 @@ impl RulesService {
         .await
         .map_err(|e| format!("Task error: {e}"))?;
 
-        // --sarif: print SARIF to stdout directly (bypasses display_run)
-        if sarif {
-            print!("{}", report.format_sarif());
-            return Ok(DiagnosticsReport::new());
+        // Native engine (stale-summary, check-refs, stale-docs, check-examples)
+        // runs in async context; included in All and Native engine types.
+        if run_native {
+            let native_root = effective_root.clone();
+            let native_config = crate::config::NormalizeConfig::load(&native_root);
+            let threshold = 10;
+
+            let summary_report =
+                crate::commands::analyze::stale_summary::build_stale_summary_report(
+                    &native_root,
+                    threshold,
+                );
+            report.merge(summary_report.into());
+
+            let stale_report =
+                crate::commands::analyze::stale_docs::build_stale_docs_report(&native_root);
+            report.merge(stale_report.into());
+
+            let examples_report =
+                crate::commands::analyze::check_examples::build_check_examples_report(&native_root);
+            report.merge(examples_report.into());
+
+            if let Ok(refs_report) =
+                crate::commands::analyze::check_refs::build_check_refs_report(&native_root).await
+            {
+                report.merge(refs_report.into());
+            }
+
+            crate::commands::rules::apply_native_rules_config(
+                &mut report,
+                &native_config.analyze.rules,
+            );
+            report.sources_run.push("native".into());
         }
+
+        report.sort();
 
         let error_count = report.count_by_severity(normalize_output::diagnostics::Severity::Error);
         if !no_fail && error_count > 0 {
