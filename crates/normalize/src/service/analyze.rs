@@ -1467,7 +1467,7 @@ impl AnalyzeService {
     /// Rank modules by import fan-in (requires facts index)
     #[server(group = "modules")]
     #[cli(display_with = "display_imports")]
-    pub fn imports(
+    pub async fn imports(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
@@ -1489,12 +1489,13 @@ impl AnalyzeService {
             effective_limit,
             internal,
         )
+        .await
     }
 
     /// Per-module dependency depth + ripple risk
     #[server(group = "modules")]
     #[cli(display_with = "display_depth_map")]
-    pub fn depth_map(
+    pub async fn depth_map(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
@@ -1510,13 +1511,16 @@ impl AnalyzeService {
             0 => usize::MAX,
             n => n,
         };
-        crate::commands::analyze::depth_map::analyze_depth_map_sync(&root_path, effective_limit)
+        let idx = crate::index::ensure_ready(&root_path).await?;
+        crate::commands::analyze::depth_map::analyze_depth_map(&idx, effective_limit)
+            .await
+            .map_err(|e| format!("Depth map analysis failed: {}", e))
     }
 
     /// Graph-theoretic properties of the dependency graph
     #[server(group = "graph")]
     #[cli(display_with = "display_graph")]
-    pub fn graph(
+    pub async fn graph(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
@@ -1533,13 +1537,16 @@ impl AnalyzeService {
             n => n,
         };
         let target = on.unwrap_or(GraphTarget::Modules);
-        crate::commands::analyze::graph::analyze_graph_sync(&root_path, effective_limit, target)
+        let idx = crate::index::ensure_ready(&root_path).await?;
+        crate::commands::analyze::graph::analyze_graph(&idx, effective_limit, target)
+            .await
+            .map_err(|e| format!("Graph analysis failed: {}", e))
     }
 
     /// Find all modules or symbols that transitively depend on a given file or symbol
     #[server(group = "graph")]
     #[cli(display_with = "display_dependents")]
-    pub fn dependents(
+    pub async fn dependents(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
@@ -1552,13 +1559,16 @@ impl AnalyzeService {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
         let target = on.unwrap_or(GraphTarget::Modules);
-        crate::commands::analyze::graph::analyze_dependents_sync(&root_path, &file, target)
+        let idx = crate::index::ensure_ready(&root_path).await?;
+        crate::commands::analyze::graph::analyze_dependents(&idx, &file, target)
+            .await
+            .map_err(|e| format!("Dependents query failed: {}", e))
     }
 
     /// Per-module public symbol count, public ratio, and constraint score
     #[server(group = "modules")]
     #[cli(display_with = "display_surface")]
-    pub fn surface(
+    pub async fn surface(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
@@ -1574,13 +1584,16 @@ impl AnalyzeService {
             0 => usize::MAX,
             n => n,
         };
-        crate::commands::analyze::surface::analyze_surface_sync(&root_path, effective_limit)
+        let idx = crate::index::ensure_ready(&root_path).await?;
+        crate::commands::analyze::surface::analyze_surface(&idx, effective_limit)
+            .await
+            .map_err(|e| format!("Surface analysis failed: {}", e))
     }
 
     /// Per-module import layering compliance — are imports flowing downward?
     #[server(group = "modules")]
     #[cli(display_with = "display_layering")]
-    pub fn layering(
+    pub async fn layering(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
@@ -1596,7 +1609,10 @@ impl AnalyzeService {
             0 => usize::MAX,
             n => n,
         };
-        crate::commands::analyze::layering::analyze_layering_sync(&root_path, effective_limit)
+        let idx = crate::index::ensure_ready(&root_path).await?;
+        crate::commands::analyze::layering::analyze_layering(&idx, effective_limit)
+            .await
+            .map_err(|e| format!("Layering analysis failed: {}", e))
     }
 
     /// Provenance graph: git blame → session mapping + code relations

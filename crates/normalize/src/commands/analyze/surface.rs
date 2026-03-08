@@ -7,7 +7,6 @@ use crate::index::FileIndex;
 use crate::output::OutputFormatter;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::path::Path;
 
 /// One module's interface metrics.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -140,16 +139,6 @@ pub async fn analyze_surface(
     Ok(SurfaceReport {
         modules: entries,
         stats,
-    })
-}
-
-/// CLI entry point.
-pub fn analyze_surface_sync(root: &Path, limit: usize) -> Result<SurfaceReport, String> {
-    crate::runtime::block_on(async {
-        let idx = crate::index::ensure_ready(root).await?;
-        analyze_surface(&idx, limit)
-            .await
-            .map_err(|e| format!("Surface analysis failed: {}", e))
     })
 }
 

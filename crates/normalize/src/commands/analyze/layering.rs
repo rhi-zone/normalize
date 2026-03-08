@@ -10,7 +10,6 @@ use normalize_architecture::{
 };
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
 
 /// Per-module layering metrics.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -194,16 +193,6 @@ pub async fn analyze_layering(
         modules: entries,
         layers,
         stats,
-    })
-}
-
-/// CLI entry point.
-pub fn analyze_layering_sync(root: &Path, limit: usize) -> Result<LayeringReport, String> {
-    crate::runtime::block_on(async {
-        let idx = crate::index::ensure_ready(root).await?;
-        analyze_layering(&idx, limit)
-            .await
-            .map_err(|e| format!("Layering analysis failed: {}", e))
     })
 }
 

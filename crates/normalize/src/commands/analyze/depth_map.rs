@@ -8,7 +8,6 @@ use crate::output::OutputFormatter;
 use normalize_architecture::{build_import_graph, compute_depth, compute_downstream};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
 
 /// One module's depth and risk metrics.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -141,16 +140,6 @@ pub async fn analyze_depth_map(
     Ok(DepthMapReport {
         modules: entries,
         stats,
-    })
-}
-
-/// CLI entry point.
-pub fn analyze_depth_map_sync(root: &Path, limit: usize) -> Result<DepthMapReport, String> {
-    crate::runtime::block_on(async {
-        let idx = crate::index::ensure_ready(root).await?;
-        analyze_depth_map(&idx, limit)
-            .await
-            .map_err(|e| format!("Depth map analysis failed: {}", e))
     })
 }
 
