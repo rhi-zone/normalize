@@ -42,10 +42,8 @@ Ordered by impact × tractability. Pick from top.
    `DiagnosticsReport` with single banner, colors, severity counts, and global allow for
    `**/tests/fixtures/**` in `.normalize/config.toml`.
 
-2. ~~**Eliminate `cmd_*` layer**~~ — DONE (2026-03-08). Dead wrappers in `commands/analyze/`,
-   `commands/view/`, and `commands/rules.rs` deleted. `commands/rules.rs` still has
-   i32-returning inner functions (`cmd_list`, `cmd_run`, `cmd_enable_disable`, etc.) called by
-   `service/rules.rs` via `exit_to_result()` — this is the remaining refactor if desired.
+2. **Eliminate `cmd_*` layer** — PARTIAL. Dead wrappers in `commands/analyze/` deleted
+   (2026-03-08). ~21 cmd_* functions remain in view/, sessions/, tools/, facts.rs, etc.
    See: [Eliminate cmd_* layer](#eliminate-cmd_-layer--move-logic-into-service-methods)
 
 2. ~~**Wire `tags.scm` into symbol extraction**~~ — DONE (already complete before this session).
