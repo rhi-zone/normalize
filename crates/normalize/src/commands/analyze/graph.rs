@@ -12,11 +12,11 @@
 //! This module handles graph construction from the index and CLI wiring.
 
 use crate::index::FileIndex;
-use normalize_graph::analyze_graph_data;
+use normalize_graph::{analyze_graph_data, find_dependents};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-pub use normalize_graph::{GraphReport, GraphTarget};
+pub use normalize_graph::{DependentsReport, GraphReport, GraphTarget};
 
 // ---------------------------------------------------------------------------
 // Graph construction
@@ -127,5 +127,43 @@ pub fn analyze_graph_sync(
         analyze_graph(&idx, limit, target)
             .await
             .map_err(|e| format!("Graph analysis failed: {}", e))
+    })
+}
+
+/// Find all modules/symbols that (transitively) depend on a given file.
+pub async fn analyze_dependents(
+    idx: &FileIndex,
+    file: &str,
+    target: GraphTarget,
+) -> Result<DependentsReport, libsql::Error> {
+    let adj = match target {
+        GraphTarget::Modules => {
+            use super::architecture::build_import_graph;
+            let graph = build_import_graph(idx).await?;
+            graph.imports_by_file
+        }
+        GraphTarget::Symbols => build_call_graph(idx).await?,
+        GraphTarget::Types => build_type_graph(idx).await?,
+    };
+
+    let dependents = find_dependents(&adj, file);
+    Ok(DependentsReport {
+        target: file.to_string(),
+        graph_target: target,
+        dependents,
+    })
+}
+
+/// CLI entry point for dependents query (sync wrapper).
+pub fn analyze_dependents_sync(
+    root: &Path,
+    file: &str,
+    target: GraphTarget,
+) -> Result<DependentsReport, String> {
+    crate::runtime::block_on(async {
+        let idx = crate::index::ensure_ready(root).await?;
+        analyze_dependents(&idx, file, target)
+            .await
+            .map_err(|e| format!("Dependents query failed: {}", e))
     })
 }

@@ -71,6 +71,8 @@ pub struct GraphStats {
     pub transitive_edge_count: usize,
     pub max_chain_depth: usize,
     pub chain_count: usize,
+    /// Nodes with no inbound edges (unreachable / potentially dead code)
+    pub dead_node_count: usize,
 }
 
 /// A strongly connected component (circular-dependency cluster).
@@ -115,6 +117,57 @@ pub struct TransitiveEdge {
     pub via: String,
 }
 
+/// Report for reverse dependency queries: what depends on a given file/symbol.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct DependentsReport {
+    /// The file or symbol being queried.
+    pub target: String,
+    /// Graph node kind used for the query.
+    pub graph_target: GraphTarget,
+    /// All nodes that transitively depend on `target`, sorted alphabetically.
+    pub dependents: Vec<String>,
+}
+
+impl normalize_output::OutputFormatter for DependentsReport {
+    fn format_text(&self) -> String {
+        let kind = match self.graph_target {
+            GraphTarget::Modules => "modules",
+            GraphTarget::Symbols => "symbols",
+            GraphTarget::Types => "types",
+        };
+        let mut out = Vec::new();
+        out.push(format!(
+            "# Dependents of {} ({} {} depend on it)",
+            self.target,
+            self.dependents.len(),
+            kind
+        ));
+        for dep in &self.dependents {
+            out.push(format!("  {}", dep));
+        }
+        out.join("\n")
+    }
+
+    fn format_pretty(&self) -> String {
+        let kind = match self.graph_target {
+            GraphTarget::Modules => "modules",
+            GraphTarget::Symbols => "symbols",
+            GraphTarget::Types => "types",
+        };
+        let mut out = Vec::new();
+        out.push(format!(
+            "\x1b[1;36m# Dependents of\x1b[0m \x1b[1m{}\x1b[0m \x1b[2m({} {} depend on it)\x1b[0m",
+            self.target,
+            self.dependents.len(),
+            kind
+        ));
+        for dep in &self.dependents {
+            out.push(format!("  \x1b[37m{}\x1b[0m", dep));
+        }
+        out.join("\n")
+    }
+}
+
 /// Full graph analysis report.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct GraphReport {
@@ -125,6 +178,9 @@ pub struct GraphReport {
     pub bridges: Vec<BridgeEdge>,
     pub longest_chains: Vec<ImportChain>,
     pub transitive_edges: Vec<TransitiveEdge>,
+    /// Nodes with no inbound edges (files/symbols that nothing imports/calls).
+    /// Sorted alphabetically. Does not include fully isolated nodes (no edges at all).
+    pub dead_nodes: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -146,6 +202,66 @@ pub fn all_nodes(imports: &HashMap<String, HashSet<String>>) -> HashSet<String> 
 /// Count directed edges.
 pub fn edge_count(imports: &HashMap<String, HashSet<String>>) -> usize {
     imports.values().map(|s| s.len()).sum()
+}
+
+/// Build the reverse (transposed) graph: edges point from target to source.
+pub fn reverse_graph(
+    imports: &HashMap<String, HashSet<String>>,
+) -> HashMap<String, HashSet<String>> {
+    let mut rev: HashMap<String, HashSet<String>> = HashMap::new();
+    for (src, targets) in imports {
+        for tgt in targets {
+            rev.entry(tgt.clone()).or_default().insert(src.clone());
+        }
+    }
+    rev
+}
+
+/// Find all nodes that (transitively) depend on `target` via BFS on the reverse graph.
+/// Returns a sorted list excluding the target itself.
+pub fn find_dependents(imports: &HashMap<String, HashSet<String>>, target: &str) -> Vec<String> {
+    let rev = reverse_graph(imports);
+    let mut visited: HashSet<String> = HashSet::new();
+    let mut queue: VecDeque<String> = VecDeque::new();
+    queue.push_back(target.to_string());
+    visited.insert(target.to_string());
+
+    while let Some(node) = queue.pop_front() {
+        if let Some(parents) = rev.get(&node) {
+            for parent in parents {
+                if visited.insert(parent.clone()) {
+                    queue.push_back(parent.clone());
+                }
+            }
+        }
+    }
+
+    let mut result: Vec<String> = visited.into_iter().filter(|n| n != target).collect();
+    result.sort();
+    result
+}
+
+/// Find nodes with no inbound edges (nothing imports/calls them) that do have
+/// outbound edges (they import/call something). These are unreachable internal
+/// nodes — potential dead code. Entry points (main.rs, lib.rs) are included;
+/// callers can filter based on their heuristics.
+pub fn find_dead_nodes(imports: &HashMap<String, HashSet<String>>) -> Vec<String> {
+    // Collect all nodes that appear as targets (have at least one inbound edge)
+    let mut has_inbound: HashSet<&str> = HashSet::new();
+    for targets in imports.values() {
+        for t in targets {
+            has_inbound.insert(t.as_str());
+        }
+    }
+
+    // Nodes that have outbound edges but no inbound edges
+    let mut dead: Vec<String> = imports
+        .keys()
+        .filter(|n| !has_inbound.contains(n.as_str()))
+        .cloned()
+        .collect();
+    dead.sort();
+    dead
 }
 
 /// Weakly connected components via BFS on the undirected view.
@@ -687,11 +803,15 @@ pub fn analyze_graph_data(
         },
     );
 
+    let mut dead_nodes = find_dead_nodes(imports);
+    let dead_node_count = dead_nodes.len();
+
     // Apply limits
     sccs.truncate(limit);
     diamonds.truncate(limit);
     longest_chains.truncate(limit);
     transitive_edges.truncate(limit);
+    dead_nodes.truncate(limit);
 
     let stats = GraphStats {
         nodes: node_count,
@@ -706,6 +826,7 @@ pub fn analyze_graph_data(
         transitive_edge_count,
         max_chain_depth,
         chain_count,
+        dead_node_count,
     };
 
     GraphReport {
@@ -716,6 +837,7 @@ pub fn analyze_graph_data(
         bridges,
         longest_chains,
         transitive_edges,
+        dead_nodes,
     }
 }
 
@@ -757,6 +879,12 @@ impl OutputFormatter for GraphReport {
             out.push(format!(
                 "  max chain depth {}, {} deep chains (depth > 2)",
                 s.max_chain_depth, s.chain_count
+            ));
+        }
+        if s.dead_node_count > 0 {
+            out.push(format!(
+                "  {} unreferenced nodes (no inbound edges)",
+                s.dead_node_count
             ));
         }
         out.push(String::new());
@@ -860,6 +988,24 @@ impl OutputFormatter for GraphReport {
             out.push(String::new());
         }
 
+        // Dead nodes (no inbound edges)
+        if !self.dead_nodes.is_empty() {
+            let label = match self.target {
+                GraphTarget::Modules => "Unreferenced modules",
+                GraphTarget::Symbols => "Uncalled symbols",
+                GraphTarget::Types => "Unreferenced types",
+            };
+            out.push(format!(
+                "## {} ({} nodes with no inbound edges)",
+                label,
+                self.dead_nodes.len()
+            ));
+            for node in &self.dead_nodes {
+                out.push(format!("  {}", node));
+            }
+            out.push(String::new());
+        }
+
         out.join("\n")
     }
 
@@ -920,6 +1066,12 @@ impl OutputFormatter for GraphReport {
             out.push(format!(
                 "  max chain depth {}{}\x1b[0m, {} deep chains (depth > 2)",
                 depth_color, s.max_chain_depth, s.chain_count
+            ));
+        }
+        if s.dead_node_count > 0 {
+            out.push(format!(
+                "  \x1b[2m{} unreferenced nodes (no inbound edges)\x1b[0m",
+                s.dead_node_count
             ));
         }
         out.push(String::new());
@@ -1027,6 +1179,24 @@ impl OutputFormatter for GraphReport {
                     truncate_path(&te.to, 30),
                     truncate_path(&te.via, 30),
                 ));
+            }
+            out.push(String::new());
+        }
+
+        // Dead nodes (no inbound edges)
+        if !self.dead_nodes.is_empty() {
+            let label = match self.target {
+                GraphTarget::Modules => "Unreferenced modules",
+                GraphTarget::Symbols => "Uncalled symbols",
+                GraphTarget::Types => "Unreferenced types",
+            };
+            out.push(format!(
+                "\x1b[2m## {} ({} with no inbound edges)\x1b[0m",
+                label,
+                self.dead_nodes.len()
+            ));
+            for node in &self.dead_nodes {
+                out.push(format!("  \x1b[2m{}\x1b[0m", node));
             }
             out.push(String::new());
         }

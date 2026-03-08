@@ -23,7 +23,7 @@ use crate::commands::analyze::duplicates::{
 use crate::commands::analyze::duplicates_views::{DuplicateMode, DuplicateScope, DuplicatesReport};
 use crate::commands::analyze::files::FileLengthReport;
 use crate::commands::analyze::fragments::{FragmentScope, FragmentsReport};
-use crate::commands::analyze::graph::{GraphReport, GraphTarget};
+use crate::commands::analyze::graph::{DependentsReport, GraphReport, GraphTarget};
 use crate::commands::analyze::hotspots::HotspotsReport;
 use crate::commands::analyze::impact::ImpactReport;
 use crate::commands::analyze::imports::ImportCentralityReport;
@@ -240,6 +240,14 @@ impl AnalyzeService {
     }
 
     fn display_graph(&self, r: &GraphReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_dependents(&self, r: &DependentsReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1526,6 +1534,25 @@ impl AnalyzeService {
         };
         let target = on.unwrap_or(GraphTarget::Modules);
         crate::commands::analyze::graph::analyze_graph_sync(&root_path, effective_limit, target)
+    }
+
+    /// Find all modules or symbols that transitively depend on a given file or symbol
+    #[server(group = "graph")]
+    #[cli(display_with = "display_dependents")]
+    pub fn dependents(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "File or symbol to find dependents for")] file: String,
+        #[param(help = "Graph nodes: modules (default) or symbols")] on: Option<GraphTarget>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<DependentsReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let target = on.unwrap_or(GraphTarget::Modules);
+        crate::commands::analyze::graph::analyze_dependents_sync(&root_path, &file, target)
     }
 
     /// Per-module public symbol count, public ratio, and constraint score

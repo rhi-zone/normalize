@@ -569,9 +569,9 @@ See `docs/lint-architecture.md` for full design discussion.
 
 These belong under `analyze graph` as new `--on` modes or flags, not as separate top-level commands. Keeps surface area down; they're all graph operations.
 
-- [ ] `analyze graph --on modules --dead` (or `--on symbols --dead`) — symbols/files with no inbound edges. Set-difference query over resolved imports + call sites. Cross-language differentiator.
+- [x] `analyze graph --on modules --dead` — DONE (2026-03-09). `dead_nodes` field in `GraphReport`; rendered in both text/pretty output; `dead_node_count` in stats summary line.
 - [ ] `analyze graph --on modules --cycles` — surface SCCs as human-readable cycle lists. Already computed (`nontrivial_scc_count`, `sccs`); just needs a clearer dedicated output mode.
-- [ ] `analyze graph --dependents <file>` — reverse dependency query: what breaks if this file changes. Complement to `find-references`.
+- [x] `analyze graph --dependents <file>` — DONE (2026-03-09). New `normalize analyze dependents --file <path>` command; uses reverse BFS over module import graph; `DependentsReport` with pretty/text output.
 - [ ] `analyze graph --on modules --coupling` — Ca (afferent), Ce (efferent), instability `I = Ce/(Ca+Ce)` per file. Standard SE metrics; index has the data. Check if existing `coupling` command already exposes these.
 - [ ] `analyze graph --on modules --hotspots` — most-imported files, most-called functions. Check if existing `hotspots` command uses index or just git churn.
 

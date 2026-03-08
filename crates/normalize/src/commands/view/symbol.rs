@@ -943,6 +943,7 @@ fn display_referenced_types(
 
     let mut external_types: Vec<(String, String, String, usize)> = Vec::new(); // (name, file, signature, line)
 
+    #[allow(clippy::collapsible_if)]
     if !remaining.is_empty() {
         if let Some(idx) = crate::runtime::block_on(crate::index::open_if_enabled(root)) {
             for type_name in &remaining {
