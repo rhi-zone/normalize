@@ -25,33 +25,42 @@ impl<'a> IndexedResolver<'a> {
 
 impl InterfaceResolver for IndexedResolver<'_> {
     fn resolve_interface_methods(&self, name: &str, current_file: &str) -> Option<Vec<String>> {
-        let rt = tokio::runtime::Runtime::new().ok()?;
+        let index = self.index;
+        let name = name.to_owned();
+        let current_file = current_file.to_owned();
 
-        // First try to resolve the import to find the source file
-        if let Ok(Some((source_module, _original_name))) =
-            rt.block_on(self.index.resolve_import(current_file, name))
-        {
-            // Convert module to file path and query type_methods
-            // For now, try the source_module as a relative path
-            let methods = rt
-                .block_on(self.index.get_type_methods(&source_module, name))
-                .ok()?;
-            if !methods.is_empty() {
-                return Some(methods);
-            }
-        }
-
-        // Also check if the type is defined in any indexed file
-        if let Ok(files) = rt.block_on(self.index.find_type_definitions(name)) {
-            for file in files {
-                if let Ok(methods) = rt.block_on(self.index.get_type_methods(&file, name))
-                    && !methods.is_empty()
-                {
+        let task = async move {
+            // First try to resolve the import to find the source file
+            if let Ok(Some((source_module, _original_name))) =
+                index.resolve_import(&current_file, &name).await
+            {
+                let methods = index
+                    .get_type_methods(&source_module, &name)
+                    .await
+                    .ok()
+                    .unwrap_or_default();
+                if !methods.is_empty() {
                     return Some(methods);
                 }
             }
-        }
 
-        None
+            // Also check if the type is defined in any indexed file
+            if let Ok(files) = index.find_type_definitions(&name).await {
+                for file in files {
+                    if let Ok(methods) = index.get_type_methods(&file, &name).await
+                        && !methods.is_empty()
+                    {
+                        return Some(methods);
+                    }
+                }
+            }
+
+            None
+        };
+
+        match tokio::runtime::Handle::try_current() {
+            Ok(handle) => tokio::task::block_in_place(|| handle.block_on(task)),
+            Err(_) => tokio::runtime::Runtime::new().ok()?.block_on(task),
+        }
     }
 }

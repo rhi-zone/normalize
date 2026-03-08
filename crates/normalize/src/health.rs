@@ -934,16 +934,21 @@ pub fn analyze_health(root: &Path) -> HealthReport {
     // Try index first for file/line stats, fall back to filesystem walk
     let config = crate::config::NormalizeConfig::load(root);
     if config.index.enabled() {
-        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        if let Ok(mut index) = rt.block_on(crate::index::open(root)) {
-            return rt.block_on(analyze_health_indexed(
-                root,
-                &mut index,
-                &allow_patterns,
-                complexity,
-                extra,
-            ));
+        let fut = async { crate::index::open(root).await.ok() };
+        let indexed = match tokio::runtime::Handle::try_current() {
+            Ok(handle) => tokio::task::block_in_place(|| handle.block_on(fut)),
+            Err(_) => tokio::runtime::Runtime::new()
+                .expect("tokio runtime")
+                .block_on(fut),
+        };
+        if let Some(mut index) = indexed {
+            let fut2 = analyze_health_indexed(root, &mut index, &allow_patterns, complexity, extra);
+            return match tokio::runtime::Handle::try_current() {
+                Ok(handle) => tokio::task::block_in_place(|| handle.block_on(fut2)),
+                Err(_) => tokio::runtime::Runtime::new()
+                    .expect("tokio runtime")
+                    .block_on(fut2),
+            };
         }
     }
     analyze_health_unindexed(root, &allow_patterns, complexity, extra)

@@ -8,34 +8,54 @@ use normalize_languages::Symbol;
 // Re-export public types from the extracted crate
 pub use normalize_path_resolve::{PathMatch, PathSource, SigilExpansion, UnifiedPath};
 
-/// Wraps a `FileIndex` + `tokio::Runtime` as a `PathSource`.
+/// Wraps pre-fetched index file data as a `PathSource`.
+///
+/// Data is fetched once during `open` (or `open_sync`). The sync `PathSource`
+/// methods then operate on cached data — no stored `Runtime` needed.
 struct IndexPathSource {
-    index: crate::index::FileIndex,
-    rt: tokio::runtime::Runtime,
+    files: Vec<(String, bool)>,
 }
 
 impl IndexPathSource {
-    fn open(root: &Path) -> Option<Self> {
-        let rt = tokio::runtime::Runtime::new().ok()?;
-        let mut index = rt.block_on(crate::index::open_if_enabled(root))?;
-        let _ = rt.block_on(index.incremental_refresh());
-        Some(Self { index, rt })
+    async fn open(root: &Path) -> Option<Self> {
+        let mut index = crate::index::open_if_enabled(root).await?;
+        let _ = index.incremental_refresh().await;
+        let files = index
+            .all_files()
+            .await
+            .ok()?
+            .into_iter()
+            .map(|f| (f.path, f.is_dir))
+            .collect();
+        Some(Self { files })
+    }
+
+    /// Open from a sync context: uses `block_in_place` inside a tokio runtime,
+    /// or creates a temporary runtime when called outside tokio.
+    fn open_sync(root: &Path) -> Option<Self> {
+        match tokio::runtime::Handle::try_current() {
+            Ok(handle) => tokio::task::block_in_place(|| handle.block_on(Self::open(root))),
+            Err(_) => tokio::runtime::Runtime::new()
+                .ok()?
+                .block_on(Self::open(root)),
+        }
     }
 }
 
 impl PathSource for IndexPathSource {
     fn find_like(&mut self, query: &str) -> Option<Vec<(String, bool)>> {
-        self.rt
-            .block_on(self.index.find_like(query))
-            .ok()
-            .map(|files| files.into_iter().map(|f| (f.path, f.is_dir)).collect())
+        let q = query.to_lowercase();
+        Some(
+            self.files
+                .iter()
+                .filter(|(p, _)| p.to_lowercase().contains(&q))
+                .cloned()
+                .collect(),
+        )
     }
 
     fn all_files(&mut self) -> Option<Vec<(String, bool)>> {
-        self.rt
-            .block_on(self.index.all_files())
-            .ok()
-            .map(|files| files.into_iter().map(|f| (f.path, f.is_dir)).collect())
+        Some(self.files.clone())
     }
 }
 
@@ -55,7 +75,7 @@ pub fn resolve_unified(query: &str, root: &Path) -> Option<UnifiedPath> {
         query,
         root,
         &alias_lookup(root),
-        IndexPathSource::open(root)
+        IndexPathSource::open_sync(root)
             .as_mut()
             .map(|s| s as &mut dyn PathSource),
     )
@@ -67,7 +87,7 @@ pub fn resolve_unified_all(query: &str, root: &Path) -> Vec<UnifiedPath> {
         query,
         root,
         &alias_lookup(root),
-        IndexPathSource::open(root)
+        IndexPathSource::open_sync(root)
             .as_mut()
             .map(|s| s as &mut dyn PathSource),
     )
@@ -77,7 +97,7 @@ pub fn resolve_unified_all(query: &str, root: &Path) -> Vec<UnifiedPath> {
 pub fn all_files(root: &Path) -> Vec<PathMatch> {
     normalize_path_resolve::all_files(
         root,
-        IndexPathSource::open(root)
+        IndexPathSource::open_sync(root)
             .as_mut()
             .map(|s| s as &mut dyn PathSource),
     )
@@ -88,7 +108,7 @@ pub fn resolve(query: &str, root: &Path) -> Vec<PathMatch> {
     normalize_path_resolve::resolve(
         query,
         root,
-        IndexPathSource::open(root)
+        IndexPathSource::open_sync(root)
             .as_mut()
             .map(|s| s as &mut dyn PathSource),
     )
