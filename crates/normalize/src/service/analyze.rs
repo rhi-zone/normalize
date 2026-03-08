@@ -854,7 +854,7 @@ impl AnalyzeService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        #[param(help = "Run across all git repos under DIR")] repos: Option<String>,
+        #[param(help = "Run across all git repos under DIR")] repos_dir: Option<String>,
         #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
         pretty: bool,
         compact: bool,
@@ -867,7 +867,7 @@ impl AnalyzeService {
             &root_path,
             "hotspots-allow",
         ));
-        if let Some(repos_dir) = repos {
+        if let Some(repos_dir) = repos_dir {
             let repo_paths = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
             let entries: Vec<crate::commands::analyze::hotspots::HotspotsRepoEntry> = repo_paths
                 .into_iter()
@@ -919,12 +919,12 @@ impl AnalyzeService {
             String,
         >,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
-        #[param(help = "Run across all git repos under DIR")] repos: Option<String>,
+        #[param(help = "Run across all git repos under DIR")] repos_dir: Option<String>,
         #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
     ) -> Result<OwnershipReport, String> {
         let root_path = Self::root_path(root);
         let lim = limit.unwrap_or(20);
-        if let Some(repos_dir) = repos {
+        if let Some(repos_dir) = repos_dir {
             let repo_paths = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
             let entries: Vec<OwnershipRepoEntry> = repo_paths
                 .into_iter()
@@ -1048,9 +1048,8 @@ impl AnalyzeService {
         #[param(help = "Minimum similarity threshold (0.0-1.0, similar/clusters mode)")]
         similarity: Option<f64>,
         #[param(help = "Match on control-flow structure (similar/clusters mode)")] skeleton: bool,
-        #[param(help = "Scan across all git repos under DIR (functions scope only)")] repos: Option<
-            String,
-        >,
+        #[param(help = "Scan across all git repos under DIR (functions scope only)")]
+        repos_dir: Option<String>,
         #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
         #[param(help = "Skip function/method nodes (blocks scope only)")] skip_functions: bool,
         #[param(
@@ -1067,7 +1066,7 @@ impl AnalyzeService {
 
         match (mode, scope) {
             (DuplicateMode::Exact, DuplicateScope::Functions) => {
-                let roots: Vec<PathBuf> = if let Some(repos_dir) = repos {
+                let roots: Vec<PathBuf> = if let Some(repos_dir) = repos_dir {
                     discover_repos(&repos_dir, repos_depth.unwrap_or(1))?
                 } else {
                     vec![root_path.clone()]
@@ -1102,7 +1101,7 @@ impl AnalyzeService {
                 ),
             ),
             (DuplicateMode::Similar, DuplicateScope::Functions) => {
-                let roots: Vec<PathBuf> = if let Some(repos_dir) = repos {
+                let roots: Vec<PathBuf> = if let Some(repos_dir) = repos_dir {
                     discover_repos(&repos_dir, repos_depth.unwrap_or(1))?
                 } else {
                     vec![root_path.clone()]
@@ -1143,7 +1142,7 @@ impl AnalyzeService {
                 ),
             ),
             (DuplicateMode::Clusters, _) => {
-                let roots: Vec<PathBuf> = if let Some(repos_dir) = repos {
+                let roots: Vec<PathBuf> = if let Some(repos_dir) = repos_dir {
                     discover_repos(&repos_dir, repos_depth.unwrap_or(1))?
                 } else {
                     vec![root_path.clone()]
