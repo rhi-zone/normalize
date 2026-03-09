@@ -83,21 +83,68 @@ fn resolve_ref<'a>(
 }
 
 /// Navigate the schema along a key path, resolving `$ref` at each step.
+/// Falls back to `additionalProperties` when a key isn't in `properties`.
+///
+/// `root` is always the top-level schema (for `$ref` resolution);
+/// `current` is the schema node at the current path position.
+fn navigate_schema_inner<'a>(
+    root: &'a serde_json::Value,
+    current: &'a serde_json::Value,
+    path: &[&str],
+) -> Option<&'a serde_json::Value> {
+    if path.is_empty() {
+        return Some(current);
+    }
+    let child = current
+        .get("properties")
+        .and_then(|p| p.get(path[0]))
+        .or_else(|| current.get("additionalProperties"))?;
+    // Always resolve $refs against the root schema, not the current node
+    let resolved = resolve_ref(root, child);
+    navigate_schema_inner(root, resolved, &path[1..])
+}
+
 fn navigate_schema<'a>(
     root: &'a serde_json::Value,
     path: &[&str],
 ) -> Option<&'a serde_json::Value> {
-    if path.is_empty() {
-        return Some(root);
-    }
-    let props = root.get("properties")?;
-    let first = props.get(path[0])?;
-    let resolved = resolve_ref(root, first);
-    if path.len() == 1 {
-        Some(resolved)
+    navigate_schema_inner(root, root, path)
+}
+
+/// Format the type annotation for a schema node, including array item types.
+fn format_type(schema: &serde_json::Value) -> String {
+    let raw_type = schema.get("type");
+
+    // Unwrap nullable types: ["string", "null"] → "string (optional)"
+    let base = if let Some(serde_json::Value::Array(types)) = raw_type {
+        let non_null: Vec<&str> = types
+            .iter()
+            .filter_map(|t| t.as_str())
+            .filter(|t| *t != "null")
+            .collect();
+        let nullable = types.iter().any(|t| t.as_str() == Some("null"));
+        let base = non_null.join(" | ");
+        if nullable {
+            format!("{base} (optional)")
+        } else {
+            base
+        }
     } else {
-        navigate_schema(resolved, &path[1..])
+        raw_type
+            .and_then(|t| t.as_str())
+            .unwrap_or("any")
+            .to_string()
+    };
+
+    // For arrays, append item type
+    if base.starts_with("array")
+        && let Some(items) = schema.get("items")
+    {
+        let item_type = items.get("type").and_then(|t| t.as_str()).unwrap_or("any");
+        return format!("array of {item_type}");
     }
+
+    base
 }
 
 /// Format a single JSON value as a TOML-compatible inline string for a comment.
@@ -118,10 +165,12 @@ fn format_schema_annotated(
     section_path: &[&str],
 ) -> String {
     let Some(schema) = section_schema else {
-        // No schema for this path — fall back to raw content
-        return section_content
-            .map(json_to_toml_string)
-            .unwrap_or_else(|| "(not found)".to_string());
+        // No schema for this path — fall back to raw content as TOML
+        return match (section_path.last(), section_content) {
+            (Some(key), Some(v)) => json_to_toml_string(&serde_json::json!({ *key: v })),
+            (_, Some(v)) => json_to_toml_string(v),
+            _ => "(not found)".to_string(),
+        };
     };
 
     let resolved = resolve_ref(root_schema, schema);
@@ -137,7 +186,9 @@ fn format_schema_annotated(
         }
         // Type info
         if let Some(t) = resolved.get("type") {
-            out.push_str(&format!("# type: {t}\n"));
+            let type_str = format_type(resolved);
+            out.push_str(&format!("# type: {type_str}\n"));
+            let _ = t; // used via format_type
         }
         // Current value or default
         let key = section_path.last().copied().unwrap_or("value");
