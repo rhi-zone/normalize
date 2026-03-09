@@ -33,7 +33,7 @@ An external agent audited the CLI for usability and discoverability. Full report
 
 See `docs/cli-ux-audit.md` for reproduction steps and suggested fixes.
 
-## Session Queue (2026-03-09)
+## Session Queue (2026-03-10)
 
 Ordered by impact × tractability. Pick from top.
 
@@ -59,6 +59,14 @@ Ordered by impact × tractability. Pick from top.
    52 types registered. See Next Up for remaining imports.scm wiring work.
 
 5. ~~**Feature-gate CLI behind `cli` feature**~~ — DONE. See Next Up section.
+
+6. **`normalize-language-meta` — cover remaining 98 languages in `languages.toml`**
+   Current: ~55 entries. Missing: languages with all() caps and no test globs don't need entries,
+   but languages like Ada, Agda, Assembly, Awk, Bash variants, C, C++, etc. may want test glob
+   entries. Audit which of the 98 have test file conventions not yet covered.
+
+7. **`normalize analyze check` command cleanup** — the command still exists but is subsumed
+   by `normalize rules run --engine native`. Delete it (or keep as alias). Steps tracked below.
 
 3. **normalize as LSP server** (stretch)
    - `textDocument/references`, `textDocument/rename`, `textDocument/definition` backed by normalize
