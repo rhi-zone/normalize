@@ -1369,6 +1369,34 @@ impl AnalyzeService {
         ))
     }
 
+    /// Show test ratio trend over git history
+    #[server(group = "test")]
+    #[cli(display_with = "display_scalar_trend")]
+    pub fn test_ratio_trend(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'n', help = "Number of snapshots to collect (default: 10)")]
+        snapshots: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ScalarTrendReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        crate::commands::analyze::trend::analyze_scalar_trend(
+            &root_path,
+            "overall_test_ratio",
+            snapshots.unwrap_or(10),
+            true, // higher test ratio is better
+            |wt| {
+                let report =
+                    crate::commands::analyze::test_ratio::analyze_test_ratio(wt, usize::MAX);
+                Some(report.overall_ratio)
+            },
+        )
+    }
+
     /// Measure information density (compression ratio + token uniqueness) per module
     #[server(group = "modules")]
     #[cli(display_with = "display_density")]
@@ -1396,6 +1424,33 @@ impl AnalyzeService {
             module_limit,
             worst.unwrap_or(10),
         ))
+    }
+
+    /// Show information density trend over git history
+    #[server(group = "modules")]
+    #[cli(display_with = "display_scalar_trend")]
+    pub fn density_trend(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'n', help = "Number of snapshots to collect (default: 10)")]
+        snapshots: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ScalarTrendReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        crate::commands::analyze::trend::analyze_scalar_trend(
+            &root_path,
+            "overall_density_score",
+            snapshots.unwrap_or(10),
+            true, // higher density score is better
+            |wt| {
+                let report = crate::commands::analyze::density::analyze_density(wt, usize::MAX, 0);
+                Some((report.overall_compression_ratio + report.overall_token_uniqueness) / 2.0)
+            },
+        )
     }
 
     /// Measure what fraction of functions have no structural near-twin per module

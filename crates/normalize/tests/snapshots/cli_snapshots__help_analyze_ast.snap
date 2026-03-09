@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 312
 expression: "snapshot_help(&[\"analyze\", \"ast\"])"
 ---
 Analyze codebase (health, complexity, security, duplicates, docs)
@@ -47,6 +46,7 @@ Modes: exact (default), similar (fuzzy MinHash), clusters (connected components)
 Module structure:
   size               Show hierarchical LOC breakdown (ncdu-style)
   density            Measure information density (compression ratio + token uniqueness) per module
+  density-trend      Show information density trend over git history
   module-health      Score each module across test ratio, uniqueness, and density (worst first)
   imports            Rank modules by import fan-in (requires facts index)
   depth-map          Per-module dependency depth + ripple risk
@@ -80,6 +80,7 @@ Testing:
   test-ratio         Test/impl line ratio per module
   test-gaps          Find untested public functions ranked by risk
   budget             Line budget breakdown by purpose (business logic, tests, docs, config, etc.)
+  test-ratio-trend   Show test ratio trend over git history
 
 Security:
   security           Run security analysis

@@ -1,0 +1,20 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+expression: "snapshot_help(&[\"analyze\", \"test-ratio-trend\"])"
+---
+Show test ratio trend over git history
+
+Usage: normalize analyze test-ratio-trend [OPTIONS]
+
+Options:
+      --jsonl                      Output one JSON object per line (for arrays)
+  -r, --root <root>                Root directory (defaults to current directory)
+      --json                       Output machine-readable JSON
+  -n, --snapshots <snapshots>      Number of snapshots to collect (default: 10)
+      --jq <jq>                    Filter output through jq expression
+      --pretty                     Enable pretty
+      --compact                    Enable compact
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help

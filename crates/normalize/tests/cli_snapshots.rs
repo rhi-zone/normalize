@@ -263,6 +263,16 @@ fn test_help_analyze_length_trend() {
 }
 
 #[test]
+fn test_help_analyze_density_trend() {
+    insta::assert_snapshot!(snapshot_help(&["analyze", "density-trend"]));
+}
+
+#[test]
+fn test_help_analyze_test_ratio_trend() {
+    insta::assert_snapshot!(snapshot_help(&["analyze", "test-ratio-trend"]));
+}
+
+#[test]
 fn test_help_analyze_security() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "security"]));
 }
