@@ -188,7 +188,7 @@ allowed via config. See `.normalize/config.toml` for the full allow list.
 All `cmd_*` functions eliminated from both `normalize/src/commands/` and `normalize-rules/src/`.
 Service methods return `Result<T, String>` with natural `?` propagation. `exit_to_result` deleted.
 
-### Feature-gate CLI behind `cli` feature (workspace-wide)
+### ~~Feature-gate CLI behind `cli` feature (workspace-wide)~~ — DONE
 
 Every crate should be usable both as a library and as a standalone CLI tool. Library consumers shouldn't pull in clap; CLI users get a binary. This is a workspace-wide convention, not a one-off.
 
