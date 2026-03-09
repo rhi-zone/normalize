@@ -404,7 +404,7 @@ See `docs/design/analyze-consolidation.md` for full design (axis decomposition, 
 **Phase 3 — Further consolidation (needs design):**
 - [x] `dependents` absorbs `impact` — `DependentsReport` now shows blast radius (depth, test coverage, fan-in) for modules; flat list for symbols/types. `impact` deleted. `dependents` target is now positional. (2026-03-09)
 - [ ] `duplicates` + `fragments`: collapse remaining similarity commands (duplicate-types still separate, fragments absorbed patterns)
-- [ ] `deps`: collapse 9 commands (imports, depth-map, surface, layering, architecture, call-graph, trace) — `impact` absorbed, `callers`/`callees` are already flags in `call-graph`
+- ~~`deps` collapse~~ — NOT DOING. `imports`/`depth-map`/`surface`/`layering` have clear distinct names and are already grouped in `--help` via `#[server(group = "modules")]`. `architecture`/`call-graph`/`trace` have incompatible types and purposes. Short intuitive names beat a `rank <metric>` prefix with no user benefit.
 - **`analyze graph` scope fixed**: `graph` = pure graph theory only (SCCs, bridges, diamonds, dead nodes). `call-graph`, `trace`, `dependents` are index traversal queries, NOT graph theory — they stay in `analyze`. Do not merge traversal commands into `graph`.
 - [x] `docs` → unified `check` command: `check-refs`, `stale-docs`, `check-examples` → `normalize analyze check [--refs] [--stale] [--examples]`. Shared `DiagnosticsReport` in `normalize-output::diagnostics`. `docs` (coverage) stays separate (metric/rank). See `docs/design/rules-unification.md`
 - [ ] `git`: collapse 5 commands (ownership, contributors, activity, repo-coupling, cross-repo-health) — all git/repo-centric analysis
