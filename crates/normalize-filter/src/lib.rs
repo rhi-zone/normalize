@@ -74,13 +74,13 @@ impl AliasConfig {
     fn builtin(name: &str, languages: &[&str]) -> Option<Vec<String>> {
         let patterns: Vec<&str> = match name {
             "tests" => {
-                let mut p: Vec<&str> = vec![];
+                let mut p: Vec<String> = vec![];
                 for lang in languages {
-                    p.extend(normalize_language_meta::test_file_globs_for_language(lang).iter());
+                    p.extend(normalize_language_meta::test_file_globs_for_language(lang));
                 }
                 p.sort_unstable();
                 p.dedup();
-                p
+                return Some(p);
             }
             "config" => vec![
                 "*.toml",

@@ -1,0 +1,580 @@
+# Language metadata for normalize.
+#
+# Each [[language]] entry defines capabilities and test file glob patterns
+# for a language or group of related languages.
+#
+# Fields:
+#   names       - canonical name(s) and aliases; names[0] is the canonical
+#                 name used for capabilities lookup (case-sensitive, must
+#                 match Language::name()). All names/extensions are
+#                 case-insensitive for test_globs lookup.
+#   extensions  - file extensions (dot optional, case-insensitive)
+#   test_globs  - glob patterns matching dedicated test files; omit if the
+#                 language has no test file convention (e.g. C, C++, Zig)
+#
+# Capabilities:
+#   capabilities.preset = "all" | "data_format" | "markup" | "query" |
+#                         "build_dsl" | "shell" | "none"
+#   capabilities.imports, .callable_symbols, .complexity, .executable
+#     (bool overrides applied on top of the preset)
+#   Omitting capabilities entirely means Capabilities::all() (full
+#   programming language).
+
+# ============================================================
+# Full programming languages (Capabilities::all() = default)
+# ============================================================
+
+[[language]]
+names = ["Go", "golang"]
+extensions = ["go"]
+test_globs = ["**/*_test.go"]
+
+[[language]]
+names = ["Rust", "rust"]
+extensions = ["rs"]
+test_globs = ["**/tests/**/*.rs"]
+
+[[language]]
+names = ["Python", "python", "py"]
+extensions = ["py", "pyw"]
+test_globs = ["**/test_*.py", "**/*_test.py"]
+
+[[language]]
+names = ["JavaScript", "js"]
+extensions = ["js", "jsx"]
+test_globs = [
+  "**/__tests__/**/*.js",
+  "**/__mocks__/**/*.js",
+  "**/*.test.js",
+  "**/*.spec.js",
+  "**/*.test.jsx",
+  "**/*.spec.jsx",
+]
+
+[[language]]
+names = ["TypeScript", "TSX", "ts", "tsx"]
+extensions = ["ts", "tsx"]
+test_globs = [
+  "**/__tests__/**/*.ts",
+  "**/__mocks__/**/*.ts",
+  "**/*.test.ts",
+  "**/*.spec.ts",
+  "**/*.test.tsx",
+  "**/*.spec.tsx",
+]
+
+[[language]]
+names = ["Ruby", "ruby"]
+extensions = ["rb", "rbw"]
+test_globs = [
+  "**/spec/**/*.rb",
+  "**/test/**/*.rb",
+  "**/*_test.rb",
+  "**/*_spec.rb",
+]
+
+[[language]]
+names = ["Java", "java"]
+extensions = ["java"]
+test_globs = [
+  "**/src/test/**/*.java",
+  "**/Test*.java",
+  "**/*Test.java",
+  "**/*Tests.java",
+]
+
+[[language]]
+names = ["Kotlin", "kotlin"]
+extensions = ["kt", "kts"]
+test_globs = [
+  "**/src/test/**/*.kt",
+  "**/Test*.kt",
+  "**/*Test.kt",
+  "**/*Tests.kt",
+]
+
+[[language]]
+names = ["Scala", "scala"]
+extensions = ["scala", "sc"]
+test_globs = [
+  "**/src/test/**/*.scala",
+  "**/*Test.scala",
+  "**/*Spec.scala",
+  "**/*Suite.scala",
+]
+
+[[language]]
+names = ["Swift", "swift"]
+extensions = ["swift"]
+test_globs = ["**/*Tests.swift", "**/*Test.swift"]
+
+[[language]]
+names = ["Dart", "dart"]
+extensions = ["dart"]
+test_globs = ["**/test/**/*.dart", "**/*_test.dart"]
+
+[[language]]
+names = ["Elixir", "elixir"]
+extensions = ["ex", "exs"]
+test_globs = ["**/test/**/*.exs", "**/*_test.exs"]
+
+[[language]]
+names = ["Erlang", "erlang"]
+extensions = ["erl", "hrl"]
+test_globs = ["**/*_SUITE.erl", "**/*_test.erl", "**/*_tests.erl"]
+
+[[language]]
+names = ["Haskell", "haskell"]
+extensions = ["hs", "lhs"]
+test_globs = ["**/test/**/*.hs", "**/*Spec.hs", "**/*Test.hs"]
+
+[[language]]
+names = ["Clojure", "clojure"]
+extensions = ["clj", "cljs", "cljc"]
+test_globs = ["**/*_test.clj", "**/*_test.cljs", "**/*_test.cljc"]
+
+[[language]]
+names = ["Groovy", "groovy"]
+extensions = ["groovy", "gvy"]
+test_globs = ["**/src/test/**/*.groovy", "**/*Test.groovy", "**/*Spec.groovy"]
+
+[[language]]
+names = ["Perl", "perl"]
+extensions = ["pl", "pm", "t"]
+test_globs = ["**/t/**/*.t", "**/*.t"]
+
+[[language]]
+names = ["PHP", "php"]
+extensions = ["php", "php3", "php4", "php5"]
+test_globs = ["**/*Test.php"]
+
+[[language]]
+names = ["C#", "csharp"]
+extensions = ["cs"]
+test_globs = ["**/*Test.cs", "**/*Tests.cs"]
+
+[[language]]
+names = ["F#", "fsharp"]
+extensions = ["fs", "fsi", "fsx"]
+test_globs = ["**/*Test.fs", "**/*Tests.fs"]
+
+[[language]]
+names = ["D"]
+extensions = ["d"]
+test_globs = ["**/test/**/*.d", "**/*_test.d", "**/*_unittest.d"]
+
+[[language]]
+names = ["Elm", "elm"]
+extensions = ["elm"]
+test_globs = ["**/tests/**/*.elm", "**/*Test.elm", "**/*Tests.elm"]
+
+[[language]]
+names = ["Gleam", "gleam"]
+extensions = ["gleam"]
+test_globs = ["**/test/**/*.gleam", "**/*_test.gleam"]
+
+[[language]]
+names = ["Julia", "julia"]
+extensions = ["jl"]
+test_globs = ["**/test/**/*.jl", "**/*_test.jl", "**/*_tests.jl"]
+
+[[language]]
+names = ["Lua", "lua"]
+extensions = ["lua"]
+test_globs = ["**/spec/**/*.lua", "**/test/**/*.lua", "**/*_spec.lua", "**/*_test.lua"]
+
+[[language]]
+names = ["OCaml", "ocaml"]
+extensions = ["ml", "mli"]
+test_globs = ["**/test/**/*.ml", "**/*_test.ml", "**/*_tests.ml"]
+
+[[language]]
+names = ["R", "rscript"]
+extensions = ["r", "R"]
+test_globs = ["**/test-*.R", "**/test_*.R"]
+
+[[language]]
+names = ["ReScript", "rescript"]
+extensions = ["res", "resi"]
+test_globs = ["**/*_test.res", "**/*Test.res"]
+
+[[language]]
+names = ["Visual Basic", "vb"]
+extensions = ["vb"]
+test_globs = ["**/*Test.vb", "**/*Tests.vb"]
+
+# Vue and Svelte are full component languages (Capabilities::all())
+[[language]]
+names = ["Vue"]
+extensions = ["vue"]
+
+[[language]]
+names = ["Svelte"]
+extensions = ["svelte"]
+
+# ============================================================
+# Shell languages
+# ============================================================
+
+[[language]]
+names = ["Bash", "Shell", "sh", "bash"]
+extensions = ["sh", "bash"]
+test_globs = [
+  "**/*.bats",
+  "**/test_*.sh",
+  "**/*_test.sh",
+  "**/tests/**/*.sh",
+]
+capabilities.preset = "shell"
+
+[[language]]
+names = ["Zsh", "zsh"]
+extensions = ["zsh"]
+capabilities.preset = "shell"
+
+[[language]]
+names = ["Fish", "fish"]
+extensions = ["fish"]
+capabilities.preset = "shell"
+
+[[language]]
+names = ["PowerShell", "powershell", "pwsh"]
+extensions = ["ps1", "psm1"]
+test_globs = ["**/*.Tests.ps1", "**/*Test.ps1", "**/tests/**/*.ps1"]
+capabilities.preset = "shell"
+
+[[language]]
+names = ["Batch", "batch"]
+extensions = ["bat", "cmd"]
+capabilities.preset = "shell"
+
+[[language]]
+names = ["AWK", "awk"]
+extensions = ["awk"]
+capabilities.preset = "shell"
+
+# ============================================================
+# Data formats (Capabilities::data_format)
+# ============================================================
+
+[[language]]
+names = ["JSON"]
+extensions = ["json"]
+capabilities.preset = "data_format"
+
+[[language]]
+names = ["YAML"]
+extensions = ["yaml", "yml"]
+capabilities.preset = "data_format"
+
+[[language]]
+names = ["TOML"]
+extensions = ["toml"]
+capabilities.preset = "data_format"
+
+[[language]]
+names = ["XML"]
+extensions = ["xml"]
+capabilities.preset = "data_format"
+
+[[language]]
+names = ["INI"]
+extensions = ["ini", "cfg", "conf"]
+capabilities.preset = "data_format"
+
+[[language]]
+names = ["RON"]
+extensions = ["ron"]
+capabilities.preset = "data_format"
+
+[[language]]
+names = ["KDL"]
+extensions = ["kdl"]
+capabilities.preset = "data_format"
+
+[[language]]
+names = ["TextProto"]
+extensions = ["textproto", "pbtxt"]
+capabilities.preset = "data_format"
+
+[[language]]
+names = ["SSH Config"]
+extensions = []
+capabilities.preset = "data_format"
+
+[[language]]
+names = ["DeviceTree"]
+extensions = ["dts", "dtsi"]
+capabilities.preset = "data_format"
+
+[[language]]
+names = ["DOT"]
+extensions = ["dot", "gv"]
+capabilities.preset = "data_format"
+
+# ============================================================
+# Markup languages (Capabilities::markup)
+# ============================================================
+
+[[language]]
+names = ["Markdown"]
+extensions = ["md", "markdown"]
+capabilities.preset = "markup"
+
+[[language]]
+names = ["AsciiDoc"]
+extensions = ["adoc", "asciidoc"]
+capabilities.preset = "markup"
+
+[[language]]
+names = ["Typst"]
+extensions = ["typ"]
+capabilities.preset = "markup"
+
+# ============================================================
+# Markup with partial capabilities
+# ============================================================
+
+[[language]]
+names = ["HTML"]
+extensions = ["html", "htm"]
+# <script src>, <link href>
+capabilities.imports = true
+capabilities.callable_symbols = true
+capabilities.complexity = false
+capabilities.executable = false
+
+[[language]]
+names = ["CSS"]
+extensions = ["css"]
+# @import
+capabilities.imports = true
+capabilities.callable_symbols = false
+capabilities.complexity = false
+capabilities.executable = false
+
+[[language]]
+names = ["SCSS"]
+extensions = ["scss"]
+# @import / @use
+capabilities.imports = true
+capabilities.callable_symbols = false
+capabilities.complexity = false
+capabilities.executable = false
+
+# ============================================================
+# Query languages
+# ============================================================
+
+[[language]]
+names = ["SQL"]
+extensions = ["sql"]
+capabilities.preset = "query"
+
+[[language]]
+names = ["GraphQL"]
+extensions = ["graphql", "gql"]
+# queries, mutations, types are callable-ish
+capabilities.imports = false
+capabilities.callable_symbols = true
+capabilities.complexity = false
+capabilities.executable = true
+
+[[language]]
+names = ["SPARQL"]
+extensions = ["sparql", "rq"]
+capabilities.preset = "query"
+
+[[language]]
+names = ["jq"]
+extensions = ["jq"]
+capabilities.preset = "query"
+
+# ============================================================
+# Build / config DSLs (Capabilities::build_dsl)
+# ============================================================
+
+[[language]]
+names = ["Dockerfile"]
+extensions = []
+capabilities.preset = "build_dsl"
+
+[[language]]
+names = ["CMake"]
+extensions = ["cmake"]
+capabilities.preset = "build_dsl"
+
+[[language]]
+names = ["Meson"]
+extensions = []
+capabilities.preset = "build_dsl"
+
+[[language]]
+names = ["Ninja"]
+extensions = ["ninja"]
+capabilities.preset = "build_dsl"
+
+[[language]]
+names = ["Starlark"]
+extensions = ["star", "bzl"]
+capabilities.preset = "build_dsl"
+
+[[language]]
+names = ["HCL"]
+extensions = ["hcl", "tf"]
+capabilities.preset = "build_dsl"
+
+[[language]]
+names = ["Nix"]
+extensions = ["nix"]
+capabilities.preset = "build_dsl"
+
+[[language]]
+names = ["Caddy"]
+extensions = []
+capabilities.preset = "build_dsl"
+
+# ============================================================
+# Config files with limited semantics
+# ============================================================
+
+[[language]]
+names = ["Nginx"]
+extensions = []
+# include directive
+capabilities.imports = true
+capabilities.callable_symbols = false
+capabilities.complexity = false
+capabilities.executable = false
+
+# ============================================================
+# Diff / patch (not really a language)
+# ============================================================
+
+[[language]]
+names = ["Diff"]
+extensions = ["diff", "patch"]
+capabilities.preset = "none"
+
+# ============================================================
+# Schema / IDL languages
+# ============================================================
+
+[[language]]
+names = ["Cap'n Proto"]
+extensions = ["capnp"]
+capabilities.imports = true
+capabilities.callable_symbols = true   # types, methods
+capabilities.complexity = false
+capabilities.executable = false
+
+[[language]]
+names = ["Thrift"]
+extensions = ["thrift"]
+capabilities.imports = true
+capabilities.callable_symbols = true
+capabilities.complexity = false
+capabilities.executable = false
+
+[[language]]
+names = ["WIT"]
+extensions = ["wit"]
+capabilities.imports = true
+capabilities.callable_symbols = true
+capabilities.complexity = false
+capabilities.executable = false
+
+# ============================================================
+# Shader languages
+# ============================================================
+
+[[language]]
+names = ["GLSL"]
+extensions = ["glsl", "vert", "frag", "geom", "comp"]
+# #include is preprocessor, not a module system
+capabilities.imports = false
+capabilities.callable_symbols = true
+capabilities.complexity = true
+capabilities.executable = true
+
+[[language]]
+names = ["HLSL"]
+extensions = ["hlsl", "hlsli"]
+# #include is preprocessor
+capabilities.imports = false
+capabilities.callable_symbols = true
+capabilities.complexity = true
+capabilities.executable = true
+
+# ============================================================
+# Assembly languages
+# ============================================================
+
+[[language]]
+names = ["Assembly"]
+extensions = ["asm", "s", "S"]
+# labels are callable
+capabilities.imports = false
+capabilities.callable_symbols = true
+capabilities.complexity = false   # metrics don't apply well
+capabilities.executable = true
+
+[[language]]
+names = ["x86 Assembly"]
+extensions = []
+capabilities.imports = false
+capabilities.callable_symbols = true
+capabilities.complexity = false
+capabilities.executable = true
+
+# ============================================================
+# Hardware description languages
+# ============================================================
+
+[[language]]
+names = ["Verilog"]
+extensions = ["v", "vh"]
+capabilities.imports = true
+capabilities.callable_symbols = true
+capabilities.complexity = true
+capabilities.executable = false   # describes hardware
+
+[[language]]
+names = ["VHDL"]
+extensions = ["vhd", "vhdl"]
+capabilities.imports = true
+capabilities.callable_symbols = true
+capabilities.complexity = true
+capabilities.executable = false   # describes hardware
+
+# ============================================================
+# Domain-specific languages
+# ============================================================
+
+[[language]]
+names = ["PostScript"]
+extensions = ["ps", "eps"]
+capabilities.imports = false
+capabilities.callable_symbols = true
+capabilities.complexity = true
+capabilities.executable = true
+
+[[language]]
+names = ["TLA+"]
+extensions = ["tla"]
+capabilities.imports = true
+capabilities.callable_symbols = true
+capabilities.complexity = false   # specification language
+capabilities.executable = false
+
+# ============================================================
+# Templating (mixed markup / code)
+# ============================================================
+
+[[language]]
+names = ["Jinja2"]
+extensions = ["j2", "jinja", "jinja2"]
+capabilities.imports = true
+capabilities.callable_symbols = false
+capabilities.complexity = false
+capabilities.executable = false

@@ -28,6 +28,7 @@
 //! - Common domains (web, systems, data science)
 
 mod capabilities;
+mod data;
 mod registry;
 mod test_globs;
 

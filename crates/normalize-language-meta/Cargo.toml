@@ -7,3 +7,5 @@ repository.workspace = true
 description = "Language metadata and capabilities for normalize"
 
 [dependencies]
+serde = { workspace = true, features = ["derive"] }
+toml = { workspace = true }

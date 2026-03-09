@@ -4043,6 +4043,10 @@ dependencies = [
 [[package]]
 name = "normalize-language-meta"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "toml",
+]
 
 [[package]]
 name = "normalize-languages"
