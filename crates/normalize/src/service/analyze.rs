@@ -404,7 +404,7 @@ impl AnalyzeService {
 
 #[cli(
     name = "analyze",
-    about = "Analyze codebase (health, complexity, security, duplicates, docs)"
+    description = "Analyze codebase (health, complexity, security, duplicates, docs)"
 )]
 #[server(groups(
     code = "Code quality",

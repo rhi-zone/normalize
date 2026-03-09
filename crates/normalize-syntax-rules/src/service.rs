@@ -164,7 +164,7 @@ impl Default for SyntaxRulesService {
 #[cli(
     name = "normalize-syntax-rules",
     version = "0.1.0",
-    about = "Syntax-based linting rules with tree-sitter queries"
+    description = "Syntax-based linting rules with tree-sitter queries"
 )]
 impl SyntaxRulesService {
     /// Run rules against files in a directory

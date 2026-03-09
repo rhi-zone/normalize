@@ -502,7 +502,7 @@ impl ConfigService {
 
 #[server_less::cli(
     name = "config",
-    about = "Inspect and validate config files using JSON Schema"
+    description = "Inspect and validate config files using JSON Schema"
 )]
 impl ConfigService {
     /// Emit the JSON Schema for .normalize/config.toml (NormalizeConfig)

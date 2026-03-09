@@ -257,7 +257,7 @@ impl RulesService {
 
 #[cli(
     name = "rules",
-    about = "Manage and run analysis rules (syntax + fact + native)"
+    description = "Manage and run analysis rules (syntax + fact + native)"
 )]
 impl RulesService {
     /// List all rules (syntax + fact, builtin + user)

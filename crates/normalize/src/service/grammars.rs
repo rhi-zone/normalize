@@ -64,7 +64,10 @@ impl std::fmt::Display for GrammarInstallResult {
     }
 }
 
-#[cli(name = "grammars", about = "Manage tree-sitter grammars for parsing")]
+#[cli(
+    name = "grammars",
+    description = "Manage tree-sitter grammars for parsing"
+)]
 impl GrammarService {
     /// List installed grammars
     #[cli(display_with = "display_list")]

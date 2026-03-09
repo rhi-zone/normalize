@@ -25,7 +25,7 @@ impl SyntaxService {
     }
 }
 
-#[cli(name = "syntax", about = "AST inspection")]
+#[cli(name = "syntax", description = "AST inspection")]
 impl SyntaxService {
     /// Show AST structure for a file
     #[cli(display_with = "display_ast")]

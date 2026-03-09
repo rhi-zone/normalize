@@ -676,7 +676,7 @@ async fn packages_data(
 
 #[cli(
     name = "structure",
-    about = "Manage the structural index (symbols, imports, calls)"
+    description = "Manage the structural index (symbols, imports, calls)"
 )]
 impl FactsService {
     /// Rebuild the file index

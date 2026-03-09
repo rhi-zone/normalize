@@ -86,7 +86,7 @@ impl Default for FilterCliService {
 #[cli(
     name = "normalize-filter",
     version = "0.1.0",
-    about = "File filtering with glob patterns and alias resolution"
+    description = "File filtering with glob patterns and alias resolution"
 )]
 impl FilterCliService {
     /// Check if a path is included by the given filters

@@ -106,7 +106,7 @@ impl Default for FactsCliService {
 #[cli(
     name = "normalize-facts",
     version = "0.1.0",
-    about = "Code fact extraction and index management"
+    description = "Code fact extraction and index management"
 )]
 impl FactsCliService {
     /// Rebuild the file index (re-scan all files)

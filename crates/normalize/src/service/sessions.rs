@@ -87,7 +87,7 @@ impl SessionsService {
 
 #[cli(
     name = "sessions",
-    about = "Analyze agent session logs (Claude Code, Codex, Gemini)"
+    description = "Analyze agent session logs (Claude Code, Codex, Gemini)"
 )]
 impl SessionsService {
     /// List available sessions

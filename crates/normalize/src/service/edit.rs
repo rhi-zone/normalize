@@ -931,7 +931,7 @@ pub struct EditService {
     pub(crate) history: HistoryService,
 }
 
-#[cli(name = "edit", about = "Structural editing of code symbols")]
+#[cli(name = "edit", description = "Structural editing of code symbols")]
 impl EditService {
     /// Delete a symbol.
     ///

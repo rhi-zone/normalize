@@ -60,7 +60,7 @@ fn run_package(
 
 #[cli(
     name = "package",
-    about = "Package management: info, list, tree, outdated"
+    description = "Package management: info, list, tree, outdated"
 )]
 impl PackageService {
     /// Query package info from registry

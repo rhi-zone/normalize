@@ -43,7 +43,10 @@ fn discover_repos(dir: &str, depth: usize) -> Result<Vec<PathBuf>, String> {
     crate::multi_repo::discover_repos_depth(&PathBuf::from(dir), depth)
 }
 
-#[cli(name = "tools", about = "Run linters, formatters, and test runners")]
+#[cli(
+    name = "tools",
+    description = "Run linters, formatters, and test runners"
+)]
 impl ToolsService {
     /// Run linters, formatters, and type checkers
     pub fn lint(&self) -> &LintService {
@@ -56,7 +59,10 @@ impl ToolsService {
     }
 }
 
-#[cli(name = "lint", about = "Run linters, formatters, and type checkers")]
+#[cli(
+    name = "lint",
+    description = "Run linters, formatters, and type checkers"
+)]
 impl LintService {
     /// Run linters on the codebase
     #[allow(clippy::too_many_arguments)]
@@ -106,7 +112,7 @@ impl LintService {
     }
 }
 
-#[cli(name = "test", about = "Run native test runners")]
+#[cli(name = "test", description = "Run native test runners")]
 impl TestService {
     /// Run tests with auto-detected or specified runner
     pub fn run(

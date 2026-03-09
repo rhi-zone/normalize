@@ -26,7 +26,7 @@ impl std::fmt::Display for GenerateResult {
     }
 }
 
-#[cli(name = "generate", about = "Generate code from API spec")]
+#[cli(name = "generate", description = "Generate code from API spec")]
 impl GenerateService {
     /// Generate API client from OpenAPI spec
     pub fn client(

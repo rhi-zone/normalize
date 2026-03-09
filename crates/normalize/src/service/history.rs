@@ -45,7 +45,7 @@ impl std::fmt::Display for HistoryPruneReport {
     }
 }
 
-#[cli(name = "history", about = "View shadow git edit history")]
+#[cli(name = "history", description = "View shadow git edit history")]
 impl HistoryService {
     /// List recent edit history
     pub fn list(

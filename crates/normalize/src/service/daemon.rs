@@ -101,7 +101,7 @@ impl std::fmt::Display for DaemonRootList {
     }
 }
 
-#[cli(name = "daemon", about = "Manage the global normalize daemon")]
+#[cli(name = "daemon", description = "Manage the global normalize daemon")]
 impl DaemonService {
     /// Show daemon status
     pub fn status(&self) -> Result<DaemonStatus, String> {

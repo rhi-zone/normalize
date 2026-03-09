@@ -229,7 +229,7 @@ impl std::fmt::Display for TranslateResult {
 #[cli(
     name = "normalize",
     version = "0.1.0",
-    about = "Fast code intelligence CLI",
+    description = "Fast code intelligence CLI",
     defaults = "config_defaults",
     global = [
         pretty = "Human-friendly output with colors and formatting",
