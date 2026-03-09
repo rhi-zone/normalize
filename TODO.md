@@ -71,6 +71,16 @@ Ordered by impact × tractability. Pick from top.
    `check-examples`, `normalize-native-rules` lib.rs comment, `docs/workflows/documentation-sync.md`
    updated to use `normalize rules run --rule X` / `--engine native`.
 
+8. ~~**server-less 0.4.0 → 0.4.1-alpha.1 upgrade**~~ — DONE (2026-03-10). `about =` renamed to
+   `description =` in 17 service files across 5 crates. `config` feature enabled. Feature requests
+   filed: nested Config struct support (landed in 0.4.1-alpha.1), multi-file merge semantics
+   (MergeFile landed in 0.4.1-alpha.1), `about → description` migration hint (open), and
+   `#[param(nested, serde)]` for serde-passthrough on complex nested types (open).
+   `#[derive(Config)]` adoption on `NormalizeConfig` blocked until `#[param(nested, serde)]` lands:
+   `AliasConfig`, `RulesConfig`, and `RuleTagsConfig` use `#[serde(flatten)] HashMap` and can't
+   be `#[derive(Config)]` structs. Simple sub-configs (DaemonConfig, ViewConfig, etc.) are
+   compatible already.
+
 3. **normalize as LSP server** (stretch)
    - `textDocument/references`, `textDocument/rename`, `textDocument/definition` backed by normalize
    - Proxy mode: `normalize serve lsp --proxy 'rust-analyzer'`
@@ -319,7 +329,8 @@ dotted paths (e.g. `analyze.threshold`, `rules."rust/unwrap-in-impl".allow`) inc
 **Remaining follow-ups:**
 - `normalize rules show-config` and `normalize rules validate` still exist; delete when superseded
 - Extract engine into `normalize-config-ui` crate for reuse / publication (stretch goal)
-- Propose `#[config]` proc macro to server-less (stretch goal)
+- Propose `#[config]` proc macro to server-less (stretch goal — superseded by `#[derive(Config)]`;
+  filed nested struct support + merge semantics requests in server-less TODO.md 2026-03-10)
 
 ### Rust Redesign Candidates
 - Rules engine: consider semgrep/ruff integration instead of custom
