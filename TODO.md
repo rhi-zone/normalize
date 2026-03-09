@@ -292,19 +292,24 @@ Pattern: traits are the extensibility mechanism. Users implement traits in their
 - `context` could be `normalize view context [path]` but semantics differ slightly (content-only vs prepend). Low priority.
 - `aliases` is a cross-cutting utility. Too small for top-level but has no clear parent. Low priority.
 
-### ~~Schema-Driven Config UI — `normalize config`~~ — DONE (2026-03-09)
+### Schema-Driven Config UI — `normalize config` — WIP, awaiting feedback
 
 `normalize config schema/show/validate/set` implemented in `crates/normalize/src/service/config.rs`.
 Generic engine: TOML/JSON/YAML + any JSON Schema; defaults to `.normalize/config.toml` + `NormalizeConfig`.
 Uses `jsonschema` crate for validation, `toml_edit` for typed writes.
 
+`show` walks the JSON Schema to display all available options with descriptions; `--section` accepts
+dotted paths (e.g. `analyze.threshold`, `rules."rust/unwrap-in-impl".allow`) including
+`additionalProperties` entries. Array item types rendered as `array of string`.
+
+**Awaiting feedback before closing:**
+- Is the `show` output format useful? Too verbose? Should unset fields be hidden by default?
+- Should `config set` validate before writing (blocking on schema errors, not just warnings)?
+
 **Remaining follow-ups:**
-- ~~`normalize rules show-config`~~ and ~~`normalize rules validate`~~ still exist; delete when ready
+- `normalize rules show-config` and `normalize rules validate` still exist; delete when superseded
 - Extract engine into `normalize-config-ui` crate for reuse / publication (stretch goal)
 - Propose `#[config]` proc macro to server-less (stretch goal)
-
-**Note:** `normalize rules show-config` and `normalize rules validate` can coexist until the
-generic version covers their use cases, then be removed or aliased.
 
 ### Rust Redesign Candidates
 - Rules engine: consider semgrep/ruff integration instead of custom
