@@ -6,5 +6,6 @@
 ; find_package(SomePackage)
 (normal_command
   (identifier) @_cmd
-  (#match? @_cmd "^(include|find_package)$")
-  (argument) @import.path) @import
+  (argument_list
+    (argument) @import.path)
+  (#match? @_cmd "^(include|find_package)$")) @import

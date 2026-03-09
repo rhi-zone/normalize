@@ -6,15 +6,15 @@
 
 ; #import "lib.typ"
 (import
-  (string) @import.path) @import
+  import: (string) @import.path) @import
 
 ; #import "lib.typ": func1, func2
 (import
-  (string) @import.path
-  (import_items
+  import: (string) @import.path
+  (binding
     (ident) @import.name)) @import
 
 ; #import "lib.typ": *
 (import
-  (string) @import.path
+  import: (string) @import.path
   (wildcard) @import.glob) @import

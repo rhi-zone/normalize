@@ -4,10 +4,10 @@
 
 ; Simple invocation: Method()
 (invocation_expression
-  function: (identifier_name) @call)
+  function: (identifier) @call)
 
 ; Member access invocation: obj.Method()
 (invocation_expression
   function: (member_access_expression
     expression: (_) @call.qualifier
-    name: (identifier_name) @call))
+    name: (identifier) @call))

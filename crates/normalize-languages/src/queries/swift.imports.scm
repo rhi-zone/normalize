@@ -3,9 +3,6 @@
 ; @import.path  — the module identifier
 
 ; import Module
+; import class Module.Type  (with import kind keyword — kind is modifiers child)
 (import_declaration
   (identifier) @import.path) @import
-
-; import class Module.Type  (with import kind keyword)
-(import_declaration
-  (scoped_identifier) @import.path) @import

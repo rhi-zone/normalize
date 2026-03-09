@@ -4,5 +4,6 @@
 
 ; source file.fish
 (command
-  name: (command_name) @_cmd (#eq? @_cmd "source")
-  argument: (_) @import.path) @import
+  name: (word) @_cmd
+  argument: (_) @import.path
+  (#eq? @_cmd "source")) @import

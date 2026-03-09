@@ -2,8 +2,16 @@
 ; License: MIT
 ; (TSX uses the same tags as TypeScript; no tsx-specific tags.scm upstream)
 
+(function_declaration
+  name: (identifier) @name) @definition.function
+
 (function_signature
   name: (identifier) @name) @definition.function
+
+; Arrow function components: const Counter: FC<...> = (...) => ...
+(variable_declarator
+  name: (identifier) @name
+  value: (arrow_function)) @definition.function
 
 (method_signature
   name: (property_identifier) @name) @definition.method

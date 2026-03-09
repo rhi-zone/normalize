@@ -92,7 +92,7 @@ mod tests {
             "expression_with_unary_operator", "file_redirection_operator", "finally_clause",
             "flow_control_statement", "for_condition", "for_initializer", "for_iterator",
             "foreach_command", "foreach_parameter", "format_argument_expression",
-            "format_expression", "format_operator", "function_name",
+            "format_expression", "format_operator",
             "function_parameter_declaration", "generic_type_arguments", "generic_type_name",
             "hash_entry", "hash_literal_body", "hash_literal_expression",
             "inlinescript_statement", "invokation_expression", "invokation_foreach_expression",

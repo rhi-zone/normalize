@@ -180,8 +180,8 @@ mod tests {
             "binary_adding_operator", "choice_parameter_specification", "chunk_specification",
             "elsif_expression_item", "elsif_statement_item", "exception_choice", "exception_choice_list",
             "exception_renaming_declaration", "expression", "formal_part", "function_call",
-            "function_specification", "general_access_modifier", "identifier", "index_subtype_definition",
-            "iterator_specification", "multiplying_operator", "procedure_specification", "quantifier",
+            "general_access_modifier", "index_subtype_definition",
+            "iterator_specification", "multiplying_operator", "quantifier",
             "real_range_specification", "record_definition", "reduction_specification",
             "relational_operator", "subpool_specification", "unary_adding_operator",
             // control flow — not extracted as symbols

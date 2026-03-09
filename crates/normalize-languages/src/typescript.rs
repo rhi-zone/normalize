@@ -361,7 +361,6 @@ mod tests {
             "if_statement",
             "throw_statement",
             "try_statement",
-            "function_declaration",
             "break_statement",
             "arrow_function",
             "catch_clause",

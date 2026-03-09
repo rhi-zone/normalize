@@ -82,12 +82,12 @@ mod tests {
             "function_type", "polyvar_type", "polymorphic_type", "tuple_type",
             "record_type", "record_type_field", "object_type", "variant_type",
             "abstract_type", "type_arguments", "type_parameters", "type_constraint",
-            "type_annotation", "type_binding", "type_spread", "constrain_type",
+            "type_annotation", "type_spread", "constrain_type",
             "as_aliasing_type", "function_type_parameters",
             // Module nodes
             "parenthesized_module_expression", "module_type_constraint", "module_type_annotation",
             "module_type_of", "constrain_module", "module_identifier", "module_identifier_path",
-            "module_pack", "module_unpack", "module_binding",
+            "module_pack", "module_unpack",
             // Declaration nodes
             "let_declaration", "exception_declaration", "variant_declaration",
             "polyvar_declaration", "include_statement",
@@ -96,7 +96,7 @@ mod tests {
             // Pattern matching
             "exception_pattern", "polyvar_type_pattern",
             // Identifiers
-            "value_identifier", "value_identifier_path", "variant_identifier",
+            "value_identifier_path", "variant_identifier",
             "nested_variant_identifier", "polyvar_identifier", "property_identifier",
             "extension_identifier", "decorator_identifier",
             // Clauses

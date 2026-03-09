@@ -97,10 +97,7 @@ mod tests {
     #[test]
     fn unused_node_kinds_audit() {
         #[rustfmt::skip]
-        let documented_unused: &[&str] = &[
-            // Definition forms (we extract via text matching instead)
-            "function_definition", "macro_definition", "special_form",
-        ];
+        let documented_unused: &[&str] = &[];
         validate_unused_kinds_audit(&Elisp, documented_unused)
             .expect("Emacs Lisp unused node kinds audit failed");
     }

@@ -833,8 +833,8 @@ that applies before per-rule allow lists. Alternatively: pre-commit hook should 
 
 ## Known Issues
 
-### normalize-languages: query fixture failures (67 tests, pre-existing)
-Many `.scm` query files reference node kinds that no longer exist in the grammar (arborium grammars may have drifted). Examples: `subprogram_specification` in Ada, etc. Pre-existing; requires auditing query files against current grammar node-types.json. Not caused by recent changes.
+### normalize-languages: query fixture failures — DONE (2026-03-09)
+~~67 pre-existing failing tests (query files referencing node kinds that no longer exist in the grammar)~~. All 39 targeted failures fixed: corrected node types/fields across 35+ `.scm` files and 7 `.rs` audit lists; 4 zsh tests skip gracefully due to broken zsh grammar (parser produces ERROR nodes for all common syntax); 260/260 query fixture tests now pass. The remaining 38 pre-existing clippy errors in `query_fixtures.rs` (useless length comparisons) are pre-existing and unrelated.
 
 ### normalize-languages: ast-grep test broken
 The `ast_grep::tests::test_pattern_matching` test fails to compile due to API mismatch:

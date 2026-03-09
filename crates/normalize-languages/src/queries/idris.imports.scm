@@ -5,4 +5,7 @@
 ; import Data.List
 ; import public Data.List
 (import
-  (module_name) @import.path) @import
+  module: (qualified_caname) @import.path) @import
+
+(import
+  module: (caname) @import.path) @import

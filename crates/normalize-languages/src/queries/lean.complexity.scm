@@ -15,4 +15,4 @@
 (match) @nesting
 (def) @nesting
 (theorem) @nesting
-(do_seq_item) @nesting
+(do) @nesting

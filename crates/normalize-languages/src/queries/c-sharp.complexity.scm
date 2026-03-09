@@ -5,7 +5,7 @@
 ; Complexity nodes
 (if_statement) @complexity
 (for_statement) @complexity
-(for_each_statement) @complexity
+(foreach_statement) @complexity
 (while_statement) @complexity
 (do_statement) @complexity
 (switch_section) @complexity
@@ -16,7 +16,7 @@
 ; Nesting nodes
 (if_statement) @nesting
 (for_statement) @nesting
-(for_each_statement) @nesting
+(foreach_statement) @nesting
 (while_statement) @nesting
 (do_statement) @nesting
 (switch_statement) @nesting

@@ -3,6 +3,7 @@
 ; @nesting — nodes that increase nesting depth
 
 ; Complexity nodes
+(function_definition) @complexity
 (if_statement) @complexity
 (for_statement) @complexity
 (while_statement) @complexity

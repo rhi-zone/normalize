@@ -10,3 +10,6 @@
   (attribute
     object: (identifier) @type.reference
     attribute: (identifier) @type.reference))
+
+; Class definitions
+(class_definition name: (identifier) @name) @definition.type

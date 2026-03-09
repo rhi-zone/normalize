@@ -9,6 +9,7 @@
 (conditional) @complexity
 (for_tuple_expr) @complexity
 (for_object_expr) @complexity
+(block) @complexity
 
 ; Nesting nodes
 (block) @nesting

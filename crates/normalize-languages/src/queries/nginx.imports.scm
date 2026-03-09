@@ -3,7 +3,7 @@
 ; @import.path  — the path pattern being included
 
 ; include /etc/nginx/conf.d/*.conf;
-(directive
-  (identifier) @_name
-  (#eq? @_name "include")
-  (string) @import.path) @import
+(simple_directive
+  name: (directive) @_name
+  (param) @import.path
+  (#eq? @_name "include")) @import

@@ -1,19 +1,18 @@
 ; Idris tags query
 
-(function
-  name: (name) @name) @definition.function
-
+; Function signatures: distance : Point -> Point -> Double
 (signature
-  name: (name) @name) @definition.function
+  name: (loname) @name) @definition.function
 
+; Data types: data Shape = ...
 (data
-  name: (name) @name) @definition.class
+  name: (data_name) @name) @definition.class
 
+; Records: record Point where ...
 (record
-  name: (name) @name) @definition.class
+  name: (record_name) @name) @definition.class
 
+; Interfaces
 (interface
-  name: (name) @name) @definition.interface
-
-(implementation
-  name: (name) @name) @definition.method
+  (interface_head
+    name: (interface_name) @name)) @definition.interface

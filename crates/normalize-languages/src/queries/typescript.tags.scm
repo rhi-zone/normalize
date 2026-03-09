@@ -1,6 +1,9 @@
 ; Vendored from https://github.com/tree-sitter/tree-sitter-typescript
 ; License: MIT
 
+(function_declaration
+  name: (identifier) @name) @definition.function
+
 (function_signature
   name: (identifier) @name) @definition.function
 

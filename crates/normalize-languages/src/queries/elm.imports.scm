@@ -7,22 +7,22 @@
 
 ; import Html
 (import_clause
-  name: (upper_case_qid) @import.path) @import
+  moduleName: (upper_case_qid) @import.path) @import
 
 ; import Html as H
 (import_clause
-  name: (upper_case_qid) @import.path
-  (as_clause
-    name: (upper_case_identifier) @import.alias)) @import
+  moduleName: (upper_case_qid) @import.path
+  asClause: (as_clause
+    (upper_case_identifier) @import.alias)) @import
 
 ; import Html exposing (..)
 (import_clause
-  name: (upper_case_qid) @import.path
-  (exposing_list
+  moduleName: (upper_case_qid) @import.path
+  exposing: (exposing_list
     (double_dot) @import.glob)) @import
 
 ; import Html exposing (div, span)
 (import_clause
-  name: (upper_case_qid) @import.path
-  (exposing_list
+  moduleName: (upper_case_qid) @import.path
+  exposing: (exposing_list
     (exposed_value) @import.name)) @import

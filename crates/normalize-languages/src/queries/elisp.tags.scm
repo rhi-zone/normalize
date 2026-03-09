@@ -1,53 +1,22 @@
 ; Emacs Lisp tags query
 ;
-; Emacs Lisp uses list nodes for all forms.
-; The first child symbol names the form.
+; In the elisp grammar, (defun name ...) parses as a top-level function_definition
+; node with a name: symbol field. Similarly (defmacro ...) parses as macro_definition.
+; Other forms remain as list nodes with leading symbol keywords.
 
 ; (defun name ...)
-(list
-  (symbol) @_kw (#eq? @_kw "defun")
-  .
-  (symbol) @name) @definition.function
-
 ; (defsubst name ...)
-(list
-  (symbol) @_kw (#eq? @_kw "defsubst")
-  .
-  (symbol) @name) @definition.function
-
 ; (cl-defun name ...)
-(list
-  (symbol) @_kw (#eq? @_kw "cl-defun")
-  .
-  (symbol) @name) @definition.function
+(function_definition
+  name: (symbol) @name) @definition.function
 
 ; (defmacro name ...)
-(list
-  (symbol) @_kw (#eq? @_kw "defmacro")
-  .
-  (symbol) @name) @definition.macro
-
 ; (cl-defmacro name ...)
-(list
-  (symbol) @_kw (#eq? @_kw "cl-defmacro")
-  .
-  (symbol) @name) @definition.macro
+(macro_definition
+  name: (symbol) @name) @definition.macro
 
-; (defvar name ...)
-(list
-  (symbol) @_kw (#eq? @_kw "defvar")
-  .
-  (symbol) @name) @definition.constant
-
-; (defconst name ...)
-(list
-  (symbol) @_kw (#eq? @_kw "defconst")
-  .
-  (symbol) @name) @definition.constant
-
-; (defcustom name ...)
-(list
-  (symbol) @_kw (#eq? @_kw "defcustom")
+; (defvar name ...) — parses as special_form with symbol as first named child
+(special_form
   .
   (symbol) @name) @definition.constant
 

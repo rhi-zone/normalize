@@ -5,11 +5,6 @@
 
 ; Imports System.Collections
 ; Imports System.Collections.Generic
-(imports_statement
-  (imports_member_name) @import.path) @import
-
 ; Imports Alias = Namespace
 (imports_statement
-  (imports_alias_clause
-    name: (identifier) @import.alias
-    (imports_member_name) @import.path)) @import
+  namespace: (namespace_name) @import.path) @import

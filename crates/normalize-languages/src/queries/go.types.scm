@@ -1,10 +1,11 @@
-; Go type references
-; Captures type identifiers used in type positions.
+; Go type definitions
+; Captures type names from struct and interface definitions.
 
-; Plain type identifiers: Foo, Bar
-(type_identifier) @type.reference
+; Type definition: type Stack struct {...}
+(type_spec
+  name: (type_identifier) @name) @definition.type
 
-; Qualified types: io.Reader, http.Handler — capture both parts
+; Qualified type references: io.Reader, http.Handler
 (qualified_type
-  package: (package_identifier) @type.reference
-  name: (type_identifier) @type.reference)
+  package: (package_identifier) @type.qualifier
+  name: (type_identifier) @name)

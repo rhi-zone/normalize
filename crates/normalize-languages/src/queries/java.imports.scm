@@ -9,8 +9,8 @@
 
 ; import pkg.*;  (wildcard)
 (import_declaration
-  (asterisk) @import.glob
-  (scoped_identifier) @import.path) @import
+  (scoped_identifier) @import.path
+  (asterisk) @import.glob) @import
 
 ; import static pkg.Class.method;
 (import_declaration
@@ -20,5 +20,5 @@
 ; import static pkg.Class.*;
 (import_declaration
   "static"
-  (asterisk) @import.glob
-  (scoped_identifier) @import.path) @import
+  (scoped_identifier) @import.path
+  (asterisk) @import.glob) @import

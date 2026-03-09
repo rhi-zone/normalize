@@ -13,4 +13,17 @@
       (identifier) @_attr
       (#eq? @_attr "source")
       (expression
-        (quoted_template) @import.path)))) @import
+        (literal_value
+          (string_lit) @import.path))))) @import
+
+; Also match template expressions (interpolated strings)
+(block
+  (identifier) @_type
+  (#eq? @_type "module")
+  (body
+    (attribute
+      (identifier) @_attr
+      (#eq? @_attr "source")
+      (expression
+        (template_expr
+          (quoted_template) @import.path))))) @import

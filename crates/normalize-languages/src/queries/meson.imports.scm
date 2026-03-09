@@ -4,7 +4,10 @@
 
 ; subproject('foo')
 ; dependency('glib-2.0')
+; The first positional argument is in a variableunit child containing a string.
 (normal_command
-  (identifier) @_cmd
-  (#match? @_cmd "^(subproject|dependency)$")
-  (argument) @import.path) @import
+  command: (identifier) @_cmd (#match? @_cmd "^(subproject|dependency)$")
+  .
+  (variableunit
+    .
+    (string) @import.path)) @import

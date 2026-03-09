@@ -3,11 +3,11 @@
 ; @nesting — nodes that increase nesting depth
 
 ; Complexity nodes
-(if) @complexity
+(branch) @complexity
 (while) @complexity
 (for) @complexity
 
 ; Nesting nodes
-(if) @nesting
+(branch) @nesting
 (while) @nesting
 (for) @nesting

@@ -32,20 +32,20 @@
 
 ; Wildcard: use path::*;
 (use_declaration
-  argument: (scoped_use_tree
+  argument: (scoped_use_list
     path: (_) @import.path
-    list: (use_wildcard) @import.glob)) @import
+    list: (use_list (use_wildcard) @import.glob))) @import
 
 ; Multi-name: use path::{A, B, C};
 (use_declaration
-  argument: (scoped_use_tree
+  argument: (scoped_use_list
     path: (_) @import.path
     list: (use_list
       (identifier) @import.name))) @import
 
 ; Multi-name aliased: use path::{A as X};
 (use_declaration
-  argument: (scoped_use_tree
+  argument: (scoped_use_list
     path: (_) @import.path
     list: (use_list
       (use_as_clause

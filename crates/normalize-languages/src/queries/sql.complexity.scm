@@ -6,13 +6,11 @@
 ; WHERE and HAVING clauses that add branching conditions.
 
 ; Complexity nodes
-(case_expression) @complexity
 (when_clause) @complexity
-(join_clause) @complexity
-(where_clause) @complexity
-(having_clause) @complexity
+(join) @complexity
+(where) @complexity
+(having) @complexity
 
 ; Nesting nodes
-(select_statement) @nesting
+(select) @nesting
 (subquery) @nesting
-(case_expression) @nesting

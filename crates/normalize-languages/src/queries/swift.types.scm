@@ -3,6 +3,3 @@
 
 ; Plain type identifiers: Foo, String
 (type_identifier) @type.reference
-
-; Member types: Module.Type — capture both parts
-(member_type_identifier) @type.reference

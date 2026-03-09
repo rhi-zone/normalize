@@ -14,5 +14,5 @@
 ; Nesting nodes
 (if_expression) @nesting
 (switch_expression) @nesting
-(function_expression) @nesting
+(function) @nesting
 (block) @nesting

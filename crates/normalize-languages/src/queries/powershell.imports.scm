@@ -5,10 +5,10 @@
 ; Import-Module ModuleName
 ; Import-Module "path/to/module"
 (command
-  name: (command_name) @_cmd (#match? @_cmd "(?i)^import-module$")
-  argument: (_) @import.path) @import
+  command_name: (command_name) @_cmd (#match? @_cmd "(?i)^import-module$")
+  command_elements: (command_elements) @import.path) @import
 
 ; . ./script.ps1 (dot-sourcing)
 (command
-  name: (command_name) @_dot (#eq? @_dot ".")
-  argument: (_) @import.path) @import
+  command_name: (command_name) @_dot (#eq? @_dot ".")
+  command_elements: (command_elements) @import.path) @import

@@ -9,3 +9,7 @@
 
 ; Nested types: Foo.Bar — capture the full path
 (nested_type_identifier) @type.reference
+
+; Type definitions: class and interface
+(class_declaration name: (type_identifier) @name) @definition.type
+(interface_declaration name: (type_identifier) @name) @definition.interface

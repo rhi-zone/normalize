@@ -13,5 +13,5 @@
 ; Nesting nodes
 (exp_if) @nesting
 (exp_case) @nesting
-(function_declaration) @nesting
+(function) @nesting
 (exp_lambda) @nesting

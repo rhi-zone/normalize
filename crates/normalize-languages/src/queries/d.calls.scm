@@ -1,15 +1,9 @@
 ; D calls query
-; @call — call expression nodes
-; @call.qualifier — qualifier/receiver for method calls
+; @call — function/method call identifiers
 ;
-; D uses `call_expression` for function/method calls.
+; In D, function calls appear as postfix_expression where the function name
+; is represented as a qualified_identifier child.
 
-; Simple call: func(args)
-(call_expression
-  function: (identifier) @call)
-
-; Method call: obj.method(args)
-(call_expression
-  function: (dot_expression
-    (_) @call.qualifier
-    (identifier) @call))
+; Function and method calls: func(args), obj.method(args)
+(postfix_expression
+  (qualified_identifier) @call)

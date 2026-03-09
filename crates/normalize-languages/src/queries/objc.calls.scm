@@ -13,10 +13,10 @@
 ; C-style with qualifier: obj->method(args)
 (call_expression
   function: (field_expression
-    value: (_) @call.qualifier
+    argument: (_) @call.qualifier
     field: (field_identifier) @call))
 
 ; ObjC message send: [receiver message:arg]
 (message_expression
   receiver: (_) @call.qualifier
-  (selector) @call)
+  method: (identifier) @call)

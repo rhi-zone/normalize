@@ -98,8 +98,6 @@ mod tests {
             "module", "export",
             // Control flow
             "do_return",
-            // Classes
-            "class_inductive",
             // control flow — not extracted as symbols
             "if_then_else",
             "match_alt",

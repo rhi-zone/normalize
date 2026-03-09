@@ -11,10 +11,10 @@
   (module_name) @call)
 
 ; Function application in expressions: the `expr` node's first child is
-; typically the applied function (an `id` or `qid`).
-; Use the expr node to capture application — first child is the callee.
+; typically the applied function (a qid).
+; Use the expr node to capture application — first atom's qid is the callee.
 (expr
   .
   (atom
     .
-    (id) @call))
+    (qid) @call))

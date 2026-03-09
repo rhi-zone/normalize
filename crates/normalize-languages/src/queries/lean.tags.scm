@@ -21,7 +21,7 @@
 (inductive
   name: (identifier) @name) @definition.class
 
-(class
+(class_inductive
   name: (identifier) @name) @definition.interface
 
 (namespace

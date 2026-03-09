@@ -1,10 +1,12 @@
 ; PowerShell tags query
 
+; function_statement has no name: field; function_name is a child node
 (function_statement
-  name: (command_name) @name) @definition.function
+  (function_name) @name) @definition.function
 
+; class_statement has no name: field; simple_name is a child node
 (class_statement
-  name: (type_identifier) @name) @definition.class
+  (simple_name) @name) @definition.class
 
 (enum_statement
-  name: (type_identifier) @name) @definition.type
+  (simple_name) @name) @definition.type

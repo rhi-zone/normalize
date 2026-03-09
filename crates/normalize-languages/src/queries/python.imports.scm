@@ -20,10 +20,10 @@
   module_name: (_) @import.path
   name: (dotted_name) @import.name) @import
 
-; from foo import bar (identifier form)
+; from foo import bar (single name as dotted_name with one part)
 (import_from_statement
   module_name: (_) @import.path
-  name: (identifier) @import.name) @import
+  name: (dotted_name) @import.name) @import
 
 ; from foo import bar as baz
 (import_from_statement

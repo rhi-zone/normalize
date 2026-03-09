@@ -93,7 +93,9 @@ mod tests {
             "parameters_body", "namespace_body", "mutual_body", "data_body",
             "record_body", "interface_body", "implementation_body",
             // Interface and module
-            "interface_head", "interface_name", "module",
+            "interface_name", "module",
+            // Function body — used in complexity.scm, not tags.scm
+            "function",
             // Operators
             "operator", "qualified_operator", "qualified_dot_operators", "dot_operator",
             "ticked_operator", "tuple_operator",

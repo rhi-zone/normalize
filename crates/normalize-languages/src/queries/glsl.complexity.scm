@@ -9,6 +9,7 @@
 (switch_statement) @complexity
 (case_statement) @complexity
 (conditional_expression) @complexity
+(function_definition) @complexity
 
 ; Nesting nodes
 (if_statement) @nesting

@@ -7,7 +7,7 @@
 (elseif_statement) @complexity
 (for_loop) @complexity
 (while_loop) @complexity
-(catch_clause) @complexity
+(catch_statement) @complexity
 
 ; Nesting nodes
 (if_statement) @nesting

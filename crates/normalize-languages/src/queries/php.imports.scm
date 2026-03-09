@@ -7,31 +7,24 @@
 ; use Namespace\Class;
 (namespace_use_declaration
   (namespace_use_clause
-    name: (qualified_name) @import.path)) @import
+    (qualified_name) @import.path)) @import
 
 ; use Namespace\Class as Alias;
 (namespace_use_declaration
   (namespace_use_clause
-    name: (qualified_name) @import.path
-    (namespace_aliasing_clause
-      (name) @import.alias))) @import
+    (qualified_name) @import.path
+    alias: (name) @import.alias)) @import
 
-; use function Namespace\func;
-(namespace_function_use_declaration
-  (namespace_use_clause
-    name: (qualified_name) @import.path)) @import
+; use function Namespace\func; (also handled by namespace_use_declaration above)
 
-; use const Namespace\CONST;
-(namespace_const_use_declaration
-  (namespace_use_clause
-    name: (qualified_name) @import.path)) @import
+; use const Namespace\CONST; (handled by namespace_use_declaration above)
 
 ; include 'file.php' or require 'file.php'
 (include_expression
   (string
-    (string_value) @import.path)) @import
+    (string_content) @import.path)) @import
 
 ; include_once / require_once
 (include_once_expression
   (string
-    (string_value) @import.path)) @import
+    (string_content) @import.path)) @import

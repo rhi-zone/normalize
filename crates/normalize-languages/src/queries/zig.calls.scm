@@ -20,5 +20,7 @@
   (FnCallArguments))
 
 ; Builtin call: @import("file"), @This(), etc.
-(builtin_call_expression
-  (BUILTINIDENTIFIER) @call)
+; Builtins use BUILTINIDENTIFIER inside a SuffixExpr
+(SuffixExpr
+  (BUILTINIDENTIFIER) @call
+  (FnCallArguments))

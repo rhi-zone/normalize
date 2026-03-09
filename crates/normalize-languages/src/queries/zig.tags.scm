@@ -11,7 +11,9 @@
 
 ; Container declarations (struct, enum, union) referenced via VarDecl
 ; In Zig, types are values: `const Foo = struct { ... }`
-; The VarDecl holds the name; ContainerDecl is the type expression.
+; The path is VarDecl -> ErrorUnionExpr -> SuffixExpr -> ContainerDecl
 (VarDecl
   variable_type_function: (IDENTIFIER) @name
-  (ContainerDecl)) @definition.class
+  (ErrorUnionExpr
+    (SuffixExpr
+      (ContainerDecl)))) @definition.class

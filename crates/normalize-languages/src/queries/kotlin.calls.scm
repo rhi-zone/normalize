@@ -9,6 +9,6 @@
 ; Member/navigation call: obj.method()
 (call_expression
   (navigation_expression
-    target: (_) @call.qualifier
+    (_) @call.qualifier
     (navigation_suffix
       (simple_identifier) @call)))

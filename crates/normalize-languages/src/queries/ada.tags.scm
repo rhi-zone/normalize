@@ -7,25 +7,33 @@
   name: (identifier) @name) @definition.module
 
 (generic_package_declaration
-  name: (identifier) @name) @definition.module
+  (package_declaration
+    name: (identifier) @name)) @definition.module
 
 (subprogram_declaration
-  (subprogram_specification
+  (function_specification
+    name: (identifier) @name)) @definition.function
+
+(subprogram_declaration
+  (procedure_specification
     name: (identifier) @name)) @definition.function
 
 (subprogram_body
-  (subprogram_specification
+  (function_specification
+    name: (identifier) @name)) @definition.function
+
+(subprogram_body
+  (procedure_specification
     name: (identifier) @name)) @definition.function
 
 (expression_function_declaration
-  (subprogram_specification
-    name: (identifier) @name)) @definition.function
+  (function_specification name: (identifier) @name)) @definition.function
 
 (full_type_declaration
-  name: (identifier) @name) @definition.type
+  (identifier) @name) @definition.type
 
 (private_type_declaration
-  name: (identifier) @name) @definition.type
+  (identifier) @name) @definition.type
 
 (incomplete_type_declaration
-  name: (identifier) @name) @definition.type
+  (identifier) @name) @definition.type

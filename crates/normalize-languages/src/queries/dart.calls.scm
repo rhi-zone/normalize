@@ -1,13 +1,12 @@
 ; Dart calls query
-; @call — call expression nodes
-; @call.qualifier — qualifier/receiver for method calls
+; @call — call expression identifiers
+;
+; In Dart, function calls appear as: identifier followed by selector(argument_part)
+; A selector containing argument_part represents the call.
+; The identifier precedes the selector as a sibling in the parent node.
 
 ; Simple function call: func()
-(invocation_expression
-  function: (identifier) @call)
-
-; Method call: obj.method()
-(invocation_expression
-  function: (selector_expression
-    operand: (_) @call.qualifier
-    (identifier) @call))
+((identifier) @call
+ .
+ (selector
+   (argument_part)))

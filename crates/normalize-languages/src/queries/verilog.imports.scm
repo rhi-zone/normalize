@@ -8,10 +8,10 @@
 (package_import_declaration
   (package_import_item
     (package_identifier) @import.path
-    (wildcard) @import.glob)) @import
+    "*" @import.glob)) @import
 
 ; import my_pkg::my_type;
 (package_import_declaration
   (package_import_item
     (package_identifier) @import.path
-    (identifier) @import.name)) @import
+    (simple_identifier) @import.name)) @import
