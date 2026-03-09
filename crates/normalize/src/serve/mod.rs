@@ -4,14 +4,14 @@
 
 use serde::Deserialize;
 
-use normalize_core::Merge;
-
 pub mod http;
 pub mod lsp;
 pub mod mcp;
 
 /// Serve configuration from config.toml.
-#[derive(Debug, Clone, Deserialize, serde::Serialize, Default, Merge, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Deserialize, serde::Serialize, Default, schemars::JsonSchema, server_less::Config,
+)]
 #[serde(default)]
 pub struct ServeConfig {
     /// Default HTTP port (overridden by --port).

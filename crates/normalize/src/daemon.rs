@@ -4,7 +4,6 @@
 //! refreshes their indexes. Index queries go directly to SQLite files.
 
 use crate::config::NormalizeConfig;
-use normalize_core::Merge;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -83,7 +82,9 @@ pub fn global_socket_path() -> PathBuf {
 }
 
 /// Daemon configuration.
-#[derive(Debug, Clone, Deserialize, serde::Serialize, Merge, Default, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Deserialize, serde::Serialize, Default, schemars::JsonSchema, server_less::Config,
+)]
 #[serde(default)]
 pub struct DaemonConfig {
     /// Whether to use the daemon. Default: true

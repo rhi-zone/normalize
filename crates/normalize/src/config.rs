@@ -65,14 +65,13 @@ use crate::daemon::DaemonConfig;
 use crate::filter::AliasConfig;
 use crate::output::PrettyConfig;
 use crate::shadow::ShadowConfig;
-use normalize_core::Merge;
 use normalize_rules::RulesConfig;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 /// Index configuration.
-#[derive(Debug, Clone, Deserialize, Serialize, Merge, Default, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, JsonSchema, server_less::Config)]
 #[serde(default)]
 pub struct IndexConfig {
     /// Whether to create and use the file index. Default: true
@@ -97,29 +96,40 @@ impl IndexConfig {
 /// my-checks   = ["circular-deps", "hub-file"]    # group of rule IDs
 /// strict      = ["ci-blockers", "my-checks"]     # references other user tags
 /// ```
-#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, JsonSchema)]
 #[serde(transparent)]
 pub struct RuleTagsConfig(pub std::collections::HashMap<String, Vec<String>>);
 
 /// Root configuration structure.
-#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, JsonSchema, server_less::Config)]
 #[serde(default)]
 pub struct NormalizeConfig {
+    #[param(nested)]
     pub daemon: DaemonConfig,
+    #[param(nested)]
     pub index: IndexConfig,
+    #[param(nested, serde)]
     pub shadow: ShadowConfig,
+    #[param(nested, serde)]
     pub aliases: AliasConfig,
+    #[param(nested)]
     pub view: ViewConfig,
+    #[param(nested, serde)]
     pub analyze: AnalyzeConfig,
     /// Rules configuration: per-rule overrides, global-allow, and sarif-tools.
     /// Configured via `[rules]`, `[rules."rule-id"]`, and `[[rules.sarif-tools]]`.
+    #[param(nested, serde)]
     pub rules: RulesConfig,
     #[serde(rename = "text-search")]
+    #[param(nested, file_key = "text-search")]
     pub text_search: TextSearchConfig,
+    #[param(nested, serde)]
     pub pretty: PrettyConfig,
+    #[param(nested)]
     pub serve: crate::serve::ServeConfig,
     /// User-defined rule tag groups (`[rule-tags]` section).
     #[serde(default, rename = "rule-tags")]
+    #[param(nested, serde, file_key = "rule-tags")]
     pub rule_tags: RuleTagsConfig,
 }
 
@@ -127,29 +137,16 @@ impl NormalizeConfig {
     /// Load configuration for a project.
     ///
     /// Loads global config from ~/.config/normalize/config.toml,
-    /// then merges with per-project config from .normalize/config.toml.
+    /// then per-project config from .normalize/config.toml (overrides global).
     pub fn load(root: &Path) -> Self {
-        let mut config = Self::default_enabled();
-
-        // Load global config
-        if let Some(global_path) = Self::global_config_path()
-            && let Some(global) = Self::load_file(&global_path)
-        {
-            config = config.merge(global);
+        let mut sources = vec![server_less::ConfigSource::Defaults];
+        if let Some(global_path) = Self::global_config_path() {
+            sources.push(server_less::ConfigSource::File(global_path));
         }
-
-        // Load per-project config (overrides global)
-        let project_path = root.join(".normalize").join("config.toml");
-        if let Some(project) = Self::load_file(&project_path) {
-            config = config.merge(project);
-        }
-
-        config
-    }
-
-    /// Default config with serde defaults (enabled fields default to true).
-    fn default_enabled() -> Self {
-        Self::default()
+        sources.push(server_less::ConfigSource::File(
+            root.join(".normalize").join("config.toml"),
+        ));
+        <Self as server_less::ConfigTrait>::load(&sources).unwrap_or_default()
     }
 
     /// Get the global config path.
@@ -159,12 +156,6 @@ impl NormalizeConfig {
             .ok()
             .or_else(|| dirs::home_dir().map(|h| h.join(".config")))?;
         Some(config_home.join("normalize").join("config.toml"))
-    }
-
-    /// Load config from a file path.
-    fn load_file(path: &Path) -> Option<Self> {
-        let content = std::fs::read_to_string(path).ok()?;
-        toml::from_str(&content).ok()
     }
 }
 
@@ -176,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_default_config() {
-        let config = NormalizeConfig::default_enabled();
+        let config = NormalizeConfig::default();
         assert!(config.daemon.enabled());
         assert!(config.daemon.auto_start());
         assert!(config.index.enabled());
@@ -265,31 +256,31 @@ config = []
     }
 
     #[test]
-    fn test_merge_preserves_explicit_values() {
-        // Simulate: global sets enabled=false, project only sets auto_start=true
-        // The explicit enabled=false should be preserved, not overwritten by default
-        let global = NormalizeConfig {
-            daemon: DaemonConfig {
-                enabled: Some(false), // explicitly disabled
-                auto_start: None,
-            },
-            ..Default::default()
-        };
+    fn test_global_project_layering() {
+        // Global sets enabled=false; project only sets auto_start=true.
+        // Config::load(File(global), File(project)) must preserve enabled=false.
+        use server_less::{ConfigSource, ConfigTrait};
 
-        let project = NormalizeConfig {
-            daemon: DaemonConfig {
-                enabled: None,          // not specified
-                auto_start: Some(true), // explicitly enabled
-            },
-            ..Default::default()
-        };
+        let tmp = TempDir::new().unwrap();
+        let global = tmp.path().join("global.toml");
+        let project_dir = tmp.path().join("project");
+        std::fs::create_dir_all(project_dir.join(".normalize")).unwrap();
+        let project = project_dir.join(".normalize").join("config.toml");
 
-        let merged = global.merge(project);
+        std::fs::write(&global, "[daemon]\nenabled = false\n").unwrap();
+        std::fs::write(&project, "[daemon]\nauto_start = true\n").unwrap();
 
-        // enabled should stay false (from global), not become true (default)
-        assert!(!merged.daemon.enabled());
-        // auto_start should be true (from project)
-        assert!(merged.daemon.auto_start());
+        let config = <NormalizeConfig as ConfigTrait>::load(&[
+            ConfigSource::Defaults,
+            ConfigSource::File(global),
+            ConfigSource::File(project),
+        ])
+        .unwrap_or_default();
+
+        // enabled=false must come from global, not be reset by project's absent field
+        assert!(!config.daemon.enabled());
+        // auto_start=true must come from project
+        assert!(config.daemon.auto_start());
     }
 
     #[test]

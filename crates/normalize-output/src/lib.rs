@@ -5,9 +5,9 @@
 
 pub mod diagnostics;
 
-use normalize_core::Merge;
 use serde::{Deserialize, Serialize};
 use std::io::IsTerminal;
+use std::str::FromStr;
 
 /// Color output mode.
 #[derive(
@@ -24,9 +24,17 @@ pub enum ColorMode {
     Never,
 }
 
-impl Merge for ColorMode {
-    fn merge(self, other: Self) -> Self {
-        other
+impl FromStr for ColorMode {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "auto" => Ok(Self::Auto),
+            "always" => Ok(Self::Always),
+            "never" => Ok(Self::Never),
+            _ => Err(format!(
+                "unknown color mode `{s}`; expected auto, always, or never"
+            )),
+        }
     }
 }
 
@@ -39,7 +47,7 @@ impl Merge for ColorMode {
 /// colors = "auto"      # "auto", "always", or "never"
 /// highlight = true     # syntax highlighting on signatures
 /// ```
-#[derive(Debug, Clone, Deserialize, Serialize, Merge, Default, schemars::JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, schemars::JsonSchema)]
 #[serde(default)]
 pub struct PrettyConfig {
     /// Enable pretty mode. None = auto (true when stdout is TTY)
@@ -137,14 +145,6 @@ mod tests {
         fn format_text(&self) -> String {
             format!("{}: {}", self.name, self.count)
         }
-    }
-
-    #[test]
-    fn test_color_mode_merge() {
-        // Later value wins
-        assert_eq!(ColorMode::Auto.merge(ColorMode::Always), ColorMode::Always);
-        assert_eq!(ColorMode::Always.merge(ColorMode::Never), ColorMode::Never);
-        assert_eq!(ColorMode::Never.merge(ColorMode::Auto), ColorMode::Auto);
     }
 
     #[test]

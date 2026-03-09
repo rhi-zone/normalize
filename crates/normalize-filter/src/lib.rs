@@ -31,10 +31,7 @@ use std::path::Path;
 /// tests = []                      # disable built-in @tests
 /// ```
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[cfg_attr(
-    feature = "config",
-    derive(normalize_core::Merge, schemars::JsonSchema)
-)]
+#[cfg_attr(feature = "config", derive(schemars::JsonSchema))]
 #[serde(default)]
 pub struct AliasConfig {
     /// Map alias names to paths/patterns. Empty array disables the alias.

@@ -3,7 +3,6 @@
 //! Maintains a hidden git repository (`.normalize/shadow/`) that automatically
 //! commits after each `normalize edit` operation, preserving full edit history.
 
-use normalize_core::Merge;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -24,7 +23,7 @@ pub struct HistoryEntry {
 }
 
 /// Shadow git configuration.
-#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, schemars::JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, schemars::JsonSchema)]
 #[serde(default)]
 pub struct ShadowConfig {
     /// Whether shadow git is enabled. Default: true

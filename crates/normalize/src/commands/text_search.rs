@@ -4,11 +4,12 @@
 //! (`service.rs`). This module retains only the configuration type used by
 //! `NormalizeConfig`.
 
-use normalize_core::Merge;
 use serde::Deserialize;
 
 /// Text search command configuration.
-#[derive(Debug, Clone, Deserialize, serde::Serialize, Default, Merge, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Deserialize, serde::Serialize, Default, schemars::JsonSchema, server_less::Config,
+)]
 #[serde(default)]
 pub struct TextSearchConfig {
     /// Default maximum number of matches

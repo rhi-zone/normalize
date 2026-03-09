@@ -44,12 +44,11 @@ pub mod trend;
 pub mod uniqueness;
 
 use crate::filter::Filter;
-use normalize_core::Merge;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 /// Analyze command configuration.
-#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, schemars::JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, schemars::JsonSchema)]
 #[serde(default)]
 pub struct AnalyzeConfig {
     /// Default complexity threshold for filtering
@@ -81,7 +80,7 @@ pub struct AnalyzeConfig {
 }
 
 /// Weights for each analysis pass (higher = more impact on grade).
-#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, schemars::JsonSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, schemars::JsonSchema)]
 #[serde(default)]
 pub struct AnalyzeWeights {
     pub health: Option<f64>,

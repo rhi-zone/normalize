@@ -19,7 +19,7 @@ required-features = ["cli"]
 default = ["cli-full"]
 
 # Core normalize CLI (server-less proc macro; clap re-exported from server-less)
-cli = ["dep:server-less"]
+cli = []
 
 # Drop-in CLI replacements (each implies cli)
 jq-cli = ["cli"]
@@ -76,7 +76,8 @@ normalize-analyze = { path = "../normalize-analyze", version = "0.1.0" }
 normalize-architecture = { path = "../normalize-architecture", version = "0.1.0" }
 normalize-native-rules = { path = "../normalize-native-rules", version = "0.1.0" }
 normalize-rules = { path = "../normalize-rules", version = "0.1.0", features = ["cli"] }
-server-less = { workspace = true, optional = true }
+server-less = { workspace = true }
+server-less-core = { workspace = true }
 normalize-cli-parser = { path = "../normalize-cli-parser", version = "0.1.0" }
 normalize-surface-syntax = { path = "../normalize-surface-syntax", version = "0.1.0", features = ["read-typescript", "read-lua", "read-python", "write-typescript", "write-lua", "write-python"] }
 grep-matcher.workspace = true

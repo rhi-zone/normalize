@@ -10,14 +10,15 @@ pub mod tree;
 
 use crate::tree::DocstringDisplay;
 use crate::{daemon, path_resolve};
-use normalize_core::Merge;
 use serde::Deserialize;
 use std::path::Path;
 
 pub use search::search_symbols;
 
 /// View command configuration.
-#[derive(Debug, Clone, Deserialize, serde::Serialize, Default, Merge, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Deserialize, serde::Serialize, Default, schemars::JsonSchema, server_less::Config,
+)]
 #[serde(default)]
 pub struct ViewConfig {
     /// Default depth for tree expansion (0=names, 1=signatures, 2=children, -1=all)

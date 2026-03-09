@@ -102,7 +102,8 @@ toml = "0.8"
 roxmltree = "0.21"
 
 # Service framework
-server-less = { version = "0.4.1-alpha.1", default-features = false, features = ["cli", "jsonschema", "config"] }
+server-less = { version = "0.4.1-alpha.3", default-features = false, features = ["cli", "jsonschema", "config"] }
+server-less-core = { version = "0.4.1-alpha.3", default-features = false, features = ["config"] }
 
 # JSON Schema validation
 jsonschema = "0.26"
@@ -121,4 +122,10 @@ opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
+
+# Use local server-less until alpha.3 is published
+[patch.crates-io]
+server-less = { path = "/home/me/git/rhizone/server-less/crates/server-less" }
+server-less-core = { path = "/home/me/git/rhizone/server-less/crates/server-less-core" }
+server-less-macros = { path = "/home/me/git/rhizone/server-less/crates/server-less-macros" }
 
