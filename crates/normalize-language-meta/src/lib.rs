@@ -30,8 +30,7 @@
 mod capabilities;
 mod data;
 mod registry;
-mod test_globs;
 
 pub use capabilities::Capabilities;
+pub use data::test_file_globs_for_language;
 pub use registry::{capabilities_for, register};
-pub use test_globs::test_file_globs_for_language;
