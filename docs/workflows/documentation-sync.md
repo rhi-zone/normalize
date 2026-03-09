@@ -85,7 +85,7 @@ normalize rules run --rule stale-summary    # missing/stale SUMMARY.md files
 ### Renamed Symbols
 ```
 Problem: Doc references `old_function_name`
-Detection: normalize analyze check --stale
+Detection: normalize rules run --rule stale-docs
 Fix: Update to `new_function_name`
 ```
 
@@ -106,7 +106,7 @@ Fix: Update description
 ### Broken Examples
 ```
 Problem: Example code doesn't compile/run
-Detection: normalize analyze check --examples
+Detection: normalize rules run --rule check-examples
 Fix: Update example or fix code
 ```
 
@@ -125,7 +125,7 @@ Fix: Update example or fix code
 
 ```
 Turn 1: Find stale references
-  $(normalize analyze check --stale)
+  $(normalize rules run --rule stale-docs)
   → docs/api.md references `get_user` (now `fetch_user`)
   → docs/examples.md uses old function name
 
@@ -151,7 +151,7 @@ Turn 5: Keep migration.md
   → Add note: "In versions < 2.0, this was called `get_user`"
 
 Turn 6: Verify
-  $(normalize analyze check --refs)
+  $(normalize rules run --rule check-refs)
   → No broken references
   $(cargo test --doc)
   → Doc tests pass
@@ -173,8 +173,7 @@ pub fn fetch_user(id: u64) -> Result<User> { ... }
 ```yaml
 - name: Check documentation
   run: |
-    normalize analyze check --refs
-    normalize analyze check --stale
+    normalize rules run --engine native
     cargo test --doc
 ```
 

@@ -66,8 +66,10 @@ Ordered by impact × tractability. Pick from top.
    no universal test file convention (C, C++, Zig, Agda, Idris, Lean, Uiua, Yuri) have entries
    with capabilities only; others include test_globs.
 
-7. **`normalize analyze check` command cleanup** — the command still exists but is subsumed
-   by `normalize rules run --engine native`. Delete it (or keep as alias). Steps tracked below.
+7. ~~**`normalize analyze check` command cleanup**~~ — DONE (2026-03-10). Command was already
+   removed from service layer. Cleaned up: stale snapshot tests for `check-refs`/`stale-docs`/
+   `check-examples`, `normalize-native-rules` lib.rs comment, `docs/workflows/documentation-sync.md`
+   updated to use `normalize rules run --rule X` / `--engine native`.
 
 3. **normalize as LSP server** (stretch)
    - `textDocument/references`, `textDocument/rename`, `textDocument/definition` backed by normalize

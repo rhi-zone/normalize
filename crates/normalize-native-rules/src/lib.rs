@@ -2,8 +2,7 @@
 //!
 //! Implements stale-summary, check-refs, stale-docs, and check-examples as
 //! pure Rust checks (no tree-sitter AST parsing). These are the "native engine"
-//! checks invoked by `normalize rules run --engine native` and
-//! `normalize analyze check`.
+//! checks invoked by `normalize rules run --engine native`.
 
 pub mod check_examples;
 pub mod check_refs;

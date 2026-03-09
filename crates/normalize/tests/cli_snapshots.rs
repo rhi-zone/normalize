@@ -303,21 +303,6 @@ fn test_help_analyze_repo_coupling() {
 }
 
 #[test]
-fn test_help_analyze_check_refs() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "check-refs"]));
-}
-
-#[test]
-fn test_help_analyze_stale_docs() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "stale-docs"]));
-}
-
-#[test]
-fn test_help_analyze_check_examples() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "check-examples"]));
-}
-
-#[test]
 fn test_help_analyze_duplicate_types() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "duplicate-types"]));
 }
