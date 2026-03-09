@@ -481,8 +481,14 @@ language that silently returns empty is misleading users who expect analysis and
       property_declaration from tags.scm entirely; documented in kotlin.rs unused kinds audit.
       Root cause: Kotlin grammar uses same node kind for class-level properties AND local val/var
       declarations inside function bodies — can't distinguish without ancestor traversal. — DONE 2026-03-09
-- [ ] Kotlin/Scala/Groovy: import queries produce no results — import.scm patterns may not match
-      actual grammar node structure (needs AST inspection to verify node kinds)
+- [x] Kotlin/Scala/Groovy: import queries fixed — DONE (2026-03-09).
+      Groovy: `(dotted_identifier)` was invalid (grammar uses `import: (qualified_name)` field) →
+      query failed to compile → fell back to trait. Fixed to use correct field accessor.
+      Scala: sentinel `(import_declaration) @import` was generating empty-module imports in
+      DepsExtractor. Fixed `collect_imports_from_query` to skip entries with no path info and
+      return `None` when empty (triggering correct trait fallback for dotted-path splitting).
+      Kotlin: was already working correctly.
+      Added `groovy_imports_live` test in `query_fixtures.rs`. — DONE 2026-03-09
 - [x] Elixir: added `(arguments (identifier) @name)` patterns for no-args function defs
       (`def name do ... end`, `defp name do ...`, `defmacro name do ...`, `defmacrop name do ...`).
       Removed `identifier` from documented_unused in elixir.rs. Live test added. — DONE 2026-03-09

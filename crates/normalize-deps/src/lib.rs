@@ -246,8 +246,9 @@ impl DepsExtractor {
 
     /// Extract imports from an imports.scm query.
     ///
-    /// Returns `None` when the grammar or query is unavailable (triggering trait fallback).
-    /// Returns `Some(vec)` when the query compiled and ran (vec may be empty if no imports).
+    /// Returns `None` when the grammar or query is unavailable, or when the query produced
+    /// no usable import paths (triggering trait fallback in both cases).
+    /// Returns `Some(vec)` when the query extracted at least one import with a non-empty path.
     ///
     /// Captures used:
     /// - `@import`      — the whole import node (provides the line number anchor)
@@ -335,6 +336,10 @@ impl DepsExtractor {
                     result[idx].is_wildcard = true;
                 }
             } else {
+                // Skip sentinel matches with no usable path info (e.g. Scala's @import-only query)
+                if module.is_empty() && name.is_none() && !is_glob {
+                    continue;
+                }
                 let mut imp = Import {
                     module,
                     names: Vec::new(),
@@ -351,7 +356,12 @@ impl DepsExtractor {
             }
         }
 
-        Some(result)
+        // Return None when no usable imports found — signals caller to use trait fallback
+        if result.is_empty() {
+            None
+        } else {
+            Some(result)
+        }
     }
 
     fn collect_imports_with_trait(

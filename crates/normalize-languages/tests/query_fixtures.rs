@@ -6157,6 +6157,31 @@ fn haskell_tags_no_duplicate_signatures() {
 const GROOVY_SAMPLE: &str = include_str!("fixtures/groovy/sample.groovy");
 
 #[test]
+fn groovy_imports_live() {
+    let loader = normalize_languages::GrammarLoader::new();
+    let Some(lang) = loader.get("groovy") else {
+        eprintln!("Skipping groovy_imports_live: groovy grammar not found");
+        return;
+    };
+    let query_str = loader
+        .get_imports("groovy")
+        .expect("groovy imports query missing");
+    let paths = collect_captures(&lang, GROOVY_SAMPLE, &query_str, "import.path");
+    assert!(
+        paths
+            .iter()
+            .any(|p| p.contains("Immutable") || p.contains("groovy")),
+        "expected 'groovy.transform.Immutable' in groovy import paths, got: {paths:?}"
+    );
+    assert!(
+        paths
+            .iter()
+            .any(|p| p.contains("ArrayList") || p.contains("java")),
+        "expected 'java.util.ArrayList' in groovy import paths, got: {paths:?}"
+    );
+}
+
+#[test]
 fn kotlin_tags_live() {
     let loader = normalize_languages::GrammarLoader::new();
     let Some(lang) = loader.get("kotlin") else {
