@@ -111,6 +111,68 @@ impl OutputFormatter for RulesConfigReport {
     }
 }
 
+/// Report returned by `normalize rules validate`.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct RulesValidateReport {
+    /// Path to the config file that was checked.
+    pub config_path: String,
+    /// Overall validity — false if any errors were found.
+    pub valid: bool,
+    /// TOML parse errors or unknown rule IDs.
+    pub errors: Vec<String>,
+    /// Non-fatal warnings (e.g. disabled rules that have no effect).
+    pub warnings: Vec<String>,
+    /// Number of per-rule overrides found in the config.
+    pub rule_count: usize,
+    /// Number of global-allow patterns.
+    pub global_allow_count: usize,
+}
+
+impl OutputFormatter for RulesValidateReport {
+    fn format_text(&self) -> String {
+        let mut out = String::new();
+        if self.valid {
+            out.push_str("Rules configuration is valid\n");
+        } else {
+            out.push_str("Rules configuration has errors\n");
+        }
+        out.push('\n');
+        out.push_str(&format!("Config file: {}\n", self.config_path));
+
+        if self.valid {
+            out.push_str(&format!(
+                "  {} rule override{}, {} global-allow pattern{}\n",
+                self.rule_count,
+                if self.rule_count == 1 { "" } else { "s" },
+                self.global_allow_count,
+                if self.global_allow_count == 1 {
+                    ""
+                } else {
+                    "s"
+                },
+            ));
+        } else {
+            out.push_str(&format!(
+                "  {} error{}:\n\n",
+                self.errors.len(),
+                if self.errors.len() == 1 { "" } else { "s" }
+            ));
+            for e in &self.errors {
+                out.push_str(&format!("  error: {e}\n"));
+            }
+        }
+
+        if !self.warnings.is_empty() {
+            out.push('\n');
+            for w in &self.warnings {
+                out.push_str(&format!("  warning: {w}\n"));
+            }
+        }
+
+        out
+    }
+}
+
 /// Rules management sub-service.
 pub struct RulesService {
     pretty: Cell<bool>,
@@ -177,6 +239,14 @@ impl RulesService {
     }
 
     fn display_config_show(&self, r: &RulesConfigReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_validate(&self, r: &RulesValidateReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -595,6 +665,102 @@ impl RulesService {
             overrides,
             sarif_tools,
         })
+    }
+
+    /// Validate the rules configuration — check rule IDs, TOML syntax, and report issues
+    #[cli(display_with = "display_validate")]
+    pub fn validate(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<RulesValidateReport, String> {
+        let effective_root = root
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+        self.pretty.set(resolve_pretty(pretty, compact));
+
+        let config_file = effective_root.join(".normalize").join("config.toml");
+        let config_path = if config_file.exists() {
+            ".normalize/config.toml".to_string()
+        } else {
+            "(not found — using defaults)".to_string()
+        };
+
+        let mut errors: Vec<String> = Vec::new();
+
+        // Check for TOML parse errors directly (load_rules_config silently swallows them)
+        if config_file.exists() {
+            let raw = std::fs::read_to_string(&config_file)
+                .map_err(|e| format!("Failed to read config: {e}"))?;
+            if let Err(e) = toml::from_str::<toml::Value>(&raw) {
+                errors.push(format!("TOML parse error: {e}"));
+                return Ok(RulesValidateReport {
+                    config_path,
+                    valid: false,
+                    errors,
+                    warnings: Vec::new(),
+                    rule_count: 0,
+                    global_allow_count: 0,
+                });
+            }
+        }
+
+        // Load effective config
+        let config = load_rules_config(&effective_root);
+        let rules_cfg = &config.rules;
+
+        let rule_count = rules_cfg.rules.len();
+        let global_allow_count = rules_cfg.global_allow.len();
+
+        // Build list of known rule IDs by querying all rule engines
+        let list_report = build_list_report(
+            &effective_root,
+            &ListFilters {
+                sources: false,
+                type_filter: &RuleType::All,
+                tag: None,
+                enabled: false,
+                disabled: false,
+                no_desc: true,
+                json: false,
+                use_colors: false,
+            },
+            &config,
+        );
+        let known_ids: std::collections::HashSet<String> =
+            list_report.rules.iter().map(|r| r.id.clone()).collect();
+
+        // Check each configured rule ID against known rules
+        for rule_id in rules_cfg.rules.keys() {
+            if !known_ids.contains(rule_id) {
+                errors.push(format!(
+                    "unknown rule ID \"{rule_id}\" — run 'normalize rules list' to see available rules"
+                ));
+            }
+        }
+
+        let valid = errors.is_empty();
+
+        let report = RulesValidateReport {
+            config_path,
+            valid,
+            errors,
+            warnings: Vec::new(),
+            rule_count,
+            global_allow_count,
+        };
+
+        if !report.valid {
+            return Err(report.format_text());
+        }
+
+        Ok(report)
     }
 }
 
