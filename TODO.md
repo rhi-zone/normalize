@@ -71,15 +71,13 @@ Ordered by impact × tractability. Pick from top.
    `check-examples`, `normalize-native-rules` lib.rs comment, `docs/workflows/documentation-sync.md`
    updated to use `normalize rules run --rule X` / `--engine native`.
 
-8. ~~**server-less 0.4.0 → 0.4.1-alpha.1 upgrade**~~ — DONE (2026-03-10). `about =` renamed to
-   `description =` in 17 service files across 5 crates. `config` feature enabled. Feature requests
-   filed: nested Config struct support (landed in 0.4.1-alpha.1), multi-file merge semantics
-   (MergeFile landed in 0.4.1-alpha.1), `about → description` migration hint (open), and
-   `#[param(nested, serde)]` for serde-passthrough on complex nested types (open).
-   `#[derive(Config)]` adoption on `NormalizeConfig` blocked until `#[param(nested, serde)]` lands:
-   `AliasConfig`, `RulesConfig`, and `RuleTagsConfig` use `#[serde(flatten)] HashMap` and can't
-   be `#[derive(Config)]` structs. Simple sub-configs (DaemonConfig, ViewConfig, etc.) are
-   compatible already.
+8. ~~**server-less 0.4.0 → 0.4.1-alpha.3 upgrade**~~ — DONE (2026-03-10). `about =` renamed to
+   `description =` in 17 service files. `#[derive(Config)]` adopted on `NormalizeConfig` and
+   5 sub-configs (DaemonConfig, IndexConfig, ViewConfig, TextSearchConfig, ServeConfig).
+   Complex sub-configs use `#[param(nested, serde)]` (AliasConfig, RulesConfig, etc.).
+   Merge-based config loading replaced with ConfigTrait::load() source chain. alpha.3 fix:
+   nested,serde fields fall back to Default when section absent (MissingField bug).
+   Local [patch.crates-io] until alpha.3 published on crates.io.
 
 3. **normalize as LSP server** (stretch)
    - `textDocument/references`, `textDocument/rename`, `textDocument/definition` backed by normalize
