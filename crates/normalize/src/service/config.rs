@@ -17,27 +17,185 @@ use std::path::{Path, PathBuf};
 pub struct ConfigShowReport {
     pub config_path: String,
     pub section: Option<String>,
+    /// Current config values (the file content).
     pub content: serde_json::Value,
+    /// Full JSON Schema — skipped from JSON output, used for annotated rendering.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub schema: serde_json::Value,
 }
 
 impl OutputFormatter for ConfigShowReport {
     fn format_text(&self) -> String {
-        let header = format!("# Config: {}", self.config_path);
-        let value = if let Some(ref sec) = self.section {
-            self.content
-                .get(sec)
-                .cloned()
-                .unwrap_or(serde_json::Value::Object(Default::default()))
-        } else {
-            self.content.clone()
-        };
-        let toml_str = json_to_toml_string(&value);
-        format!("{header}\n\n{toml_str}")
+        let section_path: Vec<&str> = self
+            .section
+            .as_deref()
+            .map(|s| s.split('.').collect())
+            .unwrap_or_default();
+
+        let mut out = format!("# Config: {}", self.config_path);
+        if let Some(ref sec) = self.section {
+            out.push_str(&format!(" — [{sec}]"));
+        }
+        out.push_str("\n\n");
+
+        // Navigate schema and content to the requested path
+        let section_schema = navigate_schema(&self.schema, &section_path);
+        let section_content = navigate_json(&self.content, &section_path);
+
+        out.push_str(&format_schema_annotated(
+            &self.schema,
+            section_schema,
+            section_content,
+            &section_path,
+        ));
+        out.trim_end().to_string()
+    }
+}
+
+/// Navigate a JSON value along a dotted key path.
+fn navigate_json<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a serde_json::Value> {
+    let mut cur = value;
+    for key in path {
+        cur = cur.get(key)?;
+    }
+    Some(cur)
+}
+
+/// Resolve a `$ref` in the schema (local `#/$defs/...` refs only).
+fn resolve_ref<'a>(
+    root: &'a serde_json::Value,
+    schema: &'a serde_json::Value,
+) -> &'a serde_json::Value {
+    if let Some(r) = schema.get("$ref").and_then(|v| v.as_str())
+        && let Some(path) = r.strip_prefix("#/")
+    {
+        let mut cur = root;
+        for part in path.split('/') {
+            match cur.get(part) {
+                Some(v) => cur = v,
+                None => return schema,
+            }
+        }
+        return cur;
+    }
+    schema
+}
+
+/// Navigate the schema along a key path, resolving `$ref` at each step.
+fn navigate_schema<'a>(
+    root: &'a serde_json::Value,
+    path: &[&str],
+) -> Option<&'a serde_json::Value> {
+    if path.is_empty() {
+        return Some(root);
+    }
+    let props = root.get("properties")?;
+    let first = props.get(path[0])?;
+    let resolved = resolve_ref(root, first);
+    if path.len() == 1 {
+        Some(resolved)
+    } else {
+        navigate_schema(resolved, &path[1..])
+    }
+}
+
+/// Format a single JSON value as a TOML-compatible inline string for a comment.
+fn json_val_inline(v: &serde_json::Value) -> String {
+    match v {
+        serde_json::Value::String(s) => format!("{s:?}"),
+        serde_json::Value::Null => "(unset)".to_string(),
+        other => other.to_string(),
+    }
+}
+
+/// Render a schema section with current values annotated by schema descriptions.
+/// Shows ALL schema properties, not just what's set in the file.
+fn format_schema_annotated(
+    root_schema: &serde_json::Value,
+    section_schema: Option<&serde_json::Value>,
+    section_content: Option<&serde_json::Value>,
+    section_path: &[&str],
+) -> String {
+    let Some(schema) = section_schema else {
+        // No schema for this path — fall back to raw content
+        return section_content
+            .map(json_to_toml_string)
+            .unwrap_or_else(|| "(not found)".to_string());
+    };
+
+    let resolved = resolve_ref(root_schema, schema);
+
+    // Leaf node (not an object with properties) — show its schema details
+    let Some(props) = resolved.get("properties").and_then(|p| p.as_object()) else {
+        let mut out = String::new();
+        // Description
+        if let Some(desc) = resolved.get("description").and_then(|d| d.as_str()) {
+            for line in desc.lines() {
+                out.push_str(&format!("# {line}\n"));
+            }
+        }
+        // Type info
+        if let Some(t) = resolved.get("type") {
+            out.push_str(&format!("# type: {t}\n"));
+        }
+        // Current value or default
+        let key = section_path.last().copied().unwrap_or("value");
+        match section_content {
+            Some(v) if !v.is_null() => {
+                let toml_str = json_to_toml_string(&serde_json::json!({ key: v }));
+                out.push_str(toml_str.trim_end());
+            }
+            _ => {
+                let default_str = resolved
+                    .get("default")
+                    .map(json_val_inline)
+                    .unwrap_or_else(|| "(unset)".to_string());
+                out.push_str(&format!("# {key} = {default_str}"));
+            }
+        }
+        return out;
+    };
+
+    // Object with properties — show section description then all fields
+    let mut out = String::new();
+    if let Some(desc) = resolved.get("description").and_then(|d| d.as_str()) {
+        for line in desc.lines() {
+            out.push_str(&format!("# {line}\n"));
+        }
+        out.push('\n');
     }
 
-    fn format_pretty(&self) -> String {
-        self.format_text()
+    for (key, prop_schema) in props {
+        let prop_resolved = resolve_ref(root_schema, prop_schema);
+
+        // Description
+        if let Some(desc) = prop_resolved.get("description").and_then(|d| d.as_str()) {
+            for line in desc.lines() {
+                out.push_str(&format!("# {line}\n"));
+            }
+        }
+
+        let current = section_content.and_then(|c| c.get(key));
+        let is_set = current.map(|v| !v.is_null()).unwrap_or(false);
+
+        if is_set {
+            let v = current.unwrap();
+            // Render as TOML key = value
+            let toml_str = json_to_toml_string(&serde_json::json!({ key: v }));
+            out.push_str(toml_str.trim_end());
+        } else {
+            // Show default or (unset) as a comment
+            let default_str = prop_schema
+                .get("default")
+                .map(json_val_inline)
+                .unwrap_or_else(|| "(unset)".to_string());
+            out.push_str(&format!("# {key} = {default_str}"));
+        }
+        out.push_str("\n\n");
     }
+
+    out
 }
 
 /// Report from `normalize config validate`.
@@ -304,7 +462,8 @@ impl ConfigService {
         serde_json::to_value(schema).map_err(|e| format!("Schema serialization error: {e}"))
     }
 
-    /// Show a config file, optionally filtered to one top-level section
+    /// Show a config file with schema annotations — all available options, with descriptions.
+    /// Use --section for a dotted path (e.g. 'analyze', 'analyze.threshold').
     #[cli(display_with = "display_show")]
     pub fn show(
         &self,
@@ -316,7 +475,9 @@ impl ConfigService {
         >,
         #[param(help = "Path to JSON Schema file (default: NormalizeConfig schema)")]
         schema: Option<String>,
-        #[param(help = "Show only this top-level section (e.g. 'rules', 'analyze')")]
+        #[param(
+            help = "Show a specific section or field (dotted path, e.g. 'analyze', 'analyze.threshold')"
+        )]
         section: Option<String>,
         pretty: bool,
         compact: bool,
@@ -324,13 +485,15 @@ impl ConfigService {
         let root_path = Self::resolve_root(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let config_path = file.unwrap_or_else(|| default_config_file(&root_path));
-        let content = load_file_as_json(&config_path)?;
-        // schema loaded but not displayed — validates presence only
-        let _ = load_schema(schema.as_deref())?;
+        let schema_json = load_schema(schema.as_deref())?;
+        // Config file is optional — show schema even if no file exists yet
+        let content = load_file_as_json(&config_path)
+            .unwrap_or(serde_json::Value::Object(Default::default()));
         Ok(ConfigShowReport {
             config_path,
             section,
             content,
+            schema: schema_json,
         })
     }
 
