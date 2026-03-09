@@ -60,10 +60,9 @@ Graph analysis:
   call-graph         Show callers and/or callees of a symbol
   trace              Trace value provenance for a symbol
   architecture       Show architecture analysis (coupling, cycles, hubs)
-  impact             What-if impact analysis: reverse-dependency closure + blast radius
   repo-coupling      Analyze cross-repo coupling
   graph              Graph-theoretic properties of the dependency graph
-  dependents         Find all modules or symbols that transitively depend on a given file or symbol
+  dependents         Reverse-dependency closure: who depends on this file/symbol? Modules mode shows blast radius with test coverage; symbols/types mode shows a flat list.
 
 Git history:
   coupling           Temporal coupling: file pairs that change together in git history

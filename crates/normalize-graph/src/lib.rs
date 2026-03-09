@@ -117,52 +117,198 @@ pub struct TransitiveEdge {
     pub via: String,
 }
 
+/// A file that depends on the query target (modules graph only).
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct DependentEntry {
+    pub file: String,
+    pub depth: usize,
+    pub has_tests: bool,
+    pub fan_in: usize,
+}
+
+/// Blast radius summary statistics (modules graph only).
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct BlastRadius {
+    pub direct_count: usize,
+    pub transitive_count: usize,
+    pub untested_count: usize,
+    pub max_depth: usize,
+}
+
 /// Report for reverse dependency queries: what depends on a given file/symbol.
+///
+/// For `--on modules` (default): structured output with depth, test coverage,
+/// fan-in, and blast radius statistics.
+/// For `--on symbols` / `--on types`: flat alphabetical list of dependents.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct DependentsReport {
     /// The file or symbol being queried.
     pub target: String,
     /// Graph node kind used for the query.
     pub graph_target: GraphTarget,
-    /// All nodes that transitively depend on `target`, sorted alphabetically.
+    /// Direct dependents (depth = 1) — populated for modules graph.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub direct: Vec<DependentEntry>,
+    /// Transitive dependents (depth > 1) — populated for modules graph.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub transitive: Vec<DependentEntry>,
+    /// Blast radius summary — populated for modules graph.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blast_radius: Option<BlastRadius>,
+    /// Untested impact paths — populated for modules graph.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub untested_paths: Vec<String>,
+    /// Flat dependent list — populated for symbols/types graph.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub dependents: Vec<String>,
 }
 
 impl normalize_output::OutputFormatter for DependentsReport {
     fn format_text(&self) -> String {
-        let kind = match self.graph_target {
-            GraphTarget::Modules => "modules",
-            GraphTarget::Symbols => "symbols",
-            GraphTarget::Types => "types",
-        };
-        let mut out = Vec::new();
-        out.push(format!(
-            "# Dependents of {} ({} {} depend on it)",
-            self.target,
-            self.dependents.len(),
-            kind
-        ));
-        for dep in &self.dependents {
-            out.push(format!("  {}", dep));
+        match self.graph_target {
+            GraphTarget::Modules => self.format_modules_text(false),
+            GraphTarget::Symbols | GraphTarget::Types => self.format_flat_text(false),
         }
-        out.join("\n")
     }
 
     fn format_pretty(&self) -> String {
+        match self.graph_target {
+            GraphTarget::Modules => self.format_modules_text(true),
+            GraphTarget::Symbols | GraphTarget::Types => self.format_flat_text(true),
+        }
+    }
+}
+
+impl DependentsReport {
+    fn format_modules_text(&self, pretty: bool) -> String {
+        let mut lines = Vec::new();
+        let total = self.direct.len() + self.transitive.len();
+
+        if pretty {
+            lines.push(format!("\x1b[1;36m# Dependents of {}\x1b[0m", self.target));
+        } else {
+            lines.push(format!("# Dependents of {}", self.target));
+        }
+        lines.push(String::new());
+
+        if let Some(ref br) = self.blast_radius {
+            if pretty {
+                lines.push(format!(
+                    "\x1b[1m{}\x1b[0m files affected · \x1b[32m{}\x1b[0m direct · \x1b[33m{}\x1b[0m transitive · \x1b[31m{}\x1b[0m untested · max depth {}",
+                    total, br.direct_count, br.transitive_count, br.untested_count, br.max_depth
+                ));
+            } else {
+                lines.push(format!(
+                    "{} files affected · {} direct · {} transitive · {} untested · max depth {}",
+                    total, br.direct_count, br.transitive_count, br.untested_count, br.max_depth
+                ));
+            }
+        }
+
+        if !self.direct.is_empty() {
+            lines.push(String::new());
+            if pretty {
+                lines.push(format!(
+                    "\x1b[1;32m## Direct ({})\x1b[0m",
+                    self.direct.len()
+                ));
+            } else {
+                lines.push(format!("## Direct ({})", self.direct.len()));
+            }
+            for e in &self.direct {
+                let tested = if e.has_tests {
+                    if pretty {
+                        "\x1b[32mtested\x1b[0m"
+                    } else {
+                        "tested"
+                    }
+                } else if pretty {
+                    "\x1b[1;31mUNTESTED\x1b[0m"
+                } else {
+                    "UNTESTED"
+                };
+                lines.push(format!(
+                    "  {:<40} depth {}  {}  fan-in {}",
+                    e.file, e.depth, tested, e.fan_in
+                ));
+            }
+        }
+
+        if !self.transitive.is_empty() {
+            lines.push(String::new());
+            if pretty {
+                lines.push(format!(
+                    "\x1b[1;33m## Transitive ({})\x1b[0m",
+                    self.transitive.len()
+                ));
+            } else {
+                lines.push(format!("## Transitive ({})", self.transitive.len()));
+            }
+            for e in &self.transitive {
+                let tested = if e.has_tests {
+                    if pretty {
+                        "\x1b[32mtested\x1b[0m"
+                    } else {
+                        "tested"
+                    }
+                } else if pretty {
+                    "\x1b[1;31mUNTESTED\x1b[0m"
+                } else {
+                    "UNTESTED"
+                };
+                lines.push(format!(
+                    "  {:<40} depth {}  {}  fan-in {}",
+                    e.file, e.depth, tested, e.fan_in
+                ));
+            }
+        }
+
+        if !self.untested_paths.is_empty() {
+            lines.push(String::new());
+            if pretty {
+                lines.push(format!(
+                    "\x1b[1;31m## Untested Impact Paths ({})\x1b[0m",
+                    self.untested_paths.len()
+                ));
+            } else {
+                lines.push(format!(
+                    "## Untested Impact Paths ({})",
+                    self.untested_paths.len()
+                ));
+            }
+            for p in &self.untested_paths {
+                lines.push(format!("  {}", p));
+            }
+        }
+
+        lines.join("\n")
+    }
+
+    fn format_flat_text(&self, pretty: bool) -> String {
         let kind = match self.graph_target {
             GraphTarget::Modules => "modules",
             GraphTarget::Symbols => "symbols",
             GraphTarget::Types => "types",
         };
         let mut out = Vec::new();
-        out.push(format!(
-            "\x1b[1;36m# Dependents of\x1b[0m \x1b[1m{}\x1b[0m \x1b[2m({} {} depend on it)\x1b[0m",
-            self.target,
-            self.dependents.len(),
-            kind
-        ));
-        for dep in &self.dependents {
-            out.push(format!("  \x1b[37m{}\x1b[0m", dep));
+        if pretty {
+            out.push(format!(
+                "\x1b[1;36m# Dependents of\x1b[0m \x1b[1m{}\x1b[0m \x1b[2m({} {} depend on it)\x1b[0m",
+                self.target, self.dependents.len(), kind
+            ));
+            for dep in &self.dependents {
+                out.push(format!("  \x1b[37m{}\x1b[0m", dep));
+            }
+        } else {
+            out.push(format!(
+                "# Dependents of {} ({} {} depend on it)",
+                self.target,
+                self.dependents.len(),
+                kind
+            ));
+            for dep in &self.dependents {
+                out.push(format!("  {}", dep));
+            }
         }
         out.join("\n")
     }

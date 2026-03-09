@@ -22,7 +22,6 @@ pub mod files;
 pub mod fragments;
 pub mod graph;
 pub mod hotspots;
-pub mod impact;
 pub mod imports;
 pub mod layering;
 pub mod length;

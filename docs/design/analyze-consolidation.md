@@ -272,8 +272,9 @@ Each merge follows this pattern:
 | After `fragments` absorbs `patterns` | 44 | -1 |
 | After `check` unification (refs + stale + examples) | 42 | -2 |
 | After `coverage`/`churn` enum reverts (+4 commands, -2 wrappers) | 42 | ±0 |
-| After `graph` consolidation | 31 | -4 |
-| After further `check` → rules migration | ~28 | ~-3 |
+| After `dependents` absorbs `impact` | 41 | -1 |
+| After `graph` consolidation | 30 | -4 |
+| After further `check` → rules migration | ~27 | ~-3 |
 
 The goal isn't minimizing count for its own sake — it's making the mental model learnable and the extension model obvious.
 
@@ -330,3 +331,10 @@ It doesn't work when parameter signatures diverge — that means they're differe
 - `DiagnosticsReport` in `normalize-output::diagnostics` — reusable by any issue-reporting command
 - Old commands: `check-refs`, `stale-docs`, `check-examples` — deleted
 - Output format: `file:line:col: severity [rule_id] message` (standard diagnostic format)
+
+**`dependents` absorbs `impact`** (Phase 3, 2026-03-09):
+- `normalize analyze dependents <target>` — now positional; for modules shows blast radius with test coverage; for symbols/types shows flat list
+- `impact` was a file-only command computing the same reverse-dependency BFS but without `--on` support
+- `DependentsReport` in `normalize-graph` expanded: adds `direct`, `transitive`, `blast_radius`, `untested_paths` (populated for modules graph); `dependents` flat list used for symbols/types
+- Blast-radius computation (BFS + fan-in + test path detection) moved into `commands/analyze/graph.rs::analyze_module_dependents`
+- Old command: `impact` — deleted

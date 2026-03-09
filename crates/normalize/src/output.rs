@@ -37,9 +37,8 @@ mod tests {
         use crate::commands::analyze::duplicates_views::DuplicatesReport;
         use crate::commands::analyze::files::FileLengthReport;
         use crate::commands::analyze::fragments::FragmentsReport;
-        use crate::commands::analyze::graph::GraphReport;
+        use crate::commands::analyze::graph::{DependentsReport, GraphReport};
         use crate::commands::analyze::hotspots::HotspotsReport;
-        use crate::commands::analyze::impact::ImpactReport;
         use crate::commands::analyze::imports::ImportCentralityReport;
         use crate::commands::analyze::layering::LayeringReport;
         use crate::commands::analyze::module_health::ModuleHealthReport;
@@ -98,6 +97,7 @@ mod tests {
         assert_output_formatter::<ReferencesReport>();
         assert_output_formatter::<GrammarListReport>();
         assert_output_formatter::<GrammarPathsReport>();
+        assert_output_formatter::<DependentsReport>();
         assert_output_formatter::<GraphReport>();
         assert_output_formatter::<GrepResult>();
         assert_output_formatter::<HistoryDiffReport>();
@@ -106,7 +106,6 @@ mod tests {
         assert_output_formatter::<HistoryStatusReport>();
         assert_output_formatter::<HistoryTreeReport>();
         assert_output_formatter::<HotspotsReport>();
-        assert_output_formatter::<ImpactReport>();
         assert_output_formatter::<ImportCentralityReport>();
         assert_output_formatter::<LengthReport>();
         assert_output_formatter::<ModuleHealthReport>();

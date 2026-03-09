@@ -25,7 +25,6 @@ use crate::commands::analyze::files::FileLengthReport;
 use crate::commands::analyze::fragments::{FragmentScope, FragmentsReport};
 use crate::commands::analyze::graph::{DependentsReport, GraphReport, GraphTarget};
 use crate::commands::analyze::hotspots::HotspotsReport;
-use crate::commands::analyze::impact::ImpactReport;
 use crate::commands::analyze::imports::ImportCentralityReport;
 use crate::commands::analyze::layering::LayeringReport;
 use crate::commands::analyze::module_health::ModuleHealthReport;
@@ -87,14 +86,6 @@ impl AnalyzeService {
     }
 
     fn display_architecture(&self, r: &ArchitectureReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_impact(&self, r: &ImpactReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -483,26 +474,6 @@ impl AnalyzeService {
         crate::commands::analyze::architecture::analyze_architecture(&idx)
             .await
             .map_err(|e| format!("Architecture analysis failed: {}", e))
-    }
-
-    /// What-if impact analysis: reverse-dependency closure + blast radius
-    #[server(group = "graph")]
-    #[cli(display_with = "display_impact")]
-    pub async fn impact(
-        &self,
-        #[param(positional, help = "Target file to analyze impact for")] target: String,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<ImpactReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        let idx = crate::index::ensure_ready(&root_path).await?;
-        crate::commands::analyze::impact::analyze_impact(&idx, &target)
-            .await
-            .map_err(|e| format!("Impact analysis failed: {}", e))
     }
 
     /// Run health analysis (file counts, complexity stats, large file warnings)
@@ -1512,24 +1483,26 @@ impl AnalyzeService {
             .map_err(|e| format!("Graph analysis failed: {}", e))
     }
 
-    /// Find all modules or symbols that transitively depend on a given file or symbol
+    /// Reverse-dependency closure: who depends on this file/symbol? Modules mode shows blast radius with test coverage; symbols/types mode shows a flat list.
     #[server(group = "graph")]
     #[cli(display_with = "display_dependents")]
     pub async fn dependents(
         &self,
+        #[param(positional, help = "File or symbol to find dependents for")] target: String,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        #[param(help = "File or symbol to find dependents for")] file: String,
-        #[param(help = "Graph nodes: modules (default) or symbols")] on: Option<GraphTarget>,
+        #[param(help = "Graph nodes: modules (default), symbols, or types")] on: Option<
+            GraphTarget,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<DependentsReport, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
-        let target = on.unwrap_or(GraphTarget::Modules);
+        let graph_target = on.unwrap_or(GraphTarget::Modules);
         let idx = crate::index::ensure_ready(&root_path).await?;
-        crate::commands::analyze::graph::analyze_dependents(&idx, &file, target)
+        crate::commands::analyze::graph::analyze_dependents(&idx, &target, graph_target)
             .await
             .map_err(|e| format!("Dependents query failed: {}", e))
     }

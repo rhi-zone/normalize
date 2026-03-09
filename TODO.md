@@ -403,13 +403,14 @@ See `docs/design/analyze-consolidation.md` for full design (axis decomposition, 
 - [ ] **2c. `density`**: needs design — `uniqueness` has 8 extra params
 
 **Phase 3 — Further consolidation (needs design):**
+- [x] `dependents` absorbs `impact` — `DependentsReport` now shows blast radius (depth, test coverage, fan-in) for modules; flat list for symbols/types. `impact` deleted. `dependents` target is now positional. (2026-03-09)
 - [ ] `duplicates` + `fragments`: collapse remaining similarity commands (duplicate-types still separate, fragments absorbed patterns)
-- [ ] `deps`: collapse 10 commands (imports, depth-map, surface, layering, architecture, call-graph, callers, callees, trace, impact)
+- [ ] `deps`: collapse 9 commands (imports, depth-map, surface, layering, architecture, call-graph, trace) — `impact` absorbed, `callers`/`callees` are already flags in `call-graph`
 - [x] `docs` → unified `check` command: `check-refs`, `stale-docs`, `check-examples` → `normalize analyze check [--refs] [--stale] [--examples]`. Shared `DiagnosticsReport` in `normalize-output::diagnostics`. `docs` (coverage) stays separate (metric/rank). See `docs/design/rules-unification.md`
 - [ ] `git`: collapse 5 commands (ownership, contributors, activity, repo-coupling, cross-repo-health) — all git/repo-centric analysis
 - [ ] Cross-cutting `--trend` and `--diff <ref>` modifiers on any scoring command
 
-**Design pressure:** ~43 commands after Phase 2 is still too spread out. Phase 3 must happen. The goal is a surface small enough that a user can hold it in working memory — not just "fewer than 49".
+**Design pressure:** ~41 commands is still too spread out. Phase 3 must continue. The goal is a surface small enough that a user can hold it in working memory — not just "fewer than 49".
 
 **Enum-return "unifications" — DONE:**
 
