@@ -138,8 +138,7 @@ based on context and output mode:
 
 Remaining gaps:
 - `rules run --engine sarif` could show which SARIF tools had errors (not done)
-- Hints only appear in text mode. Pretty mode shows them too but they're redundant there.
-  Could suppress hints in pretty mode (hints are most useful in the compact/default mode).
+- `hints: Vec<String>` on `DiagnosticsReport` is never populated — decide whether the field is actually needed or should be removed.
 
 ### ~~Failing skeleton tests (4 tests)~~ FIXED
 Root causes:
