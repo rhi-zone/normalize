@@ -1,5 +1,19 @@
 [
   {
+    "file": "SUMMARY.md",
+    "kind": "Heading",
+    "name": "rust/add_numbers — project source",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "src/SUMMARY.md",
+    "kind": "Heading",
+    "name": "rust/add_numbers — project/src",
+    "parent": null,
+    "start_line": 1
+  },
+  {
     "file": "src/main.rs",
     "kind": "Module",
     "name": "math",

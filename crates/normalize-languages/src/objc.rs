@@ -108,6 +108,39 @@ impl Language for ObjC {
         })
     }
 
+    fn extract_implements(&self, node: &Node, content: &str) -> crate::ImplementsInfo {
+        let mut implements = Vec::new();
+        // Superclass is a named field inlined from _class_interface_inheritance
+        if let Some(superclass) = node.child_by_field_name("superclass") {
+            implements.push(content[superclass.byte_range()].to_string());
+        }
+        // Protocols are in a parameterized_arguments child: <Proto1, Proto2>
+        // Each protocol appears as type_name > type_identifier inside parameterized_arguments.
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "parameterized_arguments" {
+                let mut pc = child.walk();
+                for item in child.children(&mut pc) {
+                    if item.kind() == "identifier" || item.kind() == "type_identifier" {
+                        implements.push(content[item.byte_range()].to_string());
+                    } else if item.kind() == "type_name" {
+                        // type_name wraps type_identifier: extract the inner type
+                        let mut tc = item.walk();
+                        for inner in item.children(&mut tc) {
+                            if inner.kind() == "type_identifier" || inner.kind() == "identifier" {
+                                implements.push(content[inner.byte_range()].to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        crate::ImplementsInfo {
+            is_interface: false,
+            implements,
+        }
+    }
+
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
         if let Some(n) = node
             .child_by_field_name("name")

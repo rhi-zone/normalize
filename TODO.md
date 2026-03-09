@@ -833,6 +833,9 @@ that applies before per-rule allow lists. Alternatively: pre-commit hook should 
 
 ## Known Issues
 
+### normalize-languages: query fixture failures (67 tests, pre-existing)
+Many `.scm` query files reference node kinds that no longer exist in the grammar (arborium grammars may have drifted). Examples: `subprogram_specification` in Ada, etc. Pre-existing; requires auditing query files against current grammar node-types.json. Not caused by recent changes.
+
 ### normalize-languages: ast-grep test broken
 The `ast_grep::tests::test_pattern_matching` test fails to compile due to API mismatch:
 - `DynLang.parse()` method not found

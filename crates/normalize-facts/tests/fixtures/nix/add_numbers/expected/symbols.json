@@ -1,14 +1,42 @@
 [
   {
+    "file": "SUMMARY.md",
+    "kind": "Heading",
+    "name": "nix/add_numbers — project source",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "default.nix",
+    "kind": "Variable",
+    "name": "mathUtils",
+    "parent": null,
+    "start_line": 2
+  },
+  {
+    "file": "default.nix",
+    "kind": "Variable",
+    "name": "sum",
+    "parent": null,
+    "start_line": 5
+  },
+  {
+    "file": "default.nix",
+    "kind": "Variable",
+    "name": "product",
+    "parent": null,
+    "start_line": 6
+  },
+  {
     "file": "math_utils.nix",
-    "kind": "Function",
+    "kind": "Variable",
     "name": "add",
     "parent": null,
     "start_line": 2
   },
   {
     "file": "math_utils.nix",
-    "kind": "Function",
+    "kind": "Variable",
     "name": "multiply",
     "parent": null,
     "start_line": 4

@@ -47,5 +47,12 @@
     "name": "Compute",
     "parent": "Calculator",
     "start_line": 17
+  },
+  {
+    "file": "SUMMARY.md",
+    "kind": "Heading",
+    "name": "vb/add_numbers — project source",
+    "parent": null,
+    "start_line": 1
   }
 ]

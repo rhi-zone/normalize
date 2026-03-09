@@ -47,5 +47,12 @@
     "name": "Main",
     "parent": "Program",
     "start_line": 8
+  },
+  {
+    "file": "SUMMARY.md",
+    "kind": "Heading",
+    "name": "csharp/add_numbers — project source",
+    "parent": null,
+    "start_line": 1
   }
 ]

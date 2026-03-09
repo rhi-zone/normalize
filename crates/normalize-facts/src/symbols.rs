@@ -184,7 +184,15 @@ impl SymbolParser {
         let mut stack = vec![root];
         while let Some(node) = stack.pop() {
             for import in support.extract_imports(&node, source) {
-                if import.names.is_empty() {
+                if import.is_wildcard {
+                    // Wildcard import: store name="*" with module
+                    results.push(FlatImport {
+                        module: Some(import.module.clone()),
+                        name: "*".to_string(),
+                        alias: None,
+                        line: import.line,
+                    });
+                } else if import.names.is_empty() {
                     // Single import: module is the full path
                     results.push(FlatImport {
                         module: None,

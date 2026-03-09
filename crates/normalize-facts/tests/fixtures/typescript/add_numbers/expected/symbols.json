@@ -1,5 +1,12 @@
 [
   {
+    "file": "SUMMARY.md",
+    "kind": "Heading",
+    "name": "typescript/add_numbers — project source",
+    "parent": null,
+    "start_line": 1
+  },
+  {
     "file": "logger.ts",
     "kind": "Interface",
     "name": "Loggable",

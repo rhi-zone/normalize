@@ -76,6 +76,20 @@ impl Language for Haskell {
         &["**/test/**/*.hs", "**/*Spec.hs", "**/*Test.hs"]
     }
 
+    fn extract_implements(&self, node: &Node, content: &str) -> crate::ImplementsInfo {
+        // instance MyClass Foo where → symbol name is "MyClass", implements = ["MyClass"]
+        if node.kind() == "instance"
+            && let Some(name_node) = node.child_by_field_name("name")
+        {
+            let class_name = content[name_node.byte_range()].to_string();
+            return crate::ImplementsInfo {
+                is_interface: false,
+                implements: vec![class_name],
+            };
+        }
+        crate::ImplementsInfo::default()
+    }
+
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         // tree-sitter-haskell uses "declarations" (not "where") for the body
         node.child_by_field_name("declarations")

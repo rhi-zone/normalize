@@ -1,19 +1,5 @@
 [
   {
-    "file": "Main.hs",
-    "kind": "Function",
-    "name": "main",
-    "parent": null,
-    "start_line": 5
-  },
-  {
-    "file": "MathUtils.hs",
-    "kind": "Function",
-    "name": "add",
-    "parent": null,
-    "start_line": 3
-  },
-  {
     "file": "MathUtils.hs",
     "kind": "Function",
     "name": "add",
@@ -25,13 +11,13 @@
     "kind": "Function",
     "name": "multiply",
     "parent": null,
-    "start_line": 6
+    "start_line": 7
   },
   {
-    "file": "MathUtils.hs",
-    "kind": "Function",
-    "name": "multiply",
+    "file": "SUMMARY.md",
+    "kind": "Heading",
+    "name": "haskell/add_numbers — project source",
     "parent": null,
-    "start_line": 7
+    "start_line": 1
   }
 ]

@@ -2098,9 +2098,6 @@ mod tests {
         index.refresh().await.unwrap();
         index.refresh_call_graph().await.unwrap();
 
-        // Manually add wildcard imports (refresh_call_graph parses these)
-        // The parser should have picked up the wildcard imports
-
         // Now resolve MyClass - should find it in mylib.exports
         let result = index
             .resolve_import("src/consumer.py", "MyClass")

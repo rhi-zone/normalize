@@ -35,4 +35,4 @@
 ; from foo import *
 (import_from_statement
   module_name: (_) @import.path
-  name: (wildcard_import) @import.glob) @import
+  (wildcard_import) @import.glob) @import

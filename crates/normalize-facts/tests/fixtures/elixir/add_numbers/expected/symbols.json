@@ -1,10 +1,24 @@
 [
   {
+    "file": "SUMMARY.md",
+    "kind": "Heading",
+    "name": "elixir/add_numbers — project source",
+    "parent": null,
+    "start_line": 1
+  },
+  {
     "file": "main.ex",
     "kind": "Module",
     "name": "Main",
     "parent": null,
     "start_line": 1
+  },
+  {
+    "file": "main.ex",
+    "kind": "Method",
+    "name": "run",
+    "parent": "Main",
+    "start_line": 4
   },
   {
     "file": "math_utils.ex",

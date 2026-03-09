@@ -1,1 +1,30 @@
-[]
+[
+  {
+    "file": "SUMMARY.md",
+    "kind": "Heading",
+    "name": "awk/add_numbers — project source",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "math_utils.awk",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "math_utils.awk",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 5
+  },
+  {
+    "file": "math_utils.awk",
+    "kind": "Function",
+    "name": "square",
+    "parent": null,
+    "start_line": 9
+  }
+]

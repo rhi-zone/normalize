@@ -1,5 +1,12 @@
 [
   {
+    "file": "SUMMARY.md",
+    "kind": "Heading",
+    "name": "ruby/add_numbers — project source",
+    "parent": null,
+    "start_line": 1
+  },
+  {
     "file": "calculator.rb",
     "kind": "Class",
     "name": "Calculator",

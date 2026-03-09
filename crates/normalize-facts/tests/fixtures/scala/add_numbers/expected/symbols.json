@@ -33,5 +33,12 @@
     "name": "multiply",
     "parent": "MathUtils",
     "start_line": 8
+  },
+  {
+    "file": "SUMMARY.md",
+    "kind": "Heading",
+    "name": "scala/add_numbers — project source",
+    "parent": null,
+    "start_line": 1
   }
 ]

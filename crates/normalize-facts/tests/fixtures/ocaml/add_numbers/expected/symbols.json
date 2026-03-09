@@ -1,5 +1,12 @@
 [
   {
+    "file": "SUMMARY.md",
+    "kind": "Heading",
+    "name": "ocaml/add_numbers — project source",
+    "parent": null,
+    "start_line": 1
+  },
+  {
     "file": "main.ml",
     "kind": "Function",
     "name": "sum",
