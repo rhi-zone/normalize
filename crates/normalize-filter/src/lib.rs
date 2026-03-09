@@ -462,7 +462,7 @@ mod tests {
         config.entries.insert("tests".to_string(), vec![]);
 
         // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
-        let filter = Filter::new(&["@tests".to_string()], &[], &config, &["go"]).unwrap();
+        let filter = Filter::new(&["@tests".to_string()], &[], &config, &["Go"]).unwrap();
 
         assert!(!filter.is_active()); // No patterns = not active
         assert_eq!(filter.warnings().len(), 1);
@@ -477,7 +477,7 @@ mod tests {
             .insert("tests".to_string(), vec!["my_tests/**".to_string()]);
 
         // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
-        let filter = Filter::new(&["@tests".to_string()], &[], &config, &["go"]).unwrap();
+        let filter = Filter::new(&["@tests".to_string()], &[], &config, &["Go"]).unwrap();
 
         assert!(filter.is_active());
         assert!(!filter.matches(Path::new("my_tests/foo.go")));
