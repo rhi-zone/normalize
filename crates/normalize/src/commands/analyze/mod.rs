@@ -20,6 +20,7 @@ pub mod duplicates;
 pub mod duplicates_views;
 pub mod files;
 pub mod fragments;
+pub mod git_history;
 pub mod graph;
 pub mod hotspots;
 pub mod imports;

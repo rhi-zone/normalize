@@ -18,6 +18,9 @@ pub struct FileReport<T: Serialize + schemars::JsonSchema> {
     /// Stats computed before limit was applied (for accurate reporting when limited).
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub full_stats: Option<FullStats>,
+    /// Git ref used as baseline for diff (set when `--diff` is used).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub diff_ref: Option<String>,
 }
 
 /// Statistics computed on the full result set before limiting.

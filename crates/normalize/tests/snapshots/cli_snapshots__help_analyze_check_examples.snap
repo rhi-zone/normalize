@@ -32,7 +32,9 @@ Commands:
 
 Code quality:
   complexity         Run complexity analysis
+  complexity-trend   Show complexity trend over git history
   length             Run function length analysis
+  length-trend       Show function length trend over git history
   ceremony           Show ceremony ratio: fraction of callables that are trait/interface boilerplate
   duplicates         Detect duplicate/similar code (functions or blocks)
 

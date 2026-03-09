@@ -37,7 +37,7 @@ use crate::commands::analyze::skeleton_diff::SkeletonDiffReport;
 use crate::commands::analyze::summary::SummaryReport;
 use crate::commands::analyze::surface::SurfaceReport;
 use crate::commands::analyze::test_ratio::TestRatioReport;
-use crate::commands::analyze::trend::TrendReport;
+use crate::commands::analyze::trend::{ScalarTrendReport, TrendReport};
 use crate::commands::analyze::uniqueness::UniquenessReport;
 use crate::output::OutputFormatter;
 use server_less::cli;
@@ -110,6 +110,14 @@ impl AnalyzeService {
     }
 
     fn display_complexity(&self, r: &ComplexityReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_scalar_trend(&self, r: &ScalarTrendReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -574,6 +582,9 @@ impl AnalyzeService {
         limit: Option<usize>,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<ComplexityReport, String> {
@@ -606,14 +617,69 @@ impl AnalyzeService {
                 analysis_root.display()
             ));
         }
-        Ok(
-            crate::commands::analyze::complexity::analyze_codebase_complexity(
-                &analysis_root,
-                effective_limit,
-                effective_threshold,
-                filter.as_ref(),
-                &allowlist,
-            ),
+        let mut report = crate::commands::analyze::complexity::analyze_codebase_complexity(
+            &analysis_root,
+            effective_limit,
+            effective_threshold,
+            filter.as_ref(),
+            &allowlist,
+        );
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::complexity::apply_complexity_diff;
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            // Compute relative sub-path of analysis_root within root_path (if any)
+            let sub = analysis_root
+                .strip_prefix(&root_path)
+                .unwrap_or(std::path::Path::new(""))
+                .to_path_buf();
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                let wt_root = wt.join(&sub);
+                Ok(
+                    crate::commands::analyze::complexity::analyze_codebase_complexity(
+                        &wt_root,
+                        usize::MAX, // get all functions for accurate baseline matching
+                        None,
+                        None,
+                        &[],
+                    ),
+                )
+            })?;
+            apply_complexity_diff(&mut report, &baseline, diff_ref);
+        }
+        Ok(report)
+    }
+
+    /// Show complexity trend over git history
+    #[server(group = "code")]
+    #[cli(display_with = "display_scalar_trend")]
+    pub fn complexity_trend(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'n', help = "Number of snapshots to collect (default: 10)")]
+        snapshots: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ScalarTrendReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        crate::commands::analyze::trend::analyze_scalar_trend(
+            &root_path,
+            "avg_complexity",
+            snapshots.unwrap_or(10),
+            false, // lower complexity is better
+            |wt| {
+                let report = crate::commands::analyze::complexity::analyze_codebase_complexity(
+                    wt,
+                    usize::MAX,
+                    None,
+                    None,
+                    &[],
+                );
+                report.full_stats.map(|s| s.total_avg)
+            },
         )
     }
 
@@ -631,6 +697,9 @@ impl AnalyzeService {
         limit: Option<usize>,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<LengthReport, String> {
@@ -661,12 +730,64 @@ impl AnalyzeService {
                 analysis_root.display()
             ));
         }
-        Ok(crate::commands::analyze::length::analyze_codebase_length(
+        let mut report = crate::commands::analyze::length::analyze_codebase_length(
             &analysis_root,
             effective_limit,
             filter.as_ref(),
             &allowlist,
-        ))
+        );
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use crate::commands::analyze::length::apply_length_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let sub = analysis_root
+                .strip_prefix(&root_path)
+                .unwrap_or(std::path::Path::new(""))
+                .to_path_buf();
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                let wt_root = wt.join(&sub);
+                Ok(crate::commands::analyze::length::analyze_codebase_length(
+                    &wt_root,
+                    usize::MAX,
+                    None,
+                    &[],
+                ))
+            })?;
+            apply_length_diff(&mut report, &baseline, diff_ref);
+        }
+        Ok(report)
+    }
+
+    /// Show function length trend over git history
+    #[server(group = "code")]
+    #[cli(display_with = "display_scalar_trend")]
+    pub fn length_trend(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'n', help = "Number of snapshots to collect (default: 10)")]
+        snapshots: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ScalarTrendReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        crate::commands::analyze::trend::analyze_scalar_trend(
+            &root_path,
+            "avg_length",
+            snapshots.unwrap_or(10),
+            false, // shorter functions is better
+            |wt| {
+                let report = crate::commands::analyze::length::analyze_codebase_length(
+                    wt,
+                    usize::MAX,
+                    None,
+                    &[],
+                );
+                report.full_stats.map(|s| s.total_avg)
+            },
+        )
     }
 
     /// Analyze documentation coverage

@@ -248,8 +248,18 @@ fn test_help_analyze_complexity() {
 }
 
 #[test]
+fn test_help_analyze_complexity_trend() {
+    insta::assert_snapshot!(snapshot_help(&["analyze", "complexity-trend"]));
+}
+
+#[test]
 fn test_help_analyze_length() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "length"]));
+}
+
+#[test]
+fn test_help_analyze_length_trend() {
+    insta::assert_snapshot!(snapshot_help(&["analyze", "length-trend"]));
 }
 
 #[test]

@@ -8,7 +8,10 @@ use crate::output::OutputFormatter;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::Path;
-use std::process::Command;
+
+pub use crate::commands::analyze::git_history::{
+    CommitInfo, format_unix_date, git_log_timestamps, run_in_worktree, select_snapshots,
+};
 
 /// Direction of a metric's change over time.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, schemars::JsonSchema)]
@@ -66,139 +69,188 @@ pub struct TrendReport {
     pub num_snapshots: usize,
 }
 
-struct CommitInfo {
-    hash: String,
-    timestamp: i64,
+/// A single point in a scalar metric trend over time.
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct ScalarTrendPoint {
+    pub commit: String,
+    pub date: String,
+    pub timestamp: i64,
+    pub value: f64,
 }
 
-/// Get all commits with timestamps, oldest first.
-fn git_log_timestamps(root: &Path) -> Result<Vec<CommitInfo>, String> {
-    let output = Command::new("git")
-        .args(["log", "--format=%H%x00%at", "--reverse"])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("Failed to run git log: {e}"))?;
+/// Trend of a single scalar metric over git history.
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct ScalarTrendReport {
+    /// Metric name (e.g. "avg_complexity", "avg_length").
+    pub metric: String,
+    pub points: Vec<ScalarTrendPoint>,
+    /// Change from first to last snapshot.
+    pub delta: f64,
+    pub delta_pct: f64,
+    pub direction: TrendDirection,
+    pub span_days: u64,
+}
 
-    if !output.status.success() {
-        return Err(format!(
-            "git log failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
+impl OutputFormatter for ScalarTrendReport {
+    fn format_text(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push(format!(
+            "# {} trend ({} snapshots over {} days)",
+            self.metric,
+            self.points.len(),
+            self.span_days,
         ));
+        lines.push(String::new());
+
+        for p in &self.points {
+            lines.push(format!("{:<12} {:<9} {:.2}", p.date, p.commit, p.value));
+        }
+
+        if !self.points.is_empty() {
+            let sign = if self.delta >= 0.0 { "+" } else { "" };
+            lines.push(String::new());
+            lines.push(format!(
+                "Change: {}{:.2} ({}{:.0}%) — {}",
+                sign, self.delta, sign, self.delta_pct, self.direction,
+            ));
+        }
+
+        lines.join("\n")
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let commits: Vec<CommitInfo> = stdout
-        .lines()
-        .filter(|l| !l.is_empty())
-        .filter_map(|line| {
-            let parts: Vec<&str> = line.splitn(2, '\0').collect();
-            if parts.len() == 2 {
-                let ts = parts[1].parse::<i64>().ok()?;
-                Some(CommitInfo {
-                    hash: parts[0].to_string(),
-                    timestamp: ts,
-                })
-            } else {
-                None
-            }
-        })
-        .collect();
+    fn format_pretty(&self) -> String {
+        use nu_ansi_term::{Color, Style};
 
-    if commits.is_empty() {
-        return Err("No commits found in git history".to_string());
+        let mut lines = Vec::new();
+        lines.push(
+            Style::new()
+                .bold()
+                .paint(format!(
+                    "{} trend ({} snapshots over {} days)",
+                    self.metric,
+                    self.points.len(),
+                    self.span_days,
+                ))
+                .to_string(),
+        );
+        lines.push(String::new());
+
+        for p in &self.points {
+            lines.push(format!("{:<12} {:<9} {:.2}", p.date, p.commit, p.value));
+        }
+
+        if !self.points.is_empty() {
+            let sign = if self.delta >= 0.0 { "+" } else { "" };
+            let (dir_str, change_str) = match self.direction {
+                TrendDirection::Improving => (
+                    Color::Green.paint("improving").to_string(),
+                    Color::Green
+                        .paint(format!(
+                            "{sign}{:.2} ({sign}{:.0}%)",
+                            self.delta, self.delta_pct
+                        ))
+                        .to_string(),
+                ),
+                TrendDirection::Degrading => (
+                    Color::Red.paint("degrading").to_string(),
+                    Color::Red
+                        .paint(format!(
+                            "{sign}{:.2} ({sign}{:.0}%)",
+                            self.delta, self.delta_pct
+                        ))
+                        .to_string(),
+                ),
+                TrendDirection::Stable => (
+                    "stable".to_string(),
+                    format!("{sign}{:.2} ({sign}{:.0}%)", self.delta, self.delta_pct),
+                ),
+            };
+            lines.push(String::new());
+            lines.push(format!("Change: {} — {}", change_str, dir_str));
+        }
+
+        lines.join("\n")
     }
-
-    Ok(commits)
 }
 
-/// Pick N commits at regular time intervals from the commit list.
-fn select_snapshots(commits: &[CommitInfo], n: usize) -> Vec<&CommitInfo> {
-    if commits.len() <= n {
-        return commits.iter().collect();
-    }
+/// Run a scalar metric trend over git history.
+///
+/// `extract_value` takes the root of a checked-out worktree and returns the scalar.
+pub fn analyze_scalar_trend<F>(
+    root: &Path,
+    metric: &str,
+    num_snapshots: usize,
+    higher_is_better: bool,
+    extract_value: F,
+) -> Result<ScalarTrendReport, String>
+where
+    F: Fn(&Path) -> Option<f64>,
+{
+    let commits = git_log_timestamps(root)?;
+    let selected = select_snapshots(&commits, num_snapshots);
 
-    let first_ts = commits[0].timestamp;
-    let last_ts = commits[commits.len() - 1].timestamp;
-
-    if first_ts == last_ts {
-        // All commits at same timestamp — just pick evenly spaced indices
-        let step = commits.len() / n;
-        let mut selected: Vec<&CommitInfo> = (0..n).map(|i| &commits[i * step]).collect();
-        // Always include last
-        if let Some(last) = commits.last()
-            && selected
-                .last()
-                .is_none_or(|prev: &&CommitInfo| prev.hash != last.hash)
-        {
-            selected.pop();
-            selected.push(last);
-        }
-        return selected;
-    }
-
-    // Place n evenly-spaced targets from first_ts to last_ts (inclusive of both endpoints).
-    let interval = (last_ts - first_ts) as f64 / (n - 1).max(1) as f64;
-    let mut selected = Vec::with_capacity(n);
-
-    for i in 0..n {
-        let target_ts = first_ts as f64 + interval * i as f64;
-        // Find the commit closest to the target timestamp
-        let best = commits
-            .iter()
-            .min_by_key(|c| ((c.timestamp as f64) - target_ts).abs() as i64);
-        if let Some(commit) = best {
-            // Avoid duplicates
-            if selected
-                .last()
-                .is_none_or(|prev: &&CommitInfo| prev.hash != commit.hash)
-            {
-                selected.push(commit);
-            }
+    let mut points = Vec::new();
+    for commit in &selected {
+        let hash = commit.hash.clone();
+        let ts = commit.timestamp;
+        match run_in_worktree(root, &hash, |wt| {
+            extract_value(wt).ok_or_else(|| "no data".to_string())
+        }) {
+            Ok(value) => points.push(ScalarTrendPoint {
+                commit: hash[..7.min(hash.len())].to_string(),
+                date: format_unix_date(ts),
+                timestamp: ts,
+                value,
+            }),
+            Err(e) => eprintln!("Warning: skipping commit {}: {e}", &hash[..7]),
         }
     }
 
-    selected
+    if points.is_empty() {
+        return Err("No data points could be collected".to_string());
+    }
+
+    let span_days = if points.len() >= 2 {
+        ((points.last().unwrap().timestamp - points[0].timestamp) / 86400) as u64
+    } else {
+        0
+    };
+
+    let first = points[0].value;
+    let last = points[points.len() - 1].value;
+    let delta = last - first;
+    let delta_pct = if first.abs() < 1e-9 {
+        if delta.abs() < 1e-9 {
+            0.0
+        } else {
+            100.0 * delta.signum()
+        }
+    } else {
+        (delta / first) * 100.0
+    };
+    let direction = if delta.abs() < 1e-9 {
+        TrendDirection::Stable
+    } else if (delta > 0.0) == higher_is_better {
+        TrendDirection::Improving
+    } else {
+        TrendDirection::Degrading
+    };
+
+    Ok(ScalarTrendReport {
+        metric: metric.to_string(),
+        points,
+        delta,
+        delta_pct,
+        direction,
+        span_days,
+    })
 }
 
 /// Create a worktree, run health analysis, remove worktree.
 fn analyze_at_commit(root: &Path, commit: &CommitInfo) -> Result<TrendSnapshot, String> {
-    let short_hash = &commit.hash[..7.min(commit.hash.len())];
-    let worktree_name = format!("normalize-trend-{short_hash}");
-    let worktree_path = std::env::temp_dir().join(&worktree_name);
-    let worktree_str = worktree_path.to_string_lossy().to_string();
-
-    // Clean up any stale worktree at this path
-    if worktree_path.exists() {
-        let _ = Command::new("git")
-            .args(["worktree", "remove", &worktree_str, "--force"])
-            .current_dir(root)
-            .output();
-    }
-
-    // Create worktree
-    let add_output = Command::new("git")
-        .args(["worktree", "add", &worktree_str, &commit.hash, "--detach"])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("Failed to create worktree: {e}"))?;
-
-    if !add_output.status.success() {
-        return Err(format!(
-            "git worktree add failed: {}",
-            String::from_utf8_lossy(&add_output.stderr).trim()
-        ));
-    }
-
-    // Run health analysis (always clean up afterward)
-    let result = run_health_snapshot(&worktree_path, commit);
-
-    // Remove worktree
-    let _ = Command::new("git")
-        .args(["worktree", "remove", &worktree_str, "--force"])
-        .current_dir(root)
-        .output();
-
-    result
+    run_in_worktree(root, &commit.hash, |worktree_path| {
+        run_health_snapshot(worktree_path, commit)
+    })
 }
 
 fn run_health_snapshot(worktree_path: &Path, commit: &CommitInfo) -> Result<TrendSnapshot, String> {
@@ -221,18 +273,6 @@ fn run_health_snapshot(worktree_path: &Path, commit: &CommitInfo) -> Result<Tren
         ceremony_ratio: health.ceremony_ratio,
         density_score: health.density_score,
     })
-}
-
-fn format_unix_date(ts: i64) -> String {
-    // Manual conversion from unix timestamp to YYYY-MM-DD
-    // Using chrono-free approach: shell out to date or compute manually
-    let output = Command::new("date")
-        .args(["-d", &format!("@{ts}"), "+%Y-%m-%d"])
-        .output();
-    match output {
-        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).trim().to_string(),
-        _ => format!("{ts}"),
-    }
 }
 
 fn compute_deltas(snapshots: &[TrendSnapshot]) -> Vec<MetricDelta> {

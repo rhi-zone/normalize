@@ -47,6 +47,9 @@ pub struct FunctionLength {
     pub end_line: usize,
     pub parent: Option<String>,
     pub file_path: Option<String>,
+    /// Change in line count vs a baseline ref (set when `--diff` is used).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub delta: Option<i64>,
 }
 impl normalize_analyze::Entity for FunctionLength {
     fn label(&self) -> &str {
@@ -114,7 +117,12 @@ impl LengthReport {
 impl OutputFormatter for LengthReport {
     fn format_text(&self) -> String {
         let mut lines = Vec::new();
-        lines.push("# Function Length Analysis".to_string());
+        let is_diff = self.diff_ref.is_some();
+        if let Some(ref r) = self.diff_ref {
+            lines.push(format!("# Function Length Diff vs {r}"));
+        } else {
+            lines.push("# Function Length Analysis".to_string());
+        }
         lines.push(String::new());
 
         if let Some(ref stats) = self.full_stats {
@@ -153,21 +161,39 @@ impl OutputFormatter for LengthReport {
 
         if !self.functions.is_empty() {
             lines.push(String::new());
-            lines.push("## Longest Functions".to_string());
-
-            let mut current_cat: Option<LengthCategory> = None;
-            for func in &self.functions {
-                let cat = func.category();
-                if Some(cat) != current_cat {
-                    lines.push(format!("### {}", cat.as_title()));
-                    current_cat = Some(cat);
+            if is_diff {
+                lines.push("## Most Changed Functions".to_string());
+                for func in &self.functions {
+                    let display_name = if let Some(ref fp) = func.file_path {
+                        format!("{}:{}", fp, func.short_name())
+                    } else {
+                        func.short_name()
+                    };
+                    let delta_str = match func.delta {
+                        Some(d) if d > 0 => format!(" (+{d})"),
+                        Some(d) if d < 0 => format!(" ({d})"),
+                        Some(_) => " (±0)".to_string(),
+                        None => " (new)".to_string(),
+                    };
+                    lines.push(format!("{}{} {}", func.lines, delta_str, display_name));
                 }
-                let display_name = if let Some(ref fp) = func.file_path {
-                    format!("{}:{}", fp, func.short_name())
-                } else {
-                    func.short_name()
-                };
-                lines.push(format!("{} {}", func.lines, display_name));
+            } else {
+                lines.push("## Longest Functions".to_string());
+
+                let mut current_cat: Option<LengthCategory> = None;
+                for func in &self.functions {
+                    let cat = func.category();
+                    if Some(cat) != current_cat {
+                        lines.push(format!("### {}", cat.as_title()));
+                        current_cat = Some(cat);
+                    }
+                    let display_name = if let Some(ref fp) = func.file_path {
+                        format!("{}:{}", fp, func.short_name())
+                    } else {
+                        func.short_name()
+                    };
+                    lines.push(format!("{} {}", func.lines, display_name));
+                }
             }
         }
 
@@ -178,12 +204,22 @@ impl OutputFormatter for LengthReport {
         use nu_ansi_term::{Color, Style};
 
         let mut lines = Vec::new();
-        lines.push(
-            Style::new()
-                .bold()
-                .paint("Function Length Analysis")
-                .to_string(),
-        );
+        let is_diff = self.diff_ref.is_some();
+        if let Some(ref r) = self.diff_ref {
+            lines.push(
+                Style::new()
+                    .bold()
+                    .paint(format!("Function Length Diff vs {r}"))
+                    .to_string(),
+            );
+        } else {
+            lines.push(
+                Style::new()
+                    .bold()
+                    .paint("Function Length Analysis")
+                    .to_string(),
+            );
+        }
         lines.push(String::new());
 
         if let Some(ref stats) = self.full_stats {
@@ -264,37 +300,79 @@ impl OutputFormatter for LengthReport {
 
         if !self.functions.is_empty() {
             lines.push(String::new());
-            lines.push(Style::new().bold().paint("Longest Functions").to_string());
-
-            let mut current_cat: Option<LengthCategory> = None;
-            for func in &self.functions {
-                let cat = func.category();
-                if Some(cat) != current_cat {
-                    let cat_color = match cat {
-                        LengthCategory::TooLong => Color::Red,
-                        LengthCategory::Long => Color::Yellow,
-                        LengthCategory::Medium => Color::Blue,
-                        LengthCategory::Short => Color::Green,
-                    };
-                    lines.push(cat_color.bold().paint(cat.as_title()).to_string());
-                    current_cat = Some(cat);
-                }
-                let display_name = if let Some(ref fp) = func.file_path {
-                    format!("{}:{}", fp, func.short_name())
-                } else {
-                    func.short_name()
-                };
-                let lines_str = match func.category() {
-                    LengthCategory::TooLong => {
-                        Color::Red.bold().paint(func.lines.to_string()).to_string()
-                    }
-                    LengthCategory::Long => Color::Yellow
+            if is_diff {
+                lines.push(
+                    Style::new()
                         .bold()
-                        .paint(func.lines.to_string())
+                        .paint("Most Changed Functions")
                         .to_string(),
-                    _ => func.lines.to_string(),
-                };
-                lines.push(format!("{} {}", lines_str, display_name));
+                );
+                for func in &self.functions {
+                    let display_name = if let Some(ref fp) = func.file_path {
+                        format!("{}:{}", fp, func.short_name())
+                    } else {
+                        func.short_name()
+                    };
+                    let (delta_color, _) = match func.delta {
+                        Some(d) if d > 0 => (
+                            Color::Red.paint(format!(" (+{d})")).to_string(),
+                            format!(" (+{d})"),
+                        ),
+                        Some(d) if d < 0 => (
+                            Color::Green.paint(format!(" ({d})")).to_string(),
+                            format!(" ({d})"),
+                        ),
+                        Some(_) => (" (±0)".to_string(), " (±0)".to_string()),
+                        None => (
+                            Color::Yellow.paint(" (new)").to_string(),
+                            " (new)".to_string(),
+                        ),
+                    };
+                    let lines_str = match func.category() {
+                        LengthCategory::TooLong => {
+                            Color::Red.bold().paint(func.lines.to_string()).to_string()
+                        }
+                        LengthCategory::Long => Color::Yellow
+                            .bold()
+                            .paint(func.lines.to_string())
+                            .to_string(),
+                        _ => func.lines.to_string(),
+                    };
+                    lines.push(format!("{}{} {}", lines_str, delta_color, display_name));
+                }
+            } else {
+                lines.push(Style::new().bold().paint("Longest Functions").to_string());
+
+                let mut current_cat: Option<LengthCategory> = None;
+                for func in &self.functions {
+                    let cat = func.category();
+                    if Some(cat) != current_cat {
+                        let cat_color = match cat {
+                            LengthCategory::TooLong => Color::Red,
+                            LengthCategory::Long => Color::Yellow,
+                            LengthCategory::Medium => Color::Blue,
+                            LengthCategory::Short => Color::Green,
+                        };
+                        lines.push(cat_color.bold().paint(cat.as_title()).to_string());
+                        current_cat = Some(cat);
+                    }
+                    let display_name = if let Some(ref fp) = func.file_path {
+                        format!("{}:{}", fp, func.short_name())
+                    } else {
+                        func.short_name()
+                    };
+                    let lines_str = match func.category() {
+                        LengthCategory::TooLong => {
+                            Color::Red.bold().paint(func.lines.to_string()).to_string()
+                        }
+                        LengthCategory::Long => Color::Yellow
+                            .bold()
+                            .paint(func.lines.to_string())
+                            .to_string(),
+                        _ => func.lines.to_string(),
+                    };
+                    lines.push(format!("{} {}", lines_str, display_name));
+                }
             }
         }
 
@@ -316,6 +394,7 @@ impl LengthAnalyzer {
             functions,
             file_path: path.to_string_lossy().to_string(),
             full_stats: None,
+            diff_ref: None,
         }
     }
     fn analyze_with_trait(&self, content: &str, support: &dyn Language) -> Vec<FunctionLength> {
@@ -444,6 +523,7 @@ impl LengthAnalyzer {
                 end_line: fn_end,
                 parent: parent_name,
                 file_path: None,
+                delta: None,
             });
         }
 

@@ -55,6 +55,9 @@ pub struct FunctionComplexity {
     pub end_line: usize,
     pub parent: Option<String>,    // class/struct name for methods
     pub file_path: Option<String>, // file path for codebase-wide reports
+    /// Change in complexity vs a baseline ref (set when `--diff` is used).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub delta: Option<i64>,
 }
 
 impl normalize_analyze::Entity for FunctionComplexity {
@@ -166,7 +169,12 @@ impl ComplexityReport {
 impl OutputFormatter for ComplexityReport {
     fn format_text(&self) -> String {
         let mut lines = Vec::new();
-        lines.push("# Complexity Analysis".to_string());
+        let is_diff = self.diff_ref.is_some();
+        if let Some(ref r) = self.diff_ref {
+            lines.push(format!("# Complexity Diff vs {r}"));
+        } else {
+            lines.push("# Complexity Analysis".to_string());
+        }
         lines.push(String::new());
 
         if let Some(ref stats) = self.full_stats {
@@ -205,21 +213,39 @@ impl OutputFormatter for ComplexityReport {
 
         if !self.functions.is_empty() {
             lines.push(String::new());
-            lines.push("## Complex Functions".to_string());
-
-            let mut current_risk: Option<RiskLevel> = None;
-            for func in &self.functions {
-                let risk = func.risk_level();
-                if Some(risk) != current_risk {
-                    lines.push(format!("### {}", risk.as_title()));
-                    current_risk = Some(risk);
+            if is_diff {
+                lines.push("## Most Changed Functions".to_string());
+                for func in &self.functions {
+                    let display_name = if let Some(ref fp) = func.file_path {
+                        format!("{}:{}", fp, func.short_name())
+                    } else {
+                        func.short_name()
+                    };
+                    let delta_str = match func.delta {
+                        Some(d) if d > 0 => format!(" (+{d})"),
+                        Some(d) if d < 0 => format!(" ({d})"),
+                        Some(_) => " (±0)".to_string(),
+                        None => " (new)".to_string(),
+                    };
+                    lines.push(format!("{}{} {}", func.complexity, delta_str, display_name));
                 }
-                let display_name = if let Some(ref fp) = func.file_path {
-                    format!("{}:{}", fp, func.short_name())
-                } else {
-                    func.short_name()
-                };
-                lines.push(format!("{} {}", func.complexity, display_name));
+            } else {
+                lines.push("## Complex Functions".to_string());
+
+                let mut current_risk: Option<RiskLevel> = None;
+                for func in &self.functions {
+                    let risk = func.risk_level();
+                    if Some(risk) != current_risk {
+                        lines.push(format!("### {}", risk.as_title()));
+                        current_risk = Some(risk);
+                    }
+                    let display_name = if let Some(ref fp) = func.file_path {
+                        format!("{}:{}", fp, func.short_name())
+                    } else {
+                        func.short_name()
+                    };
+                    lines.push(format!("{} {}", func.complexity, display_name));
+                }
             }
         }
 
@@ -230,7 +256,17 @@ impl OutputFormatter for ComplexityReport {
         use nu_ansi_term::{Color, Style};
 
         let mut lines = Vec::new();
-        lines.push(Style::new().bold().paint("Complexity Analysis").to_string());
+        let is_diff = self.diff_ref.is_some();
+        if let Some(ref r) = self.diff_ref {
+            lines.push(
+                Style::new()
+                    .bold()
+                    .paint(format!("Complexity Diff vs {r}"))
+                    .to_string(),
+            );
+        } else {
+            lines.push(Style::new().bold().paint("Complexity Analysis").to_string());
+        }
         lines.push(String::new());
 
         if let Some(ref stats) = self.full_stats {
@@ -311,38 +347,85 @@ impl OutputFormatter for ComplexityReport {
 
         if !self.functions.is_empty() {
             lines.push(String::new());
-            lines.push(Style::new().bold().paint("Complex Functions").to_string());
-
-            let mut current_risk: Option<RiskLevel> = None;
-            for func in &self.functions {
-                let risk = func.risk_level();
-                if Some(risk) != current_risk {
-                    let risk_color = match risk {
-                        RiskLevel::Critical => Color::Red,
-                        RiskLevel::High => Color::Yellow,
-                        RiskLevel::Moderate => Color::Blue,
-                        RiskLevel::Low => Color::Green,
+            if is_diff {
+                lines.push(
+                    Style::new()
+                        .bold()
+                        .paint("Most Changed Functions")
+                        .to_string(),
+                );
+                for func in &self.functions {
+                    let display_name = if let Some(ref fp) = func.file_path {
+                        format!("{}:{}", fp, func.short_name())
+                    } else {
+                        func.short_name()
                     };
-                    lines.push(risk_color.bold().paint(risk.as_title()).to_string());
-                    current_risk = Some(risk);
+                    let (delta_str, delta_color) = match func.delta {
+                        Some(d) if d > 0 => (
+                            format!(" (+{d})"),
+                            Color::Red.paint(format!(" (+{d})")).to_string(),
+                        ),
+                        Some(d) if d < 0 => (
+                            format!(" ({d})"),
+                            Color::Green.paint(format!(" ({d})")).to_string(),
+                        ),
+                        Some(_) => (" (±0)".to_string(), " (±0)".to_string()),
+                        None => (
+                            " (new)".to_string(),
+                            Color::Yellow.paint(" (new)").to_string(),
+                        ),
+                    };
+                    let _ = delta_str;
+                    let complexity_str = match func.risk_level() {
+                        RiskLevel::Critical => Color::Red
+                            .bold()
+                            .paint(func.complexity.to_string())
+                            .to_string(),
+                        RiskLevel::High => Color::Yellow
+                            .bold()
+                            .paint(func.complexity.to_string())
+                            .to_string(),
+                        _ => func.complexity.to_string(),
+                    };
+                    lines.push(format!(
+                        "{}{} {}",
+                        complexity_str, delta_color, display_name
+                    ));
                 }
-                let display_name = if let Some(ref fp) = func.file_path {
-                    format!("{}:{}", fp, func.short_name())
-                } else {
-                    func.short_name()
-                };
-                let complexity_str = match func.risk_level() {
-                    RiskLevel::Critical => Color::Red
-                        .bold()
-                        .paint(func.complexity.to_string())
-                        .to_string(),
-                    RiskLevel::High => Color::Yellow
-                        .bold()
-                        .paint(func.complexity.to_string())
-                        .to_string(),
-                    _ => func.complexity.to_string(),
-                };
-                lines.push(format!("{} {}", complexity_str, display_name));
+            } else {
+                lines.push(Style::new().bold().paint("Complex Functions").to_string());
+
+                let mut current_risk: Option<RiskLevel> = None;
+                for func in &self.functions {
+                    let risk = func.risk_level();
+                    if Some(risk) != current_risk {
+                        let risk_color = match risk {
+                            RiskLevel::Critical => Color::Red,
+                            RiskLevel::High => Color::Yellow,
+                            RiskLevel::Moderate => Color::Blue,
+                            RiskLevel::Low => Color::Green,
+                        };
+                        lines.push(risk_color.bold().paint(risk.as_title()).to_string());
+                        current_risk = Some(risk);
+                    }
+                    let display_name = if let Some(ref fp) = func.file_path {
+                        format!("{}:{}", fp, func.short_name())
+                    } else {
+                        func.short_name()
+                    };
+                    let complexity_str = match func.risk_level() {
+                        RiskLevel::Critical => Color::Red
+                            .bold()
+                            .paint(func.complexity.to_string())
+                            .to_string(),
+                        RiskLevel::High => Color::Yellow
+                            .bold()
+                            .paint(func.complexity.to_string())
+                            .to_string(),
+                        _ => func.complexity.to_string(),
+                    };
+                    lines.push(format!("{} {}", complexity_str, display_name));
+                }
             }
         }
 
@@ -373,6 +456,7 @@ impl ComplexityAnalyzer {
             functions,
             file_path: path.to_string_lossy().to_string(),
             full_stats: None,
+            diff_ref: None,
         }
     }
 
@@ -530,6 +614,7 @@ impl ComplexityAnalyzer {
                 end_line: fn_end,
                 parent: parent_name,
                 file_path: None,
+                delta: None,
             });
         }
 

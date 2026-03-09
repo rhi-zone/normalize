@@ -485,6 +485,7 @@ fn analyze_glob(
                 functions: all_functions,
                 file_path: pattern.to_string(),
                 full_stats: None,
+                diff_ref: None,
             })
         } else {
             None
@@ -521,6 +522,7 @@ fn analyze_glob(
                 functions: all_functions,
                 file_path: pattern.to_string(),
                 full_stats: None,
+                diff_ref: None,
             })
         } else {
             None

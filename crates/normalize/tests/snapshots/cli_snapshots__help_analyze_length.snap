@@ -1,6 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 247
+assertion_line: 252
 expression: "snapshot_help(&[\"analyze\", \"length\"])"
 ---
 Run function length analysis
@@ -19,8 +19,9 @@ Options:
       --jq <jq>                    Filter output through jq expression
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --only <only>                Include only paths matching pattern
+      --diff <diff>                Show delta vs this git ref (branch, tag, commit, HEAD~N)
       --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
       --pretty                     Enable pretty
       --compact                    Enable compact
-      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help

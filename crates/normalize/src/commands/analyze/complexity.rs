@@ -5,6 +5,7 @@ use crate::filter::Filter;
 use crate::path_resolve;
 use normalize_analyze::ranked::{Scored, rank_pipeline};
 use rayon::prelude::*;
+use std::collections::HashMap;
 use std::path::Path;
 
 use super::collect_code_files;
@@ -102,5 +103,45 @@ pub fn analyze_codebase_complexity(
         functions,
         file_path: root.to_string_lossy().to_string(),
         full_stats,
+        diff_ref: None,
     }
+}
+
+/// Annotate `report` with per-function deltas relative to `baseline`.
+///
+/// After this call, `report.functions` is sorted by `|delta|` descending and
+/// `report.diff_ref` is set to the baseline ref string.
+pub fn apply_complexity_diff(
+    report: &mut ComplexityReport,
+    baseline: &ComplexityReport,
+    diff_ref: &str,
+) {
+    // Key: (file_path, parent, name) → baseline complexity
+    let baseline_map: HashMap<(Option<String>, Option<String>, String), usize> = baseline
+        .functions
+        .iter()
+        .map(|f| {
+            (
+                (f.file_path.clone(), f.parent.clone(), f.name.clone()),
+                f.complexity,
+            )
+        })
+        .collect();
+
+    for f in &mut report.functions {
+        let key = (f.file_path.clone(), f.parent.clone(), f.name.clone());
+        f.delta = Some(match baseline_map.get(&key) {
+            Some(&base) => f.complexity as i64 - base as i64,
+            None => f.complexity as i64, // new function — full complexity as delta
+        });
+    }
+
+    // Sort by |delta| descending; secondary sort by complexity descending
+    report.functions.sort_by(|a, b| {
+        let da = a.delta.unwrap_or(0).unsigned_abs();
+        let db = b.delta.unwrap_or(0).unsigned_abs();
+        db.cmp(&da).then(b.complexity.cmp(&a.complexity))
+    });
+
+    report.diff_ref = Some(diff_ref.to_string());
 }
