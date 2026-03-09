@@ -29,23 +29,30 @@
   },
   {
     "file": "math_utils.zig",
-    "kind": "Function",
-    "name": "init",
+    "kind": "Class",
+    "name": "Calculator",
     "parent": null,
+    "start_line": 11
+  },
+  {
+    "file": "math_utils.zig",
+    "kind": "Method",
+    "name": "init",
+    "parent": "Calculator",
     "start_line": 14
   },
   {
     "file": "math_utils.zig",
-    "kind": "Function",
+    "kind": "Method",
     "name": "compute",
-    "parent": null,
+    "parent": "Calculator",
     "start_line": 18
   },
   {
     "file": "math_utils.zig",
-    "kind": "Function",
+    "kind": "Method",
     "name": "lastResult",
-    "parent": null,
+    "parent": "Calculator",
     "start_line": 27
   }
 ]

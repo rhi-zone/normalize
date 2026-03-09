@@ -5,5 +5,26 @@
     "name": "ada/add_numbers — project source",
     "parent": null,
     "start_line": 1
+  },
+  {
+    "file": "main.adb",
+    "kind": "Function",
+    "name": "Main",
+    "parent": null,
+    "start_line": 4
+  },
+  {
+    "file": "math_utils.adb",
+    "kind": "Module",
+    "name": "Math_Utils",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "math_utils.adb",
+    "kind": "Method",
+    "name": "Add",
+    "parent": "Math_Utils",
+    "start_line": 2
   }
 ]

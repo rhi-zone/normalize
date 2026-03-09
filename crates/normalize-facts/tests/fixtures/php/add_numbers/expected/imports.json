@@ -5,12 +5,5 @@
     "line": 5,
     "module": null,
     "name": "App\\Logging\\Logger"
-  },
-  {
-    "alias": null,
-    "file": "Calculator.php",
-    "line": 6,
-    "module": null,
-    "name": "InvalidArgumentException"
   }
 ]

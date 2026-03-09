@@ -5,5 +5,12 @@
     "line": 3,
     "module": null,
     "name": "MathUtils"
+  },
+  {
+    "alias": null,
+    "file": "Main.elm",
+    "line": 3,
+    "module": "MathUtils",
+    "name": "add"
   }
 ]

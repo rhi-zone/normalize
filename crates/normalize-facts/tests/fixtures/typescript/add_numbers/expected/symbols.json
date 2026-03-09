@@ -57,6 +57,20 @@
   },
   {
     "file": "math.ts",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 8
+  },
+  {
+    "file": "math.ts",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 12
+  },
+  {
+    "file": "math.ts",
     "kind": "Class",
     "name": "Calculator",
     "parent": null,

@@ -5,5 +5,12 @@
     "line": 3,
     "module": "math_utils",
     "name": "Calculator"
+  },
+  {
+    "alias": null,
+    "file": "main.py",
+    "line": 3,
+    "module": "math_utils",
+    "name": "Calculator"
   }
 ]

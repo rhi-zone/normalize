@@ -1,5 +1,26 @@
 [
   {
+    "file": "MathUtils.pm",
+    "kind": "Module",
+    "name": "MathUtils",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "MathUtils.pm",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 9
+  },
+  {
+    "file": "MathUtils.pm",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 14
+  },
+  {
     "file": "SUMMARY.md",
     "kind": "Heading",
     "name": "perl/add_numbers — project source",
