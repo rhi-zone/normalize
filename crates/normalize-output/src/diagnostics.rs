@@ -78,9 +78,6 @@ pub struct DiagnosticsReport {
     pub files_checked: usize,
     /// Which checks/engines produced issues in this report.
     pub sources_run: Vec<String>,
-    /// Actionable next steps shown at the end of text output (e.g., "Run with --pretty for details").
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub hints: Vec<String>,
 }
 
 impl DiagnosticsReport {
@@ -90,7 +87,6 @@ impl DiagnosticsReport {
             issues: Vec::new(),
             files_checked: 0,
             sources_run: Vec::new(),
-            hints: Vec::new(),
         }
     }
 
@@ -103,7 +99,6 @@ impl DiagnosticsReport {
                 self.sources_run.push(source);
             }
         }
-        // Hints are set by the caller after merging; sub-report hints are not propagated.
     }
 
     /// Sort issues by file, then line, then severity (most severe first).
@@ -318,13 +313,6 @@ impl DiagnosticsReport {
             ));
         }
 
-        if !self.hints.is_empty() {
-            out.push('\n');
-            for hint in &self.hints {
-                out.push_str(&format!("hint: {hint}\n"));
-            }
-        }
-
         out
     }
 }
@@ -462,13 +450,6 @@ impl OutputFormatter for DiagnosticsReport {
             }
         }
 
-        if !self.hints.is_empty() {
-            out.push('\n');
-            for hint in &self.hints {
-                out.push_str(&format!("{} {hint}\n", Color::DarkGray.paint("hint:")));
-            }
-        }
-
         out
     }
 }
@@ -493,7 +474,6 @@ mod tests {
             issues: vec![],
             files_checked: 10,
             sources_run: vec!["check-refs".into()],
-            hints: Vec::new(),
         };
         let text = report.format_text();
         assert!(text.contains("No issues found"));
@@ -554,7 +534,6 @@ mod tests {
             }],
             files_checked: 5,
             sources_run: vec!["check-refs".into()],
-            hints: Vec::new(),
         };
         let b = DiagnosticsReport {
             issues: vec![Issue {
@@ -572,7 +551,6 @@ mod tests {
             }],
             files_checked: 8,
             sources_run: vec!["stale-docs".into()],
-            hints: Vec::new(),
         };
         a.merge(b);
         assert_eq!(a.issues.len(), 2);
@@ -620,7 +598,6 @@ mod tests {
             ],
             files_checked: 2,
             sources_run: vec!["s".into()],
-            hints: Vec::new(),
         };
         report.sort();
         assert_eq!(report.issues[0].file, "a.rs");

@@ -327,11 +327,6 @@ fn test_help_analyze_query() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "query"]));
 }
 
-#[test]
-fn test_help_analyze_rules() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "rules"]));
-}
-
 // sessions subcommands
 #[test]
 fn test_help_sessions_list() {

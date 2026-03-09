@@ -287,7 +287,7 @@ Pattern: traits are the extensibility mechanism. Users implement traits in their
 **Top-level command level issues (low priority):**
 - `history` is at the wrong level: shadow edit history is a feature of `edit`, not a
   standalone concept. Should be `normalize edit history [list|diff|status|tree|prune]`.
-- `analyze rules` is redundant with top-level `normalize rules run`. Should be removed from AnalyzeService.
+- ~~`analyze rules` is redundant with top-level `normalize rules run`. Should be removed from AnalyzeService.~~ — DONE (2026-03-09). Snapshot and test for the non-existent `analyze rules` subcommand deleted. The command never existed in the service layer; the test was capturing broken fallback behavior.
 - `context` could be `normalize view context [path]` but semantics differ slightly (content-only vs prepend). Low priority.
 - `aliases` is a cross-cutting utility. Too small for top-level but has no clear parent. Low priority.
 
@@ -398,8 +398,8 @@ See `docs/design/analyze-consolidation.md` for full design (axis decomposition, 
 - Output formats remain per-command (too heterogeneous to unify into one generic formatter — each has different columns, stats, grouping)
 
 **Phase 2 — Merge obvious families:**
-- [ ] **2a. `health`**: needs design — `health` is default command, param signatures diverge
-- [ ] **2c. `density`**: needs design — `uniqueness` has 8 extra params
+- ~~**2a. `health`**~~ — NOT DOING. `health()` is the `#[cli(default)]` fallback (invoked when no subcommand given), returning `AnalyzeReport`. `module_health()` is the per-module composite scorer. `cross_repo_health()` runs on a portfolio of repos. Three distinct scopes and report shapes; no shared data model.
+- ~~**2c. `density` + `uniqueness`**~~ — NOT DOING. `density` = information bloat (compression + token frequency); `uniqueness` = structural duplication (function near-twins). Different primary dimension, different per-item drilling (files vs. function clusters), incompatible report shapes. Already composed at higher level by `module-health`. Uniqueness has 8 extra params (similarity threshold, skeleton mode, trait-impls, etc.) that don't apply to density.
 
 **Phase 3 — Further consolidation (needs design):**
 - [x] `dependents` absorbs `impact` — `DependentsReport` now shows blast radius (depth, test coverage, fan-in) for modules; flat list for symbols/types. `impact` deleted. `dependents` target is now positional. (2026-03-09)
