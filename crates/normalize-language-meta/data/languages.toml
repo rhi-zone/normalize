@@ -203,6 +203,85 @@ names = ["Visual Basic", "vb"]
 extensions = ["vb"]
 test_globs = ["**/*Test.vb", "**/*Tests.vb"]
 
+[[language]]
+names = ["Ada", "ada"]
+extensions = ["ada", "adb", "ads"]
+# AUnit is the standard test framework; no universal file naming convention
+
+[[language]]
+names = ["Agda", "agda"]
+extensions = ["agda"]
+# No conventional test file naming
+
+[[language]]
+names = ["C", "c"]
+extensions = ["c", "h"]
+# No universal test file convention (project-specific: CUnit, Check, Unity, etc.)
+
+[[language]]
+names = ["C++", "cpp", "c++"]
+extensions = ["cpp", "cc", "cxx", "hpp", "hh", "hxx"]
+# No universal test file convention (project-specific: Google Test, Catch2, etc.)
+
+[[language]]
+names = ["Common Lisp", "commonlisp", "lisp"]
+extensions = ["lisp", "lsp", "cl", "asd"]
+test_globs = ["**/*-test.lisp", "**/*-tests.lisp", "**/*_test.lisp"]
+
+[[language]]
+names = ["Emacs Lisp", "elisp", "emacs-lisp"]
+extensions = ["el"]
+test_globs = ["**/*-test.el", "**/*-tests.el"]
+
+[[language]]
+names = ["Idris", "idris"]
+extensions = ["idr", "lidr"]
+# No conventional test file naming
+
+[[language]]
+names = ["Lean", "lean"]
+extensions = ["lean"]
+# Lean 4 has no conventional separate test file naming
+
+[[language]]
+names = ["MATLAB", "matlab"]
+extensions = ["m"]
+# MATLAB built-in unit testing framework
+test_globs = ["**/*Test.m", "**/*_test.m"]
+
+[[language]]
+names = ["Objective-C", "objc", "objective-c"]
+extensions = ["m", "mm"]
+# XCTest convention
+test_globs = ["**/*Tests.m", "**/*Spec.m", "**/*Tests.mm", "**/*Spec.mm"]
+
+[[language]]
+names = ["Prolog", "prolog"]
+extensions = ["pl", "pro", "prolog"]
+# plunit convention
+test_globs = ["**/*_test.pl", "**/*_tests.pl"]
+
+[[language]]
+names = ["Scheme", "scheme"]
+extensions = ["scm", "ss", "rkt"]
+test_globs = ["**/*-test.scm", "**/*-tests.scm", "**/*_test.scm"]
+
+[[language]]
+names = ["Uiua", "uiua"]
+extensions = ["ua"]
+# No established test file convention
+
+[[language]]
+names = ["Vim", "vimscript", "viml"]
+extensions = ["vim", "vimrc"]
+# Themis testing framework
+test_globs = ["**/*_spec.vim", "**/test/**/*.vim"]
+
+[[language]]
+names = ["Zig", "zig"]
+extensions = ["zig"]
+# Zig has built-in testing (test blocks in source files); no separate test files
+
 # Vue and Svelte are full component languages (Capabilities::all())
 [[language]]
 names = ["Vue"]
@@ -388,6 +467,12 @@ capabilities.preset = "query"
 [[language]]
 names = ["jq"]
 extensions = ["jq"]
+capabilities.preset = "query"
+
+[[language]]
+names = ["Query", "tree-sitter-query"]
+extensions = ["scm"]
+# tree-sitter query language (.scm files); no test file convention
 capabilities.preset = "query"
 
 # ============================================================
@@ -578,3 +663,12 @@ capabilities.imports = true
 capabilities.callable_symbols = false
 capabilities.complexity = false
 capabilities.executable = false
+
+# ============================================================
+# Internal / custom DSLs
+# ============================================================
+
+[[language]]
+names = ["Yuri"]
+extensions = ["yuri"]
+# normalize-internal DSL (tree-sitter-yuri); test convention: test_ prefix functions

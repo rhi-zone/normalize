@@ -60,10 +60,11 @@ Ordered by impact × tractability. Pick from top.
 
 5. ~~**Feature-gate CLI behind `cli` feature**~~ — DONE. See Next Up section.
 
-6. **`normalize-language-meta` — cover remaining 98 languages in `languages.toml`**
-   Current: ~55 entries. Missing: languages with all() caps and no test globs don't need entries,
-   but languages like Ada, Agda, Assembly, Awk, Bash variants, C, C++, etc. may want test glob
-   entries. Audit which of the 98 have test file conventions not yet covered.
+6. ~~**`normalize-language-meta` — cover remaining 98 languages in `languages.toml`**~~
+   DONE (2026-03-10). Added all 17 missing languages: Ada, Agda, C, C++, Common Lisp, Emacs Lisp,
+   Idris, Lean, MATLAB, Objective-C, Prolog, Scheme, Uiua, Vim, Zig, Query, Yuri. Languages with
+   no universal test file convention (C, C++, Zig, Agda, Idris, Lean, Uiua, Yuri) have entries
+   with capabilities only; others include test_globs.
 
 7. **`normalize analyze check` command cleanup** — the command still exists but is subsumed
    by `normalize rules run --engine native`. Delete it (or keep as alias). Steps tracked below.
