@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 438
 expression: "snapshot_help(&[\"rules\", \"list\"])"
 ---
 List all rules (syntax + fact, builtin + user)
@@ -10,7 +11,7 @@ Options:
       --jsonl                      Output one JSON object per line (for arrays)
       --sources                    Show source URLs for imported rules
       --json                       Output machine-readable JSON
-  -t, --r-type <r-type>            Filter by rule type (all, syntax, fact)
+  -t, --type <type>                Filter by rule type (all, syntax, fact)
       --jq <jq>                    Filter output through jq expression
       --tag <tag>                  Filter by tag
       --enabled                    Filter to enabled rules only
