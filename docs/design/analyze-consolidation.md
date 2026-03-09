@@ -199,11 +199,13 @@ Today: duplicates (5 modes via `--mode`/`--scope`), duplicate-types, fragments. 
 
 `duplicates` already unified: `--mode exact|similar|clusters --scope functions|blocks`. `patterns` absorbed into `fragments` (use `--scope functions --skeleton --similarity 0.7 --min-members 3`). Could further absorb under a broader `similar` command.
 
-**3. `graph <symbol>` — walk relations from a starting point (open set)**
+**3. `graph` — pure graph-theoretic properties of the dependency graph (NOT traversal queries)**
 
-Today: call-graph, callers, callees, trace, impact. All walk the call/dependency graph from a symbol. Direction (up/down/both) and depth (direct/transitive) differ.
+`normalize analyze graph` (and any future `normalize graph`) is reserved for fully general graph theory: SCCs, bridges, diamond dependencies, transitive edges, dead nodes, graph density. These algorithms apply to any graph regardless of what nodes/edges represent.
 
-Could become: `graph <symbol> [--callers|--callees|--both] [--transitive] [--impact]`
+`call-graph`, `trace`, `dependents` are **index traversal queries**, not graph theory. They ask "show me a specific path starting from this symbol/file" — normalize-specific lookups. They belong in `analyze`, not under `graph`.
+
+This scope is **closed** — new graph-theoretic properties can be added as flags/output fields on the existing `graph` command, not as new commands. The `--on modules|symbols|types` flag already generalizes over node types.
 
 **4. `check` — find violations / scan for problems (→ subsumes into rules engine)**
 
@@ -229,7 +231,7 @@ Today: docs, check-refs, stale-docs, check-examples, security. All scan files fo
 |---------|-------------|-------------|----------|
 | `rank <metric>` | Open — new metrics frequently | Yes, highest leverage | High |
 | `similar` | Open — new scopes/methods | Yes, 7 → 1 | High |
-| `graph` | Open — new relation types | Yes, 5 → 1 | Medium |
+| `graph` | Closed — pure graph theory only | No new commands; add fields to existing | Low (already correct) |
 | `check` | Open — → rules engine | Already happening | Low (already have `rules`) |
 | `churn` | Closed | Done | — |
 | `coverage` | Closed | Done | — |
@@ -243,7 +245,7 @@ The target isn't "merge commands with compatible params." It's:
 
 2. **`similar`**: One command with scope + mode flags. Delete 7 commands, add 1.
 
-3. **`graph`**: One command with direction + depth flags. Delete 5 commands, add 1.
+3. **`graph`**: Already correct scope — pure graph theory only. `call-graph`, `trace`, `dependents` are index traversal queries, not graph theory; they stay in `analyze`. No merging needed here.
 
 4. **`check`**: Migrate hardcoded checks to the rules engine over time. No command-level change needed.
 
