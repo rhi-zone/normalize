@@ -21,6 +21,96 @@ fn resolve_pretty(pretty: bool, compact: bool) -> bool {
     !compact && (pretty || std::io::stdout().is_terminal())
 }
 
+/// Per-rule configuration entry shown in the config report.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct RuleConfigEntry {
+    pub rule_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub severity: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub allow: Vec<String>,
+}
+
+/// Report returned by `normalize rules config-show`.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct RulesConfigReport {
+    pub config_path: String,
+    pub global_allow: Vec<String>,
+    pub overrides: Vec<RuleConfigEntry>,
+    pub sarif_tools: Vec<String>,
+}
+
+impl OutputFormatter for RulesConfigReport {
+    fn format_text(&self) -> String {
+        let mut out = String::from("Rules Configuration\n\n");
+        out.push_str(&format!("Config file: {}\n", self.config_path));
+
+        let has_content = !self.global_allow.is_empty()
+            || !self.overrides.is_empty()
+            || !self.sarif_tools.is_empty();
+
+        if !has_content {
+            out.push_str(
+                "\nNo per-rule overrides configured.\n\
+                To configure rules, edit .normalize/config.toml or run:\n\
+                  normalize init --setup\n",
+            );
+            return out;
+        }
+
+        out.push('\n');
+        if self.global_allow.is_empty() {
+            out.push_str("Global allow patterns: (none)\n");
+        } else {
+            out.push_str(&format!(
+                "Global allow patterns ({}):\n",
+                self.global_allow.len()
+            ));
+            for pat in &self.global_allow {
+                out.push_str(&format!("  {pat}\n"));
+            }
+        }
+
+        out.push('\n');
+        if self.overrides.is_empty() {
+            out.push_str("Per-rule overrides: (none)\n");
+        } else {
+            out.push_str(&format!("Per-rule overrides ({}):\n", self.overrides.len()));
+            for entry in &self.overrides {
+                out.push_str(&format!("\n  {}\n", entry.rule_id));
+                if let Some(ref sev) = entry.severity {
+                    out.push_str(&format!("    severity: {sev}\n"));
+                }
+                if let Some(en) = entry.enabled {
+                    out.push_str(&format!("    enabled: {en}\n"));
+                }
+                if !entry.allow.is_empty() {
+                    out.push_str(&format!("    allow: {}\n", entry.allow.join(", ")));
+                }
+            }
+        }
+
+        out.push('\n');
+        if self.sarif_tools.is_empty() {
+            out.push_str("SARIF tools: (none)\n");
+        } else {
+            out.push_str(&format!("SARIF tools ({}):\n", self.sarif_tools.len()));
+            for tool in &self.sarif_tools {
+                out.push_str(&format!("  {tool}\n"));
+            }
+        }
+
+        out.push_str(
+            "\nTo change a rule: edit .normalize/config.toml or run:\n\
+              normalize rules enable <rule-id>\n\
+              normalize rules disable <rule-id>\n",
+        );
+        out
+    }
+}
+
 /// Rules management sub-service.
 pub struct RulesService {
     pretty: Cell<bool>,
@@ -79,6 +169,14 @@ impl RulesService {
     }
 
     fn display_list(&self, r: &RulesListReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_config_show(&self, r: &RulesConfigReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -440,6 +538,62 @@ impl RulesService {
             success: true,
             message: None,
             data: None,
+        })
+    }
+
+    /// Show the effective rules configuration (merged from global and project config)
+    #[cli(display_with = "display_config_show")]
+    pub fn config_show(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<RulesConfigReport, String> {
+        let effective_root = root
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+        self.pretty.set(resolve_pretty(pretty, compact));
+
+        let config = load_rules_config(&effective_root);
+        let rules_cfg = &config.rules;
+
+        let config_path = {
+            let p = effective_root.join(".normalize").join("config.toml");
+            if p.exists() {
+                ".normalize/config.toml".to_string()
+            } else {
+                "(not found — using defaults)".to_string()
+            }
+        };
+
+        let mut overrides: Vec<RuleConfigEntry> = rules_cfg
+            .rules
+            .iter()
+            .map(|(rule_id, ov)| RuleConfigEntry {
+                rule_id: rule_id.clone(),
+                enabled: ov.enabled,
+                severity: ov.severity.clone(),
+                allow: ov.allow.clone(),
+            })
+            .collect();
+        overrides.sort_by(|a, b| a.rule_id.cmp(&b.rule_id));
+
+        let sarif_tools: Vec<String> = rules_cfg
+            .sarif_tools
+            .iter()
+            .map(|t| t.name.clone())
+            .collect();
+
+        Ok(RulesConfigReport {
+            config_path,
+            global_allow: rules_cfg.global_allow.clone(),
+            overrides,
+            sarif_tools,
         })
     }
 }
