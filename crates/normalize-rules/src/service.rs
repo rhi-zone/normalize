@@ -238,7 +238,7 @@ impl RulesService {
         }
     }
 
-    fn display_config_show(&self, r: &RulesConfigReport) -> String {
+    fn display_show_config(&self, r: &RulesConfigReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -612,8 +612,8 @@ impl RulesService {
     }
 
     /// Show the effective rules configuration (merged from global and project config)
-    #[cli(display_with = "display_config_show")]
-    pub fn config_show(
+    #[cli(display_with = "display_show_config")]
+    pub fn show_config(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,

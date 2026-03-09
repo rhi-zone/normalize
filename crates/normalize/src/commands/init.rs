@@ -14,7 +14,7 @@ const TODO_CANDIDATES: &[&str] = &[
     "TASKS",
 ];
 
-pub fn cmd_init(root: &Path, do_index: bool, setup: bool) -> i32 {
+pub async fn run_init(root: &Path, do_index: bool, setup: bool) -> i32 {
     let mut changes = Vec::new();
 
     // 1. Create .normalize directory if needed
@@ -91,16 +91,14 @@ pub fn cmd_init(root: &Path, do_index: bool, setup: bool) -> i32 {
     // 5. Optionally index
     if do_index {
         println!("\nIndexing codebase...");
-        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let mut idx = match rt.block_on(crate::index::open(root)) {
+        let mut idx = match crate::index::open(root).await {
             Ok(idx) => idx,
             Err(e) => {
                 eprintln!("Failed to open index: {}", e);
                 return 1;
             }
         };
-        match rt.block_on(idx.refresh()) {
+        match idx.refresh().await {
             Ok(count) => println!("Indexed {} files.", count),
             Err(e) => {
                 eprintln!("Failed to index: {}", e);
@@ -112,7 +110,7 @@ pub fn cmd_init(root: &Path, do_index: bool, setup: bool) -> i32 {
     // 6. Optionally run the interactive setup wizard
     if setup {
         println!();
-        return cmd_setup_wizard(root);
+        return run_setup_wizard(root);
     }
 
     0
@@ -122,9 +120,9 @@ pub fn cmd_init(root: &Path, do_index: bool, setup: bool) -> i32 {
 ///
 /// Runs all rules against the codebase, groups violations by rule, and walks the user
 /// through each rule that has violations — showing examples and prompting enable/disable.
-pub fn cmd_setup_wizard(root: &Path) -> i32 {
-    use crate::commands::rules::{RuleType, run_rules_report};
+pub fn run_setup_wizard(root: &Path) -> i32 {
     use normalize_facts_rules_interpret as interpret;
+    use normalize_rules::{RuleType, RulesRunConfig, run_rules_report};
     use normalize_syntax_rules;
     use std::collections::HashMap;
 
@@ -137,8 +135,8 @@ pub fn cmd_setup_wizard(root: &Path) -> i32 {
     let config = crate::config::NormalizeConfig::load(root);
 
     // Load rule metadata for descriptions
-    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.analyze.rules);
-    let fact_rules = interpret::load_all_rules(root, &config.analyze.facts_rules);
+    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
+    let fact_rules = interpret::load_all_rules(root, &config.rules);
 
     // Build map: rule_id -> (description, severity, enabled, type)
     let mut rule_meta: HashMap<String, RuleMeta> = HashMap::new();
@@ -166,7 +164,11 @@ pub fn cmd_setup_wizard(root: &Path) -> i32 {
     }
 
     // Run all rules to collect violations
-    let report = run_rules_report(root, root, None, None, &RuleType::All, &[], &config);
+    let rules_config = RulesRunConfig {
+        rule_tags: config.rule_tags.0.clone(),
+        rules: config.rules.clone(),
+    };
+    let report = run_rules_report(root, root, None, None, &RuleType::All, &[], &rules_config);
 
     // Group issues by rule_id
     let mut by_rule: HashMap<String, Vec<normalize_output::diagnostics::Issue>> = HashMap::new();
@@ -205,7 +207,6 @@ pub fn cmd_setup_wizard(root: &Path) -> i32 {
     let stdin = io::stdin();
     let mut enabled_rules: Vec<String> = Vec::new();
     let mut disabled_rules: Vec<String> = Vec::new();
-    let mut skipped_rules: Vec<String> = Vec::new();
     let mut quit_early = false;
 
     for (i, (rule_id, issues)) in rules_with_violations.iter().enumerate() {
@@ -289,36 +290,35 @@ pub fn cmd_setup_wizard(root: &Path) -> i32 {
         match line.trim().to_lowercase().as_str() {
             "e" | "enable" => {
                 if !enabled {
-                    let code = crate::commands::rules::cmd_enable_disable(
-                        root, rule_id, true, false, &config,
-                    );
-                    if code == 0 {
-                        println!("  → Enabled {}", rule_id);
-                        enabled_rules.push(rule_id.clone());
-                    } else {
-                        eprintln!("  Error enabling {}", rule_id);
-                        skipped_rules.push(rule_id.clone());
+                    match normalize_rules::enable_disable(root, rule_id, true, false, &rules_config)
+                    {
+                        Ok(_) => {
+                            println!("  → Enabled {}", rule_id);
+                            enabled_rules.push(rule_id.clone());
+                        }
+                        Err(e) => eprintln!("  Error enabling {}: {}", rule_id, e),
                     }
                 } else {
                     println!("  → Already enabled");
-                    skipped_rules.push(rule_id.clone());
                 }
             }
             "d" | "disable" => {
                 if enabled {
-                    let code = crate::commands::rules::cmd_enable_disable(
-                        root, rule_id, false, false, &config,
-                    );
-                    if code == 0 {
-                        println!("  → Disabled {}", rule_id);
-                        disabled_rules.push(rule_id.clone());
-                    } else {
-                        eprintln!("  Error disabling {}", rule_id);
-                        skipped_rules.push(rule_id.clone());
+                    match normalize_rules::enable_disable(
+                        root,
+                        rule_id,
+                        false,
+                        false,
+                        &rules_config,
+                    ) {
+                        Ok(_) => {
+                            println!("  → Disabled {}", rule_id);
+                            disabled_rules.push(rule_id.clone());
+                        }
+                        Err(e) => eprintln!("  Error disabling {}: {}", rule_id, e),
                     }
                 } else {
                     println!("  → Already disabled");
-                    skipped_rules.push(rule_id.clone());
                 }
             }
             "q" | "quit" => {
@@ -329,41 +329,32 @@ pub fn cmd_setup_wizard(root: &Path) -> i32 {
             _ => {
                 // skip or empty
                 println!("  → Skipped");
-                skipped_rules.push(rule_id.clone());
             }
         }
         println!();
     }
 
-    // Print summary
-    let changed = enabled_rules.len() + disabled_rules.len();
-    if quit_early && changed == 0 {
+    if quit_early && enabled_rules.is_empty() && disabled_rules.is_empty() {
         println!("Setup cancelled. No changes were made.");
-    } else if changed == 0 {
+    } else if enabled_rules.is_empty() && disabled_rules.is_empty() {
         println!("Setup complete. No changes made.");
-        println!("Run `normalize rules show-config` to see the current configuration.");
+        println!("Run 'normalize rules show-config' to see the current configuration.");
     } else {
         println!("Setup complete. Changes made:\n");
         if !enabled_rules.is_empty() {
             println!("  Enabled ({}):", enabled_rules.len());
-            for r in &enabled_rules {
-                println!("    {}", r);
+            for id in &enabled_rules {
+                println!("    {}", id);
             }
-            println!();
         }
         if !disabled_rules.is_empty() {
             println!("  Disabled ({}):", disabled_rules.len());
-            for r in &disabled_rules {
-                println!("    {}", r);
+            for id in &disabled_rules {
+                println!("    {}", id);
             }
-            println!();
         }
-        if !skipped_rules.is_empty() {
-            println!("  Skipped ({}): (no changes made)", skipped_rules.len());
-            println!();
-        }
-        println!("Configuration saved to .normalize/config.toml");
-        println!("Run `normalize rules show-config` to see the full configuration.");
+        println!("\nConfiguration saved to .normalize/config.toml");
+        println!("Run 'normalize rules show-config' to see the full configuration.");
     }
 
     0
@@ -511,42 +502,42 @@ mod tests {
     use std::fs;
     use tempfile::tempdir;
 
-    #[test]
-    fn test_init_creates_moss_dir() {
+    #[tokio::test]
+    async fn test_init_creates_moss_dir() {
         let tmp = tempdir().unwrap();
-        let result = cmd_init(tmp.path(), false, false);
+        let result = run_init(tmp.path(), false, false).await;
         assert_eq!(result, 0);
         assert!(tmp.path().join(".normalize").exists());
         assert!(tmp.path().join(".normalize/config.toml").exists());
     }
 
-    #[test]
-    fn test_init_idempotent() {
+    #[tokio::test]
+    async fn test_init_idempotent() {
         let tmp = tempdir().unwrap();
-        let result1 = cmd_init(tmp.path(), false, false);
-        let result2 = cmd_init(tmp.path(), false, false);
+        let result1 = run_init(tmp.path(), false, false).await;
+        let result2 = run_init(tmp.path(), false, false).await;
         assert_eq!(result1, 0);
         assert_eq!(result2, 0);
     }
 
-    #[test]
-    fn test_init_updates_gitignore() {
+    #[tokio::test]
+    async fn test_init_updates_gitignore() {
         let tmp = tempdir().unwrap();
         fs::write(tmp.path().join(".gitignore"), "node_modules\n").unwrap();
 
-        cmd_init(tmp.path(), false, false);
+        run_init(tmp.path(), false, false).await;
 
         let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         assert!(content.contains(".normalize/*"));
         assert!(content.contains("!.normalize/config.toml"));
     }
 
-    #[test]
-    fn test_init_skips_commented_entries() {
+    #[tokio::test]
+    async fn test_init_skips_commented_entries() {
         let tmp = tempdir().unwrap();
         fs::write(tmp.path().join(".gitignore"), "# .normalize\n").unwrap();
 
-        cmd_init(tmp.path(), false, false);
+        run_init(tmp.path(), false, false).await;
 
         let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         let lines: Vec<&str> = content.lines().collect();
@@ -569,8 +560,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_init_inserts_near_existing() {
+    #[tokio::test]
+    async fn test_init_inserts_near_existing() {
         let tmp = tempdir().unwrap();
         // Existing .gitignore already has .normalize/*
         fs::write(
@@ -579,7 +570,7 @@ mod tests {
         )
         .unwrap();
 
-        cmd_init(tmp.path(), false, false);
+        run_init(tmp.path(), false, false).await;
 
         let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         let lines: Vec<&str> = content.lines().collect();
@@ -600,13 +591,13 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_init_detects_todo_files() {
+    #[tokio::test]
+    async fn test_init_detects_todo_files() {
         let tmp = tempdir().unwrap();
         fs::write(tmp.path().join("TODO.md"), "# TODO\n").unwrap();
         fs::write(tmp.path().join("TASKS.md"), "# Tasks\n").unwrap();
 
-        cmd_init(tmp.path(), false, false);
+        run_init(tmp.path(), false, false).await;
 
         let config = fs::read_to_string(tmp.path().join(".normalize/config.toml")).unwrap();
         assert!(config.contains("[aliases]"));
@@ -614,11 +605,11 @@ mod tests {
         assert!(config.contains("TASKS.md"));
     }
 
-    #[test]
-    fn test_init_no_todo_files() {
+    #[tokio::test]
+    async fn test_init_no_todo_files() {
         let tmp = tempdir().unwrap();
 
-        cmd_init(tmp.path(), false, false);
+        run_init(tmp.path(), false, false).await;
 
         let config = fs::read_to_string(tmp.path().join(".normalize/config.toml")).unwrap();
         // Should not have aliases section if no todo-tracking files found
