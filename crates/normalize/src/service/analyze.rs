@@ -962,7 +962,7 @@ impl AnalyzeService {
     }
 
     /// Analyze cross-repo coupling
-    #[server(group = "graph")]
+    #[server(group = "git")]
     #[cli(display_with = "display_repo_coupling")]
     pub fn repo_coupling(
         &self,
@@ -982,6 +982,7 @@ impl AnalyzeService {
     }
 
     /// Rank repos by tech debt (churn + complexity + coupling)
+    #[server(group = "git")]
     #[cli(display_with = "display_cross_repo_health")]
     pub fn cross_repo_health(
         &self,

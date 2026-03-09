@@ -28,7 +28,6 @@ Options:
 Commands:
   health             Run health analysis (file counts, complexity stats, large file warnings)
   all                Run all analysis passes
-  cross-repo-health  Rank repos by tech debt (churn + complexity + coupling)
   summary            Auto-generated single-page codebase overview
 
 Code quality:
@@ -60,7 +59,6 @@ Graph analysis:
   call-graph         Show callers and/or callees of a symbol
   trace              Trace value provenance for a symbol
   architecture       Show architecture analysis (coupling, cycles, hubs)
-  repo-coupling      Analyze cross-repo coupling
   graph              Graph-theoretic properties of the dependency graph
   dependents         Reverse-dependency closure: who depends on this file/symbol? Modules mode shows blast radius with test coverage; symbols/types mode shows a flat list.
 
@@ -71,6 +69,8 @@ Git history:
   ownership          Show per-file ownership concentration from git blame
   contributors       Analyze contributors across repos
   activity           Analyze cross-repo activity over time
+  repo-coupling      Analyze cross-repo coupling
+  cross-repo-health  Rank repos by tech debt (churn + complexity + coupling)
   provenance         Provenance graph: git blame → session mapping + code relations
   trend              Track health metrics over git history at regular intervals
 
