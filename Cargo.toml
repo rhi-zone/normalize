@@ -104,6 +104,9 @@ roxmltree = "0.21"
 # Service framework
 server-less = { version = "0.3.2", default-features = false, features = ["cli", "jsonschema"] }
 
+# JSON Schema validation
+jsonschema = "0.26"
+
 # Minimize debug build size (full debug info adds ~2GB)
 [profile.dev]
 debug = 0

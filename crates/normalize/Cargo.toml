@@ -105,6 +105,7 @@ jaq-json.workspace = true
 tempfile = "3"
 toml = "0.8"
 toml_edit = "0.22"
+jsonschema = { workspace = true }
 rmcp = { version = "0.12", features = ["server", "macros", "schemars", "transport-io"], optional = true }
 schemars = "1"
 tower-lsp = "0.20"

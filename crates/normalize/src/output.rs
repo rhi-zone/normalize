@@ -129,5 +129,10 @@ mod tests {
         assert_output_formatter::<TestRatioReport>();
         assert_output_formatter::<TrendReport>();
         assert_output_formatter::<ViewOutput>();
+
+        use crate::service::config::{ConfigSetReport, ConfigShowReport, ConfigValidateReport};
+        assert_output_formatter::<ConfigShowReport>();
+        assert_output_formatter::<ConfigValidateReport>();
+        assert_output_formatter::<ConfigSetReport>();
     }
 }

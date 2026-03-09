@@ -18,6 +18,7 @@
 //! `--compact` globals + config) and calls `format_pretty()` or `format_text()`.
 
 pub mod analyze;
+pub mod config;
 pub mod daemon;
 pub mod edit;
 pub mod facts;
@@ -48,6 +49,7 @@ pub struct NormalizeService {
     /// Text prefix to prepend to view output (used for --dir-context).
     view_prefix: Cell<String>,
     analyze: analyze::AnalyzeService,
+    config: config::ConfigService,
     daemon: daemon::DaemonService,
     edit: edit::EditService,
     facts: facts::FactsService,
@@ -80,6 +82,7 @@ impl NormalizeService {
         Self {
             view_prefix: Cell::new(String::new()),
             analyze: analyze::AnalyzeService::new(&pretty),
+            config: config::ConfigService::new(&pretty),
             daemon: daemon::DaemonService,
             edit: edit::EditService {
                 history: history::HistoryService,
@@ -820,6 +823,11 @@ impl NormalizeService {
     /// Manage and run syntax/fact rules
     pub fn rules(&self) -> &normalize_rules::RulesService {
         &self.rules
+    }
+
+    /// Inspect and validate config files using JSON Schema
+    pub fn config(&self) -> &config::ConfigService {
+        &self.config
     }
 
     /// Start a normalize server (MCP, HTTP, LSP)

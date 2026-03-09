@@ -292,30 +292,16 @@ Pattern: traits are the extensibility mechanism. Users implement traits in their
 - `context` could be `normalize view context [path]` but semantics differ slightly (content-only vs prepend). Low priority.
 - `aliases` is a cross-cutting utility. Too small for top-level but has no clear parent. Low priority.
 
-### Schema-Driven Config UI — `normalize config` + potential server-less extension
+### ~~Schema-Driven Config UI — `normalize config`~~ — DONE (2026-03-09)
 
-The hand-rolled `normalize rules show-config` and `normalize rules validate` are ad-hoc instances
-of what a generic schema-driven config UI should provide. Design:
+`normalize config schema/show/validate/set` implemented in `crates/normalize/src/service/config.rs`.
+Generic engine: TOML/JSON/YAML + any JSON Schema; defaults to `.normalize/config.toml` + `NormalizeConfig`.
+Uses `jsonschema` crate for validation, `toml_edit` for typed writes.
 
-**Generic engine** (could live in a new `normalize-config-ui` crate, eventually published standalone):
-- Input: JSON Schema + config file path (TOML/JSON)
-- Operations: `show` (render with schema labels), `validate` (schema + unknown keys), `set <key> <val>` (typed write), `schema` (emit schema)
-
-**In normalize:** `normalize config show/validate/set/schema` passes `NormalizeConfig`'s
-`JsonSchema` to the engine. Subsumes `normalize rules show-config` and `normalize rules validate`.
-The schema comes from `NormalizeConfig::json_schema()` (already derivable via `schemars`).
-
-**In server-less (stretch):** `#[config]` proc macro on a struct → auto-generates the same
-service-layer subcommands as `#[cli]` but for persistent config files rather than request
-handlers. Any `#[derive(Serialize, Deserialize, JsonSchema)]` struct opts in for free.
-
-**Implementation order:**
-1. Add `normalize config schema` — emit `NormalizeConfig` JSON Schema (trivial, just schemars)
-2. Add `normalize config show` — render `.normalize/config.toml` using schema field names/descriptions
-3. Add `normalize config validate` — schema validation (replaces ad-hoc rules validate)
-4. Add `normalize config set <dotted.key> <value>` — typed write (needs TOML round-trip)
-5. Extract engine into `normalize-config-ui` crate for reuse / publication
-6. Propose `#[config]` to server-less maintainer (us)
+**Remaining follow-ups:**
+- ~~`normalize rules show-config`~~ and ~~`normalize rules validate`~~ still exist; delete when ready
+- Extract engine into `normalize-config-ui` crate for reuse / publication (stretch goal)
+- Propose `#[config]` proc macro to server-less (stretch goal)
 
 **Note:** `normalize rules show-config` and `normalize rules validate` can coexist until the
 generic version covers their use cases, then be removed or aliased.

@@ -5,3 +5,5 @@ Root of the normalize library and binary. `main.rs` handles argv[0] dispatch (sy
 `commands/` contains domain logic modules; dead `cmd_*` i32-returning wrappers were eliminated — service methods now call analysis functions directly. `service/` is the primary CLI registration point (server-less `#[cli]` proc macro). Rule orchestration (`RulesService`, `run_rules_report()`, `apply_native_rules_config()`, syntax rule runner) has been extracted into the `normalize-rules` crate; `commands/rules.rs`, `service/rules.rs`, and `commands/analyze/rules_cmd.rs` have been removed.
 
 Recent CLI UX fixes: `view --full` now emits raw file source (was a no-op); `sessions stats --group-by` wired up; `sessions show/analyze` gained `--project` flag; `--only <lang>` bare names now emit a clear error; `analyze complexity/length` support single-file input.
+
+`service/config.rs` — `ConfigService` provides `normalize config schema/show/validate/set`: generic JSON Schema + TOML/JSON/YAML config inspection engine, defaulting to `.normalize/config.toml` + `NormalizeConfig`. Uses `jsonschema` crate for validation, `toml_edit` for typed writes.

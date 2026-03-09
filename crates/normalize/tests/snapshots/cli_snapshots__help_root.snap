@@ -25,6 +25,7 @@ Commands:
   edit       Structural editing of code symbols
   analyze    Analyze codebase (health, complexity, security, duplicates, docs)
   rules      Manage and run syntax/fact rules
+  config     Inspect and validate config files using JSON Schema
   serve      Start a normalize server (MCP, HTTP, LSP)
   help       Print this message or the help of the given subcommand(s)
 
