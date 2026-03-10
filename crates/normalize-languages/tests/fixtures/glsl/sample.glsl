@@ -1,5 +1,9 @@
 #version 450 core
 
+#include "common.glsl"
+#include "lighting.glsl"
+#include <pbr_utils.glsl>
+
 // Uniforms
 uniform mat4 u_Model;
 uniform mat4 u_View;
