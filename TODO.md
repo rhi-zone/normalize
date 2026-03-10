@@ -370,7 +370,7 @@ tools, or other commands would want. Pure "compute + format for one command" sta
 
 ## Backlog
 
-### ~~Richer Jinja2 grammar~~ — DONE (grammar written; pending arborium publish)
+### ~~Richer Jinja2 grammar~~ — DONE (grammar written; pending publish + integration)
 
 Grammar written from scratch at `/tmp/ts-jinja2/` (54/54 corpus tests pass). Installed
 locally to `~/.config/normalize/grammars/jinja2.so` replacing arborium-jinja2. Key node
@@ -379,9 +379,12 @@ types: `extends_statement`, `import_statement`, `from_statement`, `include_state
 `trans_statement`, etc. — full expression language including filters, tests, ternary, etc.
 Imports query (`jinja2.imports.scm`) updated to use named node types with `path:` field.
 
-**Remaining**: publish to crates.io as `arborium-jinja2` v3.x so it persists across
-`cargo xtask build-grammars` rebuilds. Also add `jinja2.tags.scm` (macro_statement →
-function symbols) and `jinja2.complexity.scm` (for/if → complexity).
+**Remaining**:
+- Publish as our own crate (e.g. `tree-sitter-jinja2` on crates.io) — arborium vendors
+  their own grammars, we publish separately. Update `normalize-grammars` to depend on
+  the new crate instead of `arborium-jinja2`.
+- Add `jinja2.tags.scm` (macro_statement → function symbols)
+- Add `jinja2.complexity.scm` (for/if/elif/else → complexity)
 
 ### normalize-manifest: eval-backed parsing (`eval` feature gate)
 
