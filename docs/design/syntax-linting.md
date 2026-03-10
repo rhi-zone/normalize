@@ -40,13 +40,13 @@ Rules in `.normalize/rules/` as `.scm` files with TOML frontmatter:
 
 ```bash
 # Run all rules
-normalize analyze rules
+normalize rules run
 
 # Run specific rule
-normalize analyze rules --rule no-grammar-loader-new
+normalize rules run --rule no-grammar-loader-new
 
 # List available rules
-normalize analyze rules --list
+normalize rules list
 
 # Authoring helpers
 normalize analyze ast <file>           # Show AST for a file
@@ -147,7 +147,7 @@ The `@match` capture is required and marks where the finding is reported.
 1. `normalize analyze ast <file>` - dump AST
 2. `normalize analyze query <file> <query>` - test queries
 3. Rule files with basic format
-4. `normalize analyze rules` - run all rules
+4. `normalize rules run` - run all rules
 
 ### Phase 2: Polish
 

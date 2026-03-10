@@ -191,7 +191,7 @@ Patterns can be excluded via `.normalize/` allow files:
 |------|---------|
 | `.normalize/large-files-allow` | Exclude from `analyze files` |
 | `.normalize/hotspots-allow` | Exclude from `analyze hotspots` |
-| `.normalize/duplicate-functions-allow` | Exclude from `analyze duplicates` |
+| `.normalize/duplicate-functions-allow` | Exclude from `analyze duplicates --scope functions` |
 | `.normalize/duplicate-types-allow` | Exclude type pairs |
 | `.normalize/test-gaps-allow` | Exclude from `analyze test-gaps` |
 
