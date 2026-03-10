@@ -973,15 +973,17 @@ git push --tags
 ## Syntax Ruleset Breadth
 
 After batch-fixing the current info violations, audit and expand rule coverage:
-- **What we have**: ~20 builtin rules, mostly Rust-focused. Good Rust coverage; thin everywhere else.
-- **Next**: flesh out rules for JS/TS, Python, Go, Ruby — languages with large userbases and well-known anti-patterns.
+- **What we have**: 42 builtin rules (38 syntax). Good Rust/Go/Python/JS/Ruby coverage.
+- **Next**: deepen TypeScript rules; add more Go rules; Ruby string interpolation.
 - **Trigger for fix infrastructure**: once enough rules have structural auto-fixes that need correct indentation, build the corpus-based indentation model (see `docs/prior-art.md` § "Corpus-based indentation model"). Don't build it speculatively.
+- **tree-sitter-go note**: `block` → `statement_list` → statements. Queries must use `statement_list` as intermediate node; `(block (return_statement))` won't match.
 - **Rule ideas by language**:
-  - JS/TS: `var` usage, `== null` vs `=== null`, `typeof` checks, async/await anti-patterns
-  - Python: mutable default args, bare `except`, `assert` in non-test code
-  - Go: error ignored (`_ = err`), `fmt.Println` in non-main, unnecessary `return` at end
-  - Ruby: `rescue Exception`, `puts` in non-script, string interpolation over concatenation
-  - Cross-language: hardcoded credentials (already have), magic numbers, commented-out code blocks
+  - JS/TS: `var` usage ✓, `== null` ✓, `typeof` checks ✓, async/await ✓ — `no-prototype-builtins`, `prefer-optional-chain`
+  - TypeScript: `no-any` ✓ — `no-non-null-assertion`, `strict-boolean-expressions`
+  - Python: mutable default args ✓, bare `except` ✓, `assert` in non-test ✓
+  - Go: error ignored ✓, `fmt.Println` ✓, `empty-return` ✓, `defer-in-loop` ✓ — `context-todo`, `sync-mutex-copied`
+  - Ruby: `rescue Exception` ✓, `puts` in non-script ✓, string interpolation over concatenation
+  - Cross-language: hardcoded credentials ✓, magic numbers, commented-out code blocks
 
 ## Fix System: Structural Rewrites (post text-replacement)
 - **Sexpr-based fix expressions**: The current `fix = "template $capture"` is text replacement. For structural transforms (indentation-aware, composable), consider expressing fixes as output tree patterns rather than strings. eglint (~/git/eglint) does this for TypeScript — useful prior art for the approach even though it's TS-compiler-specific and doesn't port directly.

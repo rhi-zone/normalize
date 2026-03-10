@@ -89,6 +89,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "typescript/tuple-return",
         content: include_str!("typescript_tuple_return.scm"),
     },
+    BuiltinRule {
+        id: "typescript/no-any",
+        content: include_str!("typescript_no_any.scm"),
+    },
     // Python rules
     BuiltinRule {
         id: "python/print-debug",
@@ -134,6 +138,14 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
     BuiltinRule {
         id: "go/error-ignored",
         content: include_str!("go_error_ignored.scm"),
+    },
+    BuiltinRule {
+        id: "go/empty-return",
+        content: include_str!("go_empty_return.scm"),
+    },
+    BuiltinRule {
+        id: "go/defer-in-loop",
+        content: include_str!("go_defer_in_loop.scm"),
     },
     // Ruby rules
     BuiltinRule {
