@@ -1464,3 +1464,9 @@ crates/normalize-syntax-rules/src/loader.rs:84-88
 crates/normalize-tools/src/adapters/clippy.rs:134-138
 crates/normalize-tools/src/adapters/mod.rs:97-101
 crates/normalize-tools/src/adapters/oxlint.rs:166-170
+# grammar_loader.rs: bundled_*_query functions all use same match-on-lang-name pattern
+# but with different query types (.tags vs .calls vs .complexity etc). Parallel match arms.
+crates/normalize-languages/src/grammar_loader.rs:511-583
+crates/normalize-languages/src/grammar_loader.rs:600-673
+crates/normalize-languages/src/grammar_loader.rs:676-748
+crates/normalize-languages/src/grammar_loader.rs:751-824
