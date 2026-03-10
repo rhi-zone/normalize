@@ -655,7 +655,7 @@ Trigger: split a capability when >50% of languages would return stubs. `has_symb
 - [x] Add `as_symbols()` query method to `Language` with `None` default; `LanguageSymbols` marker trait; 91 programming languages implement it; 6 config languages (CSS/HTML/JSON/TOML/XML/YAML) don't — DONE (2026-03-11)
 - [x] Migrate call sites (`ceremony.rs`, `docs.rs`, `search.rs`) to use `as_symbols().is_some()` — DONE (2026-03-11)
 - [x] Remove `has_symbols()` — DONE (2026-03-11)
-- [ ] Add `as_imports()`, `as_complexity()`, `as_edit()` capability queries — not ready yet. Sparsity check (2026-03-11): `extract_imports` is empty in ~29% of languages (below 50% threshold). Most "empty" cases are data/config/markup languages or languages covered by `.imports.scm` query files. True gaps (remaining): AWK (`@include` GAWK-only — defer), Batch (no import system — skip). Closed: CSS, GLSL, HTML, Jinja2 via `.imports.scm` (2026-03-11).
+- [ ] Add `as_imports()`, `as_complexity()`, `as_edit()` capability queries — not ready yet. Sparsity check (2026-03-11): `extract_imports` is empty in ~29% of languages (below 50% threshold). Most "empty" cases are data/config/markup languages or languages covered by `.imports.scm` query files. True gaps (remaining): Batch (no import system — skip). Closed: AWK, CSS, GLSL, HTML, Jinja2 via `.imports.scm` (2026-03-11).
 
 ### normalize-typegen
 

@@ -811,6 +811,7 @@ fn bundled_imports_query(name: &str) -> Option<&'static str> {
         "nginx" => Some(include_str!("queries/nginx.imports.scm")),
         "ninja" => Some(include_str!("queries/ninja.imports.scm")),
         "prolog" => Some(include_str!("queries/prolog.imports.scm")),
+        "awk" => Some(include_str!("queries/awk.imports.scm")),
         "css" => Some(include_str!("queries/css.imports.scm")),
         "glsl" => Some(include_str!("queries/glsl.imports.scm")),
         "html" => Some(include_str!("queries/html.imports.scm")),
@@ -1094,6 +1095,7 @@ mod tests {
     #[test]
     fn test_bundled_imports_queries() {
         for lang in &[
+            "awk",
             "python",
             "javascript",
             "go",
@@ -1180,6 +1182,7 @@ mod tests {
     #[test]
     fn test_get_imports_returns_bundled() {
         let loader = GrammarLoader::with_paths(vec![]);
+        assert!(loader.get_imports("awk").is_some());
         assert!(loader.get_imports("python").is_some());
         assert!(loader.get_imports("javascript").is_some());
         assert!(loader.get_imports("go").is_some());
