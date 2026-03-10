@@ -1,8 +1,9 @@
 //! Function length analysis.
 //!
 //! Identifies long functions that may be candidates for refactoring.
-use normalize_languages::{Language, parsers, support_for_path};
-use normalize_output::OutputFormatter;
+use crate::output::OutputFormatter;
+use crate::parsers;
+use normalize_languages::{Language, support_for_path};
 use serde::Serialize;
 use std::path::Path;
 use streaming_iterator::StreamingIterator;

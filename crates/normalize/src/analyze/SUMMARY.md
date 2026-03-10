@@ -1,9 +1,3 @@
 # src/analyze
 
-Re-export shim for backward compatibility within this crate. All types have moved to the
-`normalize-metrics` crate (`crates/normalize-metrics/`).
-
-`mod.rs` re-exports `complexity`, `function_length`, and `test_gaps` sub-modules from
-`normalize_metrics`, plus the shared `FileReport<T>`, `FullStats`, `FunctionComplexity`,
-and `FunctionLength` top-level types. Existing code in `commands/analyze/` and
-`service/analyze.rs` continues to use `crate::analyze::*` paths unchanged.
+Core analysis passes used internally by multiple commands. Contains three modules: `complexity.rs` (cyclomatic/cognitive complexity per function, `FunctionComplexity`), `function_length.rs` (line count per function, `FunctionLength`), and `test_gaps.rs` (detection of untested functions). Results are wrapped in the shared `FileReport<T>` / `FullStats` types. `FileReport` carries an optional `diff_ref` field; `FunctionComplexity` and `FunctionLength` carry an optional `delta` field — both populated when `--diff <ref>` is used. This module is the computation layer; formatting and CLI wiring live in `commands/analyze/` and `service/analyze.rs`.

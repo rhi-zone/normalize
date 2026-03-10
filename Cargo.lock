@@ -3706,7 +3706,6 @@ dependencies = [
  "normalize-graph",
  "normalize-languages",
  "normalize-local-deps",
- "normalize-metrics",
  "normalize-native-rules",
  "normalize-openapi",
  "normalize-output",
@@ -4081,21 +4080,6 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
-]
-
-[[package]]
-name = "normalize-metrics"
-version = "0.1.0"
-dependencies = [
- "normalize-analyze",
- "normalize-facts",
- "normalize-languages",
- "normalize-output",
- "nu-ansi-term",
- "schemars",
- "serde",
- "streaming-iterator",
- "tree-sitter",
 ]
 
 [[package]]
