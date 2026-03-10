@@ -26,12 +26,8 @@
 use super::arch_common;
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use crate::cache;
-use flate2::read::GzDecoder;
 use rayon::prelude::*;
-use std::collections::HashMap;
-use std::io::{Cursor, Read};
 use std::time::Duration;
-use tar::Archive;
 
 /// Cache TTL for repo databases (1 hour).
 const CACHE_TTL: Duration = Duration::from_secs(60 * 60);
@@ -209,115 +205,8 @@ impl CachyOs {
 
     /// Parse an Arch-style .db file.
     fn parse_db(data: &[u8], repo: CachyOsRepo) -> Result<Vec<PackageMeta>, IndexError> {
-        let tar_data = if data.len() >= 2 && data[0] == 0x1f && data[1] == 0x8b {
-            let mut decoder = GzDecoder::new(Cursor::new(data));
-            let mut decompressed = Vec::new();
-            decoder
-                .read_to_end(&mut decompressed)
-                .map_err(IndexError::Io)?;
-            decompressed
-        } else {
-            data.to_vec()
-        };
-
-        let mut archive = Archive::new(Cursor::new(tar_data));
-        let mut packages = Vec::new();
-
-        for entry in archive.entries().map_err(IndexError::Io)? {
-            let mut entry = entry.map_err(IndexError::Io)?;
-            let path = entry
-                .path()
-                .map_err(IndexError::Io)?
-                .to_string_lossy()
-                .to_string();
-
-            if !path.ends_with("/desc") {
-                continue;
-            }
-
-            let mut content = String::new();
-            entry.read_to_string(&mut content).map_err(IndexError::Io)?;
-
-            if let Some(pkg) = Self::parse_desc(&content, repo) {
-                packages.push(pkg);
-            }
-        }
-
-        Ok(packages)
-    }
-
-    /// Parse a desc file from a database.
-    fn parse_desc(content: &str, repo: CachyOsRepo) -> Option<PackageMeta> {
-        let mut fields: HashMap<String, String> = HashMap::new();
-        let mut current_key: Option<String> = None;
-        let mut current_value = String::new();
-
-        for line in content.lines() {
-            if line.starts_with('%') && line.ends_with('%') {
-                if let Some(key) = current_key.take() {
-                    fields.insert(key, current_value.trim().to_string());
-                }
-                current_key = Some(line[1..line.len() - 1].to_string());
-                current_value.clear();
-            } else if current_key.is_some() {
-                if !current_value.is_empty() {
-                    current_value.push('\n');
-                }
-                current_value.push_str(line);
-            }
-        }
-        if let Some(key) = current_key {
-            fields.insert(key, current_value.trim().to_string());
-        }
-
-        let name = fields.get("NAME")?.clone();
-        let version = fields.get("VERSION")?.clone();
-
-        let mut extra = HashMap::new();
-        extra.insert(
-            "source_repo".to_string(),
-            serde_json::Value::String(repo.name().to_string()),
-        );
-
-        if let Some(deps) = fields.get("DEPENDS") {
-            let parsed_deps: Vec<serde_json::Value> = deps
-                .lines()
-                .filter(|l| !l.is_empty())
-                .map(|d| {
-                    let name = d
-                        .split(|c| c == '>' || c == '<' || c == '=' || c == ':')
-                        .next()
-                        .unwrap_or(d);
-                    serde_json::Value::String(name.to_string())
-                })
-                .collect();
-            if !parsed_deps.is_empty() {
-                extra.insert("depends".to_string(), serde_json::Value::Array(parsed_deps));
-            }
-        }
-
-        if let Some(size) = fields.get("CSIZE").and_then(|s| s.parse::<u64>().ok()) {
-            extra.insert("size".to_string(), serde_json::Value::Number(size.into()));
-        }
-
-        Some(PackageMeta {
-            name,
-            version,
-            description: fields.get("DESC").cloned(),
-            homepage: fields.get("URL").cloned(),
-            repository: None,
-            license: fields.get("LICENSE").cloned(),
-            binaries: Vec::new(),
-            keywords: Vec::new(),
-            maintainers: Vec::new(),
-            published: None,
-            downloads: None,
-            archive_url: None,
-            checksum: fields
-                .get("SHA256SUM")
-                .map(|s| format!("sha256:{}", s))
-                .or_else(|| fields.get("MD5SUM").map(|s| format!("md5:{}", s))),
-            extra,
+        arch_common::parse_arch_db(data, |content| {
+            arch_common::parse_arch_db_desc(content, repo.name())
         })
     }
 
