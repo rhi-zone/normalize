@@ -157,7 +157,7 @@ based on context and output mode:
 
 Remaining gaps:
 - `rules run --engine sarif` could show which SARIF tools had errors (not done)
-- `hints: Vec<String>` on `DiagnosticsReport` is never populated — decide whether the field is actually needed or should be removed.
+- ~~`hints: Vec<String>` on `DiagnosticsReport` is never populated~~ — field was never added; `DiagnosticsReport` has no hints field; decided not to add one.
 
 ### ~~Failing skeleton tests (4 tests)~~ FIXED
 Root causes:
@@ -370,21 +370,18 @@ tools, or other commands would want. Pure "compute + format for one command" sta
 
 ## Backlog
 
-### Richer Jinja2 grammar
+### ~~Richer Jinja2 grammar~~ — DONE (grammar written; pending arborium publish)
 
-The current `arborium-jinja2` grammar uses a flat `statement + keyword` structure — every statement (`extends`, `import`, `from`, `include`, `block`, `macro`, `for`, `if`, ...) is just a `statement` node with a `keyword` child. There are no distinct named node types per statement kind.
+Grammar written from scratch at `/tmp/ts-jinja2/` (54/54 corpus tests pass). Installed
+locally to `~/.config/normalize/grammars/jinja2.so` replacing arborium-jinja2. Key node
+types: `extends_statement`, `import_statement`, `from_statement`, `include_statement`,
+`macro_statement`, `block_statement`, `for_statement`, `if_statement`, `call_statement`,
+`trans_statement`, etc. — full expression language including filters, tests, ternary, etc.
+Imports query (`jinja2.imports.scm`) updated to use named node types with `path:` field.
 
-This is workable for import extraction (`.imports.scm` uses `#eq?` on the keyword text), but it blocks:
-- Symbol extraction: can't identify macro/block definitions without matching on keyword text
-- Complexity: can't write `*.complexity.scm` patterns for `for`/`if` without matching on text
-- Call sites: can't distinguish filter calls, macro calls, etc. via structure alone
-- Type-safe query evolution: adding new statement types requires updating all query files via text matching
-
-**What we want**: a grammar that models `extends_statement`, `import_statement`, `include_statement`, `block_statement`, `macro_statement`, `for_statement`, `if_statement` as distinct named node types, each with properly typed fields (e.g. `path:`, `name:`, `condition:`).
-
-**Approach**: write a new grammar from scratch and publish via arborium. The upstream grammar is a dbt-specific tool, not a general-purpose one — no need to coordinate with it.
-
-**Scope**: Jinja2 is widely used (Django templates, Ansible, Flask, cookiecutter, etc.). A proper grammar is worth writing.
+**Remaining**: publish to crates.io as `arborium-jinja2` v3.x so it persists across
+`cargo xtask build-grammars` rebuilds. Also add `jinja2.tags.scm` (macro_statement →
+function symbols) and `jinja2.complexity.scm` (for/if → complexity).
 
 ### normalize-manifest: eval-backed parsing (`eval` feature gate)
 
