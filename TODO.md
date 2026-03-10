@@ -355,7 +355,7 @@ tools, or other commands would want. Pure "compute + format for one command" sta
 
 **Secondary targets (lower priority):**
 - `serve/` (LSP + HTTP + MCP, 1.5k) → `normalize-serve`
-- `src/analyze/` (1.4k, pure computation) → belongs in `normalize-architecture` or `normalize-facts`
+- ~~`src/analyze/` (1.4k, pure computation)~~ — DONE (2026-03-10). Extracted to `normalize-metrics` crate. `src/analyze/mod.rs` is now a re-export shim for backward compat within the main crate; all types live in `crates/normalize-metrics/`.
 - `commands/sessions/` (3.4k) — circular dep risk, needs care
 
 ## Backlog

@@ -4,7 +4,7 @@
 //! directly called from test context. Computes a risk score based on
 //! complexity, caller count, and lines of code.
 
-use crate::output::OutputFormatter;
+use normalize_output::OutputFormatter;
 use serde::Serialize;
 
 /// A public function analyzed for test coverage gaps.

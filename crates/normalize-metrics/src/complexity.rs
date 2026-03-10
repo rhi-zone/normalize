@@ -3,10 +3,9 @@
 //! Calculates McCabe cyclomatic complexity for functions.
 //! Complexity = number of decision points + 1
 
-use crate::output::OutputFormatter;
-use crate::parsers;
 use normalize_facts::extract::compute_complexity;
-use normalize_languages::{Language, support_for_path};
+use normalize_languages::{GrammarLoader, Language, parsers, support_for_path};
+use normalize_output::OutputFormatter;
 use serde::Serialize;
 use std::path::Path;
 use streaming_iterator::StreamingIterator;
@@ -501,7 +500,7 @@ impl ComplexityAnalyzer {
         tags_query: &tree_sitter::Query,
         content: &str,
         support: &dyn Language,
-        loader: &normalize_languages::GrammarLoader,
+        loader: &GrammarLoader,
         grammar_name: &str,
     ) -> Vec<FunctionComplexity> {
         use streaming_iterator::StreamingIterator;

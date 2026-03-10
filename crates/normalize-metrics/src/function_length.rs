@@ -1,13 +1,13 @@
 //! Function length analysis.
 //!
 //! Identifies long functions that may be candidates for refactoring.
-use crate::output::OutputFormatter;
-use crate::parsers;
-use normalize_languages::{Language, support_for_path};
+use normalize_languages::{Language, parsers, support_for_path};
+use normalize_output::OutputFormatter;
 use serde::Serialize;
 use std::path::Path;
 use streaming_iterator::StreamingIterator;
 use tree_sitter;
+
 /// Length classification for functions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub enum LengthCategory {
@@ -20,6 +20,7 @@ pub enum LengthCategory {
     /// 100+ lines: should be split
     TooLong,
 }
+
 impl LengthCategory {
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -29,6 +30,7 @@ impl LengthCategory {
             LengthCategory::TooLong => "too-long",
         }
     }
+
     pub fn as_title(&self) -> &'static str {
         match self {
             LengthCategory::Short => "Short",
@@ -38,6 +40,7 @@ impl LengthCategory {
         }
     }
 }
+
 /// Function length data.
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct FunctionLength {
@@ -51,6 +54,7 @@ pub struct FunctionLength {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub delta: Option<i64>,
 }
+
 impl normalize_analyze::Entity for FunctionLength {
     fn label(&self) -> &str {
         &self.name
@@ -70,6 +74,7 @@ impl FunctionLength {
             base
         }
     }
+
     pub fn short_name(&self) -> String {
         if let Some(parent) = &self.parent {
             format!("{}.{}", parent, self.name)
@@ -77,6 +82,7 @@ impl FunctionLength {
             self.name.clone()
         }
     }
+
     pub fn category(&self) -> LengthCategory {
         match self.lines {
             1..=20 => LengthCategory::Short,
@@ -86,8 +92,10 @@ impl FunctionLength {
         }
     }
 }
+
 /// Length report for a file.
 pub type LengthReport = super::FileReport<FunctionLength>;
+
 impl LengthReport {
     pub fn avg_length(&self) -> f64 {
         if self.functions.is_empty() {
@@ -97,15 +105,18 @@ impl LengthReport {
             total as f64 / self.functions.len() as f64
         }
     }
+
     pub fn max_length(&self) -> usize {
         self.functions.iter().map(|f| f.lines).max().unwrap_or(0)
     }
+
     pub fn long_count(&self) -> usize {
         self.functions
             .iter()
             .filter(|f| f.category() == LengthCategory::Long)
             .count()
     }
+
     pub fn too_long_count(&self) -> usize {
         self.functions
             .iter()
@@ -381,10 +392,12 @@ impl OutputFormatter for LengthReport {
 }
 
 pub struct LengthAnalyzer {}
+
 impl LengthAnalyzer {
     pub fn new() -> Self {
         Self {}
     }
+
     pub fn analyze(&self, path: &Path, content: &str) -> LengthReport {
         let functions = match support_for_path(path) {
             Some(support) => self.analyze_with_trait(content, support),
@@ -397,6 +410,7 @@ impl LengthAnalyzer {
             diff_ref: None,
         }
     }
+
     fn analyze_with_trait(&self, content: &str, support: &dyn Language) -> Vec<FunctionLength> {
         let grammar_name = support.grammar_name();
         let tree = match parsers::parse_with_grammar(grammar_name, content) {
@@ -530,6 +544,7 @@ impl LengthAnalyzer {
         functions
     }
 }
+
 impl Default for LengthAnalyzer {
     fn default() -> Self {
         Self::new()
