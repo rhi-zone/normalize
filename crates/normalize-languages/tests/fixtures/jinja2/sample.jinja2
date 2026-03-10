@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "helpers.html" import render_field %}
+{% import "utils.html" as utils %}
+{% include "header.html" %}
+
+{% macro render_form(form, action="/submit") %}
+  <form action="{{ action }}" method="post">
+    {% for field in form.fields %}
+      {% if field.visible %}
+        {{ render_field(field) }}
+      {% elif field.hidden %}
+        <input type="hidden" name="{{ field.name }}" value="{{ field.value }}">
+      {% else %}
+        {# skip #}
+      {% endif %}
+    {% endfor %}
+  </form>
+{% endmacro %}
+
+{% macro render_nav(items) %}
+  <nav>
+    {% for item in items %}
+      <a href="{{ item.url }}">{{ item.label }}</a>
+    {% endfor %}
+  </nav>
+{% endmacro %}
+
+{% block content %}
+  {{ render_form(login_form) }}
+  {{ utils.header("Welcome") }}
+{% endblock %}

@@ -6152,6 +6152,84 @@ fn vue_complexity_query_runs_cleanly() {
 }
 
 // ---------------------------------------------------------------------------
+// Jinja2 (live grammar — uses ~/.config/normalize/grammars/jinja2.so)
+// ---------------------------------------------------------------------------
+
+const JINJA2_SAMPLE: &str = include_str!("fixtures/jinja2/sample.jinja2");
+
+#[test]
+fn jinja2_tags_finds_macros() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping jinja2_tags: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("jinja2") else {
+        eprintln!("Skipping jinja2_tags: jinja2 grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_tags("jinja2")
+        .expect("jinja2 tags query missing");
+    let names = collect_captures(&lang, JINJA2_SAMPLE, &query_str, "name");
+    assert!(
+        names.contains(&"render_form".to_string()),
+        "expected 'render_form' macro in jinja2 tags, got: {names:?}"
+    );
+    assert!(
+        names.contains(&"render_nav".to_string()),
+        "expected 'render_nav' macro in jinja2 tags, got: {names:?}"
+    );
+}
+
+#[test]
+fn jinja2_imports_finds_paths() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping jinja2_imports: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("jinja2") else {
+        eprintln!("Skipping jinja2_imports: jinja2 grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_imports("jinja2")
+        .expect("jinja2 imports query missing");
+    let paths = collect_captures(&lang, JINJA2_SAMPLE, &query_str, "import.path");
+    assert!(
+        paths.iter().any(|p| p.contains("base.html")),
+        "expected 'base.html' in jinja2 import paths, got: {paths:?}"
+    );
+    assert!(
+        paths.iter().any(|p| p.contains("helpers.html")),
+        "expected 'helpers.html' in jinja2 import paths, got: {paths:?}"
+    );
+}
+
+#[test]
+fn jinja2_complexity_finds_control_flow() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping jinja2_complexity: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("jinja2") else {
+        eprintln!("Skipping jinja2_complexity: jinja2 grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_complexity("jinja2")
+        .expect("jinja2 complexity query missing");
+    let complexity = collect_captures(&lang, JINJA2_SAMPLE, &query_str, "complexity");
+    assert!(
+        complexity.len() >= 3,
+        "expected at least 3 complexity nodes in jinja2 sample (for/if/elif), got {} ({complexity:?})",
+        complexity.len()
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Groovy / Elixir / Haskell live grammar tests (use ~/.config/normalize/grammars/)
 // ---------------------------------------------------------------------------
 

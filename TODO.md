@@ -384,8 +384,8 @@ Imports query (`jinja2.imports.scm`) updated to use named node types with `path:
   on crates.io (`tree-sitter-jinja2` name is taken — pick another), then replace
   `arborium-jinja2 = "*"` in `normalize-grammars/Cargo.toml`. Until then the local
   `grammars/jinja2/` + `find_local_grammars()` in xtask is sufficient.
-- Add `jinja2.tags.scm` (macro_statement → function symbols)
-- Add `jinja2.complexity.scm` (for/if/elif/else → complexity)
+- ~~Add `jinja2.tags.scm` (macro_statement → function symbols)~~ — DONE
+- ~~Add `jinja2.complexity.scm` (for/if/elif/else → complexity)~~ — DONE
 
 ### normalize-manifest: eval-backed parsing (`eval` feature gate)
 

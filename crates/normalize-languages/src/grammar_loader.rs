@@ -578,6 +578,7 @@ fn bundled_tags_query(name: &str) -> Option<&'static str> {
         "vhdl" => Some(include_str!("queries/vhdl.tags.scm")),
         "vim" => Some(include_str!("queries/vim.tags.scm")),
         "vue" => Some(include_str!("queries/vue.tags.scm")),
+        "jinja2" => Some(include_str!("queries/jinja2.tags.scm")),
         _ => None,
     }
 }
@@ -668,6 +669,7 @@ fn bundled_complexity_query(name: &str) -> Option<&'static str> {
         "vue" => Some(include_str!("queries/vue.complexity.scm")),
         "batch" => Some(include_str!("queries/batch.complexity.scm")),
         "thrift" => Some(include_str!("queries/thrift.complexity.scm")),
+        "jinja2" => Some(include_str!("queries/jinja2.complexity.scm")),
         _ => None,
     }
 }
