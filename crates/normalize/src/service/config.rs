@@ -27,11 +27,12 @@ pub struct ConfigShowReport {
 
 impl OutputFormatter for ConfigShowReport {
     fn format_text(&self) -> String {
-        let section_path: Vec<&str> = self
+        let section_path: Vec<String> = self
             .section
             .as_deref()
-            .map(|s| s.split('.').collect())
+            .map(parse_section_path)
             .unwrap_or_default();
+        let section_path_refs: Vec<&str> = section_path.iter().map(String::as_str).collect();
 
         let mut out = format!("# Config: {}", self.config_path);
         if let Some(ref sec) = self.section {
@@ -40,17 +41,41 @@ impl OutputFormatter for ConfigShowReport {
         out.push_str("\n\n");
 
         // Navigate schema and content to the requested path
-        let section_schema = navigate_schema(&self.schema, &section_path);
-        let section_content = navigate_json(&self.content, &section_path);
+        let section_schema = navigate_schema(&self.schema, &section_path_refs);
+        let section_content = navigate_json(&self.content, &section_path_refs);
 
         out.push_str(&format_schema_annotated(
             &self.schema,
             section_schema,
             section_content,
-            &section_path,
+            &section_path_refs,
         ));
         out.trim_end().to_string()
     }
+}
+
+/// Parse a dotted section path, handling quoted segments like `rules."rust/unwrap-in-impl"`.
+/// `rules."foo/bar"` → `["rules", "foo/bar"]`; `a.b.c` → `["a", "b", "c"]`.
+fn parse_section_path(s: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut cur = String::new();
+    let mut in_quote = false;
+    for ch in s.chars() {
+        match ch {
+            '"' => in_quote = !in_quote,
+            '.' if !in_quote => {
+                if !cur.is_empty() {
+                    parts.push(cur.clone());
+                    cur.clear();
+                }
+            }
+            c => cur.push(c),
+        }
+    }
+    if !cur.is_empty() {
+        parts.push(cur);
+    }
+    parts
 }
 
 /// Navigate a JSON value along a dotted key path.
@@ -244,6 +269,46 @@ fn format_schema_annotated(
             out.push_str(&format!("# {key} = {default_str}"));
         }
         out.push_str("\n\n");
+    }
+
+    // If the schema has additionalProperties, also enumerate content keys not in `properties`.
+    // This covers dynamic keys like per-rule overrides in [rules."rule-id"] sections.
+    if let (Some(add_schema), Some(content_obj)) = (
+        resolved.get("additionalProperties"),
+        section_content.and_then(|c| c.as_object()),
+    ) {
+        let schema_keys: std::collections::HashSet<&str> =
+            props.keys().map(String::as_str).collect();
+        let _add_resolved = resolve_ref(root_schema, add_schema);
+
+        // Show a header if there are any dynamic entries
+        let dynamic_keys: Vec<(&str, &serde_json::Value)> = content_obj
+            .iter()
+            .filter(|(k, _)| !schema_keys.contains(k.as_str()))
+            .map(|(k, v)| (k.as_str(), v))
+            .collect();
+
+        if !dynamic_keys.is_empty() {
+            // Build the parent path string for section headers
+            let parent_path = section_path.join(".");
+
+            for (key, value) in dynamic_keys {
+                let quoted_key = if key.contains('/') || key.contains('-') || key.contains('.') {
+                    format!("\"{key}\"")
+                } else {
+                    key.to_string()
+                };
+                let section_header = if parent_path.is_empty() {
+                    quoted_key.clone()
+                } else {
+                    format!("{parent_path}.{quoted_key}")
+                };
+                out.push_str(&format!("[{section_header}]\n"));
+                let toml_str = json_to_toml_string(value);
+                out.push_str(toml_str.trim_end());
+                out.push_str("\n\n");
+            }
+        }
     }
 
     out

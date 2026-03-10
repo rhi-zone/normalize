@@ -6,4 +6,4 @@ Root of the normalize library and binary. `main.rs` handles argv[0] dispatch (sy
 
 Recent CLI UX fixes: `view --full` now emits raw file source (was a no-op); `sessions stats --group-by` wired up; `sessions show/analyze` gained `--project` flag; `--only <lang>` bare names now emit a clear error; `analyze complexity/length` support single-file input.
 
-`service/config.rs` — `ConfigService` provides `normalize config schema/show/validate/set`: generic JSON Schema + TOML/JSON/YAML config inspection engine, defaulting to `.normalize/config.toml` + `NormalizeConfig`. Uses `jsonschema` crate for validation, `toml_edit` for typed writes.
+`service/config.rs` — `ConfigService` provides `normalize config schema/show/validate/set`: generic JSON Schema + TOML/JSON/YAML config inspection engine, defaulting to `.normalize/config.toml` + `NormalizeConfig`. Uses `jsonschema` crate for validation, `toml_edit` for typed writes. `show --section rules` now enumerates per-rule overrides from `additionalProperties` content; `--section` supports quoted keys (`rules."rust/unwrap-in-impl"`).

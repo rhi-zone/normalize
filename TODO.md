@@ -304,8 +304,8 @@ Pattern: traits are the extensibility mechanism. Users implement traits in their
 ### CLI Internal Consolidation
 
 **Top-level command level issues (low priority):**
-- `history` is at the wrong level: shadow edit history is a feature of `edit`, not a
-  standalone concept. Should be `normalize edit history [list|diff|status|tree|prune]`.
+- ~~`history` is at the wrong level: shadow edit history is a feature of `edit`, not a
+  standalone concept. Should be `normalize edit history [list|diff|status|tree|prune]`.~~ — DONE (already under `normalize edit history`)
 - ~~`analyze rules` is redundant with top-level `normalize rules run`. Should be removed from AnalyzeService.~~ — DONE (2026-03-09). Snapshot and test for the non-existent `analyze rules` subcommand deleted. The command never existed in the service layer; the test was capturing broken fallback behavior.
 - `context` could be `normalize view context [path]` but semantics differ slightly (content-only vs prepend). Low priority.
 - `aliases` is a cross-cutting utility. Too small for top-level but has no clear parent. Low priority.
@@ -320,12 +320,17 @@ Uses `jsonschema` crate for validation, `toml_edit` for typed writes.
 dotted paths (e.g. `analyze.threshold`, `rules."rust/unwrap-in-impl".allow`) including
 `additionalProperties` entries. Array item types rendered as `array of string`.
 
+**Improvements (2026-03-10):**
+- `--section 'rules."rust/unwrap-in-impl"'` now works (quoted key parsing fixed)
+- `normalize config show --section rules` now shows per-rule overrides from `additionalProperties` content
+- `normalize rules show-config` deleted — fully superseded — DONE
+
 **Awaiting feedback before closing:**
 - Is the `show` output format useful? Too verbose? Should unset fields be hidden by default?
 - Should `config set` validate before writing (blocking on schema errors, not just warnings)?
 
 **Remaining follow-ups:**
-- `normalize rules show-config` and `normalize rules validate` still exist; delete when superseded
+- `normalize rules validate` still exists; has unique rule-ID validation not in `config validate`
 - Extract engine into `normalize-config-ui` crate for reuse / publication (stretch goal)
 - Propose `#[config]` proc macro to server-less (stretch goal — superseded by `#[derive(Config)]`;
   filed nested struct support + merge semantics requests in server-less TODO.md 2026-03-10)
