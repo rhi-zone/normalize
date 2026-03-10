@@ -3730,7 +3730,6 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "server-less",
- "server-less-core",
  "similar",
  "smallvec",
  "streaming-iterator",
@@ -5341,7 +5340,7 @@ dependencies = [
 
 [[package]]
 name = "server-less"
-version = "0.4.1-alpha.3"
+version = "0.4.1-alpha.4"
 dependencies = [
  "clap",
  "serde",
@@ -5353,7 +5352,7 @@ dependencies = [
 
 [[package]]
 name = "server-less-core"
-version = "0.4.1-alpha.3"
+version = "0.4.1-alpha.4"
 dependencies = [
  "clap",
  "futures-core",
@@ -5370,7 +5369,7 @@ dependencies = [
 
 [[package]]
 name = "server-less-macros"
-version = "0.4.1-alpha.3"
+version = "0.4.1-alpha.4"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -5382,7 +5381,7 @@ dependencies = [
 
 [[package]]
 name = "server-less-parse"
-version = "0.4.1-alpha.3"
+version = "0.4.1-alpha.4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5391,7 +5390,7 @@ dependencies = [
 
 [[package]]
 name = "server-less-rpc"
-version = "0.4.1-alpha.3"
+version = "0.4.1-alpha.4"
 dependencies = [
  "proc-macro2",
  "quote",
