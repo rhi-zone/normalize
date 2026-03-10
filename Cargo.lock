@@ -4287,22 +4287,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "normalize-view"
-version = "0.1.0"
-dependencies = [
- "ignore",
- "normalize-facts",
- "normalize-facts-core",
- "normalize-languages",
- "nu-ansi-term",
- "schemars",
- "serde",
- "streaming-iterator",
- "tempfile",
- "tree-sitter",
-]
-
-[[package]]
 name = "notify"
 version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

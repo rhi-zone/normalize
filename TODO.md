@@ -335,12 +335,10 @@ dotted paths (e.g. `analyze.threshold`, `rules."rust/unwrap-in-impl".allow`) inc
 - Propose `#[config]` proc macro to server-less (stretch goal — superseded by `#[derive(Config)]`;
   filed nested struct support + merge semantics requests in server-less TODO.md 2026-03-10)
 
-### normalize-view zombie crate
-`normalize-view` was "folded into" `normalize` (skeleton.rs + tree.rs copied to main crate) but
-the `normalize-view` crate body was never removed. No crate depends on it. `tree.rs`/`skeleton.rs`
-in both crates differ only in comment wording (1501 + 621 duplicate lines flagged by `analyze duplicates --scope blocks`).
-- Options: (a) mark `publish = false` + deprecation notice, (b) make it a re-export wrapper, (c) delete
-- Pre-requisite: check crates.io for any dependents before deleting
+### ~~normalize-view zombie crate~~ — DELETED (2026-03-10)
+`normalize-view` removed from workspace and source deleted. tree.rs + skeleton.rs live in
+`normalize/src/`. Published v0.1.0 remains on crates.io (can't be deleted) but no crates
+depend on it. Removed `crates/normalize-view` from workspace Cargo.toml.
 
 ### Rust Redesign Candidates
 - Rules engine: consider semgrep/ruff integration instead of custom

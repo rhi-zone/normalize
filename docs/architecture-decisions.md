@@ -41,7 +41,7 @@ crates/
 ├── normalize-language-meta/           # Language metadata (extensions, names)
 ├── normalize-grammars/                # Tree-sitter grammar loading (publish=false)
 │
-├── normalize-view/                    # View command logic
+
 ├── normalize-edit/                    # Edit command logic
 ├── normalize-shadow/                  # Shadow git (edit history)
 ├── normalize-filter/                  # --exclude/--only filtering
