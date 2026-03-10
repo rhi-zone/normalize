@@ -380,9 +380,10 @@ types: `extends_statement`, `import_statement`, `from_statement`, `include_state
 Imports query (`jinja2.imports.scm`) updated to use named node types with `path:` field.
 
 **Remaining**:
-- Publish as our own crate (e.g. `tree-sitter-jinja2` on crates.io) — arborium vendors
-  their own grammars, we publish separately. Update `normalize-grammars` to depend on
-  the new crate instead of `arborium-jinja2`.
+- **Low priority / deferred until ecosystem publish**: publish grammar as our own crate
+  on crates.io (`tree-sitter-jinja2` name is taken — pick another), then replace
+  `arborium-jinja2 = "*"` in `normalize-grammars/Cargo.toml`. Until then the local
+  `grammars/jinja2/` + `find_local_grammars()` in xtask is sufficient.
 - Add `jinja2.tags.scm` (macro_statement → function symbols)
 - Add `jinja2.complexity.scm` (for/if/elif/else → complexity)
 
