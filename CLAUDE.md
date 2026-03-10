@@ -17,7 +17,7 @@ Behavioral rules for Claude Code in this repository.
 2. Add a `display_<name>` method and a `pub fn <name>` method to `service/analyze.rs` using `#[cli(display_with = "display_<name>")]`
 3. Add the module to `commands/analyze/mod.rs`
 4. Add `assert_output_formatter::<Report>()` in `output.rs` test
-5. Optionally add to `args.rs` `AnalyzeCommand` enum + dispatch in `mod.rs::run()` (for params-json/schema support)
+5. params-json/schema support is automatic via server-less — no `args.rs` changes needed
 
 Pattern for service methods:
 ```rust

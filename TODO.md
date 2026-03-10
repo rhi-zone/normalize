@@ -330,7 +330,7 @@ dotted paths (e.g. `analyze.threshold`, `rules."rust/unwrap-in-impl".allow`) inc
 - ~~Should `config set` validate before writing (blocking on schema errors, not just warnings)?~~ — DONE (2026-03-10). `config set` now blocks on schema errors; `--force` bypasses; `--dry-run` shows errors without writing.
 
 **Remaining follow-ups:**
-- `normalize rules validate` still exists; has unique rule-ID validation not in `config validate`
+- `normalize rules validate` intentionally separate: rule-ID validation (checks against live registry) can't be expressed in JSON Schema. Not redundant with `config validate` — they check different things.
 - Extract engine into `normalize-config-ui` crate for reuse / publication (stretch goal)
 - Propose `#[config]` proc macro to server-less (stretch goal — superseded by `#[derive(Config)]`;
   filed nested struct support + merge semantics requests in server-less TODO.md 2026-03-10)
@@ -861,11 +861,8 @@ that applies before per-rule allow lists. Alternatively: pre-commit hook should 
 ### normalize-languages: query fixture failures — DONE (2026-03-09)
 ~~67 pre-existing failing tests (query files referencing node kinds that no longer exist in the grammar)~~. All 39 targeted failures fixed: corrected node types/fields across 35+ `.scm` files and 7 `.rs` audit lists; 4 zsh tests skip gracefully due to broken zsh grammar (parser produces ERROR nodes for all common syntax); 260/260 query fixture tests now pass. The remaining 38 pre-existing clippy errors in `query_fixtures.rs` (useless length comparisons) are pre-existing and unrelated.
 
-### normalize-languages: ast-grep test broken
-The `ast_grep::tests::test_pattern_matching` test fails to compile due to API mismatch:
-- `DynLang.parse()` method not found
-- `ast_grep_core::tree_sitter::LanguageExt` trait may need explicit import or implementation
-- Pre-existing issue, not caused by feature flag changes
+### ~~normalize-languages: ast-grep test broken~~ — FIXED (2026-03-10)
+`ast_grep::tests::test_pattern_matching` now passes (`cargo test -p normalize-languages` clean).
 
 ## Long-Term Goals
 
