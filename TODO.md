@@ -541,8 +541,9 @@ language that silently returns empty is misleading users who expect analysis and
       missing `using System.Collections.Generic;`). Test assertion strengthened. C and C++ had no
       `test_file_globs()` — added common patterns (`test_*.c`, `*_test.cpp`, etc.). Ruby audited:
       imports via query (5 forms: require/require_relative/include/extend/prepend), all comprehensive.
-      C and C++ have no visibility detection (genuinely complex: access specifier sections in class
-      body, not per-member modifiers). C++20 `import` modules not captured (only `#include`).
+      C++ `get_visibility()` implemented via `access_specifier` sibling traversal (class defaults
+      private, struct defaults public). Swift `extract_docstring()` added for `///` and `/** */`.
+      C++20 `import` modules not captured (only `#include`) — genuine limitation, deferred.
 
 **Comprehensive language fixtures** (long-term, verification via nix flakes):
 Goal: for every language we support, a test suite that exercises the full extraction pipeline

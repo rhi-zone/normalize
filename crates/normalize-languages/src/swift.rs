@@ -39,6 +39,62 @@ impl Language for Swift {
         " {}"
     }
 
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        // Swift doc comments use triple-slash `///` lines or `/** */` blocks.
+        let mut doc_lines: Vec<String> = Vec::new();
+        let mut prev = node.prev_sibling();
+
+        while let Some(sibling) = prev {
+            match sibling.kind() {
+                "comment" => {
+                    let text = &content[sibling.byte_range()];
+                    if text.starts_with("///") {
+                        let line = text.strip_prefix("///").unwrap_or("").trim().to_string();
+                        doc_lines.push(line);
+                    } else {
+                        break;
+                    }
+                }
+                "multiline_comment" => {
+                    let text = &content[sibling.byte_range()];
+                    if text.starts_with("/**") {
+                        let lines: Vec<&str> = text
+                            .strip_prefix("/**")
+                            .unwrap_or(text)
+                            .strip_suffix("*/")
+                            .unwrap_or(text)
+                            .lines()
+                            .map(|l| l.trim().strip_prefix('*').unwrap_or(l).trim())
+                            .filter(|l| !l.is_empty())
+                            .collect();
+                        if lines.is_empty() {
+                            return None;
+                        }
+                        return Some(lines.join(" "));
+                    }
+                    break;
+                }
+                "attribute" => {
+                    // Skip attributes between doc comment and declaration
+                }
+                _ => break,
+            }
+            prev = sibling.prev_sibling();
+        }
+
+        if doc_lines.is_empty() {
+            return None;
+        }
+        doc_lines.reverse();
+        let joined = doc_lines.join(" ");
+        let trimmed = joined.trim().to_string();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
+    }
+
     fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
         let mut attrs = Vec::new();
         if let Some(mods) = node.child_by_field_name("modifiers") {

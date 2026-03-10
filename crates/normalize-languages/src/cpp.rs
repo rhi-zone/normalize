@@ -1,6 +1,6 @@
 //! C++ language support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
 /// C++ language support.
@@ -163,6 +163,36 @@ impl Language for Cpp {
         inner_indent: &str,
     ) -> Option<ContainerBody> {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
+    }
+
+    fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
+        // C++ visibility is determined by the most recent access_specifier in the enclosing
+        // class body. Classes default to private, structs to public.
+        // Walk backward through siblings to find the nearest access_specifier.
+        let mut prev = node.prev_sibling();
+        while let Some(sibling) = prev {
+            if sibling.kind() == "access_specifier" {
+                let spec = content[sibling.byte_range()].trim().trim_end_matches(':');
+                return match spec {
+                    "public" => Visibility::Public,
+                    "protected" => Visibility::Protected,
+                    "private" => Visibility::Private,
+                    _ => Visibility::Public,
+                };
+            }
+            prev = sibling.prev_sibling();
+        }
+        // No access_specifier found: check if parent is struct (public) or class (private).
+        // If we can't determine, default to Public (safe for analysis).
+        if node
+            .parent()
+            .and_then(|p| p.parent())
+            .map(|g| g.kind() == "class_specifier")
+            .unwrap_or(false)
+        {
+            return Visibility::Private;
+        }
+        Visibility::Public
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
