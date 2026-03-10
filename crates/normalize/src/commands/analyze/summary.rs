@@ -112,6 +112,18 @@ async fn try_architecture(root: &Path) -> Option<ArchStats> {
     Some(extract_arch_stats(&report))
 }
 
+fn breakdown_rows(b: &crate::health::HealthScoreBreakdown) -> Vec<(&'static str, f64, &str)> {
+    vec![
+        ("complexity", b.complexity, &b.complexity_reason),
+        ("risk", b.risk, &b.risk_reason),
+        ("file sizes", b.file_size, &b.file_size_reason),
+        ("test ratio", b.test_coverage, &b.test_coverage_reason),
+        ("ceremony", b.ceremony, &b.ceremony_reason),
+        ("duplicates", b.duplicates, &b.duplicates_reason),
+        ("uniqueness", b.uniqueness, &b.uniqueness_reason),
+    ]
+}
+
 fn human_lines(n: usize) -> String {
     if n >= 1_000_000 {
         format!("{:.1}M", n as f64 / 1_000_000.0)
@@ -160,36 +172,7 @@ impl OutputFormatter for SummaryReport {
         // Health breakdown
         out.push(String::new());
         out.push("## Health Breakdown".to_string());
-        let rows: &[(&str, f64, &str)] = &[
-            (
-                "complexity",
-                breakdown.complexity,
-                &breakdown.complexity_reason,
-            ),
-            ("risk", breakdown.risk, &breakdown.risk_reason),
-            (
-                "file sizes",
-                breakdown.file_size,
-                &breakdown.file_size_reason,
-            ),
-            (
-                "test ratio",
-                breakdown.test_coverage,
-                &breakdown.test_coverage_reason,
-            ),
-            ("ceremony", breakdown.ceremony, &breakdown.ceremony_reason),
-            (
-                "duplicates",
-                breakdown.duplicates,
-                &breakdown.duplicates_reason,
-            ),
-            (
-                "uniqueness",
-                breakdown.uniqueness,
-                &breakdown.uniqueness_reason,
-            ),
-        ];
-        for (label, score, reason) in rows {
+        for (label, score, reason) in breakdown_rows(&breakdown) {
             out.push(format!("  {:<12} {:.0}%  {}", label, score * 100.0, reason));
         }
 
@@ -275,43 +258,14 @@ impl OutputFormatter for SummaryReport {
             }
         };
         const LW: usize = 12;
-        let rows: &[(&str, f64, &str)] = &[
-            (
-                "complexity",
-                breakdown.complexity,
-                &breakdown.complexity_reason,
-            ),
-            ("risk", breakdown.risk, &breakdown.risk_reason),
-            (
-                "file sizes",
-                breakdown.file_size,
-                &breakdown.file_size_reason,
-            ),
-            (
-                "test ratio",
-                breakdown.test_coverage,
-                &breakdown.test_coverage_reason,
-            ),
-            ("ceremony", breakdown.ceremony, &breakdown.ceremony_reason),
-            (
-                "duplicates",
-                breakdown.duplicates,
-                &breakdown.duplicates_reason,
-            ),
-            (
-                "uniqueness",
-                breakdown.uniqueness,
-                &breakdown.uniqueness_reason,
-            ),
-        ];
-        for (label, score, reason) in rows {
-            let c = score_color(*score);
+        for (label, score, reason) in breakdown_rows(&breakdown) {
+            let c = score_color(score);
             out.push(format!(
                 "  {}  {}  {}  {}",
                 Style::new().dimmed().paint(format!("{:<LW$}", label)),
-                c.paint(progress_bar(*score, 12)),
+                c.paint(progress_bar(score, 12)),
                 c.paint(format!("{:.0}%", score * 100.0)),
-                Style::new().dimmed().paint(*reason),
+                Style::new().dimmed().paint(reason),
             ));
         }
 

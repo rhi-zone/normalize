@@ -1473,3 +1473,20 @@ crates/normalize-languages/src/grammar_loader.rs:751-824
 # glsl + hlsl locals.scm: identical C-like scoping rules — parallel per-grammar files
 queries/glsl.locals.scm:1-46
 queries/hlsl.locals.scm:1-46
+# valibot/zod: parallel schema library output generators — intentionally parallel
+crates/normalize-typegen/src/output/valibot.rs:102-164
+crates/normalize-typegen/src/output/zod.rs:62-124
+# freebsd/void: identical PackageIndex trait implementation boilerplate — strings differ only
+crates/normalize-package-index/src/index/freebsd.rs:290-351
+crates/normalize-package-index/src/index/void.rs:365-426
+# artix/manjaro: identical parse_db decompression — parse_desc diverges (kept separate)
+crates/normalize-package-index/src/index/artix.rs:245-282
+crates/normalize-package-index/src/index/manjaro.rs:240-277
+# svelte/vue test fixtures: sample component files with inherently similar structure
+crates/normalize-languages/tests/fixtures/svelte/sample.svelte:1-33
+crates/normalize-languages/tests/fixtures/svelte/sample.svelte:35-56
+crates/normalize-languages/tests/fixtures/vue/sample.vue:21-60
+crates/normalize-languages/tests/fixtures/vue/sample.vue:62-84
+# cli-parser click/commander: parallel format parsers with same CLI pattern structure
+crates/normalize-cli-parser/src/formats/click.rs:22-51
+crates/normalize-cli-parser/src/formats/commander.rs:22-51

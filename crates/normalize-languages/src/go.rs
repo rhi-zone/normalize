@@ -1,5 +1,6 @@
 //! Go language support.
 
+use crate::docstring::extract_preceding_prefix_comments;
 use crate::{ContainerBody, Import, Language, Visibility};
 use tree_sitter::Node;
 
@@ -22,35 +23,7 @@ impl Language for Go {
     }
 
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
-        let mut doc_lines: Vec<String> = Vec::new();
-        let mut prev = node.prev_sibling();
-
-        while let Some(sibling) = prev {
-            if sibling.kind() == "comment" {
-                let text = &content[sibling.byte_range()];
-                if let Some(line) = text.strip_prefix("//") {
-                    let line = line.strip_prefix(' ').unwrap_or(line);
-                    doc_lines.push(line.to_string());
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
-            prev = sibling.prev_sibling();
-        }
-
-        if doc_lines.is_empty() {
-            return None;
-        }
-
-        doc_lines.reverse();
-        let joined = doc_lines.join("\n").trim().to_string();
-        if joined.is_empty() {
-            None
-        } else {
-            Some(joined)
-        }
+        extract_preceding_prefix_comments(node, content, "//")
     }
 
     fn build_signature(&self, node: &Node, content: &str) -> String {
