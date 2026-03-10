@@ -41,6 +41,8 @@ pub fn foo(&self, root: Option<String>, limit: Option<usize>, pretty: bool, comp
 
 **Generally useful functionality belongs in its own crate, not `normalize`.** The main crate is for CLI wiring (service layer, command dispatch, output formatting). The test: would anything other than one CLI command want this — another command, the LSP server, an external tool, a future library consumer? If yes, it belongs in a domain crate (`normalize-facts`, `normalize-session-analysis`, etc.). If it's purely "compute something and format it for this one command", it can stay in `commands/`. The `normalize` binary is a consumer of the ecosystem, not a home for reusable logic.
 
+**Don't create new crates when an existing one fits.** Before adding a new crate, check whether the code belongs in `normalize-architecture`, `normalize-facts`, `normalize-graph`, etc. New crates add published surface; prefer extending an existing crate. Only create a new crate when the domain is clearly distinct from all existing ones AND there is a real second consumer today (not hypothetical).
+
 **Language vs LocalDeps traits:** Two separate traits, two separate crates, no cross-dependency.
 - `Language` (`normalize-languages`): Syntax/AST extraction — symbols, imports, exports, complexity. Implemented by ~98 languages. All methods are required (no defaults). Adding a language = implement this trait.
 - `LocalDeps` (`normalize-local-deps`): Filesystem/package discovery — resolve imports, find installed packages, index external deps. Implemented by ~10 ecosystems. All methods have defaults (opt-in overrides). Adding package support = implement this trait.
