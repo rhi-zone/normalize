@@ -639,7 +639,9 @@ Trigger: split a capability when >50% of languages would return stubs. `has_symb
 - [x] Add `as_symbols()` query method to `Language` with `None` default; `LanguageSymbols` marker trait; 91 programming languages implement it; 6 config languages (CSS/HTML/JSON/TOML/XML/YAML) don't — DONE (2026-03-11)
 - [x] Migrate call sites (`ceremony.rs`, `docs.rs`, `search.rs`) to use `as_symbols().is_some()` — DONE (2026-03-11)
 - [x] Remove `has_symbols()` — DONE (2026-03-11)
-- [ ] Add `as_imports()`, `as_complexity()`, `as_edit()` capability queries — not ready yet. Sparsity check (2026-03-11): `extract_imports` is empty in ~29% of languages (below 50% threshold). Most "empty" cases are data/config/markup languages or languages covered by `.imports.scm` query files. True gaps: HTML (`<script src>`, `<link href>`), Jinja2 (minimal grammar — no structured nodes), AWK (`@include` GAWK-only), Batch (no import system). CSS and GLSL gaps CLOSED (2026-03-11) via `css.imports.scm` and `glsl.imports.scm`.
+- [ ] Add `as_imports()`, `as_complexity()`, `as_edit()` capability queries — not ready yet. Sparsity check (2026-03-11): `extract_imports` is empty in ~29% of languages (below 50% threshold). Most "empty" cases are data/config/markup languages or languages covered by `.imports.scm` query files. True gaps (remaining): AWK (`@include` GAWK-only — defer), Batch (no import system — skip). Closed: CSS, GLSL, HTML, Jinja2 via `.imports.scm` (2026-03-11).
+  - **Jinja2 grammar note**: The `arborium-jinja2` grammar does have structured nodes (`statement`, `keyword`, `string`) and `.imports.scm` extraction works. However the grammar is minimal — `keyword` is a flat named node (no subtypes), and `statement` has no specialised child types for different statement kinds. If richer analysis (macro definitions, filter introspection) is ever needed, a more capable grammar would be required.
+  - **Future grammar work**: Consider writing a richer Jinja2 grammar (or contributing to upstream) that models `extends_statement`, `import_statement`, `include_statement` as distinct named types rather than a generic `statement + keyword` combo.
 
 ### normalize-typegen
 
