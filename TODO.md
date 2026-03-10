@@ -382,7 +382,7 @@ This is workable for import extraction (`.imports.scm` uses `#eq?` on the keywor
 
 **What we want**: a grammar that models `extends_statement`, `import_statement`, `include_statement`, `block_statement`, `macro_statement`, `for_statement`, `if_statement` as distinct named node types, each with properly typed fields (e.g. `path:`, `name:`, `condition:`).
 
-**Approach**: write a new grammar from scratch. The upstream `tree-sitter-jinja2` README explicitly says it is "highly simplified and incomplete" and "primarily intended to support dbt-extractor" — it is not a general-purpose grammar and upstream intent is not to make it one. A PR upstream would be wasted effort.
+**Approach**: write a new grammar from scratch. The upstream `tree-sitter-jinja2` README explicitly says it is "highly simplified and incomplete" and "primarily intended to support dbt-extractor". A structured contribution upstream is worth considering for community benefit, but shouldn't block us — the design we need (distinct named node types per statement kind) is a significant structural departure from the current grammar, and iteration speed matters.
 
 **Scope**: Jinja2 is widely used (Django templates, Ansible, Flask, cookiecutter, etc.). A proper grammar is worth writing. Publish via arborium once complete.
 
