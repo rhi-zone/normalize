@@ -6,4 +6,4 @@ Service methods call underlying domain functions directly (not `cmd_*` wrappers 
 
 `AnalyzeService::check` has been removed — documentation health checks (`check-refs`, `stale-docs`, `check-examples`, `stale-summary`) are now exposed exclusively via `normalize rules run --engine native`. Use `normalize rules run --rule <id>` to run a specific check.
 
-`config.rs` — `ConfigService` provides `normalize config schema/show/validate/set`: generic JSON Schema + TOML/JSON/YAML engine defaulting to `.normalize/config.toml` + `NormalizeConfig` schema.
+`config.rs` — `ConfigService` provides `normalize config schema/show/validate/set`: generic JSON Schema + TOML/JSON/YAML engine. `show --set-only` hides unset fields; `set` blocks on schema errors (use `--force` to bypass). `analyze.rs` — `duplicates --scope blocks` now defaults to `elide_literals=true`; use `--no-elide-literals` to opt out. Updated 2026-03-10.

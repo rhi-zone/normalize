@@ -1126,7 +1126,12 @@ impl AnalyzeService {
         #[param(help = "Detection mode: exact (default), similar (fuzzy), or clusters")]
         mode: Option<DuplicateMode>,
         #[param(help = "Elide identifier names when comparing")] elide_identifiers: bool,
-        #[param(help = "Elide literal values when comparing")] elide_literals: bool,
+        #[param(help = "Elide literal values when comparing (default: true for blocks scope)")]
+        elide_literals: bool,
+        #[param(
+            help = "Keep literal values distinct when comparing (blocks scope: opt out of default elision)"
+        )]
+        no_elide_literals: bool,
         #[param(help = "Show source code for matches")] show_source: bool,
         #[param(help = "Minimum lines to be considered")] min_lines: Option<usize>,
         #[param(help = "Include groups where all items share the same name")]
@@ -1156,6 +1161,13 @@ impl AnalyzeService {
         let scope = scope.unwrap_or(DuplicateScope::Functions);
         let mode = mode.unwrap_or(DuplicateMode::Exact);
         let filter = Self::build_filter(&root_path, &exclude, &only);
+
+        // Blocks scope defaults to eliding literals (structurally-identical blocks that differ
+        // only in literal values are real duplication). Use --no-elide-literals to opt out.
+        let elide_literals = match scope {
+            DuplicateScope::Blocks => !no_elide_literals,
+            _ => elide_literals,
+        };
 
         match (mode, scope) {
             (DuplicateMode::Exact, DuplicateScope::Functions) => {
