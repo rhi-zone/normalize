@@ -143,7 +143,13 @@ jobs:
           # --min-lines 15: Functions under 15 lines are often simple patterns
           # (constructors, getters, trait impls) where duplication is acceptable.
           # Above 15 lines usually indicates extractable shared logic.
-          ./target/release/normalize analyze duplicate-functions --min-lines 15
+          ./target/release/normalize analyze duplicates --scope functions --min-lines 15
+
+          # --scope blocks: catch duplicated logic blocks (e.g., repeated match arms,
+          # copy-pasted error handling). Default elide-literals=true catches structural
+          # duplicates that differ only in string/number literals.
+          ./target/release/normalize analyze duplicates --scope blocks --min-lines 15 \
+            --exclude '**/*.json' --exclude '**/*.lock'
 
           # --min-overlap 90: Overlap = common_fields / smaller_type_fields.
           # Small types (e.g., Position{line,column}) match any type with those
@@ -156,7 +162,7 @@ jobs:
       - name: Check syntax rules
         run: |
           # Dogfood our own rules - tuple returns should use named structs
-          ./target/release/normalize analyze rules --rule rust/tuple-return crates/
+          ./target/release/normalize rules run --rule rust/tuple-return crates/
         env:
           NORMALIZE_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
 

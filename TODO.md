@@ -839,7 +839,7 @@ entries from `rust/tuple-return`, `no-grammar-loader-new`, `rust/chained-if-let`
 `rust/numeric-type-annotation`. The `global-allow` pattern IS the global exclude mechanism.
 
 ### CI/Infrastructure
-- [ ] Wire `normalize analyze duplicate-blocks --exclude '**/*.json' --exclude '**/*.lock'` into CI
+- [x] Wire `normalize analyze duplicates --scope blocks` into CI — DONE (2026-03-10). Also fixed stale `duplicate-functions` → `duplicates --scope functions` and `analyze rules` → `rules run` command references.
 
 ### Distribution
 - Wrapper packages for ecosystems: npm, PyPI, Homebrew, etc.
