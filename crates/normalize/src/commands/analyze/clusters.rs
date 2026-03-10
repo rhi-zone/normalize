@@ -39,28 +39,28 @@ pub struct FunctionCluster {
     pub pair_count: usize,
 }
 
-/// Union-Find for grouping functions into connected components.
-struct UnionFind {
+/// Union-Find for grouping elements into connected components.
+pub(crate) struct UnionFind {
     parent: Vec<usize>,
     rank: Vec<usize>,
 }
 
 impl UnionFind {
-    fn new(n: usize) -> Self {
+    pub(crate) fn new(n: usize) -> Self {
         Self {
             parent: (0..n).collect(),
             rank: vec![0; n],
         }
     }
 
-    fn find(&mut self, x: usize) -> usize {
+    pub(crate) fn find(&mut self, x: usize) -> usize {
         if self.parent[x] != x {
             self.parent[x] = self.find(self.parent[x]);
         }
         self.parent[x]
     }
 
-    fn union(&mut self, x: usize, y: usize) {
+    pub(crate) fn union(&mut self, x: usize, y: usize) {
         let rx = self.find(x);
         let ry = self.find(y);
         if rx == ry {

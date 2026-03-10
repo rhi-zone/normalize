@@ -37,6 +37,7 @@
 pub mod ast_grep;
 mod body;
 mod component;
+mod docstring;
 pub mod ecmascript;
 pub mod external_packages;
 pub mod ffi;

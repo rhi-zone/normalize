@@ -6,21 +6,19 @@
 use crate::ContainerBody;
 use tree_sitter::Node;
 
-/// Analyze a brace-delimited container body (`{ ... }`).
-///
-/// Expects `body_node` to span from `{` to `}` inclusive (as is standard in
-/// tree-sitter grammars for C-family and similar languages).
-pub(crate) fn analyze_brace_body(
+fn analyze_delimited_body(
     body_node: &Node,
     content: &str,
     inner_indent: &str,
+    open: u8,
+    close: u8,
 ) -> Option<ContainerBody> {
     let body_start = body_node.start_byte();
     let body_end = body_node.end_byte();
 
     let mut content_start = body_start;
     for (i, byte) in content[body_start..body_end].bytes().enumerate() {
-        if byte == b'{' {
+        if byte == open {
             content_start = body_start + i + 1;
             while content_start < body_end {
                 let b = content.as_bytes()[content_start];
@@ -39,7 +37,7 @@ pub(crate) fn analyze_brace_body(
 
     let mut content_end = body_end;
     for (i, byte) in content[body_start..body_end].bytes().rev().enumerate() {
-        if byte == b'}' {
+        if byte == close {
             content_end = body_end - i - 1;
             while content_end > content_start && content.as_bytes()[content_end - 1] == b' ' {
                 content_end -= 1;
@@ -56,6 +54,18 @@ pub(crate) fn analyze_brace_body(
         inner_indent: inner_indent.to_string(),
         is_empty,
     })
+}
+
+/// Analyze a brace-delimited container body (`{ ... }`).
+///
+/// Expects `body_node` to span from `{` to `}` inclusive (as is standard in
+/// tree-sitter grammars for C-family and similar languages).
+pub(crate) fn analyze_brace_body(
+    body_node: &Node,
+    content: &str,
+    inner_indent: &str,
+) -> Option<ContainerBody> {
+    analyze_delimited_body(body_node, content, inner_indent, b'{', b'}')
 }
 
 /// Analyze a container body with no surrounding delimiters.
@@ -96,47 +106,7 @@ pub(crate) fn analyze_paren_body(
     content: &str,
     inner_indent: &str,
 ) -> Option<ContainerBody> {
-    let body_start = body_node.start_byte();
-    let body_end = body_node.end_byte();
-
-    let mut content_start = body_start;
-    for (i, byte) in content[body_start..body_end].bytes().enumerate() {
-        if byte == b'(' {
-            content_start = body_start + i + 1;
-            while content_start < body_end {
-                let b = content.as_bytes()[content_start];
-                if b == b'\n' {
-                    content_start += 1;
-                    break;
-                } else if b.is_ascii_whitespace() {
-                    content_start += 1;
-                } else {
-                    break;
-                }
-            }
-            break;
-        }
-    }
-
-    let mut content_end = body_end;
-    for (i, byte) in content[body_start..body_end].bytes().rev().enumerate() {
-        if byte == b')' {
-            content_end = body_end - i - 1;
-            while content_end > content_start && content.as_bytes()[content_end - 1] == b' ' {
-                content_end -= 1;
-            }
-            break;
-        }
-    }
-
-    let is_empty = content[content_start..content_end].trim().is_empty();
-
-    Some(ContainerBody {
-        content_start,
-        content_end,
-        inner_indent: inner_indent.to_string(),
-        is_empty,
-    })
+    analyze_delimited_body(body_node, content, inner_indent, b'(', b')')
 }
 
 /// Analyze a body delimited by `is`/`begin` ... `end` (Ada, VHDL style).
