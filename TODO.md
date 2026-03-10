@@ -326,7 +326,7 @@ dotted paths (e.g. `analyze.threshold`, `rules."rust/unwrap-in-impl".allow`) inc
 - `normalize rules show-config` deleted — fully superseded — DONE
 
 **Awaiting feedback before closing:**
-- Is the `show` output format useful? Too verbose? Should unset fields be hidden by default?
+- Is the `show` output format useful? Too verbose? ~~Should unset fields be hidden by default?~~ — DONE (2026-03-10): `--set-only` flag added to hide unset fields.
 - ~~Should `config set` validate before writing (blocking on schema errors, not just warnings)?~~ — DONE (2026-03-10). `config set` now blocks on schema errors; `--force` bypasses; `--dry-run` shows errors without writing.
 
 **Remaining follow-ups:**

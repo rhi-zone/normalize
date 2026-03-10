@@ -19,6 +19,10 @@ pub struct ConfigShowReport {
     pub section: Option<String>,
     /// Current config values (the file content).
     pub content: serde_json::Value,
+    /// If true, only show fields that have a value set in the config file.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub set_only: bool,
     /// Full JSON Schema — skipped from JSON output, used for annotated rendering.
     #[serde(skip)]
     #[schemars(skip)]
@@ -49,6 +53,7 @@ impl OutputFormatter for ConfigShowReport {
             section_schema,
             section_content,
             &section_path_refs,
+            self.set_only,
         ));
         out.trim_end().to_string()
     }
@@ -182,12 +187,13 @@ fn json_val_inline(v: &serde_json::Value) -> String {
 }
 
 /// Render a schema section with current values annotated by schema descriptions.
-/// Shows ALL schema properties, not just what's set in the file.
+/// If `set_only` is true, unset fields are omitted; otherwise all schema properties are shown.
 fn format_schema_annotated(
     root_schema: &serde_json::Value,
     section_schema: Option<&serde_json::Value>,
     section_content: Option<&serde_json::Value>,
     section_path: &[&str],
+    set_only: bool,
 ) -> String {
     let Some(schema) = section_schema else {
         // No schema for this path — fall back to raw content as TOML
@@ -244,31 +250,39 @@ fn format_schema_annotated(
 
     for (key, prop_schema) in props {
         let prop_resolved = resolve_ref(root_schema, prop_schema);
+        let current = section_content.and_then(|c| c.get(key));
+        let is_set = current.map(|v| !v.is_null()).unwrap_or(false);
+
+        // Skip unset fields when set_only is active
+        if set_only && !is_set {
+            continue;
+        }
+
+        // Buffer this field so we can append it atomically
+        let mut field_buf = String::new();
 
         // Description
         if let Some(desc) = prop_resolved.get("description").and_then(|d| d.as_str()) {
             for line in desc.lines() {
-                out.push_str(&format!("# {line}\n"));
+                field_buf.push_str(&format!("# {line}\n"));
             }
         }
-
-        let current = section_content.and_then(|c| c.get(key));
-        let is_set = current.map(|v| !v.is_null()).unwrap_or(false);
 
         if is_set {
             let v = current.unwrap();
             // Render as TOML key = value
             let toml_str = json_to_toml_string(&serde_json::json!({ key: v }));
-            out.push_str(toml_str.trim_end());
+            field_buf.push_str(toml_str.trim_end());
         } else {
             // Show default or (unset) as a comment
             let default_str = prop_schema
                 .get("default")
                 .map(json_val_inline)
                 .unwrap_or_else(|| "(unset)".to_string());
-            out.push_str(&format!("# {key} = {default_str}"));
+            field_buf.push_str(&format!("# {key} = {default_str}"));
         }
-        out.push_str("\n\n");
+        field_buf.push_str("\n\n");
+        out.push_str(&field_buf);
     }
 
     // If the schema has additionalProperties, also enumerate content keys not in `properties`.
@@ -586,6 +600,7 @@ impl ConfigService {
 
     /// Show a config file with schema annotations — all available options, with descriptions.
     /// Use --section for a dotted path (e.g. 'analyze', 'analyze.threshold').
+    /// Use --set-only to hide fields that have no value set in the config file.
     #[cli(display_with = "display_show")]
     pub fn show(
         &self,
@@ -601,6 +616,7 @@ impl ConfigService {
             help = "Show a specific section or field (dotted path, e.g. 'analyze', 'analyze.threshold')"
         )]
         section: Option<String>,
+        #[param(help = "Only show fields that have a value set in the config file")] set_only: bool,
         pretty: bool,
         compact: bool,
     ) -> Result<ConfigShowReport, String> {
@@ -614,6 +630,7 @@ impl ConfigService {
         Ok(ConfigShowReport {
             config_path,
             section,
+            set_only,
             content,
             schema: schema_json,
         })
