@@ -811,6 +811,7 @@ fn bundled_imports_query(name: &str) -> Option<&'static str> {
         "nginx" => Some(include_str!("queries/nginx.imports.scm")),
         "ninja" => Some(include_str!("queries/ninja.imports.scm")),
         "prolog" => Some(include_str!("queries/prolog.imports.scm")),
+        "css" => Some(include_str!("queries/css.imports.scm")),
         "scss" => Some(include_str!("queries/scss.imports.scm")),
         "thrift" => Some(include_str!("queries/thrift.imports.scm")),
         "tlaplus" => Some(include_str!("queries/tlaplus.imports.scm")),
@@ -1234,6 +1235,7 @@ mod tests {
         assert!(loader.get_imports("nginx").is_some());
         assert!(loader.get_imports("ninja").is_some());
         assert!(loader.get_imports("prolog").is_some());
+        assert!(loader.get_imports("css").is_some());
         assert!(loader.get_imports("scss").is_some());
         assert!(loader.get_imports("thrift").is_some());
         assert!(loader.get_imports("tlaplus").is_some());

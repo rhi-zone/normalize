@@ -5572,6 +5572,41 @@ fn scss_imports_finds_use_and_import_statements() {
 }
 
 // ---------------------------------------------------------------------------
+// CSS
+// ---------------------------------------------------------------------------
+
+const CSS_SAMPLE: &str = include_str!("fixtures/css/sample.css");
+
+#[test]
+fn css_imports_finds_at_import_paths() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping css_imports: run `cargo xtask build-grammars` first");
+        return;
+    };
+    let loader = GrammarLoader::with_paths(vec![gdir]);
+    let Some(lang) = loader.get("css") else {
+        eprintln!("Skipping css_imports: css grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_imports("css")
+        .expect("css imports query missing");
+    let paths = collect_captures(&lang, CSS_SAMPLE, &query_str, "import.path");
+    assert!(
+        paths
+            .iter()
+            .any(|p| p.contains("reset") || p.contains("variables")),
+        "expected string @import paths in css sample, got: {paths:?}"
+    );
+    assert!(
+        paths
+            .iter()
+            .any(|p| p.contains("theme") || p.contains("fonts")),
+        "expected url() @import paths in css sample, got: {paths:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Svelte
 // ---------------------------------------------------------------------------
 

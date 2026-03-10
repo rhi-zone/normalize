@@ -1,0 +1,43 @@
+/* CSS sample with @import statements */
+
+@import "reset.css";
+@import "variables.css";
+@import url("theme.css");
+@import url('fonts.css');
+@import url(icons.css);
+@import "responsive.css" screen and (max-width: 768px);
+
+:root {
+    --primary-color: #3498db;
+    --secondary-color: #2ecc71;
+    --font-size-base: 16px;
+}
+
+body {
+    font-family: sans-serif;
+    color: var(--primary-color);
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
+.button {
+    display: inline-flex;
+    align-items: center;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 0 8px;
+    }
+}

@@ -531,6 +531,7 @@ language that silently returns empty is misleading users who expect analysis and
 - [x] Haskell: removed `(signature ...)` pattern from haskell.tags.scm; type signatures are not
       definition sites. Multi-equation function deduplication added in normalize-facts/extract.rs
       via `dedup_haskell_functions()` post-processing pass. Live tests added. — DONE 2026-03-09
+- [x] CSS: `@import "file.css"` and `@import url("file.css")` / `url('...')` / bare `url(...)` extraction via `css.imports.scm`. Live fixture test added (`css_imports_finds_at_import_paths`). — DONE 2026-03-11
 - [x] JavaScript/TypeScript CommonJS `require()` support — DONE (2026-03-10). `collect_js_ts_deps`
       now handles `const x = require('module')`, `const { a, b } = require('module')` (with
       pair_pattern alias support), and bare `require('./side-effect')`. 2 new tests in
@@ -637,7 +638,7 @@ Trigger: split a capability when >50% of languages would return stubs. `has_symb
 - [x] Add `as_symbols()` query method to `Language` with `None` default; `LanguageSymbols` marker trait; 91 programming languages implement it; 6 config languages (CSS/HTML/JSON/TOML/XML/YAML) don't — DONE (2026-03-11)
 - [x] Migrate call sites (`ceremony.rs`, `docs.rs`, `search.rs`) to use `as_symbols().is_some()` — DONE (2026-03-11)
 - [x] Remove `has_symbols()` — DONE (2026-03-11)
-- [ ] Add `as_imports()`, `as_complexity()`, `as_edit()` capability queries — next step when those methods become sparse
+- [ ] Add `as_imports()`, `as_complexity()`, `as_edit()` capability queries — not ready yet. Sparsity check (2026-03-11): `extract_imports` is empty in ~29% of languages (below 50% threshold). Most "empty" cases are data/config/markup languages or languages covered by `.imports.scm` query files. True gaps: HTML (`<script src>`, `<link href>`), Jinja2 (minimal grammar — no structured nodes), AWK (`@include` GAWK-only), Batch (no import system). CSS gap CLOSED (2026-03-11) via `css.imports.scm`.
 
 ### normalize-typegen
 
