@@ -35,6 +35,9 @@
             clang
             # JS tooling: VS Code extension, docs, sessions SPA
             bun
+            # Grammar development: tree-sitter CLI for writing/testing grammars
+            tree-sitter
+            nodejs
           ];
 	  LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath buildInputs}:$LD_LIBRARY_PATH";
         };
