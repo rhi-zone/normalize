@@ -112,6 +112,10 @@ impl Language for C {
         }
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &["**/test_*.c", "**/*_test.c", "**/tests/**/*.c"]
+    }
+
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")
     }

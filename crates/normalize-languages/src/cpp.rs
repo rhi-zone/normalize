@@ -141,6 +141,17 @@ impl Language for Cpp {
         }
     }
 
+    fn test_file_globs(&self) -> &'static [&'static str] {
+        &[
+            "**/test_*.cpp",
+            "**/*_test.cpp",
+            "**/test_*.cc",
+            "**/*_test.cc",
+            "**/tests/**/*.cpp",
+            "**/tests/**/*.cc",
+        ]
+    }
+
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")
     }

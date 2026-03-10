@@ -536,6 +536,13 @@ language that silently returns empty is misleading users who expect analysis and
       pair_pattern alias support), and bare `require('./side-effect')`. 2 new tests in
       normalize-deps. Python and Go audited: fully implemented (imports, docstrings, visibility,
       test detection, type refs). Analyze command consolidation reviewed: all feasible merges done.
+- [x] Java, C#, Swift, Kotlin audited (2026-03-10): all have complete query files (5 each) and trait
+      implementations. C# imports query fixed to handle `qualified_name` (was only `identifier`,
+      missing `using System.Collections.Generic;`). Test assertion strengthened. C and C++ had no
+      `test_file_globs()` — added common patterns (`test_*.c`, `*_test.cpp`, etc.). Ruby audited:
+      imports via query (5 forms: require/require_relative/include/extend/prepend), all comprehensive.
+      C and C++ have no visibility detection (genuinely complex: access specifier sections in class
+      body, not per-member modifiers). C++20 `import` modules not captured (only `#include`).
 
 **Comprehensive language fixtures** (long-term, verification via nix flakes):
 Goal: for every language we support, a test suite that exercises the full extraction pipeline

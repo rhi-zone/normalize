@@ -1786,11 +1786,17 @@ fn csharp_imports_finds_using_directives() {
         .get_imports("c-sharp")
         .expect("c-sharp imports query missing");
     let paths = collect_captures(&lang, CSHARP_SAMPLE, &query_str, "import.path");
+    // Must capture simple identifier: `using System;`
+    assert!(
+        paths.iter().any(|p| p == "System"),
+        "expected 'System' in c-sharp import paths, got: {paths:?}"
+    );
+    // Must capture qualified name: `using System.Collections.Generic;`
     assert!(
         paths
             .iter()
-            .any(|p| p.contains("System") || p.contains("Collections")),
-        "expected 'System' or 'Collections' in c-sharp import paths, got: {paths:?}"
+            .any(|p| p.contains("Collections") || p.contains("Generic")),
+        "expected qualified namespace in c-sharp import paths, got: {paths:?}"
     );
 }
 
