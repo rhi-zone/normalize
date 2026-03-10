@@ -370,6 +370,25 @@ tools, or other commands would want. Pure "compute + format for one command" sta
 
 ## Backlog
 
+### Richer Jinja2 grammar
+
+The current `arborium-jinja2` grammar uses a flat `statement + keyword` structure — every statement (`extends`, `import`, `from`, `include`, `block`, `macro`, `for`, `if`, ...) is just a `statement` node with a `keyword` child. There are no distinct named node types per statement kind.
+
+This is workable for import extraction (`.imports.scm` uses `#eq?` on the keyword text), but it blocks:
+- Symbol extraction: can't identify macro/block definitions without matching on keyword text
+- Complexity: can't write `*.complexity.scm` patterns for `for`/`if` without matching on text
+- Call sites: can't distinguish filter calls, macro calls, etc. via structure alone
+- Type-safe query evolution: adding new statement types requires updating all query files via text matching
+
+**What we want**: a grammar that models `extends_statement`, `import_statement`, `include_statement`, `block_statement`, `macro_statement`, `for_statement`, `if_statement` as distinct named node types, each with properly typed fields (e.g. `path:`, `name:`, `condition:`).
+
+**Options** (in order of preference):
+1. Contribute a PR to upstream `tree-sitter-jinja2` to restructure the grammar
+2. Fork and publish as `arborium-jinja2-v2` or similar with the new grammar
+3. Write a fresh grammar from scratch if upstream is unresponsive
+
+**Scope**: Jinja2 is widely used (Django templates, Ansible, Flask, cookiecutter, etc.). Proper support is worth the grammar work.
+
 ### normalize-manifest: eval-backed parsing (`eval` feature gate)
 
 Heuristic parsers in `normalize-manifest` cover ~95% of real-world files but fail on
@@ -640,8 +659,6 @@ Trigger: split a capability when >50% of languages would return stubs. `has_symb
 - [x] Migrate call sites (`ceremony.rs`, `docs.rs`, `search.rs`) to use `as_symbols().is_some()` — DONE (2026-03-11)
 - [x] Remove `has_symbols()` — DONE (2026-03-11)
 - [ ] Add `as_imports()`, `as_complexity()`, `as_edit()` capability queries — not ready yet. Sparsity check (2026-03-11): `extract_imports` is empty in ~29% of languages (below 50% threshold). Most "empty" cases are data/config/markup languages or languages covered by `.imports.scm` query files. True gaps (remaining): AWK (`@include` GAWK-only — defer), Batch (no import system — skip). Closed: CSS, GLSL, HTML, Jinja2 via `.imports.scm` (2026-03-11).
-  - **Jinja2 grammar note**: The `arborium-jinja2` grammar does have structured nodes (`statement`, `keyword`, `string`) and `.imports.scm` extraction works. However the grammar is minimal — `keyword` is a flat named node (no subtypes), and `statement` has no specialised child types for different statement kinds. If richer analysis (macro definitions, filter introspection) is ever needed, a more capable grammar would be required.
-  - **Future grammar work**: Consider writing a richer Jinja2 grammar (or contributing to upstream) that models `extends_statement`, `import_statement`, `include_statement` as distinct named types rather than a generic `statement + keyword` combo.
 
 ### normalize-typegen
 
