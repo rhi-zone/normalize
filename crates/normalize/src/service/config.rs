@@ -349,6 +349,7 @@ pub struct ConfigSetReport {
     pub new_value: serde_json::Value,
     pub config_path: String,
     pub dry_run: bool,
+    /// Schema errors that were present but bypassed (via --force or --dry-run).
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub schema_warnings: Vec<String>,
 }
@@ -368,7 +369,12 @@ impl OutputFormatter for ConfigSetReport {
             path = self.config_path,
         );
         if !self.schema_warnings.is_empty() {
-            out.push_str("\n\nSchema warnings:");
+            let label = if self.dry_run {
+                "Schema errors (would require --force to write):"
+            } else {
+                "Schema errors (written with --force):"
+            };
+            out.push_str(&format!("\n\n{label}"));
             for w in &self.schema_warnings {
                 out.push_str(&format!("\n  - {w}"));
             }
@@ -674,6 +680,7 @@ impl ConfigService {
         #[param(help = "Path to JSON Schema file (default: NormalizeConfig schema)")]
         schema: Option<String>,
         #[param(help = "Preview changes without writing")] dry_run: bool,
+        #[param(help = "Write even if the value fails schema validation")] force: bool,
         pretty: bool,
         compact: bool,
     ) -> Result<ConfigSetReport, String> {
@@ -710,7 +717,21 @@ impl ConfigService {
                 .map_err(|e| format!("Post-set TOML parse error: {e}"))?;
             serde_json::to_value(tv).map_err(|e| format!("Post-set conversion error: {e}"))?
         };
-        let schema_warnings = validate_against_schema(&schema_json, &new_instance);
+        let schema_errors = validate_against_schema(&schema_json, &new_instance);
+
+        // Block on schema errors unless --force or --dry-run
+        if !schema_errors.is_empty() && !force && !dry_run {
+            let mut msg = format!(
+                "Schema validation failed for '{key}':\n{}",
+                schema_errors
+                    .iter()
+                    .map(|e| format!("  - {e}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            );
+            msg.push_str("\nRun with --force to write anyway.");
+            return Err(msg);
+        }
 
         // Read back the new value for reporting
         let new_value: serde_json::Value = {
@@ -742,7 +763,7 @@ impl ConfigService {
             new_value,
             config_path,
             dry_run,
-            schema_warnings,
+            schema_warnings: schema_errors,
         })
     }
 }

@@ -327,7 +327,7 @@ dotted paths (e.g. `analyze.threshold`, `rules."rust/unwrap-in-impl".allow`) inc
 
 **Awaiting feedback before closing:**
 - Is the `show` output format useful? Too verbose? Should unset fields be hidden by default?
-- Should `config set` validate before writing (blocking on schema errors, not just warnings)?
+- ~~Should `config set` validate before writing (blocking on schema errors, not just warnings)?~~ — DONE (2026-03-10). `config set` now blocks on schema errors; `--force` bypasses; `--dry-run` shows errors without writing.
 
 **Remaining follow-ups:**
 - `normalize rules validate` still exists; has unique rule-ID validation not in `config validate`
