@@ -1,0 +1,15 @@
+{
+  "grammars": [
+    {
+      "name": "jinja2",
+      "path": ".",
+      "file-types": [".j2", ".jinja", ".jinja2"],
+      "scope": "source.jinja2"
+    }
+  ],
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Jinja2 template grammar for tree-sitter",
+    "license": "Apache-2.0"
+  }
+}

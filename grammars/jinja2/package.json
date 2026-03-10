@@ -1,0 +1,9 @@
+{
+  "name": "tree-sitter-jinja2",
+  "version": "1.0.0",
+  "description": "Jinja2 grammar for tree-sitter",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "nan": "*"
+  }
+}

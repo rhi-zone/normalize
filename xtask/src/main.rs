@@ -79,6 +79,28 @@ fn build_grammars(args: &[String]) {
         }
     }
 
+    // Compile local grammars from grammars/ in the workspace root.
+    // These take priority over arborium — always compiled (they override installed .so).
+    let local_grammars = find_local_grammars();
+    if !local_grammars.is_empty() {
+        println!(
+            "\nCompiling {} local grammars (grammars/):",
+            local_grammars.len()
+        );
+        for (lang, grammar_dir) in &local_grammars {
+            match compile_local_grammar(lang, grammar_dir, &out_dir) {
+                Ok(size) => {
+                    println!("  {lang}: {} (local)", human_size(size));
+                    compiled += 1;
+                }
+                Err(e) => {
+                    eprintln!("  {lang}: FAILED - {e}");
+                    failed += 1;
+                }
+            }
+        }
+    }
+
     // Copy bundled query files from the workspace queries/ directory.
     // These supplement arborium grammars for languages that don't ship their own.
     // Arborium-provided files take precedence (already written above); bundled files
@@ -189,6 +211,82 @@ fn copy_bundled_queries(queries_dir: &Path, out_dir: &Path) -> usize {
         }
     }
     copied
+}
+
+/// Find local grammars in the workspace `grammars/` directory.
+/// Each subdirectory named `<lang>` that contains `src/parser.c` is a grammar.
+/// Returns `(lang, grammar_dir)` pairs.
+fn find_local_grammars() -> Vec<(String, PathBuf)> {
+    let manifest_dir = match env::var("CARGO_MANIFEST_DIR") {
+        Ok(d) => d,
+        Err(_) => return Vec::new(),
+    };
+    let workspace_root = match Path::new(&manifest_dir).parent() {
+        Some(p) => p.to_path_buf(),
+        None => return Vec::new(),
+    };
+    let grammars_dir = workspace_root.join("grammars");
+
+    let Ok(entries) = fs::read_dir(&grammars_dir) else {
+        return Vec::new();
+    };
+
+    let mut grammars = Vec::new();
+    for entry in entries.flatten() {
+        let grammar_dir = entry.path();
+        if !grammar_dir.is_dir() {
+            continue;
+        }
+        let lang = grammar_dir
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+        // Local grammar structure: src/parser.c (not grammar/src/parser.c like arborium)
+        if grammar_dir.join("src/parser.c").exists() {
+            grammars.push((lang, grammar_dir));
+        }
+    }
+    grammars.sort_by(|a, b| a.0.cmp(&b.0));
+    grammars
+}
+
+/// Compile a local grammar from `grammars/<lang>/`.
+/// Local structure differs from arborium: parser at `src/parser.c`, scanner at `src/scanner.c`.
+fn compile_local_grammar(lang: &str, grammar_dir: &Path, out_dir: &Path) -> Result<u64, String> {
+    let parser_c = grammar_dir.join("src/parser.c");
+    let scanner_c = grammar_dir.join("src/scanner.c");
+    let out_file = out_dir.join(format!("{lang}.{}", lib_extension()));
+
+    let mut cmd = Command::new("cc");
+    cmd.arg("-shared")
+        .arg("-fPIC")
+        .arg("-O2")
+        .arg("-I")
+        .arg(grammar_dir.join("src"))
+        .arg(&parser_c);
+
+    if scanner_c.exists() {
+        cmd.arg(&scanner_c);
+    }
+
+    #[cfg(target_os = "linux")]
+    cmd.arg("-Wl,--unresolved-symbols=ignore-in-shared-libs");
+
+    #[cfg(target_os = "macos")]
+    cmd.arg("-undefined").arg("dynamic_lookup");
+
+    cmd.arg("-o").arg(&out_file);
+
+    let output = cmd.output().map_err(|e| format!("Failed to run cc: {e}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Compilation failed: {stderr}"));
+    }
+
+    let size = fs::metadata(&out_file).map(|m| m.len()).unwrap_or(0);
+    Ok(size)
 }
 
 fn find_cargo_registry_src() -> PathBuf {
