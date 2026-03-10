@@ -832,14 +832,11 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 - Follow-up patterns: `--types-only` → immediately view symbol
 - Repeated queries: same file viewed multiple times
 
-### Global rules exclude in config
+### ~~Global rules exclude in config~~ — DONE (2026-03-10)
 
-`normalize rules run` has no global path exclude — every error rule needs `.claude/**` added
-to its `allow` list separately to prevent false positives from agent worktrees under `.claude/`.
-Added `.claude/**` to `rust/tuple-return`, `no-grammar-loader-new`, `rust/chained-if-let`,
-`rust/numeric-type-annotation` as a workaround. Need a `[rules] exclude = [...]` config key
-that applies before per-rule allow lists. Alternatively: pre-commit hook should pass
-`--root crates/` or an `--exclude .claude/` flag.
+`.claude/**` added to `global-allow` in `[rules]` config. Removed redundant `.claude/**`
+entries from `rust/tuple-return`, `no-grammar-loader-new`, `rust/chained-if-let`,
+`rust/numeric-type-annotation`. The `global-allow` pattern IS the global exclude mechanism.
 
 ### CI/Infrastructure
 - [ ] Wire `normalize analyze duplicate-blocks --exclude '**/*.json' --exclude '**/*.lock'` into CI

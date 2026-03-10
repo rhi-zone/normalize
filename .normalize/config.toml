@@ -41,7 +41,7 @@ exclude = [
 # Per-rule configuration: { "rule-id" = { severity = "...", enabled = true/false } }
 # Global allow: skip violations in test fixture files for all rules.
 [rules]
-global-allow = ["**/tests/fixtures/**", "**/fixtures/**"]
+global-allow = ["**/tests/fixtures/**", "**/fixtures/**", ".claude/**"]
 
 # Disable println-debug for CLI tools (we use println for output)
 [rules."rust/println-debug"]
@@ -70,10 +70,9 @@ allow = ["**/tests/fixtures/**"]
 
 # Enable numeric literal suffix rule (disabled by default).
 # Exclude rule fixtures: those files intentionally contain the bad pattern to test detection.
-# .claude/worktrees/ contains agent work-in-progress not yet ready to commit.
 [rules."rust/numeric-type-annotation"]
 enabled = true
-allow = ["**/tests/fixtures/**", ".claude/**"]
+allow = ["**/tests/fixtures/**"]
 
 # Audit complete: all 1608 violations resolved (inline suppressed with reasons or allow-listed).
 # Production .unwrap() uses are annotated; test code in inline #[cfg(test)] modules allowed below.
@@ -126,9 +125,6 @@ allow = [
     # normalize (main crate) rg/: vendored from ripgrep — defs.rs has 500+ test assertions
     # using .unwrap() idiomatically; version.rs has writeln!() to String (infallible).
     "crates/normalize/src/rg/**",
-    # .claude/worktrees/ contains agent work-in-progress; walker follows symlinks into these
-    # directories, creating duplicate paths that bypass crate-specific allow patterns.
-    ".claude/**",
     # normalize (main crate) ast_grep/: vendored from ast-grep 0.41.0 (MIT) — production violations
     # are infallible (String::from_utf8 on ast-grep internal buffers, TypesBuilder constants,
     # mutex lock, test assertions). Not our code to refactor.
@@ -176,10 +172,8 @@ severity = "warning"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
-# .claude/worktrees/ contains agent work-in-progress not yet ready to commit.
 [rules."rust/chained-if-let"]
 enabled = true
-allow = [".claude/**"]
 
 [rules."js/console-log"]
 enabled = true
@@ -220,17 +214,15 @@ allow = [
 # no-grammar-loader-new: allow in test modules and test files (tests may need custom loaders
 # with add_path() for isolated grammar directories, which requires GrammarLoader::new()).
 # normalize-scope/src/lib.rs test module uses add_path() which requires a mutable loader.
-# .claude/worktrees/ contains agent work-in-progress not yet ready to commit.
 [rules."no-grammar-loader-new"]
-allow = ["**/tests/**", "crates/*/tests/**", "crates/normalize-scope/src/lib.rs", ".claude/**"]
+allow = ["**/tests/**", "crates/*/tests/**", "crates/normalize-scope/src/lib.rs"]
 
 # rust/tuple-return: rg/ is vendored from ripgrep (do not modify); fixtures intentionally
 # contain the bad pattern. All other violations must be fixed.
-# .claude/worktrees/ contains agent work-in-progress not yet ready to commit.
 [rules."rust/tuple-return"]
 severity = "error"
 enabled = true
-allow = ["crates/normalize/src/rg/**", "**/tests/fixtures/**", ".claude/**"]
+allow = ["crates/normalize/src/rg/**", "**/tests/fixtures/**"]
 
 # SUMMARY.md freshness: currently at info severity (TODO: re-escalate to "error" once all
 # SUMMARY.md enforcement — severity=error blocks commits when SUMMARY.md is stale/missing.
