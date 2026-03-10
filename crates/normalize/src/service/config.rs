@@ -601,6 +601,7 @@ impl ConfigService {
     /// Show a config file with schema annotations — all available options, with descriptions.
     /// Use --section for a dotted path (e.g. 'analyze', 'analyze.threshold').
     /// Use --set-only to hide fields that have no value set in the config file.
+    #[allow(clippy::too_many_arguments)]
     #[cli(display_with = "display_show")]
     pub fn show(
         &self,

@@ -643,6 +643,46 @@ impl DepsExtractor {
                         }
                     }
                 }
+                // const x = require('./module')
+                // let { a, b } = require('./module')
+                // var x = require('./module')
+                "lexical_declaration" | "variable_declaration" => {
+                    let line = node.start_position().row + 1;
+                    for i in 0..node.child_count() as u32 {
+                        if let Some(decl) = node.child(i)
+                            && decl.kind() == "variable_declarator"
+                            && let Some(value) = decl.child_by_field_name("value")
+                            && let Some(mut imp) = Self::extract_require_call(value, content, line)
+                        {
+                            if let Some(name_node) = decl.child_by_field_name("name") {
+                                match name_node.kind() {
+                                    "identifier" => {
+                                        imp.names =
+                                            vec![content[name_node.byte_range()].to_string()];
+                                    }
+                                    "object_pattern" => {
+                                        Self::collect_destructure_names(
+                                            name_node,
+                                            content,
+                                            &mut imp.names,
+                                        );
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            imports.push(imp);
+                        }
+                    }
+                }
+                // require('./side-effect') — bare require, no binding
+                "expression_statement" => {
+                    let line = node.start_position().row + 1;
+                    if let Some(child) = node.child(0)
+                        && let Some(imp) = Self::extract_require_call(child, content, line)
+                    {
+                        imports.push(imp);
+                    }
+                }
                 _ => {}
             }
 
@@ -654,6 +694,73 @@ impl DepsExtractor {
 
             if !cursor.goto_next_sibling() {
                 break;
+            }
+        }
+    }
+
+    /// Extract a require('module') call from a call_expression node.
+    /// Returns Some(Import) if this is a require(string) call, None otherwise.
+    fn extract_require_call(node: tree_sitter::Node, content: &str, line: usize) -> Option<Import> {
+        if node.kind() != "call_expression" {
+            return None;
+        }
+        let func = node.child_by_field_name("function")?;
+        if func.kind() != "identifier" || &content[func.byte_range()] != "require" {
+            return None;
+        }
+        let args = node.child_by_field_name("arguments")?;
+        let module = Self::extract_string_from_args(args, content)?;
+        Some(Import {
+            is_relative: module.starts_with('.'),
+            module,
+            names: Vec::new(),
+            alias: None,
+            is_wildcard: false,
+            line,
+        })
+    }
+
+    /// Extract the first string literal from an arguments node.
+    fn extract_string_from_args(args: tree_sitter::Node, content: &str) -> Option<String> {
+        for i in 0..args.child_count() as u32 {
+            let arg = args.child(i)?;
+            match arg.kind() {
+                "string" => {
+                    for j in 0..arg.child_count() as u32 {
+                        if let Some(frag) = arg.child(j)
+                            && frag.kind() == "string_fragment"
+                        {
+                            return Some(content[frag.byte_range()].to_string());
+                        }
+                    }
+                }
+                "string_fragment" => {
+                    return Some(content[arg.byte_range()].to_string());
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    /// Collect bound names from a destructuring object pattern.
+    /// Handles `{ a, b }` and `{ key: alias }`.
+    fn collect_destructure_names(node: tree_sitter::Node, content: &str, names: &mut Vec<String>) {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            match child.kind() {
+                "shorthand_property_identifier_pattern" | "identifier" => {
+                    names.push(content[child.byte_range()].to_string());
+                }
+                "pair_pattern" => {
+                    // { key: boundName } — use the bound name (value side)
+                    if let Some(val) = child.child_by_field_name("value")
+                        && val.kind() == "identifier"
+                    {
+                        names.push(content[val.byte_range()].to_string());
+                    }
+                }
+                _ => {}
             }
         }
     }
@@ -1007,6 +1114,86 @@ const message = ref('Hello World');
         assert!(
             result.imports.iter().any(|i| i.module == "./app.js"),
             "Should have app.js import"
+        );
+    }
+
+    #[test]
+    fn test_commonjs_require_imports() {
+        let extractor = DepsExtractor::new();
+        let content = r#"
+const path = require('path');
+const { readFile, writeFile } = require('fs');
+const { join: joinPath } = require('path');
+const express = require('express');
+require('./side-effect');
+
+module.exports = { path, express };
+"#;
+        let result = extractor.extract(&PathBuf::from("test.js"), content);
+
+        // Simple binding: const x = require(...)
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
+        let path_import = result
+            .imports
+            .iter()
+            .find(|i| i.module == "path" && i.names.contains(&"path".to_string()));
+        assert!(
+            path_import.is_some(),
+            "Should extract const path = require('path')"
+        );
+
+        // Destructured: const { a, b } = require(...)
+        let fs_import = result.imports.iter().find(|i| i.module == "fs");
+        assert!(fs_import.is_some(), "Should extract require('fs')");
+        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
+        let fs_import = fs_import.unwrap();
+        assert!(
+            fs_import.names.contains(&"readFile".to_string()),
+            "Should extract destructured name 'readFile'"
+        );
+        assert!(
+            fs_import.names.contains(&"writeFile".to_string()),
+            "Should extract destructured name 'writeFile'"
+        );
+
+        // Aliased destructuring: { join: joinPath }
+        let join_import = result
+            .imports
+            .iter()
+            .find(|i| i.module == "path" && i.names.contains(&"joinPath".to_string()));
+        assert!(
+            join_import.is_some(),
+            "Should extract aliased destructure {{ join: joinPath }}"
+        );
+
+        // Bare require (side-effect)
+        assert!(
+            result.imports.iter().any(|i| i.module == "./side-effect"),
+            "Should extract bare require('./side-effect')"
+        );
+    }
+
+    #[test]
+    fn test_commonjs_require_in_typescript() {
+        let extractor = DepsExtractor::new();
+        let content = r#"
+const fs = require('fs');
+const { EventEmitter } = require('events');
+import { Something } from './es-module';
+"#;
+        let result = extractor.extract(&PathBuf::from("test.ts"), content);
+
+        assert!(
+            result.imports.iter().any(|i| i.module == "fs"),
+            "TypeScript: should extract const fs = require('fs')"
+        );
+        assert!(
+            result.imports.iter().any(|i| i.module == "events"),
+            "TypeScript: should extract destructured require('events')"
+        );
+        assert!(
+            result.imports.iter().any(|i| i.module == "./es-module"),
+            "TypeScript: should still extract ES6 imports"
         );
     }
 }

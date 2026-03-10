@@ -415,11 +415,17 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
 - Still can't resolve runtime variables, but dramatically fewer false negatives
 - Belongs in same feature gate or a separate `tree-sitter` feature in normalize-manifest
 
-### Analyze Command Consolidation — HIGH PRIORITY
+### Analyze Command Consolidation — SUBSTANTIALLY COMPLETE (2026-03-10)
 
 See `docs/design/analyze-consolidation.md` for full design (axis decomposition, phased plan).
 
-**The CLI is too big.** ~38 subcommands under `analyze` (down from 50 after coverage/churn/duplicates/patterns merges; now grouped via `#[server(groups(...))]` in `--help`). Users can't hold this in working memory. Grouping helps discoverability but doesn't reduce the surface enough.
+**Current: 44 commands.** All Phase 2/3 merges that were feasible have been completed. Remaining work is lower-leverage (future rules migration, rank infrastructure). See design doc for current command count table.
+
+**What was done:** duplicates unified (5→1), patterns→fragments, check unified (refs+stale+examples), CoverageOutput/CouplingOutput enum wrappers reverted, dependents absorbs impact.
+
+**Explicitly NOT merging:** health family, density family, churn family, duplicate-types+duplicates, fragments+duplicates, trend commands, call-complexity+complexity. All justified in design doc.
+
+**Future (low priority):** `security` → SARIF rules engine (wraps bandit; could be `normalize rules run --engine sarif` with bandit configured). `docs`/`security` → rules migration (~-3 commands, see design doc).
 
 **Current state (2026-03):**
 - `--help` output is now grouped into 8 sections (code, modules, repo, graph, git, test, security, diff) via server-less `#[server(groups(...))]`
@@ -525,6 +531,11 @@ language that silently returns empty is misleading users who expect analysis and
 - [x] Haskell: removed `(signature ...)` pattern from haskell.tags.scm; type signatures are not
       definition sites. Multi-equation function deduplication added in normalize-facts/extract.rs
       via `dedup_haskell_functions()` post-processing pass. Live tests added. — DONE 2026-03-09
+- [x] JavaScript/TypeScript CommonJS `require()` support — DONE (2026-03-10). `collect_js_ts_deps`
+      now handles `const x = require('module')`, `const { a, b } = require('module')` (with
+      pair_pattern alias support), and bare `require('./side-effect')`. 2 new tests in
+      normalize-deps. Python and Go audited: fully implemented (imports, docstrings, visibility,
+      test detection, type refs). Analyze command consolidation reviewed: all feasible merges done.
 
 **Comprehensive language fixtures** (long-term, verification via nix flakes):
 Goal: for every language we support, a test suite that exercises the full extraction pipeline

@@ -275,8 +275,9 @@ Each merge follows this pattern:
 | After `check` unification (refs + stale + examples) | 42 | -2 |
 | After `coverage`/`churn` enum reverts (+4 commands, -2 wrappers) | 42 | ±0 |
 | After `dependents` absorbs `impact` | 41 | -1 |
-| After `graph` consolidation | 30 | -4 |
-| After further `check` → rules migration | ~27 | ~-3 |
+| New commands added (trend variants, cross-repo, provenance) | 44 | +3 |
+| After `graph` consolidation (NOT DOING — see design) | 44 | 0 |
+| After further `check` → rules migration (future) | ~41 | ~-3 |
 
 The goal isn't minimizing count for its own sake — it's making the mental model learnable and the extension model obvious.
 
