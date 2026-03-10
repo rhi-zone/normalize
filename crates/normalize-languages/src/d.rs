@@ -1,6 +1,6 @@
 //! D language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// D language support.
@@ -31,6 +31,10 @@ impl Language for D {
     }
     fn grammar_name(&self) -> &'static str {
         "d"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -239,6 +243,8 @@ impl Language for D {
         None
     }
 }
+
+impl LanguageSymbols for D {}
 
 #[cfg(test)]
 mod tests {

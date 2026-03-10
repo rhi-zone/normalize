@@ -1,6 +1,6 @@
 //! Device Tree source file support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Device Tree language support.
@@ -15,6 +15,10 @@ impl Language for DeviceTree {
     }
     fn grammar_name(&self) -> &'static str {
         "devicetree"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -62,6 +66,8 @@ impl Language for DeviceTree {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for DeviceTree {}
 
 #[cfg(test)]
 mod tests {

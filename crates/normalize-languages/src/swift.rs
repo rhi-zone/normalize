@@ -1,6 +1,6 @@
 //! Swift language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Swift language support.
@@ -33,6 +33,10 @@ impl Language for Swift {
     }
     fn grammar_name(&self) -> &'static str {
         "swift"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -258,6 +262,8 @@ impl Language for Swift {
         &["**/*Tests.swift", "**/*Test.swift"]
     }
 }
+
+impl LanguageSymbols for Swift {}
 
 #[cfg(test)]
 mod tests {

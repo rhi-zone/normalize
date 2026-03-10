@@ -1,6 +1,6 @@
 //! PostScript support.
 
-use crate::{ContainerBody, Language};
+use crate::{ContainerBody, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// PostScript language support.
@@ -15,6 +15,10 @@ impl Language for PostScript {
     }
     fn grammar_name(&self) -> &'static str {
         "postscript"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
@@ -32,6 +36,8 @@ impl Language for PostScript {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for PostScript {}
 
 #[cfg(test)]
 mod tests {

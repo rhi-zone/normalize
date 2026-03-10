@@ -17,10 +17,6 @@ impl Language for Toml {
         "toml"
     }
 
-    fn has_symbols(&self) -> bool {
-        false
-    }
-
     // TOML is config, not code - no functions/types/control flow
 
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {

@@ -1,6 +1,6 @@
 //! Zig language support.
 
-use crate::{Import, Language, Visibility};
+use crate::{Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Zig language support.
@@ -15,6 +15,10 @@ impl Language for Zig {
     }
     fn grammar_name(&self) -> &'static str {
         "zig"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -92,6 +96,8 @@ impl Language for Zig {
         node.child_by_field_name("body")
     }
 }
+
+impl LanguageSymbols for Zig {}
 
 #[cfg(test)]
 mod tests {

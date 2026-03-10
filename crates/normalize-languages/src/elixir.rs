@@ -1,6 +1,6 @@
 //! Elixir language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Elixir language support.
@@ -15,6 +15,10 @@ impl Language for Elixir {
     }
     fn grammar_name(&self) -> &'static str {
         "elixir"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -185,6 +189,8 @@ impl Language for Elixir {
         None
     }
 }
+
+impl LanguageSymbols for Elixir {}
 
 impl Elixir {
     fn extract_module_name(&self, node: &Node, content: &str) -> Option<String> {

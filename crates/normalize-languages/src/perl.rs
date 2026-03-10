@@ -1,6 +1,6 @@
 //! Perl language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Perl language support.
@@ -15,6 +15,10 @@ impl Language for Perl {
     }
     fn grammar_name(&self) -> &'static str {
         "perl"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -128,6 +132,8 @@ impl Language for Perl {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for Perl {}
 
 #[cfg(test)]
 mod tests {

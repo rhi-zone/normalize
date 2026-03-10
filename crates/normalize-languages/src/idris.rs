@@ -1,6 +1,6 @@
 //! Idris language support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Idris language support.
@@ -15,6 +15,10 @@ impl Language for Idris {
     }
     fn grammar_name(&self) -> &'static str {
         "idris"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -74,6 +78,8 @@ impl Language for Idris {
         }
     }
 }
+
+impl LanguageSymbols for Idris {}
 
 #[cfg(test)]
 mod tests {

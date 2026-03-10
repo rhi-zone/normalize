@@ -17,10 +17,6 @@ impl Language for Yaml {
         "yaml"
     }
 
-    fn has_symbols(&self) -> bool {
-        false
-    }
-
     // YAML is data, not code - no functions/types/control flow
 
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {

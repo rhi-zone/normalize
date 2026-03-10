@@ -1,6 +1,6 @@
 //! Lean language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Lean language support.
@@ -15,6 +15,10 @@ impl Language for Lean {
     }
     fn grammar_name(&self) -> &'static str {
         "lean"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -78,6 +82,8 @@ impl Language for Lean {
         crate::body::analyze_end_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for Lean {}
 
 #[cfg(test)]
 mod tests {

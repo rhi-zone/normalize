@@ -1,6 +1,6 @@
 //! KDL (KDocument Language) support.
 
-use crate::{ContainerBody, Language};
+use crate::{ContainerBody, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// KDL language support.
@@ -15,6 +15,10 @@ impl Language for Kdl {
     }
     fn grammar_name(&self) -> &'static str {
         "kdl"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
@@ -49,6 +53,8 @@ impl Language for Kdl {
         None
     }
 }
+
+impl LanguageSymbols for Kdl {}
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,6 @@
 //! Rust language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Rust language support.
@@ -15,6 +15,10 @@ impl Language for Rust {
     }
     fn grammar_name(&self) -> &'static str {
         "rust"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -272,6 +276,8 @@ impl Language for Rust {
         Some(&content[name_node.byte_range()])
     }
 }
+
+impl LanguageSymbols for Rust {}
 
 impl Rust {
     fn extract_visibility_prefix(&self, node: &Node, content: &str) -> String {

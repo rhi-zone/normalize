@@ -1,6 +1,6 @@
 //! Prolog language support.
 
-use crate::{Import, Language};
+use crate::{Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Prolog language support.
@@ -15,6 +15,10 @@ impl Language for Prolog {
     }
     fn grammar_name(&self) -> &'static str {
         "prolog"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -95,6 +99,8 @@ impl Language for Prolog {
         None
     }
 }
+
+impl LanguageSymbols for Prolog {}
 
 #[cfg(test)]
 mod tests {

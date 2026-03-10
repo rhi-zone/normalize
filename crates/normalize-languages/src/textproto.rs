@@ -1,6 +1,6 @@
 //! Protocol Buffers text format support.
 
-use crate::Language;
+use crate::{Language, LanguageSymbols};
 
 /// TextProto language support.
 pub struct TextProto;
@@ -15,7 +15,13 @@ impl Language for TextProto {
     fn grammar_name(&self) -> &'static str {
         "textproto"
     }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
+    }
 }
+
+impl LanguageSymbols for TextProto {}
 
 #[cfg(test)]
 mod tests {

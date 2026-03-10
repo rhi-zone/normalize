@@ -1,6 +1,6 @@
 //! Tree-sitter query language support.
 
-use crate::Language;
+use crate::{Language, LanguageSymbols};
 
 /// Tree-sitter query language support.
 pub struct Query;
@@ -15,7 +15,13 @@ impl Language for Query {
     fn grammar_name(&self) -> &'static str {
         "query"
     }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
+    }
 }
+
+impl LanguageSymbols for Query {}
 
 #[cfg(test)]
 mod tests {

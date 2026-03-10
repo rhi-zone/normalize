@@ -1,6 +1,6 @@
 //! Zsh language support.
 
-use crate::{Import, Language};
+use crate::{Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Zsh language support.
@@ -15,6 +15,10 @@ impl Language for Zsh {
     }
     fn grammar_name(&self) -> &'static str {
         "zsh"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -63,6 +67,8 @@ impl Language for Zsh {
         node.child_by_field_name("body")
     }
 }
+
+impl LanguageSymbols for Zsh {}
 
 #[cfg(test)]
 mod tests {

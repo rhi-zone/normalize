@@ -1,6 +1,6 @@
 //! Haskell language support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Haskell language support.
@@ -15,6 +15,10 @@ impl Language for Haskell {
     }
     fn grammar_name(&self) -> &'static str {
         "haskell"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
@@ -106,6 +110,8 @@ impl Language for Haskell {
         crate::body::analyze_end_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for Haskell {}
 
 /// Extract a Haddock documentation comment preceding a definition node.
 ///

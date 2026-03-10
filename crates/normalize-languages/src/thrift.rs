@@ -1,6 +1,6 @@
 //! Apache Thrift IDL support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Thrift language support.
@@ -15,6 +15,10 @@ impl Language for Thrift {
     }
     fn grammar_name(&self) -> &'static str {
         "thrift"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -51,6 +55,8 @@ impl Language for Thrift {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for Thrift {}
 
 #[cfg(test)]
 mod tests {

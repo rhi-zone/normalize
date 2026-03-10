@@ -1,6 +1,6 @@
 //! CMake language support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// CMake language support.
@@ -15,6 +15,10 @@ impl Language for CMake {
     }
     fn grammar_name(&self) -> &'static str {
         "cmake"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -80,6 +84,8 @@ impl Language for CMake {
         None
     }
 }
+
+impl LanguageSymbols for CMake {}
 
 #[cfg(test)]
 mod tests {

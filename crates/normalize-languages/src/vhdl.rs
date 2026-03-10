@@ -1,6 +1,6 @@
 //! VHDL support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// VHDL language support.
@@ -15,6 +15,10 @@ impl Language for Vhdl {
     }
     fn grammar_name(&self) -> &'static str {
         "vhdl"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -67,6 +71,8 @@ impl Language for Vhdl {
         crate::body::analyze_is_begin_end_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for Vhdl {}
 
 #[cfg(test)]
 mod tests {

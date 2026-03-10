@@ -1,6 +1,6 @@
 //! AsciiDoc language support.
 
-use crate::{Import, Language};
+use crate::{Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// AsciiDoc language support.
@@ -15,6 +15,10 @@ impl Language for AsciiDoc {
     }
     fn grammar_name(&self) -> &'static str {
         "asciidoc"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -55,6 +59,8 @@ impl Language for AsciiDoc {
         if !name.is_empty() { Some(name) } else { None }
     }
 }
+
+impl LanguageSymbols for AsciiDoc {}
 
 #[cfg(test)]
 mod tests {

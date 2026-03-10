@@ -1,6 +1,6 @@
 //! INI configuration file support.
 
-use crate::Language;
+use crate::{Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// INI language support.
@@ -17,12 +17,18 @@ impl Language for Ini {
         "ini"
     }
 
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
+    }
+
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
         node.child_by_field_name("name")
             .map(|n| &content[n.byte_range()])
             .map(|s| s.trim_matches(|c| c == '[' || c == ']'))
     }
 }
+
+impl LanguageSymbols for Ini {}
 
 #[cfg(test)]
 mod tests {

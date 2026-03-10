@@ -374,7 +374,9 @@ impl DepsExtractor {
             let node = cursor.node();
 
             // Check for embedded content (e.g., <script> in Vue/Svelte/HTML)
-            if let Some(embedded) = support.embedded_content(&node, content)
+            if let Some(embedded) = support
+                .as_embedded()
+                .and_then(|e| e.embedded_content(&node, content))
                 && let Some(sub_lang) = support_for_grammar(embedded.grammar)
                 && let Some(sub_tree) = parse_with_grammar(embedded.grammar, &embedded.content)
             {

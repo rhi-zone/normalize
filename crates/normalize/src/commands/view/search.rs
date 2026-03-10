@@ -14,7 +14,7 @@ struct SymbolQuery {
 /// Check if a file has language support (symbols can be extracted)
 pub fn has_language_support(path: &str) -> bool {
     support_for_path(Path::new(path))
-        .map(|lang| lang.has_symbols())
+        .map(|lang| lang.as_symbols().is_some())
         .unwrap_or(false)
 }
 
@@ -128,7 +128,7 @@ fn search_symbols_unindexed(query: &str, root: &Path) -> Vec<index::SymbolMatch>
         let Some(lang) = support_for_path(path) else {
             continue;
         };
-        if !lang.has_symbols() {
+        if lang.as_symbols().is_none() {
             continue;
         }
 
@@ -209,7 +209,7 @@ pub fn suggest_symbols_trigram(
         let Some(lang) = normalize_languages::support_for_path(path) else {
             continue;
         };
-        if !lang.has_symbols() {
+        if lang.as_symbols().is_none() {
             continue;
         }
         let Ok(content) = std::fs::read_to_string(path) else {

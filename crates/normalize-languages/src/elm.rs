@@ -1,6 +1,6 @@
 //! Elm language support.
 
-use crate::{Import, Language};
+use crate::{Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Elm language support.
@@ -15,6 +15,10 @@ impl Language for Elm {
     }
     fn grammar_name(&self) -> &'static str {
         "elm"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
@@ -116,6 +120,8 @@ impl Language for Elm {
         }
     }
 }
+
+impl LanguageSymbols for Elm {}
 
 #[cfg(test)]
 mod tests {

@@ -633,10 +633,11 @@ The monolithic `Language` trait couples two growth axes: adding a language requi
 
 Trigger: split a capability when >50% of languages would return stubs. `has_symbols()` is the existing smell.
 
-- [ ] `LanguageEmbedded` — extract `embedded_content()`, already past sparsity threshold (only Vue, HTML, ~3 others)
-- [ ] Add `as_symbols()`, `as_imports()`, `as_complexity()`, `as_edit()` query methods to `Language` with `None` defaults (Option B from design doc — incremental, no flag-day)
-- [ ] Migrate call sites to use capability queries where "not supported" differs from "empty"
-- [ ] Remove `has_symbols()` once capability queries cover all its uses
+- [x] `LanguageEmbedded` — extract `embedded_content()`, already past sparsity threshold (only Vue, HTML, ~3 others) — DONE (2026-03-11)
+- [x] Add `as_symbols()` query method to `Language` with `None` default; `LanguageSymbols` marker trait; 91 programming languages implement it; 6 config languages (CSS/HTML/JSON/TOML/XML/YAML) don't — DONE (2026-03-11)
+- [x] Migrate call sites (`ceremony.rs`, `docs.rs`, `search.rs`) to use `as_symbols().is_some()` — DONE (2026-03-11)
+- [x] Remove `has_symbols()` — DONE (2026-03-11)
+- [ ] Add `as_imports()`, `as_complexity()`, `as_edit()` capability queries — next step when those methods become sparse
 
 ### normalize-typegen
 

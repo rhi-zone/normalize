@@ -1,6 +1,6 @@
 //! MATLAB language support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// MATLAB language support.
@@ -15,6 +15,10 @@ impl Language for Matlab {
     }
     fn grammar_name(&self) -> &'static str {
         "matlab"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -83,6 +87,8 @@ impl Language for Matlab {
         None
     }
 }
+
+impl LanguageSymbols for Matlab {}
 
 #[cfg(test)]
 mod tests {

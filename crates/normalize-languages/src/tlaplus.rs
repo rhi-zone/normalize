@@ -1,6 +1,6 @@
 //! TLA+ specification language support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// TLA+ language support.
@@ -15,6 +15,10 @@ impl Language for TlaPlus {
     }
     fn grammar_name(&self) -> &'static str {
         "tlaplus"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -91,6 +95,8 @@ impl Language for TlaPlus {
         })
     }
 }
+
+impl LanguageSymbols for TlaPlus {}
 
 #[cfg(test)]
 mod tests {

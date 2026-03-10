@@ -1,7 +1,7 @@
 //! Vue language support.
 
 use crate::component::extract_embedded_content;
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageEmbedded, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Vue language support.
@@ -16,6 +16,10 @@ impl Language for Vue {
     }
     fn grammar_name(&self) -> &'static str {
         "vue"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn format_import(&self, import: &Import, names: Option<&[&str]>) -> String {
@@ -53,8 +57,8 @@ impl Language for Vue {
         }
     }
 
-    fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {
-        extract_embedded_content(node, content)
+    fn as_embedded(&self) -> Option<&dyn LanguageEmbedded> {
+        Some(self)
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
@@ -71,6 +75,14 @@ impl Language for Vue {
     ) -> Option<ContainerBody> {
         // raw_text node from script/style/template element — content after leading newline
         crate::body::analyze_end_body(body_node, content, inner_indent)
+    }
+}
+
+impl LanguageSymbols for Vue {}
+
+impl LanguageEmbedded for Vue {
+    fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {
+        extract_embedded_content(node, content)
     }
 }
 

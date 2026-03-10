@@ -1,6 +1,6 @@
 //! Starlark (Bazel/Buck) support.
 
-use crate::{Import, Language};
+use crate::{Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Starlark language support.
@@ -15,6 +15,10 @@ impl Language for Starlark {
     }
     fn grammar_name(&self) -> &'static str {
         "starlark"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -59,6 +63,8 @@ impl Language for Starlark {
         node.child_by_field_name("body")
     }
 }
+
+impl LanguageSymbols for Starlark {}
 
 #[cfg(test)]
 mod tests {

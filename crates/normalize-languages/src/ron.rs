@@ -1,6 +1,6 @@
 //! RON (Rusty Object Notation) support.
 
-use crate::{ContainerBody, Language};
+use crate::{ContainerBody, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// RON language support.
@@ -15,6 +15,10 @@ impl Language for Ron {
     }
     fn grammar_name(&self) -> &'static str {
         "ron"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
@@ -35,6 +39,8 @@ impl Language for Ron {
         }
     }
 }
+
+impl LanguageSymbols for Ron {}
 
 #[cfg(test)]
 mod tests {

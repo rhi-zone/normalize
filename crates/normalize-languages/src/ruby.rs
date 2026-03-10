@@ -1,6 +1,6 @@
 //! Ruby language support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Ruby language support.
@@ -15,6 +15,10 @@ impl Language for Ruby {
     }
     fn grammar_name(&self) -> &'static str {
         "ruby"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -134,6 +138,8 @@ impl Language for Ruby {
         crate::body::analyze_end_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for Ruby {}
 
 #[cfg(test)]
 mod tests {

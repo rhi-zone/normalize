@@ -1,6 +1,6 @@
 //! Python language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 // ============================================================================
@@ -19,6 +19,10 @@ impl Language for Python {
     }
     fn grammar_name(&self) -> &'static str {
         "python"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
@@ -310,6 +314,8 @@ impl Language for Python {
         })
     }
 }
+
+impl LanguageSymbols for Python {}
 
 /// Extract a Python docstring from a function or class body.
 ///

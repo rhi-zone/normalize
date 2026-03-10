@@ -1,6 +1,6 @@
 //! Dockerfile language support.
 
-use crate::{Import, Language};
+use crate::{Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Dockerfile language support.
@@ -15,6 +15,10 @@ impl Language for Dockerfile {
     }
     fn grammar_name(&self) -> &'static str {
         "dockerfile"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     // Dockerfiles have stages (FROM ... AS name) that act as containers
@@ -49,6 +53,8 @@ impl Language for Dockerfile {
         None
     }
 }
+
+impl LanguageSymbols for Dockerfile {}
 
 impl Dockerfile {
     /// Extract the image name from a FROM instruction

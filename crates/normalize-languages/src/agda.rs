@@ -1,6 +1,6 @@
 //! Agda language support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Agda language support.
@@ -15,6 +15,10 @@ impl Language for Agda {
     }
     fn grammar_name(&self) -> &'static str {
         "agda"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -108,6 +112,8 @@ impl Language for Agda {
         None
     }
 }
+
+impl LanguageSymbols for Agda {}
 
 #[cfg(test)]
 mod tests {

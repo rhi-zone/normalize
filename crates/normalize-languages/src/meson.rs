@@ -1,6 +1,6 @@
 //! Meson build system support.
 
-use crate::{Import, Language};
+use crate::{Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Meson language support.
@@ -15,6 +15,10 @@ impl Language for Meson {
     }
     fn grammar_name(&self) -> &'static str {
         "meson"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -62,6 +66,8 @@ impl Language for Meson {
         None
     }
 }
+
+impl LanguageSymbols for Meson {}
 
 #[cfg(test)]
 mod tests {

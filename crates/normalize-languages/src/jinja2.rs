@@ -1,6 +1,6 @@
 //! Jinja2 template support.
 
-use crate::Language;
+use crate::{Language, LanguageSymbols};
 
 /// Jinja2 language support.
 pub struct Jinja2;
@@ -15,7 +15,13 @@ impl Language for Jinja2 {
     fn grammar_name(&self) -> &'static str {
         "jinja2"
     }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
+    }
 }
+
+impl LanguageSymbols for Jinja2 {}
 
 #[cfg(test)]
 mod tests {

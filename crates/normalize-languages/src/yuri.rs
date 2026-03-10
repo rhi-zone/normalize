@@ -1,6 +1,6 @@
 //! Yuri language support (tree-sitter-yuri).
 
-use crate::Language;
+use crate::{Language, LanguageSymbols};
 
 /// Yuri language support.
 pub struct Yuri;
@@ -16,6 +16,10 @@ impl Language for Yuri {
         "yuri"
     }
 
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
+    }
+
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
         let name = symbol.name.as_str();
         match symbol.kind {
@@ -25,6 +29,8 @@ impl Language for Yuri {
         }
     }
 }
+
+impl LanguageSymbols for Yuri {}
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,6 @@
 //! GraphQL language support.
 
-use crate::{ContainerBody, Language};
+use crate::{ContainerBody, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// GraphQL language support.
@@ -39,6 +39,10 @@ impl Language for GraphQL {
     }
     fn grammar_name(&self) -> &'static str {
         "graphql"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn build_signature(&self, node: &Node, content: &str) -> String {
@@ -98,6 +102,8 @@ impl Language for GraphQL {
         None
     }
 }
+
+impl LanguageSymbols for GraphQL {}
 
 #[cfg(test)]
 mod tests {

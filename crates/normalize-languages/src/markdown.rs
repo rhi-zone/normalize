@@ -1,6 +1,6 @@
 //! Markdown language support.
 
-use crate::{ContainerBody, Language};
+use crate::{ContainerBody, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Markdown language support.
@@ -15,6 +15,10 @@ impl Language for Markdown {
     }
     fn grammar_name(&self) -> &'static str {
         "markdown"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     // Markdown sections are modeled as `section` nodes in the grammar,
@@ -58,6 +62,8 @@ impl Language for Markdown {
         Some(content[inline.byte_range()].trim())
     }
 }
+
+impl LanguageSymbols for Markdown {}
 
 #[cfg(test)]
 mod tests {

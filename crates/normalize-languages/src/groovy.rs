@@ -1,6 +1,6 @@
 //! Groovy language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Groovy language support.
@@ -15,6 +15,10 @@ impl Language for Groovy {
     }
     fn grammar_name(&self) -> &'static str {
         "groovy"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -125,6 +129,8 @@ impl Language for Groovy {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for Groovy {}
 
 /// Extract a GroovyDoc comment from a node.
 ///

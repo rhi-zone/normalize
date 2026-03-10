@@ -1,6 +1,6 @@
 //! Assembly language support.
 
-use crate::{Import, Language};
+use crate::{Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Assembly language support.
@@ -17,6 +17,10 @@ impl Language for Asm {
         "asm"
     }
 
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
+    }
+
     fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
         Vec::new() // asm grammar doesn't have imports
     }
@@ -28,6 +32,8 @@ impl Language for Asm {
         if !name.is_empty() { Some(name) } else { None }
     }
 }
+
+impl LanguageSymbols for Asm {}
 
 #[cfg(test)]
 mod tests {

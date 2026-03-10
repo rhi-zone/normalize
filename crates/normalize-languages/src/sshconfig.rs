@@ -1,6 +1,6 @@
 //! SSH config file support.
 
-use crate::Language;
+use crate::{Language, LanguageSymbols};
 
 /// SSH config language support.
 pub struct SshConfig;
@@ -15,7 +15,13 @@ impl Language for SshConfig {
     fn grammar_name(&self) -> &'static str {
         "ssh-config"
     }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
+    }
 }
+
+impl LanguageSymbols for SshConfig {}
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,6 @@
 //! SPARQL query language support.
 
-use crate::Language;
+use crate::{Language, LanguageSymbols};
 
 /// SPARQL language support.
 pub struct Sparql;
@@ -15,7 +15,13 @@ impl Language for Sparql {
     fn grammar_name(&self) -> &'static str {
         "sparql"
     }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
+    }
 }
+
+impl LanguageSymbols for Sparql {}
 
 #[cfg(test)]
 mod tests {

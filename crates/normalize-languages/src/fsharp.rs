@@ -1,6 +1,6 @@
 //! F# language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// F# language support.
@@ -15,6 +15,10 @@ impl Language for FSharp {
     }
     fn grammar_name(&self) -> &'static str {
         "fsharp"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
@@ -214,6 +218,8 @@ impl Language for FSharp {
         }
     }
 }
+
+impl LanguageSymbols for FSharp {}
 
 #[cfg(test)]
 mod tests {

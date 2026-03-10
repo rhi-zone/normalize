@@ -1,7 +1,7 @@
 //! R language support.
 
 use crate::docstring::extract_preceding_prefix_comments;
-use crate::{Import, Language, Visibility};
+use crate::{Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// R language support.
@@ -16,6 +16,10 @@ impl Language for R {
     }
     fn grammar_name(&self) -> &'static str {
         "r"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -87,6 +91,8 @@ impl Language for R {
         None
     }
 }
+
+impl LanguageSymbols for R {}
 
 #[cfg(test)]
 mod tests {

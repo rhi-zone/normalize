@@ -1,6 +1,6 @@
 //! Kotlin language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Kotlin language support.
@@ -33,6 +33,10 @@ impl Language for Kotlin {
     }
     fn grammar_name(&self) -> &'static str {
         "kotlin"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -230,6 +234,8 @@ impl Language for Kotlin {
         Visibility::Public
     }
 }
+
+impl LanguageSymbols for Kotlin {}
 
 /// Extract a KDoc comment (`/** ... */`) preceding a node.
 ///

@@ -1,6 +1,6 @@
 //! Objective-C language support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Objective-C language support.
@@ -15,6 +15,10 @@ impl Language for ObjC {
     }
     fn grammar_name(&self) -> &'static str {
         "objc"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn build_signature(&self, node: &Node, content: &str) -> String {
@@ -159,6 +163,8 @@ impl Language for ObjC {
         None
     }
 }
+
+impl LanguageSymbols for ObjC {}
 
 #[cfg(test)]
 mod tests {

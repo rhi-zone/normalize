@@ -1,6 +1,6 @@
 //! Julia language support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Julia language support.
@@ -15,6 +15,10 @@ impl Language for Julia {
     }
     fn grammar_name(&self) -> &'static str {
         "julia"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
@@ -141,6 +145,8 @@ impl Language for Julia {
         crate::body::analyze_end_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for Julia {}
 
 #[cfg(test)]
 mod tests {

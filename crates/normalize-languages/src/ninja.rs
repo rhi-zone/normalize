@@ -1,6 +1,6 @@
 //! Ninja build system support.
 
-use crate::{Import, Language};
+use crate::{Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Ninja language support.
@@ -15,6 +15,10 @@ impl Language for Ninja {
     }
     fn grammar_name(&self) -> &'static str {
         "ninja"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -39,6 +43,8 @@ impl Language for Ninja {
         format!("include {}", import.module)
     }
 }
+
+impl LanguageSymbols for Ninja {}
 
 #[cfg(test)]
 mod tests {

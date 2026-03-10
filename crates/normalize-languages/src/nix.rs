@@ -1,6 +1,6 @@
 //! Nix language support.
 
-use crate::{Import, Language};
+use crate::{Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Nix language support.
@@ -15,6 +15,10 @@ impl Language for Nix {
     }
     fn grammar_name(&self) -> &'static str {
         "nix"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -60,6 +64,8 @@ impl Language for Nix {
             .map(|n| &content[n.byte_range()])
     }
 }
+
+impl LanguageSymbols for Nix {}
 
 #[cfg(test)]
 mod tests {

@@ -17,10 +17,6 @@ impl Language for Json {
         "json"
     }
 
-    fn has_symbols(&self) -> bool {
-        false
-    }
-
     // JSON is data, not code - no functions/types/control flow
     // "pair" nodes are key-value pairs that we extract as symbols
 

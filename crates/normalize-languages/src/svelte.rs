@@ -1,7 +1,7 @@
 //! Svelte language support.
 
 use crate::component::extract_embedded_content;
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageEmbedded, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Svelte language support.
@@ -16,6 +16,10 @@ impl Language for Svelte {
     }
     fn grammar_name(&self) -> &'static str {
         "svelte"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -90,8 +94,8 @@ impl Language for Svelte {
         }
     }
 
-    fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {
-        extract_embedded_content(node, content)
+    fn as_embedded(&self) -> Option<&dyn LanguageEmbedded> {
+        Some(self)
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
@@ -115,6 +119,14 @@ impl Language for Svelte {
         node.child_by_field_name("name")
             .or_else(|| node.child_by_field_name("function"))
             .map(|n| &content[n.byte_range()])
+    }
+}
+
+impl LanguageSymbols for Svelte {}
+
+impl LanguageEmbedded for Svelte {
+    fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {
+        extract_embedded_content(node, content)
     }
 }
 

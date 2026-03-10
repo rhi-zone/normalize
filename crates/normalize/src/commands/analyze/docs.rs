@@ -191,7 +191,7 @@ fn process_file(
     let lang = normalize_languages::support_for_path(&path);
 
     // normalize-syntax-allow: rust/unwrap-in-impl - short-circuit: only reached when Some
-    if lang.is_none() || !lang.unwrap().has_symbols() {
+    if lang.is_none() || lang.unwrap().as_symbols().is_none() {
         return;
     }
 

@@ -17,10 +17,6 @@ impl Language for Css {
         "css"
     }
 
-    fn has_symbols(&self) -> bool {
-        false
-    }
-
     // CSS has no functions/containers/types in the traditional sense
 
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {

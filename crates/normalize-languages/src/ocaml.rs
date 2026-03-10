@@ -1,6 +1,6 @@
 //! OCaml language support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// OCaml language support.
@@ -15,6 +15,10 @@ impl Language for OCaml {
     }
     fn grammar_name(&self) -> &'static str {
         "ocaml"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
@@ -145,6 +149,8 @@ impl Language for OCaml {
         }
     }
 }
+
+impl LanguageSymbols for OCaml {}
 
 /// Extract an OCamldoc comment (`(** ... *)`) preceding a definition node.
 ///

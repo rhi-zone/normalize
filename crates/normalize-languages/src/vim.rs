@@ -1,6 +1,6 @@
 //! Vim script language support.
 
-use crate::{Import, Language, Visibility};
+use crate::{Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Vim script language support.
@@ -15,6 +15,10 @@ impl Language for Vim {
     }
     fn grammar_name(&self) -> &'static str {
         "vim"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -70,6 +74,8 @@ impl Language for Vim {
         }
     }
 }
+
+impl LanguageSymbols for Vim {}
 
 #[cfg(test)]
 mod tests {

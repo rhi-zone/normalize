@@ -1,6 +1,6 @@
 //! Java language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Java language support.
@@ -15,6 +15,10 @@ impl Language for Java {
     }
     fn grammar_name(&self) -> &'static str {
         "java"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -188,6 +192,8 @@ impl Language for Java {
         Visibility::Public
     }
 }
+
+impl LanguageSymbols for Java {}
 
 /// Extract a JavaDoc comment (`/** ... */`) preceding a node.
 ///

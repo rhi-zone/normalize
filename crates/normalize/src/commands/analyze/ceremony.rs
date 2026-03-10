@@ -145,7 +145,7 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
         .filter_map(|file| {
             let path = root.join(&file.path);
             let lang = match normalize_languages::support_for_path(&path) {
-                Some(l) if l.has_symbols() => l,
+                Some(l) if l.as_symbols().is_some() => l,
                 _ => return None,
             };
 

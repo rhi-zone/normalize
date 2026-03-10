@@ -1,6 +1,6 @@
 //! Scala language support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Scala language support.
@@ -15,6 +15,10 @@ impl Language for Scala {
     }
     fn grammar_name(&self) -> &'static str {
         "scala"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -204,6 +208,8 @@ impl Language for Scala {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for Scala {}
 
 /// Extract a ScalaDoc comment (`/** ... */`) preceding a node.
 ///

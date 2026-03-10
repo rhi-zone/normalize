@@ -1,6 +1,6 @@
 //! WebAssembly Interface Types (WIT) support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// WIT language support.
@@ -15,6 +15,10 @@ impl Language for Wit {
     }
     fn grammar_name(&self) -> &'static str {
         "wit"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -58,6 +62,8 @@ impl Language for Wit {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for Wit {}
 
 #[cfg(test)]
 mod tests {

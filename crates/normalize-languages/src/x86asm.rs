@@ -1,6 +1,6 @@
 //! x86 assembly support.
 
-use crate::Language;
+use crate::{Language, LanguageSymbols};
 
 /// x86 Assembly language support.
 pub struct X86Asm;
@@ -15,7 +15,13 @@ impl Language for X86Asm {
     fn grammar_name(&self) -> &'static str {
         "x86asm"
     }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
+    }
 }
+
+impl LanguageSymbols for X86Asm {}
 
 #[cfg(test)]
 mod tests {

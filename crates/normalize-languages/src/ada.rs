@@ -1,7 +1,7 @@
 //! Ada language support.
 
 use crate::docstring::extract_preceding_prefix_comments;
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Ada language support.
@@ -16,6 +16,10 @@ impl Language for Ada {
     }
     fn grammar_name(&self) -> &'static str {
         "ada"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -93,6 +97,8 @@ impl Language for Ada {
         None
     }
 }
+
+impl LanguageSymbols for Ada {}
 
 #[cfg(test)]
 mod tests {

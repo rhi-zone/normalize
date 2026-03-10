@@ -1,6 +1,6 @@
 //! Emacs Lisp language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Emacs Lisp language support.
@@ -15,6 +15,10 @@ impl Language for Elisp {
     }
     fn grammar_name(&self) -> &'static str {
         "elisp"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -88,6 +92,8 @@ impl Language for Elisp {
         None
     }
 }
+
+impl LanguageSymbols for Elisp {}
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,6 @@
 //! ReScript language support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// ReScript language support.
@@ -15,6 +15,10 @@ impl Language for ReScript {
     }
     fn grammar_name(&self) -> &'static str {
         "rescript"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -60,6 +64,8 @@ impl Language for ReScript {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for ReScript {}
 
 #[cfg(test)]
 mod tests {

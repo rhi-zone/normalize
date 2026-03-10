@@ -1,6 +1,6 @@
 //! Erlang language support.
 
-use crate::{Import, Language};
+use crate::{Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Erlang language support.
@@ -15,6 +15,10 @@ impl Language for Erlang {
     }
     fn grammar_name(&self) -> &'static str {
         "erlang"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -131,6 +135,8 @@ impl Language for Erlang {
         &["**/*_SUITE.erl", "**/*_test.erl", "**/*_tests.erl"]
     }
 }
+
+impl LanguageSymbols for Erlang {}
 
 #[cfg(test)]
 mod tests {

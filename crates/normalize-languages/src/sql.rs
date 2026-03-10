@@ -1,6 +1,6 @@
 //! SQL language support.
 
-use crate::Language;
+use crate::{Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// SQL language support.
@@ -17,6 +17,10 @@ impl Language for Sql {
         "sql"
     }
 
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
+    }
+
     fn build_signature(&self, node: &Node, content: &str) -> String {
         // SQL: use first line as signature (CREATE TABLE foo...)
         let text = &content[node.byte_range()];
@@ -27,6 +31,8 @@ impl Language for Sql {
         None
     }
 }
+
+impl LanguageSymbols for Sql {}
 
 #[cfg(test)]
 mod tests {

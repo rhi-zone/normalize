@@ -1,6 +1,6 @@
 //! DOT/Graphviz language support.
 
-use crate::{ContainerBody, Language};
+use crate::{ContainerBody, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// DOT (Graphviz) language support.
@@ -15,6 +15,10 @@ impl Language for Dot {
     }
     fn grammar_name(&self) -> &'static str {
         "dot"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
@@ -36,6 +40,8 @@ impl Language for Dot {
             .map(|n| &content[n.byte_range()])
     }
 }
+
+impl LanguageSymbols for Dot {}
 
 #[cfg(test)]
 mod tests {

@@ -17,10 +17,6 @@ impl Language for Xml {
         "xml"
     }
 
-    fn has_symbols(&self) -> bool {
-        false
-    }
-
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
         None
     }

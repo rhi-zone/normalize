@@ -1,6 +1,6 @@
 //! GLSL (OpenGL Shading Language) support.
 
-use crate::{ContainerBody, Language};
+use crate::{ContainerBody, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// GLSL language support.
@@ -15,6 +15,10 @@ impl Language for Glsl {
     }
     fn grammar_name(&self) -> &'static str {
         "glsl"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
@@ -40,6 +44,8 @@ impl Language for Glsl {
             })
     }
 }
+
+impl LanguageSymbols for Glsl {}
 
 #[cfg(test)]
 mod tests {

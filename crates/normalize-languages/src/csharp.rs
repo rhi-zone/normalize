@@ -1,6 +1,6 @@
 //! C# language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// C# language support.
@@ -15,6 +15,10 @@ impl Language for CSharp {
     }
     fn grammar_name(&self) -> &'static str {
         "c-sharp"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -234,6 +238,8 @@ impl Language for CSharp {
         Visibility::Public
     }
 }
+
+impl LanguageSymbols for CSharp {}
 
 /// Strip common XML doc comment tags.
 fn strip_xml_tags(s: &str) -> String {

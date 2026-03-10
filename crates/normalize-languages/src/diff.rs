@@ -1,6 +1,6 @@
 //! Diff/patch file support.
 
-use crate::Language;
+use crate::{Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Diff language support.
@@ -17,10 +17,16 @@ impl Language for Diff {
         "diff"
     }
 
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
+    }
+
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
         None
     }
 }
+
+impl LanguageSymbols for Diff {}
 
 #[cfg(test)]
 mod tests {

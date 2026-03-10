@@ -1,6 +1,6 @@
 //! AWK language support.
 
-use crate::Language;
+use crate::{Language, LanguageSymbols};
 
 /// AWK language support.
 pub struct Awk;
@@ -16,6 +16,10 @@ impl Language for Awk {
         "awk"
     }
 
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
+    }
+
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
         let name = symbol.name.as_str();
         match symbol.kind {
@@ -25,6 +29,8 @@ impl Language for Awk {
         }
     }
 }
+
+impl LanguageSymbols for Awk {}
 
 #[cfg(test)]
 mod tests {

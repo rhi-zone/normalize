@@ -1,6 +1,6 @@
 //! Nginx configuration file support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Nginx language support.
@@ -15,6 +15,10 @@ impl Language for Nginx {
     }
     fn grammar_name(&self) -> &'static str {
         "nginx"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -67,6 +71,8 @@ impl Language for Nginx {
         None
     }
 }
+
+impl LanguageSymbols for Nginx {}
 
 #[cfg(test)]
 mod tests {

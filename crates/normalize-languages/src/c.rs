@@ -1,6 +1,6 @@
 //! C language support.
 
-use crate::{Import, Language};
+use crate::{Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// C language support.
@@ -15,6 +15,10 @@ impl Language for C {
     }
     fn grammar_name(&self) -> &'static str {
         "c"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -132,6 +136,8 @@ impl Language for C {
         None
     }
 }
+
+impl LanguageSymbols for C {}
 
 impl C {
     fn find_identifier<'a>(node: &Node, content: &'a str) -> Option<&'a str> {

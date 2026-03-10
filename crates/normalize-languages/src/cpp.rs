@@ -1,6 +1,6 @@
 //! C++ language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// C++ language support.
@@ -15,6 +15,10 @@ impl Language for Cpp {
     }
     fn grammar_name(&self) -> &'static str {
         "cpp"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -205,6 +209,8 @@ impl Language for Cpp {
         None
     }
 }
+
+impl LanguageSymbols for Cpp {}
 
 fn find_identifier<'a>(node: &Node, content: &'a str) -> Option<&'a str> {
     if node.kind() == "identifier" || node.kind() == "field_identifier" {

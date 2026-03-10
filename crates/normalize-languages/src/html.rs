@@ -1,6 +1,6 @@
 //! HTML language support (parse only, minimal skeleton).
 
-use crate::Language;
+use crate::{Language, LanguageEmbedded};
 use tree_sitter::Node;
 
 /// HTML language support.
@@ -17,12 +17,18 @@ impl Language for Html {
         "html"
     }
 
-    fn has_symbols(&self) -> bool {
-        false
-    }
-
     // HTML has no functions/containers/types in the traditional sense
 
+    fn as_embedded(&self) -> Option<&dyn LanguageEmbedded> {
+        Some(self)
+    }
+
+    fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
+        None
+    }
+}
+
+impl LanguageEmbedded for Html {
     fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {
         match node.kind() {
             "script_element" => {
@@ -44,10 +50,6 @@ impl Language for Html {
             }
             _ => None,
         }
-    }
-
-    fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
-        None
     }
 }
 

@@ -1,6 +1,6 @@
 //! Clojure language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Clojure language support.
@@ -15,6 +15,10 @@ impl Language for Clojure {
     }
     fn grammar_name(&self) -> &'static str {
         "clojure"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -118,6 +122,8 @@ impl Language for Clojure {
         None
     }
 }
+
+impl LanguageSymbols for Clojure {}
 
 impl Clojure {
     /// Extract the form name and symbol name from a list like (defn foo ...)

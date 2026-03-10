@@ -1,6 +1,6 @@
 //! Scheme language support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Scheme language support.
@@ -15,6 +15,10 @@ impl Language for Scheme {
     }
     fn grammar_name(&self) -> &'static str {
         "scheme"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -119,6 +123,8 @@ impl Language for Scheme {
         None
     }
 }
+
+impl LanguageSymbols for Scheme {}
 
 #[cfg(test)]
 mod tests {

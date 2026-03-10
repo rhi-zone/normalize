@@ -1,6 +1,6 @@
 //! Common Lisp language support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Common Lisp language support.
@@ -15,6 +15,10 @@ impl Language for CommonLisp {
     }
     fn grammar_name(&self) -> &'static str {
         "commonlisp"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -93,6 +97,8 @@ impl Language for CommonLisp {
         None
     }
 }
+
+impl LanguageSymbols for CommonLisp {}
 
 #[cfg(test)]
 mod tests {

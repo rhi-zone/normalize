@@ -1,6 +1,6 @@
 //! Bash language support.
 
-use crate::{Import, Language};
+use crate::{Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Bash language support.
@@ -15,6 +15,10 @@ impl Language for Bash {
     }
     fn grammar_name(&self) -> &'static str {
         "bash"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn build_signature(&self, node: &Node, content: &str) -> String {
@@ -50,6 +54,8 @@ impl Language for Bash {
         node.child_by_field_name("body")
     }
 }
+
+impl LanguageSymbols for Bash {}
 
 #[cfg(test)]
 mod tests {

@@ -1,7 +1,7 @@
 //! Lua language support.
 
 use crate::docstring::extract_preceding_prefix_comments;
-use crate::{Import, Language, Visibility};
+use crate::{Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Lua language support.
@@ -16,6 +16,10 @@ impl Language for Lua {
     }
     fn grammar_name(&self) -> &'static str {
         "lua"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -112,6 +116,8 @@ impl Language for Lua {
         node.child_by_field_name("body")
     }
 }
+
+impl LanguageSymbols for Lua {}
 
 #[cfg(test)]
 mod tests {

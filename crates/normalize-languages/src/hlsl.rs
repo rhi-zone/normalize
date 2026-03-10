@@ -1,6 +1,6 @@
 //! HLSL (High-Level Shading Language) support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// HLSL language support.
@@ -15,6 +15,10 @@ impl Language for Hlsl {
     }
     fn grammar_name(&self) -> &'static str {
         "hlsl"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -78,6 +82,8 @@ impl Language for Hlsl {
             })
     }
 }
+
+impl LanguageSymbols for Hlsl {}
 
 #[cfg(test)]
 mod tests {

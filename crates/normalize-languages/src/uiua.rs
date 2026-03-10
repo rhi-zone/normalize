@@ -1,6 +1,6 @@
 //! Uiua array programming language support.
 
-use crate::Language;
+use crate::{Language, LanguageSymbols};
 
 /// Uiua language support.
 pub struct Uiua;
@@ -16,6 +16,10 @@ impl Language for Uiua {
         "uiua"
     }
 
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
+    }
+
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
         let name = symbol.name.as_str();
         match symbol.kind {
@@ -25,6 +29,8 @@ impl Language for Uiua {
         }
     }
 }
+
+impl LanguageSymbols for Uiua {}
 
 #[cfg(test)]
 mod tests {

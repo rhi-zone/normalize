@@ -1,7 +1,7 @@
 //! TypeScript language support.
 
 use crate::ecmascript;
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// TypeScript language support.
@@ -19,6 +19,10 @@ impl Language for TypeScript {
     }
     fn grammar_name(&self) -> &'static str {
         "typescript"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -112,6 +116,8 @@ impl Language for TypeScript {
     }
 }
 
+impl LanguageSymbols for TypeScript {}
+
 // TSX shares the same implementation as TypeScript, just with a different grammar
 impl Language for Tsx {
     fn name(&self) -> &'static str {
@@ -122,10 +128,6 @@ impl Language for Tsx {
     }
     fn grammar_name(&self) -> &'static str {
         "tsx"
-    }
-
-    fn has_symbols(&self) -> bool {
-        true
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -187,10 +189,6 @@ impl Language for Tsx {
             "**/*.test.tsx",
             "**/*.spec.tsx",
         ]
-    }
-
-    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
-        None
     }
 
     fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {

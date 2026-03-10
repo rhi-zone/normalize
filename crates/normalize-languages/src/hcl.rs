@@ -1,6 +1,6 @@
 //! HCL (HashiCorp Configuration Language) support.
 
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// HCL language support (Terraform, Packer, etc.).
@@ -15,6 +15,10 @@ impl Language for Hcl {
     }
     fn grammar_name(&self) -> &'static str {
         "hcl"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -85,6 +89,8 @@ impl Language for Hcl {
         None
     }
 }
+
+impl LanguageSymbols for Hcl {}
 
 impl Hcl {
     fn extract_block_info(&self, node: &Node, content: &str) -> Option<(String, String)> {

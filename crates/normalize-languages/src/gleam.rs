@@ -1,6 +1,6 @@
 //! Gleam language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Gleam language support.
@@ -15,6 +15,10 @@ impl Language for Gleam {
     }
     fn grammar_name(&self) -> &'static str {
         "gleam"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
@@ -120,6 +124,8 @@ impl Language for Gleam {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for Gleam {}
 
 #[cfg(test)]
 mod tests {

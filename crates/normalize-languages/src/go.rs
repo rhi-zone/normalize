@@ -1,7 +1,7 @@
 //! Go language support.
 
 use crate::docstring::extract_preceding_prefix_comments;
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Go language support.
@@ -16,6 +16,10 @@ impl Language for Go {
     }
     fn grammar_name(&self) -> &'static str {
         "go"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -140,6 +144,8 @@ impl Language for Go {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for Go {}
 
 impl Go {
     fn parse_import_spec(node: &Node, content: &str, line: usize) -> Option<Import> {

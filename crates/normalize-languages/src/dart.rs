@@ -1,6 +1,6 @@
 //! Dart language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Dart language support.
@@ -15,6 +15,10 @@ impl Language for Dart {
     }
     fn grammar_name(&self) -> &'static str {
         "dart"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -188,6 +192,8 @@ impl Language for Dart {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for Dart {}
 
 /// Extract Dart annotations from child and preceding sibling nodes.
 fn extract_dart_annotations(node: &Node, content: &str) -> Vec<String> {

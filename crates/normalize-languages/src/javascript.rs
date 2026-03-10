@@ -1,7 +1,7 @@
 //! JavaScript language support.
 
 use crate::ecmascript;
-use crate::{ContainerBody, Import, Language};
+use crate::{ContainerBody, Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// JavaScript language support.
@@ -16,6 +16,10 @@ impl Language for JavaScript {
     }
     fn grammar_name(&self) -> &'static str {
         "javascript"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -100,6 +104,8 @@ impl Language for JavaScript {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
 }
+
+impl LanguageSymbols for JavaScript {}
 
 #[cfg(test)]
 mod tests {

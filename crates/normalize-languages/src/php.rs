@@ -1,6 +1,6 @@
 //! PHP language support.
 
-use crate::{ContainerBody, Import, Language, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// PHP language support.
@@ -15,6 +15,10 @@ impl Language for Php {
     }
     fn grammar_name(&self) -> &'static str {
         "php"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {
@@ -149,6 +153,8 @@ impl Language for Php {
         Visibility::Public
     }
 }
+
+impl LanguageSymbols for Php {}
 
 /// Extract a PHPDoc comment (`/** ... */`) preceding a PHP declaration.
 fn extract_phpdoc(node: &Node, content: &str) -> Option<String> {

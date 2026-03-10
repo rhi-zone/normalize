@@ -38,6 +38,23 @@ pub struct EmbeddedBlock {
     pub start_line: usize,
 }
 
+/// Capability trait: language has code symbols (functions, classes, types, etc.).
+///
+/// Config and data languages (CSS, HTML, JSON, TOML, XML, YAML) don't implement this.
+/// All general-purpose programming languages do.
+/// Access via `lang.as_symbols()` rather than `lang.has_symbols()`.
+pub trait LanguageSymbols: Language {}
+
+/// Capability trait: language can contain embedded blocks in another language.
+///
+/// Only a handful of multi-language formats implement this (Vue, HTML, Svelte).
+/// Access via `lang.as_embedded()` rather than casting.
+pub trait LanguageEmbedded: Language {
+    /// Extract embedded content from a node (e.g., JS/CSS in Vue/HTML).
+    /// Returns None for nodes that don't contain embedded code in another language.
+    fn embedded_content(&self, node: &Node, content: &str) -> Option<EmbeddedBlock>;
+}
+
 // === Helper functions for common extractor patterns ===
 
 /// Create a simple symbol with standard defaults.
@@ -104,9 +121,11 @@ pub trait Language: Send + Sync {
     /// Grammar name for arborium (e.g., "python", "rust")
     fn grammar_name(&self) -> &'static str;
 
-    /// Whether this language has code symbols (functions, classes, etc.)
-    fn has_symbols(&self) -> bool {
-        true
+    /// Capability query: returns `Some(self)` if this language has code symbols
+    /// (functions, classes, types, etc.). Returns `None` for config/data languages.
+    /// Implement `LanguageSymbols` and override this to opt in.
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        None
     }
 
     // === Symbol Building ===
@@ -197,11 +216,10 @@ pub trait Language: Send + Sync {
         &[]
     }
 
-    // === Embedded Languages ===
-
-    /// Extract embedded content from a node (e.g., JS/CSS in Vue/HTML).
-    /// Returns None for nodes that don't contain embedded code in another language.
-    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<EmbeddedBlock> {
+    /// Capability query: returns `Some(self)` if this language can contain embedded blocks
+    /// in another language (e.g., JS in Vue, CSS in HTML). Returns `None` for most languages.
+    /// Implement `LanguageEmbedded` and override this to opt in.
+    fn as_embedded(&self) -> Option<&dyn LanguageEmbedded> {
         None
     }
 

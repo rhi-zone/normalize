@@ -1,6 +1,6 @@
 //! Windows Batch file support.
 
-use crate::{Import, Language};
+use crate::{Import, Language, LanguageSymbols};
 use tree_sitter::Node;
 
 /// Batch language support.
@@ -15,6 +15,10 @@ impl Language for Batch {
     }
     fn grammar_name(&self) -> &'static str {
         "batch"
+    }
+
+    fn as_symbols(&self) -> Option<&dyn LanguageSymbols> {
+        Some(self)
     }
 
     fn format_import(&self, import: &Import, _names: Option<&[&str]>) -> String {
@@ -44,6 +48,8 @@ impl Language for Batch {
         None
     }
 }
+
+impl LanguageSymbols for Batch {}
 
 #[cfg(test)]
 mod tests {
