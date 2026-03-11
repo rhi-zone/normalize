@@ -7,7 +7,7 @@ use normalize_syntax_rules::MatchResult;
 use server_less::cli;
 use std::path::PathBuf;
 
-/// Syntax sub-service — AST inspection.
+/// Tree-sitter AST inspection and query tools.
 #[derive(Default)]
 pub struct SyntaxService;
 
@@ -25,7 +25,10 @@ impl SyntaxService {
     }
 }
 
-#[cli(name = "syntax", description = "AST inspection")]
+#[cli(
+    name = "syntax",
+    description = "Tree-sitter AST inspection and query tools"
+)]
 impl SyntaxService {
     /// Show AST structure for a file
     ///
