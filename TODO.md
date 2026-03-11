@@ -985,7 +985,7 @@ Three commands added for rule development:
 - `setup` — setting up normalize
 - `analyze` — running analysis
 - `tree-sitter` — tree-sitter introspection
-- **Next**: add examples to individual `--help` output (needs server-less `after_help` support)
+- ~~**Next**: add examples to individual `--help` output~~ — DONE (91ad965f). server-less 0.4.2 splits multi-line doc comments at first blank line into `.about()` + `.after_help()`. 100+ methods across all services now have `Examples:` sections in `--help`.
 
 ## Syntax Ruleset Breadth
 
