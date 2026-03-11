@@ -1,0 +1,5 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+expression: "snapshot_help(&[\"structure\", \"check\"])"
+---
+

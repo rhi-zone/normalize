@@ -49,9 +49,9 @@ normalize rules run --rule no-grammar-loader-new
 normalize rules list
 
 # Authoring helpers
-normalize analyze ast <file>           # Show AST for a file
-normalize analyze ast <file> --at 42   # Show AST node at line 42
-normalize analyze query <file> <query> # Test query against file
+normalize syntax ast <file>           # Show AST for a file
+normalize syntax ast <file> --at 42   # Show AST node at line 42
+normalize syntax query <file> <query> # Test query against file
 ```
 
 ### Authoring Tools
@@ -60,7 +60,7 @@ To help write queries, expose AST inspection:
 
 ```bash
 # Dump full AST with node types
-$ normalize analyze ast src/main.rs
+$ normalize syntax ast src/main.rs
 (source_file
   (function_item
     name: (identifier) "main"
@@ -69,7 +69,7 @@ $ normalize analyze ast src/main.rs
         (call_expression ...)))))
 
 # Show node at cursor/line
-$ normalize analyze ast src/main.rs --at 42
+$ normalize syntax ast src/main.rs --at 42
 Line 42 is inside:
   call_expression (L42:5-42:30)
     function: scoped_identifier (L42:5-42:22)
@@ -78,7 +78,7 @@ Line 42 is inside:
     arguments: arguments (L42:23-42:30)
 
 # Test a query interactively
-$ normalize analyze query src/main.rs '(call_expression function: (scoped_identifier) @fn)'
+$ normalize syntax query src/main.rs '(call_expression function: (scoped_identifier) @fn)'
 3 matches:
   src/main.rs:42 - GrammarLoader::new()
   src/main.rs:55 - Config::load()
@@ -144,8 +144,8 @@ The `@match` capture is required and marks where the finding is reported.
 
 ### Phase 1: MVP
 
-1. `normalize analyze ast <file>` - dump AST
-2. `normalize analyze query <file> <query>` - test queries
+1. `normalize syntax ast <file>` - dump AST
+2. `normalize syntax query <file> <query>` - test queries
 3. Rule files with basic format
 4. `normalize rules run` - run all rules
 
@@ -187,6 +187,6 @@ Con: Learning curve for users unfamiliar with S-expressions
 ## Success Criteria
 
 - Can express "X only allowed in Y" rules
-- Authoring workflow is discoverable (`analyze ast`, `analyze query`)
+- Authoring workflow is discoverable (`syntax ast`, `syntax query`)
 - Performance: <100ms for typical project
 - Rules are portable (share in repos, copy between projects)

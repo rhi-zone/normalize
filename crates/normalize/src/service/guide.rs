@@ -23,9 +23,6 @@ pub struct GuideService;
 #[cli(name = "guide", description = "Workflow guides with examples")]
 impl GuideService {
     /// Writing and testing syntax rules
-    ///
-    /// Example:
-    ///   normalize guide rules
     pub fn rules(&self) -> Result<Guide, String> {
         Ok(Guide {
             topic: "rules".into(),
@@ -34,9 +31,6 @@ impl GuideService {
     }
 
     /// Exploring a codebase
-    ///
-    /// Example:
-    ///   normalize guide explore
     pub fn explore(&self) -> Result<Guide, String> {
         Ok(Guide {
             topic: "explore".into(),
@@ -45,9 +39,6 @@ impl GuideService {
     }
 
     /// Setting up normalize in a project
-    ///
-    /// Example:
-    ///   normalize guide setup
     pub fn setup(&self) -> Result<Guide, String> {
         Ok(Guide {
             topic: "setup".into(),
@@ -56,9 +47,6 @@ impl GuideService {
     }
 
     /// Running analysis on a codebase
-    ///
-    /// Example:
-    ///   normalize guide analyze
     pub fn analyze(&self) -> Result<Guide, String> {
         Ok(Guide {
             topic: "analyze".into(),
@@ -67,9 +55,6 @@ impl GuideService {
     }
 
     /// Using tree-sitter introspection commands
-    ///
-    /// Example:
-    ///   normalize guide tree-sitter
     pub fn tree_sitter(&self) -> Result<Guide, String> {
         Ok(Guide {
             topic: "tree-sitter".into(),
@@ -91,14 +76,14 @@ Shows all named types, anonymous types, and field names matching "raise".
 
 ## 2. See how target code parses
 
-  normalize analyze parse buggy_code.py
-  normalize analyze parse buggy_code.py --at 5:4      # subtree at line 5, col 4
-  normalize analyze parse buggy_code.py --depth 3     # limit depth
+  normalize syntax ast buggy_code.py
+  normalize syntax ast buggy_code.py --at 5:4      # subtree at line 5, col 4
+  normalize syntax ast buggy_code.py --depth 3     # limit depth
 
 ## 3. Draft and test a query interactively
 
-  normalize analyze query code.py '(raise_statement !cause) @match'
-  normalize analyze query code.py path/to/draft.scm
+  normalize syntax query code.py '(raise_statement !cause) @match'
+  normalize syntax query code.py path/to/draft.scm
 
 Each match shows captures with node kind, position, and text.
 
@@ -292,9 +277,9 @@ Shows named types, anonymous types (operators, punctuation), and field names.
 
 ## Parse a file into its CST
 
-  normalize analyze parse src/main.rs
-  normalize analyze parse src/main.rs --depth 3
-  normalize analyze parse src/main.rs --at 10:4
+  normalize syntax ast src/main.rs
+  normalize syntax ast src/main.rs --depth 3
+  normalize syntax ast src/main.rs --at 10:4
 
 Output shows every node with its kind, field name, position, and leaf text:
 
@@ -306,8 +291,8 @@ Output shows every node with its kind, field name, position, and leaf text:
 
 ## Run a query against a file
 
-  normalize analyze query file.py '(function_definition name: (identifier) @fn)'
-  normalize analyze query file.go path/to/query.scm
+  normalize syntax query file.py '(function_definition name: (identifier) @fn)'
+  normalize syntax query file.go path/to/query.scm
 
 Shows each match with captures:
 
@@ -328,6 +313,6 @@ Shows each match with captures:
 ## Workflow: unknown grammar
 
   normalize analyze node-types <lang>                    # what types exist?
-  normalize analyze parse sample.<ext> --depth 2         # how does it parse?
-  normalize analyze query sample.<ext> '(type) @m'       # does my query match?
+  normalize syntax ast sample.<ext> --depth 2         # how does it parse?
+  normalize syntax query sample.<ext> '(type) @m'       # does my query match?
 "#;

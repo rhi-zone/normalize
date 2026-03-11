@@ -104,20 +104,20 @@ Match nested structures:
 
 ### Authoring Helpers
 
-Use `normalize analyze ast` and `normalize analyze query` to develop rules interactively:
+Use `normalize syntax ast` and `normalize syntax query` to develop rules interactively:
 
 ```bash
 # Dump the full AST for a file
-normalize analyze ast src/main.rs
+normalize syntax ast src/main.rs
 
 # Show AST at a specific line
-normalize analyze ast src/main.rs --at 42
+normalize syntax ast src/main.rs -l 42
 
 # Test a query interactively
-normalize analyze query src/main.rs '(call_expression function: (identifier) @fn) @match'
+normalize syntax query '(call_expression function: (identifier) @fn) @match'
 
 # Test with source context
-normalize analyze query src/main.rs --show-source '(function_item) @match'
+normalize syntax query --show-source '(function_item) @match'
 ```
 
 ## Conditionals
@@ -338,10 +338,10 @@ normalize ships with 24 builtin rules:
 
 ## Tips
 
-- **Start with `normalize analyze ast`** to understand the AST structure of your target language.
+- **Start with `normalize syntax ast`** to understand the AST structure of your target language.
 - **Use `@_` prefixed captures** for predicate-only nodes to keep findings focused.
 - **Cross-language rules** work when the query nodes exist in the grammar. A rule without `languages` is validated per-grammar and silently skipped for incompatible languages.
-- **Test rules incrementally** with `normalize analyze query` before adding frontmatter.
+- **Test rules incrementally** with `normalize syntax query` before adding frontmatter.
 - **Prefer `#match?` over `#eq?`** when you need partial matching or case-insensitive patterns.
 - **Use `normalize rules run`** instead of `normalize analyze rules` — the unified command runs both syntax and fact rules.
 

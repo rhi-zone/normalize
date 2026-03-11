@@ -22,6 +22,3 @@ Options:
   -r, --root <root>                Root directory (defaults to current directory)
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
-
-Examples:
-normalize analyze trace "symbol_name"  # trace a symbol's provenance

@@ -67,7 +67,6 @@ Analyze codebase quality: health, complexity, security, duplicates, docs.
 | Subcommand | Description |
 |------------|-------------|
 | `docs` | Documentation coverage |
-| `check` | Run documentation checks: broken refs (`--refs`), stale docs (`--stale`), missing examples (`--examples`). Default: all |
 
 ### Cross-cutting
 | Subcommand | Description |

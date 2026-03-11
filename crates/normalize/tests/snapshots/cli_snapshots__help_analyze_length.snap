@@ -24,7 +24,3 @@ Options:
       --pretty                     Enable pretty
       --compact                    Enable compact
   -h, --help                       Print help
-
-Examples:
-normalize analyze length                    # top 10 longest functions
-normalize analyze length --threshold 50     # only functions above 50 lines

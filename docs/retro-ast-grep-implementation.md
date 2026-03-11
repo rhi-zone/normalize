@@ -2,7 +2,7 @@
 
 ## Summary
 
-Adding ast-grep pattern support to `normalize analyze query` took ~30 turns when it could have been done in ~10. This document analyzes why.
+Adding ast-grep pattern support to `normalize syntax query` took ~30 turns when it could have been done in ~10. This document analyzes why.
 
 ## What Was Built
 

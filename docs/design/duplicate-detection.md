@@ -103,7 +103,7 @@ The most common real-world motivation. Developer copies a function, tweaks a few
 
 Find places where an abstraction *could* be extracted — a recurring 15-line block across 8 functions that nobody noticed because they're spread across different files.
 
-**What helps:** This is actually a strong argument *for* both subtree-level matching and partial matching. `analyze query` requires you to already know what pattern you're looking for. Clone detection is the discovery step: it tells you "this block appears in N places" without you having to suspect it first.
+**What helps:** This is actually a strong argument *for* both subtree-level matching and partial matching. `syntax query` requires you to already know what pattern you're looking for. Clone detection is the discovery step: it tells you "this block appears in N places" without you having to suspect it first.
 
 Exact matching with elision catches Type 1/2. But real-world copy-paste-and-tweak produces Type 3: someone copies a 15-line block, tweaks 2 lines in each copy. Exact matching misses it entirely — yet that's precisely the case where the pattern has *lived long enough to drift*, which is the strongest refactoring signal. The copies aren't identical because the codebase grew around them.
 
@@ -131,7 +131,7 @@ When building context for an LLM, sending near-duplicate code wastes tokens and 
 
 Developer knows there's duplication around, say, error handling or config parsing, but doesn't know where. Wants to find all instances.
 
-**What helps:** `analyze query` with a tree-sitter pattern is more precise than clone detection here. Clone detection requires an existing instance to hash/match against.
+**What helps:** `syntax query` with a tree-sitter pattern is more precise than clone detection here. Clone detection requires an existing instance to hash/match against.
 
 **Verdict:** Not a strong fit for clone detection tools.
 

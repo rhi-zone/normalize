@@ -325,14 +325,11 @@ It doesn't work when parameter signatures diverge — that means they're differe
 - Added `--min-members` flag, `avg_similarity` per cluster (fuzzy mode), `unclustered_count` in report
 - Old command: `patterns` — deleted
 
-**`check`** — unifies `check-refs`, `stale-docs`, `check-examples`:
-- `normalize analyze check` → run all documentation checks (default)
-- `normalize analyze check --refs` → broken documentation references
-- `normalize analyze check --stale` → stale documentation
-- `normalize analyze check --examples` → missing example markers
+**`check`** — unified `check-refs`, `stale-docs`, `check-examples` (now subsumed by `normalize rules run --engine native`):
+- `normalize rules run --engine native` → run all native checks (refs, stale docs, stale summaries, examples)
 - Shared `DiagnosticsReport` struct (not an enum wrapper — all checks produce the same `Issue` type)
 - `DiagnosticsReport` in `normalize-output::diagnostics` — reusable by any issue-reporting command
-- Old commands: `check-refs`, `stale-docs`, `check-examples` — deleted
+- Old commands: `check-refs`, `stale-docs`, `check-examples` — deleted; `analyze check` also deleted
 - Output format: `file:line:col: severity [rule_id] message` (standard diagnostic format)
 
 **`dependents` absorbs `impact`** (Phase 3, 2026-03-09):

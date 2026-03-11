@@ -42,8 +42,6 @@ pub mod test_ratio;
 pub mod trace;
 pub mod trend;
 pub mod ts_node_types;
-pub mod ts_parse;
-pub mod ts_query;
 pub mod uniqueness;
 
 use crate::filter::Filter;

@@ -68,7 +68,7 @@ Docs reference by marker (syntax - not yet implemented):
 
     {​{example: tests/parser_test.rs#basic-usage}​}
 
-Validate with `normalize analyze check --examples`. Future: `normalize docs build` will expand these.
+Validate with `normalize rules run --engine native`. Future: `normalize docs build` will expand these.
 
 ## Implementation
 
@@ -79,12 +79,12 @@ Validate with `normalize analyze check --examples`. Future: `normalize docs buil
 
 ### Phase 2: External doc tracking
 - [x] `<!-- covers: ... -->` parser
-- [x] `normalize analyze check --stale` to detect stale docs
+- [x] `normalize rules run --engine native` to detect stale docs
 - [ ] Integration with `normalize view` to show related docs
 
 ### Phase 3: Example extraction
 - [x] `[example: name]` marker parser
-- [x] `{​{example: path#name}}` reference validation (`normalize analyze check --examples`)
+- [x] `{​{example: path#name}}` reference validation (`normalize rules run --engine native`)
 - [ ] `{​{example: path#name}}` expansion (future `normalize docs build`)
 - [ ] Test that examples compile/run
 

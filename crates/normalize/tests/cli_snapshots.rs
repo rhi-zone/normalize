@@ -143,16 +143,6 @@ fn test_help_edit_insert() {
     insta::assert_snapshot!(snapshot_help(&["edit", "insert"]));
 }
 
-#[test]
-fn test_help_edit_move() {
-    insta::assert_snapshot!(snapshot_help(&["edit", "move"]));
-}
-
-#[test]
-fn test_help_edit_copy() {
-    insta::assert_snapshot!(snapshot_help(&["edit", "copy"]));
-}
-
 // structure subcommands
 #[test]
 fn test_help_structure_rebuild() {
@@ -160,18 +150,28 @@ fn test_help_structure_rebuild() {
 }
 
 #[test]
-fn test_help_structure_stats() {
+fn test_help_facts_stats() {
     insta::assert_snapshot!(snapshot_help(&["structure", "stats"]));
 }
 
 #[test]
-fn test_help_structure_files() {
+fn test_help_facts_files() {
     insta::assert_snapshot!(snapshot_help(&["structure", "files"]));
 }
 
 #[test]
-fn test_help_structure_packages() {
+fn test_help_facts_packages() {
     insta::assert_snapshot!(snapshot_help(&["structure", "packages"]));
+}
+
+#[test]
+fn test_help_facts_rules() {
+    insta::assert_snapshot!(snapshot_help(&["structure", "rules"]));
+}
+
+#[test]
+fn test_help_facts_check() {
+    insta::assert_snapshot!(snapshot_help(&["structure", "check"]));
 }
 
 // daemon subcommands
@@ -300,16 +300,6 @@ fn test_help_analyze_duplicate_types() {
 #[test]
 fn test_help_analyze_all() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "all"]));
-}
-
-#[test]
-fn test_help_analyze_ast() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "ast"]));
-}
-
-#[test]
-fn test_help_analyze_query() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "query"]));
 }
 
 // sessions subcommands
