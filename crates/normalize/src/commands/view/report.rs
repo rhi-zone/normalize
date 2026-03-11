@@ -68,6 +68,9 @@ pub struct ViewFileReport {
     /// Formatted export lines
     pub exports: Vec<String>,
     pub node: ViewNode,
+    /// Warnings about unsupported features or missing capabilities
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
 }
 
 /// Symbol view with source code and imports.
@@ -240,6 +243,16 @@ fn render_dir(node: &ViewNode, opts: &FormatOptions) -> String {
 
 fn render_file(report: &ViewFileReport, opts: &FormatOptions, use_colors: bool) -> String {
     let mut text = format!("# {}\nLines: {}\n", report.path, report.line_count);
+    if !report.warnings.is_empty() {
+        text.push('\n');
+        for w in &report.warnings {
+            if use_colors {
+                text.push_str(&format!("\x1b[33mwarning:\x1b[0m {}\n", w));
+            } else {
+                text.push_str(&format!("warning: {}\n", w));
+            }
+        }
+    }
     if !report.imports.is_empty() {
         text.push_str("\n## Imports\n");
         for imp in &report.imports {

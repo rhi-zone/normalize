@@ -521,8 +521,11 @@ test detection etc. This is not "honest support" — it's a gap that must not be
 language that silently returns empty is misleading users who expect analysis and get nothing.
 - [ ] Audit: for each language, document which methods are genuinely unsupported by the grammar
       vs which are just unimplemented (the latter must be fixed, not accepted)
-- [ ] Warning: when analysis returns empty because the language impl doesn't support it (not
-      because the file has no symbols), surface a warning rather than silent empty output
+- [x] Warning: when analysis returns empty because the language impl doesn't support it (not
+      because the file has no symbols), surface a warning rather than silent empty output — DONE 2026-03-11.
+      `ViewFileReport` now has `warnings: Vec<String>` field; `build_view_file_service()` checks
+      `as_symbols()` and warns for data/config languages (JSON, YAML, TOML, HTML, CSS, XML).
+      Warnings appear in text, pretty, and JSON output.
 - [ ] Prioritize: Python, JavaScript/TypeScript, Go, Java, C, C++, Ruby, Rust (already good)
       are the high-value targets — full implementations, not boilerplate
 - [x] `refine_kind()` audit: Go, C#, C++, Swift, Kotlin now implement `refine_kind()` to

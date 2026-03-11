@@ -32,7 +32,18 @@ pub fn build_view_file_service(
         }));
     }
 
-    let grammar = support_for_path(&full_path).map(|s| s.grammar_name().to_string());
+    let support = support_for_path(&full_path);
+    let grammar = support.as_ref().map(|s| s.grammar_name().to_string());
+
+    let mut warnings = Vec::new();
+    if let Some(lang) = support
+        && lang.as_symbols().is_none()
+    {
+        warnings.push(format!(
+            "{} is a data/config language — symbol extraction is not supported",
+            lang.name()
+        ));
+    }
 
     let extractor = skeleton::SkeletonExtractor::new();
     let skeleton_result = extractor.extract(&full_path, &content);
@@ -81,5 +92,6 @@ pub fn build_view_file_service(
         imports,
         exports,
         node: view_node,
+        warnings,
     }))
 }
