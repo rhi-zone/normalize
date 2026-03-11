@@ -18,7 +18,7 @@ Commands:
   grammars   Manage tree-sitter grammars for parsing
   guide      Workflow guides with examples
   generate   Generate code from API spec
-  facts      Extract and query code facts (symbols, imports, calls)
+  structure  Manage the structural index (symbols, imports, calls)
   syntax     AST inspection and syntax rules
   package    Package management: info, list, tree, outdated
   sessions   Analyze agent session logs (Claude Code, Codex, Gemini)

@@ -156,7 +156,7 @@ impl OutputFormatter for SurfaceReport {
         out.push(String::new());
 
         if self.modules.is_empty() {
-            out.push("No symbol data found. Run `normalize facts rebuild` first.".to_string());
+            out.push("No symbol data found. Run `normalize structure rebuild` first.".to_string());
             return out.join("\n");
         }
 
@@ -222,7 +222,7 @@ impl OutputFormatter for SurfaceReport {
         out.push(String::new());
 
         if self.modules.is_empty() {
-            out.push("No symbol data found. Run `normalize facts rebuild` first.".to_string());
+            out.push("No symbol data found. Run `normalize structure rebuild` first.".to_string());
             return out.join("\n");
         }
 

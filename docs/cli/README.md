@@ -19,7 +19,7 @@ Normalize provides a unified CLI for code intelligence. Three core primitives: *
 ### Facts, Syntax & Rules
 | Command | Purpose |
 |---------|---------|
-| [facts](facts.md) | Manage code facts (symbols, imports, calls) |
+| [structure](structure.md) | Manage structural index (symbols, imports, calls) |
 | syntax | AST inspection and syntax rules (ast, query, rules) |
 | [rules](rules.md) | Manage and run analysis rules (`syntax rules`) |
 | [init](init.md) | Initialize normalize in a project |

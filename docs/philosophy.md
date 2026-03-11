@@ -10,16 +10,38 @@ Normalize is **structural code intelligence as a platform**. It provides tools f
 | User | Interface | Use Case |
 |------|-----------|----------|
 | Developer | CLI | Understand unfamiliar code, explore structure |
-| CI/CD | CLI | Quality gates, validation, analysis |
+| CI/CD | CLI | Quality gates, validation, linting |
 | Tool Builder | Library | Build custom tools on structural primitives |
+| Agent | CLI + JSON | Code intelligence for LLMs and automated workflows |
 
 LSP integration is a future direction — the groundwork (symbol extraction, scope analysis, references) is in place, but it's not a current interface.
 
+## Scope
+
+Normalize started as three composable primitives (view, edit, analyze) and grew into a code intelligence platform with ~22 top-level commands and 90+ entry points across a 38-crate workspace.
+
+The CLI surface today covers:
+
+| Domain | Commands | Examples |
+|--------|----------|----------|
+| Viewing & navigation | `view`, `grep`, `context` | File/symbol browsing, search, context extraction |
+| Editing | `edit` | Structural code modifications |
+| Analysis | `analyze` (40+ subcommands) | Complexity, duplication, coupling, test gaps, architecture |
+| Linting & rules | `rules` | Multi-engine rule system (syntax, fact, native, SARIF) |
+| Indexing | `structure` | Cross-file fact extraction (symbols, imports, calls) |
+| Package management | `package` | Dependency info, audit, outdated, tree |
+| Code generation | `generate`, `translate` | OpenAPI clients, type generation, syntax translation |
+| Developer tooling | `sessions`, `daemon`, `grammars`, `init` | Session analysis, background services, grammar management |
+| Introspection | `syntax`, `aliases`, `config` | Tree-sitter inspection, filter aliases, configuration |
+| Servers | `serve` | MCP, HTTP, LSP interfaces |
+
+The architectural principles below still hold — the system grew by applying them, not by abandoning them. View/edit/analyze remain the conceptual core, with supporting infrastructure built around them.
+
 ## Architecture
 
-Normalize is a structural codebase analysis toolkit. It understands code at the CST level via tree-sitter, extracts facts (symbols, imports, calls, complexity) into an index, and exposes them through three primary operations: `view` (read/navigate), `edit` (structural modification), and `analyze` (compute properties).
+Normalize is a structural codebase analysis toolkit. It understands code at the CST level via tree-sitter, extracts facts (symbols, imports, calls, complexity) into an index, and exposes them through commands organized around three conceptual operations: `view` (read/navigate), `edit` (structural modification), and `analyze` (compute properties), plus supporting infrastructure for linting, indexing, package management, and developer tooling.
 
-The index is an implementation detail — commands work with or without one, building what they need on demand.
+The index enables cross-file features (import resolution, dead code detection, dependency graphs). Single-file features — viewing, complexity, parsing — degrade gracefully without it. The index is not a prerequisite, but cross-file intelligence requires it.
 
 ---
 
@@ -32,7 +54,7 @@ The index is an implementation detail — commands work with or without one, bui
 When facing N use cases, prefer one flexible solution over N specialized ones. Composability reduces cognitive load, maintenance burden, and token cost.
 
 Examples:
-- Three primitives (view, edit, analyze) with rich options, not 100 specialized tools
+- Core operations (view, edit, analyze) with rich options, plus domain-grouped supporting commands — not 100 unrelated specialized tools
 - Log formats as plugins, not N hardcoded parsers
 - `--json` + `--jq` + `--pretty` flags, not `--format=X` for every format
 - Distros that compose, not fork
@@ -84,19 +106,23 @@ Uniform addressing with `/` everywhere:
 
 Same primitives work at every level.
 
-#### Three Primitives
+#### Conceptual Primitives
 
-| Primitive | Purpose | Composable options |
+The CLI is organized around three core operations, with supporting commands built around them:
+
+| Operation | Purpose | Composable options |
 |-----------|---------|-------------------|
 | `view` | See/find nodes | `--depth`, `--deps`, `--type`, `--calls`, `--called-by` |
 | `edit` | Modify a node | `--insert`, `--replace`, `--delete`, `--move` |
 | `analyze` | Compute properties | `--health`, `--complexity`, `--security` |
 
+These aren't the only commands — `rules`, `structure`, `grep`, `sessions`, and others exist as first-class entry points. But view/edit/analyze remain the conceptual core: understand code, modify code, measure code. Supporting commands (linting, indexing, configuration) exist to make those three operations richer.
+
 Depth controls expansion: `view src/ --depth 2` shows files and their top-level symbols. Filters compose: `view --type function --calls "db.*"` finds functions that call database code.
 
-Discoverability through simplicity. With 100+ tools, users can't find what they need. With 3 primitives and composable filters, the entire interface fits in working memory.
+Discoverability through structure. The CLI surface is larger than three commands, but the mental model stays simple: what am I trying to do — see something, change something, or measure something? Supporting commands are organized by domain (rules, grammars, sessions) so they're findable without memorizing an inventory.
 
-Put smarts in the tool, not the schema. Tool definitions cost context. With only 3 primitives, there's no ambiguity about which tool to use—the cognitive load disappears entirely.
+Put smarts in the tool, not the schema. Tool definitions cost context. A few well-understood entry points with composable options beat a flat list of specialized tools.
 
 #### Friction Minimization Loop
 
@@ -168,7 +194,7 @@ If a human can do it interactively, automation should be able to do it non-inter
 - Symbol search tolerates partial names and typos
 - Pattern: try exact → try fuzzy → try corrections → ask for clarification
 
-Note: With only 3 primitives, tool selection ambiguity is eliminated. This applies to path and symbol resolution, not tool choice.
+Note: The conceptual model (view/edit/analyze) reduces tool selection ambiguity. This principle applies to path and symbol resolution within commands.
 
 **Suggest obvious corrections**: When something seems wrong, suggest the likely fix. Not "here's what you could do" (overwhelming) but "did you mean X?" (helpful).
 - Symbol not found → "Did you mean: `normalize grep 'foo' file.rs`"
@@ -210,7 +236,9 @@ When structure is ambiguous, make a reasonable choice. When truly unclear, ask�
 - Composability: Small pieces combine flexibly
 - Refactorability: Can restructure without rewriting everything
 
-**Library-first**: The core should be a reusable Rust library (`crates/normalize/`). The CLI is a thin wrapper around it.
+The 38-crate workspace reflects this: domain logic lives in focused crates (`normalize-languages`, `normalize-facts`, `normalize-rules`, etc.), with the main `normalize` crate handling CLI wiring and service dispatch. The main crate is larger than ideal — extraction of analysis algorithms into domain crates is ongoing.
+
+**Library-first**: Domain crates should be reusable Rust libraries. The main crate (`crates/normalize/`) is the CLI consumer, not the home for reusable logic.
 
 **Everything is a plugin**: Where possible, use plugin protocols instead of hardcoded implementations. Even "native" integrations should implement the same plugin interface as third-party ones.
 

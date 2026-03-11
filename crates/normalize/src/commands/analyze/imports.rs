@@ -2,7 +2,7 @@
 //!
 //! Most-imported modules are load-bearing and essential.
 //! Least-imported modules are leaf utilities or potential dead weight.
-//! Requires a built facts index (`normalize facts rebuild`).
+//! Requires a built facts index (`normalize structure rebuild`).
 
 use crate::output::OutputFormatter;
 use serde::Serialize;
@@ -49,7 +49,7 @@ impl OutputFormatter for ImportCentralityReport {
         out.push(String::new());
 
         if self.entries.is_empty() {
-            out.push("No import data found. Run `normalize facts rebuild` first.".to_string());
+            out.push("No import data found. Run `normalize structure rebuild` first.".to_string());
             return out.join("\n");
         }
 

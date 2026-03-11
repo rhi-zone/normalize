@@ -1,32 +1,34 @@
 # CLI Design
 
-## Command Structure (18 top-level commands)
+## Command Structure (21 top-level commands)
 
 ### Core Operations
 - `view` - View directory/file/symbol structure
 - `grep` - Fast ripgrep-based text search
-- `edit` - Structural code modifications (delete, replace, swap, insert, undo, redo, history)
-- `analyze` - Codebase analysis (40 subcommands)
+- `edit` - Structural code modifications (delete, replace, swap, insert, undo, redo, goto, batch, history)
+- `analyze` - Codebase analysis (45 subcommands)
 - `syntax` - AST inspection (ast, query)
 - `rules` - Manage and run analysis rules (syntax + fact)
 
 ### Infrastructure
-- `structure` - Manage the structural index (symbols, imports, calls)
+- `facts` - Extract and query code facts (symbols, imports, calls)
+- `config` - Inspect and validate config files using JSON Schema
 - `daemon` - Background process management
 - `grammars` - Tree-sitter grammar management
 - `init` - Initialize normalize in a directory
 - `update` - Check for and install updates
 
 ### Ecosystem Integration
-- `sessions` - Agent session logs (Claude Code, Codex, Gemini, Normalize)
+- `sessions` - Agent session logs (Claude Code, Codex, Gemini)
   - `list`, `show`, `stats`, `messages`, `plans`
-- `package` - Package management (info, list, tree, outdated)
+- `package` - Package management (info, list, tree, why, outdated, audit)
 - `tools` - External tool orchestration
   - `lint` - Linters, formatters, type checkers
   - `test` - Test runners
 - `serve` - Server protocols (mcp, http, lsp)
 - `generate` - Code generation from API spec
 - `translate` - Translate code between languages
+- `guide` - Workflow guides with examples
 
 ### Utility
 - `aliases` - List filter aliases (used by --exclude/--only)
@@ -43,7 +45,7 @@ Bad: `list-sessions`, `list-grammars`, `list-packages`
 Good: `sessions`, `grammars list`, `package list`
 
 ### 3. Subcommands for related operations
-`analyze` has 40 subcommands because they're all "analysis" - one concept with variants.
+`analyze` has 45 subcommands because they're all "analysis" - one concept with variants.
 This is better than 40 top-level commands that pollute the namespace.
 
 ### 4. `list` as subcommand, not flag
@@ -61,11 +63,11 @@ Not: `--list` flag (inconsistent with above).
 
 ### 7. `--dry-run` on every mutating command
 
-Every command that writes, deletes, or modifies anything must support `--dry-run` to preview what would happen without doing it. No exceptions. This applies to `edit`, `init`, `update`, `syntax rules enable/disable`, and anything that touches files, config, or state. Read-only commands (`view`, `analyze`, `grep`) don't need it.
+Every command that writes, deletes, or modifies anything must support `--dry-run` to preview what would happen without doing it. No exceptions. This applies to `edit`, `init`, `update`, `rules enable/disable`, and anything that touches files, config, or state. Read-only commands (`view`, `analyze`, `grep`) don't need it.
 
 ### 8. Filters compose
 
-Multiple filters always AND together. There are no filter combinations that are invalid or undefined. A user who specifies `--tag debug-print --language rust --enabled` gets exactly the intersection: enabled debug-print rules for Rust. This applies uniformly across all commands that accept filters (`syntax rules list`, `syntax rules run`, `view`, `edit`, etc.).
+Multiple filters always AND together. There are no filter combinations that are invalid or undefined. A user who specifies `--tag debug-print --language rust --enabled` gets exactly the intersection: enabled debug-print rules for Rust. This applies uniformly across all commands that accept filters (`rules list`, `rules run`, `view`, `edit`, etc.).
 
 Corollary: never add a special-cased filter that only works alone or only works with certain other filters. If a filter can't compose, it's a flag, not a filter.
 
@@ -74,31 +76,32 @@ Output format flags (`--json`, `--jq`, `--pretty`, `--compact`) are defined once
 
 ## Entry Points
 
-Total: ~90 entry points (18 top-level + subcommands)
+Total: ~110 entry points (21 top-level + subcommands)
 
 Commands with most subcommands:
-- `analyze`: 41 (health, complexity, length, security, docs, files, trace, call-graph, graph, impact, coupling, coupling-clusters, hotspots, test-ratio, test-gaps, budget, duplicates, duplicate-types, fragments, architecture, depth-map, surface, layering, imports, provenance, skeleton-diff, trend, summary, module-health, density, uniqueness, ceremony, call-complexity, ownership, size, activity, contributors, repo-coupling, cross-repo-health, all)
-- `syntax rules`: 9 (list, run, enable, disable, show, tags, add, update, remove)
+- `analyze`: 45 (health, all, summary, complexity, complexity-trend, length, length-trend, ceremony, duplicates, duplicate-types, uniqueness, call-complexity, fragments, node-types, size, density, density-trend, module-health, imports, depth-map, surface, layering, docs, files, call-graph, trace, architecture, graph, dependents, coupling, coupling-clusters, hotspots, ownership, contributors, activity, repo-coupling, cross-repo-health, provenance, trend, test-ratio, test-gaps, budget, test-ratio-trend, security, skeleton-diff)
+- `rules`: 10 (list, run, enable, disable, show, tags, add, update, remove, validate)
+- `edit`: 10 (delete, replace, swap, insert, undo, redo, goto, batch, history)
 - `daemon`: 7 (status, stop, start, run, add, remove, list)
-- `edit`: 9 (delete, replace, swap, insert, undo, redo, goto, batch, history)
-- `sessions`: 5 (list, show, stats, messages, plans)
+- `sessions`: 6 (list, show, stats, messages, plans)
 - `package`: 6 (info, list, tree, why, outdated, audit)
 
-### `syntax rules` subcommand surface
+### `rules` subcommand surface
 
 ```
-syntax rules list     [--tag <tag>] [--language <lang>] [--enabled] [--disabled] [--type syntax|fact] [--expand]
-syntax rules run      [--tag <tag>] [--language <lang>] [--rule <id>] [--fix] [--dry-run]
-syntax rules show     <id>
-syntax rules tags     [--show-rules] [--tag <tag>]
-syntax rules enable   <tag-or-id>   [--dry-run]
-syntax rules disable  <tag-or-id>   [--dry-run]
-syntax rules add      <url>
-syntax rules update
-syntax rules remove   <id>
+rules list     [--tag <tag>] [--language <lang>] [--enabled] [--disabled] [--type syntax|fact] [--expand]
+rules run      [--tag <tag>] [--language <lang>] [--rule <id>] [--fix] [--dry-run]
+rules show     <id>
+rules tags     [--show-rules] [--tag <tag>]
+rules enable   <tag-or-id>   [--dry-run]
+rules disable  <tag-or-id>   [--dry-run]
+rules add      <url>
+rules update
+rules remove   <id>
+rules validate
 ```
 
-`--expand` on `syntax rules list` shows allow patterns, message, and first line of docs per rule. `syntax rules show <id>` renders the full documentation — rationale, examples, remediation, when to disable — accessible offline.
+`--expand` on `rules list` shows allow patterns, message, and first line of docs per rule. `rules show <id>` renders the full documentation — rationale, examples, remediation, when to disable — accessible offline.
 
 All filters on `list` and `run` compose (see principle #8). `enable`/`disable` accept either a rule ID or a tag name — when given a tag, they apply to all rules matching that tag.
 

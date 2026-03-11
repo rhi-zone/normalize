@@ -207,7 +207,7 @@ normalize sessions plans             # View agent plans
 Create `.normalize/config.toml`:
 
 ```toml
-[facts]
+[structure]
 # enabled = true
 
 [view]

@@ -43,8 +43,8 @@ fn test_help_history() {
 }
 
 #[test]
-fn test_help_facts() {
-    insta::assert_snapshot!(snapshot_help(&["facts"]));
+fn test_help_structure() {
+    insta::assert_snapshot!(snapshot_help(&["structure"]));
 }
 
 #[test]
@@ -153,35 +153,25 @@ fn test_help_edit_copy() {
     insta::assert_snapshot!(snapshot_help(&["edit", "copy"]));
 }
 
-// facts subcommands
+// structure subcommands
 #[test]
-fn test_help_facts_rebuild() {
-    insta::assert_snapshot!(snapshot_help(&["facts", "rebuild"]));
+fn test_help_structure_rebuild() {
+    insta::assert_snapshot!(snapshot_help(&["structure", "rebuild"]));
 }
 
 #[test]
-fn test_help_facts_stats() {
-    insta::assert_snapshot!(snapshot_help(&["facts", "stats"]));
+fn test_help_structure_stats() {
+    insta::assert_snapshot!(snapshot_help(&["structure", "stats"]));
 }
 
 #[test]
-fn test_help_facts_files() {
-    insta::assert_snapshot!(snapshot_help(&["facts", "files"]));
+fn test_help_structure_files() {
+    insta::assert_snapshot!(snapshot_help(&["structure", "files"]));
 }
 
 #[test]
-fn test_help_facts_packages() {
-    insta::assert_snapshot!(snapshot_help(&["facts", "packages"]));
-}
-
-#[test]
-fn test_help_facts_rules() {
-    insta::assert_snapshot!(snapshot_help(&["facts", "rules"]));
-}
-
-#[test]
-fn test_help_facts_check() {
-    insta::assert_snapshot!(snapshot_help(&["facts", "check"]));
+fn test_help_structure_packages() {
+    insta::assert_snapshot!(snapshot_help(&["structure", "packages"]));
 }
 
 // daemon subcommands

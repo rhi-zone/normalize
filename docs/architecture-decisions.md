@@ -124,7 +124,7 @@ Methods like `complexity_nodes()`, `nesting_nodes()`, `control_flow_kinds()`, `s
 
 **Decision**: The index (SQLite via libsql) is an implementation detail — commands build it on demand, cache it in `.normalize/`, and invalidate on file changes.
 
-The index is **not optional for cross-file features**. Call graphs, import resolution, cross-file references, and Datalog rules all require persistent indexed data. Commands that depend on these hard-fail without an index and prompt the user to run `normalize facts rebuild`.
+The index is **not optional for cross-file features**. Call graphs, import resolution, cross-file references, and Datalog rules all require persistent indexed data. Commands that depend on these hard-fail without an index and prompt the user to run `normalize structure rebuild`.
 
 Single-file operations (view, edit, within-file analysis) work without any index.
 

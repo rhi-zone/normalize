@@ -1,27 +1,24 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 47
-expression: "snapshot_help(&[\"facts\"])"
+expression: "snapshot_help(&[\"structure\", \"stats\"])"
 ---
-Extract and query code facts (symbols, imports, calls)
+Show index statistics (DB size vs codebase size)
 
-Usage: normalize facts [OPTIONS] [COMMAND]
-
-Commands:
-  rebuild   Rebuild the file index
-  stats     Show index statistics (DB size vs codebase size)
-  files     List indexed files (with optional prefix filter)
-  packages  Index external packages (stdlib, site-packages) into global cache
-  help      Print this message or the help of the given subcommand(s)
+Usage: normalize structure stats [OPTIONS]
 
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
       --pretty                     Human-friendly output with colors and formatting
+      --storage                    Show storage usage for index and caches
       --compact                    Compact output without colors (overrides TTY detection)
       --json                       Output machine-readable JSON
+  -r, --root <root>                Root directory (defaults to current directory)
       --jq <jq>                    Filter output through jq expression
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
-  -V, --version                    Print version
+
+Examples:
+normalize structure stats              # show symbol/call/import counts and DB size
+normalize structure stats --storage    # show storage usage for index and caches

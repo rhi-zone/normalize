@@ -127,4 +127,4 @@ normalize grep "TODO" --only "*.rs"
 - `normalize analyze` is the primary analysis command with 40 subcommands: health, complexity, security, hotspots, coupling, graph, duplicates, etc.
 - `normalize grep` for text search, `normalize view` for structural navigation
 - Use `--json` when you need to parse output programmatically
-- The facts DB (`.normalize/facts.db`) caches symbols for fast lookups
+- The structure DB (`.normalize/facts.db`) caches symbols for fast lookups

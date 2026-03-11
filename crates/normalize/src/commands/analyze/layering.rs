@@ -211,7 +211,7 @@ impl OutputFormatter for LayeringReport {
         out.push(String::new());
 
         if self.modules.is_empty() {
-            out.push("No import data found. Run `normalize facts rebuild` first.".to_string());
+            out.push("No import data found. Run `normalize structure rebuild` first.".to_string());
             return out.join("\n");
         }
 
@@ -336,7 +336,7 @@ impl OutputFormatter for LayeringReport {
         out.push(String::new());
 
         if self.modules.is_empty() {
-            out.push("No import data found. Run `normalize facts rebuild` first.".to_string());
+            out.push("No import data found. Run `normalize structure rebuild` first.".to_string());
             return out.join("\n");
         }
 

@@ -1,14 +1,17 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-expression: "snapshot_help(&[\"facts\", \"rebuild\"])"
+expression: "snapshot_help(&[\"structure\", \"files\"])"
 ---
-Rebuild the file index
+List indexed files (with optional prefix filter)
 
-Usage: normalize facts rebuild [OPTIONS]
+Usage: normalize structure files [OPTIONS] [prefix]
+
+Arguments:
+  [prefix]  Filter files by prefix
 
 Options:
-      --include <include>          What to extract: symbols, calls, imports (comma-separated)
       --jsonl                      Output one JSON object per line (for arrays)
+  -l, --limit <limit>              Maximum number of files to show
       --pretty                     Human-friendly output with colors and formatting
       --compact                    Compact output without colors (overrides TTY detection)
       --json                       Output machine-readable JSON
@@ -20,6 +23,6 @@ Options:
   -h, --help                       Print help
 
 Examples:
-normalize structure rebuild                          # rebuild with all content types
-normalize structure rebuild --include symbols        # only extract symbols
-normalize structure rebuild --include calls,imports  # extract calls and imports
+normalize structure files                    # list all indexed files
+normalize structure files src/               # list files under src/
+normalize structure files -l 10              # show only the first 10 files

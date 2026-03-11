@@ -86,6 +86,14 @@ Ordered by impact × tractability. Pick from top.
 
 ## Immediate Fixes
 
+### server-less: `name` attribute ignored for nested service fields
+
+**Bug**: `#[cli(name = "structure")]` on a nested service's impl block is ignored when the service
+is registered as a field in the parent struct. The CLI subcommand name comes from the **field name**,
+not the `name` attribute. Discovered when `facts: FactsService` showed as `facts` despite
+`name = "structure"` in the `#[cli]` attribute. Workaround: rename the field. Fix needed in
+server-less proc macro — nested service `name` should override field name.
+
 ### ~~`sessions stats --group-by` not wired up~~ DONE
 
 Added `--group-by <fields>` param to `stats` service method. When present, parses

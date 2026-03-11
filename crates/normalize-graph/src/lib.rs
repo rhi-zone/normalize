@@ -1036,7 +1036,7 @@ impl OutputFormatter for GraphReport {
         out.push(String::new());
 
         if s.nodes == 0 {
-            out.push("No data found. Run `normalize facts rebuild` first.".to_string());
+            out.push("No data found. Run `normalize structure rebuild` first.".to_string());
             return out.join("\n");
         }
 
@@ -1223,7 +1223,7 @@ impl OutputFormatter for GraphReport {
         out.push(String::new());
 
         if s.nodes == 0 {
-            out.push("No data found. Run `normalize facts rebuild` first.".to_string());
+            out.push("No data found. Run `normalize structure rebuild` first.".to_string());
             return out.join("\n");
         }
 

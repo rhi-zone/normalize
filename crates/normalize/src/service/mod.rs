@@ -53,7 +53,7 @@ pub struct NormalizeService {
     config: config::ConfigService,
     daemon: daemon::DaemonService,
     edit: edit::EditService,
-    facts: facts::FactsService,
+    structure: facts::FactsService,
     grammars: grammars::GrammarService,
     guide: guide::GuideService,
     generate: generate::GenerateService,
@@ -89,7 +89,7 @@ impl NormalizeService {
             edit: edit::EditService {
                 history: history::HistoryService,
             },
-            facts: facts::FactsService::new(&pretty),
+            structure: facts::FactsService::new(&pretty),
             grammars: grammars::GrammarService::new(&pretty),
             guide: guide::GuideService,
             generate: generate::GenerateService,
@@ -829,9 +829,9 @@ impl NormalizeService {
         &self.generate
     }
 
-    /// Extract and query code facts (symbols, imports, calls)
-    pub fn facts(&self) -> &facts::FactsService {
-        &self.facts
+    /// Manage the structural index (symbols, imports, calls)
+    pub fn structure(&self) -> &facts::FactsService {
+        &self.structure
     }
 
     /// AST inspection and syntax rules
