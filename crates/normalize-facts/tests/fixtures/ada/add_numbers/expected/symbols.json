@@ -26,5 +26,19 @@
     "name": "Add",
     "parent": "Math_Utils",
     "start_line": 2
+  },
+  {
+    "file": "math_utils.ads",
+    "kind": "Module",
+    "name": "Math_Utils",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "math_utils.ads",
+    "kind": "Type",
+    "name": "Number",
+    "parent": "Math_Utils",
+    "start_line": 2
   }
 ]

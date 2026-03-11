@@ -1,6 +1,6 @@
 //! SCSS language support.
 
-use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 /// SCSS language support.
@@ -78,9 +78,133 @@ impl Language for Scss {
         }
     }
 
+    fn refine_kind(&self, node: &Node, _content: &str, tag_kind: SymbolKind) -> SymbolKind {
+        match node.kind() {
+            "media_statement" | "supports_statement" | "keyframes_statement" => SymbolKind::Module,
+            _ => tag_kind,
+        }
+    }
+
+    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
+        match node.kind() {
+            "mixin_statement" | "function_statement" => {
+                let name_node = node.child_by_field_name("name")?;
+                Some(content[name_node.byte_range()].trim())
+            }
+            "rule_set" => {
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    if child.kind() == "selectors" {
+                        return Some(content[child.byte_range()].trim());
+                    }
+                }
+                None
+            }
+            "media_statement" => extract_at_rule_name(node, content, "@media"),
+            "supports_statement" => extract_at_rule_name(node, content, "@supports"),
+            "keyframes_statement" => {
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    if child.kind() == "keyframes_name" {
+                        return Some(content[child.byte_range()].trim());
+                    }
+                }
+                None
+            }
+            "declaration" => {
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    if child.kind() == "property_name" {
+                        return Some(content[child.byte_range()].trim());
+                    }
+                }
+                None
+            }
+            _ => node
+                .child_by_field_name("name")
+                .map(|n| content[n.byte_range()].trim()),
+        }
+    }
+
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
-        node.child_by_field_name("body")
-            .or_else(|| node.child_by_field_name("block"))
+        match node.kind() {
+            "rule_set" | "media_statement" | "supports_statement" | "keyframes_statement" => {
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    if child.kind() == "block" || child.kind() == "keyframe_block_list" {
+                        return Some(child);
+                    }
+                }
+                None
+            }
+            _ => node
+                .child_by_field_name("body")
+                .or_else(|| node.child_by_field_name("block")),
+        }
+    }
+
+    fn build_signature(&self, node: &Node, content: &str) -> String {
+        if let Some(name) = self.node_name(node, content) {
+            match node.kind() {
+                "mixin_statement" => {
+                    // Include parameters if present
+                    let mut cursor = node.walk();
+                    for child in node.children(&mut cursor) {
+                        if child.kind() == "parameters" {
+                            let params = content[child.byte_range()].trim();
+                            return format!(
+                                "@mixin {}({}) {{ … }}",
+                                name,
+                                params.trim_matches(|c| c == '(' || c == ')')
+                            );
+                        }
+                    }
+                    format!("@mixin {} {{ … }}", name)
+                }
+                "function_statement" => {
+                    let mut cursor = node.walk();
+                    for child in node.children(&mut cursor) {
+                        if child.kind() == "parameters" {
+                            let params = content[child.byte_range()].trim();
+                            return format!(
+                                "@function {}({}) {{ … }}",
+                                name,
+                                params.trim_matches(|c| c == '(' || c == ')')
+                            );
+                        }
+                    }
+                    format!("@function {} {{ … }}", name)
+                }
+                "rule_set" => format!("{} {{ … }}", name),
+                "media_statement" => format!("@media {} {{ … }}", name),
+                "supports_statement" => format!("@supports {} {{ … }}", name),
+                "keyframes_statement" => format!("@keyframes {} {{ … }}", name),
+                "declaration" => {
+                    let mut cursor = node.walk();
+                    let mut found_name = false;
+                    for child in node.children(&mut cursor) {
+                        if child.kind() == "property_name" {
+                            found_name = true;
+                        } else if found_name && child.kind() != ":" && child.kind() != ";" {
+                            let val = content[child.byte_range()].trim();
+                            if val.len() > 40 {
+                                return format!("{}: {}…", name, &val[..37]);
+                            }
+                            return format!("{}: {}", name, val);
+                        }
+                    }
+                    name.to_string()
+                }
+                _ => name.to_string(),
+            }
+        } else {
+            content[node.byte_range()]
+                .lines()
+                .next()
+                .unwrap_or("")
+                .trim()
+                .to_string()
+        }
     }
 
     fn analyze_container_body(
@@ -95,6 +219,19 @@ impl Language for Scss {
 
 impl LanguageSymbols for Scss {}
 
+/// Extract the text between an at-rule keyword and its block.
+fn extract_at_rule_name<'a>(node: &Node, content: &'a str, keyword: &str) -> Option<&'a str> {
+    let full = &content[node.byte_range()];
+    let after_keyword = full.strip_prefix(keyword)?.trim_start();
+    let name = after_keyword.split('{').next()?.trim();
+    if name.is_empty() {
+        return None;
+    }
+    let start = node.start_byte() + full.find(name)?;
+    let end = start + name.len();
+    Some(&content[start..end])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -107,17 +244,18 @@ mod tests {
         let documented_unused: &[&str] = &[
             "at_root_statement", "binary_expression", "call_expression",
             "charset_statement", "class_name", "class_selector", "debug_statement",
-            "declaration", "else_clause", "else_if_clause", "error_statement",
+            "else_clause", "else_if_clause", "error_statement",
             "extend_statement", "function_name", "identifier", "important",
             "important_value", "include_statement", "keyframe_block",
-            "keyframe_block_list", "keyframes_statement", "media_statement",
+            "keyframe_block_list",
             "namespace_statement", "postcss_statement", "pseudo_class_selector",
-            "return_statement", "scope_statement", "supports_statement", "warn_statement",
+            "return_statement", "scope_statement", "warn_statement",
+            // Structural — used in container_body but not definition kinds
+            "block",
             // Control flow — not definition kinds
-            "block", "each_statement", "for_statement", "if_statement", "while_statement",
+            "each_statement", "for_statement", "if_statement", "while_statement",
             // Module system — handled in extract_imports, not as symbols
             "forward_statement", "import_statement", "use_statement",
-            // control flow — not extracted as symbols
 
         ];
         validate_unused_kinds_audit(&Scss, documented_unused)

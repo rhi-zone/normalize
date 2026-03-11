@@ -33,5 +33,33 @@
     "name": "calculator_compute",
     "parent": null,
     "start_line": 16
+  },
+  {
+    "file": "math.h",
+    "kind": "Function",
+    "name": "add",
+    "parent": null,
+    "start_line": 9
+  },
+  {
+    "file": "math.h",
+    "kind": "Function",
+    "name": "multiply",
+    "parent": null,
+    "start_line": 10
+  },
+  {
+    "file": "math.h",
+    "kind": "Function",
+    "name": "calculator_init",
+    "parent": null,
+    "start_line": 11
+  },
+  {
+    "file": "math.h",
+    "kind": "Function",
+    "name": "calculator_compute",
+    "parent": null,
+    "start_line": 12
   }
 ]

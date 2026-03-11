@@ -7,6 +7,27 @@
     "start_line": 1
   },
   {
+    "file": "main.pro",
+    "kind": "Module",
+    "name": "use_module",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "main.pro",
+    "kind": "Function",
+    "name": "compute",
+    "parent": null,
+    "start_line": 3
+  },
+  {
+    "file": "main.pro",
+    "kind": "Module",
+    "name": "initialization",
+    "parent": null,
+    "start_line": 16
+  },
+  {
     "file": "math_utils.pro",
     "kind": "Module",
     "name": "module",

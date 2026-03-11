@@ -158,11 +158,13 @@ mod tests {
     fn unused_node_kinds_audit() {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
-            "binary_expression", "call_expression", "charset_statement",
+            "binary_expression", "block", "call_expression", "charset_statement",
+            "class_name", "class_selector",
             "function_name",
             "identifier", "import_statement", "important", "important_value",
+            "keyframe_block", "keyframe_block_list",
             "namespace_statement", "postcss_statement",
-            "scope_statement",
+            "pseudo_class_selector", "scope_statement",
         ];
         validate_unused_kinds_audit(&Css, documented_unused)
             .expect("CSS unused node kinds audit failed");
