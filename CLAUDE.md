@@ -39,7 +39,7 @@ Behavioral rules for Claude Code in this repository.
 
 **Goal: maximum quality for every language we support.** Every supported language should have the best extraction we can provide — symbols, imports, calls, complexity, types — unless the language genuinely lacks a concept (e.g. Bash has no type system). "We haven't gotten to it yet" is a gap to close, not a state to accept.
 
-**Writing custom grammars is on the table.** We've already written our own Jinja2 grammar when the ecosystem didn't have what we needed. If a tree-sitter grammar doesn't exist or is too limited for a language we want to support well, writing or forking one is a valid approach.
+**Grammars come from arborium or us.** We use arborium exclusively for curated grammars (we trust amos wenger's taste). For any language not in arborium's set, we write our own grammar — the Jinja2 grammar set this precedent. Don't pull in random tree-sitter grammars from the ecosystem.
 
 **When adding or improving a language:**
 1. Add all applicable `.scm` query files (tags, imports, calls, complexity, types)
