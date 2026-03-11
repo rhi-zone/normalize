@@ -13,15 +13,15 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ## P0 — Blocking / Broken / Incoherent
 
-### server-less UX issues (fix in server-less, not normalize)
+### server-less UX issues — ~~all fixed~~ (server-less commit 9c294b2)
 
-1. **`name` attribute ignored for nested services**: `#[cli(name = "structure")]` on a nested service's impl block is ignored — CLI subcommand name comes from the field name. Workaround: rename the field. Fix in proc macro.
-2. **No error for helper methods in `#[cli]` block**: Every `&self` method becomes a subcommand. Putting a `display_*` helper inside the `#[cli]` impl block silently creates a broken subcommand. Should error or warn at compile time.
-3. **`display_with` across impl blocks is non-obvious**: Works but nothing signals this is possible. Better docs or a compile-time hint when `display_with` target isn't found in the same block.
+1. ~~**`name` attribute ignored for nested services**~~: Fixed — `#[cli(name = "...")]` now works on individual methods (leaf and mount). `get_cli_name()` helper added.
+2. ~~**No error for helper methods in `#[cli]` block**~~: Fixed — added `#[cli(helper)]` as a self-documenting alias for `#[cli(skip)]`. Module docs updated.
+3. ~~**`display_with` across impl blocks is non-obvious**~~: Fixed — module docs now explicitly document that `display_with` functions can live in any impl block on the same type.
 
-### Session analysis bug
+### ~~Session analysis bug~~ (already fixed)
 
-**Bug: `Turn::token_usage` only captures the last API call per turn.** In `claude_code.rs`, `last_request_id` is overwritten on each assistant entry — so multi-round turns (user → tool call → tool result → final answer) only account for the final API call. Fix: accumulate all `requestId`s seen within a turn (`turn_request_ids: Vec<String>`) and sum their `request_tokens` on flush.
+~~**Bug: `Turn::token_usage` only captures the last API call per turn.**~~ Already fixed in claude_code.rs — `turn_request_ids: Vec<String>` accumulates all request IDs and `sum_turn_tokens` sums them on flush.
 
 ### LSP diagnostics improvements (basic implementation done, needs incrementality)
 
