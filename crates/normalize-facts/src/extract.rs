@@ -671,11 +671,14 @@ fn collect_symbols_from_tags<'tree>(
             None => continue,
         };
 
+        // Apply language-specific kind refinement before determining container status,
+        // so languages like JSON can promote Variable → Module for object-valued pairs.
+        let refined_kind = support.refine_kind(&def_node, content, kind);
         defs.push(TagDef {
             node: def_node,
             kind,
             is_method_capture: capture_name == "definition.method",
-            is_container: is_container_kind(kind),
+            is_container: is_container_kind(refined_kind),
             start_line: def_node.start_position().row + 1,
             end_line: def_node.end_position().row + 1,
         });
