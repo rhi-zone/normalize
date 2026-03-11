@@ -284,5 +284,14 @@ enabled = true
 [rules."broken-ref"]
 allow = ["CHANGELOG.md"]
 
+[rules."go/context-todo"]
+enabled = false
+
+[rules."typescript/no-non-null-assertion"]
+enabled = false
+
+[rules."ruby/string-concat"]
+enabled = false
+
 [aliases]
 todo = ["TODO.md"]

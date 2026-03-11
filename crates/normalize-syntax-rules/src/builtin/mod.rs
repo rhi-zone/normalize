@@ -93,6 +93,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "typescript/no-any",
         content: include_str!("typescript_no_any.scm"),
     },
+    BuiltinRule {
+        id: "typescript/no-non-null-assertion",
+        content: include_str!("typescript_no_non_null_assertion.scm"),
+    },
     // Python rules
     BuiltinRule {
         id: "python/print-debug",
@@ -147,6 +151,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "go/defer-in-loop",
         content: include_str!("go_defer_in_loop.scm"),
     },
+    BuiltinRule {
+        id: "go/context-todo",
+        content: include_str!("go_context_todo.scm"),
+    },
     // Ruby rules
     BuiltinRule {
         id: "ruby/binding-pry",
@@ -163,6 +171,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
     BuiltinRule {
         id: "ruby/puts-in-lib",
         content: include_str!("ruby_puts_in_lib.scm"),
+    },
+    BuiltinRule {
+        id: "ruby/string-concat",
+        content: include_str!("ruby_string_concat.scm"),
     },
     // Cross-language rules
     BuiltinRule {
