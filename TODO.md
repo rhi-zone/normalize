@@ -67,14 +67,14 @@ tool, another command). Don't extract for line count alone.
 **Feasible gaps (grammar supports it, .scm not written):**
 
 High-value:
-- [ ] TSX imports.scm (reuse TypeScript logic)
-- [ ] Svelte imports.scm (JS imports in `<script>`)
-- [ ] Vue imports.scm (same)
+- [x] TSX imports.scm (reuse TypeScript logic)
+- [x] ~~Svelte imports.scm~~ — grammar produces opaque import_statement nodes; extraction handled by Rust extract_imports() + embedded JS injection
+- [x] ~~Vue imports.scm~~ — grammar doesn't parse JS content; extraction depends entirely on embedded JS injection
 - [x] ~~GraphQL imports.scm~~ — genuinely no import syntax in grammar (federation directives are just regular directives)
 - [x] ~~SQL imports.scm~~ — genuinely no import syntax modeled in grammar (IMPORT FOREIGN SCHEMA not in tree-sitter-sql)
-- [ ] Jinja2 calls.scm (macro/filter invocations)
-- [ ] Thrift tags.scm (struct/service/enum defs)
-- [ ] Dockerfile tags.scm (build stages)
+- [x] Jinja2 calls.scm (function/method/filter/test/call-statement)
+- [x] Thrift tags.scm (struct/union/exception/enum/service/function/typedef/const)
+- [x] Dockerfile tags.scm (FROM...AS stages, ARG, ENV)
 
 80% languages (missing types.scm — assess feasibility per-language):
 - [ ] AWK, Fish, Zsh, Vim, Typst, SCSS, Jq, Meson, CMake, Perl, Prolog

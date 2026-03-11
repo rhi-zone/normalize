@@ -753,6 +753,7 @@ fn bundled_calls_query(name: &str) -> Option<&'static str> {
         "svelte" => Some(include_str!("queries/svelte.calls.scm")),
         "vue" => Some(include_str!("queries/vue.calls.scm")),
         "jq" => Some(include_str!("queries/jq.calls.scm")),
+        "jinja2" => Some(include_str!("queries/jinja2.calls.scm")),
         _ => None,
     }
 }
@@ -1093,6 +1094,7 @@ mod tests {
             "vb",
             "commonlisp",
             "scss",
+            "jinja2",
         ] {
             let query = bundled_calls_query(lang);
             assert!(query.is_some(), "Missing bundled calls query for {lang}");
