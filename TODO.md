@@ -531,7 +531,10 @@ language that silently returns empty is misleading users who expect analysis and
       XML now also fully support symbol extraction — DONE 2026-03-11. CSS: rule_set selectors as
       Class, media/supports/keyframes as Module containers, declarations as Variable. HTML/XML:
       elements with children as Module, leaf elements as Variable, with id/class attributes in
-      signatures.
+      signatures. TOML inline table noise fixed: `node_name` returns None for pairs inside
+      `inline_table`; `table_array_element` now captured + handled; `build_symbol_from_def` None
+      changed from `?` (abort all) to skip-and-continue. Also fixed pre-existing extraction bug:
+      `build_symbol_from_def` returning None would abort ALL symbol extraction via `?` propagation.
 - [x] Prioritize: Top 8 (Rust, Python, Go, Java, C, C++, Ruby, JS/TS) fully audited. Mid-tier
       (Dart, PHP, Kotlin, Swift, C#, Scala) now complete: Dart docstring, Scala visibility,
       PHP attributes added 2026-03-11. Remaining gaps in lower-priority languages (Haskell

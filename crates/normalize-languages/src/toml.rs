@@ -23,7 +23,7 @@ impl Language for Toml {
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
         match node.kind() {
-            "table" | "array_table" => {
+            "table" | "array_table" | "table_array_element" => {
                 // First bare_key child is the section name
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
@@ -34,6 +34,10 @@ impl Language for Toml {
                 None
             }
             "pair" => {
+                // Skip pairs inside inline_table (they appear as noise siblings)
+                if is_inside_inline_table(node) {
+                    return None;
+                }
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
                     if child.kind() == "bare_key" || child.kind() == "quoted_key" {
@@ -49,8 +53,13 @@ impl Language for Toml {
     fn build_signature(&self, node: &Node, content: &str) -> String {
         if let Some(key) = self.node_name(node, content) {
             match node.kind() {
-                "table" | "array_table" => {
-                    return format!("[{}]", key);
+                "table" | "array_table" | "table_array_element" => {
+                    let brackets = if node.kind() == "table_array_element" {
+                        ("[[", "]]")
+                    } else {
+                        ("[", "]")
+                    };
+                    return format!("{}{}{}", brackets.0, key, brackets.1);
                 }
                 "pair" => {
                     // Find value child (after the = sign)
@@ -80,6 +89,18 @@ impl Language for Toml {
 }
 
 impl LanguageSymbols for Toml {}
+
+/// Check if a node is inside an inline_table by walking up the parent chain.
+fn is_inside_inline_table(node: &Node) -> bool {
+    let mut current = node.parent();
+    while let Some(n) = current {
+        if n.kind() == "inline_table" {
+            return true;
+        }
+        current = n.parent();
+    }
+    false
+}
 
 #[cfg(test)]
 mod tests {

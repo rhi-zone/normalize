@@ -728,7 +728,11 @@ fn collect_symbols_from_tags<'tree>(
 
         let in_container = enclosing_ci.is_some();
 
-        let mut sym = build_symbol_from_def(def, content, support, in_container)?;
+        let Some(mut sym) = build_symbol_from_def(def, content, support, in_container) else {
+            symbols.push(None);
+            parent_of.push(None);
+            continue;
+        };
 
         if !include_private
             && matches!(

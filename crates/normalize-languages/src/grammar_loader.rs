@@ -1279,7 +1279,10 @@ mod tests {
     #[test]
     fn test_tags_queries_compile() {
         let loader = GrammarLoader::new();
-        let langs = ["zig", "clojure", "scheme", "nix", "prolog"];
+        let langs = [
+            "zig", "clojure", "scheme", "nix", "prolog", "toml", "json", "yaml", "css", "html",
+            "xml",
+        ];
         for lang in langs {
             let tags = loader.get_tags(lang);
             assert!(
