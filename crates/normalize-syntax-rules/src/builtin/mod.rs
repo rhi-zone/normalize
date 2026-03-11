@@ -105,6 +105,14 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "typescript/no-non-null-assertion",
         content: include_str!("typescript_no_non_null_assertion.scm"),
     },
+    BuiltinRule {
+        id: "typescript/no-empty-interface",
+        content: include_str!("typescript_no_empty_interface.scm"),
+    },
+    BuiltinRule {
+        id: "typescript/no-inferrable-types",
+        content: include_str!("typescript_no_inferrable_types.scm"),
+    },
     // Python rules
     BuiltinRule {
         id: "python/print-debug",
@@ -133,6 +141,14 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
     BuiltinRule {
         id: "python/assert-in-non-test",
         content: include_str!("python_assert.scm"),
+    },
+    BuiltinRule {
+        id: "python/use-enumerate",
+        content: include_str!("python_use_enumerate.scm"),
+    },
+    BuiltinRule {
+        id: "python/raise-without-from",
+        content: include_str!("python_raise_without_from.scm"),
     },
     // Go rules
     BuiltinRule {
@@ -187,6 +203,14 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
     BuiltinRule {
         id: "ruby/string-concat",
         content: include_str!("ruby_string_concat.scm"),
+    },
+    BuiltinRule {
+        id: "ruby/double-negation",
+        content: include_str!("ruby_double_negation.scm"),
+    },
+    BuiltinRule {
+        id: "ruby/open-struct",
+        content: include_str!("ruby_open_struct.scm"),
     },
     // Cross-language rules
     BuiltinRule {
