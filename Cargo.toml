@@ -102,7 +102,7 @@ toml = "0.8"
 roxmltree = "0.21"
 
 # Service framework
-server-less = { version = "0.4.2", default-features = false, features = ["cli", "jsonschema", "config"] }
+server-less = { version = "0.4.3", default-features = false, features = ["cli", "jsonschema", "config"] }
 
 # JSON Schema validation
 jsonschema = "0.26"
