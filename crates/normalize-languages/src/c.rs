@@ -44,6 +44,20 @@ impl Language for C {
         None
     }
 
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        let mut attrs = Vec::new();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            match child.kind() {
+                "attribute_declaration" | "attribute_specifier" | "ms_declspec_modifier" => {
+                    attrs.push(content[child.byte_range()].trim().to_string());
+                }
+                _ => {}
+            }
+        }
+        attrs
+    }
+
     fn build_signature(&self, node: &Node, content: &str) -> String {
         match node.kind() {
             "function_definition" => {
@@ -233,8 +247,8 @@ mod tests {
 
             // OTHER
             "alignas_qualifier",       // alignas
-            "attribute_declaration",   // [[attr]]
-            "attribute_specifier",     // __attribute__
+            "attribute_declaration",   // [[attr]] — used by extract_attributes (not detectable by audit)
+            "attribute_specifier",     // __attribute__ — used by extract_attributes
             "attributed_statement",    // stmt with attr
             "expression_statement",    // expr;
             "gnu_asm_qualifier",       // asm qualifiers
@@ -244,7 +258,7 @@ mod tests {
             // MS EXTENSIONS
             "ms_based_modifier",       // __based
             "ms_call_modifier",        // __cdecl
-            "ms_declspec_modifier",    // __declspec
+            "ms_declspec_modifier",    // __declspec — used by extract_attributes
             "ms_pointer_modifier",     // __ptr32
             "ms_restrict_modifier",    // __restrict
             "ms_signed_ptr_modifier",  // __sptr
