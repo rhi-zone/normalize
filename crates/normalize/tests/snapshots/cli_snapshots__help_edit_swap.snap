@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 138
 expression: "snapshot_help(&[\"edit\", \"swap\"])"
 ---
 Swap two symbols
@@ -27,3 +26,7 @@ Options:
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -r, --root <root>                Root directory
   -h, --help                       Print help
+
+Examples:
+normalize edit swap src/lib.rs/fn_a fn_b             # swap two functions in the same file
+normalize edit swap src/lib.rs/fn_a fn_b --dry-run   # preview the swap

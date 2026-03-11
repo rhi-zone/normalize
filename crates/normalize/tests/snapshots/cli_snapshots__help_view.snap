@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 32
 expression: "snapshot_help(&[\"view\"])"
 ---
 View a node in the codebase tree (directory, file, or symbol)
@@ -40,3 +39,15 @@ Options:
   -i, --case-insensitive           Case-insensitive symbol matching
       --history <history>          Show git history for symbol (last N changes)
   -h, --help                       Print help
+
+Examples:
+normalize view                           # top-level directory tree
+normalize view src/                      # expand a subdirectory
+normalize view src/main.rs               # file skeleton (functions, classes)
+normalize view src/main.rs/ClassName     # single symbol and its children
+normalize view SymbolName                # search by symbol name
+normalize view file.rs:42                # jump to line 42
+normalize view src/ --depth 2            # deeper expansion
+normalize view src/main.rs --full        # full source code
+normalize view src/main.rs --deps        # show imports/exports
+normalize view src/main.rs --context     # skeleton + imports combined

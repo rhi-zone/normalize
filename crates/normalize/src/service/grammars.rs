@@ -70,6 +70,10 @@ impl std::fmt::Display for GrammarInstallResult {
 )]
 impl GrammarService {
     /// List installed grammars
+    ///
+    /// Examples:
+    ///   normalize grammars list          # show all available tree-sitter grammars
+    ///   normalize grammars list --json   # machine-readable grammar list
     #[cli(display_with = "display_list")]
     pub fn list(&self) -> Result<GrammarListReport, String> {
         let grammars = crate::parsers::available_external_grammars();
@@ -77,6 +81,11 @@ impl GrammarService {
     }
 
     /// Install grammars from GitHub release
+    ///
+    /// Examples:
+    ///   normalize grammars install                    # install latest grammars
+    ///   normalize grammars install --version v0.1.0   # install a specific version
+    ///   normalize grammars install --force             # reinstall even if grammars exist
     pub fn install(
         &self,
         #[param(help = "Specific version to install (default: latest)")] version: Option<String>,
@@ -197,6 +206,9 @@ impl GrammarService {
     }
 
     /// Show grammar search paths
+    ///
+    /// Examples:
+    ///   normalize grammars paths          # show directories searched for grammar .so files
     #[cli(display_with = "display_paths")]
     pub fn paths(&self) -> Result<GrammarPathsReport, String> {
         Ok(crate::commands::grammars::build_paths_report())

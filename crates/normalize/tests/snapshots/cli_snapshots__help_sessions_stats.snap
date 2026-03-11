@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 338
 expression: "snapshot_help(&[\"sessions\", \"stats\"])"
 ---
 Show aggregate statistics across sessions
@@ -27,3 +26,9 @@ Options:
       --group-by <group-by>        Group results by comma-separated fields: project, day (e.g. project,day)
   -r, --root <root>                Root directory (defaults to current directory)
   -h, --help                       Print help
+
+Examples:
+normalize sessions stats                             # aggregate stats for recent sessions
+normalize sessions stats --days 30                   # stats for the last 30 days
+normalize sessions stats --group-by project          # group results by project
+normalize sessions stats --group-by project,day      # group by project and day

@@ -163,6 +163,11 @@ impl RulesService {
 )]
 impl RulesService {
     /// List all rules (syntax + fact, builtin + user)
+    ///
+    /// Examples:
+    ///   normalize rules list                   # all rules with status
+    ///   normalize rules list --pretty          # with full descriptions
+    ///   normalize rules list --json            # machine-readable output
     #[cli(display_with = "display_list")]
     #[allow(clippy::too_many_arguments)]
     pub fn list(
@@ -212,6 +217,13 @@ impl RulesService {
     }
 
     /// Run rules against the codebase
+    ///
+    /// Examples:
+    ///   normalize rules run                    # run all enabled rules
+    ///   normalize rules run src/               # run on specific directory
+    ///   normalize rules run --rule rust/unwrap-in-impl   # single rule
+    ///   normalize rules run --pretty           # colored output with details
+    ///   normalize rules run --engine syntax    # only syntax rules
     #[cli(display_with = "display_run")]
     #[allow(clippy::too_many_arguments)]
     pub async fn run(
@@ -368,6 +380,10 @@ impl RulesService {
     }
 
     /// Enable a rule or all rules matching a tag
+    ///
+    /// Examples:
+    ///   normalize rules enable python/bare-except   # enable a specific rule
+    ///   normalize rules enable --tag correctness    # enable all correctness rules
     pub fn enable(
         &self,
         #[param(positional, help = "Rule ID or tag name")] id_or_tag: String,
@@ -391,6 +407,9 @@ impl RulesService {
     }
 
     /// Disable a rule or all rules matching a tag
+    ///
+    /// Examples:
+    ///   normalize rules disable no-todo-comment     # disable a specific rule
     pub fn disable(
         &self,
         #[param(positional, help = "Rule ID or tag name")] id_or_tag: String,
@@ -414,6 +433,9 @@ impl RulesService {
     }
 
     /// Show full documentation for a rule
+    ///
+    /// Examples:
+    ///   normalize rules show rust/unwrap-in-impl    # full docs for a rule
     pub fn show(
         &self,
         #[param(positional, help = "Rule ID to show")] id: String,
@@ -439,6 +461,9 @@ impl RulesService {
     }
 
     /// List all tags and the rules they group
+    ///
+    /// Examples:
+    ///   normalize rules tags                   # list all tags with rule counts
     pub fn tags(
         &self,
         #[param(help = "Expand each tag to show its member rules")] show_rules: bool,
@@ -473,6 +498,9 @@ impl RulesService {
     }
 
     /// Add a rule from a URL
+    ///
+    /// Examples:
+    ///   normalize rules add https://example.com/rule.scm   # import a rule from URL
     pub fn add(
         &self,
         #[param(positional, help = "URL to download the rule from")] url: String,
@@ -514,6 +542,9 @@ impl RulesService {
     }
 
     /// Validate the rules configuration — check rule IDs, TOML syntax, and report issues
+    ///
+    /// Examples:
+    ///   normalize rules validate               # check rule config for errors
     #[cli(display_with = "display_validate")]
     pub fn validate(
         &self,

@@ -1,12 +1,8 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 123
 expression: "snapshot_help(&[\"edit\", \"delete\"])"
 ---
 Delete a symbol.
-
-With `--each`, deletes the symbol from every file matching `--only` that contains it —
-useful for removing a trait method from all implementations at once.
 
 Usage: normalize edit delete [OPTIONS] [target]
 
@@ -32,3 +28,11 @@ Options:
   -r, --root <root>                Root directory
       --each                       Delete from every file matching --only that contains the symbol
   -h, --help                       Print help
+
+With `--each`, deletes the symbol from every file matching `--only` that contains it —
+useful for removing a trait method from all implementations at once.
+
+Examples:
+normalize edit delete src/lib.rs/my_function              # delete a function
+normalize edit delete src/lib.rs/my_function --dry-run    # preview the deletion
+normalize edit delete "*/old_method" --each --only "*.rs" # delete from all matching files

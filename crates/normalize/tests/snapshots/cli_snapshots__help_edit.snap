@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 37
 expression: "snapshot_help(&[\"edit\"])"
 ---
 Structural editing of code symbols
@@ -9,25 +8,10 @@ Usage: normalize edit [OPTIONS] [COMMAND]
 
 Commands:
   delete   Delete a symbol.
-           
-           With `--each`, deletes the symbol from every file matching `--only` that contains it —
-           useful for removing a trait method from all implementations at once.
   replace  Replace a symbol with new content.
-           
-           With `--each`, replaces the symbol in every file matching `--only` that contains it —
-           useful for updating a trait method body across all implementations at once.
   swap     Swap two symbols
   insert   Insert content relative to a symbol.
-           
-           With `--each`, applies the insert to every file matching `--only` that contains
-           the symbol — useful for adding a method to all implementations of a trait.
   rename   Rename a symbol across its definition, call sites, and import statements.
-           
-           Uses the facts index to find cross-file references. If the index is unavailable,
-           falls back to renaming only the definition.
-           
-           Aborts if the new name already exists as a symbol in the definition file or as
-           an import in any affected file. Use `--force` to override conflict checks.
   undo     Undo the last N edits
   redo     Redo the last undone edit
   goto     Jump to a specific shadow commit

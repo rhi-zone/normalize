@@ -937,6 +937,11 @@ impl EditService {
     ///
     /// With `--each`, deletes the symbol from every file matching `--only` that contains it —
     /// useful for removing a trait method from all implementations at once.
+    ///
+    /// Examples:
+    ///   normalize edit delete src/lib.rs/my_function              # delete a function
+    ///   normalize edit delete src/lib.rs/my_function --dry-run    # preview the deletion
+    ///   normalize edit delete "*/old_method" --each --only "*.rs" # delete from all matching files
     #[allow(clippy::too_many_arguments)]
     pub fn delete(
         &self,
@@ -993,6 +998,10 @@ impl EditService {
     ///
     /// With `--each`, replaces the symbol in every file matching `--only` that contains it —
     /// useful for updating a trait method body across all implementations at once.
+    ///
+    /// Examples:
+    ///   normalize edit replace src/lib.rs/old_fn --content "fn old_fn() { todo!() }"
+    ///   normalize edit replace src/lib.rs/old_fn --content "..." --dry-run
     #[allow(clippy::too_many_arguments)]
     pub fn replace(
         &self,
@@ -1046,6 +1055,10 @@ impl EditService {
     }
 
     /// Swap two symbols
+    ///
+    /// Examples:
+    ///   normalize edit swap src/lib.rs/fn_a fn_b             # swap two functions in the same file
+    ///   normalize edit swap src/lib.rs/fn_a fn_b --dry-run   # preview the swap
     #[allow(clippy::too_many_arguments)]
     pub fn swap(
         &self,
@@ -1086,6 +1099,10 @@ impl EditService {
     ///
     /// With `--each`, applies the insert to every file matching `--only` that contains
     /// the symbol — useful for adding a method to all implementations of a trait.
+    ///
+    /// Examples:
+    ///   normalize edit insert src/lib.rs/MyStruct --content "fn new() {}" --at after
+    ///   normalize edit insert src/lib.rs/MyStruct --content "use foo;" --at before --dry-run
     #[allow(clippy::too_many_arguments)]
     pub fn insert(
         &self,
@@ -1144,6 +1161,11 @@ impl EditService {
     ///
     /// Aborts if the new name already exists as a symbol in the definition file or as
     /// an import in any affected file. Use `--force` to override conflict checks.
+    ///
+    /// Examples:
+    ///   normalize edit rename src/lib.rs/old_name new_name             # rename across all references
+    ///   normalize edit rename src/lib.rs/old_name new_name --dry-run   # preview rename changes
+    ///   normalize edit rename src/lib.rs/old_name new_name --force     # ignore name conflicts
     pub async fn rename(
         &self,
         #[param(positional, help = "Target symbol (path/Symbol)")] target: String,
@@ -1166,6 +1188,12 @@ impl EditService {
     }
 
     /// Undo the last N edits
+    ///
+    /// Examples:
+    ///   normalize edit undo                          # undo the last edit
+    ///   normalize edit undo 3                        # undo the last 3 edits
+    ///   normalize edit undo --file src/lib.rs        # undo edits only for a specific file
+    ///   normalize edit undo --dry-run                # preview what would be undone
     pub fn undo(
         &self,
         #[param(positional, help = "Number of edits to undo (default: 1)")] count: Option<usize>,
@@ -1207,6 +1235,9 @@ impl EditService {
     }
 
     /// Redo the last undone edit
+    ///
+    /// Examples:
+    ///   normalize edit redo                          # redo the last undone edit
     pub fn redo(
         &self,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
@@ -1243,6 +1274,10 @@ impl EditService {
     }
 
     /// Jump to a specific shadow commit
+    ///
+    /// Examples:
+    ///   normalize edit goto abc1234                  # restore files to a specific shadow commit
+    ///   normalize edit goto abc1234 --dry-run        # preview what would change
     pub fn goto(
         &self,
         #[param(positional, help = "Shadow commit reference")] commit_ref: String,
@@ -1282,6 +1317,10 @@ impl EditService {
     }
 
     /// Apply batch edits from JSON file
+    ///
+    /// Examples:
+    ///   normalize edit batch edits.json              # apply edits from a JSON file
+    ///   normalize edit batch - --dry-run             # read edits from stdin, preview only
     pub fn batch(
         &self,
         #[param(positional, help = "JSON file with edits (or - for stdin)")] file: String,
@@ -1308,6 +1347,10 @@ impl EditService {
     }
 
     /// View shadow git edit history
+    ///
+    /// Examples:
+    ///   normalize edit history list                  # show recent edit history
+    ///   normalize edit history diff abc1234          # show diff for a shadow commit
     pub fn history(&self) -> &HistoryService {
         &self.history
     }

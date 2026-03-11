@@ -1,12 +1,8 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 128
 expression: "snapshot_help(&[\"edit\", \"replace\"])"
 ---
 Replace a symbol with new content.
-
-With `--each`, replaces the symbol in every file matching `--only` that contains it —
-useful for updating a trait method body across all implementations at once.
 
 Usage: normalize edit replace [OPTIONS] [target]
 
@@ -32,3 +28,10 @@ Options:
   -r, --root <root>                Root directory
       --each                       Replace in every file matching --only that contains the symbol
   -h, --help                       Print help
+
+With `--each`, replaces the symbol in every file matching `--only` that contains it —
+useful for updating a trait method body across all implementations at once.
+
+Examples:
+normalize edit replace src/lib.rs/old_fn --content "fn old_fn() { todo!() }"
+normalize edit replace src/lib.rs/old_fn --content "..." --dry-run

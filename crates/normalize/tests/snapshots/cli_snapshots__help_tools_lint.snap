@@ -22,3 +22,7 @@ Options:
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
   -V, --version                    Print version
+
+Examples:
+normalize tools lint run             # run all detected linters
+normalize tools lint list            # list available linting tools

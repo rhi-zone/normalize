@@ -49,11 +49,19 @@ fn discover_repos(dir: &str, depth: usize) -> Result<Vec<PathBuf>, String> {
 )]
 impl ToolsService {
     /// Run linters, formatters, and type checkers
+    ///
+    /// Examples:
+    ///   normalize tools lint run             # run all detected linters
+    ///   normalize tools lint list            # list available linting tools
     pub fn lint(&self) -> &LintService {
         &self.lint
     }
 
     /// Run native test runners
+    ///
+    /// Examples:
+    ///   normalize tools test run             # run auto-detected test runner
+    ///   normalize tools test list            # list available test runners
     pub fn test(&self) -> &TestService {
         &self.test
     }
@@ -65,6 +73,14 @@ impl ToolsService {
 )]
 impl LintService {
     /// Run linters on the codebase
+    ///
+    /// Examples:
+    ///   normalize tools lint run                          # run all detected linters
+    ///   normalize tools lint run src/                     # lint a specific path
+    ///   normalize tools lint run -f                       # auto-fix issues
+    ///   normalize tools lint run -t clippy,eslint         # run specific tools only
+    ///   normalize tools lint run -c fmt                   # run only formatters
+    ///   normalize tools lint run --repos-dir ~/projects   # lint across multiple repos
     #[allow(clippy::too_many_arguments)]
     pub fn run(
         &self,
@@ -102,6 +118,9 @@ impl LintService {
     }
 
     /// List available linting tools
+    ///
+    /// Examples:
+    ///   normalize tools lint list            # show detected linters for this project
     pub fn list(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -115,6 +134,11 @@ impl LintService {
 #[cli(name = "test", description = "Run native test runners")]
 impl TestService {
     /// Run tests with auto-detected or specified runner
+    ///
+    /// Examples:
+    ///   normalize tools test run                          # run with auto-detected runner
+    ///   normalize tools test run --runner cargo            # use cargo test
+    ///   normalize tools test run --repos-dir ~/projects   # run tests across multiple repos
     pub fn run(
         &self,
         #[param(help = "Specific test runner (cargo, go, bun, npm, pytest)")] runner: Option<
@@ -144,6 +168,9 @@ impl TestService {
     }
 
     /// List available test runners
+    ///
+    /// Examples:
+    ///   normalize tools test list            # show detected test runners for this project
     pub fn list(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<

@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 252
 expression: "snapshot_help(&[\"analyze\", \"length\"])"
 ---
 Run function length analysis
@@ -25,3 +24,7 @@ Options:
       --pretty                     Enable pretty
       --compact                    Enable compact
   -h, --help                       Print help
+
+Examples:
+normalize analyze length                    # top 10 longest functions
+normalize analyze length --threshold 50     # only functions above 50 lines

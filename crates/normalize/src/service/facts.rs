@@ -680,6 +680,11 @@ async fn packages_data(
 )]
 impl FactsService {
     /// Rebuild the file index
+    ///
+    /// Examples:
+    ///   normalize structure rebuild                          # rebuild with all content types
+    ///   normalize structure rebuild --include symbols        # only extract symbols
+    ///   normalize structure rebuild --include calls,imports  # extract calls and imports
     pub async fn rebuild(
         &self,
         #[param(help = "What to extract: symbols, calls, imports (comma-separated)")] include: Vec<
@@ -706,6 +711,10 @@ impl FactsService {
     }
 
     /// Show index statistics (DB size vs codebase size)
+    ///
+    /// Examples:
+    ///   normalize structure stats              # show symbol/call/import counts and DB size
+    ///   normalize structure stats --storage    # show storage usage for index and caches
     pub async fn stats(
         &self,
         #[param(help = "Show storage usage for index and caches")] storage: bool,
@@ -731,6 +740,11 @@ impl FactsService {
     }
 
     /// List indexed files (with optional prefix filter)
+    ///
+    /// Examples:
+    ///   normalize structure files                    # list all indexed files
+    ///   normalize structure files src/               # list files under src/
+    ///   normalize structure files -l 10              # show only the first 10 files
     pub async fn files(
         &self,
         #[param(positional, help = "Filter files by prefix")] prefix: Option<String>,
@@ -745,6 +759,11 @@ impl FactsService {
     }
 
     /// Index external packages (stdlib, site-packages) into global cache
+    ///
+    /// Examples:
+    ///   normalize structure packages                  # index all detected ecosystems
+    ///   normalize structure packages --only rust      # index only Rust stdlib
+    ///   normalize structure packages --clear          # clear cache and re-index
     pub async fn packages(
         &self,
         #[param(help = "Ecosystems to index (comma-separated)")] only: Vec<String>,

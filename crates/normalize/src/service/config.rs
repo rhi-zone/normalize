@@ -591,6 +591,10 @@ impl ConfigService {
 )]
 impl ConfigService {
     /// Emit the JSON Schema for .normalize/config.toml (NormalizeConfig)
+    ///
+    /// Examples:
+    ///   normalize config schema              # print the full JSON Schema
+    ///   normalize config schema --json       # machine-readable JSON output
     pub fn schema(&self, pretty: bool, compact: bool) -> Result<serde_json::Value, String> {
         let root = std::env::current_dir().unwrap_or_default();
         self.resolve_format(pretty, compact, &root);
@@ -601,6 +605,12 @@ impl ConfigService {
     /// Show a config file with schema annotations — all available options, with descriptions.
     /// Use --section for a dotted path (e.g. 'analyze', 'analyze.threshold').
     /// Use --set-only to hide fields that have no value set in the config file.
+    ///
+    /// Examples:
+    ///   normalize config show                                  # show all options with descriptions
+    ///   normalize config show --set-only                       # only show fields with values set
+    ///   normalize config show --section rules                  # show the [rules] section
+    ///   normalize config show --section rules."rust/unwrap-in-impl"  # show a specific rule config
     #[allow(clippy::too_many_arguments)]
     #[cli(display_with = "display_show")]
     pub fn show(
@@ -638,6 +648,10 @@ impl ConfigService {
     }
 
     /// Validate a config file against its JSON Schema
+    ///
+    /// Examples:
+    ///   normalize config validate                        # validate .normalize/config.toml
+    ///   normalize config validate --file custom.toml     # validate a custom config file
     #[cli(display_with = "display_validate")]
     pub fn validate(
         &self,
@@ -682,6 +696,13 @@ impl ConfigService {
     }
 
     /// Set a config value by dotted key path (TOML files only)
+    ///
+    /// Examples:
+    ///   normalize config set analyze.threshold 50                                    # set a numeric value
+    ///   normalize config set analyze.rules."rust/unwrap-in-impl".severity warning    # set rule severity
+    ///   normalize config set analyze.rules."rust/unwrap-in-impl".enabled false       # disable a rule
+    ///   normalize config set --dry-run analyze.threshold 50                          # preview without writing
+    ///   normalize config set --force analyze.custom-key value                        # bypass schema validation
     #[cli(display_with = "display_set")]
     #[allow(clippy::too_many_arguments)]
     pub fn set(

@@ -91,6 +91,13 @@ impl SessionsService {
 )]
 impl SessionsService {
     /// List available sessions
+    ///
+    /// Examples:
+    ///   normalize sessions list                       # list recent sessions for current project
+    ///   normalize sessions list --days 7              # sessions from the last 7 days
+    ///   normalize sessions list --grep "refactor"     # filter sessions by content pattern
+    ///   normalize sessions list --all-projects        # show sessions across all projects
+    ///   normalize sessions list --format codex        # only show Codex sessions
     #[allow(clippy::too_many_arguments)]
     pub fn list(
         &self,
@@ -130,6 +137,11 @@ impl SessionsService {
     }
 
     /// Show a specific session (summary or full conversation)
+    ///
+    /// Examples:
+    ///   normalize sessions show abc123               # show session summary (fuzzy match on ID)
+    ///   normalize sessions show abc123 --full        # show full conversation log
+    ///   normalize sessions show abc123 --exact       # require exact ID match
     #[allow(clippy::too_many_arguments)]
     pub fn show(
         &self,
@@ -162,6 +174,11 @@ impl SessionsService {
     }
 
     /// Run deep behavioral analysis on a session (tool stats, errors, token costs, corrections)
+    ///
+    /// Examples:
+    ///   normalize sessions analyze abc123             # analyze a session by ID
+    ///   normalize sessions analyze abc123 --pretty    # colored terminal output
+    ///   normalize sessions analyze abc123 --json      # machine-readable analysis
     #[cli(display_with = "display_analyze")]
     #[allow(clippy::too_many_arguments)]
     pub fn analyze(
@@ -193,6 +210,12 @@ impl SessionsService {
     }
 
     /// Show aggregate statistics across sessions
+    ///
+    /// Examples:
+    ///   normalize sessions stats                             # aggregate stats for recent sessions
+    ///   normalize sessions stats --days 30                   # stats for the last 30 days
+    ///   normalize sessions stats --group-by project          # group results by project
+    ///   normalize sessions stats --group-by project,day      # group by project and day
     #[allow(clippy::too_many_arguments)]
     pub fn stats(
         &self,
@@ -254,6 +277,12 @@ impl SessionsService {
     }
 
     /// Extract all messages across sessions into a flat, queryable form
+    ///
+    /// Examples:
+    ///   normalize sessions messages                                # user messages from recent sessions
+    ///   normalize sessions messages --role all                     # all roles (user + assistant)
+    ///   normalize sessions messages --grep "error" --no-truncate   # search messages, full text
+    ///   normalize sessions messages --show-usage --sort-by-tokens  # heaviest turns first
     #[allow(clippy::too_many_arguments)]
     pub fn messages(
         &self,
@@ -308,6 +337,10 @@ impl SessionsService {
     }
 
     /// List and view agent plans
+    ///
+    /// Examples:
+    ///   normalize sessions plans                     # list all saved plans
+    ///   normalize sessions plans my-plan             # view a specific plan by name
     pub fn plans(
         &self,
         #[param(positional, help = "Plan name to view (omit to list all)")] name: Option<String>,

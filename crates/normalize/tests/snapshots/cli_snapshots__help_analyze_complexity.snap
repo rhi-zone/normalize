@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 247
 expression: "snapshot_help(&[\"analyze\", \"complexity\"])"
 ---
 Run complexity analysis
@@ -26,3 +25,8 @@ Options:
       --pretty                     Enable pretty
       --compact                    Enable compact
   -h, --help                       Print help
+
+Examples:
+normalize analyze complexity                          # top 10 most complex functions
+normalize analyze complexity src/ --threshold 15      # only functions above threshold
+normalize analyze complexity --diff main              # show delta vs main branch

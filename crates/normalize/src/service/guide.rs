@@ -23,6 +23,9 @@ pub struct GuideService;
 #[cli(name = "guide", description = "Workflow guides with examples")]
 impl GuideService {
     /// Writing and testing syntax rules
+    ///
+    /// Example:
+    ///   normalize guide rules
     pub fn rules(&self) -> Result<Guide, String> {
         Ok(Guide {
             topic: "rules".into(),
@@ -31,6 +34,9 @@ impl GuideService {
     }
 
     /// Exploring a codebase
+    ///
+    /// Example:
+    ///   normalize guide explore
     pub fn explore(&self) -> Result<Guide, String> {
         Ok(Guide {
             topic: "explore".into(),
@@ -39,6 +45,9 @@ impl GuideService {
     }
 
     /// Setting up normalize in a project
+    ///
+    /// Example:
+    ///   normalize guide setup
     pub fn setup(&self) -> Result<Guide, String> {
         Ok(Guide {
             topic: "setup".into(),
@@ -47,6 +56,9 @@ impl GuideService {
     }
 
     /// Running analysis on a codebase
+    ///
+    /// Example:
+    ///   normalize guide analyze
     pub fn analyze(&self) -> Result<Guide, String> {
         Ok(Guide {
             topic: "analyze".into(),
@@ -55,6 +67,9 @@ impl GuideService {
     }
 
     /// Using tree-sitter introspection commands
+    ///
+    /// Example:
+    ///   normalize guide tree-sitter
     pub fn tree_sitter(&self) -> Result<Guide, String> {
         Ok(Guide {
             topic: "tree-sitter".into(),

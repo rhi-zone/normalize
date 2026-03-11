@@ -104,6 +104,9 @@ impl std::fmt::Display for DaemonRootList {
 #[cli(name = "daemon", description = "Manage the global normalize daemon")]
 impl DaemonService {
     /// Show daemon status
+    ///
+    /// Examples:
+    ///   normalize daemon status              # check if daemon is running, show PID and uptime
     pub fn status(&self) -> Result<DaemonStatus, String> {
         let client = DaemonClient::new();
         let socket = global_socket_path().display().to_string();
@@ -135,6 +138,9 @@ impl DaemonService {
     }
 
     /// Stop the daemon
+    ///
+    /// Examples:
+    ///   normalize daemon stop                # gracefully stop the running daemon
     pub fn stop(&self) -> Result<DaemonActionResult, String> {
         let client = DaemonClient::new();
 
@@ -162,6 +168,9 @@ impl DaemonService {
     }
 
     /// Start the daemon (background)
+    ///
+    /// Examples:
+    ///   normalize daemon start               # start the daemon in the background
     pub fn start(&self) -> Result<DaemonActionResult, String> {
         let client = DaemonClient::new();
 
@@ -180,6 +189,9 @@ impl DaemonService {
     }
 
     /// Run the daemon in foreground (for debugging)
+    ///
+    /// Examples:
+    ///   normalize daemon run                 # run daemon in foreground with log output
     pub fn run(&self) -> Result<String, String> {
         match daemon::run_daemon() {
             Ok(code) => {
@@ -194,6 +206,10 @@ impl DaemonService {
     }
 
     /// Add a root to watch
+    ///
+    /// Examples:
+    ///   normalize daemon add                 # watch the current directory
+    ///   normalize daemon add ~/projects/app  # watch a specific project root
     pub fn add(
         &self,
         #[param(positional, help = "Path to the project root")] path: Option<String>,
@@ -239,6 +255,10 @@ impl DaemonService {
     }
 
     /// Remove a root from watching
+    ///
+    /// Examples:
+    ///   normalize daemon remove              # stop watching the current directory
+    ///   normalize daemon remove ~/projects/app  # stop watching a specific root
     pub fn remove(
         &self,
         #[param(positional, help = "Path to the project root")] path: Option<String>,
@@ -278,6 +298,9 @@ impl DaemonService {
     }
 
     /// List all watched roots
+    ///
+    /// Examples:
+    ///   normalize daemon list                # show all project roots being watched
     pub fn list(&self) -> Result<DaemonRootList, String> {
         let client = DaemonClient::new();
 

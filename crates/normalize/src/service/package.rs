@@ -64,6 +64,10 @@ fn run_package(
 )]
 impl PackageService {
     /// Query package info from registry
+    ///
+    /// Examples:
+    ///   normalize package info express                    # look up a package by name
+    ///   normalize package info serde@1.0 -e cargo         # query a specific version and ecosystem
     pub fn info(
         &self,
         #[param(positional, help = "Package name to query (optionally with @version)")]
@@ -85,6 +89,10 @@ impl PackageService {
     }
 
     /// List declared dependencies from manifest
+    ///
+    /// Examples:
+    ///   normalize package list                           # list dependencies for current project
+    ///   normalize package list -e npm                    # list only npm dependencies
     pub fn list(
         &self,
         #[param(short = 'e', help = "Force specific ecosystem (cargo, npm, python)")]
@@ -100,6 +108,10 @@ impl PackageService {
     }
 
     /// Show dependency tree from lockfile
+    ///
+    /// Examples:
+    ///   normalize package tree                           # show full dependency tree
+    ///   normalize package tree -e cargo                  # show only Cargo dependency tree
     pub fn tree(
         &self,
         #[param(short = 'e', help = "Force specific ecosystem (cargo, npm, python)")]
@@ -115,6 +127,9 @@ impl PackageService {
     }
 
     /// Show why a dependency is in the tree
+    ///
+    /// Examples:
+    ///   normalize package why serde                      # trace why serde is a dependency
     pub fn why(
         &self,
         #[param(positional, help = "Package name to trace")] package: String,
@@ -135,6 +150,10 @@ impl PackageService {
     }
 
     /// Show outdated packages (installed vs latest)
+    ///
+    /// Examples:
+    ///   normalize package outdated                       # check all ecosystems for outdated deps
+    ///   normalize package outdated -e npm                # check only npm packages
     pub fn outdated(
         &self,
         #[param(short = 'e', help = "Force specific ecosystem (cargo, npm, python)")]
@@ -154,6 +173,10 @@ impl PackageService {
     }
 
     /// Check for security vulnerabilities
+    ///
+    /// Examples:
+    ///   normalize package audit                          # audit all ecosystems for vulnerabilities
+    ///   normalize package audit -e cargo                  # audit only Cargo dependencies
     pub fn audit(
         &self,
         #[param(short = 'e', help = "Force specific ecosystem (cargo, npm, python)")]

@@ -20,3 +20,6 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Examples:
+normalize rules add https://example.com/rule.scm   # import a rule from URL

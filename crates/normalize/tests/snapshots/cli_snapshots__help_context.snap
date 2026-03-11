@@ -21,3 +21,8 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Examples:
+normalize context                      # show .context.md files for current dir
+normalize context src/                 # show context for a subdirectory
+normalize context --list               # list all .context.md file paths

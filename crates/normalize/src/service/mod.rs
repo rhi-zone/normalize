@@ -241,6 +241,18 @@ impl std::fmt::Display for TranslateResult {
 )]
 impl NormalizeService {
     /// View a node in the codebase tree (directory, file, or symbol)
+    ///
+    /// Examples:
+    ///   normalize view                           # top-level directory tree
+    ///   normalize view src/                      # expand a subdirectory
+    ///   normalize view src/main.rs               # file skeleton (functions, classes)
+    ///   normalize view src/main.rs/ClassName     # single symbol and its children
+    ///   normalize view SymbolName                # search by symbol name
+    ///   normalize view file.rs:42                # jump to line 42
+    ///   normalize view src/ --depth 2            # deeper expansion
+    ///   normalize view src/main.rs --full        # full source code
+    ///   normalize view src/main.rs --deps        # show imports/exports
+    ///   normalize view src/main.rs --context     # skeleton + imports combined
     #[cli(display_with = "display_view")]
     #[allow(clippy::too_many_arguments)]
     pub async fn view(
@@ -337,6 +349,11 @@ impl NormalizeService {
     }
 
     /// Search for text patterns in files (fast ripgrep-based search)
+    ///
+    /// Examples:
+    ///   normalize grep "TODO" --only "*.rs"    # search Rust files for TODO
+    ///   normalize grep "fn main" src/          # search in specific directory
+    ///   normalize grep "class \w+" --only "*.py" --json   # JSON output
     #[cli(display_with = "display_grep")]
     #[allow(clippy::too_many_arguments)]
     pub fn grep(
@@ -378,6 +395,9 @@ impl NormalizeService {
     }
 
     /// List filter aliases (used by --exclude/--only)
+    ///
+    /// Examples:
+    ///   normalize aliases                      # list all filter aliases
     pub fn aliases(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -397,6 +417,11 @@ impl NormalizeService {
     }
 
     /// Show directory context (hierarchical .context.md files)
+    ///
+    /// Examples:
+    ///   normalize context                      # show .context.md files for current dir
+    ///   normalize context src/                 # show context for a subdirectory
+    ///   normalize context --list               # list all .context.md file paths
     #[cli(display_with = "display_context")]
     pub fn context(
         &self,
@@ -449,6 +474,10 @@ impl NormalizeService {
     }
 
     /// Initialize normalize in current directory
+    ///
+    /// Examples:
+    ///   normalize init                         # create .normalize/ config directory
+    ///   normalize init --setup                 # interactive rule setup wizard
     pub async fn init(
         &self,
         #[param(help = "Index the codebase after initialization")] index: bool,
@@ -556,6 +585,9 @@ impl NormalizeService {
     }
 
     /// Check for and install updates
+    ///
+    /// Examples:
+    ///   normalize update                       # check for and install updates
     pub fn update(
         &self,
         #[param(short = 'c', help = "Check for updates without installing")] check: bool,
@@ -682,6 +714,10 @@ impl NormalizeService {
     }
 
     /// Translate code between programming languages
+    ///
+    /// Examples:
+    ///   normalize translate src/main.py --to rust    # translate Python to Rust
+    ///   normalize translate lib.rs --to typescript    # translate Rust to TypeScript
     #[cli(display_with = "display_translate")]
     pub fn translate(
         &self,

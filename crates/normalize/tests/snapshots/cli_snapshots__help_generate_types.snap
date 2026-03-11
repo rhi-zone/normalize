@@ -26,3 +26,8 @@ Options:
       --readonly                   Make types readonly/frozen
       --package <package>          Package name (for Go)
   -h, --help                       Print help
+
+Examples:
+normalize generate types schema.json -b typescript        # generate TypeScript types
+normalize generate types schema.json -b zod --infer-types # Zod schemas with type inference
+normalize generate types schema.json -b go --package models -o models.go

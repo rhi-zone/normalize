@@ -21,3 +21,7 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Examples:
+normalize package info express                    # look up a package by name
+normalize package info serde@1.0 -e cargo         # query a specific version and ecosystem

@@ -31,3 +31,9 @@ Options:
       --pretty                     Enable pretty
       --compact                    Enable compact
   -h, --help                       Print help
+
+Examples:
+normalize sessions messages                                # user messages from recent sessions
+normalize sessions messages --role all                     # all roles (user + assistant)
+normalize sessions messages --grep "error" --no-truncate   # search messages, full text
+normalize sessions messages --show-usage --sort-by-tokens  # heaviest turns first

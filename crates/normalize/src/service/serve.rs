@@ -9,6 +9,9 @@ pub struct ServeService;
 #[cli]
 impl ServeService {
     /// Start MCP server for LLM integration (stdio transport)
+    ///
+    /// Examples:
+    ///   normalize serve mcp                  # start MCP server on stdio
     pub fn mcp(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -25,6 +28,11 @@ impl ServeService {
     }
 
     /// Start HTTP server (REST API)
+    ///
+    /// Examples:
+    ///   normalize serve http                 # start HTTP server on default port 8080
+    ///   normalize serve http -p 3000         # start on a custom port
+    ///   normalize serve http --openapi       # output OpenAPI spec and exit
     pub async fn http(
         &self,
         #[param(short = 'p', help = "Port to listen on [default: 8080]")] port: Option<u16>,
@@ -57,6 +65,9 @@ impl ServeService {
     }
 
     /// Start LSP server for IDE integration
+    ///
+    /// Examples:
+    ///   normalize serve lsp                  # start LSP server on stdio
     pub async fn lsp(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<

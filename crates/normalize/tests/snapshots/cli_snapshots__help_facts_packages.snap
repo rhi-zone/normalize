@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 174
 expression: "snapshot_help(&[\"facts\", \"packages\"])"
 ---
 Index external packages (stdlib, site-packages) into global cache
@@ -20,3 +19,8 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Examples:
+normalize structure packages                  # index all detected ecosystems
+normalize structure packages --only rust      # index only Rust stdlib
+normalize structure packages --clear          # clear cache and re-index

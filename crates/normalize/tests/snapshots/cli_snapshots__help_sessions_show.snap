@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 333
 expression: "snapshot_help(&[\"sessions\", \"show\"])"
 ---
 Show a specific session (summary or full conversation)
@@ -25,3 +24,8 @@ Options:
       --pretty                     Enable pretty
       --compact                    Enable compact
   -h, --help                       Print help
+
+Examples:
+normalize sessions show abc123               # show session summary (fuzzy match on ID)
+normalize sessions show abc123 --full        # show full conversation log
+normalize sessions show abc123 --exact       # require exact ID match

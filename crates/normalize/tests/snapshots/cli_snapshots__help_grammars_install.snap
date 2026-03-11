@@ -18,3 +18,8 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Examples:
+normalize grammars install                    # install latest grammars
+normalize grammars install --version v0.1.0   # install a specific version
+normalize grammars install --force             # reinstall even if grammars exist

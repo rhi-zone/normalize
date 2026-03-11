@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 237
 expression: "snapshot_help(&[\"analyze\", \"health\"])"
 ---
 Run health analysis (file counts, complexity stats, large file warnings)
@@ -23,3 +22,7 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Examples:
+normalize analyze health           # run health analysis on current directory
+normalize analyze health --pretty  # colored terminal output

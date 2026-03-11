@@ -16,3 +16,7 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Examples:
+normalize grammars list          # show all available tree-sitter grammars
+normalize grammars list --json   # machine-readable grammar list

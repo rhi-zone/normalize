@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 164
 expression: "snapshot_help(&[\"facts\", \"stats\"])"
 ---
 Show index statistics (DB size vs codebase size)
@@ -19,3 +18,7 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Examples:
+normalize structure stats              # show symbol/call/import counts and DB size
+normalize structure stats --storage    # show storage usage for index and caches

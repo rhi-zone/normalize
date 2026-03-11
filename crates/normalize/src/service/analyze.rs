@@ -445,6 +445,10 @@ impl AnalyzeService {
 ))]
 impl AnalyzeService {
     /// Show callers and/or callees of a symbol
+    ///
+    /// Examples:
+    ///   normalize analyze call-graph "function_name"    # show callers of a symbol
+    ///   normalize analyze call-graph --callers "Symbol"  # explicit --callers flag
     #[server(group = "graph")]
     #[cli(display_with = "display_call_graph")]
     pub async fn call_graph(
@@ -470,6 +474,9 @@ impl AnalyzeService {
     }
 
     /// Trace value provenance for a symbol
+    ///
+    /// Examples:
+    ///   normalize analyze trace "symbol_name"  # trace a symbol's provenance
     #[server(group = "graph")]
     #[cli(display_with = "display_trace")]
     pub async fn trace(
@@ -496,6 +503,10 @@ impl AnalyzeService {
     }
 
     /// Show architecture analysis (coupling, cycles, hubs)
+    ///
+    /// Examples:
+    ///   normalize analyze architecture            # analyze module coupling and cycles
+    ///   normalize analyze architecture --pretty    # colored terminal output
     #[server(group = "graph")]
     #[cli(display_with = "display_architecture")]
     pub async fn architecture(
@@ -512,6 +523,10 @@ impl AnalyzeService {
     }
 
     /// Run health analysis (file counts, complexity stats, large file warnings)
+    ///
+    /// Examples:
+    ///   normalize analyze health           # run health analysis on current directory
+    ///   normalize analyze health --pretty  # colored terminal output
     #[cli(default, display_with = "display_report")]
     pub fn health(
         &self,
@@ -548,6 +563,10 @@ impl AnalyzeService {
     }
 
     /// Run all analysis passes
+    ///
+    /// Examples:
+    ///   normalize analyze all           # run every analysis pass
+    ///   normalize analyze all --pretty  # colored terminal output
     #[cli(display_with = "display_report")]
     pub fn all(
         &self,
@@ -577,6 +596,9 @@ impl AnalyzeService {
     }
 
     /// Run security analysis
+    ///
+    /// Examples:
+    ///   normalize analyze security  # scan for hardcoded secrets and credentials
     #[server(group = "security")]
     #[cli(display_with = "display_security")]
     pub fn security(
@@ -593,6 +615,11 @@ impl AnalyzeService {
     }
 
     /// Run complexity analysis
+    ///
+    /// Examples:
+    ///   normalize analyze complexity                          # top 10 most complex functions
+    ///   normalize analyze complexity src/ --threshold 15      # only functions above threshold
+    ///   normalize analyze complexity --diff main              # show delta vs main branch
     #[server(group = "code")]
     #[cli(display_with = "display_complexity")]
     #[allow(clippy::too_many_arguments)]
@@ -678,6 +705,9 @@ impl AnalyzeService {
     }
 
     /// Show complexity trend over git history
+    ///
+    /// Examples:
+    ///   normalize analyze complexity-trend -n 10  # 10 snapshots over git history
     #[server(group = "code")]
     #[cli(display_with = "display_scalar_trend")]
     pub fn complexity_trend(
@@ -711,6 +741,10 @@ impl AnalyzeService {
     }
 
     /// Run function length analysis
+    ///
+    /// Examples:
+    ///   normalize analyze length                    # top 10 longest functions
+    ///   normalize analyze length --threshold 50     # only functions above 50 lines
     #[server(group = "code")]
     #[cli(display_with = "display_length")]
     #[allow(clippy::too_many_arguments)]
@@ -786,6 +820,9 @@ impl AnalyzeService {
     }
 
     /// Show function length trend over git history
+    ///
+    /// Examples:
+    ///   normalize analyze length-trend  # avg function length over git history
     #[server(group = "code")]
     #[cli(display_with = "display_scalar_trend")]
     pub fn length_trend(
@@ -818,6 +855,9 @@ impl AnalyzeService {
     }
 
     /// Analyze documentation coverage
+    ///
+    /// Examples:
+    ///   normalize analyze docs  # show doc coverage per file
     #[server(group = "repo")]
     #[cli(display_with = "display_doc_coverage")]
     pub async fn docs(
@@ -844,6 +884,10 @@ impl AnalyzeService {
     }
 
     /// Show longest files in codebase
+    ///
+    /// Examples:
+    ///   normalize analyze files              # top 20 longest files
+    ///   normalize analyze files --limit 20   # custom limit
     #[server(group = "repo")]
     #[cli(display_with = "display_file_length")]
     pub fn files(
@@ -865,6 +909,10 @@ impl AnalyzeService {
     }
 
     /// Show hierarchical LOC breakdown (ncdu-style)
+    ///
+    /// Examples:
+    ///   normalize analyze size        # full project LOC tree
+    ///   normalize analyze size src/   # LOC tree for a subdirectory
     #[server(group = "modules")]
     #[cli(display_with = "display_size")]
     pub fn size(
@@ -881,6 +929,9 @@ impl AnalyzeService {
     }
 
     /// Show ceremony ratio: fraction of callables that are trait/interface boilerplate
+    ///
+    /// Examples:
+    ///   normalize analyze ceremony  # show boilerplate ratio per module
     #[server(group = "code")]
     #[cli(display_with = "display_ceremony")]
     pub fn ceremony(
@@ -900,6 +951,9 @@ impl AnalyzeService {
     }
 
     /// Temporal coupling: file pairs that change together in git history
+    ///
+    /// Examples:
+    ///   normalize analyze coupling  # show file pairs that change together
     #[server(group = "git")]
     #[cli(display_with = "display_coupling")]
     pub fn coupling(
@@ -922,6 +976,9 @@ impl AnalyzeService {
     }
 
     /// Change-clusters: connected components of temporally coupled files
+    ///
+    /// Examples:
+    ///   normalize analyze coupling-clusters  # find clusters of co-changing files
     #[server(group = "git")]
     #[cli(display_with = "display_coupling_clusters")]
     #[allow(clippy::too_many_arguments)]
@@ -965,6 +1022,10 @@ impl AnalyzeService {
     }
 
     /// Churn × complexity hotspots: files ranked by change frequency and complexity
+    ///
+    /// Examples:
+    ///   normalize analyze hotspots           # rank files by churn × complexity
+    ///   normalize analyze hotspots --pretty  # colored terminal output
     #[server(group = "git")]
     #[cli(display_with = "display_hotspots")]
     pub fn hotspots(
@@ -1027,6 +1088,9 @@ impl AnalyzeService {
     }
 
     /// Show per-file ownership concentration from git blame
+    ///
+    /// Examples:
+    ///   normalize analyze ownership  # show ownership concentration per file
     #[server(group = "git")]
     #[cli(display_with = "display_ownership")]
     pub fn ownership(
@@ -1078,6 +1142,9 @@ impl AnalyzeService {
     }
 
     /// Analyze contributors across repos
+    ///
+    /// Examples:
+    ///   normalize analyze contributors --repos-dir ~/projects  # contributor stats across repos
     #[server(group = "git")]
     #[cli(display_with = "display_contributors")]
     pub fn contributors(
@@ -1090,6 +1157,9 @@ impl AnalyzeService {
     }
 
     /// Analyze cross-repo activity over time
+    ///
+    /// Examples:
+    ///   normalize analyze activity --repos-dir ~/projects  # commit activity over time
     #[server(group = "git")]
     #[cli(display_with = "display_activity")]
     pub fn activity(
@@ -1110,6 +1180,9 @@ impl AnalyzeService {
     }
 
     /// Analyze cross-repo coupling
+    ///
+    /// Examples:
+    ///   normalize analyze repo-coupling --repos-dir ~/projects  # temporal coupling across repos
     #[server(group = "git")]
     #[cli(display_with = "display_repo_coupling")]
     pub fn repo_coupling(
@@ -1130,6 +1203,9 @@ impl AnalyzeService {
     }
 
     /// Rank repos by tech debt (churn + complexity + coupling)
+    ///
+    /// Examples:
+    ///   normalize analyze cross-repo-health --repos-dir ~/projects  # rank repos by tech debt
     #[server(group = "git")]
     #[cli(display_with = "display_cross_repo_health")]
     pub fn cross_repo_health(
@@ -1144,6 +1220,11 @@ impl AnalyzeService {
     /// Detect duplicate/similar code (functions or blocks)
     ///
     /// Modes: exact (default), similar (fuzzy MinHash), clusters (connected components).
+    ///
+    /// Examples:
+    ///   normalize analyze duplicates                  # exact duplicate functions
+    ///   normalize analyze duplicates --scope blocks   # exact duplicate code blocks
+    ///   normalize analyze duplicates --mode similar   # fuzzy matching via MinHash
     #[server(group = "code")]
     #[cli(display_with = "display_duplicates")]
     #[allow(clippy::too_many_arguments)]
@@ -1296,6 +1377,9 @@ impl AnalyzeService {
     }
 
     /// Detect duplicate type definitions
+    ///
+    /// Examples:
+    ///   normalize analyze duplicate-types  # find structurally similar type definitions
     #[server(group = "code")]
     #[cli(display_with = "display_dup_types")]
     pub fn duplicate_types(
@@ -1320,6 +1404,9 @@ impl AnalyzeService {
     }
 
     /// Test/impl line ratio per module
+    ///
+    /// Examples:
+    ///   normalize analyze test-ratio  # show test-to-implementation ratio per module
     #[server(group = "test")]
     #[cli(display_with = "display_test_ratio")]
     pub fn test_ratio(
@@ -1345,6 +1432,10 @@ impl AnalyzeService {
     }
 
     /// Find untested public functions ranked by risk
+    ///
+    /// Examples:
+    ///   normalize analyze test-gaps           # show untested functions ranked by risk
+    ///   normalize analyze test-gaps --pretty  # colored terminal output
     #[server(group = "test")]
     #[cli(display_with = "display_test_gaps")]
     #[allow(clippy::too_many_arguments)]
@@ -1384,6 +1475,9 @@ impl AnalyzeService {
     }
 
     /// Line budget breakdown by purpose (business logic, tests, docs, config, etc.)
+    ///
+    /// Examples:
+    ///   normalize analyze budget  # show line counts by purpose category
     #[server(group = "test")]
     #[cli(display_with = "display_budget")]
     pub fn budget(
@@ -1409,6 +1503,9 @@ impl AnalyzeService {
     }
 
     /// Show test ratio trend over git history
+    ///
+    /// Examples:
+    ///   normalize analyze test-ratio-trend  # test ratio over git history
     #[server(group = "test")]
     #[cli(display_with = "display_scalar_trend")]
     pub fn test_ratio_trend(
@@ -1437,6 +1534,9 @@ impl AnalyzeService {
     }
 
     /// Measure information density (compression ratio + token uniqueness) per module
+    ///
+    /// Examples:
+    ///   normalize analyze density  # show information density per module
     #[server(group = "modules")]
     #[cli(display_with = "display_density")]
     pub fn density(
@@ -1466,6 +1566,9 @@ impl AnalyzeService {
     }
 
     /// Show information density trend over git history
+    ///
+    /// Examples:
+    ///   normalize analyze density-trend  # density score over git history
     #[server(group = "modules")]
     #[cli(display_with = "display_scalar_trend")]
     pub fn density_trend(
@@ -1493,6 +1596,9 @@ impl AnalyzeService {
     }
 
     /// Measure what fraction of functions have no structural near-twin per module
+    ///
+    /// Examples:
+    ///   normalize analyze uniqueness  # show code uniqueness per module
     #[server(group = "code")]
     #[cli(display_with = "display_uniqueness")]
     #[allow(clippy::too_many_arguments)]
@@ -1536,6 +1642,9 @@ impl AnalyzeService {
     }
 
     /// Compute effective (reachable) cyclomatic complexity via call-graph BFS
+    ///
+    /// Examples:
+    ///   normalize analyze call-complexity  # show effective complexity per function
     #[server(group = "code")]
     #[cli(display_with = "display_call_complexity")]
     pub fn call_complexity(
@@ -1567,6 +1676,9 @@ impl AnalyzeService {
     }
 
     /// Score each module across test ratio, uniqueness, and density (worst first)
+    ///
+    /// Examples:
+    ///   normalize analyze module-health  # composite health score per module
     #[server(group = "modules")]
     #[cli(display_with = "display_module_health")]
     pub fn module_health(
@@ -1597,6 +1709,9 @@ impl AnalyzeService {
     }
 
     /// Auto-generated single-page codebase overview
+    ///
+    /// Examples:
+    ///   normalize analyze summary  # generate a full codebase overview
     #[cli(display_with = "display_summary")]
     pub async fn summary(
         &self,
@@ -1621,6 +1736,9 @@ impl AnalyzeService {
     }
 
     /// Rank modules by import fan-in (requires facts index)
+    ///
+    /// Examples:
+    ///   normalize analyze imports  # show most-imported modules
     #[server(group = "modules")]
     #[cli(display_with = "display_imports")]
     pub async fn imports(
@@ -1649,6 +1767,9 @@ impl AnalyzeService {
     }
 
     /// Per-module dependency depth + ripple risk
+    ///
+    /// Examples:
+    ///   normalize analyze depth-map  # show dependency depth per module
     #[server(group = "modules")]
     #[cli(display_with = "display_depth_map")]
     pub async fn depth_map(
@@ -1674,6 +1795,10 @@ impl AnalyzeService {
     }
 
     /// Graph-theoretic properties of the dependency graph
+    ///
+    /// Examples:
+    ///   normalize analyze graph --on modules   # module dependency graph properties
+    ///   normalize analyze graph --on symbols   # symbol-level graph properties
     #[server(group = "graph")]
     #[cli(display_with = "display_graph")]
     pub async fn graph(
@@ -1700,6 +1825,9 @@ impl AnalyzeService {
     }
 
     /// Reverse-dependency closure: who depends on this file/symbol? Modules mode shows blast radius with test coverage; symbols/types mode shows a flat list.
+    ///
+    /// Examples:
+    ///   normalize analyze dependents src/lib.rs  # show who depends on this file
     #[server(group = "graph")]
     #[cli(display_with = "display_dependents")]
     pub async fn dependents(
@@ -1724,6 +1852,9 @@ impl AnalyzeService {
     }
 
     /// Per-module public symbol count, public ratio, and constraint score
+    ///
+    /// Examples:
+    ///   normalize analyze surface  # show public API surface per module
     #[server(group = "modules")]
     #[cli(display_with = "display_surface")]
     pub async fn surface(
@@ -1749,6 +1880,9 @@ impl AnalyzeService {
     }
 
     /// Per-module import layering compliance — are imports flowing downward?
+    ///
+    /// Examples:
+    ///   normalize analyze layering  # check import direction compliance
     #[server(group = "modules")]
     #[cli(display_with = "display_layering")]
     pub async fn layering(
@@ -1774,6 +1908,9 @@ impl AnalyzeService {
     }
 
     /// Provenance graph: git blame → session mapping + code relations
+    ///
+    /// Examples:
+    ///   normalize analyze provenance  # show git blame to session mapping
     #[server(group = "git")]
     #[cli(display_with = "display_provenance")]
     #[allow(clippy::too_many_arguments)]
@@ -1807,6 +1944,10 @@ impl AnalyzeService {
     }
 
     /// Show structural changes between a base ref and HEAD
+    ///
+    /// Examples:
+    ///   normalize analyze skeleton-diff main         # structural diff vs main
+    ///   normalize analyze skeleton-diff HEAD~5       # diff vs 5 commits ago
     #[server(group = "diff")]
     #[cli(display_with = "display_skeleton_diff")]
     pub fn skeleton_diff(
@@ -1829,6 +1970,9 @@ impl AnalyzeService {
     }
 
     /// Track health metrics over git history at regular intervals
+    ///
+    /// Examples:
+    ///   normalize analyze trend -n 10  # 10 snapshots of health metrics
     #[server(group = "git")]
     #[cli(display_with = "display_trend")]
     pub fn trend(
@@ -1847,6 +1991,9 @@ impl AnalyzeService {
     }
 
     /// Find repeated AST fragments across the codebase
+    ///
+    /// Examples:
+    ///   normalize analyze fragments  # find repeated AST subtrees
     #[server(group = "code")]
     #[cli(display_with = "display_fragments")]
     #[allow(clippy::too_many_arguments)]
@@ -1904,6 +2051,11 @@ impl AnalyzeService {
     }
 
     /// Show the tree-sitter CST for a file (development/debugging tool for writing queries)
+    ///
+    /// Examples:
+    ///   normalize analyze parse src/main.rs             # show full CST
+    ///   normalize analyze parse file.py --at 10:4       # subtree at line 10, col 4
+    ///   normalize analyze parse file.go --depth 3       # limit tree depth
     #[server(group = "code")]
     #[cli(display_with = "display_ts_parse")]
     pub fn parse(
@@ -1930,6 +2082,10 @@ impl AnalyzeService {
     }
 
     /// Run a tree-sitter query against a file and show captures
+    ///
+    /// Examples:
+    ///   normalize analyze query file.rs '(function_item name: (identifier) @fn)'  # inline query
+    ///   normalize analyze query file.py path/to/query.scm                         # query from file
     #[server(group = "code")]
     #[cli(display_with = "display_ts_query")]
     pub fn query(
@@ -1956,6 +2112,10 @@ impl AnalyzeService {
     }
 
     /// List node kinds and field names for a tree-sitter grammar
+    ///
+    /// Examples:
+    ///   normalize analyze node-types rust              # list all Rust node kinds
+    ///   normalize analyze node-types python --search raise  # filter by substring
     #[server(group = "code")]
     #[cli(display_with = "display_node_types")]
     pub fn node_types(

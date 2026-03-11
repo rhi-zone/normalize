@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 169
 expression: "snapshot_help(&[\"facts\", \"files\"])"
 ---
 List indexed files (with optional prefix filter)
@@ -22,3 +21,8 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Examples:
+normalize structure files                    # list all indexed files
+normalize structure files src/               # list files under src/
+normalize structure files -l 10              # show only the first 10 files

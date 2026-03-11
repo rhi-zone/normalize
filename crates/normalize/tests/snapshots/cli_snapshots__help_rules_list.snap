@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 438
 expression: "snapshot_help(&[\"rules\", \"list\"])"
 ---
 List all rules (syntax + fact, builtin + user)
@@ -24,3 +23,8 @@ Options:
       --pretty                     Enable pretty
       --compact                    Enable compact
   -h, --help                       Print help
+
+Examples:
+normalize rules list                   # all rules with status
+normalize rules list --pretty          # with full descriptions
+normalize rules list --json            # machine-readable output

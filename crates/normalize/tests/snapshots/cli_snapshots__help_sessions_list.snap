@@ -25,3 +25,10 @@ Options:
       --pretty                     Enable pretty
       --compact                    Enable compact
   -h, --help                       Print help
+
+Examples:
+normalize sessions list                       # list recent sessions for current project
+normalize sessions list --days 7              # sessions from the last 7 days
+normalize sessions list --grep "refactor"     # filter sessions by content pattern
+normalize sessions list --all-projects        # show sessions across all projects
+normalize sessions list --format codex        # only show Codex sessions

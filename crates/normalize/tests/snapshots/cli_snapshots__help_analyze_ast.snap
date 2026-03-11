@@ -36,8 +36,6 @@ Code quality:
   length-trend       Show function length trend over git history
   ceremony           Show ceremony ratio: fraction of callables that are trait/interface boilerplate
   duplicates         Detect duplicate/similar code (functions or blocks)
-
-Modes: exact (default), similar (fuzzy MinHash), clusters (connected components).
   duplicate-types    Detect duplicate type definitions
   uniqueness         Measure what fraction of functions have no structural near-twin per module
   call-complexity    Compute effective (reachable) cyclomatic complexity via call-graph BFS

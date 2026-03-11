@@ -29,6 +29,10 @@ impl std::fmt::Display for GenerateResult {
 #[cli(name = "generate", description = "Generate code from API spec")]
 impl GenerateService {
     /// Generate API client from OpenAPI spec
+    ///
+    /// Examples:
+    ///   normalize generate client api.json -l typescript          # generate TypeScript client
+    ///   normalize generate client api.json -l python -o client.py # generate Python client to file
     pub fn client(
         &self,
         #[param(positional, help = "OpenAPI spec JSON file")] spec: String,
@@ -69,6 +73,11 @@ impl GenerateService {
     }
 
     /// Generate types/validators from schema
+    ///
+    /// Examples:
+    ///   normalize generate types schema.json -b typescript        # generate TypeScript types
+    ///   normalize generate types schema.json -b zod --infer-types # Zod schemas with type inference
+    ///   normalize generate types schema.json -b go --package models -o models.go
     #[allow(clippy::too_many_arguments)]
     pub fn types(
         &self,
@@ -110,6 +119,10 @@ impl GenerateService {
     }
 
     /// Generate CLI snapshot tests for a binary
+    ///
+    /// Examples:
+    ///   normalize generate cli-snapshot ./target/debug/myapp              # generate snapshot tests
+    ///   normalize generate cli-snapshot ./target/debug/myapp -o tests/cli.rs  # write to file
     #[cli(name = "cli-snapshot")]
     pub fn cli_snapshot(
         &self,

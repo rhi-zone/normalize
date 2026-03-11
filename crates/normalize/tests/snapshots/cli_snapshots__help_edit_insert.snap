@@ -1,12 +1,8 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 138
 expression: "snapshot_help(&[\"edit\", \"insert\"])"
 ---
 Insert content relative to a symbol.
-
-With `--each`, applies the insert to every file matching `--only` that contains
-the symbol — useful for adding a method to all implementations of a trait.
 
 Usage: normalize edit insert [OPTIONS] [target]
 
@@ -32,3 +28,10 @@ Options:
   -r, --root <root>                Root directory
       --each                       Apply to every file matching --only that contains the symbol
   -h, --help                       Print help
+
+With `--each`, applies the insert to every file matching `--only` that contains
+the symbol — useful for adding a method to all implementations of a trait.
+
+Examples:
+normalize edit insert src/lib.rs/MyStruct --content "fn new() {}" --at after
+normalize edit insert src/lib.rs/MyStruct --content "use foo;" --at before --dry-run

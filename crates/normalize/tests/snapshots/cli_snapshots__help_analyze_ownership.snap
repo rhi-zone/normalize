@@ -19,3 +19,6 @@ Options:
       --repos-depth <repos-depth>  Max depth to search for repos (default: 1)
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Examples:
+normalize analyze ownership  # show ownership concentration per file

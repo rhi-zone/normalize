@@ -28,6 +28,11 @@ impl SyntaxService {
 #[cli(name = "syntax", description = "AST inspection")]
 impl SyntaxService {
     /// Show AST structure for a file
+    ///
+    /// Examples:
+    ///   normalize syntax ast src/main.rs             # show full AST for a file
+    ///   normalize syntax ast src/main.rs -l 42       # show AST node at line 42
+    ///   normalize syntax ast src/main.rs --sexp      # output as S-expression
     #[cli(display_with = "display_ast")]
     pub fn ast(
         &self,
@@ -42,6 +47,11 @@ impl SyntaxService {
     }
 
     /// Run tree-sitter or ast-grep queries against the codebase
+    ///
+    /// Examples:
+    ///   normalize syntax query "(function_item name: (identifier) @name)"   # tree-sitter query
+    ///   normalize syntax query "fn $NAME() { $$$BODY }" -p src/             # ast-grep pattern
+    ///   normalize syntax query "(call_expression)" --show-source            # show full source matches
     #[cli(display_with = "display_query")]
     pub fn query(
         &self,
