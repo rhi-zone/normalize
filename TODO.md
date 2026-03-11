@@ -62,10 +62,31 @@ tool, another command). Don't extract for line count alone.
 
 ### Language implementation depth
 
-- [x] Audit: for each language, document which methods are genuinely unsupported by the grammar
-      vs which are just unimplemented (2026-03-12: all 16 major programming languages have full
-      coverage. Genuinely unsupported: Bash/Perl types, data format calls/types, HTML/CSS calls.
-      Unimplemented but feasible: CMake types, Dockerfile tags.scm, Jinja2 calls — low priority.)
+- [x] Audit (2026-03-12): 47/84 languages at 100% .scm coverage. Full gap list below.
+
+**Feasible gaps (grammar supports it, .scm not written):**
+
+High-value:
+- [ ] TSX imports.scm (reuse TypeScript logic)
+- [ ] Svelte imports.scm (JS imports in `<script>`)
+- [ ] Vue imports.scm (same)
+- [ ] GraphQL imports.scm (schema extends, federation)
+- [ ] SQL imports.scm (foreign tables, schema refs)
+- [ ] Jinja2 calls.scm (macro/filter invocations)
+- [ ] Thrift tags.scm (struct/service/enum defs)
+- [ ] Dockerfile tags.scm (build stages)
+
+80% languages (missing types.scm — assess feasibility per-language):
+- [ ] AWK, Fish, Zsh, Vim, Typst, SCSS, Jq, Meson, CMake, Perl, Prolog
+
+Config/markup (lower priority, feasible):
+- [ ] Nginx calls.scm (directive invocations)
+- [ ] Caddy tags.scm (route defs)
+
+**Genuinely unsupported (correct as None/empty):**
+- Bash types (no type system)
+- JSON/YAML/TOML/XML/Markdown imports/calls/complexity (data formats)
+- HTML/CSS calls/complexity/types (markup/style)
 
 ### Comprehensive language fixtures (long-term, nix flake verification)
 

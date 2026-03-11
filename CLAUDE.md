@@ -35,6 +35,17 @@ Behavioral rules for Claude Code in this repository.
 
 **Be honest about capabilities.** Language trait implementations reflect what the tree-sitter grammar actually provides (CST, not AST). If the grammar doesn't model a concept, return empty/None — don't fabricate semantic structure.
 
+## Language Quality
+
+**Goal: maximum quality for every language we support.** Every supported language should have the best extraction we can provide — symbols, imports, calls, complexity, types — unless the language genuinely lacks a concept (e.g. Bash has no type system). "We haven't gotten to it yet" is a gap to close, not a state to accept.
+
+**Writing custom grammars is on the table.** We've already written our own Jinja2 grammar when the ecosystem didn't have what we needed. If a tree-sitter grammar doesn't exist or is too limited for a language we want to support well, writing or forking one is a valid approach.
+
+**When adding or improving a language:**
+1. Add all applicable `.scm` query files (tags, imports, calls, complexity, types)
+2. Implement the Language trait methods that the grammar supports
+3. Don't leave gaps for "later" — if the grammar supports it, implement it now
+
 ## SUMMARY.md
 
 Every directory with files should have a `SUMMARY.md` describing its purpose and contents. The pre-commit hook enforces this at `severity=error` via `normalize rules run --engine native` (stale-summary rule).
