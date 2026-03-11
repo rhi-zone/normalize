@@ -614,6 +614,36 @@ Agents can't know what context they need before they see it:
 
 This chicken-and-egg problem causes agents to guess, miss relevant context, and loop.
 
+### "The Bitter Lesson of Agent Frameworks" (Greg Prosvetov / Browser Use, 2026)
+
+**Source**: https://x.com/gregpr07/status/2012052139384979773
+
+**Core Argument**: Rich Sutton's Bitter Lesson applies to agent frameworks — general methods leveraging computation beat hand-crafted abstractions. Agent frameworks freeze assumptions about how intelligence should work; RL breaks those assumptions.
+
+**Key Claims:**
+
+1. **An agent is just a for-loop**: Keep going until the model stops calling tools. No framework needed beyond that.
+
+2. **Start maximal, then restrict**: Instead of defining every possible action up front, assume the model can do almost anything. Give maximum freedom, then constrain based on evals. (Inverse of the typical "build up from primitives" approach.)
+
+3. **Incomplete action spaces cause failure, not weak models**: Agents fail because their action space doesn't cover what the model needs to do, not because the model is dumb. Example: Claude Code writes AppleScript directly for Spotify instead of needing a purpose-built Spotify tool.
+
+4. **Ephemeral messages for context management**: Tool outputs (e.g. DOM snapshots) are massive and stale quickly. Keep only the last N outputs per tool, discard the rest. Trades cache efficiency for coherence.
+
+5. **Explicit completion via `done()` tool**: Naive "stop when no tool calls" causes premature termination. Force the model to explicitly signal completion.
+
+6. **Abstractions are liabilities**: Every wrapper, planning module, verification layer, and output parser encodes assumptions that the model's training already covers better.
+
+**Contrast with "Vibe Coding Killed Cursor" (above):**
+
+Both critiques reject over-engineered agent frameworks, but prescribe opposite solutions:
+- **Vibe Coding**: Pre-collect context structurally, minimize tool loops, single-shot reasoning
+- **Bitter Lesson**: Give the model maximal tools, let it discover what it needs via tool calls
+
+The tension: one says "the model can't discover context efficiently" while the other says "the model is better at discovery than your hand-crafted abstractions." The resolution may be domain-dependent — browser automation (open-ended, visual) vs. code understanding (structural, indexable) favor different approaches.
+
+**Relevance to Normalize**: Normalize's index-driven context collection is closer to the "vibe coding" camp — use structural knowledge to pre-collect, don't make the LLM search. But the "maximal action space" principle applies to what the LLM can *do* with that context (edits, refactors, generation). The two ideas compose: structural collection for context, maximal freedom for action.
+
 ### Implications for Normalize Agent Design
 
 **Current agent approach has the same problems:**
