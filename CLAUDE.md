@@ -12,7 +12,8 @@ Behavioral rules for Claude Code in this repository.
 
 **Index-first:** Core data extraction (symbols, imports, calls) goes in the Rust index. When adding language support: first add extraction to the indexer, then expose via commands. All commands work without index (graceful degradation).
 
-**CLI is generated from the service layer.** The CLI help and subcommands are NOT driven by `args.rs` / clap `#[derive(Subcommand)]` alone. The primary CLI registration happens in `service/analyze.rs` via `#[cli(...)]` proc-macro attributes on `AnalyzeService` methods. When adding a new analyze subcommand:
+**CLI is generated from the service layer.** The CLI help and subcommands are NOT driven by `args.rs` / clap `#[derive(Subcommand)]` alone. The primary CLI registration happens in `service/analyze.rs` via `#[cli(...)]` proc-macro attributes on `AnalyzeService` methods. When adding a new subcommand:
+0. **Check if it already exists under a different service.** Run `normalize --help` and check each service's subcommands. Commands have been moved between services before (e.g. `analyze ast` → `syntax ast` → duplicate `analyze parse` created because no one checked `syntax`); adding without checking creates duplicates.
 1. Create the analysis module (`commands/analyze/<name>.rs`) with report struct + `OutputFormatter`
 2. Add a `display_<name>` method and a `pub fn <name>` method to `service/analyze.rs` using `#[cli(display_with = "display_<name>")]`
 3. Add the module to `commands/analyze/mod.rs`
