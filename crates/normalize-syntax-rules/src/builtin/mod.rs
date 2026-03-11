@@ -86,6 +86,14 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         content: include_str!("js_no_await_in_loop.scm"),
     },
     BuiltinRule {
+        id: "js/no-prototype-builtins",
+        content: include_str!("js_no_prototype_builtins.scm"),
+    },
+    BuiltinRule {
+        id: "js/prefer-optional-chain",
+        content: include_str!("js_prefer_optional_chain.scm"),
+    },
+    BuiltinRule {
         id: "typescript/tuple-return",
         content: include_str!("typescript_tuple_return.scm"),
     },
@@ -154,6 +162,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
     BuiltinRule {
         id: "go/context-todo",
         content: include_str!("go_context_todo.scm"),
+    },
+    BuiltinRule {
+        id: "go/sync-mutex-copied",
+        content: include_str!("go_sync_mutex_copied.scm"),
     },
     // Ruby rules
     BuiltinRule {

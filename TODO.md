@@ -973,15 +973,15 @@ git push --tags
 ## Syntax Ruleset Breadth
 
 After batch-fixing the current info violations, audit and expand rule coverage:
-- **What we have**: 45 builtin rules (41 syntax). Good Rust/Go/Python/JS/Ruby/TS coverage.
-- **Next**: more JS/TS rules; Go sync-mutex-copied; Ruby/Python depth.
+- **What we have**: 48 builtin rules (44 syntax). Good Rust/Go/Python/JS/Ruby/TS coverage.
+- **Next**: Ruby/Python depth; TypeScript type-aware rules (need semantic layer).
 - **Trigger for fix infrastructure**: once enough rules have structural auto-fixes that need correct indentation, build the corpus-based indentation model (see `docs/prior-art.md` § "Corpus-based indentation model"). Don't build it speculatively.
 - **tree-sitter-go note**: `block` → `statement_list` → statements. Queries must use `statement_list` as intermediate node; `(block (return_statement))` won't match.
 - **Rule ideas by language**:
-  - JS/TS: `var` usage ✓, `== null` ✓, `typeof` checks ✓, async/await ✓ — `no-prototype-builtins`, `prefer-optional-chain`
-  - TypeScript: `no-any` ✓, `no-non-null-assertion` ✓ — `strict-boolean-expressions`
+  - JS/TS: `var` usage ✓, `== null` ✓, `typeof` checks ✓, async/await ✓, `no-prototype-builtins` ✓, `prefer-optional-chain` ✓
+  - TypeScript: `no-any` ✓, `no-non-null-assertion` ✓ — `strict-boolean-expressions` (requires type info, skip for now)
   - Python: mutable default args ✓, bare `except` ✓, `assert` in non-test ✓
-  - Go: error ignored ✓, `fmt.Println` ✓, `empty-return` ✓, `defer-in-loop` ✓, `context-todo` ✓ — `sync-mutex-copied`
+  - Go: error ignored ✓, `fmt.Println` ✓, `empty-return` ✓, `defer-in-loop` ✓, `context-todo` ✓, `sync-mutex-copied` ✓
   - Ruby: `rescue Exception` ✓, `puts` in non-script ✓, `string-concat` ✓
   - Cross-language: hardcoded credentials ✓, magic numbers, commented-out code blocks
 
