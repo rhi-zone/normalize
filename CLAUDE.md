@@ -2,7 +2,7 @@
 
 Behavioral rules for Claude Code in this repository.
 
-**References:** `docs/philosophy.md` (design tenets), `docs/architecture-decisions.md` (technical choices), `docs/session-modes.md` (working conventions), `docs/cli-dropin-integrations.md` (embedding external tools as drop-in CLI replacements — WIP).
+**References:** `docs/philosophy.md` (design tenets), `docs/architecture-decisions.md` (technical choices), `docs/cli-design.md` (CLI surface and principles), `docs/audit-2026-03-12.md` (architecture audit with action items).
 
 ## Publishing
 
@@ -10,45 +10,17 @@ Behavioral rules for Claude Code in this repository.
 
 ## Architecture
 
-**Index-first:** Core data extraction (symbols, imports, calls) goes in the Rust index. When adding language support: first add extraction to the indexer, then expose via commands. All commands work without index (graceful degradation).
+**Index-first:** Core data extraction (symbols, imports, calls) goes in the Rust index. When adding language support: first add extraction to the indexer, then expose via commands. Single-file commands (view, complexity, parsing) work without the index; cross-file features (import resolution, call graphs, dead code) require it and prompt the user to run `normalize structure rebuild`.
 
-**CLI is generated from the service layer.** The CLI help and subcommands are NOT driven by `args.rs` / clap `#[derive(Subcommand)]` alone. The primary CLI registration happens in `service/analyze.rs` via `#[cli(...)]` proc-macro attributes on `AnalyzeService` methods. When adding a new subcommand:
-0. **Check if it already exists under a different service.** Run `normalize --help` and check each service's subcommands. Commands have been moved between services before (e.g. `analyze ast` → `syntax ast` → duplicate `analyze parse` created because no one checked `syntax`); adding without checking creates duplicates.
-1. Create the analysis module (`commands/analyze/<name>.rs`) with report struct + `OutputFormatter`
-2. Add a `display_<name>` method and a `pub fn <name>` method to `service/analyze.rs` using `#[cli(display_with = "display_<name>")]`
-3. Add the module to `commands/analyze/mod.rs`
-4. Add `assert_output_formatter::<Report>()` in `output.rs` test
-5. params-json/schema support is automatic via server-less — no `args.rs` changes needed
+**CLI is generated from the service layer.** Subcommands come from `#[cli(...)]` proc-macro attributes on service methods, not `args.rs`. When adding a new subcommand:
+0. **Check if it already exists under a different service.** Run `normalize --help` and check each service's subcommands. Commands have been moved between services before (e.g. `analyze ast` → `syntax ast` → duplicate `analyze parse` created because no one checked `syntax`).
+1. Look at an existing command for the pattern: `normalize view crates/normalize/src/service/analyze.rs` and pick a similar method as template.
+2. Create the analysis module (`commands/analyze/<name>.rs`) with report struct + `OutputFormatter`
+3. Add `assert_output_formatter::<Report>()` in `output.rs` test
 
-Pattern for service methods:
-```rust
-fn display_foo(&self, r: &FooReport) -> String {
-    if self.pretty.get() { r.format_pretty() } else { r.format_text() }
-}
-
-#[cli(display_with = "display_foo")]
-pub fn foo(&self, root: Option<String>, limit: Option<usize>, pretty: bool, compact: bool) -> Result<FooReport, String> {
-    let root_path = Self::root_path(root);
-    self.resolve_format(pretty, compact, &root_path);
-    Ok(analyze_foo(&root_path, limit.unwrap_or(30)))
-}
-```
-
-**Output formats come from server-less for free.** Any report struct that derives `Serialize` + `schemars::JsonSchema` automatically gets `--json`, `--jsonl`, `--jq`, and `--schema` via the server-less proc macro. **You never implement JSON output.** The implementation work for a new command is `format_text()` and `format_pretty()` on the report struct — that's the `OutputFormatter` trait. Don't manually handle `--json` flags or write `serde_json::to_string` in command code.
-
-**server-less is our own project** (dogfooding). The proc macro lives at `/home/me/git/rhizone/server-less`. When the proc macro causes confusing behavior, investigate and note it — don't work around silently. The `#[cli]` proc macro contract: **every `&self` method inside the annotated impl block = a subcommand.** This is by design, not a quirk. Helper methods (`display_*`, formatting, etc.) belong in a **separate** `impl` block above the `#[cli]` block. `display_with = "method_name"` references methods across impl blocks on the same struct.
-
-**Balance agent vs tooling:** Both should progress in parallel. After significant agent work, pivot to tooling; after tooling sprint, check if agent could benefit.
+**server-less is our own project** (dogfooding). The proc macro lives at `/home/me/git/rhizone/server-less`. When the proc macro causes confusing behavior, investigate and note it — don't work around silently. The `#[cli]` proc macro contract: **every `&self` method inside the annotated impl block = a subcommand.** This is by design, not a quirk. Helper methods (`display_*`, formatting, etc.) belong in a **separate** `impl` block above the `#[cli]` block. `display_with = "method_name"` references methods across impl blocks on the same struct. **Known bug:** `#[cli(name = "...")]` on nested services is ignored — the CLI subcommand name comes from the field name in the parent struct, not the `name` attribute.
 
 **Generally useful functionality belongs in its own crate, not `normalize`.** The main crate is for CLI wiring (service layer, command dispatch, output formatting). The test: would anything other than one CLI command want this — another command, the LSP server, an external tool, a future library consumer? If yes, it belongs in a domain crate (`normalize-facts`, `normalize-session-analysis`, etc.). If it's purely "compute something and format it for this one command", it can stay in `commands/`. The `normalize` binary is a consumer of the ecosystem, not a home for reusable logic.
-
-**Don't create new crates when an existing one fits.** Before adding a new crate, check whether the code belongs in `normalize-architecture`, `normalize-facts`, `normalize-graph`, etc. New crates add published surface; prefer extending an existing crate. Only create a new crate when the domain is clearly distinct from all existing ones AND there is a real second consumer today (not hypothetical).
-
-**Language vs LocalDeps traits:** Two separate traits, two separate crates, no cross-dependency.
-- `Language` (`normalize-languages`): Syntax/AST extraction — symbols, imports, exports, complexity. Implemented by ~98 languages. All methods are required (no defaults). Adding a language = implement this trait.
-- `LocalDeps` (`normalize-local-deps`): Filesystem/package discovery — resolve imports, find installed packages, index external deps. Implemented by ~10 ecosystems. All methods have defaults (opt-in overrides). Adding package support = implement this trait.
-- Assembly at top level: `deps_for_language(lang.name())` bridges syntax and deps lookups.
-- When a trait grows beyond its domain, extract a new crate rather than expanding. Watch for: methods that only ~10% of impls override, methods that need filesystem access in a syntax trait, methods that need new dependencies.
 
 
 ## Core Rule
@@ -62,7 +34,7 @@ pub fn foo(&self, root: Option<String>, limit: Option<usize>, pretty: bool, comp
 
 "I'll add that to TODO.md" or "I'll note that" without immediately editing the file is the failure mode. Edit first, then respond.
 
-**Keep docs in sync with code.** When renaming a command, adding a subcommand, or changing CLI structure: update `docs/cli/`, `README.md`, `LLMS.md`, `Architecture.md`, and `docs/cli-design.md` in the same commit. Stale docs compound — 200 commits of drift = a full day of cleanup.
+**Keep docs in sync with code.** When renaming a command, adding a subcommand, or changing CLI structure: update `docs/cli/`, `README.md`, `LLMS.md`, and `docs/cli-design.md` in the same commit. Stale docs compound — 200 commits of drift = a full day of cleanup.
 
 **Triggers:** User corrects you, 2+ failed attempts, "aha" moment, framework quirk discovered → document before proceeding.
 
@@ -74,7 +46,7 @@ pub fn foo(&self, root: Option<String>, limit: Option<usize>, pretty: bool, comp
 
 **If the user corrects you at all, or you guessed at anything:** CLAUDE.md is probably missing something. Update it before proceeding.
 
-**Language trait implementations must be honest about what the grammar provides.** Don't implement `container_kinds`, `container_body`, etc. based on what you *wish* the grammar modeled. If the tree-sitter grammar doesn't model a concept (e.g. markdown sections), return empty/None and handle it at a higher level — don't claim support you can't deliver. tree-sitter grammars are CSTs (concrete syntax trees), not ASTs — semantic structure (like "section = heading + content") must be derived, not assumed.
+**Language trait implementations must be honest about what the grammar provides.** Don't implement `container_body`, `refine_kind`, etc. based on what you *wish* the grammar modeled. If the tree-sitter grammar doesn't model a concept (e.g. markdown sections), return empty/None and handle it at a higher level — don't claim support you can't deliver. tree-sitter grammars are CSTs (concrete syntax trees), not ASTs — semantic structure (like "section = heading + content") must be derived, not assumed.
 
 ## From Session Analysis
 
@@ -109,7 +81,7 @@ Every directory with files should have a `SUMMARY.md` describing its purpose and
 ```
 ./target/debug/normalize view [path[/symbol]] [--types-only]
 ./target/debug/normalize view path:start-end
-./target/debug/normalize analyze [--complexity] [path]
+./target/debug/normalize analyze complexity [path]
 ./target/debug/normalize grep <pattern> [--only <glob>]
 ```
 
@@ -180,32 +152,15 @@ Scope is optional but recommended for multi-crate repos.
 ## Negative Constraints
 
 Do not:
-- Hardcode file extensions anywhere — ever. Extension → language mapping belongs in the `Language` registry. Any `match ext { "rs" => ..., "ts" => ..., _ => default }` in non-registry code is wrong. Use `registry.language_for_extension(ext)` or equivalent.
-- Ship mutating commands without `--dry-run` - every command that writes, deletes, or modifies anything must support `--dry-run` to preview what would happen
-- Announce actions ("I will now...") - just do them
-- Leave work uncommitted — after completing a task and tests pass, commit immediately without asking. End state: `git status` shows nothing to commit.
-- Skip TODO.md updates — every task ends with TODO.md committed alongside the implementation. Items that are done get marked done; new follow-ups get added. Never leave TODO.md stale.
-- Create special cases - design to avoid them
-- Create legacy APIs - one API, update all callers
-- Add to the monolith - split by domain into sub-crates
-- Do half measures - when you introduce a new abstraction, immediately replace all existing ad-hoc code with it; don't leave old partial implementations alongside the new one
-- "Unify" commands by wrapping N report types in an enum — that's not unification, it's just a dispatch layer with fewer CLI entry points. Real consolidation means one report struct that all modes populate, with shared fields and shared rendering. If the reports have nothing in common, they shouldn't be forced under one command
-- Ask permission when philosophy is clear - just do it
-- Return tuples - use structs with named fields
-- Use trait defaults in `Language` - explicit impl required (but `LocalDeps` uses defaults by design)
-- Put shared implementation helpers in the trait - helpers belong in a free function or a separate module, not as trait methods; trait methods are the interface, not the implementation
-- Write stub implementations - every trait method must be fully implemented; `None`/empty is only correct when the concept genuinely doesn't exist in that language
-- String-match AST properties - use tree-sitter structure
-- Return `&'static [&'static str]` node kind lists from `Language` trait methods when a `.scm` query file is the right fit — node classification (which nodes are calls/complexity/etc.) belongs in `*.calls.scm`, `*.complexity.scm` etc., not in Rust. Extraction (getting names/fields from identified nodes) stays in Rust.
-- Replace content when editing lists - extend, don't replace
-- Cut corners with fallbacks - implement properly for each case
-- Mark as done prematurely - note what remains
-- Name gaps "known limitations" and stop — a limitation is a bug to fix, not a category to accept. "X doesn't support Y" is only valid when the underlying tool genuinely cannot do it; otherwise fix it
-- Fear "over-modularization" - 100 lines is fine for a module
-- Consider time constraints - we're NOT short on time; optimize for correctness
-- Use path dependencies in Cargo.toml - causes clippy to stash changes across repos
-- Use `--no-verify` - fix the issue or fix the hook
-- Assume tools are missing - check if `nix develop` is available for the right environment
+- Hardcode file extensions — extension → language mapping belongs in the `Language` registry. Use `support_for_path(path)` or equivalent.
+- Ship mutating commands without `--dry-run`
+- Leave work uncommitted or TODO.md stale — both must be updated in the final commit
+- Do half measures — when introducing a new abstraction, replace all existing ad-hoc code with it
+- "Unify" commands by wrapping N report types in an enum — real consolidation means one report struct with shared fields. If reports have nothing in common, they shouldn't be forced under one command.
+- Write stub implementations — `None`/empty is only correct when the concept genuinely doesn't exist in that language
+- Put node classification in Rust when a `.scm` query file fits — `*.calls.scm`, `*.complexity.scm` etc. Extraction (getting names/fields from identified nodes) stays in Rust.
+- Use path dependencies in Cargo.toml — causes clippy to stash changes across repos
+- Use `--no-verify` — fix the issue or fix the hook
 
 ## Design Principles
 
@@ -213,45 +168,12 @@ Do not:
 
 **Simplicity over cleverness.** HashMap > inventory crate. OnceLock > lazy_static. Functions > traits until you need the trait. Use ecosystem tooling (tree-sitter queries) over hand-rolling.
 
-**Rust/Lua boundary.** Rust for: native ops (tree-sitter, file I/O, subprocess), perf-critical code. Lua for: pure logic, user-facing scripting.
-
 **Explicit over implicit.** Log when skipping. Location-based allowlists > hash-based. Show what's at stake before refusing.
 
 **Separate niche from shared.** Don't bloat config.toml with feature-specific data. Use separate files for specialized data.
-
-**Dynamic context > append-only.** Chatbot model (growing conversation log) is wrong for agents. Normalize uses context that can be reshaped, not just accumulated.
 
 **When stuck (2+ attempts):** Step back. Am I solving the right problem? Check docs/philosophy.md before questioning design.
 
 ## Code Conventions
 
-**OutputFormatter trait** (`crates/normalize/src/output.rs`):
-
-All types that produce user-facing output should implement `OutputFormatter`:
-
-```rust
-impl OutputFormatter for YourType {
-    fn format_text(&self) -> String {
-        // Compact text (markdown, LLM-friendly, no colors)
-        // Default format, used with --compact or no flags
-        // Good for: piping, LLM consumption, copy/paste
-    }
-
-    fn format_pretty(&self) -> String {
-        // Pretty text with colors and visualizations
-        // Used with --pretty flag
-        // Good for: terminal viewing, debugging
-    }
-}
-```
-
-Benefits:
-- Consistent `--pretty`/`--compact`/`--json`/`--jq` across all commands
-- No manual flag checking - use `OutputFormat::from_cli()` + `analysis.print(&format)`
-- Respects `NO_COLOR` env var and TTY detection automatically
-- `format_text()` is required, `format_pretty()` defaults to `format_text()` if not overridden
-
-**When to use:**
-- Analysis results (`SessionAnalysis`, complexity reports, etc.)
-- Structured command output (stats, summaries, listings)
-- **Not for:** Raw data dumps, interactive prompts, error messages
+**OutputFormatter trait** (`crates/normalize/src/output.rs`): All report structs implement `format_text()` and optionally `format_pretty()`. See any report in `commands/analyze/` for examples. `--json`/`--jq`/`--jsonl` are automatic via server-less.
