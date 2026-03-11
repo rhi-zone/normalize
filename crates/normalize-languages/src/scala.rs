@@ -1,6 +1,6 @@
 //! Scala language support.
 
-use crate::{ContainerBody, Import, Language, LanguageSymbols};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Scala language support.
@@ -196,6 +196,38 @@ impl Language for Scala {
         ]
     }
 
+    fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
+        // Scala uses `access_modifier` child with optional `access_qualifier`.
+        // `private` → Private, `protected` → Protected, no modifier → Public.
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "access_modifier" {
+                let text = &content[child.byte_range()];
+                if text.starts_with("private") {
+                    return Visibility::Private;
+                }
+                if text.starts_with("protected") {
+                    return Visibility::Protected;
+                }
+            }
+            if child.kind() == "modifiers" {
+                let mut mc = child.walk();
+                for m in child.children(&mut mc) {
+                    if m.kind() == "access_modifier" {
+                        let text = &content[m.byte_range()];
+                        if text.starts_with("private") {
+                            return Visibility::Private;
+                        }
+                        if text.starts_with("protected") {
+                            return Visibility::Protected;
+                        }
+                    }
+                }
+            }
+        }
+        Visibility::Public
+    }
+
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")
     }
@@ -274,7 +306,8 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             // STRUCTURAL
-            "access_modifier", "access_qualifier", "arrow_renamed_identifier",
+            "access_modifier",     // used in get_visibility (audit matched by "if" substring)
+            "access_qualifier", "arrow_renamed_identifier",
             "as_renamed_identifier", "block_comment", "case_block", "case_class_pattern",
             "class_parameter", "class_parameters", "derives_clause", "enum_body",
             "enum_case_definitions", "enum_definition", "enumerator", "enumerators",

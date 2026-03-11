@@ -526,8 +526,11 @@ language that silently returns empty is misleading users who expect analysis and
       `ViewFileReport` now has `warnings: Vec<String>` field; `build_view_file_service()` checks
       `as_symbols()` and warns for data/config languages (JSON, YAML, TOML, HTML, CSS, XML).
       Warnings appear in text, pretty, and JSON output.
-- [ ] Prioritize: Python, JavaScript/TypeScript, Go, Java, C, C++, Ruby, Rust (already good)
-      are the high-value targets — full implementations, not boilerplate
+- [x] Prioritize: Top 8 (Rust, Python, Go, Java, C, C++, Ruby, JS/TS) fully audited. Mid-tier
+      (Dart, PHP, Kotlin, Swift, C#, Scala) now complete: Dart docstring, Scala visibility,
+      PHP attributes added 2026-03-11. Remaining gaps in lower-priority languages (Haskell
+      build_signature, Julia build_signature, Perl build_signature) are genuine complexity —
+      function signatures in these languages are hard to express compactly. — DONE 2026-03-11
 - [x] `refine_kind()` audit: Go, C#, C++, Swift, Kotlin, Java, Dart, PHP now implement
       `refine_kind()` to distinguish struct/enum/interface/trait from generic class. TypeScript
       tags.scm now captures `enum_declaration` and `type_alias_declaration`. Java: enum/interface/

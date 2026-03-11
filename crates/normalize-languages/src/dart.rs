@@ -1,5 +1,6 @@
 //! Dart language support.
 
+use crate::docstring::extract_preceding_prefix_comments;
 use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
@@ -23,6 +24,10 @@ impl Language for Dart {
 
     fn signature_suffix(&self) -> &'static str {
         " {}"
+    }
+
+    fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
+        extract_preceding_prefix_comments(node, content, "///")
     }
 
     fn refine_kind(

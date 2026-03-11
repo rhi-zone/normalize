@@ -39,6 +39,37 @@ impl Language for Php {
         }
     }
 
+    fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
+        let mut attrs = Vec::new();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "attribute_list" {
+                let mut ac = child.walk();
+                for attr in child.children(&mut ac) {
+                    if attr.kind() == "attribute_group" || attr.kind() == "attribute" {
+                        attrs.push(content[attr.byte_range()].to_string());
+                    }
+                }
+            }
+        }
+        // Also check preceding siblings (PHP attributes can precede the declaration)
+        let mut prev = node.prev_sibling();
+        while let Some(sibling) = prev {
+            if sibling.kind() == "attribute_list" {
+                let mut ac = sibling.walk();
+                for attr in sibling.children(&mut ac) {
+                    if attr.kind() == "attribute_group" || attr.kind() == "attribute" {
+                        attrs.push(content[attr.byte_range()].to_string());
+                    }
+                }
+                prev = sibling.prev_sibling();
+                continue;
+            }
+            break;
+        }
+        attrs
+    }
+
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
         extract_phpdoc(node, content)
     }
@@ -85,7 +116,7 @@ impl Language for Php {
             }
         }
         crate::ImplementsInfo {
-            is_interface: false,
+            is_interface: node.kind() == "interface_declaration",
             implements,
         }
     }
