@@ -444,7 +444,7 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
 
 See `docs/design/analyze-consolidation.md` for full design (axis decomposition, phased plan).
 
-**Current: 44 commands.** All Phase 2/3 merges that were feasible have been completed. Remaining work is lower-leverage (future rules migration, rank infrastructure). See design doc for current command count table.
+**Current: 42 commands** (was 44; `analyze parse` and `analyze query` deleted 2026-03-12 — duplicates of `syntax ast`/`syntax query`). All Phase 2/3 merges that were feasible have been completed. Remaining work is lower-leverage (future rules migration, rank infrastructure). See design doc for current command count table.
 
 **What was done:** duplicates unified (5→1), patterns→fragments, check unified (refs+stale+examples), CoverageOutput/CouplingOutput enum wrappers reverted, dependents absorbs impact.
 
