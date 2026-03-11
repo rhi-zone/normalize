@@ -129,7 +129,7 @@ pub fn parse_file(
         lang.to_string()
     } else {
         support_for_path(file)
-            .map(|l| l.name().to_string())
+            .map(|l| l.grammar_name().to_string())
             .ok_or_else(|| {
                 format!(
                     "unsupported file type: .{}",
@@ -146,7 +146,7 @@ pub fn parse_file(
         .get(&lang_name)
         .or_else(|| {
             // Also try by grammar name if language_override was a grammar name directly.
-            support_for_grammar(&lang_name).and_then(|s| loader.get(s.name()))
+            support_for_grammar(&lang_name).and_then(|s| loader.get(s.grammar_name()))
         })
         .ok_or_else(|| format!("grammar not loaded for language '{lang_name}'"))?;
 

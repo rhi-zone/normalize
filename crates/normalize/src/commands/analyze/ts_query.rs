@@ -139,7 +139,7 @@ pub fn query_file(
         lang.to_string()
     } else {
         support_for_path(file)
-            .map(|l| l.name().to_string())
+            .map(|l| l.grammar_name().to_string())
             .ok_or_else(|| {
                 format!(
                     "unsupported file type: .{}",
@@ -154,7 +154,7 @@ pub fn query_file(
     let loader = grammar_loader();
     let ts_lang = loader
         .get(&lang_name)
-        .or_else(|| support_for_grammar(&lang_name).and_then(|s| loader.get(s.name())))
+        .or_else(|| support_for_grammar(&lang_name).and_then(|s| loader.get(s.grammar_name())))
         .ok_or_else(|| format!("grammar not loaded for language '{lang_name}'"))?;
 
     let mut parser = tree_sitter::Parser::new();
