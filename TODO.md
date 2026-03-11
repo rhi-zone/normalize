@@ -977,6 +977,16 @@ Three commands added for rule development:
 - `normalize analyze query <file> <query-or-.scm> [--language lang]` — run a query, show captures
 - `normalize analyze node-types <language> [--search pattern]` — list all node kinds and field names
 
+## Built-in Guides — DONE (cae9be26)
+
+`normalize guide <topic>` — workflow-oriented guides with examples:
+- `rules` — writing and testing syntax rules
+- `explore` — exploring a codebase
+- `setup` — setting up normalize
+- `analyze` — running analysis
+- `tree-sitter` — tree-sitter introspection
+- **Next**: add examples to individual `--help` output (needs server-less `after_help` support)
+
 ## Syntax Ruleset Breadth
 
 After batch-fixing the current info violations, audit and expand rule coverage:
