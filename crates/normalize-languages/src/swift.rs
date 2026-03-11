@@ -43,6 +43,28 @@ impl Language for Swift {
         " {}"
     }
 
+    fn refine_kind(
+        &self,
+        node: &Node,
+        content: &str,
+        tag_kind: crate::SymbolKind,
+    ) -> crate::SymbolKind {
+        // Swift uses class_declaration for class/struct/enum/actor,
+        // distinguished by the declaration_kind field.
+        if node.kind() == "class_declaration"
+            && let Some(kind_node) = node.child_by_field_name("declaration_kind")
+        {
+            let kind_text = &content[kind_node.byte_range()];
+            return match kind_text {
+                "struct" => crate::SymbolKind::Struct,
+                "enum" => crate::SymbolKind::Enum,
+                "class" | "actor" => crate::SymbolKind::Class,
+                _ => tag_kind,
+            };
+        }
+        tag_kind
+    }
+
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
         // Swift doc comments use triple-slash `///` lines or `/** */` blocks.
         let mut doc_lines: Vec<String> = Vec::new();

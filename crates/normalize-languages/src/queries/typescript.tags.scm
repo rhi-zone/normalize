@@ -28,6 +28,12 @@
 (interface_declaration
   name: (type_identifier) @name) @definition.interface
 
+(enum_declaration
+  name: (identifier) @name) @definition.enum
+
+(type_alias_declaration
+  name: (type_identifier) @name) @definition.type
+
 (type_annotation
   (type_identifier) @name) @reference.type
 

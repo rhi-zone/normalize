@@ -76,6 +76,21 @@ impl Language for CSharp {
         }
     }
 
+    fn refine_kind(
+        &self,
+        node: &Node,
+        _content: &str,
+        tag_kind: crate::SymbolKind,
+    ) -> crate::SymbolKind {
+        match node.kind() {
+            "struct_declaration" => crate::SymbolKind::Struct,
+            "enum_declaration" => crate::SymbolKind::Enum,
+            "interface_declaration" => crate::SymbolKind::Interface,
+            "record_declaration" => crate::SymbolKind::Class,
+            _ => tag_kind,
+        }
+    }
+
     fn extract_implements(&self, node: &Node, content: &str) -> crate::ImplementsInfo {
         let mut implements = Vec::new();
         let mut cursor = node.walk();

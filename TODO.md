@@ -525,6 +525,9 @@ language that silently returns empty is misleading users who expect analysis and
       because the file has no symbols), surface a warning rather than silent empty output
 - [ ] Prioritize: Python, JavaScript/TypeScript, Go, Java, C, C++, Ruby, Rust (already good)
       are the high-value targets — full implementations, not boilerplate
+- [x] `refine_kind()` audit: Go, C#, C++, Swift, Kotlin now implement `refine_kind()` to
+      distinguish struct/enum/interface from generic class. TypeScript tags.scm now captures
+      `enum_declaration` and `type_alias_declaration`. — DONE 2026-03-11
 - [x] Groovy: tags.scm references `class_definition`/`function_definition` — verified CORRECT;
       grammar does use these node kinds with `function` field for function name. Extraction works.
       Live fixture tests added in query_fixtures.rs. — DONE 2026-03-09

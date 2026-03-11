@@ -55,6 +55,19 @@ impl Language for Cpp {
         None
     }
 
+    fn refine_kind(
+        &self,
+        node: &Node,
+        _content: &str,
+        tag_kind: crate::SymbolKind,
+    ) -> crate::SymbolKind {
+        match node.kind() {
+            "struct_specifier" => crate::SymbolKind::Struct,
+            "enum_specifier" => crate::SymbolKind::Enum,
+            _ => tag_kind,
+        }
+    }
+
     fn extract_implements(&self, node: &Node, content: &str) -> crate::ImplementsInfo {
         let mut implements = Vec::new();
         let mut cursor = node.walk();

@@ -47,6 +47,29 @@ impl Language for Kotlin {
         extract_kdoc(node, content)
     }
 
+    fn refine_kind(
+        &self,
+        node: &Node,
+        _content: &str,
+        tag_kind: crate::SymbolKind,
+    ) -> crate::SymbolKind {
+        if node.kind() == "class_declaration" {
+            // Kotlin uses class_declaration for class, interface, enum class.
+            // Distinguished by keyword children: "interface", "enum", "class".
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                match child.kind() {
+                    "interface" => return crate::SymbolKind::Interface,
+                    "enum" => return crate::SymbolKind::Enum,
+                    // Stop before body/name to avoid scanning the entire tree
+                    "type_identifier" | "class_body" | "enum_class_body" => break,
+                    _ => {}
+                }
+            }
+        }
+        tag_kind
+    }
+
     fn extract_implements(&self, node: &Node, content: &str) -> crate::ImplementsInfo {
         let mut implements = Vec::new();
         for i in 0..node.child_count() {

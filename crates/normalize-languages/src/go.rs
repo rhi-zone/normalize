@@ -30,6 +30,25 @@ impl Language for Go {
         extract_preceding_prefix_comments(node, content, "//")
     }
 
+    fn refine_kind(
+        &self,
+        node: &Node,
+        _content: &str,
+        tag_kind: crate::SymbolKind,
+    ) -> crate::SymbolKind {
+        // Go type_spec wraps the actual type (struct_type, interface_type, etc.)
+        if node.kind() == "type_spec"
+            && let Some(type_node) = node.child_by_field_name("type")
+        {
+            return match type_node.kind() {
+                "struct_type" => crate::SymbolKind::Struct,
+                "interface_type" => crate::SymbolKind::Interface,
+                _ => tag_kind,
+            };
+        }
+        tag_kind
+    }
+
     fn build_signature(&self, node: &Node, content: &str) -> String {
         let name = match self.node_name(node, content) {
             Some(n) => n,
