@@ -16,6 +16,7 @@ Commands:
   translate  Translate code between programming languages
   daemon     Manage the global normalize daemon
   grammars   Manage tree-sitter grammars for parsing
+  guide      Workflow guides with examples
   generate   Generate code from API spec
   facts      Extract and query code facts (symbols, imports, calls)
   syntax     AST inspection and syntax rules

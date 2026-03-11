@@ -24,6 +24,7 @@ pub mod edit;
 pub mod facts;
 pub mod generate;
 pub mod grammars;
+pub mod guide;
 pub mod history;
 pub mod package;
 // rules module moved to normalize-rules crate; re-exported for internal use
@@ -54,6 +55,7 @@ pub struct NormalizeService {
     edit: edit::EditService,
     facts: facts::FactsService,
     grammars: grammars::GrammarService,
+    guide: guide::GuideService,
     generate: generate::GenerateService,
     package: package::PackageService,
     rules: normalize_rules::RulesService,
@@ -89,6 +91,7 @@ impl NormalizeService {
             },
             facts: facts::FactsService::new(&pretty),
             grammars: grammars::GrammarService::new(&pretty),
+            guide: guide::GuideService,
             generate: generate::GenerateService,
             package: package::PackageService::new(&pretty),
             rules: normalize_rules::RulesService::new(&pretty),
@@ -778,6 +781,11 @@ impl NormalizeService {
     /// Manage tree-sitter grammars for parsing
     pub fn grammars(&self) -> &grammars::GrammarService {
         &self.grammars
+    }
+
+    /// Workflow guides with examples
+    pub fn guide(&self) -> &guide::GuideService {
+        &self.guide
     }
 
     /// Generate code from API spec
