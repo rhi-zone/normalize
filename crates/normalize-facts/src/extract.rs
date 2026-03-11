@@ -705,23 +705,21 @@ fn collect_symbols_from_tags<'tree>(
     // Container indices (for nesting reconstruction).
     let container_idxs: Vec<usize> = (0..defs.len()).filter(|&i| defs[i].is_container).collect();
 
-    // Process each def in order, placing it either as a top-level symbol or as a child
-    // of its innermost enclosing container.
-    //
-    // We build `top_level` and use a map from def-index → position-in-top_level
-    // for containers so we can append children later.
-    let mut top_level: Vec<Symbol> = Vec::new();
-    // def_idx → index in top_level (containers only)
-    let mut container_top_idx: std::collections::HashMap<usize, usize> =
-        std::collections::HashMap::new();
+    // Two-phase assembly: first build all symbols with parent info, then assemble tree.
+    // This supports arbitrary nesting depth (namespaces > classes > methods, or
+    // deeply nested data format keys).
+
+    // Phase 1: Build symbols and record parent relationships.
+    // symbols[i] corresponds to defs[i] (None if skipped due to visibility).
+    let mut symbols: Vec<Option<Symbol>> = Vec::with_capacity(defs.len());
+    let mut parent_of: Vec<Option<usize>> = Vec::with_capacity(defs.len()); // def_idx → parent def_idx
 
     for i in 0..defs.len() {
         let def = &defs[i];
 
-        // Find the innermost enclosing container (by line range).
         let enclosing_ci = container_idxs
             .iter()
-            .filter(|&&ci| ci != i) // don't self-enclose
+            .filter(|&&ci| ci != i)
             .rev()
             .find(|&&ci| {
                 let c = &defs[ci];
@@ -738,20 +736,40 @@ fn collect_symbols_from_tags<'tree>(
                 Visibility::Private | Visibility::Protected | Visibility::Internal
             )
         {
+            symbols.push(None);
+            parent_of.push(None);
             continue;
         }
 
         if def.is_container {
-            // Container body children will be filled by the leaf pass below.
             sym.children.clear();
-            let pos = top_level.len();
-            container_top_idx.insert(i, pos);
+        }
+
+        symbols.push(Some(sym));
+        parent_of.push(enclosing_ci.copied());
+    }
+
+    // Phase 2: Assemble tree bottom-up. Process in reverse order so children are
+    // moved into their parents before the parent is moved into its parent.
+    // We use Vec<Option<Symbol>> so we can take ownership via .take().
+    for i in (0..symbols.len()).rev() {
+        if let Some(pi) = parent_of[i]
+            && symbols[pi].is_some()
+            && symbols[i].is_some()
+        {
+            let child = symbols[i].take().unwrap();
+            symbols[pi].as_mut().unwrap().children.push(child);
+        }
+    }
+
+    // Collect remaining top-level symbols (those not moved into a parent).
+    // Reverse children since we assembled bottom-up.
+    let mut top_level: Vec<Symbol> = Vec::new();
+    for sym_opt in &mut symbols {
+        if let Some(mut sym) = sym_opt.take() {
+            sym.children.reverse();
+            reverse_children_recursive(&mut sym.children);
             top_level.push(sym);
-        } else {
-            match enclosing_ci.and_then(|&ci| container_top_idx.get(&ci)) {
-                Some(&pos) => top_level[pos].children.push(sym),
-                None => top_level.push(sym),
-            }
         }
     }
 
@@ -759,6 +777,14 @@ fn collect_symbols_from_tags<'tree>(
         None
     } else {
         Some(top_level)
+    }
+}
+
+/// Recursively reverse children vectors (needed because bottom-up assembly reverses order).
+fn reverse_children_recursive(children: &mut [Symbol]) {
+    for child in children.iter_mut() {
+        child.children.reverse();
+        reverse_children_recursive(&mut child.children);
     }
 }
 

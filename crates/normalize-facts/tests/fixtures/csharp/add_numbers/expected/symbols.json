@@ -10,7 +10,7 @@
     "file": "MathUtils.cs",
     "kind": "Class",
     "name": "MathUtils",
-    "parent": null,
+    "parent": "AddNumbers",
     "start_line": 3
   },
   {
@@ -38,7 +38,7 @@
     "file": "Program.cs",
     "kind": "Class",
     "name": "Program",
-    "parent": null,
+    "parent": "AddNumbers",
     "start_line": 6
   },
   {

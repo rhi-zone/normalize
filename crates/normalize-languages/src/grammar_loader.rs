@@ -580,6 +580,8 @@ fn bundled_tags_query(name: &str) -> Option<&'static str> {
         "vue" => Some(include_str!("queries/vue.tags.scm")),
         "jinja2" => Some(include_str!("queries/jinja2.tags.scm")),
         "json" => Some(include_str!("queries/json.tags.scm")),
+        "toml" => Some(include_str!("queries/toml.tags.scm")),
+        "yaml" => Some(include_str!("queries/yaml.tags.scm")),
         _ => None,
     }
 }

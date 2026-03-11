@@ -526,7 +526,9 @@ language that silently returns empty is misleading users who expect analysis and
       `ViewFileReport` now has `warnings: Vec<String>` field; `build_view_file_service()` checks
       `as_symbols()` and warns for data/config languages. JSON now fully supports symbol extraction
       (top-level keys as variables, object-valued keys as container modules with nesting) — no longer
-      triggers the warning. YAML, TOML, HTML, CSS, XML still show the warning.
+      triggers the warning. YAML and TOML now also fully support symbol extraction (sections/keys
+      as symbols with nesting via `refine_kind` → Module promotion and `container_body`). HTML, CSS,
+      XML still show the warning.
 - [x] Prioritize: Top 8 (Rust, Python, Go, Java, C, C++, Ruby, JS/TS) fully audited. Mid-tier
       (Dart, PHP, Kotlin, Swift, C#, Scala) now complete: Dart docstring, Scala visibility,
       PHP attributes added 2026-03-11. Remaining gaps in lower-priority languages (Haskell

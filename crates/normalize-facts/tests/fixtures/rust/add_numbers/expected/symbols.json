@@ -1,5 +1,40 @@
 [
   {
+    "file": "Cargo.toml",
+    "kind": "Class",
+    "name": "package",
+    "parent": null,
+    "start_line": 1
+  },
+  {
+    "file": "Cargo.toml",
+    "kind": "Variable",
+    "name": "name",
+    "parent": "package",
+    "start_line": 2
+  },
+  {
+    "file": "Cargo.toml",
+    "kind": "Variable",
+    "name": "version",
+    "parent": "package",
+    "start_line": 3
+  },
+  {
+    "file": "Cargo.toml",
+    "kind": "Variable",
+    "name": "edition",
+    "parent": "package",
+    "start_line": 4
+  },
+  {
+    "file": "Cargo.toml",
+    "kind": "Class",
+    "name": "workspace",
+    "parent": null,
+    "start_line": 6
+  },
+  {
     "file": "SUMMARY.md",
     "kind": "Heading",
     "name": "rust/add_numbers — project source",
