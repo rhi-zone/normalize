@@ -10,6 +10,9 @@ Manage the background daemon for faster operations.
 | `stop` | Stop the daemon |
 | `status` | Check daemon status |
 | `restart` | Restart the daemon |
+| `add` | Add a project root to watch |
+| `remove` | Remove a project root from watching |
+| `list` | List all watched roots |
 
 ## Examples
 
@@ -17,6 +20,9 @@ Manage the background daemon for faster operations.
 normalize daemon start
 normalize daemon status
 normalize daemon stop
+normalize daemon add ~/projects/app
+normalize daemon add --dry-run         # preview without applying
+normalize daemon remove ~/projects/app
 ```
 
 ## Purpose

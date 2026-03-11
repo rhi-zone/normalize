@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 211
 expression: "snapshot_help(&[\"grammars\", \"install\"])"
 ---
 Install grammars from GitHub release
@@ -13,6 +14,7 @@ Options:
       --compact                    Compact output without colors (overrides TTY detection)
       --force                      Force reinstall even if grammars exist
       --json                       Output machine-readable JSON
+      --dry-run                    Preview what would be installed without downloading
       --jq <jq>                    Filter output through jq expression
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --output-schema              Print JSON Schema of the subcommand's return type and exit

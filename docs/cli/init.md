@@ -18,6 +18,8 @@ normalize init [--index]
 ## Options
 
 - `--index` - Also build the file index after init
+- `--setup` - Run interactive rule setup wizard after init
+- `--dry-run` - Preview what would be created without writing
 
 ## Generated Files
 

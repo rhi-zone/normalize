@@ -180,6 +180,8 @@ pub enum ContextOutput {
 pub struct InitResult {
     pub success: bool,
     pub message: String,
+    pub changes: Vec<String>,
+    pub dry_run: bool,
 }
 
 /// Update check result.
@@ -482,6 +484,7 @@ impl NormalizeService {
         &self,
         #[param(help = "Index the codebase after initialization")] index: bool,
         #[param(help = "Run interactive rule setup wizard after initialization")] setup: bool,
+        #[param(help = "Preview changes without writing")] dry_run: bool,
     ) -> Result<InitResult, String> {
         use std::fs;
 
@@ -492,8 +495,10 @@ impl NormalizeService {
         // 1. Create .normalize directory if needed
         let normalize_dir = root.join(".normalize");
         if !normalize_dir.exists() {
-            fs::create_dir_all(&normalize_dir)
-                .map_err(|e| format!("Failed to create .normalize directory: {}", e))?;
+            if !dry_run {
+                fs::create_dir_all(&normalize_dir)
+                    .map_err(|e| format!("Failed to create .normalize directory: {}", e))?;
+            }
             changes.push("Created .normalize/".to_string());
         }
 
@@ -533,8 +538,10 @@ impl NormalizeService {
 {}"#,
                 aliases_section
             );
-            fs::write(&config_path, default_config)
-                .map_err(|e| format!("Failed to create config.toml: {}", e))?;
+            if !dry_run {
+                fs::write(&config_path, default_config)
+                    .map_err(|e| format!("Failed to create config.toml: {}", e))?;
+            }
             changes.push("Created .normalize/config.toml".to_string());
             for f in &todo_files {
                 changes.push(format!("Detected TODO file: {}", f));
@@ -542,45 +549,65 @@ impl NormalizeService {
         }
 
         // 4. Update .gitignore if needed
-        let gitignore_path = root.join(".gitignore");
-        let gitignore_changes = commands::init::update_gitignore(&gitignore_path);
-        changes.extend(gitignore_changes);
-
-        // 5. Report changes
-        if changes.is_empty() {
-            println!("Already initialized.");
+        if !dry_run {
+            let gitignore_path = root.join(".gitignore");
+            let gitignore_changes = commands::init::update_gitignore(&gitignore_path);
+            changes.extend(gitignore_changes);
         } else {
-            println!("Initialized normalize:");
-            for change in &changes {
-                println!("  {}", change);
+            // In dry-run mode, detect what would change without writing
+            let gitignore_path = root.join(".gitignore");
+            let gitignore_changes = commands::init::preview_gitignore_changes(&gitignore_path);
+            changes.extend(gitignore_changes);
+        }
+
+        if !dry_run {
+            // 5. Report changes
+            if changes.is_empty() {
+                println!("Already initialized.");
+            } else {
+                println!("Initialized normalize:");
+                for change in &changes {
+                    println!("  {}", change);
+                }
             }
-        }
 
-        // 6. Optionally index
-        if index {
-            println!("\nIndexing codebase...");
-            let mut idx = crate::index::open(&root)
-                .await
-                .map_err(|e| format!("Failed to open index: {}", e))?;
-            let count = idx
-                .refresh()
-                .await
-                .map_err(|e| format!("Failed to index: {}", e))?;
-            println!("Indexed {} files.", count);
-        }
+            // 6. Optionally index
+            if index {
+                println!("\nIndexing codebase...");
+                let mut idx = crate::index::open(&root)
+                    .await
+                    .map_err(|e| format!("Failed to open index: {}", e))?;
+                let count = idx
+                    .refresh()
+                    .await
+                    .map_err(|e| format!("Failed to index: {}", e))?;
+                println!("Indexed {} files.", count);
+            }
 
-        // 7. Optionally run setup wizard
-        if setup {
-            commands::init::run_setup_wizard(&root);
+            // 7. Optionally run setup wizard
+            if setup {
+                commands::init::run_setup_wizard(&root);
+            }
+        } else {
+            if index {
+                changes.push("Would index codebase".to_string());
+            }
+            if setup {
+                changes.push("Would run interactive rule setup wizard".to_string());
+            }
         }
 
         Ok(InitResult {
             success: true,
             message: if changes.is_empty() {
                 "Already initialized.".to_string()
+            } else if dry_run {
+                format!("{} changes would be made", changes.len())
             } else {
                 "Initialization complete.".to_string()
             },
+            changes,
+            dry_run,
         })
     }
 
@@ -905,6 +932,18 @@ impl std::fmt::Display for ContextOutput {
 
 impl std::fmt::Display for InitResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
+        if self.dry_run {
+            writeln!(f, "[dry-run] Would initialize normalize:")?;
+            if self.changes.is_empty() {
+                write!(f, "  (no changes needed)")?;
+            } else {
+                for change in &self.changes {
+                    writeln!(f, "  {}", change)?;
+                }
+            }
+            Ok(())
+        } else {
+            write!(f, "{}", self.message)
+        }
     }
 }

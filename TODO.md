@@ -34,29 +34,16 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ## P1 — Short-term Improvements (coherence / usability)
 
-### Main Crate Size (`normalize`, 52k lines)
+### Main Crate Responsibility Boundaries
 
-`normalize analyze size -r crates/normalize/src` breakdown (2026-03):
+Size isn't the concern — multiple responsibilities in one crate is. Extract when reusable
+domain logic is trapped in the CLI crate and a real second consumer exists (LSP, external
+tool, another command). Don't extract for line count alone.
 
-| Area | Lines | % |
-|---|---|---|
-| `commands/analyze/` | 21,296 | 41% |
-| `service/` | 4,372 | 8% |
-| `commands/view/` | 4,071 | 8% |
-| `commands/sessions/` | 3,383 | 6.5% |
-| `serve/` | 1,485 | 3% |
-| `tree.rs` | 1,497 | 3% |
-| `analyze/` (non-cmd) | 1,372 | 2.6% |
-| `skeleton.rs` | 627 | 1.2% |
-
-**Don't bulk-extract `commands/analyze/` as a unit.** The right approach is to extract
-*generally useful functionality* into domain crates — algorithms that the LSP, external
-tools, or other commands would want. Pure "compute + format for one command" stays.
-
-**Secondary targets (lower priority):**
-- `serve/` (LSP + HTTP + MCP, 1.5k) → `normalize-serve`
-- `src/analyze/` (1.4k, pure computation) → `normalize-architecture` (algorithms only, following existing pattern: OutputFormatter stays in main crate). Only worth doing when there's a real second consumer (LSP, external tool).
-- `commands/sessions/` (3.4k) — circular dep risk, needs care
+**Candidates (extract when a second consumer appears):**
+- `serve/` (LSP + HTTP + MCP) → `normalize-serve`
+- `src/analyze/` (pure computation) → `normalize-architecture`
+- `commands/sessions/` — circular dep risk, needs care
 
 ### Analyze Command Consolidation — remaining work
 

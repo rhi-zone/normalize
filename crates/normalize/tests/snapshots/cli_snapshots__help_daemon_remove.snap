@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 195
 expression: "snapshot_help(&[\"daemon\", \"remove\"])"
 ---
 Remove a root from watching
@@ -10,6 +11,7 @@ Arguments:
   [path]  Path to the project root
 
 Options:
+      --dry-run                    Preview changes without applying
       --jsonl                      Output one JSON object per line (for arrays)
       --pretty                     Human-friendly output with colors and formatting
       --compact                    Compact output without colors (overrides TTY detection)

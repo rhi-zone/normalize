@@ -469,6 +469,21 @@ pub fn update_gitignore(path: &Path) -> Vec<String> {
     changes
 }
 
+/// Preview what .gitignore changes would be made without writing.
+pub fn preview_gitignore_changes(path: &Path) -> Vec<String> {
+    let content = fs::read_to_string(path).unwrap_or_default();
+    let lines: Vec<&str> = content.lines().collect();
+    let mut changes = Vec::new();
+
+    for entry in GITIGNORE_ENTRIES {
+        if matches!(find_entry(&lines, entry), EntryStatus::Missing) {
+            changes.push(format!("Would add '{}' to .gitignore", entry));
+        }
+    }
+
+    changes
+}
+
 enum EntryStatus {
     Missing,
     Present(usize),

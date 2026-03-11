@@ -43,11 +43,25 @@ pub struct GrammarInstallResult {
     pub version: Option<String>,
     pub path: String,
     pub count: usize,
+    pub dry_run: bool,
 }
 
 impl std::fmt::Display for GrammarInstallResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.status == "already_installed" {
+        if self.dry_run {
+            write!(f, "[dry-run] Would install grammars to {}", self.path)?;
+            if let Some(ref v) = self.version {
+                write!(f, " (version {})", v)?;
+            }
+            if self.status == "already_installed" {
+                write!(
+                    f,
+                    "\n  ({} files already present, use --force to reinstall)",
+                    self.count
+                )?;
+            }
+            Ok(())
+        } else if self.status == "already_installed" {
             write!(
                 f,
                 "Grammars already installed at {} ({} files)\nUse --force to reinstall",
@@ -90,10 +104,9 @@ impl GrammarService {
         &self,
         #[param(help = "Specific version to install (default: latest)")] version: Option<String>,
         #[param(help = "Force reinstall even if grammars exist")] force: bool,
+        #[param(help = "Preview what would be installed without downloading")] dry_run: bool,
     ) -> Result<GrammarInstallResult, String> {
         use crate::commands::update::get_target_triple;
-        use flate2::read::GzDecoder;
-        use tar::Archive;
 
         const GITHUB_REPO: &str = "rhi-zone/normalize";
 
@@ -110,12 +123,26 @@ impl GrammarService {
             if count > 0 {
                 return Ok(GrammarInstallResult {
                     status: "already_installed".to_string(),
-                    version: None,
+                    version,
                     path: install_dir.display().to_string(),
                     count,
+                    dry_run,
                 });
             }
         }
+
+        if dry_run {
+            return Ok(GrammarInstallResult {
+                status: "would_install".to_string(),
+                version: version.or_else(|| Some("latest".to_string())),
+                path: install_dir.display().to_string(),
+                count: 0,
+                dry_run,
+            });
+        }
+
+        use flate2::read::GzDecoder;
+        use tar::Archive;
 
         let client = ureq::agent();
 
@@ -202,6 +229,7 @@ impl GrammarService {
             version: Some(version_str),
             path: install_dir.display().to_string(),
             count,
+            dry_run,
         })
     }
 

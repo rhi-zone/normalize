@@ -69,6 +69,7 @@ pub struct DaemonRootResult {
     pub path: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    pub dry_run: bool,
 }
 
 impl std::fmt::Display for DaemonRootResult {
@@ -213,11 +214,22 @@ impl DaemonService {
     pub fn add(
         &self,
         #[param(positional, help = "Path to the project root")] path: Option<String>,
+        #[param(help = "Preview changes without applying")] dry_run: bool,
     ) -> Result<DaemonRootResult, String> {
         let path = path
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("."));
         let root = std::fs::canonicalize(&path).unwrap_or(path);
+
+        if dry_run {
+            return Ok(DaemonRootResult {
+                success: true,
+                path: root.display().to_string(),
+                message: Some(format!("[dry-run] Would add: {}", root.display())),
+                dry_run,
+            });
+        }
+
         let client = DaemonClient::new();
 
         if !client.ensure_running() {
@@ -247,6 +259,7 @@ impl DaemonService {
                     success: true,
                     path: root.display().to_string(),
                     message: Some(message),
+                    dry_run,
                 })
             }
             Ok(resp) => Err(resp.error.unwrap_or_default()),
@@ -262,11 +275,22 @@ impl DaemonService {
     pub fn remove(
         &self,
         #[param(positional, help = "Path to the project root")] path: Option<String>,
+        #[param(help = "Preview changes without applying")] dry_run: bool,
     ) -> Result<DaemonRootResult, String> {
         let path = path
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("."));
         let root = std::fs::canonicalize(&path).unwrap_or(path);
+
+        if dry_run {
+            return Ok(DaemonRootResult {
+                success: true,
+                path: root.display().to_string(),
+                message: Some(format!("[dry-run] Would remove: {}", root.display())),
+                dry_run,
+            });
+        }
+
         let client = DaemonClient::new();
 
         if !client.is_available() {
@@ -290,6 +314,7 @@ impl DaemonService {
                     success: true,
                     path: root.display().to_string(),
                     message: Some(message),
+                    dry_run,
                 })
             }
             Ok(resp) => Err(resp.error.unwrap_or_default()),
