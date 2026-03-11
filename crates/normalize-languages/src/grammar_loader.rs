@@ -585,6 +585,8 @@ fn bundled_tags_query(name: &str) -> Option<&'static str> {
         "css" => Some(include_str!("queries/css.tags.scm")),
         "html" => Some(include_str!("queries/html.tags.scm")),
         "xml" => Some(include_str!("queries/xml.tags.scm")),
+        "thrift" => Some(include_str!("queries/thrift.tags.scm")),
+        "dockerfile" => Some(include_str!("queries/dockerfile.tags.scm")),
         _ => None,
     }
 }
@@ -1280,8 +1282,19 @@ mod tests {
     fn test_tags_queries_compile() {
         let loader = GrammarLoader::new();
         let langs = [
-            "zig", "clojure", "scheme", "nix", "prolog", "toml", "json", "yaml", "css", "html",
+            "zig",
+            "clojure",
+            "scheme",
+            "nix",
+            "prolog",
+            "toml",
+            "json",
+            "yaml",
+            "css",
+            "html",
             "xml",
+            "thrift",
+            "dockerfile",
         ];
         for lang in langs {
             let tags = loader.get_tags(lang);

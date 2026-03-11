@@ -93,15 +93,13 @@ mod tests {
     fn unused_node_kinds_audit() {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
-            // All Dockerfile instruction types (we don't track these as symbols)
-            "add_instruction", "arg_instruction", "cmd_instruction", "copy_instruction",
-            "cross_build_instruction", "entrypoint_instruction", "env_instruction",
+            // Dockerfile instruction types not tracked as symbols
+            "add_instruction", "cmd_instruction", "copy_instruction",
+            "cross_build_instruction", "entrypoint_instruction",
             "expose_instruction", "healthcheck_instruction", "heredoc_block",
             "label_instruction", "maintainer_instruction", "onbuild_instruction",
             "run_instruction", "shell_instruction", "stopsignal_instruction",
             "user_instruction", "volume_instruction", "workdir_instruction",
-            // structural node, not extracted as symbols
-            "from_instruction",
         ];
 
         validate_unused_kinds_audit(&Dockerfile, documented_unused)

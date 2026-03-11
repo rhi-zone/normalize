@@ -70,9 +70,8 @@ mod tests {
             // Type-related
             "type", "container_type", "definition_type",
             // Identifiers
-            "identifier", "typedef_identifier", "annotation_identifier",
+            "annotation_identifier",
             // Definitions
-            "const_definition", "union_definition", "exception_definition",
             "senum_definition", "interaction_definition", "annotation_definition",
             "fb_annotation_definition",
             // Declarations
@@ -81,12 +80,7 @@ mod tests {
             "function_modifier", "field_modifier", "exception_modifier",
             // Other
             "throws", "struct_literal",
-            // covered by tags.scm
-            "enum_definition",
-            "function_definition",
-            "service_definition",
-            "struct_definition",
-            "typedef_definition",
+            // covered by imports.scm
             "include_statement",
         ];
         validate_unused_kinds_audit(&Thrift, documented_unused)
