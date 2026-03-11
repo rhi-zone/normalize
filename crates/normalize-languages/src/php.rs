@@ -25,6 +25,20 @@ impl Language for Php {
         " {}"
     }
 
+    fn refine_kind(
+        &self,
+        node: &Node,
+        _content: &str,
+        tag_kind: crate::SymbolKind,
+    ) -> crate::SymbolKind {
+        match node.kind() {
+            "enum_declaration" => crate::SymbolKind::Enum,
+            "interface_declaration" => crate::SymbolKind::Interface,
+            "trait_declaration" => crate::SymbolKind::Trait,
+            _ => tag_kind,
+        }
+    }
+
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
         extract_phpdoc(node, content)
     }

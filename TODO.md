@@ -528,9 +528,11 @@ language that silently returns empty is misleading users who expect analysis and
       Warnings appear in text, pretty, and JSON output.
 - [ ] Prioritize: Python, JavaScript/TypeScript, Go, Java, C, C++, Ruby, Rust (already good)
       are the high-value targets — full implementations, not boilerplate
-- [x] `refine_kind()` audit: Go, C#, C++, Swift, Kotlin now implement `refine_kind()` to
-      distinguish struct/enum/interface from generic class. TypeScript tags.scm now captures
-      `enum_declaration` and `type_alias_declaration`. — DONE 2026-03-11
+- [x] `refine_kind()` audit: Go, C#, C++, Swift, Kotlin, Java, Dart, PHP now implement
+      `refine_kind()` to distinguish struct/enum/interface/trait from generic class. TypeScript
+      tags.scm now captures `enum_declaration` and `type_alias_declaration`. Java: enum/interface/
+      record/annotation_type. Dart: enum/mixin. PHP: enum/interface/trait. Java `extract_implements`
+      now correctly sets `is_interface` for interface declarations. — DONE 2026-03-11
 - [x] `get_visibility()` audit: TypeScript, TSX, JavaScript, Ruby now implement
       `get_visibility()`. TS/JS detect `accessibility_modifier` and `#` private fields.
       Ruby walks backward through siblings to find `private`/`protected`/`public` calls. — DONE 2026-03-11

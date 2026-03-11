@@ -25,6 +25,19 @@ impl Language for Dart {
         " {}"
     }
 
+    fn refine_kind(
+        &self,
+        node: &Node,
+        _content: &str,
+        tag_kind: crate::SymbolKind,
+    ) -> crate::SymbolKind {
+        match node.kind() {
+            "enum_declaration" => crate::SymbolKind::Enum,
+            "mixin_declaration" => crate::SymbolKind::Trait,
+            _ => tag_kind,
+        }
+    }
+
     fn extract_attributes(&self, node: &Node, content: &str) -> Vec<String> {
         extract_dart_annotations(node, content)
     }
