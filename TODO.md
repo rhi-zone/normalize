@@ -915,6 +915,14 @@ entries from `rust/tuple-return`, `no-grammar-loader-new`, `rust/chained-if-let`
 ### ~~normalize-languages: ast-grep test broken~~ — FIXED (2026-03-10)
 `ast_grep::tests::test_pattern_matching` now passes (`cargo test -p normalize-languages` clean).
 
+### ~~`--rule` filter bugs~~ — FIXED (2026-03-11)
+Two bugs in `normalize rules run --rule <id>`:
+1. **Native engine ignored `--rule` filter** — `broken-ref`, `stale-summary` etc. leaked through
+   when running with `--rule no-todo-comment`. Fixed: post-filter all issues by rule_id in service.rs.
+2. **Empty file path when target is a file** — `normalize rules run --rule X path/to/file.rs` produced
+   `"file": ""` because `strip_prefix(file_path)` on the exact file returns empty string. Fixed in both
+   `run_rules()` (syntax runner) and `finding_to_issue()`: detect file targets and use parent directory.
+
 ## Long-Term Goals
 
 ### Incremental-first architecture

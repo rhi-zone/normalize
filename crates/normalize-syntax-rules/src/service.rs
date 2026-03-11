@@ -196,11 +196,11 @@ impl SyntaxRulesService {
         let loader = &*loader_arc;
         let debug_flags = DebugFlags::from_args(&debug);
 
-        let mut findings = run_rules(
+        let findings = run_rules(
             &rules,
             &target_root,
             &project_root,
-            &loader,
+            loader,
             rule.as_deref(),
             tag.as_deref(),
             None,
@@ -208,7 +208,7 @@ impl SyntaxRulesService {
         );
 
         let fixes_applied = if fix {
-            apply_fixes(&mut findings).unwrap_or(0)
+            apply_fixes(&findings).unwrap_or(0)
         } else {
             0
         };
@@ -257,10 +257,10 @@ impl SyntaxRulesService {
                 if disabled && r.enabled {
                     return false;
                 }
-                if let Some(ref t) = tag {
-                    if !r.tags.iter().any(|rt| rt == t) {
-                        return false;
-                    }
+                if let Some(ref t) = tag
+                    && !r.tags.iter().any(|rt| rt == t)
+                {
+                    return false;
                 }
                 true
             })

@@ -312,6 +312,7 @@ impl RulesService {
         }
 
         let run_native = matches!(rule_type, RuleType::All | RuleType::Native);
+        let rule_filter = rule.clone();
 
         // Syntax + fact + SARIF engines via run_rules_report() (blocking)
         let mut report = tokio::task::spawn_blocking(move || {
@@ -366,6 +367,14 @@ impl RulesService {
 
             apply_native_rules_config(&mut report, &native_config.rules);
             report.sources_run.push("native".into());
+        }
+
+        // Apply --rule filter across all engines (syntax/fact already filter internally,
+        // but native engine produces all its issues unconditionally).
+        if let Some(ref filter) = rule_filter {
+            report
+                .issues
+                .retain(|issue| issue.rule_id == filter.as_str());
         }
 
         report.sort();

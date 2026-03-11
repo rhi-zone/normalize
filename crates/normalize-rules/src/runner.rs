@@ -1690,6 +1690,14 @@ pub fn finding_to_issue(
     root: &std::path::Path,
 ) -> normalize_output::diagnostics::Issue {
     use normalize_output::diagnostics::Issue;
+    // If root is a file path, use its parent for strip_prefix so we get "file.rs" not "".
+    let effective_root;
+    let root = if root.is_file() {
+        effective_root = root.parent().unwrap_or(root).to_path_buf();
+        &effective_root
+    } else {
+        root
+    };
     let rel_path = f.file.strip_prefix(root).unwrap_or(&f.file);
     Issue {
         file: rel_path.to_string_lossy().to_string(),

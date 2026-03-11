@@ -142,7 +142,16 @@ pub fn run_rules(
 ) -> Vec<Finding> {
     let start = std::time::Instant::now();
     // Canonicalize for reliable strip_prefix comparisons.
-    let abs_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    // If root is a file, use its parent directory for path calculations.
+    let raw_abs_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    let abs_root = if raw_abs_root.is_file() {
+        raw_abs_root
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or(raw_abs_root)
+    } else {
+        raw_abs_root
+    };
     let abs_project_root = project_root
         .canonicalize()
         .unwrap_or_else(|_| project_root.to_path_buf());
