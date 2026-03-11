@@ -1,90 +1,17 @@
 # Normalize Roadmap
 
+Last triaged: 2026-03-12
+
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
-## Priorities
+## Goal
 
 Production-grade refactoring across all ~98 languages. Goal: rename, find-references,
 extract, inline, move — correct, without LSPs, without false positives.
 
-1. ~~**locals.scm for remaining languages**~~ — DONE (2026-03-09). 65 locals.scm files written,
-   all grammar-backed languages covered with 159 fixture tests. The 6 languages with tags.scm but
-   no locals.scm (graphql, markdown, nginx, scss, svelte, vue) are intentionally skipped — data
-   formats or injection languages with no meaningful scope semantics. See `docs/locals-scm.md`.
+---
 
-2. **Comprehensive language fixtures** (long-term, nix flake verification)
-   - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
-
-## CLI UX Audit (2026-03-08)
-
-An external agent audited the CLI for usability and discoverability. Full report:
-`docs/cli-ux-audit.md`. Actionable bugs found:
-
-1. ~~**`sessions stats --group-by` flag not wired up**~~ — DONE (2026-03-09).
-2. ~~**`sessions show`/`sessions analyze` ignore `CLAUDE_SESSIONS_DIR`, no `--project` flag**~~ — DONE (2026-03-09).
-3. ~~**`--only <lang>` silently returns nothing**~~ — FIXED (2026-03-08). Bare language names now
-   emit a helpful error: `'rust' is not a valid pattern — use a glob like '*.ext' or an alias like
-   '@tests'`. Implemented in `normalize-filter/src/lib.rs` via `looks_like_language_name()` check
-   in `resolve_patterns()`. When the bare word matches a detected language, the error names it.
-4. ~~**`analyze complexity <single-file>` silently returns nothing**~~ — FIXED (2026-03-08).
-   `analyze complexity` and `analyze length` now detect single-file input and call `analyze_file_*`
-   directly; nonexistent paths return a clear error. Fixed in `service/analyze.rs`.
-5. ~~**`view --full` appears to be a no-op**~~ — DONE (2026-03-09). Now correctly emits raw file source.
-
-See `docs/cli-ux-audit.md` for reproduction steps and suggested fixes.
-
-## Session Queue (2026-03-10)
-
-Ordered by impact × tractability. Pick from top.
-
-1. ~~**Fix `normalize rules run` output**~~ — DONE (a01d25ce, 2026-03-08). Unified into one
-   `DiagnosticsReport` with single banner, colors, severity counts, and global allow for
-   `**/tests/fixtures/**` in `.normalize/config.toml`.
-
-2. ~~**Eliminate `cmd_*` layer**~~ — DONE. All `cmd_*` functions removed from `commands/`
-   (2026-03-08) and from `normalize-rules` (2026-03-08). Dead wrappers deleted; active ones
-   renamed (`run_setup_wizard`, `serve_mcp`, `show_stats_grouped`, `run_package_action`,
-   `enable_disable`, `show_rule`, `list_tags`, `add_rule`, `update_rules`, `remove_rule`).
-   Service methods now use `Result<T, String>` with `?` propagation; `exit_to_result` deleted.
-
-2. ~~**Wire `tags.scm` into symbol extraction**~~ — DONE (already complete before this session).
-   `collect_symbols_from_tags()` is the primary path; Language trait has only 3 required methods.
-   ~~**tags.scm migration cleanup**~~ — DONE. `definition.var` mapped to `SymbolKind::Variable` in
-   `tags_capture_to_kind` (parity with normalize-deps). Stale `container_kinds`/`function_kinds`
-   references removed from normalize-edit, markdown.rs, registry.rs, and 68 language audit comments.
-
-3. ~~**Remaining info/warning noise (batch-fix)**~~ — DONE. Production code is clean.
-
-4. ~~**Language coverage: `.scm` query files**~~ — DONE. 68 calls, 69 complexity, 69 imports,
-   52 types registered. See Next Up for remaining imports.scm wiring work.
-
-5. ~~**Feature-gate CLI behind `cli` feature**~~ — DONE. See Next Up section.
-
-6. ~~**`normalize-language-meta` — cover remaining 98 languages in `languages.toml`**~~
-   DONE (2026-03-10). Added all 17 missing languages: Ada, Agda, C, C++, Common Lisp, Emacs Lisp,
-   Idris, Lean, MATLAB, Objective-C, Prolog, Scheme, Uiua, Vim, Zig, Query, Yuri. Languages with
-   no universal test file convention (C, C++, Zig, Agda, Idris, Lean, Uiua, Yuri) have entries
-   with capabilities only; others include test_globs.
-
-7. ~~**`normalize analyze check` command cleanup**~~ — DONE (2026-03-10). Command was already
-   removed from service layer. Cleaned up: stale snapshot tests for `check-refs`/`stale-docs`/
-   `check-examples`, `normalize-native-rules` lib.rs comment, `docs/workflows/documentation-sync.md`
-   updated to use `normalize rules run --rule X` / `--engine native`.
-
-8. ~~**server-less 0.4.0 → 0.4.1-alpha.3 upgrade**~~ — DONE (2026-03-10). `about =` renamed to
-   `description =` in 17 service files. `#[derive(Config)]` adopted on `NormalizeConfig` and
-   5 sub-configs (DaemonConfig, IndexConfig, ViewConfig, TextSearchConfig, ServeConfig).
-   Complex sub-configs use `#[param(nested, serde)]` (AliasConfig, RulesConfig, etc.).
-   Merge-based config loading replaced with ConfigTrait::load() source chain. alpha.3 fix:
-   nested,serde fields fall back to Default when section absent (MissingField bug).
-   Local [patch.crates-io] until alpha.3 published on crates.io.
-
-3. **normalize as LSP server** (stretch)
-   - `textDocument/references`, `textDocument/rename`, `textDocument/definition` backed by normalize
-   - Proxy mode: `normalize serve lsp --proxy 'rust-analyzer'`
-   - See: [Semantic Refactoring Infrastructure](#semantic-refactoring-infrastructure)
-
-## Immediate Fixes
+## P0 — Blocking / Broken / Incoherent
 
 ### server-less UX issues (fix in server-less, not normalize)
 
@@ -92,263 +19,20 @@ Ordered by impact × tractability. Pick from top.
 2. **No error for helper methods in `#[cli]` block**: Every `&self` method becomes a subcommand. Putting a `display_*` helper inside the `#[cli]` impl block silently creates a broken subcommand. Should error or warn at compile time.
 3. **`display_with` across impl blocks is non-obvious**: Works but nothing signals this is possible. Better docs or a compile-time hint when `display_with` target isn't found in the same block.
 
-### ~~`sessions stats --group-by` not wired up~~ DONE
+### Session analysis bug
 
-Added `--group-by <fields>` param to `stats` service method. When present, parses
-comma-separated fields (`project`, `day`) and delegates to `cmd_sessions_stats` which
-calls `cmd_sessions_stats_grouped`. Uses `std::process::exit` to avoid double-printing
-from the service framework.
+**Bug: `Turn::token_usage` only captures the last API call per turn.** In `claude_code.rs`, `last_request_id` is overwritten on each assistant entry — so multi-round turns (user → tool call → tool result → final answer) only account for the final API call. Fix: accumulate all `requestId`s seen within a turn (`turn_request_ids: Vec<String>`) and sum their `request_tokens` on flush.
 
-### ~~`sessions show` / `sessions analyze` ignore `CLAUDE_SESSIONS_DIR`, missing `--project`~~ DONE
+### LSP diagnostics improvements (basic implementation done, needs incrementality)
 
-Added `--project <path>` to both `show` and `analyze` service methods. Both now compute
-`effective_project = project_path.or(root_path)` (matching how `list` works). Since
-`CLAUDE_SESSIONS_DIR` is handled at the format level (`sessions_dir()` in claude_code.rs),
-both commands now correctly respect it when a project path is passed.
-
-### ~~`normalize view --full` was a no-op~~ DONE
-
-`--full` was accepted but ignored (`_full: bool` in `build_view_service`). Fixed: when `--full`
-is passed for a file target, `build_view_service` now reads the file and returns
-`ViewOutput::FileContent` (raw source), bypassing the skeleton view. Matches the behavior of
-the `file.rs:1-N` line-range syntax.
-
-### ~~Incremental caching for `normalize analyze check --summary`~~ DONE
-
-Cache at `.normalize/cache/summary-freshness.json`, keyed by HEAD commit hash. Warm run:
-~3s (was ~20s). `git status` always re-run (cheap); `git log` skipped when HEAD unchanged.
-
-### ~~Bootstrap all SUMMARY.md files~~ DONE
-
-272 SUMMARY.md files written (parallel Sonnet agents, one per crate group + fixture dirs).
-Severity re-escalated to `error`; hook blocks commits when SUMMARY.md is too stale.
-Staleness condition: `(commits_since_update + has_uncommitted) > threshold` (configurable,
-default 10). Single uncommitted change alone no longer blocks commits.
-
-### ~~Audit info/hint rule noise~~ DONE
-
-Pre-commit enforces zero error-severity violations. All production code clean:
-- `no-grammar-loader-new`: 2 production fixes; allow for test modules needing `add_path()`
-- `rust/numeric-type-annotation`: 15 violations fixed; allow for test fixtures
-- `rust/tuple-return`: severity=error; 0 violations (all fixed or in allowed paths)
-- `rust/chained-if-let`, `rust/unnecessary-type-alias`, `rust/unnecessary-let`, `no-todo-comment`: 0 production violations
-- `tools/test.rs` `writeln!(...).unwrap()` on String (infallible) → `let _ = writeln!(...)` — fixed
-
-Remaining 510 warnings are structural (`long-function`, `god-class`, `broken-ref` in docs) — not blocking.
-
-### Guided rule setup — DONE (`normalize init --setup`)
-
-Implemented as `normalize init --setup` (interactive terminal wizard).
-
-**What it does:** Runs all rules against the codebase, groups violations by rule (sorted by
-count desc), and walks the user through each — showing rule metadata and up to 5 example
-violations — then prompting [e]nable / [d]isable / [s]kip / [q]uit. Persists decisions via
-`normalize rules enable/disable`.
-
-**LLM-stateful flow** (already works via existing CLI):
-1. `normalize rules list --json` to enumerate candidates
-2. `normalize rules run --rule <id>` to review top violations per rule
-3. `normalize rules enable/disable <id>` to update config
-
-**Remaining:** Review default-enabled rule set. Several rules generate high noise; guided
-setup is the cure. Also: `normalize init --setup` currently only covers rules — extend to
-other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md enforcement).
-
-### ~~Actionable output for all diagnostic commands~~ DONE (9ae3b496)
-
-`DiagnosticsReport` now has `hints: Vec<String>`. Service methods populate hints
-based on context and output mode:
-- `rules run` (non-pretty, non-sarif): "Run with --pretty for detailed view" + "--fix to auto-fix"
-- `analyze check` subcommand deleted — subsumed by `normalize rules run --engine native`
-
-Remaining gaps:
-- `rules run --engine sarif` could show which SARIF tools had errors (not done)
-- ~~`hints: Vec<String>` on `DiagnosticsReport` is never populated~~ — field was never added; `DiagnosticsReport` has no hints field; decided not to add one.
-
-### ~~Failing skeleton tests (4 tests)~~ FIXED
-Root causes:
-- **Go/Ruby:** `collect_symbols_from_tags` had a sanity check that bailed when `@definition.method` had no enclosing container — but Go receiver methods and Ruby standalone methods are legitimately top-level. Removed the check.
-- **Java:** `java.tags.scm` was missing `enum_declaration` pattern. Added `@definition.enum`.
-- **Markdown:** No `markdown.tags.scm` existed. Created it with `(section (atx_heading (inline) @name)) @definition.heading`.
-- Also added `definition.enum`/`definition.heading` to `tags_capture_to_kind` and `Enum`/`Heading` to `is_container_kind`.
-
-### ~~LSP diagnostics for all rule engines~~ IMPLEMENTED (basic)
-Implemented on-save diagnostics with debounce (500ms). Design doc: `docs/design/lsp-diagnostics.md`.
-Future improvements:
 - Per-file syntax rules (only re-run on the saved file, not the whole workspace)
 - Incremental fact rules (currently rebuilds full index each run)
 - Configurable debounce interval
 - Progress reporting during long runs
 
-## Next Up
+---
 
-### ~~Audit `rust/unwrap-in-impl`~~ — COMPLETE
-
-Rule enabled at `severity = "warning"` (2026-03). All 1,608 violations resolved:
-production code inline-suppressed with reasons or properly fixed; test-only files
-allowed via config. See `.normalize/config.toml` for the full allow list.
-
-~~**Remaining follow-up: eliminate `cmd_*` layer**~~ — DONE (see above).
-
-**Audited crates** (production code clean, test-only unwraps allowed in config):
-- `normalize-path-resolve` — complete
-- `normalize-ecosystems` — complete
-- `normalize-facts` — complete
-- `normalize-manifest` — complete (248 → 0 production violations; 3 fixes applied:
-  nuget.rs if-let refactor, ocaml.rs peek-then-next inline suppress, setup_py.rs bytes-index refactor;
-  244 test-only unwraps allowed via config glob)
-- `normalize-typegen` — complete (35 → 0 production violations; all inline-suppressed with reasons:
-  RwLock poison, infallible iterator after len check, char case conversion always yields a char)
-- `normalize-cli-parser` — complete (30 → 0 production violations; all inline-suppressed with reasons:
-  RwLock poison, f64 partial_cmp NaN-is-detector-bug, literal Regex::new compile-time guaranteed)
-- `normalize-languages` — complete (25 → 0 production violations; all inline-suppressed with reasons:
-  RwLock poison, ASCII-quote chars().nth byte==char, non-empty guard before last())
-- `normalize-edit` — complete (16 violations; all in inline #[cfg(test)] blocks — allowed in config)
-- `normalize-view` — complete (12 → 2 production violations inline-suppressed: is_none guard before unwrap,
-  len==1 guard before iter().next())
-
-~~### Eliminate `cmd_*` layer — move logic into service methods~~ — DONE (2026-03-08)
-
-All `cmd_*` functions eliminated from both `normalize/src/commands/` and `normalize-rules/src/`.
-Service methods return `Result<T, String>` with natural `?` propagation. `exit_to_result` deleted.
-
-### ~~Feature-gate CLI behind `cli` feature (workspace-wide)~~ — DONE
-
-Every crate should be usable both as a library and as a standalone CLI tool. Library consumers shouldn't pull in clap; CLI users get a binary. This is a workspace-wide convention, not a one-off.
-
-**Sub-crates that should get standalone CLIs:**
-- `normalize-facts` — `normalize-facts index`, `normalize-facts check`
-- `normalize-filter` — pipe-friendly filtering tool
-- `normalize-syntax-rules` — standalone rule runner
-- Others as needed — each crate's CLI exposes its core functionality directly
-
-**server-less improvement — DONE (0.3.1):** server-less now does `pub use clap;`. Sub-crates
-that use only the `#[cli]` proc macro no longer need `dep:clap` (done for normalize-facts,
-normalize-filter, normalize-syntax-rules).
-
-**Feature-gate clap — DONE:** `dep:clap` in the main `normalize` crate is now optional, gated
-behind the `ast-grep-cli` feature (only `src/ast_grep/` uses clap directly). `serve` was already
-migrated to server-less. `commands/translate.rs` clap derives removed (dead legacy code — the
-service layer had already reimplemented translate logic directly). `commands/facts.rs`
-`clap::ValueEnum` derive removed; service-callable helpers gated with `#[cfg(feature = "cli")]`.
-`cargo build --no-default-features` succeeds clean.
-
-### Language trait: migrate *_kinds() methods to .scm query files
-
-The `Language` trait has several methods that return `&'static [&'static str]` — lists of
-tree-sitter node type names. These are tree-sitter queries expressed as Rust data instead of
-using the query system. See `docs/architecture-decisions.md` ("scm Query Files over Rust").
-
-**Coverage — DONE (2026-03-08):** 68 calls, 69 complexity, 69 imports, 52 types registered.
-All languages with grammars have .scm files. Fixture test framework: 257 tests across 68 languages.
-
-- [x] **Wire tags.scm into symbol extraction — replace Language trait node-classification
-  methods entirely.** — DONE. `collect_symbols_from_tags()` is the sole extraction path in
-  `extract_with_support()`. The Language trait has no `container_kinds()`, `function_kinds()`,
-  `type_kinds()`, `public_symbol_kinds()`, `extract_function()`, `extract_container()`, or
-  `extract_type()` methods. The trait has ~10 genuinely semantic methods
-  (`extract_docstring`, `get_visibility`, `is_test_symbol`, `test_file_globs`,
-  `format_import`, `signature_suffix`, `embedded_content`, `refine_kind`, etc.).
-- [x] **`*.imports.scm`** — import/require statement extraction. Wired into `DepsExtractor::extract_with_trait` as query-first path (DONE 2026-03-08). `collect_imports_from_query` runs the `.scm` query (captures `@import`, `@import.path`, `@import.name`, `@import.alias`, `@import.glob`); falls back to `Language::extract_imports` trait when query absent or fails to compile against installed grammar. Note: some grammars (Python, Rust at current installed version) have query compile errors — those fall back correctly. Long-term: fix the .scm patterns to match installed grammar node kinds.
-- [x] Implement calls.scm for all languages that have call extraction — DONE (68/68 registered)
-- [x] All tags.scm, complexity.scm, imports.scm, types.scm fully registered — DONE (2026-03-08)
-- [x] Fixture test framework — DONE: 257 tests across 68 languages in `crates/normalize-languages/tests/`
-- [x] Replace per-language inline walkers in `symbols.rs` with a generic walker over calls.scm — DONE.
-  `find_callees_for_symbol()` uses `loader.get_calls(grammar)` + `collect_calls_with_query()`.
-  No `call_node_kinds()` method ever existed; calls.scm was always the path.
-
-### Type relationship extraction (facts index) — DONE (2026-03-08)
-
-`analyze graph --on types` uses the `type_refs` table for deep type edges.
-
-**Implemented:**
-- `type_refs` table in index schema: `(file, source_symbol, target_type, kind, line)` — kind ∈ {field_type, param_type, return_type, extends, implements, generic_bound, type_alias}
-- `TypeRef` + `TypeRefKind` in `normalize-facts-core`
-- Extraction in `normalize-facts/src/symbols.rs::find_type_refs()` for Rust, TypeScript/TSX, Python, Go, Java, C#, Kotlin, Swift, C++, Ruby
-- `build_type_graph()` in `commands/analyze/graph.rs` queries `type_refs` table
-- Covers: struct field types, fn params/returns, impl/extends/implements, where bounds, type aliases
-
-**Remaining (future work):**
-- [x] Extend to Go and Java via the same pattern in `find_type_refs()` — done 2026-03-08
-- [x] Unit tests for type ref extraction per language — done (8 tests: 4 Go, 4 Java)
-- [x] Extend to C#, Kotlin, Swift, Ruby, C++ — done 2026-03-09 (10 new tests, 2 per language)
-
-### Git Analysis Enhancements
-
-**Remaining:**
-- [x] **Cross-repo hotspots**: `normalize analyze hotspots --repos <dir>` added; aggregates per-repo churn/complexity — DONE
-
-**Commands:**
-- [x] **Run commands across repos**: `normalize tools lint --repos-dir ~/git/org/` and `normalize tools test --repos-dir ~/git/org/` added; discover repos in parallel, aggregate output — DONE (analyze methods already had this)
-
-## Remaining Work
-
-- Namespace-qualified lookups: `normalize view std::vector`, `normalize view com.example.Foo`
-  - Requires language-specific namespace semantics - low priority
-- Shadow worktree: true shadow-first mode (edit in shadow, then apply)
-  - Current: --shadow flag works, but not default for all edits
-  - Zero user interruption (user can edit while agent tests in background)
-
-### Configuration System
-Sections: `[daemon]`, `[index]`, `[aliases]`, `[view]`, `[analyze]`, `[grep]`, `[pretty]`, `[serve]`
-
-Adding a new section (3 places):
-1. Define `XxxConfig` struct with `#[derive(Merge)]` + `XxxArgs` with `#[derive(Args)]` in command module
-2. Add field to NormalizeConfig
-3. Add `run(args, json)` function that loads config and merges
-
-Candidates: `[workflow]` (directory, auto-run)
-
-### Trait-Based Extensibility
-All trait-based crates follow the normalize-languages pattern for extensibility:
-- Global registry with `register()` function for user implementations
-- Built-ins initialized lazily via `init_builtin()` + `OnceLock`
-- No feature gates (implementations are small, not worth the complexity)
-
-Pattern: traits are the extensibility mechanism. Users implement traits in their own code, register at runtime. normalize CLI can add Lua bindings at application layer for scripting.
-
-### CLI Internal Consolidation
-
-**Top-level command level issues (low priority):**
-- ~~`history` is at the wrong level: shadow edit history is a feature of `edit`, not a
-  standalone concept. Should be `normalize edit history [list|diff|status|tree|prune]`.~~ — DONE (already under `normalize edit history`)
-- ~~`analyze rules` is redundant with top-level `normalize rules run`. Should be removed from AnalyzeService.~~ — DONE (2026-03-09). Snapshot and test for the non-existent `analyze rules` subcommand deleted. The command never existed in the service layer; the test was capturing broken fallback behavior.
-- `context` could be `normalize view context [path]` but semantics differ slightly (content-only vs prepend). Low priority.
-- `aliases` is a cross-cutting utility. Too small for top-level but has no clear parent. Low priority.
-
-### Schema-Driven Config UI — `normalize config` — WIP, awaiting feedback
-
-`normalize config schema/show/validate/set` implemented in `crates/normalize/src/service/config.rs`.
-Generic engine: TOML/JSON/YAML + any JSON Schema; defaults to `.normalize/config.toml` + `NormalizeConfig`.
-Uses `jsonschema` crate for validation, `toml_edit` for typed writes.
-
-`show` walks the JSON Schema to display all available options with descriptions; `--section` accepts
-dotted paths (e.g. `analyze.threshold`, `rules."rust/unwrap-in-impl".allow`) including
-`additionalProperties` entries. Array item types rendered as `array of string`.
-
-**Improvements (2026-03-10):**
-- `--section 'rules."rust/unwrap-in-impl"'` now works (quoted key parsing fixed)
-- `normalize config show --section rules` now shows per-rule overrides from `additionalProperties` content
-- `normalize rules show-config` deleted — fully superseded — DONE
-
-**Awaiting feedback before closing:**
-- Is the `show` output format useful? Too verbose? ~~Should unset fields be hidden by default?~~ — DONE (2026-03-10): `--set-only` flag added to hide unset fields.
-- ~~Should `config set` validate before writing (blocking on schema errors, not just warnings)?~~ — DONE (2026-03-10). `config set` now blocks on schema errors; `--force` bypasses; `--dry-run` shows errors without writing.
-
-**Remaining follow-ups:**
-- `normalize rules validate` intentionally separate: rule-ID validation (checks against live registry) can't be expressed in JSON Schema. Not redundant with `config validate` — they check different things.
-- Extract engine into `normalize-config-ui` crate for reuse / publication (stretch goal)
-- Propose `#[config]` proc macro to server-less (stretch goal — superseded by `#[derive(Config)]`;
-  filed nested struct support + merge semantics requests in server-less TODO.md 2026-03-10)
-
-### ~~normalize-view zombie crate~~ — DELETED (2026-03-10)
-`normalize-view` removed from workspace and source deleted. tree.rs + skeleton.rs live in
-`normalize/src/`. Published v0.1.0 remains on crates.io (can't be deleted) but no crates
-depend on it. Removed `crates/normalize-view` from workspace Cargo.toml.
-
-### Rust Redesign Candidates
-- Rules engine: consider semgrep/ruff integration instead of custom
-- Plugin system: Rust trait-based plugins or external tool orchestration
+## P1 — Short-term Improvements (coherence / usability)
 
 ### Main Crate Size (`normalize`, 52k lines)
 
@@ -374,24 +58,195 @@ tools, or other commands would want. Pure "compute + format for one command" sta
 - `src/analyze/` (1.4k, pure computation) → `normalize-architecture` (algorithms only, following existing pattern: OutputFormatter stays in main crate). Only worth doing when there's a real second consumer (LSP, external tool).
 - `commands/sessions/` (3.4k) — circular dep risk, needs care
 
-## Backlog
+### Analyze Command Consolidation — remaining work
 
-### ~~Richer Jinja2 grammar~~ — DONE (grammar written; pending publish + integration)
+**Current: 42 commands** (was 44; `analyze parse` and `analyze query` deleted 2026-03-12 — duplicates of `syntax ast`/`syntax query`). All Phase 2/3 merges that were feasible have been completed. Remaining work is lower-leverage (future rules migration, rank infrastructure). See design doc for current command count table.
 
-Grammar written from scratch at `/tmp/ts-jinja2/` (54/54 corpus tests pass). Installed
-locally to `~/.config/normalize/grammars/jinja2.so` replacing arborium-jinja2. Key node
-types: `extends_statement`, `import_statement`, `from_statement`, `include_statement`,
-`macro_statement`, `block_statement`, `for_statement`, `if_statement`, `call_statement`,
-`trans_statement`, etc. — full expression language including filters, tests, ternary, etc.
-Imports query (`jinja2.imports.scm`) updated to use named node types with `path:` field.
+**Future (low priority):** `security` → SARIF rules engine (wraps bandit; could be `normalize rules run --engine sarif` with bandit configured). `docs`/`security` → rules migration (~-3 commands, see design doc).
 
-**Remaining**:
-- **Low priority / deferred until ecosystem publish**: publish grammar as our own crate
-  on crates.io (`tree-sitter-jinja2` name is taken — pick another), then replace
-  `arborium-jinja2 = "*"` in `normalize-grammars/Cargo.toml`. Until then the local
-  `grammars/jinja2/` + `find_local_grammars()` in xtask is sufficient.
-- ~~Add `jinja2.tags.scm` (macro_statement → function symbols)~~ — DONE
-- ~~Add `jinja2.complexity.scm` (for/if/elif/else → complexity)~~ — DONE
+**Design pressure:** ~41 commands is still too spread out. Phase 3 must continue. The goal is a surface small enough that a user can hold it in working memory — not just "fewer than 49".
+
+### Language trait: remaining .scm migration
+
+**Known locals.scm scope engine limitation:**
+- Nested destructuring (e.g. `{ a: { b } }` in parameters) requires recursive queries which
+  tree-sitter does not support. One level of object/array destructuring IS covered for JS/TS/TSX.
+  Fixing deeper nesting would require engine-level recursion (walk into nested patterns).
+
+### Language implementation depth
+
+- [ ] Audit: for each language, document which methods are genuinely unsupported by the grammar
+      vs which are just unimplemented (the latter must be fixed, not accepted)
+
+### Comprehensive language fixtures (long-term, nix flake verification)
+
+- [ ] Design fixture schema: input source file → expected symbols, imports, calls, references
+      (similar to existing syntax-rules fixtures but for extraction + scope resolution)
+- [ ] Nix flake approach: each language's fixtures run in a devShell with the real compiler/runtime
+      available — lets us verify against `rustc`, `tsc`, `python`, `go build` etc. for ground truth
+- [ ] Fixture runner: language-agnostic test runner (like syntax-rules fixture runner) that loads
+      `tests/fixtures/<lang>/locals/<case>/input.<ext>` + `expected.json` and diffs
+- [ ] Seed fixtures for top 20 languages (high confidence, hand-verified)
+- [ ] Automated fixture generation: use `normalize analyze` + LLM to bootstrap expected outputs,
+      then human-verify before committing
+- [ ] CI integration: `nix flake check` runs all language fixture suites in parallel
+
+### Qualified/namespaced import resolution in the facts index
+
+`find_callers(name)` is name-only — it will rename two unrelated `foo()` functions in different
+modules simultaneously. Fix: store module-qualified caller/callee names in the index so lookups
+resolve to a specific definition, not a name string.
+- [ ] Store caller/callee with module qualification in facts index
+- [ ] Post-filter in `find_callers`: verify callee resolves to definition file via import graph
+- [ ] Update `edit rename` to use qualified lookup (eliminates false positives)
+
+### Remaining work (short items)
+
+- Namespace-qualified lookups: `normalize view std::vector`, `normalize view com.example.Foo`
+  - Requires language-specific namespace semantics - low priority
+- Shadow worktree: true shadow-first mode (edit in shadow, then apply)
+  - Current: --shadow flag works, but not default for all edits
+  - Zero user interruption (user can edit while agent tests in background)
+
+### Configuration system
+
+Sections: `[daemon]`, `[index]`, `[aliases]`, `[view]`, `[analyze]`, `[grep]`, `[pretty]`, `[serve]`
+
+Adding a new section (3 places):
+1. Define `XxxConfig` struct with `#[derive(Merge)]` + `XxxArgs` with `#[derive(Args)]` in command module
+2. Add field to NormalizeConfig
+3. Add `run(args, json)` function that loads config and merges
+
+Candidates: `[workflow]` (directory, auto-run)
+
+### Schema-Driven Config UI — remaining follow-ups
+
+- `normalize rules validate` intentionally separate: rule-ID validation (checks against live registry) can't be expressed in JSON Schema. Not redundant with `config validate` — they check different things.
+- Extract engine into `normalize-config-ui` crate for reuse / publication (stretch goal)
+- Propose `#[config]` proc macro to server-less (stretch goal — superseded by `#[derive(Config)]`;
+  filed nested struct support + merge semantics requests in server-less TODO.md 2026-03-10)
+
+### Complexity Hotspots (reduced - max now 58)
+
+- [ ] `crates/normalize/src/commands/analyze/query.rs:cmd_query` (58)
+- [ ] `crates/normalize/src/commands/daemon.rs:cmd_daemon` (54)
+- [ ] `crates/normalize-syntax-rules/src/runner.rs:evaluate_predicates` (53)
+- [ ] `crates/normalize/src/commands/analyze/mod.rs:run` (51)
+- [ ] `crates/normalize/src/commands/tools/lint.rs:cmd_lint_run` (48)
+- [ ] `crates/normalize/src/tree.rs:collect_highlight_spans` (46)
+
+### CLI Internal Consolidation
+
+**Top-level command level issues (low priority):**
+- `context` could be `normalize view context [path]` but semantics differ slightly (content-only vs prepend). Low priority.
+- `aliases` is a cross-cutting utility. Too small for top-level but has no clear parent. Low priority.
+
+### `normalize init --setup` extensions
+
+**Remaining:** Review default-enabled rule set. Several rules generate high noise; guided
+setup is the cure. Also: `normalize init --setup` currently only covers rules — extend to
+other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md enforcement).
+
+### SARIF engine actionable output
+
+- `rules run --engine sarif` could show which SARIF tools had errors (not done)
+
+### Duplicate/clone detection improvements
+
+- Per-subcommand excludes in config: `[analyze.similar-blocks] exclude = [...]` so language-file exclusion doesn't affect `analyze rules`, `analyze complexity`, etc. (currently the global `[analyze] exclude` is too coarse)
+- "Parallel impl directory" heuristic: if >N pairs originate from the same directory pair, fold them into a single suppressed note (e.g., "48 pairs suppressed within normalize-languages/ — likely parallel Language trait implementations")
+- `similar-blocks` / `similar-functions`: cross-file same-containing-function suppression covers same-method-name in different files; doesn't cover same-body-pattern across different method names (the Language impl case)
+- Consider min-lines bump for `similar-blocks` (currently 10) — the 19-line Symbol constructor is below many useful thresholds; maybe 15-20 default would further cut noise without missing real clones
+
+### Syntax Ruleset Breadth
+
+- **Trigger for fix infrastructure**: once enough rules have structural auto-fixes that need correct indentation, build the corpus-based indentation model (see `docs/prior-art.md` § "Corpus-based indentation model"). Don't build it speculatively.
+- **tree-sitter-go note**: `block` → `statement_list` → statements. Queries must use `statement_list` as intermediate node; `(block (return_statement))` won't match.
+- Phase 3b builtin rules: more builtin rules, sharing improvements (see `docs/design/builtin-rules.md`)
+  - Semantic rules system: for rules needing cross-file analysis (import cycles, unused exports, type mismatches). Current syntax-based rules are single-file AST queries; semantic rules need index-backed analysis. Separate infrastructure, triggered differently (post-index vs per-file).
+
+### Rule tags system
+
+- [ ] Deterministic tag color hashing in `--pretty` output (curated palette, red/yellow reserved for severity)
+
+---
+
+## P2 — Structural Improvements / Larger Refactors
+
+### Rules Unification — remaining threads
+
+4. **Unify rule engine config** — `syntax-rules` has a config system (`RulesConfig`, per-rule overrides, severity mapping). The other engines (native, fact, future SARIF) have none. Extract a shared `normalize-rules-config` crate (or extend `normalize-output`) with a unified config schema: rule IDs, severity overrides, enable/disable, per-directory excludes. All engines consult this at run time; `normalize rules run` passes it down.
+
+5. **SARIF passthrough engine** (`--engine sarif`) — accepts a list of external tool commands that emit SARIF output. Runs them with configurable parallelism (default: 8). Parses each tool's stdout as SARIF 2.1.0 and merges into `DiagnosticsReport`. Enables wrapping ESLint, clippy, semgrep, etc. without per-tool adapters. Config lives in `[rules.sarif]` in normalize.toml:
+   ```toml
+   [[rules.sarif.tools]]
+   name = "eslint"
+   command = ["npx", "eslint", "--format", "json", "{root}"]
+   [[rules.sarif.tools]]
+   name = "semgrep"
+   command = ["semgrep", "--sarif", "{root}"]
+   ```
+   Tools that emit JSON (not SARIF) need a `format = "json"` adapter — stretch goal.
+
+### Incremental-first architecture
+
+The current architecture is batch-oriented: commands scan the whole workspace, produce a report, and exit. This works for CLI but is wrong for LSP and other interactive consumers. The goal is to make incrementality a first-class concern throughout the stack.
+
+**Where batch hurts today:**
+- LSP diagnostics re-run all rule engines on every save (syntax rules re-parse every file, fact rules rebuild the full index)
+- `FileIndex` is rebuilt from scratch — no way to update a single file's symbols/imports/calls
+- Syntax rules load and compile all tree-sitter queries on every invocation
+
+**Target architecture:**
+- **FileIndex**: `update_file(path, content)` — re-index one file, update SQLite incrementally (delete old rows, insert new). Dependency graph tracks which files' diagnostics to invalidate.
+- **Syntax rules**: per-file evaluation. On save, re-run rules only on the saved file. Cache compiled queries across invocations (already cached per-process via `GrammarLoader`, but lost between LSP requests).
+- **Fact rules**: incremental Datalog. When facts for one file change, re-derive only affected conclusions. This is hard — may need semi-naive evaluation with change tracking, or accept batch for fact rules and optimize syntax rules first.
+- **Watch mode**: `normalize watch` that keeps the index live and re-runs checks on file changes (inotify/fsevents). The LSP server is one consumer; a TUI dashboard could be another.
+
+**Incremental steps (not all-or-nothing):**
+1. `FileIndex::update_file()` — single-file re-index without full rebuild
+2. Per-file syntax rule evaluation in LSP (run rules only on saved file)
+3. Persistent `GrammarLoader` in LSP (don't re-create `SkeletonExtractor` per request)
+4. File-level dependency tracking for diagnostic invalidation
+5. Incremental fact rule evaluation (long-term, research needed)
+
+### Lint / Analysis Architecture
+
+See `docs/lint-architecture.md` for full design discussion.
+
+**Architecture decision: Datalog for semantic queries**
+- Datalog is the standard for code analysis (CodeQL, Semmle, codeQuest)
+- Recursion essential for code queries (transitive deps, call graphs)
+- Safe Datalog: guaranteed termination, right level of expressiveness
+
+**Implementation plan:**
+- [ ] All rules (builtin + user) compile to dylibs via Ascent + `abi_stable`
+- [ ] Same infrastructure for both - builtins ship pre-compiled, users compile theirs
+- [ ] Same syntax for both (rules can graduate from user to builtin)
+- See "Facts & Rules Architecture" section below for full plan
+
+**Rule tiers:**
+1. `syntax-rules` (exists): AST patterns, no facts needed
+2. `facts-rules` (new): Datalog over extracted facts (symbols, imports, calls)
+3. `normalize-lint` (new): escape hatch for complex imperative logic
+
+**Differentiation from CodeQL:**
+- CodeQL: deep analysis (types, data flow, taint), ~12 languages
+- normalize: structural/architectural analysis, ~98 languages
+- Focus areas: circular deps, unused exports, module boundaries, import graph metrics
+
+**Architectural analysis next iteration:**
+- [ ] Boundary violation rules (configurable: "services/ cannot import cli/")
+- [ ] Re-export tracing (follow `pub use` to resolve more imports)
+
+Rules (custom enforcement, future):
+- [ ] Module boundary rules ("services/ cannot import cli/")
+- [ ] Threshold rules ("fan-out > 20 is error")
+- [ ] Dependency path queries ("what's between A and B?")
+
+**Facts & Rules Architecture:**
+- [ ] `normalize rules compile <rules.dl>` command to build custom packs (sandboxed codegen)
+- [ ] Self-install builtin dylib: `normalize rules run --engine fact` should auto-install compiled builtins to `~/.local/share/normalize/rules/` on first run (or at build/install time). Currently requires manual copy.
 
 ### normalize-manifest: eval-backed parsing (`eval` feature gate)
 
@@ -438,257 +293,51 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
 - Still can't resolve runtime variables, but dramatically fewer false negatives
 - Belongs in same feature gate or a separate `tree-sitter` feature in normalize-manifest
 
-### Analyze Command Consolidation — SUBSTANTIALLY COMPLETE (2026-03-10)
+### Rust Redesign Candidates
 
-See `docs/design/analyze-consolidation.md` for full design (axis decomposition, phased plan).
+- Rules engine: consider semgrep/ruff integration instead of custom
+- Plugin system: Rust trait-based plugins or external tool orchestration
 
-**Current: 42 commands** (was 44; `analyze parse` and `analyze query` deleted 2026-03-12 — duplicates of `syntax ast`/`syntax query`). All Phase 2/3 merges that were feasible have been completed. Remaining work is lower-leverage (future rules migration, rank infrastructure). See design doc for current command count table.
+### Language Capability Traits — remaining
 
-**What was done:** duplicates unified (5→1), patterns→fragments, check unified (refs+stale+examples), CoverageOutput/CouplingOutput enum wrappers reverted, dependents absorbs impact.
-
-**Explicitly NOT merging:** health family, density family, churn family, duplicate-types+duplicates, fragments+duplicates, trend commands, call-complexity+complexity. All justified in design doc.
-
-**Future (low priority):** `security` → SARIF rules engine (wraps bandit; could be `normalize rules run --engine sarif` with bandit configured). `docs`/`security` → rules migration (~-3 commands, see design doc).
-
-**Current state (2026-03):**
-- `--help` output is now grouped into 8 sections (code, modules, repo, graph, git, test, security, diff) via server-less `#[server(groups(...))]`
-- `normalize-analyze` crate provides shared rank infrastructure: `Entity` trait, `Scored<E>`, `rank_pipeline`, `rank_and_truncate`, `truncate_path`
-- 16 commands migrated to shared rank infrastructure (complexity, length, density + 13 via rank_and_truncate)
-- Output formats remain per-command (too heterogeneous to unify into one generic formatter — each has different columns, stats, grouping)
-
-**Phase 2 — Merge obvious families:**
-- ~~**2a. `health`**~~ — NOT DOING. `health()` is the `#[cli(default)]` fallback (invoked when no subcommand given), returning `AnalyzeReport`. `module_health()` is the per-module composite scorer. `cross_repo_health()` runs on a portfolio of repos. Three distinct scopes and report shapes; no shared data model.
-- ~~**2c. `density` + `uniqueness`**~~ — NOT DOING. `density` = information bloat (compression + token frequency); `uniqueness` = structural duplication (function near-twins). Different primary dimension, different per-item drilling (files vs. function clusters), incompatible report shapes. Already composed at higher level by `module-health`. Uniqueness has 8 extra params (similarity threshold, skeleton mode, trait-impls, etc.) that don't apply to density.
-
-**Phase 3 — Further consolidation (needs design):**
-- [x] `dependents` absorbs `impact` — `DependentsReport` now shows blast radius (depth, test coverage, fan-in) for modules; flat list for symbols/types. `impact` deleted. `dependents` target is now positional. (2026-03-09)
-- ~~`duplicates` + `duplicate-types` collapse~~ — NOT DOING. `DuplicatesReport` groups N code locations by hash/similarity; `DuplicateTypesReport` models pairs of type definitions by field overlap. Different semantics, incompatible shapes.
-- ~~`deps` collapse~~ — NOT DOING. `imports`/`depth-map`/`surface`/`layering` have clear distinct names and are already grouped in `--help` via `#[server(group = "modules")]`. `architecture`/`call-graph`/`trace` have incompatible types and purposes. Short intuitive names beat a `rank <metric>` prefix with no user benefit.
-- **`analyze graph` scope fixed**: `graph` = pure graph theory only (SCCs, bridges, diamonds, dead nodes). `call-graph`, `trace`, `dependents` are index traversal queries, NOT graph theory — they stay in `analyze`. Do not merge traversal commands into `graph`.
-- [x] `docs` → unified `check` command: `check-refs`, `stale-docs`, `check-examples` → `normalize analyze check [--refs] [--stale] [--examples]`. Shared `DiagnosticsReport` in `normalize-output::diagnostics`. `docs` (coverage) stays separate (metric/rank). See `docs/design/rules-unification.md`
-- ~~`git` collapse~~ — NOT DOING. Each command has a different primary dimension (file-centric, author-centric, time-series, dependency-graph, aggregate metric) — no shared report shape. Already grouped in `--help` via `#[server(group = "git")]`. Fixed: `repo-coupling` was mis-annotated `"graph"`, `cross-repo-health` had no group — both corrected to `"git"`.
-- [x] Cross-cutting `--trend` and `--diff <ref>` modifiers on scoring commands — DONE. `complexity --diff HEAD~10` / `length --diff main` show per-function deltas sorted by |delta|. `complexity-trend` / `length-trend` / `density-trend` / `test-ratio-trend` show aggregate metric over N evenly-spaced historical commits. Shared `git_history.rs` infrastructure. `ScalarTrendReport` in `trend.rs`.
-
-**Design pressure:** ~41 commands is still too spread out. Phase 3 must continue. The goal is a surface small enough that a user can hold it in working memory — not just "fewer than 49".
-
-**Enum-return "unifications" — DONE:**
-
-`CoverageOutput` and `CouplingOutput` were enum wrappers — not real unification. No shared shape existed between inner report structs. Split back to separate commands:
-- [x] `CoverageOutput` → `test-ratio`, `test-gaps`, `budget` (3 separate service methods)
-- [x] `CouplingOutput` → `coupling`, `coupling-clusters`, `hotspots` (3 separate service methods)
-
-### Rules Unification & `facts` → `structure` Rename
-
-See `docs/design/rules-unification.md` for full design.
-
-**Three threads:**
-
-1. **Unified diagnostic type** — DONE. `Issue` + `DiagnosticsReport` in `normalize-output::diagnostics`. Conversion functions `finding_to_issue` and `abi_diagnostic_to_issue` in `normalize::diagnostic_convert`. Ad-hoc checks (`BrokenRef`, `MissingExample`, `StaleDoc`, `StaleSummary`) already converted. Remaining: `SecurityFinding` → `DiagnosticsReport`, wire native checks as `--engine native`.
-
-4. **Unify rule engine config** — `syntax-rules` has a config system (`RulesConfig`, per-rule overrides, severity mapping). The other engines (native, fact, future SARIF) have none. Extract a shared `normalize-rules-config` crate (or extend `normalize-output`) with a unified config schema: rule IDs, severity overrides, enable/disable, per-directory excludes. All engines consult this at run time; `normalize rules run` passes it down.
-
-5. **SARIF passthrough engine** (`--engine sarif`) — accepts a list of external tool commands that emit SARIF output. Runs them with configurable parallelism (default: 8). Parses each tool's stdout as SARIF 2.1.0 and merges into `DiagnosticsReport`. Enables wrapping ESLint, clippy, semgrep, etc. without per-tool adapters. Config lives in `[rules.sarif]` in normalize.toml:
-   ```toml
-   [[rules.sarif.tools]]
-   name = "eslint"
-   command = ["npx", "eslint", "--format", "json", "{root}"]
-   [[rules.sarif.tools]]
-   name = "semgrep"
-   command = ["semgrep", "--sarif", "{root}"]
-   ```
-   Tools that emit JSON (not SARIF) need a `format = "json"` adapter — stretch goal.
-
-6. ~~**`normalize analyze check` help text is scuff**~~ — DELETED: `analyze check` subcommand removed; use `normalize rules run --engine native`.
-
-2. **Lift `rules` to top level** — DONE. `normalize rules` is now top-level. `--type` → `--engine`. `normalize facts rules` and `normalize facts check` removed. `normalize syntax` retains only `ast` and `query`.
-
-3. **Rename `facts` → `structure`** — DONE. `normalize structure rebuild/stats/files/packages`.
-
-### Semantic Refactoring Infrastructure
-
-Goal: production-grade refactoring (rename, find-references, extract, inline, move) across
-all ~98 supported languages, without relying on LSPs. Strategy: tree-sitter locals queries
-for within-file scope/reference resolution, facts index for cross-file import/export graph.
-
-**Known locals.scm scope engine limitation:**
-- Nested destructuring (e.g. `{ a: { b } }` in parameters) requires recursive queries which
-  tree-sitter does not support. One level of object/array destructuring IS covered for JS/TS/TSX.
-  Fixing deeper nesting would require engine-level recursion (walk into nested patterns).
-
-~~**Write locals.scm for remaining languages**~~ — DONE (2026-03-09). 65 locals.scm files
-written covering all grammar-backed languages (159 fixture tests). 6 languages have tags.scm
-but no locals.scm and are intentionally skipped: graphql, markdown, nginx, scss, svelte, vue
-(data formats or injection languages with no meaningful scope semantics). See `docs/locals-scm.md`
-for the full coverage table and rationale for each skip.
-
-**Language implementation depth** (not a known limitation — a bug):
-Most of the 98 language impls return empty for imports, complexity, docstrings, type extraction,
-test detection etc. This is not "honest support" — it's a gap that must not be accepted. Each
-language that silently returns empty is misleading users who expect analysis and get nothing.
-- [ ] Audit: for each language, document which methods are genuinely unsupported by the grammar
-      vs which are just unimplemented (the latter must be fixed, not accepted)
-- [x] Warning: when analysis returns empty because the language impl doesn't support it (not
-      because the file has no symbols), surface a warning rather than silent empty output — DONE 2026-03-11.
-      `ViewFileReport` now has `warnings: Vec<String>` field; `build_view_file_service()` checks
-      `as_symbols()` and warns for data/config languages. JSON now fully supports symbol extraction
-      (top-level keys as variables, object-valued keys as container modules with nesting) — no longer
-      triggers the warning. YAML and TOML now also fully support symbol extraction (sections/keys
-      as symbols with nesting via `refine_kind` → Module promotion and `container_body`). HTML, CSS,
-      XML now also fully support symbol extraction — DONE 2026-03-11. CSS: rule_set selectors as
-      Class, media/supports/keyframes as Module containers, declarations as Variable. HTML/XML:
-      elements with children as Module, leaf elements as Variable, with id/class attributes in
-      signatures. SCSS symbol extraction now works — DONE 2026-03-11: rule_set selectors,
-      media/supports/keyframes as Module containers, declarations as Variable, mixin/function
-      signatures with parameters. TOML inline table noise fixed: `node_name` returns None for
-      pairs inside `inline_table`; `table_array_element` now captured + handled;
-      `build_symbol_from_def` None changed from `?` (abort all) to skip-and-continue. Also
-      fixed pre-existing extraction bug: `build_symbol_from_def` returning None would abort ALL
-      symbol extraction via `?` propagation.
-- [x] Prioritize: Top 8 (Rust, Python, Go, Java, C, C++, Ruby, JS/TS) fully audited. Mid-tier
-      (Dart, PHP, Kotlin, Swift, C#, Scala) now complete: Dart docstring, Scala visibility,
-      PHP attributes added 2026-03-11. Remaining gaps in lower-priority languages (Haskell
-      build_signature, Julia build_signature, Perl build_signature) are genuine complexity —
-      function signatures in these languages are hard to express compactly. — DONE 2026-03-11
-- [x] `refine_kind()` audit: Go, C#, C++, Swift, Kotlin, Java, Dart, PHP now implement
-      `refine_kind()` to distinguish struct/enum/interface/trait from generic class. TypeScript
-      tags.scm now captures `enum_declaration` and `type_alias_declaration`. Java: enum/interface/
-      record/annotation_type. Dart: enum/mixin. PHP: enum/interface/trait. Java `extract_implements`
-      now correctly sets `is_interface` for interface declarations. — DONE 2026-03-11
-- [x] `get_visibility()` audit: TypeScript, TSX, JavaScript, Ruby now implement
-      `get_visibility()`. TS/JS detect `accessibility_modifier` and `#` private fields.
-      Ruby walks backward through siblings to find `private`/`protected`/`public` calls. — DONE 2026-03-11
-- [x] Groovy: tags.scm references `class_definition`/`function_definition` — verified CORRECT;
-      grammar does use these node kinds with `function` field for function name. Extraction works.
-      Live fixture tests added in query_fixtures.rs. — DONE 2026-03-09
-- [x] Kotlin: `property_declaration` pattern in tags.scm caused `collect_symbols_from_tags` to
-      return None for the entire file because `node_name()` returns None for property_declaration
-      (name is nested inside variable_declaration, not a direct "name" field). Removed
-      property_declaration from tags.scm entirely; documented in kotlin.rs unused kinds audit.
-      Root cause: Kotlin grammar uses same node kind for class-level properties AND local val/var
-      declarations inside function bodies — can't distinguish without ancestor traversal. — DONE 2026-03-09
-- [x] Kotlin/Scala/Groovy: import queries fixed — DONE (2026-03-09).
-      Groovy: `(dotted_identifier)` was invalid (grammar uses `import: (qualified_name)` field) →
-      query failed to compile → fell back to trait. Fixed to use correct field accessor.
-      Scala: sentinel `(import_declaration) @import` was generating empty-module imports in
-      DepsExtractor. Fixed `collect_imports_from_query` to skip entries with no path info and
-      return `None` when empty (triggering correct trait fallback for dotted-path splitting).
-      Kotlin: was already working correctly.
-      Added `groovy_imports_live` test in `query_fixtures.rs`. — DONE 2026-03-09
-- [x] Elixir: added `(arguments (identifier) @name)` patterns for no-args function defs
-      (`def name do ... end`, `defp name do ...`, `defmacro name do ...`, `defmacrop name do ...`).
-      Removed `identifier` from documented_unused in elixir.rs. Live test added. — DONE 2026-03-09
-- [x] Haskell: removed `(signature ...)` pattern from haskell.tags.scm; type signatures are not
-      definition sites. Multi-equation function deduplication added in normalize-facts/extract.rs
-      via `dedup_haskell_functions()` post-processing pass. Live tests added. — DONE 2026-03-09
-- [x] CSS: `@import "file.css"` and `@import url("file.css")` / `url('...')` / bare `url(...)` extraction via `css.imports.scm`. Live fixture test added. — DONE 2026-03-11
-- [x] GLSL: `#include "file.glsl"` and `#include <file.glsl>` extraction via `glsl.imports.scm` (same structure as C/HLSL). Live fixture test added. — DONE 2026-03-11
-- [x] JavaScript/TypeScript CommonJS `require()` support — DONE (2026-03-10). `collect_js_ts_deps`
-      now handles `const x = require('module')`, `const { a, b } = require('module')` (with
-      pair_pattern alias support), and bare `require('./side-effect')`. 2 new tests in
-      normalize-deps. Python and Go audited: fully implemented (imports, docstrings, visibility,
-      test detection, type refs). Analyze command consolidation reviewed: all feasible merges done.
-- [x] Java, C#, Swift, Kotlin audited (2026-03-10): all have complete query files (5 each) and trait
-      implementations. C# imports query fixed to handle `qualified_name` (was only `identifier`,
-      missing `using System.Collections.Generic;`). Test assertion strengthened. C and C++ had no
-      `test_file_globs()` — added common patterns (`test_*.c`, `*_test.cpp`, etc.). Ruby audited:
-      imports via query (5 forms: require/require_relative/include/extend/prepend), all comprehensive.
-      C++ `get_visibility()` implemented via `access_specifier` sibling traversal (class defaults
-      private, struct defaults public). Swift `extract_docstring()` added for `///` and `/** */`.
-      C++20 `import` modules not captured (only `#include`) — genuine limitation, deferred.
-
-**Comprehensive language fixtures** (long-term, verification via nix flakes):
-Goal: for every language we support, a test suite that exercises the full extraction pipeline
-and can be run in CI with real language toolchains provided by nix devShells/flake outputs.
-
-- [ ] Design fixture schema: input source file → expected symbols, imports, calls, references
-      (similar to existing syntax-rules fixtures but for extraction + scope resolution)
-- [ ] Nix flake approach: each language's fixtures run in a devShell with the real compiler/runtime
-      available — lets us verify against `rustc`, `tsc`, `python`, `go build` etc. for ground truth
-- [ ] Fixture runner: language-agnostic test runner (like syntax-rules fixture runner) that loads
-      `tests/fixtures/<lang>/locals/<case>/input.<ext>` + `expected.json` and diffs
-- [ ] Seed fixtures for top 20 languages (high confidence, hand-verified)
-- [ ] Automated fixture generation: use `normalize analyze` + LLM to bootstrap expected outputs,
-      then human-verify before committing
-- [ ] CI integration: `nix flake check` runs all language fixture suites in parallel
-
-**Qualified/namespaced import resolution in the facts index:**
-`find_callers(name)` is name-only — it will rename two unrelated `foo()` functions in different
-modules simultaneously. Fix: store module-qualified caller/callee names in the index so lookups
-resolve to a specific definition, not a name string.
-- [ ] Store caller/callee with module qualification in facts index
-- [ ] Post-filter in `find_callers`: verify callee resolves to definition file via import graph
-- [ ] Update `edit rename` to use qualified lookup (eliminates false positives)
-
-**Stretch goal: normalize as an LSP server (with optional proxy)**
-- [ ] Implement core LSP methods backed by normalize's own reference resolution:
-      `textDocument/references`, `textDocument/rename`, `textDocument/definition`,
-      `textDocument/documentSymbol`, `workspace/symbol`
-- [ ] LSP proxy mode: `normalize serve lsp --proxy 'rust-analyzer'` — forward requests to
-      an arbitrary LSP command, use normalize as fallback or supplement
-- [ ] Editor integration: VS Code extension, Neovim config — use normalize LSP for languages
-      without a native server, proxy for languages that have one
-
-### Lint / Analysis Architecture
-
-See `docs/lint-architecture.md` for full design discussion.
-
-**Architecture decision: Datalog for semantic queries**
-- Datalog is the standard for code analysis (CodeQL, Semmle, codeQuest)
-- Recursion essential for code queries (transitive deps, call graphs)
-- Safe Datalog: guaranteed termination, right level of expressiveness
-
-**Implementation plan:**
-- [ ] All rules (builtin + user) compile to dylibs via Ascent + `abi_stable`
-- [ ] Same infrastructure for both - builtins ship pre-compiled, users compile theirs
-- [ ] Same syntax for both (rules can graduate from user to builtin)
-- See "Facts & Rules Architecture" section below for full plan
-
-**Rule tiers:**
-1. `syntax-rules` (exists): AST patterns, no facts needed
-2. `facts-rules` (new): Datalog over extracted facts (symbols, imports, calls)
-3. `normalize-lint` (new): escape hatch for complex imperative logic
-
-**Differentiation from CodeQL:**
-- CodeQL: deep analysis (types, data flow, taint), ~12 languages
-- normalize: structural/architectural analysis, ~98 languages
-- Focus areas: circular deps, unused exports, module boundaries, import graph metrics
-
-**Backlog - Deep Analysis (CodeQL-style):**
-- [ ] Type extraction for top languages (TS, Python, Rust, Go)
-- [ ] Data flow analysis
-- [ ] Taint tracking
-- Note: significant per-language effort, but tractable with LLM assistance
-
-**Architectural analysis next iteration:**
-- [ ] Boundary violation rules (configurable: "services/ cannot import cli/")
-- [ ] Re-export tracing (follow `pub use` to resolve more imports)
-
-Rules (custom enforcement, future):
-- [ ] Module boundary rules ("services/ cannot import cli/")
-- [ ] Threshold rules ("fan-out > 20 is error")
-- [ ] Dependency path queries ("what's between A and B?")
-
-**Rule tags system:**
-- [ ] Deterministic tag color hashing in `--pretty` output (curated palette, red/yellow reserved for severity)
-
-**Facts & Rules Architecture:**
-
-- [ ] `normalize rules compile <rules.dl>` command to build custom packs (sandboxed codegen)
-- [ ] Self-install builtin dylib: `normalize rules run --engine fact` should auto-install compiled builtins to `~/.local/share/normalize/rules/` on first run (or at build/install time). Currently requires manual copy.
-
-### Language Capability Traits
-
-See `docs/language-capability-traits.md` for full design.
-
-The monolithic `Language` trait couples two growth axes: adding a language requires implementing all methods, adding a feature requires sweeping all 98 impls. Split into optional capability traits, following the `LocalDeps` precedent.
-
-Trigger: split a capability when >50% of languages would return stubs. `has_symbols()` is the existing smell.
-
-- [x] `LanguageEmbedded` — extract `embedded_content()`, already past sparsity threshold (only Vue, HTML, ~3 others) — DONE (2026-03-11)
-- [x] Add `as_symbols()` query method to `Language` with `None` default; `LanguageSymbols` marker trait; 91 programming languages implement it; all 6 data/markup languages (CSS/HTML/JSON/TOML/XML/YAML) now also implement it — DONE (2026-03-11)
-- [x] Migrate call sites (`ceremony.rs`, `docs.rs`, `search.rs`) to use `as_symbols().is_some()` — DONE (2026-03-11)
-- [x] Remove `has_symbols()` — DONE (2026-03-11)
 - [ ] Add `as_imports()`, `as_complexity()`, `as_edit()` capability queries — not ready yet. Sparsity check (2026-03-11, verified): `extract_imports` stub rate is ~1.4% (1 language: asm, with explicit comment). 72% have real impls; 7% use `.imports.scm` query files; 21% are config/data languages with no import concept (correct behavior). Far below 50% threshold — `as_imports()` trait is NOT warranted. Revisit after adding more languages.
+
+### Tooling
+
+- Read .git directly instead of spawning git commands where possible
+  - Default branch detection, diff file listing, etc.
+  - Trade-off: faster but more fragile (worktrees, packed refs, submodules)
+- Documentation freshness: tooling to keep docs in sync with code
+  - For normalize itself: keep docs/cli/*.md in sync with CLI behavior (lint? generate from --help?)
+  - For user projects: detect stale docs in fresh projects (full normalize assistance) and legacy codebases (missing/outdated docs)
+  - Consider boy scout rule: when touching code, improve nearby docs
+- Semantic editing next steps:
+  - Structural search-replace: `--pattern 'fn $name($args) -> $ret { ... }'` AST-level, not regex
+  - Integration with shadow git: checkpoint before large refactors, rollback on failure
+  - **Local rename (`edit rename path/func/local new_name`)**: scoped rename within a block.
+    No index needed. Two tiers:
+    - Conservative: `replace_all_words` within the container's byte range, stop at any nested
+      binding with the same name (avoids worst-case shadowing corruption, misses outer refs past inner shadow)
+    - Correct: tree-sitter scope walk — find the declaration node, then walk identifier nodes
+      that resolve to the same binding. Language-specific scope rules required (Rust, JS, Python differ).
+    SkeletonExtractor doesn't surface locals; needs a dedicated local-variable locator.
+- Cross-file refactors: `normalize move src/foo.rs/my_func src/bar.rs`
+  - Move functions/types between files with import updates
+  - Handles visibility changes (pub when crossing module boundaries)
+  - Updates callers to use new path
+- Structured config crate (`normalize-config`): trait-based view/edit for known config formats (TOML, JSON, YAML, INI). Unified interface across formats. (xkcd 927 risk acknowledged)
+  - Examples: .editorconfig, prettierrc, prettierignore, oxlintrc.json[c], oxfmtrc.json[c], eslint.config.js, pom.xml
+  - Open: do build scripts belong here? (conan, bazel, package.json, cmake) - maybe separate `normalize-build`
+  - Open: linter vs formatter vs typechecker config - same trait or specialized?
+  - Open: reconsider normalize config format choice (TOML vs YAML, JSON, KDL) - rationalize decision
+
+### Code Quality
+
+- Unnecessary aliases: `let x = Foo; x.bar()` → `Foo.bar()`. Lint for pointless intermediate bindings.
+- PR/diff analysis: `normalize analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
+- Deduplicate SQL queries in normalize: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
+- Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
+- Remaining duplicate/clone detection improvements:
 
 ### normalize-typegen
 
@@ -734,14 +383,6 @@ Trigger: split a capability when >50% of languages would return stubs. `has_symb
 - [ ] Type annotations (optional, for typed languages)
 - [ ] Pattern matching / destructuring
 
-### Complexity Hotspots (reduced - max now 58)
-- [ ] `crates/normalize/src/commands/analyze/query.rs:cmd_query` (58)
-- [ ] `crates/normalize/src/commands/daemon.rs:cmd_daemon` (54)
-- [ ] `crates/normalize-syntax-rules/src/runner.rs:evaluate_predicates` (53)
-- [ ] `crates/normalize/src/commands/analyze/mod.rs:run` (51)
-- [ ] `crates/normalize/src/commands/tools/lint.rs:cmd_lint_run` (48)
-- [ ] `crates/normalize/src/tree.rs:collect_highlight_spans` (46)
-
 ### Package Index Backlog (simplest → complex)
 
 **6. Crates.io db-dump** (hard - large dataset)
@@ -759,79 +400,48 @@ Trigger: split a capability when >50% of languages would return stubs. `has_symb
 - [ ] Consider BigQuery dataset (google-cloud-pypi) or warehouse.pypi.org
 - [ ] Consider: is this worth implementing? fetch() covers most use cases
 
-### Code Quality
-- Unnecessary aliases: `let x = Foo; x.bar()` → `Foo.bar()`. Lint for pointless intermediate bindings.
-- PR/diff analysis: `normalize analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
-- Deduplicate SQL queries in normalize: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
-- Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
-- ~~**Structural fragment frequency analysis**~~: Done — `normalize analyze fragments`. Supports `--scope all|functions|blocks`, `--min-nodes N`, `--similarity` for fuzzy matching, `--skeleton`, `--entry` for symbol glob filtering. `--inline-depth` scaffolded but not yet wired (requires async index access in sync context).
-- ~~**CLI entrypoint duplication analysis**~~: Partially done — `normalize analyze fragments --scope functions --entry 'pattern'` handles the filtering. Full callee inlining (`--inline-depth`) requires async index access, deferred.
-- Remaining duplicate/clone detection improvements:
-  - ~~**Acted on top duplicate-blocks findings (2026-03-10)**~~: UnionFind extracted to clusters.rs (pub(crate)); analyze_delimited_body parameterizes brace/paren body; docstring.rs adds extract_preceding_prefix_comments used by lua/r/go/ada; tsx.imports.scm removed (uses typescript query); arch_common.rs adds parse_arch_db/parse_arch_db_desc shared by cachyos/endeavouros; summary.rs breakdown_rows() helper. Groups: 104 → 91. Remaining groups in allow list or intentional.
-  - Per-subcommand excludes in config: `[analyze.similar-blocks] exclude = [...]` so language-file exclusion doesn't affect `analyze rules`, `analyze complexity`, etc. (currently the global `[analyze] exclude` is too coarse)
-  - "Parallel impl directory" heuristic: if >N pairs originate from the same directory pair, fold them into a single suppressed note (e.g., "48 pairs suppressed within normalize-languages/ — likely parallel Language trait implementations")
-  - ~~**`duplicate-blocks` should elide literals by default**~~ — DONE (2026-03-10). `--scope blocks` now defaults to `elide_literals=true`; opt out with `--no-elide-literals`. `--elide-literals` flag works for all modes (functions/blocks/similar — already wired since duplicates unification).
-  - `similar-blocks` / `similar-functions`: cross-file same-containing-function suppression covers same-method-name in different files; doesn't cover same-body-pattern across different method names (the Language impl case)
-  - Consider min-lines bump for `similar-blocks` (currently 10) — the 19-line Symbol constructor is below many useful thresholds; maybe 15-20 default would further cut noise without missing real clones
-- Phase 3b builtin rules: more builtin rules, sharing improvements (see `docs/design/builtin-rules.md`)
-  - Semantic rules system: for rules needing cross-file analysis (import cycles, unused exports, type mismatches). Current syntax-based rules are single-file AST queries; semantic rules need index-backed analysis. Separate infrastructure, triggered differently (post-index vs per-file).
+### Distribution
 
-### Workflow Engine
-- JSON Schema for complex action parameters (currently string-only)
-- Workflow chaining: automatically trigger next workflow based on outcome (e.g., Investigation → Fix → Review)
+- Wrapper packages for ecosystems: npm, PyPI, Homebrew, etc.
+  - Auto-generate and publish in sync with GitHub releases
+  - Single binary + thin wrapper scripts per ecosystem
+- Direct download: platform-detected link to latest GitHub release binary (avoid cargo install overhead)
 
-### Script System
-- TOML workflow format: structured definition (steps, actions) - **deferred until use cases are clearer**
-  - Builtin `workflow` runner script interprets TOML files
-  - Users can also write pure Lua scripts directly
-- Lua test framework: test discovery for `.normalize/tests/` (test + test.property modules done)
-  - Command naming: must clearly indicate "normalize Lua scripts" not general testing (avoid `@test`, `@spec`, `@check`)
-  - Alternative: no special command, just run test files directly via `normalize <file>`
-- Type system uses beyond validation
-  - Done: `T.describe(schema)` for introspection, `type.generate` for property testing
-  - Future: extract descriptions from comments (LuaDoc-style) instead of `description` field
-- Format libraries (Lua): json, yaml, toml, kdl - **very low priority, defer until concrete use case**
-  - Pure Lua implementations preferred (simple, no deps)
-  - Key ordering: sort alphabetically by default, `__keyorder` metatable field for explicit order
+### Fix System: Structural Rewrites (post text-replacement)
 
-### Tooling
-- Read .git directly instead of spawning git commands where possible
-  - Default branch detection, diff file listing, etc.
-  - Trade-off: faster but more fragile (worktrees, packed refs, submodules)
-- Documentation freshness: tooling to keep docs in sync with code
-  - For normalize itself: keep docs/cli/*.md in sync with CLI behavior (lint? generate from --help?)
-  - For user projects: detect stale docs in fresh projects (full normalize assistance) and legacy codebases (missing/outdated docs)
-  - Consider boy scout rule: when touching code, improve nearby docs
-- `normalize fetch`: web content retrieval for LLM context (needs design: chunking, streaming, headless browser?)
-- Semantic editing next steps:
-  - Structural search-replace: `--pattern 'fn $name($args) -> $ret { ... }'` AST-level, not regex
-  - Integration with shadow git: checkpoint before large refactors, rollback on failure
-  - **Local rename (`edit rename path/func/local new_name`)**: scoped rename within a block.
-    No index needed. Two tiers:
-    - Conservative: `replace_all_words` within the container's byte range, stop at any nested
-      binding with the same name (avoids worst-case shadowing corruption, misses outer refs past inner shadow)
-    - Correct: tree-sitter scope walk — find the declaration node, then walk identifier nodes
-      that resolve to the same binding. Language-specific scope rules required (Rust, JS, Python differ).
-    SkeletonExtractor doesn't surface locals; needs a dedicated local-variable locator.
-- Cross-file refactors: `normalize move src/foo.rs/my_func src/bar.rs`
-  - Move functions/types between files with import updates
-  - Handles visibility changes (pub when crossing module boundaries)
-  - Updates callers to use new path
-- Structured config crate (`normalize-config`): trait-based view/edit for known config formats (TOML, JSON, YAML, INI). Unified interface across formats. (xkcd 927 risk acknowledged)
-  - Examples: .editorconfig, prettierrc, prettierignore, oxlintrc.json[c], oxfmtrc.json[c], eslint.config.js, pom.xml
-  - Open: do build scripts belong here? (conan, bazel, package.json, cmake) - maybe separate `normalize-build`
-  - Open: linter vs formatter vs typechecker config - same trait or specialized?
-  - Open: reconsider normalize config format choice (TOML vs YAML, JSON, KDL) - rationalize decision
+- **Sexpr-based fix expressions**: The current `fix = "template $capture"` is text replacement. For structural transforms (indentation-aware, composable), consider expressing fixes as output tree patterns rather than strings. eglint (~/git/eglint) does this for TypeScript — useful prior art for the approach even though it's TS-compiler-specific and doesn't port directly.
+- **Fix fixture tests**: Infrastructure added (`fix.<ext>` + `fix.expected.<ext>` in fixture dirs; temp dir created inside fixture dir for Cargo.toml walk-up). `rust/chained-if-let` covered. Adversarial cases (nested violations, near-EOF, overlapping) not yet added. Deletion rules (`breakpoint`, `binding-pry`, `console-log`) had `fix = ""` removed — auto-delete is too aggressive for statements that may be intentional.
+- **eglint findings**: ~/git/eglint — reference-based AST formatting (not tree-sitter). Core insight: IndentNode/NewlineNode carry `deltaIndent` so indentation is computed at stringify time, not baked into captured text. InterchangeableNode/ForkNode for multiple formatting options avoids explicit conflict resolution. Would require language-specific pretty-printers to adopt — non-trivial.
 
-### Workspace/Context Management
-- Persistent workspace concept (like Notion): files, tool results, context stored permanently
-- Cross-session continuity without re-reading everything
-- Investigate memory-mapped context, incremental updates
+---
 
-### Package Management
-- `normalize package install/uninstall`: proxy to ecosystem tools (cargo add, npm install, etc.)
-  - Very low priority - needs concrete use case showing value beyond direct tool usage
-  - Possible value-adds: install across all ecosystems, auto-audit after install, config-driven installs
+## Aspirational — Research / Long-term Vision
+
+### normalize as LSP server
+
+- [ ] Implement core LSP methods backed by normalize's own reference resolution:
+      `textDocument/references`, `textDocument/rename`, `textDocument/definition`,
+      `textDocument/documentSymbol`, `workspace/symbol`
+- [ ] LSP proxy mode: `normalize serve lsp --proxy 'rust-analyzer'` — forward requests to
+      an arbitrary LSP command, use normalize as fallback or supplement
+- [ ] Editor integration: VS Code extension, Neovim config — use normalize LSP for languages
+      without a native server, proxy for languages that have one
+
+### Deep Analysis (CodeQL-style)
+
+- [ ] Type extraction for top languages (TS, Python, Rust, Go)
+- [ ] Data flow analysis
+- [ ] Taint tracking
+- Note: significant per-language effort, but tractable with LLM assistance
+
+### Trait-Based Extensibility
+
+All trait-based crates follow the normalize-languages pattern for extensibility:
+- Global registry with `register()` function for user implementations
+- Built-ins initialized lazily via `init_builtin()` + `OnceLock`
+- No feature gates (implementations are small, not worth the complexity)
+
+Pattern: traits are the extensibility mechanism. Users implement traits in their own code, register at runtime. normalize CLI can add Lua bindings at application layer for scripting.
 
 ### Agent Future
 
@@ -852,6 +462,7 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 - [ ] Depth/cost limits: cap recursion depth, token budgets per investigation
 
 ### Agent / MCP
+
 - Gemini Flash 3 prompt sensitivity: certain phrases ("shell", "execute", nested `[--opts]`) trigger 500 errors. Investigate if prompt can be further simplified to avoid safety filters entirely. See `docs/design/agent.md` for current workarounds.
 - `normalize @agent` MCP support as second-class citizen
   - Our own tools take priority, MCP as fallback/extension mechanism
@@ -861,8 +472,6 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
   - Incremental context refinement vs full re-fetch
 
 ### Session Analysis Backlog
-
-**Bug: `Turn::token_usage` only captures the last API call per turn.** In `claude_code.rs`, `last_request_id` is overwritten on each assistant entry — so multi-round turns (user → tool call → tool result → final answer) only account for the final API call. Fix: accumulate all `requestId`s seen within a turn (`turn_request_ids: Vec<String>`) and sum their `request_tokens` on flush.
 
 **Composable message filters:**
 - `--has-tool <name>` — messages in turns that used a specific tool
@@ -874,7 +483,7 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 **Analysis features:**
 1. **Cross-repo comparison**: group sessions by repository, compare metrics: tool usage, error rates, parallelization, costs. `--by-repo` flag to stats command.
 2. **Ngram analysis**: extract common word sequences from assistant messages (bigrams/trigrams/4-grams). Find common error messages, repeated explanations, boilerplate responses.
-3. **Parallelization hints**: beyond counting, show specific turns with sequential independent calls. Example: `Turn 12: ⚠️ Could parallelize: Read(foo.rs) → Read(bar.rs) → Read(baz.rs)`
+3. **Parallelization hints**: beyond counting, show specific turns with sequential independent calls. Example: `Turn 12: Could parallelize: Read(foo.rs) → Read(bar.rs) → Read(baz.rs)`
 4. **File edit heatmap**: which files churned most? Files read but never edited: potential test gaps. Files edited multiple times: fragile design or iterative refinement?
 5. **Cost breakdown**: model-specific pricing, cache savings display, per-turn cost tracking.
 
@@ -902,6 +511,7 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
   - Maybe: automated agent testing harness (run same tasks across assistants)
 
 ### Friction Signals (see `docs/research/agent-adaptation.md`)
+
 How do we know when tools aren't working? Implicit signals from agent behavior:
 - Correction patterns: "You're right", "Should have" after tool calls
 - Long tool chains: 5+ calls without acting
@@ -909,87 +519,66 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 - Follow-up patterns: `--types-only` → immediately view symbol
 - Repeated queries: same file viewed multiple times
 
-### ~~Global rules exclude in config~~ — DONE (2026-03-10)
+### Workspace/Context Management
 
-`.claude/**` added to `global-allow` in `[rules]` config. Removed redundant `.claude/**`
-entries from `rust/tuple-return`, `no-grammar-loader-new`, `rust/chained-if-let`,
-`rust/numeric-type-annotation`. The `global-allow` pattern IS the global exclude mechanism.
+- Persistent workspace concept (like Notion): files, tool results, context stored permanently
+- Cross-session continuity without re-reading everything
+- Investigate memory-mapped context, incremental updates
 
-### CI/Infrastructure
-- [x] Wire `normalize analyze duplicates --scope blocks` into CI — DONE (2026-03-10). Also fixed stale `duplicate-functions` → `duplicates --scope functions` and `analyze rules` → `rules run` command references.
+### Package Management
 
-### Distribution
-- Wrapper packages for ecosystems: npm, PyPI, Homebrew, etc.
-  - Auto-generate and publish in sync with GitHub releases
-  - Single binary + thin wrapper scripts per ecosystem
-- Direct download: platform-detected link to latest GitHub release binary (avoid cargo install overhead)
+- `normalize package install/uninstall`: proxy to ecosystem tools (cargo add, npm install, etc.)
+  - Very low priority - needs concrete use case showing value beyond direct tool usage
+  - Possible value-adds: install across all ecosystems, auto-audit after install, config-driven installs
 
-### Vision (Aspirational)
+### Workflow Engine
+
+- JSON Schema for complex action parameters (currently string-only)
+- Workflow chaining: automatically trigger next workflow based on outcome (e.g., Investigation → Fix → Review)
+
+### Script System
+
+- TOML workflow format: structured definition (steps, actions) - **deferred until use cases are clearer**
+  - Builtin `workflow` runner script interprets TOML files
+  - Users can also write pure Lua scripts directly
+- Lua test framework: test discovery for `.normalize/tests/` (test + test.property modules done)
+  - Command naming: must clearly indicate "normalize Lua scripts" not general testing (avoid `@test`, `@spec`, `@check`)
+  - Alternative: no special command, just run test files directly via `normalize <file>`
+- Type system uses beyond validation
+  - Done: `T.describe(schema)` for introspection, `type.generate` for property testing
+  - Future: extract descriptions from comments (LuaDoc-style) instead of `description` field
+- Format libraries (Lua): json, yaml, toml, kdl - **very low priority, defer until concrete use case**
+  - Pure Lua implementations preferred (simple, no deps)
+  - Key ordering: sort alphabetically by default, `__keyorder` metatable field for explicit order
+
+### Vision
+
 - **Friction Minimization Loop**: normalize should make it easier to reduce friction, which accelerates development, which makes it easier to improve normalize. Workflows documented → failure modes identified → encoded as tooling → friction reduced → faster iteration. The goal is tooling that catches problems automatically (high reliability) not documentation that hopes someone reads it (low reliability).
 - Verification Loops: domain-specific validation (compiler, linter, tests) before accepting output
 - Synthesis: decompose complex tasks into solvable subproblems (`normalize synthesize`)
 - Plugin Architecture: extensible view providers, synthesis strategies, code generators
 
-## Known Issues
+### First Release
 
-### normalize-languages: query fixture failures — DONE (2026-03-09)
-~~67 pre-existing failing tests (query files referencing node kinds that no longer exist in the grammar)~~. All 39 targeted failures fixed: corrected node types/fields across 35+ `.scm` files and 7 `.rs` audit lists; 4 zsh tests skip gracefully due to broken zsh grammar (parser produces ERROR nodes for all common syntax); 260/260 query fixture tests now pass. The remaining 38 pre-existing clippy errors in `query_fixtures.rs` (useless length comparisons) are pre-existing and unrelated.
+```bash
+git tag v0.1.0
+git push --tags
+```
+- Verify cross-platform builds in GitHub Actions
+- Test `normalize update` against real release
+- VS Code extension: test and publish to marketplace (after first CLI release)
 
-### ~~normalize-languages: ast-grep test broken~~ — FIXED (2026-03-10)
-`ast_grep::tests::test_pattern_matching` now passes (`cargo test -p normalize-languages` clean).
-
-### ~~`--rule` filter bugs~~ — FIXED (2026-03-11)
-Two bugs in `normalize rules run --rule <id>`:
-1. **Native engine ignored `--rule` filter** — `broken-ref`, `stale-summary` etc. leaked through
-   when running with `--rule no-todo-comment`. Fixed: post-filter all issues by rule_id in service.rs.
-2. **Empty file path when target is a file** — `normalize rules run --rule X path/to/file.rs` produced
-   `"file": ""` because `strip_prefix(file_path)` on the exact file returns empty string. Fixed in both
-   `run_rules()` (syntax runner) and `finding_to_issue()`: detect file targets and use parent directory.
-
-## Long-Term Goals
-
-### Incremental-first architecture
-The current architecture is batch-oriented: commands scan the whole workspace, produce a report, and exit. This works for CLI but is wrong for LSP and other interactive consumers. The goal is to make incrementality a first-class concern throughout the stack.
-
-**Where batch hurts today:**
-- LSP diagnostics re-run all rule engines on every save (syntax rules re-parse every file, fact rules rebuild the full index)
-- `FileIndex` is rebuilt from scratch — no way to update a single file's symbols/imports/calls
-- Syntax rules load and compile all tree-sitter queries on every invocation
-
-**Target architecture:**
-- **FileIndex**: `update_file(path, content)` — re-index one file, update SQLite incrementally (delete old rows, insert new). Dependency graph tracks which files' diagnostics to invalidate.
-- **Syntax rules**: per-file evaluation. On save, re-run rules only on the saved file. Cache compiled queries across invocations (already cached per-process via `GrammarLoader`, but lost between LSP requests).
-- **Fact rules**: incremental Datalog. When facts for one file change, re-derive only affected conclusions. This is hard — may need semi-naive evaluation with change tracking, or accept batch for fact rules and optimize syntax rules first.
-- **Watch mode**: `normalize watch` that keeps the index live and re-runs checks on file changes (inotify/fsevents). The LSP server is one consumer; a TUI dashboard could be another.
-
-**Incremental steps (not all-or-nothing):**
-1. `FileIndex::update_file()` — single-file re-index without full rebuild
-2. Per-file syntax rule evaluation in LSP (run rules only on saved file)
-3. Persistent `GrammarLoader` in LSP (don't re-create `SkeletonExtractor` per request)
-4. File-level dependency tracking for diagnostic invalidation
-5. Incremental fact rule evaluation (long-term, research needed)
+---
 
 ## Deferred
 
 - `normalize jq` multi-format support (YAML/CBOR/TOML/XML via `jaq-all` with `formats` feature): currently using `jaq-core/std/json` directly to avoid `jaq-fmts` bloat. Low priority — vanilla jq is JSON-only anyway.
-
-## Embedded CLI drop-in integrations (see docs/cli-dropin-integrations.md)
-
-All three integrations complete: `jq`, `rg`, `ast-grep`.
-
-Completed:
-- `normalize ast-grep --rewrite` / `--interactive` (ast-grep-config::Fixer + crossterm)
-- `normalize ast-grep scan` (project config, rule discovery, CombinedScan)
-- `normalize ast-grep test` (rule verification, snapshots, interactive reporter)
-
-Future work:
 - `normalize rg` PCRE2 support (pcre2 feature not enabled)
-
-
-
-- VS Code extension: test and publish to marketplace (after first CLI release)
+- `normalize fetch`: web content retrieval for LLM context (needs design: chunking, streaming, headless browser?)
 - Remaining docs: prior-art.md, hybrid-loops.md
 - Memory system: `docs/design/memory.md` — SQLite-backed `store/recall/forget`. Deferred until concrete use case.
+- Jinja2 grammar publish: NOT via arborium (they vendor their own); publish as our own crate (`tree-sitter-jinja2` name taken — pick another). Update normalize-grammars dep. Local `grammars/jinja2/` + `find_local_grammars()` in xtask is sufficient for now.
+- view: directory output shows dir name as first line (tree style) - intentional?
 
 ## Implementation Notes
 
@@ -998,56 +587,3 @@ Future work:
 - GITHUB_REPO constant → "rhi-zone/normalize"
 - Custom SHA256 implementation (Sha256 struct)
 - Expects GitHub release with SHA256SUMS.txt
-
-## When Ready
-
-### First Release
-```bash
-git tag v0.1.0
-git push --tags
-```
-- Verify cross-platform builds in GitHub Actions
-- Test `normalize update` against real release
-- view: directory output shows dir name as first line (tree style) - intentional?
-
-## Tree-Sitter Introspection — DONE (fd46beed)
-
-Three commands added for rule development:
-- `normalize analyze parse <file> [--at LINE:COL] [--depth N]` — show CST
-- `normalize analyze query <file> <query-or-.scm> [--language lang]` — run a query, show captures
-- `normalize analyze node-types <language> [--search pattern]` — list all node kinds and field names
-
-## Built-in Guides — DONE (cae9be26)
-
-`normalize guide <topic>` — workflow-oriented guides with examples:
-- `rules` — writing and testing syntax rules
-- `explore` — exploring a codebase
-- `setup` — setting up normalize
-- `analyze` — running analysis
-- `tree-sitter` — tree-sitter introspection
-- ~~**Next**: add examples to individual `--help` output~~ — DONE (91ad965f). server-less 0.4.2 splits multi-line doc comments at first blank line into `.about()` + `.after_help()`. 100+ methods across all services now have `Examples:` sections in `--help`.
-
-## Syntax Ruleset Breadth
-
-After batch-fixing the current info violations, audit and expand rule coverage:
-- **What we have**: 65 builtin rules (63 syntax). Good Rust/Go/Python/JS/Ruby/TS coverage.
-- ~~Cross-language magic numbers, commented-out code blocks~~ — DONE. 5 per-language `magic-number` rules (comparison context, ≥2 digits) + 2 `commented-out-code` rules (cross-language + Rust). All INFO/disabled by default.
-- **Trigger for fix infrastructure**: once enough rules have structural auto-fixes that need correct indentation, build the corpus-based indentation model (see `docs/prior-art.md` § "Corpus-based indentation model"). Don't build it speculatively.
-- **tree-sitter-go note**: `block` → `statement_list` → statements. Queries must use `statement_list` as intermediate node; `(block (return_statement))` won't match.
-- **Rule ideas by language**:
-  - JS/TS: `var` usage ✓, `== null` ✓, `typeof` checks ✓, async/await ✓, `no-prototype-builtins` ✓, `prefer-optional-chain` ✓
-  - TypeScript: `no-any` ✓, `no-non-null-assertion` ✓, `no-empty-interface` ✓, `no-inferrable-types` ✓ — `strict-boolean-expressions` (requires type info, skip for now)
-  - Python: mutable default args ✓, bare `except` ✓, `assert` in non-test ✓, `use-enumerate` ✓, `raise-without-from` ✓, `no-star-import` ✓, `use-with` ✓
-  - Go: error ignored ✓, `fmt.Println` ✓, `empty-return` ✓, `defer-in-loop` ✓, `context-todo` ✓, `sync-mutex-copied` ✓
-  - Ruby: `rescue Exception` ✓, `puts` in non-script ✓, `string-concat` ✓, `double-negation` ✓, `open-struct` ✓, `method-missing` ✓
-  - Cross-language: hardcoded credentials ✓, magic numbers ✓, commented-out code blocks ✓
-- ~~`no-todo-comment`/`no-fixme-comment` only worked for Rust~~ — FIXED. Now uses three patterns
-  (`comment` + `line_comment` + `block_comment`) to cover all tree-sitter grammars. The syntax rules
-  runner was enhanced to handle multi-pattern cross-language rules: when a combined query fails
-  (e.g. `comment` doesn't exist in Rust), it splits patterns and keeps only valid ones per grammar.
-  Works for Python, JS, Go, Ruby, Java AND Rust, C, C++.
-
-## Fix System: Structural Rewrites (post text-replacement)
-- **Sexpr-based fix expressions**: The current `fix = "template $capture"` is text replacement. For structural transforms (indentation-aware, composable), consider expressing fixes as output tree patterns rather than strings. eglint (~/git/eglint) does this for TypeScript — useful prior art for the approach even though it's TS-compiler-specific and doesn't port directly.
-- **Fix fixture tests**: Infrastructure added (`fix.<ext>` + `fix.expected.<ext>` in fixture dirs; temp dir created inside fixture dir for Cargo.toml walk-up). `rust/chained-if-let` covered. Adversarial cases (nested violations, near-EOF, overlapping) not yet added. Deletion rules (`breakpoint`, `binding-pry`, `console-log`) had `fix = ""` removed — auto-delete is too aggressive for statements that may be intentional.
-- **eglint findings**: ~/git/eglint — reference-based AST formatting (not tree-sitter). Core insight: IndentNode/NewlineNode carry `deltaIndent` so indentation is computed at stringify time, not baked into captured text. InterchangeableNode/ForkNode for multiple formatting options avoids explicit conflict resolution. Would require language-specific pretty-printers to adopt — non-trivial.
