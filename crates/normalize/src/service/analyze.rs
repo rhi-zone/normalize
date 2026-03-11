@@ -38,6 +38,9 @@ use crate::commands::analyze::summary::SummaryReport;
 use crate::commands::analyze::surface::SurfaceReport;
 use crate::commands::analyze::test_ratio::TestRatioReport;
 use crate::commands::analyze::trend::{ScalarTrendReport, TrendReport};
+use crate::commands::analyze::ts_node_types::NodeTypesReport;
+use crate::commands::analyze::ts_parse::ParseReport;
+use crate::commands::analyze::ts_query::QueryReport;
 use crate::commands::analyze::uniqueness::UniquenessReport;
 use crate::output::OutputFormatter;
 use server_less::cli;
@@ -382,6 +385,30 @@ impl AnalyzeService {
     }
 
     fn display_hotspots(&self, r: &HotspotsReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_ts_parse(&self, r: &ParseReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_ts_query(&self, r: &QueryReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_node_types(&self, r: &NodeTypesReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -1875,4 +1902,89 @@ impl AnalyzeService {
             &only,
         )
     }
+
+    /// Show the tree-sitter CST for a file (development/debugging tool for writing queries)
+    #[server(group = "code")]
+    #[cli(display_with = "display_ts_parse")]
+    pub fn parse(
+        &self,
+        #[param(positional, help = "File to parse")] file: String,
+        #[param(help = "Language override (default: detect from extension)")] language: Option<
+            String,
+        >,
+        #[param(help = "Show subtree containing position LINE:COL (1-based line, 0-based col)")]
+        at: Option<String>,
+        #[param(help = "Maximum tree depth to display")] depth: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ParseReport, String> {
+        let root_path = Self::root_path(None);
+        self.resolve_format(pretty, compact, &root_path);
+        let at_pos = at.as_deref().map(parse_line_col).transpose()?;
+        crate::commands::analyze::ts_parse::parse_file(
+            std::path::Path::new(&file),
+            language.as_deref(),
+            at_pos,
+            depth,
+        )
+    }
+
+    /// Run a tree-sitter query against a file and show captures
+    #[server(group = "code")]
+    #[cli(display_with = "display_ts_query")]
+    pub fn query(
+        &self,
+        #[param(positional, help = "File to query")] file: String,
+        #[param(
+            positional,
+            help = "Tree-sitter query: .scm file path or inline s-expression"
+        )]
+        query: String,
+        #[param(help = "Language override (default: detect from extension)")] language: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<QueryReport, String> {
+        let root_path = Self::root_path(None);
+        self.resolve_format(pretty, compact, &root_path);
+        crate::commands::analyze::ts_query::query_file(
+            std::path::Path::new(&file),
+            &query,
+            language.as_deref(),
+        )
+    }
+
+    /// List node kinds and field names for a tree-sitter grammar
+    #[server(group = "code")]
+    #[cli(display_with = "display_node_types")]
+    pub fn node_types(
+        &self,
+        #[param(positional, help = "Language name (e.g. rust, python, go)")] language: String,
+        #[param(help = "Filter types and fields by substring (case-insensitive)")] search: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<NodeTypesReport, String> {
+        let root_path = Self::root_path(None);
+        self.resolve_format(pretty, compact, &root_path);
+        crate::commands::analyze::ts_node_types::node_types_for_language(
+            &language,
+            search.as_deref(),
+        )
+    }
+}
+
+fn parse_line_col(s: &str) -> Result<(usize, usize), String> {
+    let (line_str, col_str) = s
+        .split_once(':')
+        .ok_or_else(|| format!("invalid position '{s}': expected LINE:COL"))?;
+    let line = line_str
+        .parse::<usize>()
+        .map_err(|_| format!("invalid line number '{line_str}'"))?;
+    let col = col_str
+        .parse::<usize>()
+        .map_err(|_| format!("invalid column number '{col_str}'"))?;
+    Ok((line, col))
 }

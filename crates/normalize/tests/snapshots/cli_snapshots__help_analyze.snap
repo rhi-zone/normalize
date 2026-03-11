@@ -42,6 +42,9 @@ Modes: exact (default), similar (fuzzy MinHash), clusters (connected components)
   uniqueness         Measure what fraction of functions have no structural near-twin per module
   call-complexity    Compute effective (reachable) cyclomatic complexity via call-graph BFS
   fragments          Find repeated AST fragments across the codebase
+  parse              Show the tree-sitter CST for a file (development/debugging tool for writing queries)
+  query              Run a tree-sitter query against a file and show captures
+  node-types         List node kinds and field names for a tree-sitter grammar
 
 Module structure:
   size               Show hierarchical LOC breakdown (ncdu-style)
