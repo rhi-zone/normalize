@@ -41,6 +41,13 @@ Behavioral rules for Claude Code in this repository.
 
 **Grammars come from arborium or us.** We use arborium exclusively for curated grammars (we trust amos wenger's taste). For any language not in arborium's set, we write our own grammar — the Jinja2 grammar set this precedent. Don't pull in random tree-sitter grammars from the ecosystem.
 
+**When investigating what a grammar supports**, use our own tools — don't read source code:
+```
+normalize syntax ast <file>           # see the full CST for a sample file
+normalize syntax query <file> <query> # test a .scm query against a file
+```
+Write a small example file in the target language, parse it, and see what node types exist. This is faster and more reliable than reading grammar source code or guessing.
+
 **When adding or improving a language:**
 1. Add all applicable `.scm` query files (tags, imports, calls, complexity, types)
 2. Implement the Language trait methods that the grammar supports
