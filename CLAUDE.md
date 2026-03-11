@@ -25,38 +25,15 @@ Behavioral rules for Claude Code in this repository.
 
 ## Core Rule
 
-**Note things down immediately — no deferral:**
-- Bugs/issues → fix or add to TODO.md
-- Design decisions → docs/ or code comments
-- Future work → TODO.md **right now, in the same response** — never say "I'll note this later"
-- Key insights → this file
-- Friction with normalize → TODO.md (we dogfood, friction = improvement opportunity)
+**Write it down now.** Bugs, decisions, future work, insights → edit the file (TODO.md, docs/, CLAUDE.md) before responding. "I'll note that later" is the failure mode.
 
-"I'll add that to TODO.md" or "I'll note that" without immediately editing the file is the failure mode. Edit first, then respond.
+**Keep docs in sync.** CLI changes → update `docs/cli/`, `README.md`, `LLMS.md`, `docs/cli-design.md` in the same commit.
 
-**Keep docs in sync with code.** When renaming a command, adding a subcommand, or changing CLI structure: update `docs/cli/`, `README.md`, `LLMS.md`, and `docs/cli-design.md` in the same commit. Stale docs compound — 200 commits of drift = a full day of cleanup.
+**Verify before asserting.** Read the code before modifying it. Check how similar things work in the codebase before adding new patterns. Don't assert node types, API behavior, or codebase facts from memory — check the source.
 
-**Triggers:** User corrects you, 2+ failed attempts, "aha" moment, framework quirk discovered → document before proceeding.
+**Fix root causes.** When corrected or when something fails: fix the underlying issue (docs, code, instructions) before proceeding. If a CLAUDE.md rule didn't prevent a mistake, the rule is broken — fix the rule.
 
-**Don't say these (edit first):** "Fair point", "Should have", "That should go in X" → edit the file BEFORE responding.
-
-**Do the work properly.** When asked to analyze X, actually read X - don't synthesize from conversation. The cost of doing it right < redoing it.
-
-**If citing CLAUDE.md after failing:** The file failed its purpose. Adjust it to actually prevent the failure.
-
-**If the user corrects you at all, or you guessed at anything:** CLAUDE.md is probably missing something. Update it before proceeding.
-
-**Language trait implementations must be honest about what the grammar provides.** Don't implement `container_body`, `refine_kind`, etc. based on what you *wish* the grammar modeled. If the tree-sitter grammar doesn't model a concept (e.g. markdown sections), return empty/None and handle it at a higher level — don't claim support you can't deliver. tree-sitter grammars are CSTs (concrete syntax trees), not ASTs — semantic structure (like "section = heading + content") must be derived, not assumed.
-
-## From Session Analysis
-
-Patterns from `docs/log-analysis.md` correction analysis:
-
-- **Question scope early:** Before implementing, ask whether it belongs in this crate/module
-- **Check consistency:** Look at how similar things are done elsewhere in the codebase before adding new patterns
-- **Implement fully:** No silent arbitrary caps, incomplete pagination, or unexposed trait methods
-- **Name for purpose:** Avoid names that describe one consumer ("tool registry" → "package index")
-- **Verify before stating:** Don't assert AST node types, API behavior, or codebase facts without checking
+**Be honest about capabilities.** Language trait implementations reflect what the tree-sitter grammar actually provides (CST, not AST). If the grammar doesn't model a concept, return empty/None — don't fabricate semantic structure.
 
 ## SUMMARY.md
 
@@ -91,21 +68,9 @@ When unsure of syntax: `normalize <cmd> --help`. Fall back to Read only for exac
 
 ## Workflow
 
-**Batch cargo commands** to minimize round-trips:
-```bash
-cargo clippy --all-targets --all-features -- -D warnings && cargo test
-```
-After editing multiple files, run the full check once — not after each edit. Formatting is handled automatically by the pre-commit hook (`cargo fmt`).
+**Batch, then verify.** Edit all files first, then run `cargo clippy --all-targets --all-features -- -D warnings && cargo test` once. Pre-commit hook handles `cargo fmt`.
 
-**When making the same change across multiple crates**, edit all files first, then build once.
-
-**Minimize file churn.** When editing a file, read it once, plan all changes, and apply them in one pass. Avoid read-edit-build-fail-read-fix cycles by thinking through the complete change before starting.
-
-**Always commit completed work.** The final step of any implementation task is `git commit`. After clippy + tests pass, commit immediately — don't wait to be asked. Uncommitted work is lost work. **The repo must be clean (`git status` = nothing to commit) when you finish a task.**
-
-**Always update TODO.md at task end.** Mark completed items as done (use ~~strikethrough~~ or append `— DONE`), add newly discovered follow-up items, remove stale entries. A task is not complete until TODO.md reflects the new state. **Do this before the commit, not after** — the commit should include the updated TODO.md.
-
-**These two steps are non-negotiable end conditions.** "I finished the implementation" is not done. Done = committed + TODO.md updated + `git status` clean. If you skip either step, you have left the repo in a worse state than you found it.
+**Done = committed + TODO.md updated + git status clean.** After tests pass, commit immediately. Update TODO.md (mark completed items, add follow-ups) in the same commit — not after.
 
 ## Session Handoff
 
@@ -137,24 +102,13 @@ Rules of thumb:
 
 ## Commit Convention
 
-Use conventional commits: `type(scope): message`
-
-Types:
-- `feat` - New feature
-- `fix` - Bug fix
-- `refactor` - Code change that neither fixes a bug nor adds a feature
-- `docs` - Documentation only
-- `chore` - Maintenance (deps, CI, etc.)
-- `test` - Adding or updating tests
-
-Scope is optional but recommended for multi-crate repos.
+Conventional commits: `type(scope): message`. Scope recommended for multi-crate changes.
 
 ## Negative Constraints
 
 Do not:
 - Hardcode file extensions — extension → language mapping belongs in the `Language` registry. Use `support_for_path(path)` or equivalent.
 - Ship mutating commands without `--dry-run`
-- Leave work uncommitted or TODO.md stale — both must be updated in the final commit
 - Do half measures — when introducing a new abstraction, replace all existing ad-hoc code with it
 - "Unify" commands by wrapping N report types in an enum — real consolidation means one report struct with shared fields. If reports have nothing in common, they shouldn't be forced under one command.
 - Write stub implementations — `None`/empty is only correct when the concept genuinely doesn't exist in that language
