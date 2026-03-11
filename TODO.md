@@ -990,16 +990,16 @@ Three commands added for rule development:
 ## Syntax Ruleset Breadth
 
 After batch-fixing the current info violations, audit and expand rule coverage:
-- **What we have**: 54 builtin rules (50 syntax). Good Rust/Go/Python/JS/Ruby/TS coverage.
-- **Next**: Cross-language magic numbers, commented-out code blocks; more Ruby/Python depth.
+- **What we have**: 57 builtin rules (53 syntax). Good Rust/Go/Python/JS/Ruby/TS coverage.
+- **Next**: Cross-language magic numbers, commented-out code blocks.
 - **Trigger for fix infrastructure**: once enough rules have structural auto-fixes that need correct indentation, build the corpus-based indentation model (see `docs/prior-art.md` § "Corpus-based indentation model"). Don't build it speculatively.
 - **tree-sitter-go note**: `block` → `statement_list` → statements. Queries must use `statement_list` as intermediate node; `(block (return_statement))` won't match.
 - **Rule ideas by language**:
   - JS/TS: `var` usage ✓, `== null` ✓, `typeof` checks ✓, async/await ✓, `no-prototype-builtins` ✓, `prefer-optional-chain` ✓
   - TypeScript: `no-any` ✓, `no-non-null-assertion` ✓, `no-empty-interface` ✓, `no-inferrable-types` ✓ — `strict-boolean-expressions` (requires type info, skip for now)
-  - Python: mutable default args ✓, bare `except` ✓, `assert` in non-test ✓, `use-enumerate` ✓, `raise-without-from` ✓
+  - Python: mutable default args ✓, bare `except` ✓, `assert` in non-test ✓, `use-enumerate` ✓, `raise-without-from` ✓, `no-star-import` ✓, `use-with` ✓
   - Go: error ignored ✓, `fmt.Println` ✓, `empty-return` ✓, `defer-in-loop` ✓, `context-todo` ✓, `sync-mutex-copied` ✓
-  - Ruby: `rescue Exception` ✓, `puts` in non-script ✓, `string-concat` ✓, `double-negation` ✓, `open-struct` ✓
+  - Ruby: `rescue Exception` ✓, `puts` in non-script ✓, `string-concat` ✓, `double-negation` ✓, `open-struct` ✓, `method-missing` ✓
   - Cross-language: hardcoded credentials ✓, magic numbers, commented-out code blocks
 
 ## Fix System: Structural Rewrites (post text-replacement)
