@@ -11,7 +11,7 @@
 - `rules` - Manage and run analysis rules (syntax + fact)
 
 ### Infrastructure
-- `facts` - Extract and query code facts (symbols, imports, calls)
+- `structure` - Manage the structural index (symbols, imports, calls)
 - `config` - Inspect and validate config files using JSON Schema
 - `daemon` - Background process management
 - `grammars` - Tree-sitter grammar management
