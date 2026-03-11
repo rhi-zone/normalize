@@ -970,6 +970,13 @@ git push --tags
 - Test `normalize update` against real release
 - view: directory output shows dir name as first line (tree style) - intentional?
 
+## Tree-Sitter Introspection — DONE (fd46beed)
+
+Three commands added for rule development:
+- `normalize analyze parse <file> [--at LINE:COL] [--depth N]` — show CST
+- `normalize analyze query <file> <query-or-.scm> [--language lang]` — run a query, show captures
+- `normalize analyze node-types <language> [--search pattern]` — list all node kinds and field names
+
 ## Syntax Ruleset Breadth
 
 After batch-fixing the current info violations, audit and expand rule coverage:
