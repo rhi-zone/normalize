@@ -21,6 +21,7 @@
 # If your team uses FIXME as a pre-release review marker and has a defined
 # process for clearing them before shipping, you can disable this rule.
 
-; Matches line comments containing FIXME
-; Works across languages with line_comment node type
-((line_comment) @match (#match? @match "FIXME"))
+; Matches comments containing FIXME
+; Uses `comment` node type (works for Python, JS, Go, Ruby, Java, etc.).
+; Rust/C/C++ use `line_comment` and are NOT matched — use a custom rule for those.
+((comment) @match (#match? @match "FIXME"))

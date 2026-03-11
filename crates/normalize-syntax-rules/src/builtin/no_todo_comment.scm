@@ -22,6 +22,8 @@
 # widely accepted in many teams and codebases. Enable it if you want to
 # enforce a no-inline-todos policy.
 
-; Matches line comments where TODO appears as a marker (followed by : or space),
+; Matches comments where TODO appears as a marker (followed by : or space),
 ; not as part of a filename like `TODO.md` or an identifier like `TODO_FILE`.
-((line_comment) @match (#match? @match "TODO[: ]"))
+; Uses `comment` node type (works for Python, JS, Go, Ruby, Java, etc.).
+; Rust/C/C++ use `line_comment` and are NOT matched — use a custom rule for those.
+((comment) @match (#match? @match "TODO[: ]"))
