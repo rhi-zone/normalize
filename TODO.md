@@ -86,13 +86,11 @@ Ordered by impact × tractability. Pick from top.
 
 ## Immediate Fixes
 
-### server-less: `name` attribute ignored for nested service fields
+### server-less UX issues (fix in server-less, not normalize)
 
-**Bug**: `#[cli(name = "structure")]` on a nested service's impl block is ignored when the service
-is registered as a field in the parent struct. The CLI subcommand name comes from the **field name**,
-not the `name` attribute. Discovered when `facts: FactsService` showed as `facts` despite
-`name = "structure"` in the `#[cli]` attribute. Workaround: rename the field. Fix needed in
-server-less proc macro — nested service `name` should override field name.
+1. **`name` attribute ignored for nested services**: `#[cli(name = "structure")]` on a nested service's impl block is ignored — CLI subcommand name comes from the field name. Workaround: rename the field. Fix in proc macro.
+2. **No error for helper methods in `#[cli]` block**: Every `&self` method becomes a subcommand. Putting a `display_*` helper inside the `#[cli]` impl block silently creates a broken subcommand. Should error or warn at compile time.
+3. **`display_with` across impl blocks is non-obvious**: Works but nothing signals this is possible. Better docs or a compile-time hint when `display_with` target isn't found in the same block.
 
 ### ~~`sessions stats --group-by` not wired up~~ DONE
 
