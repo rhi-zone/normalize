@@ -1,7 +1,7 @@
 //! JavaScript language support.
 
 use crate::ecmascript;
-use crate::{ContainerBody, Import, Language, LanguageSymbols};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// JavaScript language support.
@@ -102,6 +102,10 @@ impl Language for JavaScript {
         inner_indent: &str,
     ) -> Option<ContainerBody> {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
+    }
+
+    fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
+        ecmascript::get_visibility(node, content)
     }
 }
 

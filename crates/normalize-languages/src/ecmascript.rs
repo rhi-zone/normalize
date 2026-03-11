@@ -3,8 +3,40 @@
 //! This module contains common logic shared between JavaScript, TypeScript, and TSX.
 //! Each language struct delegates to these functions for DRY implementation.
 
-use crate::{ImplementsInfo, Import};
+use crate::{ImplementsInfo, Import, Visibility};
 use tree_sitter::Node;
+
+// ============================================================================
+// Visibility
+// ============================================================================
+
+/// Get visibility for a JS/TS class member.
+///
+/// TypeScript: looks for `accessibility_modifier` child (`public`, `private`, `protected`).
+/// JavaScript: checks if the member name starts with `#` (private field syntax).
+/// Default is Public (JS/TS have no module-level visibility modifiers).
+pub fn get_visibility(node: &Node, content: &str) -> Visibility {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "accessibility_modifier" {
+            let mod_text = &content[child.byte_range()];
+            return match mod_text {
+                "private" => Visibility::Private,
+                "protected" => Visibility::Protected,
+                "public" => Visibility::Public,
+                _ => Visibility::Public,
+            };
+        }
+    }
+    // JS private fields/methods use # prefix on the name
+    if let Some(name_node) = node.child_by_field_name("name") {
+        let name = &content[name_node.byte_range()];
+        if name.starts_with('#') {
+            return Visibility::Private;
+        }
+    }
+    Visibility::Public
+}
 
 // ============================================================================
 // Semantic hook helpers (for Language trait build_signature / extract_implements)

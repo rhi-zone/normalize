@@ -1,6 +1,6 @@
 //! Ruby language support.
 
-use crate::{ContainerBody, Import, Language, LanguageSymbols};
+use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
 use tree_sitter::Node;
 
 /// Ruby language support.
@@ -124,6 +124,28 @@ impl Language for Ruby {
             "**/*_test.rb",
             "**/*_spec.rb",
         ]
+    }
+
+    fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
+        // Ruby uses `private`, `protected`, `public` as method calls that change
+        // visibility for all subsequent method definitions in the class body.
+        // Walk backward through siblings to find the most recent visibility call.
+        let mut prev = node.prev_sibling();
+        while let Some(sibling) = prev {
+            if sibling.kind() == "call" || sibling.kind() == "identifier" {
+                let text = &content[sibling.byte_range()];
+                let method = text.split_whitespace().next().unwrap_or(text);
+                match method {
+                    "private" => return Visibility::Private,
+                    "protected" => return Visibility::Protected,
+                    "public" => return Visibility::Public,
+                    _ => {}
+                }
+            }
+            prev = sibling.prev_sibling();
+        }
+        // Ruby default is public
+        Visibility::Public
     }
 
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {

@@ -528,6 +528,9 @@ language that silently returns empty is misleading users who expect analysis and
 - [x] `refine_kind()` audit: Go, C#, C++, Swift, Kotlin now implement `refine_kind()` to
       distinguish struct/enum/interface from generic class. TypeScript tags.scm now captures
       `enum_declaration` and `type_alias_declaration`. — DONE 2026-03-11
+- [x] `get_visibility()` audit: TypeScript, TSX, JavaScript, Ruby now implement
+      `get_visibility()`. TS/JS detect `accessibility_modifier` and `#` private fields.
+      Ruby walks backward through siblings to find `private`/`protected`/`public` calls. — DONE 2026-03-11
 - [x] Groovy: tags.scm references `class_definition`/`function_definition` — verified CORRECT;
       grammar does use these node kinds with `function` field for function name. Extraction works.
       Live fixture tests added in query_fixtures.rs. — DONE 2026-03-09
