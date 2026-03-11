@@ -154,6 +154,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "python/no-star-import",
         content: include_str!("python_no_star_import.scm"),
     },
+    BuiltinRule {
+        id: "python/use-with",
+        content: include_str!("python_use_with.scm"),
+    },
     // Go rules
     BuiltinRule {
         id: "go/fmt-print",
