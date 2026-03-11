@@ -212,6 +212,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "ruby/open-struct",
         content: include_str!("ruby_open_struct.scm"),
     },
+    BuiltinRule {
+        id: "ruby/method-missing",
+        content: include_str!("ruby_method_missing.scm"),
+    },
     // Cross-language rules
     BuiltinRule {
         id: "no-todo-comment",
