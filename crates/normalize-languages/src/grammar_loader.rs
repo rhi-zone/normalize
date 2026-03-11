@@ -582,6 +582,9 @@ fn bundled_tags_query(name: &str) -> Option<&'static str> {
         "json" => Some(include_str!("queries/json.tags.scm")),
         "toml" => Some(include_str!("queries/toml.tags.scm")),
         "yaml" => Some(include_str!("queries/yaml.tags.scm")),
+        "css" => Some(include_str!("queries/css.tags.scm")),
+        "html" => Some(include_str!("queries/html.tags.scm")),
+        "xml" => Some(include_str!("queries/xml.tags.scm")),
         _ => None,
     }
 }

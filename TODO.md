@@ -528,7 +528,10 @@ language that silently returns empty is misleading users who expect analysis and
       (top-level keys as variables, object-valued keys as container modules with nesting) — no longer
       triggers the warning. YAML and TOML now also fully support symbol extraction (sections/keys
       as symbols with nesting via `refine_kind` → Module promotion and `container_body`). HTML, CSS,
-      XML still show the warning.
+      XML now also fully support symbol extraction — DONE 2026-03-11. CSS: rule_set selectors as
+      Class, media/supports/keyframes as Module containers, declarations as Variable. HTML/XML:
+      elements with children as Module, leaf elements as Variable, with id/class attributes in
+      signatures.
 - [x] Prioritize: Top 8 (Rust, Python, Go, Java, C, C++, Ruby, JS/TS) fully audited. Mid-tier
       (Dart, PHP, Kotlin, Swift, C#, Scala) now complete: Dart docstring, Scala visibility,
       PHP attributes added 2026-03-11. Remaining gaps in lower-priority languages (Haskell
@@ -670,7 +673,7 @@ The monolithic `Language` trait couples two growth axes: adding a language requi
 Trigger: split a capability when >50% of languages would return stubs. `has_symbols()` is the existing smell.
 
 - [x] `LanguageEmbedded` — extract `embedded_content()`, already past sparsity threshold (only Vue, HTML, ~3 others) — DONE (2026-03-11)
-- [x] Add `as_symbols()` query method to `Language` with `None` default; `LanguageSymbols` marker trait; 91 programming languages implement it; 6 config languages (CSS/HTML/JSON/TOML/XML/YAML) don't — DONE (2026-03-11)
+- [x] Add `as_symbols()` query method to `Language` with `None` default; `LanguageSymbols` marker trait; 91 programming languages implement it; all 6 data/markup languages (CSS/HTML/JSON/TOML/XML/YAML) now also implement it — DONE (2026-03-11)
 - [x] Migrate call sites (`ceremony.rs`, `docs.rs`, `search.rs`) to use `as_symbols().is_some()` — DONE (2026-03-11)
 - [x] Remove `has_symbols()` — DONE (2026-03-11)
 - [ ] Add `as_imports()`, `as_complexity()`, `as_edit()` capability queries — not ready yet. Sparsity check (2026-03-11, verified): `extract_imports` stub rate is ~1.4% (1 language: asm, with explicit comment). 72% have real impls; 7% use `.imports.scm` query files; 21% are config/data languages with no import concept (correct behavior). Far below 50% threshold — `as_imports()` trait is NOT warranted. Revisit after adding more languages.
