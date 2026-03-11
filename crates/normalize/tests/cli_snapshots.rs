@@ -150,28 +150,18 @@ fn test_help_structure_rebuild() {
 }
 
 #[test]
-fn test_help_facts_stats() {
+fn test_help_structure_stats() {
     insta::assert_snapshot!(snapshot_help(&["structure", "stats"]));
 }
 
 #[test]
-fn test_help_facts_files() {
+fn test_help_structure_files() {
     insta::assert_snapshot!(snapshot_help(&["structure", "files"]));
 }
 
 #[test]
-fn test_help_facts_packages() {
+fn test_help_structure_packages() {
     insta::assert_snapshot!(snapshot_help(&["structure", "packages"]));
-}
-
-#[test]
-fn test_help_facts_rules() {
-    insta::assert_snapshot!(snapshot_help(&["structure", "rules"]));
-}
-
-#[test]
-fn test_help_facts_check() {
-    insta::assert_snapshot!(snapshot_help(&["structure", "check"]));
 }
 
 // daemon subcommands
