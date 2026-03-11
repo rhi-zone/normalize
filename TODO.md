@@ -990,8 +990,8 @@ Three commands added for rule development:
 ## Syntax Ruleset Breadth
 
 After batch-fixing the current info violations, audit and expand rule coverage:
-- **What we have**: 57 builtin rules (53 syntax). Good Rust/Go/Python/JS/Ruby/TS coverage.
-- **Next**: Cross-language magic numbers, commented-out code blocks.
+- **What we have**: 65 builtin rules (63 syntax). Good Rust/Go/Python/JS/Ruby/TS coverage.
+- ~~Cross-language magic numbers, commented-out code blocks~~ — DONE. 5 per-language `magic-number` rules (comparison context, ≥2 digits) + 2 `commented-out-code` rules (cross-language + Rust). All INFO/disabled by default.
 - **Trigger for fix infrastructure**: once enough rules have structural auto-fixes that need correct indentation, build the corpus-based indentation model (see `docs/prior-art.md` § "Corpus-based indentation model"). Don't build it speculatively.
 - **tree-sitter-go note**: `block` → `statement_list` → statements. Queries must use `statement_list` as intermediate node; `(block (return_statement))` won't match.
 - **Rule ideas by language**:
@@ -1000,7 +1000,8 @@ After batch-fixing the current info violations, audit and expand rule coverage:
   - Python: mutable default args ✓, bare `except` ✓, `assert` in non-test ✓, `use-enumerate` ✓, `raise-without-from` ✓, `no-star-import` ✓, `use-with` ✓
   - Go: error ignored ✓, `fmt.Println` ✓, `empty-return` ✓, `defer-in-loop` ✓, `context-todo` ✓, `sync-mutex-copied` ✓
   - Ruby: `rescue Exception` ✓, `puts` in non-script ✓, `string-concat` ✓, `double-negation` ✓, `open-struct` ✓, `method-missing` ✓
-  - Cross-language: hardcoded credentials ✓, magic numbers, commented-out code blocks
+  - Cross-language: hardcoded credentials ✓, magic numbers ✓, commented-out code blocks ✓
+- **Known limitation**: `no-todo-comment` and `no-fixme-comment` use `(line_comment)` which only works for Rust; most languages use `(comment)`. Need per-language variants or a cross-language `(comment)` version.
 
 ## Fix System: Structural Rewrites (post text-replacement)
 - **Sexpr-based fix expressions**: The current `fix = "template $capture"` is text replacement. For structural transforms (indentation-aware, composable), consider expressing fixes as output tree patterns rather than strings. eglint (~/git/eglint) does this for TypeScript — useful prior art for the approach even though it's TS-compiler-specific and doesn't port directly.

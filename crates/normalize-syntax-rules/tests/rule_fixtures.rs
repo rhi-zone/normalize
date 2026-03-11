@@ -112,15 +112,16 @@ fn test_rule_fixtures() {
         let mut rules = load_all_rules(fixture_dir, &Default::default());
 
         // Enable the rule under test, disable everything else.
-        let found = rules.iter_mut().any(|r| {
+        // Must iterate ALL rules (not use `any()` which short-circuits).
+        let mut found = false;
+        for r in rules.iter_mut() {
             if r.id == rule_id {
                 r.enabled = true;
-                true
+                found = true;
             } else {
                 r.enabled = false;
-                false
             }
-        });
+        }
         if !found {
             failures.push(format!(
                 "MISSING RULE: `{rule_id}` — no builtin rule found for this fixture directory"

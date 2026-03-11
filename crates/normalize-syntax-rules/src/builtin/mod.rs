@@ -53,6 +53,14 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         content: include_str!("rust_static_mut.scm"),
     },
     BuiltinRule {
+        id: "rust/magic-number",
+        content: include_str!("rust_magic_number.scm"),
+    },
+    BuiltinRule {
+        id: "rust/commented-out-code",
+        content: include_str!("rust_commented_out_code.scm"),
+    },
+    BuiltinRule {
         id: "hardcoded-secret",
         content: include_str!("hardcoded_secret.scm"),
     },
@@ -92,6 +100,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
     BuiltinRule {
         id: "js/prefer-optional-chain",
         content: include_str!("js_prefer_optional_chain.scm"),
+    },
+    BuiltinRule {
+        id: "js/magic-number",
+        content: include_str!("js_magic_number.scm"),
     },
     BuiltinRule {
         id: "typescript/tuple-return",
@@ -158,6 +170,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "python/use-with",
         content: include_str!("python_use_with.scm"),
     },
+    BuiltinRule {
+        id: "python/magic-number",
+        content: include_str!("python_magic_number.scm"),
+    },
     // Go rules
     BuiltinRule {
         id: "go/fmt-print",
@@ -190,6 +206,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
     BuiltinRule {
         id: "go/sync-mutex-copied",
         content: include_str!("go_sync_mutex_copied.scm"),
+    },
+    BuiltinRule {
+        id: "go/magic-number",
+        content: include_str!("go_magic_number.scm"),
     },
     // Ruby rules
     BuiltinRule {
@@ -224,6 +244,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "ruby/method-missing",
         content: include_str!("ruby_method_missing.scm"),
     },
+    BuiltinRule {
+        id: "ruby/magic-number",
+        content: include_str!("ruby_magic_number.scm"),
+    },
     // Cross-language rules
     BuiltinRule {
         id: "no-todo-comment",
@@ -232,5 +256,9 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
     BuiltinRule {
         id: "no-fixme-comment",
         content: include_str!("no_fixme_comment.scm"),
+    },
+    BuiltinRule {
+        id: "commented-out-code",
+        content: include_str!("commented_out_code.scm"),
     },
 ];
