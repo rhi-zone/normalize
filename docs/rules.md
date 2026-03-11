@@ -11,17 +11,17 @@ Normalize has two types of analysis rules that catch issues across your codebase
 
 ```bash
 # Run all rules (syntax + fact)
-normalize syntax rules run
+normalize rules run
 
 # List available rules
-normalize syntax rules list
+normalize rules list
 
 # Add a rule from a URL
-normalize syntax rules add https://example.com/rules/no-console-log.scm
+normalize rules add https://example.com/rules/no-console-log.scm
 
 # Run only one type
-normalize syntax rules run --type syntax
-normalize syntax rules run --type fact
+normalize rules run --engine syntax
+normalize rules run --engine fact
 ```
 
 ## Syntax Rules

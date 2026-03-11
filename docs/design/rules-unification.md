@@ -25,12 +25,12 @@ Three separate diagnostic/finding types exist across the codebase, plus ad-hoc s
 
 ### Rule engines
 
-Two rule engines exist with separate CLI surfaces:
+Two rule engines exist (now unified under `normalize rules`):
 
-- `normalize syntax rules run` — runs tree-sitter pattern rules, outputs `Finding`
-- `normalize facts rules` / `normalize facts check` — runs compiled/interpreted Datalog rules, outputs `facts-rules-api::Diagnostic`
+- Tree-sitter pattern rules → outputs `Finding`
+- Compiled/interpreted Datalog rules → outputs `facts-rules-api::Diagnostic`
 
-Both are already managed together under `normalize syntax rules` (which has `--type syntax|fact|all`), but the name `syntax rules` is misleading since it also runs fact rules.
+Both managed together under `normalize rules run` (with `--engine syntax|fact|all`).
 
 ## Design: Unified Diagnostic
 
@@ -80,7 +80,7 @@ file:line:col: severity [rule_id] message
   suggestion: ...
 ```
 
-This is the standard format already used by `normalize syntax rules run` and most linters.
+This is the standard format already used by `normalize rules run` and most linters.
 
 ### Where it lives
 
@@ -88,21 +88,7 @@ This is the standard format already used by `normalize syntax rules run` and mos
 
 ## Design: Top-Level `rules` Command
 
-### Current state
-
-```
-normalize syntax rules run [--type syntax|fact|all] [--fix] [--sarif]
-normalize syntax rules list [--type] [--tag] [--enabled]
-normalize syntax rules enable/disable/show/tags/add/update/remove
-normalize facts rules    # runs compiled dylib packs only
-normalize facts check    # runs interpreted .dl files only
-```
-
-`syntax rules` already manages both engines. `facts rules` and `facts check` are redundant narrower entry points.
-
-### Proposed
-
-Lift `rules` to top level. Drop `syntax` prefix since it's not syntax-only.
+### Current state (implemented)
 
 ```
 normalize rules run [--engine syntax|fact|all] [--fix] [--sarif]
@@ -110,9 +96,10 @@ normalize rules list [--engine] [--tag] [--enabled]
 normalize rules enable/disable/show/tags/add/update/remove
 ```
 
-- Rename `--type` to `--engine` for clarity (syntax-rules vs fact-rules vs external-tools)
-- Delete `normalize facts rules` and `normalize facts check` (subsumed)
-- `normalize syntax` keeps `ast` and `query` (those are inspection, not rules)
+- `rules` is top-level (lifted from `syntax rules`)
+- `--engine` replaces `--type` for clarity
+- `normalize facts rules` and `normalize facts check` deleted (subsumed)
+- `normalize syntax` keeps `ast` and `query` (inspection, not rules)
 
 ### Long-term: hardcoded checks → rules
 

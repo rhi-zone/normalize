@@ -2,7 +2,7 @@
 
 ## Command Structure
 
-Normalize has 18 top-level commands organized by domain:
+Normalize has 22 top-level commands organized by domain:
 
 ### Core Operations
 | Command | Description |
@@ -10,13 +10,14 @@ Normalize has 18 top-level commands organized by domain:
 | `view` | View directory/file/symbol structure |
 | `grep` | Fast ripgrep-based text search |
 | `edit` | Structural code modifications (delete, replace, swap, insert, undo, redo, history) |
-| `analyze` | Codebase analysis (40 subcommands) |
-| `syntax` | AST inspection and syntax rules (ast, query, rules) |
+| `analyze` | Codebase analysis (~42 subcommands) |
+| `syntax` | Tree-sitter AST inspection and query tools |
+| `rules` | Manage and run analysis rules (syntax + fact) |
 
 ### Infrastructure
 | Command | Description |
 |---------|-------------|
-| `facts` | Extract and query code facts (symbols, imports, calls) |
+| `structure` | Manage structural index (symbols, imports, calls) |
 | `daemon` | Background process management |
 | `grammars` | Tree-sitter grammar management |
 | `init` | Initialize normalize in a directory |
@@ -77,8 +78,8 @@ Configuration in `.normalize/config.toml` or `~/.config/normalize/config.toml`:
 [daemon]
 enabled = true
 
-[facts]
-# See docs/cli/facts.md for rule overrides
+[structure]
+# See docs/cli/structure.md
 
 [aliases]
 tests = ["*_test.go", "**/__tests__/**"]

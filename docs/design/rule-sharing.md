@@ -24,17 +24,17 @@ No mechanism for importing from external sources.
 
 ### Phase 1: URL-based import
 
-Add `normalize syntax rules add <url>` command:
+Add `normalize rules add <url>` command:
 
 ```bash
 # Add a single rule from URL
-normalize syntax rules add https://raw.githubusercontent.com/user/rules/main/no-dbg.scm
+normalize rules add https://raw.githubusercontent.com/user/rules/main/no-dbg.scm
 
 # Add to global rules (default is project)
-normalize syntax rules add --global https://...
+normalize rules add --global https://...
 
 # List imported rules with sources
-normalize syntax rules list --sources
+normalize rules list --sources
 ```
 
 **Behavior:**
@@ -53,10 +53,10 @@ added = "2025-01-08"
 **Update command:**
 ```bash
 # Update all imported rules
-normalize syntax rules update
+normalize rules update
 
 # Update specific rule
-normalize syntax rules update no-dbg
+normalize rules update no-dbg
 ```
 
 ### Phase 2: Rule packages (future)
@@ -65,7 +65,7 @@ Reference a git repo with multiple rules:
 
 ```bash
 # Add all rules from a repo
-normalize syntax rules add-repo https://github.com/user/rust-rules.git
+normalize rules add-repo https://github.com/user/rust-rules.git
 
 # Saves to .normalize/rules/vendor/rust-rules/
 ```
@@ -84,17 +84,17 @@ extends = [
 If there's enough demand, a central registry like crates.io:
 
 ```bash
-normalize syntax rules add rust-best-practices@1.0
+normalize rules add rust-best-practices@1.0
 ```
 
 ## Implementation
 
 ### Phase 1 scope
 
-1. Add `normalize syntax rules add <url>` command
+1. Add `normalize rules add <url>` command
 2. Add `.normalize/rules.lock` tracking
-3. Add `normalize syntax rules update` command
-4. Add `normalize syntax rules list --sources`
+3. Add `normalize rules update` command
+4. Add `normalize rules list --sources`
 
 ### File structure
 
@@ -139,6 +139,6 @@ Deferred: Requires infrastructure, not enough demand yet.
 
 ## Decisions
 
-1. **Explicit updates** - `normalize syntax rules update` required, no auto-update
+1. **Explicit updates** - `normalize rules update` required, no auto-update
 2. **Private URLs** - Deferred. Auth token storage is tricky (env vars? keychain?)
 3. **Breaking changes** - Open. Options: show diff before applying, pin by hash, etc.

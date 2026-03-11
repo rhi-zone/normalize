@@ -159,7 +159,7 @@ normalize context src/               # Context for specific path
 normalize context --list             # Show file paths only
 ```
 
-### syntax rules - Analysis Rules
+### rules - Analysis Rules
 
 Manage and run syntax + fact rules:
 

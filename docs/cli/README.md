@@ -20,8 +20,8 @@ Normalize provides a unified CLI for code intelligence. Three core primitives: *
 | Command | Purpose |
 |---------|---------|
 | [structure](structure.md) | Manage structural index (symbols, imports, calls) |
-| syntax | AST inspection and syntax rules (ast, query, rules) |
-| [rules](rules.md) | Manage and run analysis rules (`syntax rules`) |
+| syntax | Tree-sitter AST inspection and query tools |
+| [rules](rules.md) | Manage and run analysis rules (syntax + fact) |
 | [init](init.md) | Initialize normalize in a project |
 | [daemon](daemon.md) | Background daemon for faster operations |
 
