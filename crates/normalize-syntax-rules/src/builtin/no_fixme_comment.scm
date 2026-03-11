@@ -22,6 +22,9 @@
 # process for clearing them before shipping, you can disable this rule.
 
 ; Matches comments containing FIXME
-; Uses `comment` node type (works for Python, JS, Go, Ruby, Java, etc.).
-; Rust/C/C++ use `line_comment` and are NOT matched — use a custom rule for those.
+; Three patterns to cover all tree-sitter comment node types:
+; `comment` (Python, JS, Go, Ruby, Java), `line_comment` (Rust, C, C++),
+; `block_comment` (Rust `/* ... */`, C/C++ block comments).
 ((comment) @match (#match? @match "FIXME"))
+((line_comment) @match (#match? @match "FIXME"))
+((block_comment) @match (#match? @match "FIXME"))

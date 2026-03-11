@@ -24,6 +24,9 @@
 
 ; Matches comments where TODO appears as a marker (followed by : or space),
 ; not as part of a filename like `TODO.md` or an identifier like `TODO_FILE`.
-; Uses `comment` node type (works for Python, JS, Go, Ruby, Java, etc.).
-; Rust/C/C++ use `line_comment` and are NOT matched — use a custom rule for those.
+; Three patterns to cover all tree-sitter comment node types:
+; `comment` (Python, JS, Go, Ruby, Java), `line_comment` (Rust, C, C++),
+; `block_comment` (Rust `/* ... */`, C/C++ block comments).
 ((comment) @match (#match? @match "TODO[: ]"))
+((line_comment) @match (#match? @match "TODO[: ]"))
+((block_comment) @match (#match? @match "TODO[: ]"))

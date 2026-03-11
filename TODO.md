@@ -1010,7 +1010,11 @@ After batch-fixing the current info violations, audit and expand rule coverage:
   - Go: error ignored ✓, `fmt.Println` ✓, `empty-return` ✓, `defer-in-loop` ✓, `context-todo` ✓, `sync-mutex-copied` ✓
   - Ruby: `rescue Exception` ✓, `puts` in non-script ✓, `string-concat` ✓, `double-negation` ✓, `open-struct` ✓, `method-missing` ✓
   - Cross-language: hardcoded credentials ✓, magic numbers ✓, commented-out code blocks ✓
-- ~~`no-todo-comment`/`no-fixme-comment` only worked for Rust~~ — FIXED. Switched from `(line_comment)` to `(comment)` node type. Now works for Python, JS, Go, Ruby, Java, etc. Rust/C/C++ (which use `line_comment`) are no longer matched — acceptable since Rust has `cargo clippy` TODO rules.
+- ~~`no-todo-comment`/`no-fixme-comment` only worked for Rust~~ — FIXED. Now uses three patterns
+  (`comment` + `line_comment` + `block_comment`) to cover all tree-sitter grammars. The syntax rules
+  runner was enhanced to handle multi-pattern cross-language rules: when a combined query fails
+  (e.g. `comment` doesn't exist in Rust), it splits patterns and keeps only valid ones per grammar.
+  Works for Python, JS, Go, Ruby, Java AND Rust, C, C++.
 
 ## Fix System: Structural Rewrites (post text-replacement)
 - **Sexpr-based fix expressions**: The current `fix = "template $capture"` is text replacement. For structural transforms (indentation-aware, composable), consider expressing fixes as output tree patterns rather than strings. eglint (~/git/eglint) does this for TypeScript — useful prior art for the approach even though it's TS-compiler-specific and doesn't port directly.

@@ -203,21 +203,41 @@ pub fn run_rules(
             continue;
         };
 
-        let mut compiled_rules: Vec<(&Rule, tree_sitter::Query)> = Vec::new();
+        // (rule, compiled_query, effective_query_str)
+        // effective_query_str may differ from rule.query_str when patterns were filtered
+        let mut compiled_rules: Vec<(&Rule, tree_sitter::Query, String)> = Vec::new();
 
         // Pass 1: Language-specific rules - compile directly (trust the author)
         for rule in &specific_rules {
             if rule.languages.iter().any(|l| l == grammar_name)
                 && let Ok(q) = tree_sitter::Query::new(&grammar, &rule.query_str)
             {
-                compiled_rules.push((rule, q));
+                compiled_rules.push((rule, q, rule.query_str.clone()));
             }
         }
 
-        // Pass 2: Cross-language rules - validate each one
+        // Pass 2: Cross-language rules - validate each one.
+        // For multi-pattern rules, try each pattern individually so that rules
+        // using alternation across node types (e.g. `comment` + `line_comment`)
+        // work even when some patterns reference node types not in this grammar.
         for rule in &global_rules {
             if let Ok(q) = tree_sitter::Query::new(&grammar, &rule.query_str) {
-                compiled_rules.push((rule, q));
+                compiled_rules.push((rule, q, rule.query_str.clone()));
+            } else {
+                // Full query failed — try each pattern separately
+                let patterns: Vec<&str> = split_query_patterns(&rule.query_str);
+                if patterns.len() > 1 {
+                    let valid: Vec<&str> = patterns
+                        .into_iter()
+                        .filter(|p| tree_sitter::Query::new(&grammar, p).is_ok())
+                        .collect();
+                    if !valid.is_empty() {
+                        let combined = valid.join("\n");
+                        if let Ok(q) = tree_sitter::Query::new(&grammar, &combined) {
+                            compiled_rules.push((rule, q, combined));
+                        }
+                    }
+                }
             }
         }
 
@@ -225,10 +245,10 @@ pub fn run_rules(
             continue;
         }
 
-        // Combine all into one query
+        // Combine all into one query using effective (possibly filtered) query strings
         let combined_str = compiled_rules
             .iter()
-            .map(|(r, _)| r.query_str.as_str())
+            .map(|(_, _, qs)| qs.as_str())
             .collect::<Vec<_>>()
             .join("\n\n");
 
@@ -248,7 +268,7 @@ pub fn run_rules(
             .position(|n| *n == "match")
             .unwrap_or(0);
 
-        for (rule, individual_query) in &compiled_rules {
+        for (rule, individual_query, _) in &compiled_rules {
             for _ in 0..individual_query.pattern_count() {
                 pattern_to_rule.push((*rule, combined_match_idx));
             }
@@ -618,6 +638,61 @@ fn collect_source_files(root: &Path) -> Vec<PathBuf> {
     files
 }
 
+/// Split a tree-sitter query string into individual top-level patterns.
+/// Each pattern starts with `(` at the beginning of a line (possibly after
+/// whitespace/comments) and ends when the matching `)` is found.
+fn split_query_patterns(query_str: &str) -> Vec<&str> {
+    let mut patterns = Vec::new();
+    let mut depth = 0i32;
+    let mut pattern_start: Option<usize> = None;
+    let bytes = query_str.as_bytes();
+    let mut i = 0;
+
+    while i < bytes.len() {
+        let b = bytes[i];
+        match b {
+            b';' => {
+                // Skip to end of line (comment)
+                while i < bytes.len() && bytes[i] != b'\n' {
+                    i += 1;
+                }
+            }
+            b'(' => {
+                if pattern_start.is_none() {
+                    pattern_start = Some(i);
+                }
+                depth += 1;
+                i += 1;
+            }
+            b')' => {
+                depth -= 1;
+                i += 1;
+                if depth == 0
+                    && let Some(start) = pattern_start
+                {
+                    patterns.push(&query_str[start..i]);
+                    pattern_start = None;
+                }
+            }
+            b'"' => {
+                // Skip string literal
+                i += 1;
+                while i < bytes.len() && bytes[i] != b'"' {
+                    if bytes[i] == b'\\' {
+                        i += 1; // skip escaped char
+                    }
+                    i += 1;
+                }
+                i += 1; // skip closing quote
+            }
+            _ => {
+                i += 1;
+            }
+        }
+    }
+    patterns
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -771,6 +846,43 @@ fn main() {
             "should match pattern 0 (unwrap)"
         );
         assert!(pattern_indices.contains(&1), "should match pattern 1 (dbg)");
+    }
+
+    #[test]
+    fn test_split_query_patterns() {
+        let query = r#"
+; Pattern 1: comment
+((comment) @match (#match? @match "TODO"))
+; Pattern 2: line_comment
+((line_comment) @match (#match? @match "TODO"))
+"#;
+        let patterns = split_query_patterns(query);
+        assert_eq!(patterns.len(), 2);
+        assert!(patterns[0].contains("comment"));
+        assert!(patterns[1].contains("line_comment"));
+    }
+
+    #[test]
+    fn test_cross_grammar_pattern_fallback() {
+        // Rust grammar doesn't have `comment` node type but has `line_comment`.
+        // A multi-pattern query with both should compile with only valid patterns.
+        let loader = loader();
+        let grammar = loader.get("rust").expect("rust grammar");
+
+        let query_str = r#"((comment) @match (#match? @match "TODO"))
+((line_comment) @match (#match? @match "TODO"))"#;
+
+        // Full query should fail (Rust has no `comment` node type)
+        assert!(tree_sitter::Query::new(&grammar, query_str).is_err());
+
+        // But splitting and filtering should succeed
+        let patterns = split_query_patterns(query_str);
+        let valid: Vec<&str> = patterns
+            .into_iter()
+            .filter(|p| tree_sitter::Query::new(&grammar, p).is_ok())
+            .collect();
+        assert_eq!(valid.len(), 1, "only line_comment should compile for Rust");
+        assert!(valid[0].contains("line_comment"));
     }
 }
 
