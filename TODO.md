@@ -32,7 +32,16 @@ extract, inline, move — correct, without LSPs, without false positives.
 - [x] Persistent `SkeletonExtractor` in LSP backend (avoids recreating per request)
 - [x] Compiled query caching in `GrammarLoader` (tags, imports, calls, complexity)
 - [x] Configurable debounce interval (`[serve] fact_debounce_ms`, default 1500)
-- Incremental Datalog for fact rules (research: semi-naive evaluation with change tracking)
+- Incremental Datalog for fact rules — **blocked on ascent-interpreter upstream** (ask user for status periodically)
+  Agreed roadmap (with ascent-interpreter maintainer):
+  1. String interning (makes most values u32)
+  2. Flat tuple storage (relations store typed arrays, arity-specialized `[u32; N]`)
+  3. **Incremental evaluation** — file-scoped retraction, strata invalidation, persisted engine.
+     This is the highest-value step for LSP: process 50 changed facts instead of re-evaluating 500k.
+     After interning, diffing facts is just comparing `[u32; N]` arrays → cheap file-scoped retraction.
+  4. Bytecode for expressions (measure after step 2 — joins may dominate, not expression eval)
+  5. Arity-specialized eval routines (generic over `[u32; N]`, stamped out via macro)
+  6. Cranelift JIT (feature-gated; defer decision until after step 4)
 - File-level dependency tracking (import graph edges to scope fact re-evaluation)
 - `normalize watch` CLI (expose daemon file-watching with TUI output)
 - Progress reporting during long runs
