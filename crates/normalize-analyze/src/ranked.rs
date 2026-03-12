@@ -1,4 +1,11 @@
 //! Ranked list helpers: scoring, stats, and the shared rank pipeline.
+//!
+//! ## Table formatting
+//!
+//! The [`RankEntry`] trait + [`format_ranked_table`] function provide shared
+//! tabular rendering for all rank-pattern commands. Implement `RankEntry` on
+//! your entry struct, then call `format_ranked_table()` in your
+//! `OutputFormatter::format_text()`.
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -7,6 +14,133 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::Entity;
+
+// ── Column / alignment types ───────────────────────────────────────────
+
+/// Column alignment in a ranked table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Align {
+    Left,
+    Right,
+}
+
+/// Column definition for ranked table rendering.
+#[derive(Debug, Clone)]
+pub struct Column {
+    pub name: &'static str,
+    pub align: Align,
+}
+
+impl Column {
+    pub const fn left(name: &'static str) -> Self {
+        Self {
+            name,
+            align: Align::Left,
+        }
+    }
+
+    pub const fn right(name: &'static str) -> Self {
+        Self {
+            name,
+            align: Align::Right,
+        }
+    }
+}
+
+// ── RankEntry trait ────────────────────────────────────────────────────
+
+/// Trait for entries that can be rendered in a ranked table.
+///
+/// Implement this on your entry struct to use [`format_ranked_table`].
+pub trait RankEntry {
+    /// Column definitions for the table header.
+    fn columns() -> Vec<Column>;
+
+    /// Format this entry's values as strings, one per column, in column order.
+    fn values(&self) -> Vec<String>;
+}
+
+// ── Table formatter ────────────────────────────────────────────────────
+
+/// Render a ranked list as a text table.
+///
+/// Produces: title line, blank line, column headers, separator, rows.
+/// If `entries` is empty, shows `empty_message` (or a default).
+pub fn format_ranked_table<E: RankEntry>(
+    title: &str,
+    entries: &[E],
+    empty_message: Option<&str>,
+) -> String {
+    let mut out = Vec::new();
+
+    out.push(title.to_string());
+    out.push(String::new());
+
+    if entries.is_empty() {
+        out.push(empty_message.unwrap_or("No entries.").to_string());
+        return out.join("\n");
+    }
+
+    let cols = E::columns();
+
+    // Pre-compute all values so we can measure widths
+    let all_values: Vec<Vec<String>> = entries.iter().map(|e| e.values()).collect();
+
+    // Compute column widths: max(header, all data)
+    let widths: Vec<usize> = cols
+        .iter()
+        .enumerate()
+        .map(|(i, col)| {
+            let header_w = col.name.len();
+            let data_w = all_values
+                .iter()
+                .map(|row| row.get(i).map_or(0, |v| v.len()))
+                .max()
+                .unwrap_or(0);
+            header_w.max(data_w)
+        })
+        .collect();
+
+    // Header row
+    let header: String = cols
+        .iter()
+        .zip(&widths)
+        .map(|(col, &w)| match col.align {
+            Align::Left => format!("{:<width$}", col.name, width = w),
+            Align::Right => format!("{:>width$}", col.name, width = w),
+        })
+        .collect::<Vec<_>>()
+        .join("  ");
+    out.push(header);
+
+    // Separator
+    let sep: String = widths
+        .iter()
+        .map(|&w| "-".repeat(w))
+        .collect::<Vec<_>>()
+        .join("--");
+    out.push(sep);
+
+    // Data rows
+    for row_vals in &all_values {
+        let row: String = cols
+            .iter()
+            .zip(&widths)
+            .enumerate()
+            .map(|(i, (col, &w))| {
+                let val = row_vals.get(i).map_or("", |v| v.as_str());
+                match col.align {
+                    Align::Left => format!("{:<width$}", val, width = w),
+                    Align::Right => format!("{:>width$}", val, width = w),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("  ");
+        out.push(row);
+    }
+
+    out.join("\n")
+}
 
 /// A scored entity in a ranked list.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -255,5 +389,76 @@ mod tests {
         assert!((stats.avg - 3.0).abs() < f64::EPSILON);
         assert!((stats.max - 5.0).abs() < f64::EPSILON);
         assert!((stats.min - 1.0).abs() < f64::EPSILON);
+    }
+
+    // ── format_ranked_table tests ──────────────────────────────────────
+
+    #[derive(Clone)]
+    struct TestEntry {
+        name: String,
+        score: usize,
+    }
+
+    impl RankEntry for TestEntry {
+        fn columns() -> Vec<Column> {
+            vec![Column::left("Name"), Column::right("Score")]
+        }
+
+        fn values(&self) -> Vec<String> {
+            vec![self.name.clone(), self.score.to_string()]
+        }
+    }
+
+    #[test]
+    fn test_format_ranked_table_basic() {
+        let entries = vec![
+            TestEntry {
+                name: "alpha".into(),
+                score: 100,
+            },
+            TestEntry {
+                name: "beta".into(),
+                score: 42,
+            },
+        ];
+        let text = format_ranked_table("# Test Report", &entries, None);
+        assert!(text.contains("# Test Report"));
+        assert!(text.contains("Name"));
+        assert!(text.contains("Score"));
+        assert!(text.contains("alpha"));
+        assert!(text.contains("100"));
+        assert!(text.contains("beta"));
+        assert!(text.contains("42"));
+    }
+
+    #[test]
+    fn test_format_ranked_table_empty() {
+        let entries: Vec<TestEntry> = vec![];
+        let text = format_ranked_table("# Empty", &entries, Some("Nothing here."));
+        assert!(text.contains("Nothing here."));
+        assert!(!text.contains("Name")); // no header for empty
+    }
+
+    #[test]
+    fn test_format_ranked_table_alignment() {
+        let entries = vec![
+            TestEntry {
+                name: "a".into(),
+                score: 1,
+            },
+            TestEntry {
+                name: "long name".into(),
+                score: 9999,
+            },
+        ];
+        let text = format_ranked_table("# Align", &entries, None);
+        let lines: Vec<&str> = text.lines().collect();
+        // Header line should have right-aligned Score header
+        let header = lines[2]; // title, blank, header
+        assert!(header.contains("Name"));
+        assert!(header.contains("Score"));
+        // Data: "a" should be left-padded to match "long name" width
+        let row_a = lines[4]; // title, blank, header, sep, row
+        assert!(row_a.starts_with("a"));
     }
 }

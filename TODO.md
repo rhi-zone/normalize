@@ -47,11 +47,16 @@ tool, another command). Don't extract for line count alone.
 
 ### Analyze Command Consolidation — remaining work
 
-**Current: 42 commands** (was 44; `analyze parse` and `analyze query` deleted 2026-03-12 — duplicates of `syntax ast`/`syntax query`). All Phase 2/3 merges that were feasible have been completed. Remaining work is lower-leverage (future rules migration, rank infrastructure). See design doc for current command count table.
+**Current: 42 commands** (was 44; `analyze parse` and `analyze query` deleted 2026-03-12 — duplicates of `syntax ast`/`syntax query`). All Phase 2/3 merges that were feasible have been completed.
+
+**Phase 3 rank infrastructure (in progress, 2026-03-12):**
+- `RankEntry` trait + `Column`/`Align` + `format_ranked_table()` in `normalize-analyze::ranked` — shared tabular rendering for all rank-pattern commands
+- Migrated 8 commands: files, imports, ownership, docs, ceremony, surface, depth-map, layering
+- **Next:** migrate remaining rank commands (complexity, length, density, uniqueness, test-ratio, test-gaps, budget, hotspots), then generic `--diff`/`--trend` infrastructure
 
 **Future (low priority):** `security` → SARIF rules engine (wraps bandit; could be `normalize rules run --engine sarif` with bandit configured). `docs`/`security` → rules migration (~-3 commands, see design doc).
 
-**Design pressure:** ~41 commands is still too spread out. Phase 3 must continue. The goal is a surface small enough that a user can hold it in working memory — not just "fewer than 49".
+**Design pressure:** ~42 commands is still too spread out. Phase 3 must continue. The goal is a surface small enough that a user can hold it in working memory — not just "fewer than 49".
 
 ### Language trait: remaining .scm migration
 

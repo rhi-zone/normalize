@@ -2,6 +2,7 @@
 
 use crate::filter::Filter;
 use crate::output::OutputFormatter;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 use normalize_languages::is_test_path;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -31,6 +32,26 @@ impl FileDocCoverage {
     }
 }
 
+impl RankEntry for FileDocCoverage {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("%"),
+            Column::right("Doc'd"),
+            Column::right("Total"),
+            Column::left("File"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            format!("{:.0}%", self.coverage_percent()),
+            self.documented.to_string(),
+            self.total.to_string(),
+            self.file_path.clone(),
+        ]
+    }
+}
+
 /// Documentation coverage report
 #[derive(Serialize, schemars::JsonSchema)]
 pub struct DocCoverageReport {
@@ -43,21 +64,15 @@ pub struct DocCoverageReport {
 
 impl OutputFormatter for DocCoverageReport {
     fn format_text(&self) -> String {
-        let mut lines = Vec::new();
-
-        lines.push("# Documentation Coverage".to_string());
-        lines.push(String::new());
-
-        // Overall stats
-        lines.push(format!(
-            "Overall: {:.0}% ({} of {} documented)",
-            self.coverage_percent, self.documented, self.total_callables
-        ));
-        lines.push(String::new());
+        let mut out = String::new();
 
         // Per-language breakdown
         if !self.by_language.is_empty() {
-            lines.push("## By Language".to_string());
+            out.push_str(&format!(
+                "# Documentation Coverage — {:.0}% ({} of {} documented)\n\n",
+                self.coverage_percent, self.documented, self.total_callables
+            ));
+            out.push_str("## By Language\n");
             let mut langs: Vec<_> = self.by_language.iter().collect();
             langs.sort_by(|a, b| {
                 let pct_a = if a.1.1 > 0 {
@@ -76,30 +91,23 @@ impl OutputFormatter for DocCoverageReport {
             for (lang, (documented, total)) in langs {
                 if *total > 0 {
                     let pct = 100.0 * *documented as f64 / *total as f64;
-                    lines.push(format!(
-                        "  {:>3.0}% ({:>3}/{:>4}) {}",
+                    out.push_str(&format!(
+                        "  {:>3.0}% ({:>3}/{:>4}) {}\n",
                         pct, documented, total, lang
                     ));
                 }
             }
-            lines.push(String::new());
+            out.push('\n');
         }
 
-        // Worst files
-        if !self.worst_files.is_empty() {
-            lines.push("## Worst Coverage".to_string());
-            for fc in &self.worst_files {
-                lines.push(format!(
-                    "  {:>3.0}% ({:>3}/{:>4}) {}",
-                    fc.coverage_percent(),
-                    fc.documented,
-                    fc.total,
-                    fc.file_path
-                ));
-            }
-        }
+        // Worst files via shared table
+        out.push_str(&format_ranked_table(
+            "## Worst Coverage",
+            &self.worst_files,
+            None,
+        ));
 
-        lines.join("\n")
+        out
     }
 }
 

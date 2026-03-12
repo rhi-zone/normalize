@@ -5,12 +5,13 @@
 //! Requires a built facts index (`normalize structure rebuild`).
 
 use crate::output::OutputFormatter;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 
 /// One module and how many distinct files import it.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct ImportEntry {
     /// Module path (e.g. `crate::output`, `serde`, `std::collections`)
     pub module: String,
@@ -18,6 +19,24 @@ pub struct ImportEntry {
     pub fan_in: usize,
     /// Representative names imported from this module (up to 5)
     pub names: Vec<String>,
+}
+
+impl RankEntry for ImportEntry {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::left("Module"),
+            Column::right("Fan-in"),
+            Column::left("Imported names"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            self.module.clone(),
+            self.fan_in.to_string(),
+            self.names.join(", "),
+        ]
+    }
 }
 
 /// Report returned by `analyze imports`.
@@ -35,65 +54,19 @@ pub struct ImportCentralityReport {
 
 impl OutputFormatter for ImportCentralityReport {
     fn format_text(&self) -> String {
-        let mut out = Vec::new();
-
         let scope = if self.internal_only {
             "internal modules"
         } else {
             "all modules"
         };
-        out.push(format!(
-            "# Import Centrality ({}) — {} modules, {} imports",
-            scope, self.total_modules, self.total_imports
-        ));
-        out.push(String::new());
-
-        if self.entries.is_empty() {
-            out.push("No import data found. Run `normalize structure rebuild` first.".to_string());
-            return out.join("\n");
-        }
-
-        let max_module_len = self
-            .entries
-            .iter()
-            .map(|e| e.module.len())
-            .max()
-            .unwrap_or(10)
-            .min(60);
-
-        out.push(format!(
-            "{:<width$}  {:>6}  {}",
-            "Module",
-            "Fan-in",
-            "Imported names",
-            width = max_module_len
-        ));
-        out.push(format!(
-            "{}---------{}",
-            "-".repeat(max_module_len),
-            "-".repeat(40)
-        ));
-
-        for entry in &self.entries {
-            let module = if entry.module.len() > max_module_len {
-                format!(
-                    "...{}",
-                    &entry.module[entry.module.len() - (max_module_len - 3)..]
-                )
-            } else {
-                entry.module.clone()
-            };
-            let names = entry.names.join(", ");
-            out.push(format!(
-                "{:<width$}  {:>6}  {}",
-                module,
-                entry.fan_in,
-                names,
-                width = max_module_len
-            ));
-        }
-
-        out.join("\n")
+        format_ranked_table(
+            &format!(
+                "# Import Centrality ({}) — {} modules, {} imports",
+                scope, self.total_modules, self.total_imports
+            ),
+            &self.entries,
+            Some("No import data found. Run `normalize structure rebuild` first."),
+        )
     }
 }
 

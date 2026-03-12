@@ -3,6 +3,7 @@
 use crate::output::OutputFormatter;
 use crate::path_resolve;
 use glob::Pattern;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -16,6 +17,16 @@ pub struct FileLength {
     pub language: String,
 }
 
+impl RankEntry for FileLength {
+    fn columns() -> Vec<Column> {
+        vec![Column::right("Lines"), Column::left("Path")]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![self.lines.to_string(), self.path.clone()]
+    }
+}
+
 /// File length report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct FileLengthReport {
@@ -26,35 +37,25 @@ pub struct FileLengthReport {
 
 impl OutputFormatter for FileLengthReport {
     fn format_text(&self) -> String {
-        let mut lines = Vec::new();
-
-        lines.push("# Longest Files".to_string());
-        lines.push(String::new());
-
-        lines.push(format!(
-            "Total: {} lines across all files",
-            self.total_lines
-        ));
-        lines.push(String::new());
-
-        if !self.files.is_empty() {
-            lines.push("## Top Files".to_string());
-            for f in &self.files {
-                lines.push(format!("{:>6} lines  {}", f.lines, f.path));
-            }
-            lines.push(String::new());
-        }
+        let mut out = format_ranked_table(
+            &format!(
+                "# Longest Files — {} lines across all files",
+                self.total_lines
+            ),
+            &self.files,
+            None,
+        );
 
         if !self.by_language.is_empty() {
-            lines.push("## By Language".to_string());
+            out.push_str("\n\n## By Language\n");
             let mut langs: Vec<_> = self.by_language.iter().collect();
             langs.sort_by(|a, b| b.1.cmp(a.1));
             for (lang, count) in langs {
-                lines.push(format!("{:>6} lines  {}", count, lang));
+                out.push_str(&format!("{:>6} lines  {}\n", count, lang));
             }
         }
 
-        lines.join("\n")
+        out
     }
 }
 

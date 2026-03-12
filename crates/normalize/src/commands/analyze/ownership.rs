@@ -3,14 +3,14 @@
 use super::is_source_file;
 use crate::output::OutputFormatter;
 use glob::Pattern;
-use normalize_analyze::truncate_path;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 
 /// Ownership data for a file
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct FileOwnership {
     pub path: String,
     pub total_lines: usize,
@@ -21,6 +21,34 @@ pub struct FileOwnership {
     pub top_author_pct: f64,
     /// Bus factor: number of authors needed to cover >50% of lines
     pub bus_factor: usize,
+}
+
+impl RankEntry for FileOwnership {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::left("File"),
+            Column::right("Lines"),
+            Column::right("Auth"),
+            Column::right("BF"),
+            Column::left("Top Author"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        let top = format!("{} ({:.0}%)", self.top_author, self.top_author_pct * 100.0);
+        let top_display = if top.len() > 28 {
+            format!("{}...", &top[..25])
+        } else {
+            top
+        };
+        vec![
+            self.path.clone(),
+            self.total_lines.to_string(),
+            self.authors.to_string(),
+            self.bus_factor.to_string(),
+            top_display,
+        ]
+    }
 }
 
 /// Per-repo ownership entry for multi-repo runs
@@ -42,34 +70,13 @@ pub struct OwnershipReport {
 }
 
 fn format_ownership_data(files: &[FileOwnership]) -> String {
-    let mut lines = Vec::new();
-    lines.push("File Ownership (git blame)".to_string());
-    lines.push(String::new());
-    lines.push(format!(
-        "{:<50} {:>6} {:>4} {:>3} {:<20}",
-        "File", "Lines", "Auth", "BF", "Top Author"
-    ));
-    lines.push("-".repeat(90));
-
-    for f in files {
-        let display_path = truncate_path(&f.path, 48);
-        let top = format!("{} ({:.0}%)", f.top_author, f.top_author_pct * 100.0);
-        let top_display = if top.len() > 28 {
-            format!("{}...", &top[..25])
-        } else {
-            top
-        };
-        lines.push(format!(
-            "{:<50} {:>6} {:>4} {:>3} {:<20}",
-            display_path, f.total_lines, f.authors, f.bus_factor, top_display
-        ));
-    }
-
-    lines.push(String::new());
-    lines.push("BF = Bus Factor (authors needed for >50% ownership)".to_string());
-    lines.push("Low bus factor (1) means single-author risk.".to_string());
-
-    lines.join("\n")
+    let mut out = format_ranked_table(
+        "# File Ownership (git blame)",
+        files,
+        Some("No ownership data found"),
+    );
+    out.push_str("\n\nBF = Bus Factor (authors needed for >50% ownership)\nLow bus factor (1) means single-author risk.");
+    out
 }
 
 impl OutputFormatter for OwnershipReport {

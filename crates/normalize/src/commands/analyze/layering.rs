@@ -5,6 +5,7 @@
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 use normalize_architecture::{
     build_import_graph, compute_depth, compute_layering_compliance, extract_layer,
 };
@@ -12,7 +13,7 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
 /// Per-module layering metrics.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct LayeringEntry {
     /// Relative file path
     pub module: String,
@@ -30,8 +31,34 @@ pub struct LayeringEntry {
     pub compliance: f64,
 }
 
+impl RankEntry for LayeringEntry {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::left("Module"),
+            Column::left("Layer"),
+            Column::right("Cross"),
+            Column::right("Down"),
+            Column::right("Up"),
+            Column::right("Self"),
+            Column::right("Compliance"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            self.module.clone(),
+            self.layer.clone(),
+            self.total_imports.to_string(),
+            self.downward_imports.to_string(),
+            self.upward_imports.to_string(),
+            self.self_imports.to_string(),
+            format!("{:.0}%", self.compliance * 100.0),
+        ]
+    }
+}
+
 /// Per-layer summary.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct LayerSummary {
     /// Layer name
     pub layer: String,
@@ -43,6 +70,28 @@ pub struct LayerSummary {
     pub avg_compliance: f64,
     /// Total upward imports from this layer
     pub upward_import_count: usize,
+}
+
+impl RankEntry for LayerSummary {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::left("Layer"),
+            Column::right("Modules"),
+            Column::right("Avg Depth"),
+            Column::right("Compliance"),
+            Column::right("Upward"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            self.layer.clone(),
+            self.module_count.to_string(),
+            format!("{:.1}", self.avg_depth),
+            format!("{:.0}%", self.avg_compliance * 100.0),
+            self.upward_import_count.to_string(),
+        ]
+    }
 }
 
 /// Aggregate stats.
@@ -198,128 +247,26 @@ pub async fn analyze_layering(
 
 impl OutputFormatter for LayeringReport {
     fn format_text(&self) -> String {
-        let mut out = Vec::new();
+        let empty_msg = "No import data found. Run `normalize structure rebuild` first.";
+        let mut out = format_ranked_table(
+            &format!(
+                "# Layering — {} files, {} layers, avg compliance {:.0}%, worst: {} ({:.0}%)",
+                self.stats.total_files,
+                self.stats.total_layers,
+                self.stats.avg_compliance * 100.0,
+                self.stats.worst_layer,
+                self.stats.worst_compliance * 100.0,
+            ),
+            &self.modules,
+            Some(empty_msg),
+        );
 
-        out.push(format!(
-            "# Layering — {} files, {} layers, avg compliance {:.0}%, worst: {} ({:.0}%)",
-            self.stats.total_files,
-            self.stats.total_layers,
-            self.stats.avg_compliance * 100.0,
-            self.stats.worst_layer,
-            self.stats.worst_compliance * 100.0,
-        ));
-        out.push(String::new());
-
-        if self.modules.is_empty() {
-            out.push("No import data found. Run `normalize structure rebuild` first.".to_string());
-            return out.join("\n");
+        if !self.layers.is_empty() {
+            out.push_str("\n\n");
+            out.push_str(&format_ranked_table("## Layer Summary", &self.layers, None));
         }
 
-        // Module table
-        let max_mod_len = self
-            .modules
-            .iter()
-            .map(|e| e.module.len())
-            .max()
-            .unwrap_or(10)
-            .min(50);
-        let max_layer_len = self
-            .modules
-            .iter()
-            .map(|e| e.layer.len())
-            .max()
-            .unwrap_or(5)
-            .min(20);
-
-        out.push(format!(
-            "{:<mw$}  {:<lw$}  {:>5}  {:>4}  {:>4}  {:>4}  {:>10}",
-            "Module",
-            "Layer",
-            "Cross",
-            "Down",
-            "Up",
-            "Self",
-            "Compliance",
-            mw = max_mod_len,
-            lw = max_layer_len,
-        ));
-        out.push(format!(
-            "{}--{}-------------------------------",
-            "-".repeat(max_mod_len),
-            "-".repeat(max_layer_len),
-        ));
-
-        for entry in &self.modules {
-            let module = if entry.module.len() > max_mod_len {
-                format!(
-                    "...{}",
-                    &entry.module[entry.module.len() - (max_mod_len - 3)..]
-                )
-            } else {
-                entry.module.clone()
-            };
-            let layer = if entry.layer.len() > max_layer_len {
-                format!(
-                    "...{}",
-                    &entry.layer[entry.layer.len() - (max_layer_len - 3)..]
-                )
-            } else {
-                entry.layer.clone()
-            };
-            out.push(format!(
-                "{:<mw$}  {:<lw$}  {:>5}  {:>4}  {:>4}  {:>4}  {:>9.0}%",
-                module,
-                layer,
-                entry.total_imports,
-                entry.downward_imports,
-                entry.upward_imports,
-                entry.self_imports,
-                entry.compliance * 100.0,
-                mw = max_mod_len,
-                lw = max_layer_len,
-            ));
-        }
-
-        // Layer summary
-        out.push(String::new());
-        out.push("## Layer Summary".to_string());
-        out.push(String::new());
-
-        let max_lname = self
-            .layers
-            .iter()
-            .map(|l| l.layer.len())
-            .max()
-            .unwrap_or(5)
-            .min(20);
-
-        out.push(format!(
-            "{:<lw$}  {:>7}  {:>9}  {:>10}  {:>8}",
-            "Layer",
-            "Modules",
-            "Avg Depth",
-            "Compliance",
-            "Upward",
-            lw = max_lname,
-        ));
-        out.push(format!(
-            "{}----------------------------------------------",
-            "-".repeat(max_lname),
-        ));
-
-        for layer in &self.layers {
-            out.push(format!(
-                "{:<lw$}  {:>7}  {:>9.1}  {:>9.0}%  {:>8}",
-                layer.layer,
-                layer.module_count,
-                layer.avg_depth,
-                layer.avg_compliance * 100.0,
-                layer.upward_import_count,
-                lw = max_lname,
-            ));
-        }
-
-        out.join("\n")
+        out
     }
 
     fn format_pretty(&self) -> String {

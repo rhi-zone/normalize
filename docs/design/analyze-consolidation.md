@@ -338,3 +338,13 @@ It doesn't work when parameter signatures diverge — that means they're differe
 - `DependentsReport` in `normalize-graph` expanded: adds `direct`, `transitive`, `blast_radius`, `untested_paths` (populated for modules graph); `dependents` flat list used for symbols/types
 - Blast-radius computation (BFS + fan-in + test path detection) moved into `commands/analyze/graph.rs::analyze_module_dependents`
 - Old command: `impact` — deleted
+
+**`rank` table infrastructure** (Phase 3, 2026-03-12):
+- `RankEntry` trait + `Column`/`Align` types + `format_ranked_table()` in `normalize-analyze::ranked`
+- Entry structs implement `RankEntry` to define column names/alignment and per-row values
+- `format_ranked_table(title, entries, empty_message)` renders: title line, dynamic-width columns, separator, rows
+- Migrated 8 commands: files, imports, ownership, docs, ceremony, surface, depth-map, layering
+- Each saves ~20-40 lines of manual table rendering; columns now auto-size consistently
+- Pretty (`format_pretty`) still uses manual ANSI-colored rendering — those stay per-command
+- **Not a `RankedReport<E>` generic struct** — every rank command has domain-specific metadata (per-language breakdowns, stats structs, layer summaries) beyond just entries+stats. A shared table *helper* gives 80% of the value without forcing a god-struct.
+- **Next steps:** migrate remaining rank commands, then generic `--diff`/`--trend` infrastructure that gives all rank commands temporal analysis for free

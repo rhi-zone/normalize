@@ -5,12 +5,13 @@
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 use normalize_architecture::{build_import_graph, compute_depth, compute_downstream};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
 /// One module's depth and risk metrics.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct DepthEntry {
     /// Relative file path
     pub module: String,
@@ -24,6 +25,30 @@ pub struct DepthEntry {
     pub downstream: usize,
     /// Composite blast radius: fan_out × depth × downstream
     pub ripple_score: usize,
+}
+
+impl RankEntry for DepthEntry {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::left("Module"),
+            Column::right("Depth"),
+            Column::right("Fan-in"),
+            Column::right("Fan-out"),
+            Column::right("Downstream"),
+            Column::right("Ripple Score"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            self.module.clone(),
+            self.depth.to_string(),
+            self.fan_in.to_string(),
+            self.fan_out.to_string(),
+            self.downstream.to_string(),
+            self.ripple_score.to_string(),
+        ]
+    }
 }
 
 /// Summary statistics for the depth map.
@@ -145,67 +170,17 @@ pub async fn analyze_depth_map(
 
 impl OutputFormatter for DepthMapReport {
     fn format_text(&self) -> String {
-        let mut out = Vec::new();
-
-        out.push(format!(
-            "# Depth Map — {} modules, max depth {}, avg {:.1}, {} entry points",
-            self.stats.total_modules,
-            self.stats.max_depth,
-            self.stats.avg_depth,
-            self.stats.modules_at_depth_0,
-        ));
-        out.push(String::new());
-
-        if self.modules.is_empty() {
-            out.push("No import data found. Run `normalize structure rebuild` first.".to_string());
-            return out.join("\n");
-        }
-
-        let max_mod_len = self
-            .modules
-            .iter()
-            .map(|e| e.module.len())
-            .max()
-            .unwrap_or(10)
-            .min(50);
-
-        out.push(format!(
-            "{:<width$}  {:>5}  {:>6}  {:>7}  {:>10}  {:>12}",
-            "Module",
-            "Depth",
-            "Fan-in",
-            "Fan-out",
-            "Downstream",
-            "Ripple Score",
-            width = max_mod_len
-        ));
-        out.push(format!(
-            "{}--------------------------------------------------",
-            "-".repeat(max_mod_len),
-        ));
-
-        for entry in &self.modules {
-            let module = if entry.module.len() > max_mod_len {
-                format!(
-                    "...{}",
-                    &entry.module[entry.module.len() - (max_mod_len - 3)..]
-                )
-            } else {
-                entry.module.clone()
-            };
-            out.push(format!(
-                "{:<width$}  {:>5}  {:>6}  {:>7}  {:>10}  {:>12}",
-                module,
-                entry.depth,
-                entry.fan_in,
-                entry.fan_out,
-                entry.downstream,
-                entry.ripple_score,
-                width = max_mod_len
-            ));
-        }
-
-        out.join("\n")
+        format_ranked_table(
+            &format!(
+                "# Depth Map — {} modules, max depth {}, avg {:.1}, {} entry points",
+                self.stats.total_modules,
+                self.stats.max_depth,
+                self.stats.avg_depth,
+                self.stats.modules_at_depth_0,
+            ),
+            &self.modules,
+            Some("No import data found. Run `normalize structure rebuild` first."),
+        )
     }
 
     fn format_pretty(&self) -> String {

@@ -1,6 +1,7 @@
 //! Ceremony ratio analysis: fraction of callable code that is trait/interface boilerplate.
 
 use crate::output::OutputFormatter;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -36,6 +37,26 @@ pub struct FileCeremony {
     pub ceremony_ratio: f64,
 }
 
+impl RankEntry for FileCeremony {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("Ratio"),
+            Column::right("Impl"),
+            Column::right("Total"),
+            Column::left("File"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            format!("{:.1}%", self.ceremony_ratio * 100.0),
+            self.interface_impl.to_string(),
+            self.total.to_string(),
+            self.file_path.clone(),
+        ]
+    }
+}
+
 /// Report returned by analyze ceremony
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct CeremonyReport {
@@ -57,23 +78,21 @@ pub struct CeremonyReport {
 
 impl OutputFormatter for CeremonyReport {
     fn format_text(&self) -> String {
-        let mut lines = Vec::new();
+        let mut out = String::new();
 
-        lines.push("# Ceremony Ratio".to_string());
-        lines.push(String::new());
-        lines.push(format!(
-            "Overall: {:.1}% ceremony ({} of {} callables are interface boilerplate)",
+        out.push_str(&format!(
+            "# Ceremony Ratio — {:.1}% ({} of {} callables are interface boilerplate)\n\n",
             self.ceremony_ratio * 100.0,
             self.interface_impl_methods,
             self.total_functions,
         ));
-        lines.push(format!(
-            "  Interface impl methods : {:>5}  ({:.1}%)",
+        out.push_str(&format!(
+            "  Interface impl methods : {:>5}  ({:.1}%)\n",
             self.interface_impl_methods,
             self.ceremony_ratio * 100.0
         ));
-        lines.push(format!(
-            "  Inherent/class methods : {:>5}  ({:.1}%)",
+        out.push_str(&format!(
+            "  Inherent/class methods : {:>5}  ({:.1}%)\n",
             self.inherent_methods,
             if self.total_functions > 0 {
                 self.inherent_methods as f64 / self.total_functions as f64 * 100.0
@@ -81,8 +100,8 @@ impl OutputFormatter for CeremonyReport {
                 0.0
             }
         ));
-        lines.push(format!(
-            "  Free functions         : {:>5}  ({:.1}%)",
+        out.push_str(&format!(
+            "  Free functions         : {:>5}  ({:.1}%)\n",
             self.free_functions,
             if self.total_functions > 0 {
                 self.free_functions as f64 / self.total_functions as f64 * 100.0
@@ -92,8 +111,7 @@ impl OutputFormatter for CeremonyReport {
         ));
 
         if !self.by_language.is_empty() {
-            lines.push(String::new());
-            lines.push("## By Language".to_string());
+            out.push_str("\n## By Language\n");
             let mut langs: Vec<_> = self.by_language.iter().collect();
             langs.sort_by(|a, b| {
                 b.1.ceremony_ratio()
@@ -102,8 +120,8 @@ impl OutputFormatter for CeremonyReport {
             });
             for (lang, stats) in langs {
                 if stats.total > 0 {
-                    lines.push(format!(
-                        "  {:>5.1}%  ({:>4}/{:>4})  {}",
+                    out.push_str(&format!(
+                        "  {:>5.1}%  ({:>4}/{:>4})  {}\n",
                         stats.ceremony_ratio() * 100.0,
                         stats.interface_impl,
                         stats.total,
@@ -114,20 +132,15 @@ impl OutputFormatter for CeremonyReport {
         }
 
         if !self.top_files.is_empty() {
-            lines.push(String::new());
-            lines.push("## Highest-Ceremony Files".to_string());
-            for f in &self.top_files {
-                lines.push(format!(
-                    "  {:>5.1}%  ({:>3}/{:>3})  {}",
-                    f.ceremony_ratio * 100.0,
-                    f.interface_impl,
-                    f.total,
-                    f.file_path,
-                ));
-            }
+            out.push('\n');
+            out.push_str(&format_ranked_table(
+                "## Highest-Ceremony Files",
+                &self.top_files,
+                None,
+            ));
         }
 
-        lines.join("\n")
+        out
     }
 }
 

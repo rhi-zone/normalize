@@ -5,11 +5,12 @@
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 use serde::Serialize;
 use std::collections::HashMap;
 
 /// One module's interface metrics.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct SurfaceEntry {
     /// Relative file path
     pub module: String,
@@ -25,6 +26,32 @@ pub struct SurfaceEntry {
     pub fan_in: usize,
     /// public_symbols × fan_in — composite constraint metric
     pub constraint_score: usize,
+}
+
+impl RankEntry for SurfaceEntry {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::left("Module"),
+            Column::right("Total"),
+            Column::right("Public"),
+            Column::right("Private"),
+            Column::right("Ratio"),
+            Column::right("Fan-in"),
+            Column::right("Constraint"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            self.module.clone(),
+            self.total_symbols.to_string(),
+            self.public_symbols.to_string(),
+            self.private_symbols.to_string(),
+            format!("{:.0}%", self.public_ratio * 100.0),
+            self.fan_in.to_string(),
+            self.constraint_score.to_string(),
+        ]
+    }
 }
 
 /// Summary statistics for the surface report.
@@ -144,69 +171,17 @@ pub async fn analyze_surface(
 
 impl OutputFormatter for SurfaceReport {
     fn format_text(&self) -> String {
-        let mut out = Vec::new();
-
-        out.push(format!(
-            "# Surface Area — {} files, avg public ratio {:.0}%, {} fully public, max constraint {}",
-            self.stats.total_files,
-            self.stats.avg_public_ratio * 100.0,
-            self.stats.fully_public_count,
-            self.stats.max_constraint_score,
-        ));
-        out.push(String::new());
-
-        if self.modules.is_empty() {
-            out.push("No symbol data found. Run `normalize structure rebuild` first.".to_string());
-            return out.join("\n");
-        }
-
-        let max_mod_len = self
-            .modules
-            .iter()
-            .map(|e| e.module.len())
-            .max()
-            .unwrap_or(10)
-            .min(50);
-
-        out.push(format!(
-            "{:<width$}  {:>5}  {:>6}  {:>7}  {:>6}  {:>6}  {:>10}",
-            "Module",
-            "Total",
-            "Public",
-            "Private",
-            "Ratio",
-            "Fan-in",
-            "Constraint",
-            width = max_mod_len
-        ));
-        out.push(format!(
-            "{}----------------------------------------------",
-            "-".repeat(max_mod_len),
-        ));
-
-        for entry in &self.modules {
-            let module = if entry.module.len() > max_mod_len {
-                format!(
-                    "...{}",
-                    &entry.module[entry.module.len() - (max_mod_len - 3)..]
-                )
-            } else {
-                entry.module.clone()
-            };
-            out.push(format!(
-                "{:<width$}  {:>5}  {:>6}  {:>7}  {:>5.0}%  {:>6}  {:>10}",
-                module,
-                entry.total_symbols,
-                entry.public_symbols,
-                entry.private_symbols,
-                entry.public_ratio * 100.0,
-                entry.fan_in,
-                entry.constraint_score,
-                width = max_mod_len
-            ));
-        }
-
-        out.join("\n")
+        format_ranked_table(
+            &format!(
+                "# Surface Area — {} files, avg public ratio {:.0}%, {} fully public, max constraint {}",
+                self.stats.total_files,
+                self.stats.avg_public_ratio * 100.0,
+                self.stats.fully_public_count,
+                self.stats.max_constraint_score,
+            ),
+            &self.modules,
+            Some("No symbol data found. Run `normalize structure rebuild` first."),
+        )
     }
 
     fn format_pretty(&self) -> String {
