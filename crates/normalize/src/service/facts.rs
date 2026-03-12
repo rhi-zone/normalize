@@ -447,6 +447,8 @@ async fn rebuild_data(
         .await
         .map_err(|e| format!("Error opening index: {}", e))?;
 
+    idx.set_progress(true);
+
     let file_count = idx
         .refresh()
         .await

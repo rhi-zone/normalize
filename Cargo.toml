@@ -82,6 +82,9 @@ ascent-syntax = { git = "https://github.com/pterror/ascent-interpreter" }
 # Parallelism
 rayon = "1.10"
 
+# Progress bars
+indicatif = { version = "0.17", features = ["rayon"] }
+
 # Search (ripgrep crates)
 grep-matcher = "0.1"
 grep-regex = "0.1"

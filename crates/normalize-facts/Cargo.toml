@@ -39,6 +39,9 @@ dirs = "5"
 # Parallelism
 rayon.workspace = true
 
+# Progress reporting
+indicatif.workspace = true
+
 # Serialization
 serde.workspace = true
 

@@ -44,7 +44,8 @@ extract, inline, move — correct, without LSPs, without false positives.
   6. Cranelift JIT (feature-gated; defer decision until after step 4)
 - File-level dependency tracking (import graph edges to scope fact re-evaluation)
 - `normalize watch` CLI (expose daemon file-watching with TUI output)
-- Progress reporting during long runs
+- [x] Progress reporting for `structure rebuild` (indicatif bars for file scan, symbol parsing, index storage)
+- Progress reporting for other long-running commands (`analyze duplicates`, `analyze architecture`)
 
 ---
 

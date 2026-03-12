@@ -1,5 +1,6 @@
 use crate::symbols::SymbolParser;
 use ignore::WalkBuilder;
+use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use libsql::{Connection, Database, params};
 pub use normalize_facts_core::IndexedFile;
 use normalize_facts_core::{FlatImport, FlatSymbol, TypeRef};
@@ -91,6 +92,7 @@ pub struct FileIndex {
     #[allow(dead_code)]
     db: Database,
     root: PathBuf,
+    progress: bool,
 }
 
 impl FileIndex {
@@ -420,7 +422,14 @@ impl FileIndex {
             conn,
             db,
             root: root.to_path_buf(),
+            progress: false,
         })
+    }
+
+    /// Enable progress bar output for long-running operations (refresh, call graph).
+    /// Only shows bars when stderr is a terminal.
+    pub fn set_progress(&mut self, enabled: bool) {
+        self.progress = enabled;
     }
 
     /// Get a reference to the underlying SQLite connection for direct queries
@@ -674,6 +683,17 @@ impl FileIndex {
         // Clear existing files
         self.conn.execute("DELETE FROM files", ()).await?;
 
+        let pb = if self.progress && std::io::IsTerminal::is_terminal(&std::io::stderr()) {
+            let pb = ProgressBar::new_spinner();
+            pb.set_style(
+                ProgressStyle::with_template("{spinner:.cyan} {msg} [{elapsed_precise}]").unwrap(),
+            );
+            pb.set_message("Scanning files...");
+            pb
+        } else {
+            ProgressBar::hidden()
+        };
+
         let mut count = 0;
         for entry in walker.flatten() {
             let path = entry.path();
@@ -708,8 +728,12 @@ impl FileIndex {
                     )
                     .await?;
                 count += 1;
+                pb.set_message(format!("Scanning files... {count}"));
+                pb.tick();
             }
         }
+
+        pb.finish_and_clear();
 
         // Update last indexed time
         let now = SystemTime::now()
@@ -1718,8 +1742,22 @@ impl FileIndex {
         // Parse all files in parallel
         // Each thread gets its own SymbolParser (tree-sitter parsers have mutable state)
         let root = self.root.clone();
+        let pb = if self.progress && std::io::IsTerminal::is_terminal(&std::io::stderr()) {
+            let pb = ProgressBar::new(files.len() as u64);
+            pb.set_style(
+                ProgressStyle::with_template(
+                    "{spinner:.cyan} Parsing symbols... [{bar:30.cyan/dim}] {pos}/{len} files [{elapsed_precise}]",
+                )
+                .unwrap()
+                .progress_chars("##-"),
+            );
+            pb
+        } else {
+            ProgressBar::hidden()
+        };
         let parsed_data: Vec<ParsedFileData> = files
             .par_iter()
+            .progress_with(pb.clone())
             .filter_map(|file_path| {
                 let full_path = root.join(file_path);
                 let content = std::fs::read_to_string(&full_path).ok()?;
@@ -1796,6 +1834,22 @@ impl FileIndex {
             })
             .collect();
 
+        pb.finish_and_clear();
+
+        let pb_insert = if self.progress && std::io::IsTerminal::is_terminal(&std::io::stderr()) {
+            let pb = ProgressBar::new(parsed_data.len() as u64);
+            pb.set_style(
+                ProgressStyle::with_template(
+                    "{spinner:.cyan} Storing index... [{bar:30.cyan/dim}] {pos}/{len} files [{elapsed_precise}]",
+                )
+                .unwrap()
+                .progress_chars("##-"),
+            );
+            pb
+        } else {
+            ProgressBar::hidden()
+        };
+
         self.conn.execute("BEGIN", ()).await?;
 
         // Clear existing data
@@ -1865,7 +1919,10 @@ impl FileIndex {
                     params![data.file_path.clone(), tr.source_symbol.clone(), tr.target_type.clone(), tr.kind.as_str(), tr.line as i64],
                 ).await?;
             }
+            pb_insert.inc(1);
         }
+
+        pb_insert.finish_and_clear();
 
         self.conn.execute("COMMIT", ()).await?;
 
