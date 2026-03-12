@@ -347,4 +347,13 @@ It doesn't work when parameter signatures diverge — that means they're differe
 - Each saves ~20-40 lines of manual table rendering; columns now auto-size consistently
 - Pretty (`format_pretty`) still uses manual ANSI-colored rendering — those stay per-command
 - **Not a `RankedReport<E>` generic struct** — every rank command has domain-specific metadata (per-language breakdowns, stats structs, layer summaries) beyond just entries+stats. A shared table *helper* gives 80% of the value without forcing a god-struct.
-- **Next steps:** migrate remaining rank commands, then generic `--diff`/`--trend` infrastructure that gives all rank commands temporal analysis for free
+- **Next steps:** add `--diff` to remaining rank commands (files, imports, ownership, ceremony, surface, depth-map, layering, budget, coupling)
+
+**`DiffableRankEntry` trait + `--diff` infrastructure** (Phase 3, 2026-03-12):
+- `DiffableRankEntry` trait in `normalize-analyze::ranked`: `diff_key()`, `diff_score()`, `set_delta()`, `delta()`
+- `compute_ranked_diff(current, baseline)`: matches entries by key, computes `current - baseline`, sorts by |delta| descending
+- `format_delta(value, as_pct)`: formats signed delta with `+`/`-` prefix
+- Entry structs add `delta: Option<f64>`, reports add `diff_ref: Option<String>`
+- Delta shown inline in the score column: `7.7% (+2.1%)` — no extra table column needed
+- Pattern in service layer: `resolve_ref` → `run_in_worktree` → `compute_ranked_diff` (3 lines of glue)
+- Migrated: test-ratio, density, uniqueness. complexity/length keep their pre-existing hand-rolled diff.

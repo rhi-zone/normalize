@@ -5,7 +5,9 @@ use std::path::Path;
 use crate::commands::analyze::duplicates::find_similar_function_pairs;
 use crate::commands::analyze::test_ratio::{discover_module_dirs, module_key};
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
+use normalize_analyze::ranked::{
+    Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
+};
 
 /// Per-module uniqueness breakdown.
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
@@ -20,6 +22,9 @@ pub struct ModuleUniqueness {
     pub uniqueness_ratio: f64,
     pub total_lines: usize,
     pub clustered_lines: usize,
+    /// Delta vs baseline (set by `--diff`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta: Option<f64>,
 }
 
 impl RankEntry for ModuleUniqueness {
@@ -34,13 +39,36 @@ impl RankEntry for ModuleUniqueness {
     }
 
     fn values(&self) -> Vec<String> {
+        let ratio_str = match self.delta {
+            Some(d) => format!(
+                "{:.1}% ({})",
+                self.uniqueness_ratio * 100.0,
+                format_delta(d * 100.0, true)
+            ),
+            None => format!("{:.1}%", self.uniqueness_ratio * 100.0),
+        };
         vec![
             self.module.clone(),
             self.total_functions.to_string(),
             self.unique_functions.to_string(),
             self.clustered_functions.to_string(),
-            format!("{:.1}%", self.uniqueness_ratio * 100.0),
+            ratio_str,
         ]
+    }
+}
+
+impl DiffableRankEntry for ModuleUniqueness {
+    fn diff_key(&self) -> &str {
+        &self.module
+    }
+    fn diff_score(&self) -> f64 {
+        self.uniqueness_ratio
+    }
+    fn set_delta(&mut self, delta: Option<f64>) {
+        self.delta = delta;
+    }
+    fn delta(&self) -> Option<f64> {
+        self.delta
     }
 }
 
@@ -70,6 +98,9 @@ pub struct UniquenessReport {
     pub modules: Vec<ModuleUniqueness>,
     /// Largest structural clusters.
     pub top_clusters: Vec<ClusterSummary>,
+    /// Set when `--diff` is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diff_ref: Option<String>,
 }
 
 impl OutputFormatter for UniquenessReport {
@@ -98,6 +129,9 @@ impl OutputFormatter for UniquenessReport {
             "Similarity threshold: {:.0}%",
             self.similarity_threshold * 100.0
         ));
+        if let Some(ref r) = self.diff_ref {
+            out.push(format!("Diff vs:              {}", r));
+        }
         out.push(String::new());
 
         if !self.modules.is_empty() {
@@ -368,6 +402,7 @@ pub fn analyze_uniqueness(
                 uniqueness_ratio: ratio,
                 total_lines: lines,
                 clustered_lines,
+                delta: None,
             }
         })
         .collect();
@@ -430,5 +465,6 @@ pub fn analyze_uniqueness(
         similarity_threshold: similarity,
         modules,
         top_clusters: cluster_summaries,
+        diff_ref: None,
     }
 }

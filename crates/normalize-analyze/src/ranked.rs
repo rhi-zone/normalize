@@ -60,6 +60,64 @@ pub trait RankEntry {
     fn values(&self) -> Vec<String>;
 }
 
+// ── Diffable rank entries ─────────────────────────────────────────────
+
+/// Trait for rank entries that support `--diff <ref>` comparison.
+///
+/// Implement this alongside `RankEntry` to enable generic `--diff` support.
+/// After calling [`compute_ranked_diff`], entries are annotated with deltas
+/// and sorted by `|delta|` descending.
+pub trait DiffableRankEntry {
+    /// Identity key for matching entries across snapshots (e.g. file path, module name).
+    fn diff_key(&self) -> &str;
+
+    /// The numeric metric to compute deltas on.
+    fn diff_score(&self) -> f64;
+
+    /// Set the computed delta.
+    fn set_delta(&mut self, delta: Option<f64>);
+
+    /// Get the delta (if diff has been applied).
+    fn delta(&self) -> Option<f64>;
+}
+
+/// Compute per-entry deltas between current and baseline entries.
+///
+/// For each entry in `current`, finds the matching baseline entry by
+/// [`DiffableRankEntry::diff_key`] and computes `current_score - baseline_score`.
+/// New entries (no baseline match) get delta = current_score.
+/// After this, `current` is sorted by `|delta|` descending.
+pub fn compute_ranked_diff<E: DiffableRankEntry>(current: &mut [E], baseline: &[E]) {
+    let baseline_map: std::collections::HashMap<&str, f64> = baseline
+        .iter()
+        .map(|e| (e.diff_key(), e.diff_score()))
+        .collect();
+
+    for e in current.iter_mut() {
+        let delta = match baseline_map.get(e.diff_key()) {
+            Some(&base) => e.diff_score() - base,
+            None => e.diff_score(), // new entity — full score as delta
+        };
+        e.set_delta(Some(delta));
+    }
+
+    current.sort_by(|a, b| {
+        let da = a.delta().unwrap_or(0.0).abs();
+        let db = b.delta().unwrap_or(0.0).abs();
+        db.partial_cmp(&da).unwrap_or(std::cmp::Ordering::Equal)
+    });
+}
+
+/// Format a delta value as a string with sign prefix.
+pub fn format_delta(delta: f64, as_pct: bool) -> String {
+    let sign = if delta >= 0.0 { "+" } else { "" };
+    if as_pct {
+        format!("{sign}{delta:.1}%")
+    } else {
+        format!("{sign}{delta:.2}")
+    }
+}
+
 // ── Table formatter ────────────────────────────────────────────────────
 
 /// Render a ranked list as a text table.
@@ -460,5 +518,99 @@ mod tests {
         // Data: "a" should be left-padded to match "long name" width
         let row_a = lines[4]; // title, blank, header, sep, row
         assert!(row_a.starts_with("a"));
+    }
+
+    // ── DiffableRankEntry tests ───────────────────────────────────────
+
+    #[derive(Clone)]
+    struct DiffEntry {
+        module: String,
+        ratio: f64,
+        delta: Option<f64>,
+    }
+
+    impl DiffableRankEntry for DiffEntry {
+        fn diff_key(&self) -> &str {
+            &self.module
+        }
+        fn diff_score(&self) -> f64 {
+            self.ratio
+        }
+        fn set_delta(&mut self, delta: Option<f64>) {
+            self.delta = delta;
+        }
+        fn delta(&self) -> Option<f64> {
+            self.delta
+        }
+    }
+
+    #[test]
+    fn test_compute_ranked_diff_basic() {
+        let baseline = vec![
+            DiffEntry {
+                module: "crate-a".into(),
+                ratio: 0.10,
+                delta: None,
+            },
+            DiffEntry {
+                module: "crate-b".into(),
+                ratio: 0.05,
+                delta: None,
+            },
+        ];
+        let mut current = vec![
+            DiffEntry {
+                module: "crate-a".into(),
+                ratio: 0.08,
+                delta: None,
+            },
+            DiffEntry {
+                module: "crate-b".into(),
+                ratio: 0.12,
+                delta: None,
+            },
+            DiffEntry {
+                module: "crate-c".into(),
+                ratio: 0.03,
+                delta: None,
+            },
+        ];
+
+        compute_ranked_diff(&mut current, &baseline);
+
+        // crate-b: 0.12 - 0.05 = 0.07 (largest |delta|)
+        // crate-c: 0.03 (new, no baseline) = 0.03
+        // crate-a: 0.08 - 0.10 = -0.02
+        assert_eq!(current[0].module, "crate-b");
+        assert!((current[0].delta.unwrap() - 0.07).abs() < 1e-9);
+
+        assert_eq!(current[1].module, "crate-c");
+        assert!((current[1].delta.unwrap() - 0.03).abs() < 1e-9);
+
+        assert_eq!(current[2].module, "crate-a");
+        assert!((current[2].delta.unwrap() - (-0.02)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_compute_ranked_diff_empty_baseline() {
+        let baseline: Vec<DiffEntry> = vec![];
+        let mut current = vec![DiffEntry {
+            module: "a".into(),
+            ratio: 0.5,
+            delta: None,
+        }];
+
+        compute_ranked_diff(&mut current, &baseline);
+
+        // Everything is "new" — delta = score
+        assert!((current[0].delta.unwrap() - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_format_delta() {
+        assert_eq!(format_delta(0.07, false), "+0.07");
+        assert_eq!(format_delta(-0.02, false), "-0.02");
+        assert_eq!(format_delta(5.3, true), "+5.3%");
+        assert_eq!(format_delta(-2.1, true), "-2.1%");
     }
 }

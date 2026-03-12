@@ -1,5 +1,7 @@
 use flate2::{Compression, write::GzEncoder};
-use normalize_analyze::ranked::{Column, RankEntry, Scored, format_ranked_table, rank_pipeline};
+use normalize_analyze::ranked::{
+    Column, DiffableRankEntry, RankEntry, Scored, format_delta, format_ranked_table, rank_pipeline,
+};
 use normalize_languages::support_for_path;
 use rayon::prelude::*;
 use serde::Serialize;
@@ -37,6 +39,9 @@ pub struct ModuleDensity {
     pub density_score: f64,
     pub total_files: usize,
     pub total_lines: usize,
+    /// Delta vs baseline (set by `--diff`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta: Option<f64>,
 }
 
 impl normalize_analyze::Entity for FileDensity {
@@ -64,14 +69,33 @@ impl RankEntry for ModuleDensity {
     }
 
     fn values(&self) -> Vec<String> {
+        let density_str = match self.delta {
+            Some(d) => format!("{:.3} ({})", self.density_score, format_delta(d, false)),
+            None => format!("{:.3}", self.density_score),
+        };
         vec![
             self.module.clone(),
             self.total_files.to_string(),
             format!("{:.3}", self.avg_compression_ratio),
             format!("{:.3}", self.avg_token_uniqueness),
-            format!("{:.3}", self.density_score),
+            density_str,
             self.total_lines.to_string(),
         ]
+    }
+}
+
+impl DiffableRankEntry for ModuleDensity {
+    fn diff_key(&self) -> &str {
+        &self.module
+    }
+    fn diff_score(&self) -> f64 {
+        self.density_score
+    }
+    fn set_delta(&mut self, delta: Option<f64>) {
+        self.delta = delta;
+    }
+    fn delta(&self) -> Option<f64> {
+        self.delta
     }
 }
 
@@ -104,14 +128,21 @@ pub struct DensityReport {
     pub modules: Vec<ModuleDensity>,
     /// Bottom N files by density_score (most repetitive first).
     pub worst_files: Vec<FileDensity>,
+    /// Set when `--diff` is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diff_ref: Option<String>,
 }
 
 impl OutputFormatter for DensityReport {
     fn format_text(&self) -> String {
         let mut out = String::new();
+        let diff_suffix = self
+            .diff_ref
+            .as_ref()
+            .map_or(String::new(), |r| format!("\nDiff vs:           {}", r));
         out.push_str(&format!(
-            "# Code Density Analysis\n\nRoot:              {}\nFiles analyzed:    {}\nCompression ratio: {:.2}  (lower = more repetitive)\nToken uniqueness:  {:.2}  (lower = more repetitive)\n\n",
-            self.root, self.files_analyzed, self.overall_compression_ratio, self.overall_token_uniqueness
+            "# Code Density Analysis\n\nRoot:              {}\nFiles analyzed:    {}\nCompression ratio: {:.2}  (lower = more repetitive)\nToken uniqueness:  {:.2}  (lower = more repetitive){}\n\n",
+            self.root, self.files_analyzed, self.overall_compression_ratio, self.overall_token_uniqueness, diff_suffix
         ));
 
         out.push_str(&format_ranked_table(
@@ -338,6 +369,7 @@ pub fn analyze_density(root: &Path, module_limit: usize, worst_limit: usize) -> 
                     density_score,
                     total_files,
                     total_lines,
+                    delta: None,
                 }
             },
         )
@@ -390,5 +422,6 @@ pub fn analyze_density(root: &Path, module_limit: usize, worst_limit: usize) -> 
         overall_token_uniqueness: overall_tok,
         modules,
         worst_files,
+        diff_ref: None,
     }
 }

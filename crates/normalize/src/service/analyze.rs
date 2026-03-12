@@ -1311,6 +1311,9 @@ impl AnalyzeService {
         >,
         #[param(short = 'l', help = "Maximum number of entries to show (0=no limit)")]
         limit: Option<usize>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<TestRatioReport, String> {
@@ -1320,10 +1323,22 @@ impl AnalyzeService {
             0 => usize::MAX,
             n => n,
         };
-        Ok(crate::commands::analyze::test_ratio::analyze_test_ratio(
-            &root_path,
-            effective_limit,
-        ))
+        let mut report =
+            crate::commands::analyze::test_ratio::analyze_test_ratio(&root_path, effective_limit);
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                Ok(crate::commands::analyze::test_ratio::analyze_test_ratio(
+                    wt,
+                    usize::MAX,
+                ))
+            })?;
+            compute_ranked_diff(&mut report.entries, &baseline.entries);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
     }
 
     /// Find untested public functions ranked by risk
@@ -1431,6 +1446,9 @@ impl AnalyzeService {
         #[param(short = 'w', help = "Number of worst files to show (default: 10)")] worst: Option<
             usize,
         >,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<DensityReport, String> {
@@ -1440,11 +1458,26 @@ impl AnalyzeService {
             0 => usize::MAX,
             n => n,
         };
-        Ok(crate::commands::analyze::density::analyze_density(
+        let mut report = crate::commands::analyze::density::analyze_density(
             &root_path,
             module_limit,
             worst.unwrap_or(10),
-        ))
+        );
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                Ok(crate::commands::analyze::density::analyze_density(
+                    wt,
+                    usize::MAX,
+                    0,
+                ))
+            })?;
+            compute_ranked_diff(&mut report.modules, &baseline.modules);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
     }
 
     /// Show information density trend over git history
@@ -1495,6 +1528,9 @@ impl AnalyzeService {
         #[param(help = "Number of top clusters to show (default: 10)")] clusters: Option<usize>,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<UniquenessReport, String> {
@@ -1505,16 +1541,39 @@ impl AnalyzeService {
             n => n,
         };
         let filter = Self::build_filter(&root_path, &exclude, &only);
-        Ok(crate::commands::analyze::uniqueness::analyze_uniqueness(
+        let sim = similarity.unwrap_or(0.80);
+        let min = min_lines.unwrap_or(5);
+        let clust = clusters.unwrap_or(10);
+        let mut report = crate::commands::analyze::uniqueness::analyze_uniqueness(
             &root_path,
-            similarity.unwrap_or(0.80),
-            min_lines.unwrap_or(5),
+            sim,
+            min,
             skeleton,
             include_trait_impls,
             module_limit,
-            clusters.unwrap_or(10),
+            clust,
             filter.as_ref(),
-        ))
+        );
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                Ok(crate::commands::analyze::uniqueness::analyze_uniqueness(
+                    wt,
+                    sim,
+                    min,
+                    skeleton,
+                    include_trait_impls,
+                    usize::MAX,
+                    0,
+                    None,
+                ))
+            })?;
+            compute_ranked_diff(&mut report.modules, &baseline.modules);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
     }
 
     /// Compute effective (reachable) cyclomatic complexity via call-graph BFS

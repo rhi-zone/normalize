@@ -4,7 +4,9 @@
 //! Shows which parts of the codebase have thin or no test coverage by LOC.
 
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
+use normalize_analyze::ranked::{
+    Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
+};
 use normalize_languages::is_test_path;
 use rayon::prelude::*;
 use serde::Serialize;
@@ -21,6 +23,9 @@ pub struct TestRatioEntry {
     pub test_lines: usize,
     /// test_lines / (impl_lines + test_lines), in 0.0–1.0
     pub ratio: f64,
+    /// Delta vs baseline (set by `--diff`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta: Option<f64>,
 }
 
 impl RankEntry for TestRatioEntry {
@@ -34,12 +39,35 @@ impl RankEntry for TestRatioEntry {
     }
 
     fn values(&self) -> Vec<String> {
+        let ratio_str = match self.delta {
+            Some(d) => format!(
+                "{:.1}% ({})",
+                self.ratio * 100.0,
+                format_delta(d * 100.0, true)
+            ),
+            None => format!("{:.1}%", self.ratio * 100.0),
+        };
         vec![
             self.path.clone(),
             self.impl_lines.to_string(),
             self.test_lines.to_string(),
-            format!("{:.1}%", self.ratio * 100.0),
+            ratio_str,
         ]
+    }
+}
+
+impl DiffableRankEntry for TestRatioEntry {
+    fn diff_key(&self) -> &str {
+        &self.path
+    }
+    fn diff_score(&self) -> f64 {
+        self.ratio
+    }
+    fn set_delta(&mut self, delta: Option<f64>) {
+        self.delta = delta;
+    }
+    fn delta(&self) -> Option<f64> {
+        self.delta
     }
 }
 
@@ -51,17 +79,25 @@ pub struct TestRatioReport {
     pub total_test_lines: usize,
     pub overall_ratio: f64,
     pub entries: Vec<TestRatioEntry>,
+    /// Set when `--diff` is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diff_ref: Option<String>,
 }
 
 impl OutputFormatter for TestRatioReport {
     fn format_text(&self) -> String {
+        let diff_suffix = self
+            .diff_ref
+            .as_ref()
+            .map_or(String::new(), |r| format!("  [diff vs {}]", r));
         format_ranked_table(
             &format!(
-                "# Test/Impl Ratio: {} — {:.1}% ({} impl, {} test)",
+                "# Test/Impl Ratio: {} — {:.1}% ({} impl, {} test){}",
                 self.root,
                 self.overall_ratio * 100.0,
                 self.total_impl_lines,
                 self.total_test_lines,
+                diff_suffix,
             ),
             &self.entries,
             None,
@@ -216,6 +252,7 @@ pub fn analyze_test_ratio(root: &Path, limit: usize) -> TestRatioReport {
             path,
             impl_lines,
             test_lines,
+            delta: None,
         })
         .collect();
 
@@ -241,6 +278,7 @@ pub fn analyze_test_ratio(root: &Path, limit: usize) -> TestRatioReport {
         total_test_lines,
         overall_ratio,
         entries,
+        diff_ref: None,
     }
 }
 
