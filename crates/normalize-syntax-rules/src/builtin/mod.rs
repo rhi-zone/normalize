@@ -228,6 +228,94 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "cpp/cout-debug",
         content: include_str!("cpp_cout_debug.scm"),
     },
+    // C# rules
+    BuiltinRule {
+        id: "csharp/console-write",
+        content: include_str!("csharp_console_write.scm"),
+    },
+    BuiltinRule {
+        id: "csharp/empty-catch",
+        content: include_str!("csharp_empty_catch.scm"),
+    },
+    BuiltinRule {
+        id: "csharp/goto",
+        content: include_str!("csharp_goto.scm"),
+    },
+    BuiltinRule {
+        id: "csharp/magic-number",
+        content: include_str!("csharp_magic_number.scm"),
+    },
+    BuiltinRule {
+        id: "csharp/thread-sleep",
+        content: include_str!("csharp_thread_sleep.scm"),
+    },
+    BuiltinRule {
+        id: "csharp/suppress-warnings",
+        content: include_str!("csharp_suppress_warnings.scm"),
+    },
+    // Kotlin rules
+    BuiltinRule {
+        id: "kotlin/println-debug",
+        content: include_str!("kotlin_println_debug.scm"),
+    },
+    BuiltinRule {
+        id: "kotlin/empty-catch",
+        content: include_str!("kotlin_empty_catch.scm"),
+    },
+    BuiltinRule {
+        id: "kotlin/magic-number",
+        content: include_str!("kotlin_magic_number.scm"),
+    },
+    BuiltinRule {
+        id: "kotlin/thread-sleep",
+        content: include_str!("kotlin_thread_sleep.scm"),
+    },
+    BuiltinRule {
+        id: "kotlin/suppress-warnings",
+        content: include_str!("kotlin_suppress_warnings.scm"),
+    },
+    // Swift rules
+    BuiltinRule {
+        id: "swift/print-debug",
+        content: include_str!("swift_print_debug.scm"),
+    },
+    BuiltinRule {
+        id: "swift/empty-catch",
+        content: include_str!("swift_empty_catch.scm"),
+    },
+    BuiltinRule {
+        id: "swift/magic-number",
+        content: include_str!("swift_magic_number.scm"),
+    },
+    BuiltinRule {
+        id: "swift/force-unwrap",
+        content: include_str!("swift_force_unwrap.scm"),
+    },
+    BuiltinRule {
+        id: "swift/thread-sleep",
+        content: include_str!("swift_thread_sleep.scm"),
+    },
+    // PHP rules
+    BuiltinRule {
+        id: "php/debug-print",
+        content: include_str!("php_debug_print.scm"),
+    },
+    BuiltinRule {
+        id: "php/empty-catch",
+        content: include_str!("php_empty_catch.scm"),
+    },
+    BuiltinRule {
+        id: "php/goto",
+        content: include_str!("php_goto.scm"),
+    },
+    BuiltinRule {
+        id: "php/magic-number",
+        content: include_str!("php_magic_number.scm"),
+    },
+    BuiltinRule {
+        id: "php/eval",
+        content: include_str!("php_eval.scm"),
+    },
     // Java rules
     BuiltinRule {
         id: "java/system-print",

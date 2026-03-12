@@ -219,7 +219,10 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 - Phase 3b builtin rules: more builtin rules, sharing improvements (see `docs/design/builtin-rules.md`)
   - [x] Java rules (6): `system-print`, `empty-catch`, `print-stack-trace`, `magic-number`, `suppress-warnings`, `thread-sleep`
   - [x] C/C++ rules (4): `c/printf-debug`, `c/goto`, `c/magic-number`, `cpp/cout-debug`
-  - Next candidates: C#, Kotlin, Swift, PHP
+  - [x] C# rules (6): `console-write`, `empty-catch`, `goto`, `magic-number`, `thread-sleep`, `suppress-warnings`
+  - [x] Kotlin rules (5): `println-debug`, `empty-catch`, `magic-number`, `thread-sleep`, `suppress-warnings`
+  - [x] Swift rules (5): `print-debug`, `empty-catch`, `magic-number`, `force-unwrap`, `thread-sleep`
+  - [x] PHP rules (5): `debug-print`, `empty-catch`, `goto`, `magic-number`, `eval`
   - Semantic rules system: for rules needing cross-file analysis (import cycles, unused exports, type mismatches). Current syntax-based rules are single-file AST queries; semantic rules need index-backed analysis. Separate infrastructure, triggered differently (post-index vs per-file).
 
 ### ~~Rule tags system~~ (done)
