@@ -1304,6 +1304,7 @@ impl AnalyzeService {
             &exclude,
             &only,
         );
+        let config_min_lines = config.analyze.duplicates_min_lines();
 
         // Blocks scope defaults to eliding literals (structurally-identical blocks that differ
         // only in literal values are real duplication). Use --no-elide-literals to opt out.
@@ -1326,7 +1327,7 @@ impl AnalyzeService {
                             elide_identifiers,
                             elide_literals,
                             show_source,
-                            min_lines: min_lines.unwrap_or(1),
+                            min_lines: min_lines.or(config_min_lines).unwrap_or(1),
                             include_trait_impls,
                             filter: filter.as_ref(),
                         },
@@ -1337,7 +1338,7 @@ impl AnalyzeService {
                 crate::commands::analyze::duplicates::build_duplicate_blocks_report(
                     DuplicateBlocksConfig {
                         root: &root_path,
-                        min_lines: min_lines.unwrap_or(5),
+                        min_lines: min_lines.or(config_min_lines).unwrap_or(5),
                         elide_identifiers,
                         elide_literals,
                         skip_functions,
@@ -1358,7 +1359,7 @@ impl AnalyzeService {
                     crate::commands::analyze::duplicates::build_similar_functions_report(
                         SimilarFunctionsConfig {
                             roots: &roots,
-                            min_lines: min_lines.unwrap_or(10),
+                            min_lines: min_lines.or(config_min_lines).unwrap_or(10),
                             similarity: similarity.unwrap_or(0.85),
                             elide_identifiers,
                             elide_literals,
@@ -1376,7 +1377,7 @@ impl AnalyzeService {
                 crate::commands::analyze::duplicates::build_similar_blocks_report(
                     SimilarBlocksConfig {
                         root: &root_path,
-                        min_lines: min_lines.unwrap_or(10),
+                        min_lines: min_lines.or(config_min_lines).unwrap_or(15),
                         similarity: similarity.unwrap_or(0.85),
                         elide_identifiers,
                         elide_literals,
@@ -1398,7 +1399,7 @@ impl AnalyzeService {
                 Ok(
                     crate::commands::analyze::clusters::build_clusters_report_multi(
                         &roots,
-                        min_lines.unwrap_or(10),
+                        min_lines.or(config_min_lines).unwrap_or(10),
                         similarity.unwrap_or(0.85),
                         elide_identifiers,
                         skeleton,

@@ -84,6 +84,7 @@ pub struct AnalyzeConfig {
     /// ```toml
     /// [analyze.duplicates]
     /// exclude = ["**/generated/**"]
+    /// min_lines = 15
     /// ```
     #[serde(flatten)]
     pub subcommands: HashMap<String, SubcommandConfig>,
@@ -96,6 +97,9 @@ pub struct SubcommandConfig {
     /// Patterns to exclude from this specific subcommand
     #[serde(default)]
     pub exclude: Vec<String>,
+    /// Minimum lines threshold (used by duplicate detection modes).
+    /// Default: 15 for similar-blocks, 10 for similar-functions/clusters, 5 for exact-blocks, 1 for exact-functions.
+    pub min_lines: Option<usize>,
 }
 
 /// Weights for each analysis pass (higher = more impact on grade).
@@ -154,6 +158,11 @@ impl AnalyzeConfig {
 
     pub fn exclude_interface_impls(&self) -> bool {
         self.exclude_interface_impls.unwrap_or(true)
+    }
+
+    /// Get the configured `min_lines` for duplicates detection, if set.
+    pub fn duplicates_min_lines(&self) -> Option<usize> {
+        self.subcommands.get("duplicates").and_then(|s| s.min_lines)
     }
 
     /// Get excludes for a specific subcommand, merging global + per-subcommand patterns.

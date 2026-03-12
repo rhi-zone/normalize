@@ -37,6 +37,9 @@
 //! threshold = 10              # only show functions with complexity >= 10
 //! compact = true              # use compact output for --overview
 //!
+//! [analyze.duplicates]
+//! min_lines = 15              # minimum lines for duplicate detection
+//!
 //! [rules]
 //! global-allow = ["**/tests/fixtures/**"]
 //!

@@ -170,7 +170,7 @@ normalize analyze impact src/main.rs
 - `--elide-identifiers` - Ignore identifier names when comparing
 - `--elide-literals` - Ignore literal values when comparing
 - `--show-source` - Show source code for matches
-- `--min-lines <N>` - Minimum lines to consider
+- `--min-lines <N>` - Minimum lines to consider (default: 1 exact-functions, 5 exact-blocks, 15 similar-blocks, 10 similar-functions/clusters; configurable via `[analyze.duplicates] min_lines`)
 - `--include-trait-impls` - Include same-name groups (likely trait impls)
 - `--similarity <F>` - MinHash similarity threshold (similar mode only)
 - `--skeleton` - Match on control-flow structure (similar mode only)
