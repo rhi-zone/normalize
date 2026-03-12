@@ -4,13 +4,14 @@
 //! Shows which parts of the codebase have thin or no test coverage by LOC.
 
 use crate::output::OutputFormatter;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 use normalize_languages::is_test_path;
 use rayon::prelude::*;
 use serde::Serialize;
 use std::path::Path;
 
 /// Per-module test/impl ratio entry.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct TestRatioEntry {
     /// Module or crate path (relative to root)
     pub path: String,
@@ -20,6 +21,26 @@ pub struct TestRatioEntry {
     pub test_lines: usize,
     /// test_lines / (impl_lines + test_lines), in 0.0–1.0
     pub ratio: f64,
+}
+
+impl RankEntry for TestRatioEntry {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::left("Module"),
+            Column::right("Impl"),
+            Column::right("Test"),
+            Column::right("Ratio"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            self.path.clone(),
+            self.impl_lines.to_string(),
+            self.test_lines.to_string(),
+            format!("{:.1}%", self.ratio * 100.0),
+        ]
+    }
 }
 
 /// Report returned by `analyze test-ratio`.
@@ -34,44 +55,17 @@ pub struct TestRatioReport {
 
 impl OutputFormatter for TestRatioReport {
     fn format_text(&self) -> String {
-        let mut out = Vec::new();
-
-        out.push(format!(
-            "# Test/Impl Ratio: {} — {:.1}% test coverage by LOC",
-            self.root,
-            self.overall_ratio * 100.0,
-        ));
-        out.push(String::new());
-        out.push(format!(
-            "Total: {} impl lines, {} test lines",
-            self.total_impl_lines, self.total_test_lines
-        ));
-        out.push(String::new());
-        out.push(format!(
-            "{:<50}  {:>8}  {:>8}  {:>7}",
-            "module", "impl", "test", "ratio"
-        ));
-        out.push("-".repeat(82));
-
-        for e in &self.entries {
-            out.push(format!(
-                "{:<50}  {:>8}  {:>8}  {:>6.1}%",
-                truncate_path(&e.path, 50),
-                e.impl_lines,
-                e.test_lines,
-                e.ratio * 100.0,
-            ));
-        }
-
-        out.join("\n")
-    }
-}
-
-fn truncate_path(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        s.to_string()
-    } else {
-        format!("…{}", &s[s.len() - (max - 1)..])
+        format_ranked_table(
+            &format!(
+                "# Test/Impl Ratio: {} — {:.1}% ({} impl, {} test)",
+                self.root,
+                self.overall_ratio * 100.0,
+                self.total_impl_lines,
+                self.total_test_lines,
+            ),
+            &self.entries,
+            None,
+        )
     }
 }
 

@@ -6,6 +6,7 @@ use crate::commands::analyze::test_ratio::{
     discover_module_dirs, module_key, split_rust_test_lines,
 };
 use crate::output::OutputFormatter;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 use normalize_languages::is_test_path;
 use rayon::prelude::*;
 use serde::Serialize;
@@ -58,6 +59,46 @@ pub struct ModuleBudget {
     pub other_pct: f64,
 }
 
+impl RankEntry for CategoryEntry {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::left("Category"),
+            Column::right("Lines"),
+            Column::right("Pct"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            self.category.to_string(),
+            format_num(self.lines),
+            format!("{:.1}%", self.pct),
+        ]
+    }
+}
+
+impl RankEntry for ModuleBudget {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::left("Module"),
+            Column::right("Lines"),
+            Column::right("Logic"),
+            Column::right("Test"),
+            Column::right("Other"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            self.module.clone(),
+            format!("{:.0}K", self.total_lines as f64 / 1000.0),
+            format!("{:.0}%", self.logic_pct),
+            format!("{:.0}%", self.test_pct),
+            format!("{:.0}%", self.other_pct),
+        ]
+    }
+}
+
 /// Report returned by `analyze budget`.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct BudgetReport {
@@ -69,50 +110,19 @@ pub struct BudgetReport {
 
 impl OutputFormatter for BudgetReport {
     fn format_text(&self) -> String {
-        let mut out = Vec::new();
-
         let total_k = self.total_lines as f64 / 1000.0;
-        out.push(format!(
-            "# Line Budget: {} ({:.0}K lines)",
-            self.root, total_k,
-        ));
-        out.push(String::new());
-        out.push(format!("  {:<18} {:>8}  {:>6}", "category", "lines", "pct"));
-        out.push(format!("  {}", "-".repeat(36)));
-
-        for entry in &self.categories {
-            out.push(format!(
-                "  {:<18} {:>8}  {:>5.1}%",
-                entry.category.to_string(),
-                format_num(entry.lines),
-                entry.pct,
-            ));
-        }
-
-        out.push(format!("  {}", "-".repeat(36)));
-        out.push(format!(
-            "  {:<18} {:>8}  {:>5.1}%",
-            "total",
-            format_num(self.total_lines),
-            100.0,
-        ));
+        let mut out = format_ranked_table(
+            &format!("# Line Budget: {} ({:.0}K lines)", self.root, total_k),
+            &self.categories,
+            None,
+        );
 
         if !self.modules.is_empty() {
-            out.push(String::new());
-            out.push("## By Module".to_string());
-            for m in &self.modules {
-                out.push(format!(
-                    "  {:<40} {:>5.0}K  ({:.0}% logic, {:.0}% test, {:.0}% other)",
-                    truncate_path(&m.module, 40),
-                    m.total_lines as f64 / 1000.0,
-                    m.logic_pct,
-                    m.test_pct,
-                    m.other_pct,
-                ));
-            }
+            out.push_str("\n\n");
+            out.push_str(&format_ranked_table("## By Module", &self.modules, None));
         }
 
-        out.join("\n")
+        out
     }
 
     fn format_pretty(&self) -> String {

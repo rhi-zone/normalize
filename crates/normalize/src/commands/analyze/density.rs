@@ -1,5 +1,5 @@
 use flate2::{Compression, write::GzEncoder};
-use normalize_analyze::ranked::{Scored, rank_pipeline};
+use normalize_analyze::ranked::{Column, RankEntry, Scored, format_ranked_table, rank_pipeline};
 use normalize_languages::support_for_path;
 use rayon::prelude::*;
 use serde::Serialize;
@@ -51,6 +51,48 @@ impl normalize_analyze::Entity for ModuleDensity {
     }
 }
 
+impl RankEntry for ModuleDensity {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::left("Module"),
+            Column::right("Files"),
+            Column::right("Compress"),
+            Column::right("Unique"),
+            Column::right("Density"),
+            Column::right("Lines"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            self.module.clone(),
+            self.total_files.to_string(),
+            format!("{:.3}", self.avg_compression_ratio),
+            format!("{:.3}", self.avg_token_uniqueness),
+            format!("{:.3}", self.density_score),
+            self.total_lines.to_string(),
+        ]
+    }
+}
+
+impl RankEntry for FileDensity {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("Density"),
+            Column::left("File"),
+            Column::right("Lines"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            format!("{:.3}", self.density_score),
+            self.path.clone(),
+            self.lines.to_string(),
+        ]
+    }
+}
+
 /// Report returned by `analyze density`.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct DensityReport {
@@ -66,80 +108,28 @@ pub struct DensityReport {
 
 impl OutputFormatter for DensityReport {
     fn format_text(&self) -> String {
-        let mut out = Vec::new();
-        out.push("# Code Density Analysis".to_string());
-        out.push(String::new());
-        out.push(format!("Root:              {}", self.root));
-        out.push(format!("Files analyzed:    {}", self.files_analyzed));
-        out.push(format!(
-            "Compression ratio: {:.2}  (lower = more repetitive)",
-            self.overall_compression_ratio
+        let mut out = String::new();
+        out.push_str(&format!(
+            "# Code Density Analysis\n\nRoot:              {}\nFiles analyzed:    {}\nCompression ratio: {:.2}  (lower = more repetitive)\nToken uniqueness:  {:.2}  (lower = more repetitive)\n\n",
+            self.root, self.files_analyzed, self.overall_compression_ratio, self.overall_token_uniqueness
         ));
-        out.push(format!(
-            "Token uniqueness:  {:.2}  (lower = more repetitive)",
-            self.overall_token_uniqueness
-        ));
-        out.push(String::new());
 
-        if self.modules.is_empty() {
-            out.push("No modules found.".to_string());
-            return out.join("\n");
-        }
+        out.push_str(&format_ranked_table(
+            "## Modules (most repetitive first)",
+            &self.modules,
+            Some("No modules found."),
+        ));
 
-        out.push("## Modules (most repetitive first)".to_string());
-        out.push(String::new());
-        let w = self
-            .modules
-            .iter()
-            .map(|m| m.module.len())
-            .max()
-            .unwrap_or(20);
-        out.push(format!(
-            "  {:<w$}  {:>6}  {:>8}  {:>8}  {:>8}  {:>6}",
-            "module",
-            "files",
-            "compress",
-            "unique",
-            "density",
-            "lines",
-            w = w
-        ));
-        out.push(format!(
-            "  {:<w$}  {:>6}  {:>8}  {:>8}  {:>8}  {:>6}",
-            "-".repeat(w),
-            "------",
-            "--------",
-            "--------",
-            "--------",
-            "------",
-            w = w
-        ));
-        for m in &self.modules {
-            out.push(format!(
-                "  {:<w$}  {:>6}  {:>8.3}  {:>8.3}  {:>8.3}  {:>6}",
-                m.module,
-                m.total_files,
-                m.avg_compression_ratio,
-                m.avg_token_uniqueness,
-                m.density_score,
-                m.total_lines,
-                w = w
+        if !self.worst_files.is_empty() {
+            out.push_str("\n\n");
+            out.push_str(&format_ranked_table(
+                "## Most Repetitive Files",
+                &self.worst_files,
+                None,
             ));
         }
 
-        if !self.worst_files.is_empty() {
-            out.push(String::new());
-            out.push("## Most Repetitive Files".to_string());
-            out.push(String::new());
-            for f in &self.worst_files {
-                out.push(format!(
-                    "  {:.3} density  {}  ({} lines)",
-                    f.density_score, f.path, f.lines
-                ));
-            }
-        }
-
-        out.join("\n")
+        out
     }
 
     fn format_pretty(&self) -> String {
