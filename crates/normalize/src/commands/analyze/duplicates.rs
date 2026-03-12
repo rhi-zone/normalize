@@ -1,6 +1,6 @@
 //! Duplicate function and type detection.
 
-use super::duplicates_views::DuplicatesReport;
+use super::duplicates_views::{DuplicateGroup, DuplicatesReport};
 use crate::extract::Extractor;
 use crate::filter::Filter;
 use crate::output::OutputFormatter;
@@ -427,6 +427,113 @@ fn collect_block_signatures(
     }
 }
 
+/// Minimum pairs from the same directory pair before suppression kicks in.
+const PARALLEL_IMPL_THRESHOLD: usize = 5;
+
+/// Extract the parent directory from a relative file path, returning the path
+/// up to the last `/` (or "." for top-level files).
+fn parent_dir(path: &str) -> &str {
+    match path.rfind('/') {
+        Some(pos) => &path[..pos],
+        None => ".",
+    }
+}
+
+/// Suppress groups/pairs that originate from directory pairs with many matches
+/// (likely parallel trait implementations).  Returns (kept, suppressed_summaries).
+/// Compute a canonical directory-pair key for a group.  For 2-location groups,
+/// returns the ordered pair of parent dirs.  For N-location groups where all
+/// files share the same directory, returns (dir, dir).  Returns None otherwise.
+fn group_dir_pair_key(group: &DuplicateGroup) -> Option<(String, String)> {
+    if group.locations.len() == 2 {
+        let dir_a = parent_dir(&group.locations[0].file).to_string();
+        let dir_b = parent_dir(&group.locations[1].file).to_string();
+        Some(if dir_a <= dir_b {
+            (dir_a, dir_b)
+        } else {
+            (dir_b, dir_a)
+        })
+    } else if group.locations.len() > 2 {
+        // Check if all locations share at most 2 distinct directories.
+        let mut dirs: Vec<String> = group
+            .locations
+            .iter()
+            .map(|l| parent_dir(&l.file).to_string())
+            .collect();
+        dirs.sort();
+        dirs.dedup();
+        match dirs.len() {
+            1 => Some((dirs[0].clone(), dirs[0].clone())),
+            2 => {
+                let (a, b) = (dirs[0].clone(), dirs[1].clone());
+                Some(if a <= b { (a, b) } else { (b, a) })
+            }
+            _ => None,
+        }
+    } else {
+        None
+    }
+}
+
+struct DirectorySuppressionResult {
+    kept: Vec<DuplicateGroup>,
+    suppressed: Vec<crate::commands::analyze::duplicates_views::SuppressedDirectoryPair>,
+}
+
+fn suppress_parallel_directory_groups(groups: Vec<DuplicateGroup>) -> DirectorySuppressionResult {
+    use crate::commands::analyze::duplicates_views::SuppressedDirectoryPair;
+
+    // Count groups per ordered directory pair.
+    let mut dir_pair_counts: HashMap<(String, String), usize> = HashMap::new();
+    for group in &groups {
+        if let Some(key) = group_dir_pair_key(group) {
+            *dir_pair_counts.entry(key).or_default() += 1;
+        }
+    }
+
+    // Identify hot directory pairs.
+    let hot_pairs: HashSet<(String, String)> = dir_pair_counts
+        .iter()
+        .filter(|&(_, count)| *count >= PARALLEL_IMPL_THRESHOLD)
+        .map(|(k, _)| k.clone())
+        .collect();
+
+    if hot_pairs.is_empty() {
+        return DirectorySuppressionResult {
+            kept: groups,
+            suppressed: Vec::new(),
+        };
+    }
+
+    let mut kept = Vec::new();
+    let mut suppressed_counts: HashMap<(String, String), usize> = HashMap::new();
+
+    for group in groups {
+        if let Some(key) = group_dir_pair_key(&group)
+            && hot_pairs.contains(&key)
+        {
+            *suppressed_counts.entry(key).or_default() += 1;
+            continue;
+        }
+        kept.push(group);
+    }
+
+    let mut summaries: Vec<SuppressedDirectoryPair> = suppressed_counts
+        .into_iter()
+        .map(|((dir_a, dir_b), count)| SuppressedDirectoryPair {
+            dir_b: if dir_a == dir_b { None } else { Some(dir_b) },
+            dir_a,
+            pair_count: count,
+        })
+        .collect();
+    summaries.sort_by(|a, b| b.pair_count.cmp(&a.pair_count));
+
+    DirectorySuppressionResult {
+        kept,
+        suppressed: summaries,
+    }
+}
+
 /// Suppress overlapping pairs: if two pairs involve the same two files and
 /// both locations significantly overlap, keep only the largest (first seen,
 /// since pairs are pre-sorted by similarity desc then size desc).
@@ -784,9 +891,7 @@ pub(crate) fn find_similar_function_pairs(
 
 /// Build duplicate functions report without printing (for service layer).
 pub fn build_duplicate_functions_report(cfg: DuplicateFunctionsConfig<'_>) -> DuplicatesReport {
-    use crate::commands::analyze::duplicates_views::{
-        CodeLocation, DuplicateGroup, DuplicateMode, DuplicateScope,
-    };
+    use crate::commands::analyze::duplicates_views::{CodeLocation, DuplicateMode, DuplicateScope};
 
     let DuplicateFunctionsConfig {
         roots,
@@ -964,6 +1069,18 @@ pub fn build_duplicate_functions_report(cfg: DuplicateFunctionsConfig<'_>) -> Du
         })
         .collect();
 
+    let DirectorySuppressionResult {
+        kept: unified_groups,
+        suppressed: suppressed_directory_pairs,
+    } = if include_trait_impls {
+        DirectorySuppressionResult {
+            kept: unified_groups,
+            suppressed: Vec::new(),
+        }
+    } else {
+        suppress_parallel_directory_groups(unified_groups)
+    };
+
     DuplicatesReport {
         mode: DuplicateMode::Exact,
         scope: DuplicateScope::Functions,
@@ -977,6 +1094,7 @@ pub fn build_duplicate_functions_report(cfg: DuplicateFunctionsConfig<'_>) -> Du
         suppressed_same_name: Some(suppressed_same_name),
         stats: None,
         groups: unified_groups,
+        suppressed_directory_pairs,
         show_source,
         roots: roots.to_vec(),
     }
@@ -984,9 +1102,7 @@ pub fn build_duplicate_functions_report(cfg: DuplicateFunctionsConfig<'_>) -> Du
 
 /// Build duplicate blocks report without printing (for service layer).
 pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> DuplicatesReport {
-    use crate::commands::analyze::duplicates_views::{
-        CodeLocation, DuplicateGroup, DuplicateMode, DuplicateScope,
-    };
+    use crate::commands::analyze::duplicates_views::{CodeLocation, DuplicateMode, DuplicateScope};
 
     let DuplicateBlocksConfig {
         root,
@@ -1148,6 +1264,7 @@ pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> Duplicat
         suppressed_same_name: None,
         stats: None,
         groups: unified_groups,
+        suppressed_directory_pairs: Vec::new(),
         show_source,
         roots: vec![root.to_path_buf()],
     }
@@ -1155,9 +1272,7 @@ pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> Duplicat
 
 /// Build similar functions report without printing (for service layer).
 pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> DuplicatesReport {
-    use crate::commands::analyze::duplicates_views::{
-        CodeLocation, DuplicateGroup, DuplicateMode, DuplicateScope,
-    };
+    use crate::commands::analyze::duplicates_views::{CodeLocation, DuplicateMode, DuplicateScope};
 
     let SimilarFunctionsConfig {
         roots,
@@ -1252,6 +1367,18 @@ pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> Duplic
         })
         .collect();
 
+    let DirectorySuppressionResult {
+        kept: unified_groups,
+        suppressed: suppressed_directory_pairs,
+    } = if include_trait_impls {
+        DirectorySuppressionResult {
+            kept: unified_groups,
+            suppressed: Vec::new(),
+        }
+    } else {
+        suppress_parallel_directory_groups(unified_groups)
+    };
+
     DuplicatesReport {
         mode: DuplicateMode::Similar,
         scope: DuplicateScope::Functions,
@@ -1265,6 +1392,7 @@ pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> Duplic
         suppressed_same_name: None,
         stats: None,
         groups: unified_groups,
+        suppressed_directory_pairs,
         show_source,
         roots: roots.to_vec(),
     }
@@ -1272,9 +1400,7 @@ pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> Duplic
 
 /// Build similar blocks report without printing (for service layer).
 pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> DuplicatesReport {
-    use crate::commands::analyze::duplicates_views::{
-        CodeLocation, DuplicateGroup, DuplicateMode, DuplicateScope,
-    };
+    use crate::commands::analyze::duplicates_views::{CodeLocation, DuplicateMode, DuplicateScope};
 
     let SimilarBlocksConfig {
         root,
@@ -1513,6 +1639,18 @@ pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> DuplicatesRe
         })
         .collect();
 
+    let DirectorySuppressionResult {
+        kept: unified_groups,
+        suppressed: suppressed_directory_pairs,
+    } = if include_trait_impls {
+        DirectorySuppressionResult {
+            kept: unified_groups,
+            suppressed: Vec::new(),
+        }
+    } else {
+        suppress_parallel_directory_groups(unified_groups)
+    };
+
     DuplicatesReport {
         mode: DuplicateMode::Similar,
         scope: DuplicateScope::Blocks,
@@ -1526,6 +1664,7 @@ pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> DuplicatesRe
         suppressed_same_name: None,
         stats: None,
         groups: unified_groups,
+        suppressed_directory_pairs,
         show_source,
         roots: vec![root.to_path_buf()],
     }

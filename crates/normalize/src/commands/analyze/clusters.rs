@@ -273,6 +273,7 @@ pub(crate) fn build_clusters_report_multi(
         suppressed_same_name: None,
         stats: None,
         groups: unified_groups,
+        suppressed_directory_pairs: Vec::new(),
         show_source: false,
         roots: roots.to_vec(),
     }

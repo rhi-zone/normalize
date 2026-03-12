@@ -208,7 +208,7 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 ### Duplicate/clone detection improvements
 
 - Per-subcommand excludes in config: `[analyze.similar-blocks] exclude = [...]` so language-file exclusion doesn't affect `analyze rules`, `analyze complexity`, etc. (currently the global `[analyze] exclude` is too coarse)
-- "Parallel impl directory" heuristic: if >N pairs originate from the same directory pair, fold them into a single suppressed note (e.g., "48 pairs suppressed within normalize-languages/ — likely parallel Language trait implementations")
+- [x] "Parallel impl directory" heuristic: if >=5 pairs originate from the same directory pair, fold them into a suppressed note (e.g., "388 pairs suppressed across 10 directory groups"). Applied to exact-functions, similar-functions, and similar-blocks when `!include_trait_impls`. Handles 2-location pairs and multi-location groups (up to 2 distinct directories).
 - `similar-blocks` / `similar-functions`: cross-file same-containing-function suppression covers same-method-name in different files; doesn't cover same-body-pattern across different method names (the Language impl case)
 - Consider min-lines bump for `similar-blocks` (currently 10) — the 19-line Symbol constructor is below many useful thresholds; maybe 15-20 default would further cut noise without missing real clones
 
@@ -219,9 +219,9 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 - Phase 3b builtin rules: more builtin rules, sharing improvements (see `docs/design/builtin-rules.md`)
   - Semantic rules system: for rules needing cross-file analysis (import cycles, unused exports, type mismatches). Current syntax-based rules are single-file AST queries; semantic rules need index-backed analysis. Separate infrastructure, triggered differently (post-index vs per-file).
 
-### Rule tags system
+### ~~Rule tags system~~ (done)
 
-- [ ] Deterministic tag color hashing in `--pretty` output (curated palette, red/yellow reserved for severity)
+- [x] Deterministic tag color hashing in `--pretty` output (FNV-1a hash, 10-color curated palette at OKLCH L≈0.65, red/yellow reserved for severity)
 
 ---
 

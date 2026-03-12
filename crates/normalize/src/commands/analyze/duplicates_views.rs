@@ -94,6 +94,18 @@ impl CodeLocation {
     }
 }
 
+/// A directory pair that had many duplicate/similar pairs suppressed.
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+pub struct SuppressedDirectoryPair {
+    /// First directory (or the sole directory if both files share it).
+    pub dir_a: String,
+    /// Second directory (empty if same as dir_a).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dir_b: Option<String>,
+    /// Number of pairs/groups suppressed.
+    pub pair_count: usize,
+}
+
 /// A group of duplicate/similar code locations.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct DuplicateGroup {
@@ -129,6 +141,9 @@ pub struct DuplicatesReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stats: Option<RankStats>,
     pub groups: Vec<DuplicateGroup>,
+    /// Directory pairs suppressed because they had too many parallel-impl pairs.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub suppressed_directory_pairs: Vec<SuppressedDirectoryPair>,
     /// For show_source rendering (not serialized).
     #[serde(skip)]
     pub show_source: bool,
@@ -245,6 +260,29 @@ impl OutputFormatter for DuplicatesReport {
                     self.groups.len(),
                     total_fns
                 ));
+            }
+        }
+
+        if !self.suppressed_directory_pairs.is_empty() {
+            let total: usize = self
+                .suppressed_directory_pairs
+                .iter()
+                .map(|s| s.pair_count)
+                .sum();
+            out.push(format!(
+                "Suppressed: {} pairs across {} directory groups (likely parallel implementations; use --include-trait-impls to show)",
+                total,
+                self.suppressed_directory_pairs.len()
+            ));
+            for s in &self.suppressed_directory_pairs {
+                if let Some(dir_b) = &s.dir_b {
+                    out.push(format!(
+                        "   {} <-> {}  ({} pairs)",
+                        s.dir_a, dir_b, s.pair_count
+                    ));
+                } else {
+                    out.push(format!("   within {}  ({} pairs)", s.dir_a, s.pair_count));
+                }
             }
         }
 
@@ -483,6 +521,31 @@ impl OutputFormatter for DuplicatesReport {
                     self.groups.len(),
                     total_fns
                 ));
+            }
+        }
+
+        if !self.suppressed_directory_pairs.is_empty() {
+            let total: usize = self
+                .suppressed_directory_pairs
+                .iter()
+                .map(|s| s.pair_count)
+                .sum();
+            out.push(
+                Color::Fixed(245)
+                    .paint(format!(
+                        "Suppressed: {} pairs across {} directory groups (parallel implementations)",
+                        total,
+                        self.suppressed_directory_pairs.len()
+                    ))
+                    .to_string(),
+            );
+            for s in &self.suppressed_directory_pairs {
+                let line = if let Some(dir_b) = &s.dir_b {
+                    format!("   {} <-> {}  ({} pairs)", s.dir_a, dir_b, s.pair_count)
+                } else {
+                    format!("   within {}  ({} pairs)", s.dir_a, s.pair_count)
+                };
+                out.push(Color::Fixed(245).paint(line).to_string());
             }
         }
 
