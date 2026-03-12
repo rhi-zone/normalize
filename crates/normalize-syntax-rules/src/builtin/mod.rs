@@ -211,6 +211,23 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "go/magic-number",
         content: include_str!("go_magic_number.scm"),
     },
+    // C/C++ rules
+    BuiltinRule {
+        id: "c/printf-debug",
+        content: include_str!("c_printf_debug.scm"),
+    },
+    BuiltinRule {
+        id: "c/goto",
+        content: include_str!("c_goto.scm"),
+    },
+    BuiltinRule {
+        id: "c/magic-number",
+        content: include_str!("c_magic_number.scm"),
+    },
+    BuiltinRule {
+        id: "cpp/cout-debug",
+        content: include_str!("cpp_cout_debug.scm"),
+    },
     // Java rules
     BuiltinRule {
         id: "java/system-print",

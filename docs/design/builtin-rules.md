@@ -33,6 +33,8 @@ Not all rules are appropriate for all project types:
 | `python/breakpoint` | ✓ Use | ✓ Use | ✓ Use | Never commit breakpoint() |
 | `go/fmt-print` | ✓ Use | ❌ Disable | ✓ Use | CLI tools use fmt.Print |
 | `ruby/binding-pry` | ✓ Use | ✓ Use | ✓ Use | Never commit binding.pry |
+| `c/printf-debug` | ✓ Use | ❌ Disable | N/A | CLI tools use printf for output |
+| `cpp/cout-debug` | ✓ Use | ❌ Disable | N/A | CLI tools use cout for output |
 | `java/system-print` | ✓ Use | ❌ Disable | ✓ Use | CLI tools use System.out |
 | `java/empty-catch` | ✓ Use | ✓ Use | ✓ Use | Silent exception swallowing |
 | `java/print-stack-trace` | ✓ Use | ⚠️ Noisy | ✓ Use | Use structured logging |
@@ -191,6 +193,37 @@ Flags `fmt.Print`, `fmt.Println`, `fmt.Printf` calls.
 
 **When to use:** Library code where structured logging is preferred.
 **When to disable:** CLI tools in `cmd/` directories.
+
+### C/C++ Rules
+
+#### `c/printf-debug`
+**Severity:** info | **Languages:** c, cpp
+
+Flags `printf`, `fprintf`, `puts`, `fputs`, `perror` calls.
+
+**Default allow:** `**/test/**`, `**/tests/**`, `**/examples/**`
+
+**When to use:** Library code where structured logging is preferred.
+**When to disable:** CLI tools and systems code. Disabled by default.
+
+#### `c/goto`
+**Severity:** info | **Languages:** c, cpp
+
+Flags `goto` statements.
+
+**When to disable:** Disabled by default. The "goto cleanup" pattern is idiomatic in C kernel/systems code.
+
+#### `c/magic-number`
+**Severity:** info | **Languages:** c, cpp
+
+Flags numeric literals in comparisons (excluding single-digit 0-9). Disabled by default.
+
+#### `cpp/cout-debug`
+**Severity:** info | **Languages:** cpp
+
+Flags `std::cout`, `std::cerr`, `std::clog` stream output.
+
+**Default allow:** `**/test/**`, `**/tests/**`, `**/examples/**`. Disabled by default.
 
 ### Java Rules
 
