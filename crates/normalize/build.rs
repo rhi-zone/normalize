@@ -63,6 +63,35 @@ fn rebuild_spa_if_needed() {
 
     eprintln!("Rebuilding sessions SPA...");
 
+    // Install deps if node_modules is missing (e.g. fresh worktree)
+    let node_modules = web_dir.join("node_modules");
+    if !node_modules.exists() {
+        eprintln!("Installing SPA dependencies...");
+        let install = Command::new("bun")
+            .args(["install"])
+            .current_dir(web_dir)
+            .status()
+            .or_else(|_| {
+                Command::new("npm")
+                    .args(["install"])
+                    .current_dir(web_dir)
+                    .status()
+            });
+        match install {
+            Ok(s) if s.success() => {}
+            Ok(s) => {
+                panic!(
+                    "SPA dependency install failed with status {s}. Run manually: cd web/sessions && bun install"
+                );
+            }
+            Err(e) => {
+                panic!(
+                    "Could not install SPA deps (bun/npm not found: {e}). Install bun or run: cd web/sessions && bun install"
+                );
+            }
+        }
+    }
+
     // Try bun first, fall back to npm
     let result = Command::new("bun")
         .args(["run", "build"])
