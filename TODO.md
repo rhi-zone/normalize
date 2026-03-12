@@ -76,12 +76,22 @@ High-value:
 - [x] Thrift tags.scm (struct/union/exception/enum/service/function/typedef/const)
 - [x] Dockerfile tags.scm (FROM...AS stages, ARG, ENV)
 
-80% languages (missing types.scm — assess feasibility per-language):
-- [ ] AWK, Fish, Zsh, Vim, Typst, SCSS, Jq, Meson, CMake, Perl, Prolog
+80% languages (types.scm assessed — only Typst feasible):
+- [x] Typst types.scm (parameter type annotations via `tagged` nodes in `let` bindings)
+- [x] ~~SCSS types.scm~~ — no type system; grammar has no type-like nodes
+- [x] ~~Perl types.scm~~ — no static type annotations in grammar (Perl is dynamically typed; type constraints via Moose/Type::Tiny are runtime, not in CST)
+- [x] ~~Prolog types.scm~~ — no type system in grammar (Prolog is untyped; type annotations via library predicates are just regular terms)
+- [x] ~~AWK types.scm~~ — no type system; all values are strings/numbers contextually
+- [x] ~~Fish types.scm~~ — shell language, no type annotations in grammar
+- [x] ~~Zsh types.scm~~ — shell language, no type annotations in grammar
+- [x] ~~Vim types.scm~~ — VimScript has no type annotations in grammar
+- [x] ~~Jq types.scm~~ — no type system; jq operates on JSON values dynamically
+- [x] ~~Meson types.scm~~ — build system DSL, no type annotations in grammar
+- [x] ~~CMake types.scm~~ — build system scripting, no type annotations in grammar
 
-Config/markup (lower priority, feasible):
-- [ ] Nginx calls.scm (directive invocations)
-- [ ] Caddy tags.scm (route defs)
+Config/markup:
+- [x] Nginx calls.scm (simple_directive and block_directive name captures)
+- [x] Caddy tags.scm (site blocks, snippets, named matchers, handle/route directives)
 
 **Genuinely unsupported (correct as None/empty):**
 - Bash types (no type system)

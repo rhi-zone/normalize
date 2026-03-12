@@ -499,6 +499,7 @@ fn bundled_types_query(name: &str) -> Option<&'static str> {
         "starlark" => Some(include_str!("queries/starlark.types.scm")),
         "matlab" => Some(include_str!("queries/matlab.types.scm")),
         "tlaplus" => Some(include_str!("queries/tlaplus.types.scm")),
+        "typst" => Some(include_str!("queries/typst.types.scm")),
         _ => None,
     }
 }
@@ -587,6 +588,7 @@ fn bundled_tags_query(name: &str) -> Option<&'static str> {
         "xml" => Some(include_str!("queries/xml.tags.scm")),
         "thrift" => Some(include_str!("queries/thrift.tags.scm")),
         "dockerfile" => Some(include_str!("queries/dockerfile.tags.scm")),
+        "caddy" => Some(include_str!("queries/caddy.tags.scm")),
         _ => None,
     }
 }
@@ -956,6 +958,20 @@ mod tests {
             "vhdl",
             "sql",
             "hcl",
+            "glsl",
+            "hlsl",
+            "clojure",
+            "commonlisp",
+            "elisp",
+            "javascript",
+            "lua",
+            "scheme",
+            "graphql",
+            "nix",
+            "starlark",
+            "matlab",
+            "tlaplus",
+            "typst",
         ] {
             let query = bundled_types_query(lang);
             assert!(query.is_some(), "Missing bundled types query for {lang}");
@@ -1300,6 +1316,7 @@ mod tests {
             "xml",
             "thrift",
             "dockerfile",
+            "caddy",
         ];
         for lang in langs {
             let tags = loader.get_tags(lang);
