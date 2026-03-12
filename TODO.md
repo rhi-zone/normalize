@@ -29,8 +29,12 @@ extract, inline, move — correct, without LSPs, without false positives.
 - [x] Incremental index update on save via `FileIndex::update_file()`
 - [x] Two-tier diagnostics: immediate syntax, debounced (1500ms) fact rules
 - [x] Daemon calls `incremental_call_graph_refresh()` after detecting changes
+- [x] Persistent `SkeletonExtractor` in LSP backend (avoids recreating per request)
+- [x] Compiled query caching in `GrammarLoader` (tags, imports, calls, complexity)
+- [x] Configurable debounce interval (`[serve] fact_debounce_ms`, default 1500)
 - Incremental Datalog for fact rules (research: semi-naive evaluation with change tracking)
-- Configurable debounce interval
+- File-level dependency tracking (import graph edges to scope fact re-evaluation)
+- `normalize watch` CLI (expose daemon file-watching with TUI output)
 - Progress reporting during long runs
 
 ---

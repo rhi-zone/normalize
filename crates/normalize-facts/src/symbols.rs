@@ -88,11 +88,10 @@ impl SymbolParser {
 
         let root = tree.root_node();
 
-        // Query-based extraction
+        // Query-based extraction (compiled query is cached in the loader)
         if let Some(query_str) = loader.get_imports(grammar_name)
-            && let Some(grammar) = loader.get(grammar_name)
-            && let Some(imports) =
-                Self::collect_imports_with_query(root, content, &grammar, &query_str)
+            && let Some(query) = loader.get_compiled_query(grammar_name, "imports", &query_str)
+            && let Some(imports) = Self::collect_imports_with_compiled_query(root, content, &query)
         {
             return imports;
         }
@@ -103,13 +102,11 @@ impl SymbolParser {
 
     /// Query-based import extraction using `@import`, `@import.path`, `@import.name`,
     /// `@import.alias`, and `@import.glob` captures.
-    fn collect_imports_with_query(
+    fn collect_imports_with_compiled_query(
         root: tree_sitter::Node,
         source: &str,
-        grammar: &tree_sitter::Language,
-        query_str: &str,
+        query: &tree_sitter::Query,
     ) -> Option<Vec<FlatImport>> {
-        let query = tree_sitter::Query::new(grammar, query_str).ok()?;
         let path_idx = query.capture_index_for_name("import.path");
         let name_idx = query.capture_index_for_name("import.name");
         let alias_idx = query.capture_index_for_name("import.alias");
@@ -119,7 +116,7 @@ impl SymbolParser {
         let mut qcursor = tree_sitter::QueryCursor::new();
         let mut results = Vec::new();
 
-        let mut matches = qcursor.matches(&query, root, source.as_bytes());
+        let mut matches = qcursor.matches(query, root, source.as_bytes());
         while let Some(m) = matches.next() {
             let mut stmt_line = 0usize;
             let mut path: Option<String> = None;
@@ -297,14 +294,9 @@ impl SymbolParser {
             None => return Vec::new(),
         };
 
-        let grammar = match loader.get(grammar_name) {
-            Some(g) => g,
+        let query = match loader.get_compiled_query(grammar_name, "calls", &calls_query) {
+            Some(q) => q,
             None => return Vec::new(),
-        };
-
-        let query = match tree_sitter::Query::new(&grammar, &calls_query) {
-            Ok(q) => q,
-            Err(_) => return Vec::new(),
         };
 
         let lines: Vec<&str> = content.lines().collect();

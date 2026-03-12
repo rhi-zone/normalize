@@ -18,6 +18,8 @@ pub struct ServeConfig {
     pub http_port: Option<u16>,
     /// HTTP host to bind to.
     pub http_host: Option<String>,
+    /// Debounce interval for LSP fact diagnostics in milliseconds. Default: 1500
+    pub fact_debounce_ms: Option<u64>,
 }
 
 impl ServeConfig {
@@ -27,6 +29,10 @@ impl ServeConfig {
 
     pub fn http_host(&self) -> &str {
         self.http_host.as_deref().unwrap_or("127.0.0.1")
+    }
+
+    pub fn fact_debounce_ms(&self) -> u64 {
+        self.fact_debounce_ms.unwrap_or(1500)
     }
 }
 

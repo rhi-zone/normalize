@@ -56,6 +56,9 @@
 //! enabled = true              # auto-enable when TTY (default: auto)
 //! colors = "auto"             # "auto", "always", or "never"
 //! highlight = true            # syntax highlighting on signatures
+//!
+//! [serve]
+//! fact_debounce_ms = 1500     # debounce for LSP fact diagnostics (ms)
 //! ```
 
 use crate::commands::analyze::AnalyzeConfig;

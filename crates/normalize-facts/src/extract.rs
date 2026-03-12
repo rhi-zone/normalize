@@ -290,12 +290,11 @@ impl Extractor {
             None => return Vec::new(),
         };
 
-        // Use the tags-based extraction path.
+        // Use the tags-based extraction path with cached compiled queries.
         let loader = parsers::grammar_loader();
         let mut symbols = if let Some(tags_query_str) = loader.get_tags(grammar_name) {
-            let grammar_lang = loader.get(grammar_name);
-            grammar_lang
-                .and_then(|lang| tree_sitter::Query::new(&lang, &tags_query_str).ok())
+            loader
+                .get_compiled_query(grammar_name, "tags", &tags_query_str)
                 .and_then(|query| {
                     collect_symbols_from_tags(
                         &tree,
@@ -802,8 +801,7 @@ pub fn compute_complexity(
     let grammar_name = support.grammar_name();
     let loader = parsers::grammar_loader();
     if let Some(scm) = loader.get_complexity(grammar_name)
-        && let Some(grammar) = loader.get(grammar_name)
-        && let Ok(query) = tree_sitter::Query::new(&grammar, &scm)
+        && let Some(query) = loader.get_compiled_query(grammar_name, "complexity", &scm)
     {
         return count_complexity_with_query(node, source, &query);
     }

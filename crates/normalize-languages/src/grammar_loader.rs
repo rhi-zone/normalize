@@ -80,6 +80,8 @@ pub struct GrammarLoader {
     tags_cache: RwLock<HashMap<String, Arc<String>>>,
     /// Cached imports queries.
     imports_cache: RwLock<HashMap<String, Arc<String>>>,
+    /// Cached compiled tree-sitter queries (keyed by "grammar:query_type").
+    compiled_query_cache: RwLock<HashMap<String, Arc<tree_sitter::Query>>>,
 }
 
 impl GrammarLoader {
@@ -116,6 +118,7 @@ impl GrammarLoader {
             types_cache: RwLock::new(HashMap::new()),
             tags_cache: RwLock::new(HashMap::new()),
             imports_cache: RwLock::new(HashMap::new()),
+            compiled_query_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -132,6 +135,7 @@ impl GrammarLoader {
             types_cache: RwLock::new(HashMap::new()),
             tags_cache: RwLock::new(HashMap::new()),
             imports_cache: RwLock::new(HashMap::new()),
+            compiled_query_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -341,6 +345,40 @@ impl GrammarLoader {
         }
 
         None
+    }
+
+    /// Get a compiled tree-sitter query, using the cache to avoid recompilation.
+    ///
+    /// `grammar_name` is the grammar name (e.g. "rust", "python").
+    /// `query_type` is the query category (e.g. "tags", "complexity", "calls").
+    /// `query_str` is the raw .scm query string.
+    ///
+    /// Returns the compiled query or None if compilation fails.
+    pub fn get_compiled_query(
+        &self,
+        grammar_name: &str,
+        query_type: &str,
+        query_str: &str,
+    ) -> Option<Arc<tree_sitter::Query>> {
+        let key = format!("{grammar_name}:{query_type}");
+
+        // Check cache
+        if let Ok(cache) = self.compiled_query_cache.read()
+            && let Some(q) = cache.get(&key)
+        {
+            return Some(Arc::clone(q));
+        }
+
+        // Compile and cache
+        let grammar = self.get(grammar_name)?;
+        let compiled = tree_sitter::Query::new(&grammar, query_str).ok()?;
+        let arc = Arc::new(compiled);
+
+        if let Ok(mut cache) = self.compiled_query_cache.write() {
+            cache.insert(key, Arc::clone(&arc));
+        }
+
+        Some(arc)
     }
 
     /// Load a grammar from external .so file.

@@ -18,12 +18,16 @@ struct NormalizeBackend {
     client: Client,
     root: Mutex<Option<PathBuf>>,
     index: Mutex<Option<FileIndex>>,
+    /// Persistent extractor — avoids recreating grammar caches per request.
+    extractor: SkeletonExtractor,
     /// Files with syntax diagnostics in the last per-file run.
     syntax_diagnosed_files: Arc<Mutex<HashSet<Url>>>,
     /// Files with fact diagnostics in the last workspace-wide run.
     fact_diagnosed_files: Arc<Mutex<HashSet<Url>>>,
     /// Generation counter for debouncing fact diagnostic runs.
     fact_diagnostics_generation: Arc<std::sync::atomic::AtomicU64>,
+    /// Debounce interval for fact diagnostics in milliseconds.
+    fact_debounce_ms: std::sync::atomic::AtomicU64,
 }
 
 impl NormalizeBackend {
@@ -32,9 +36,13 @@ impl NormalizeBackend {
             client,
             root: Mutex::new(None),
             index: Mutex::new(None),
+            extractor: SkeletonExtractor::new(),
             syntax_diagnosed_files: Arc::new(Mutex::new(HashSet::new())),
             fact_diagnosed_files: Arc::new(Mutex::new(HashSet::new())),
             fact_diagnostics_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            fact_debounce_ms: std::sync::atomic::AtomicU64::new(
+                super::ServeConfig::default().fact_debounce_ms(),
+            ),
         }
     }
 
@@ -43,6 +51,14 @@ impl NormalizeBackend {
         if let Some(idx) = crate::index::open_if_enabled(&root).await {
             *self.index.lock().await = Some(idx);
         }
+
+        // Load configurable debounce from project config
+        let config = crate::config::NormalizeConfig::load(&root);
+        self.fact_debounce_ms.store(
+            config.serve.fact_debounce_ms(),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+
         *self.root.lock().await = Some(root.clone());
 
         // Run initial diagnostics (all rules, no debounce)
@@ -167,10 +183,13 @@ impl NormalizeBackend {
         let client = self.client.clone();
         let fact_diagnosed = Arc::clone(&self.fact_diagnosed_files);
         let gen_ref = Arc::clone(&self.fact_diagnostics_generation);
+        let debounce_ms = self
+            .fact_debounce_ms
+            .load(std::sync::atomic::Ordering::Relaxed);
 
         tokio::spawn(async move {
-            // Debounce: wait 1500ms, then check if we're still the latest request
-            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+            // Debounce: wait configured interval, then check if we're still the latest request
+            tokio::time::sleep(std::time::Duration::from_millis(debounce_ms)).await;
             let current = gen_ref.load(std::sync::atomic::Ordering::SeqCst);
             if current != generation {
                 return; // superseded by a newer request
@@ -294,9 +313,8 @@ impl LanguageServer for NormalizeBackend {
             Err(_) => return Ok(None),
         };
 
-        // Extract symbols using skeleton extractor
-        let extractor = SkeletonExtractor::new();
-        let result = extractor.extract(&file_path, &content);
+        // Extract symbols using persistent extractor
+        let result = self.extractor.extract(&file_path, &content);
 
         // Convert to LSP document symbols (nested structure)
         fn to_document_symbol(sym: &normalize_languages::Symbol) -> DocumentSymbol {
@@ -410,9 +428,8 @@ impl LanguageServer for NormalizeBackend {
             Err(_) => return Ok(None),
         };
 
-        // Extract symbols
-        let extractor = SkeletonExtractor::new();
-        let result = extractor.extract(&file_path, &content);
+        // Extract symbols using persistent extractor
+        let result = self.extractor.extract(&file_path, &content);
 
         // Find symbol at position (1-indexed line)
         let line = position.line as usize + 1;
