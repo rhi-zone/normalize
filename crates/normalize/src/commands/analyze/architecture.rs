@@ -5,6 +5,7 @@
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
+use indicatif::{ProgressBar, ProgressStyle};
 use normalize_analyze::truncate_path;
 pub use normalize_architecture::{
     CrossImport, Cycle, HubModule, ImportChain, ImportGraph, LayerFlow, ModuleCoupling,
@@ -164,10 +165,23 @@ impl OutputFormatter for ArchitectureReport {
 }
 
 pub async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport, libsql::Error> {
+    let pb = if std::io::IsTerminal::is_terminal(&std::io::stderr()) {
+        let pb = ProgressBar::new_spinner();
+        pb.set_style(
+            ProgressStyle::with_template("{spinner:.cyan} {msg} [{elapsed_precise}]").unwrap(),
+        );
+        pb.set_message("Building import graph...");
+        pb.enable_steady_tick(std::time::Duration::from_millis(100));
+        pb
+    } else {
+        ProgressBar::hidden()
+    };
+
     let graph = build_import_graph(idx).await?;
     let conn = idx.connection();
 
     // Get all source files (programming languages only)
+    pb.set_message("Loading source files...");
     let mut all_files: HashSet<String> = HashSet::new();
     let stmt = conn.prepare("SELECT DISTINCT file FROM symbols").await?;
     let mut rows = stmt.query(()).await?;
@@ -178,11 +192,16 @@ pub async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport,
         }
     }
 
+    pb.set_message("Computing coupling and hubs...");
     let coupling_and_hubs =
         compute_coupling_and_hubs(&graph.imports_by_file, &graph.importers_by_file, &all_files);
+    pb.set_message("Detecting cross-imports...");
     let cross_imports = detect_cross_imports(&graph.imports_by_file);
+    pb.set_message("Computing layer flows...");
     let layer_flows = compute_layer_flows(&graph.imports_by_file);
+    pb.set_message("Finding orphan modules...");
     let orphans = find_orphan_modules(conn, &graph.importers_by_file).await?;
+    pb.set_message("Finding symbol hotspots...");
     let symbol_hotspots = find_symbol_hotspots(conn).await?;
 
     let total_modules = all_files.len();
@@ -196,6 +215,8 @@ pub async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport,
     } else {
         0
     };
+
+    pb.finish_and_clear();
 
     Ok(ArchitectureReport {
         cross_imports,

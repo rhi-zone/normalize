@@ -5,6 +5,7 @@ use crate::extract::Extractor;
 use crate::filter::Filter;
 use crate::output::OutputFormatter;
 use crate::parsers;
+use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use normalize_code_similarity::{
     LSH_BANDS, MINHASH_N, SHINGLE_K, compute_function_hash, compute_minhash, find_function_node,
     flatten_symbols, jaccard_estimate, lsh_band_hash, serialize_subtree_tokens,
@@ -15,6 +16,23 @@ use serde::Serialize;
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+
+/// Create a progress bar for file scanning with a known count.
+fn file_progress_bar(count: u64, msg: &str) -> ProgressBar {
+    if !std::io::IsTerminal::is_terminal(&std::io::stderr()) {
+        return ProgressBar::hidden();
+    }
+    let pb = ProgressBar::new(count);
+    pb.set_style(
+        ProgressStyle::with_template(&format!(
+            "{{spinner:.cyan}} {} [{{bar:30.cyan/dim}}] {{pos}}/{{len}} files [{{elapsed_precise}}]",
+            msg
+        ))
+        .unwrap()
+        .progress_chars("##-"),
+    );
+    pb
+}
 
 /// A group of duplicate functions
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -565,6 +583,7 @@ pub(crate) fn find_similar_function_pairs(
 
         // Per-file: (total_fn_count, minhash_entries)
         // Per-file: (rel_path, total_fn_count, line_count, minhash_entries)
+        let pb = file_progress_bar(files.len() as u64, "Hashing functions...");
         #[allow(clippy::type_complexity)]
         let per_file: Vec<(
             String,
@@ -573,6 +592,7 @@ pub(crate) fn find_similar_function_pairs(
             Vec<(String, String, usize, usize, [u64; MINHASH_N])>,
         )> = files
             .par_iter()
+            .progress_with(pb.clone())
             .filter_map(|path| {
                 let content = std::fs::read_to_string(path).ok()?;
                 let support = support_for_path(path)?;
@@ -641,6 +661,7 @@ pub(crate) fn find_similar_function_pairs(
                 }
             })
             .collect();
+        pb.finish_and_clear();
 
         for (rel_path, fn_count, lines, entries) in per_file {
             files_scanned += 1;
@@ -814,8 +835,10 @@ pub fn build_duplicate_functions_report(cfg: DuplicateFunctionsConfig<'_>) -> Du
             .collect();
 
         // (fn_count, Vec<(hash, location)>)
+        let pb = file_progress_bar(files.len() as u64, "Hashing functions...");
         let per_file: Vec<(usize, Vec<(u64, DuplicateFunctionLocation)>)> = files
             .par_iter()
+            .progress_with(pb.clone())
             .filter_map(|path| {
                 let content = std::fs::read_to_string(path).ok()?;
                 let support = support_for_path(path)?;
@@ -859,6 +882,7 @@ pub fn build_duplicate_functions_report(cfg: DuplicateFunctionsConfig<'_>) -> Du
                 Some((entries.len(), entries))
             })
             .collect();
+        pb.finish_and_clear();
 
         for (fn_count, entries) in per_file {
             files_scanned += 1;
@@ -982,39 +1006,52 @@ pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> Duplicat
     let mut files_scanned = 0usize;
     let mut blocks_hashed = 0usize;
 
-    let walker = ignore::WalkBuilder::new(root)
+    let files: Vec<PathBuf> = ignore::WalkBuilder::new(root)
         .hidden(true)
         .git_ignore(true)
         .git_global(true)
         .git_exclude(true)
-        .build();
-
-    for entry in walker.filter_map(|e| e.ok()).filter(|e| {
-        let path = e.path();
-        path.is_file() && super::is_source_file(path)
-    }) {
-        let path = entry.path();
-
-        if let Some(f) = filter {
-            let rel_path = path.strip_prefix(root).unwrap_or(path);
-            if !f.matches(rel_path) {
-                continue;
+        .build()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let path = e.path();
+            path.is_file() && super::is_source_file(path)
+        })
+        .filter(|e| {
+            if let Some(f) = filter {
+                let rel_path = e.path().strip_prefix(root).unwrap_or(e.path());
+                f.matches(rel_path)
+            } else {
+                true
             }
-        }
+        })
+        .map(|e| e.path().to_path_buf())
+        .collect();
 
+    let pb = file_progress_bar(files.len() as u64, "Hashing blocks...");
+    for path in &files {
         let content = match std::fs::read_to_string(path) {
             Ok(c) => c,
-            Err(_) => continue,
+            Err(_) => {
+                pb.inc(1);
+                continue;
+            }
         };
 
         let support = match support_for_path(path) {
             Some(s) => s,
-            None => continue,
+            None => {
+                pb.inc(1);
+                continue;
+            }
         };
 
         let tree = match crate::parsers::parse_with_grammar(support.grammar_name(), &content) {
             Some(t) => t,
-            None => continue,
+            None => {
+                pb.inc(1);
+                continue;
+            }
         };
 
         files_scanned += 1;
@@ -1039,7 +1076,9 @@ pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> Duplicat
         );
         let after = hash_groups.values().map(|v| v.len()).sum::<usize>();
         blocks_hashed += after - before;
+        pb.inc(1);
     }
+    pb.finish_and_clear();
 
     let groups_raw: Vec<DuplicateBlockGroup> = hash_groups
         .into_iter()
@@ -1256,39 +1295,52 @@ pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> DuplicatesRe
         HashMap::new();
     let mut files_scanned = 0usize;
 
-    let walker = ignore::WalkBuilder::new(root)
+    let files: Vec<PathBuf> = ignore::WalkBuilder::new(root)
         .hidden(true)
         .git_ignore(true)
         .git_global(true)
         .git_exclude(true)
-        .build();
-
-    for entry in walker.filter_map(|e| e.ok()).filter(|e| {
-        let path = e.path();
-        path.is_file() && super::is_source_file(path)
-    }) {
-        let path = entry.path();
-
-        if let Some(f) = filter {
-            let rel_path = path.strip_prefix(root).unwrap_or(path);
-            if !f.matches(rel_path) {
-                continue;
+        .build()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let path = e.path();
+            path.is_file() && super::is_source_file(path)
+        })
+        .filter(|e| {
+            if let Some(f) = filter {
+                let rel_path = e.path().strip_prefix(root).unwrap_or(e.path());
+                f.matches(rel_path)
+            } else {
+                true
             }
-        }
+        })
+        .map(|e| e.path().to_path_buf())
+        .collect();
 
+    let pb = file_progress_bar(files.len() as u64, "Hashing blocks...");
+    for path in &files {
         let content = match std::fs::read_to_string(path) {
             Ok(c) => c,
-            Err(_) => continue,
+            Err(_) => {
+                pb.inc(1);
+                continue;
+            }
         };
 
         let support = match support_for_path(path) {
             Some(s) => s,
-            None => continue,
+            None => {
+                pb.inc(1);
+                continue;
+            }
         };
 
         let tree = match crate::parsers::parse_with_grammar(support.grammar_name(), &content) {
             Some(t) => t,
-            None => continue,
+            None => {
+                pb.inc(1);
+                continue;
+            }
         };
 
         files_scanned += 1;
@@ -1310,7 +1362,9 @@ pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> DuplicatesRe
             skeleton,
             &mut all_blocks,
         );
+        pb.inc(1);
     }
+    pb.finish_and_clear();
 
     let blocks_analyzed = all_blocks.len();
 
@@ -1530,11 +1584,15 @@ pub fn build_duplicate_types_report(
             .collect()
     };
 
+    let pb = file_progress_bar(files.len() as u64, "Scanning types...");
     for path in &files {
         let path = path.as_path();
         let content = match std::fs::read_to_string(path) {
             Ok(c) => c,
-            Err(_) => continue,
+            Err(_) => {
+                pb.inc(1);
+                continue;
+            }
         };
         files_scanned += 1;
         let result = extractor.extract(path, &content);
@@ -1571,7 +1629,9 @@ pub fn build_duplicate_types_report(
                 fields,
             });
         }
+        pb.inc(1);
     }
+    pb.finish_and_clear();
 
     let n = types.len() as f64;
     let mut field_df: HashMap<&str, usize> = HashMap::new();

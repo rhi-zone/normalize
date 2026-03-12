@@ -3695,6 +3695,7 @@ dependencies = [
  "grep-regex",
  "grep-searcher",
  "ignore",
+ "indicatif",
  "insta",
  "jaq-core",
  "jaq-json",
