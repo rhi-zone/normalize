@@ -5,9 +5,10 @@ use std::path::Path;
 use crate::commands::analyze::duplicates::find_similar_function_pairs;
 use crate::commands::analyze::test_ratio::{discover_module_dirs, module_key};
 use crate::output::OutputFormatter;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 
 /// Per-module uniqueness breakdown.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct ModuleUniqueness {
     pub module: String,
     pub total_functions: usize,
@@ -19,6 +20,28 @@ pub struct ModuleUniqueness {
     pub uniqueness_ratio: f64,
     pub total_lines: usize,
     pub clustered_lines: usize,
+}
+
+impl RankEntry for ModuleUniqueness {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::left("Module"),
+            Column::right("Fns"),
+            Column::right("Unique"),
+            Column::right("Clustered"),
+            Column::right("Ratio"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            self.module.clone(),
+            self.total_functions.to_string(),
+            self.unique_functions.to_string(),
+            self.clustered_functions.to_string(),
+            format!("{:.1}%", self.uniqueness_ratio * 100.0),
+        ]
+    }
 }
 
 /// Summary of a structural cluster (group of near-duplicate functions).
@@ -78,43 +101,11 @@ impl OutputFormatter for UniquenessReport {
         out.push(String::new());
 
         if !self.modules.is_empty() {
-            out.push("## Modules (most clustered first)".to_string());
-            out.push(String::new());
-            let w = self
-                .modules
-                .iter()
-                .map(|m| m.module.len())
-                .max()
-                .unwrap_or(20);
-            out.push(format!(
-                "  {:<w$}  {:>5}  {:>9}  {:>9}  {:>8}",
-                "module",
-                "fns",
-                "unique",
-                "clustered",
-                "ratio",
-                w = w
+            out.push(format_ranked_table(
+                "## Modules (most clustered first)",
+                &self.modules,
+                None,
             ));
-            out.push(format!(
-                "  {:<w$}  {:>5}  {:>9}  {:>9}  {:>8}",
-                "-".repeat(w),
-                "-----",
-                "---------",
-                "---------",
-                "--------",
-                w = w
-            ));
-            for m in &self.modules {
-                out.push(format!(
-                    "  {:<w$}  {:>5}  {:>9}  {:>9}  {:>7.1}%",
-                    m.module,
-                    m.total_functions,
-                    m.unique_functions,
-                    m.clustered_functions,
-                    m.uniqueness_ratio * 100.0,
-                    w = w
-                ));
-            }
         }
 
         if !self.top_clusters.is_empty() {

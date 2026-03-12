@@ -3,13 +3,13 @@
 use super::is_source_file;
 use crate::output::OutputFormatter;
 use glob::Pattern;
-use normalize_analyze::truncate_path;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 
 /// A pair of files with temporal coupling
-#[derive(Debug, Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct CoupledPair {
     pub file_a: String,
     pub file_b: String,
@@ -21,6 +21,26 @@ pub struct CoupledPair {
     pub commits_b: usize,
     /// Confidence: shared / max(commits_a, commits_b)
     pub confidence: f64,
+}
+
+impl RankEntry for CoupledPair {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::left("File A"),
+            Column::left("File B"),
+            Column::right("Shared"),
+            Column::right("Conf%"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            self.file_a.clone(),
+            self.file_b.clone(),
+            self.shared_commits.to_string(),
+            format!("{:.0}%", self.confidence * 100.0),
+        ]
+    }
 }
 
 /// Per-repo coupling entry for multi-repo runs
@@ -42,32 +62,13 @@ pub struct CouplingReport {
 }
 
 fn format_coupling_data(pairs: &[CoupledPair]) -> String {
-    let mut lines = Vec::new();
-    lines.push("Temporal Coupling (files that change together)".to_string());
-    lines.push(String::new());
-    lines.push(format!(
-        "{:<45} {:<45} {:>7} {:>6}",
-        "File A", "File B", "Shared", "Conf%"
-    ));
-    lines.push("-".repeat(107));
-
-    for p in pairs {
-        let a = truncate_path(&p.file_a, 43);
-        let b = truncate_path(&p.file_b, 43);
-        lines.push(format!(
-            "{:<45} {:<45} {:>7} {:>5.0}%",
-            a,
-            b,
-            p.shared_commits,
-            p.confidence * 100.0
-        ));
-    }
-
-    lines.push(String::new());
-    lines.push("Confidence = shared commits / max(commits_a, commits_b)".to_string());
-    lines.push("High coupling may indicate hidden dependencies or shotgun surgery.".to_string());
-
-    lines.join("\n")
+    let mut out = format_ranked_table(
+        "# Temporal Coupling (files that change together)",
+        pairs,
+        Some("No temporal coupling found (no files change together frequently)"),
+    );
+    out.push_str("\n\nConfidence = shared commits / max(commits_a, commits_b)\nHigh coupling may indicate hidden dependencies or shotgun surgery.");
+    out
 }
 
 impl OutputFormatter for CouplingReport {
