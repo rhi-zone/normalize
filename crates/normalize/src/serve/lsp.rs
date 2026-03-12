@@ -14,24 +14,27 @@ use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
 /// Normalize LSP backend.
-struct MossBackend {
+struct NormalizeBackend {
     client: Client,
     root: Mutex<Option<PathBuf>>,
     index: Mutex<Option<FileIndex>>,
-    /// Files that had diagnostics in the last run (to clear stale ones).
-    diagnosed_files: Arc<Mutex<HashSet<Url>>>,
-    /// Generation counter for debouncing diagnostic runs.
-    diagnostics_generation: Arc<std::sync::atomic::AtomicU64>,
+    /// Files with syntax diagnostics in the last per-file run.
+    syntax_diagnosed_files: Arc<Mutex<HashSet<Url>>>,
+    /// Files with fact diagnostics in the last workspace-wide run.
+    fact_diagnosed_files: Arc<Mutex<HashSet<Url>>>,
+    /// Generation counter for debouncing fact diagnostic runs.
+    fact_diagnostics_generation: Arc<std::sync::atomic::AtomicU64>,
 }
 
-impl MossBackend {
+impl NormalizeBackend {
     fn new(client: Client) -> Self {
         Self {
             client,
             root: Mutex::new(None),
             index: Mutex::new(None),
-            diagnosed_files: Arc::new(Mutex::new(HashSet::new())),
-            diagnostics_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            syntax_diagnosed_files: Arc::new(Mutex::new(HashSet::new())),
+            fact_diagnosed_files: Arc::new(Mutex::new(HashSet::new())),
+            fact_diagnostics_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
     }
 
@@ -42,33 +45,154 @@ impl MossBackend {
         }
         *self.root.lock().await = Some(root.clone());
 
-        // Run initial diagnostics
-        self.schedule_diagnostics().await;
+        // Run initial diagnostics (all rules, no debounce)
+        self.schedule_all_diagnostics().await;
     }
 
-    /// Schedule a debounced diagnostics run (500ms delay).
-    async fn schedule_diagnostics(&self) {
+    /// Schedule all diagnostics (syntax + fact) for initial load.
+    async fn schedule_all_diagnostics(&self) {
+        let root = self.root.lock().await.clone();
+        let Some(root) = root else { return };
+
+        let client = self.client.clone();
+        let syntax_diagnosed = Arc::clone(&self.syntax_diagnosed_files);
+        let fact_diagnosed = Arc::clone(&self.fact_diagnosed_files);
+
+        tokio::spawn(async move {
+            run_and_publish_diagnostics(
+                &client,
+                &root,
+                &normalize_rules::RuleType::Syntax,
+                &syntax_diagnosed,
+            )
+            .await;
+            run_and_publish_diagnostics(
+                &client,
+                &root,
+                &normalize_rules::RuleType::Fact,
+                &fact_diagnosed,
+            )
+            .await;
+        });
+    }
+
+    /// Run syntax diagnostics immediately for a single file.
+    async fn run_syntax_diagnostics_for_file(&self, uri: &Url) {
+        let file_path = match uri.to_file_path() {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+
+        let root = self.root.lock().await.clone();
+        let Some(root) = root else { return };
+
+        let client = self.client.clone();
+        let syntax_diagnosed = Arc::clone(&self.syntax_diagnosed_files);
+        let file_owned = file_path.clone();
+        let root_owned = root.clone();
+
+        tokio::spawn(async move {
+            let report = tokio::task::spawn_blocking(move || {
+                let config = crate::config::NormalizeConfig::load(&root_owned);
+                let rules_config = normalize_rules::RulesRunConfig {
+                    rule_tags: config.rule_tags.0.clone(),
+                    rules: config.rules.clone(),
+                };
+                normalize_rules::run_rules_report(
+                    &file_owned,
+                    &root_owned,
+                    None,
+                    None,
+                    &normalize_rules::RuleType::Syntax,
+                    &[],
+                    &rules_config,
+                )
+            })
+            .await;
+
+            let report = match report {
+                Ok(r) => r,
+                Err(e) => {
+                    client
+                        .log_message(
+                            MessageType::ERROR,
+                            format!("Failed to run syntax diagnostics: {e}"),
+                        )
+                        .await;
+                    return;
+                }
+            };
+
+            let diagnostics: Vec<Diagnostic> =
+                report.issues.iter().map(issue_to_lsp_diagnostic).collect();
+
+            let uri = match Url::from_file_path(&file_path) {
+                Ok(u) => u,
+                Err(_) => return,
+            };
+
+            let mut prev = syntax_diagnosed.lock().await;
+            if diagnostics.is_empty() {
+                // Clear syntax diagnostics for this file if it had them before
+                if prev.remove(&uri) {
+                    client.publish_diagnostics(uri, vec![], None).await;
+                }
+            } else {
+                client
+                    .publish_diagnostics(uri.clone(), diagnostics, None)
+                    .await;
+                prev.insert(uri);
+            }
+        });
+    }
+
+    /// Schedule debounced fact diagnostics (1500ms delay, workspace-wide).
+    /// Incrementally updates the index for the saved file before running fact rules.
+    async fn schedule_fact_diagnostics(&self, saved_uri: &Url) {
         let generation = self
-            .diagnostics_generation
+            .fact_diagnostics_generation
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
             + 1;
 
         let root = self.root.lock().await.clone();
         let Some(root) = root else { return };
 
+        // Compute relative path for index update
+        let rel_path = saved_uri.to_file_path().ok().and_then(|p| {
+            p.strip_prefix(&root)
+                .ok()
+                .map(|r| r.to_string_lossy().to_string())
+        });
+
         let client = self.client.clone();
-        let diagnosed_files = Arc::clone(&self.diagnosed_files);
-        let gen_ref = Arc::clone(&self.diagnostics_generation);
+        let fact_diagnosed = Arc::clone(&self.fact_diagnosed_files);
+        let gen_ref = Arc::clone(&self.fact_diagnostics_generation);
 
         tokio::spawn(async move {
-            // Debounce: wait 500ms, then check if we're still the latest request
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            // Debounce: wait 1500ms, then check if we're still the latest request
+            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
             let current = gen_ref.load(std::sync::atomic::Ordering::SeqCst);
             if current != generation {
                 return; // superseded by a newer request
             }
 
-            run_and_publish_diagnostics(&client, &root, &diagnosed_files).await;
+            // Incrementally update the index for the saved file
+            if let Some(rel) = &rel_path
+                && let Ok(mut idx) = crate::index::open(&root).await
+                && let Err(e) = idx.update_file(rel).await
+            {
+                client
+                    .log_message(MessageType::WARNING, format!("Index update for {rel}: {e}"))
+                    .await;
+            }
+
+            run_and_publish_diagnostics(
+                &client,
+                &root,
+                &normalize_rules::RuleType::Fact,
+                &fact_diagnosed,
+            )
+            .await;
         });
     }
 
@@ -92,7 +216,7 @@ impl MossBackend {
 }
 
 #[tower_lsp::async_trait]
-impl LanguageServer for MossBackend {
+impl LanguageServer for NormalizeBackend {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
         // Get workspace root from params
         if let Some(root_uri) = params.root_uri
@@ -146,8 +270,12 @@ impl LanguageServer for MossBackend {
         Ok(())
     }
 
-    async fn did_save(&self, _params: DidSaveTextDocumentParams) {
-        self.schedule_diagnostics().await;
+    async fn did_save(&self, params: DidSaveTextDocumentParams) {
+        let uri = &params.text_document.uri;
+        // Fast: per-file syntax diagnostics (immediate)
+        self.run_syntax_diagnostics_for_file(uri).await;
+        // Slow: workspace-wide fact diagnostics (debounced 1500ms)
+        self.schedule_fact_diagnostics(uri).await;
     }
 
     async fn document_symbol(
@@ -194,7 +322,7 @@ impl LanguageServer for MossBackend {
                 } else {
                     Some(sym.signature.clone())
                 },
-                kind: MossBackend::to_lsp_symbol_kind(sym.kind.as_str()),
+                kind: NormalizeBackend::to_lsp_symbol_kind(sym.kind.as_str()),
                 tags: None,
                 deprecated: None,
                 range,
@@ -827,14 +955,15 @@ fn issue_to_lsp_diagnostic(issue: &normalize_output::diagnostics::Issue) -> Diag
     }
 }
 
-/// Run all rule engines and publish diagnostics to the LSP client.
+/// Run rules of a specific type and publish diagnostics to the LSP client.
 async fn run_and_publish_diagnostics(
     client: &Client,
     root: &std::path::Path,
+    rule_type: &normalize_rules::RuleType,
     diagnosed_files: &Mutex<HashSet<Url>>,
 ) {
-    // Run rules on a blocking thread (they do synchronous I/O + tree-sitter parsing)
     let root_owned = root.to_path_buf();
+    let rule_type_owned = rule_type.clone();
     let report = tokio::task::spawn_blocking(move || {
         let config = crate::config::NormalizeConfig::load(&root_owned);
         let rules_config = normalize_rules::RulesRunConfig {
@@ -846,7 +975,7 @@ async fn run_and_publish_diagnostics(
             &root_owned,
             None,
             None,
-            &normalize_rules::RuleType::All,
+            &rule_type_owned,
             &[],
             &rules_config,
         )
@@ -918,7 +1047,7 @@ pub async fn run_lsp_server(root: Option<&std::path::Path>) -> i32 {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
-    let (service, socket) = LspService::new(MossBackend::new);
+    let (service, socket) = LspService::new(NormalizeBackend::new);
 
     // If root is provided, initialize early (will be overridden by client's root)
     if let Some(_root) = root {

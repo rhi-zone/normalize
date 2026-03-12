@@ -226,7 +226,7 @@ LlmClient NormalizeAgentSession
 Hunk BuiltinRule
 
 # Server state types share index/root
-AppState MossBackend
+AppState NormalizeBackend
 
 # File parsing results share symbol data
 ExtractResult ParsedFileData

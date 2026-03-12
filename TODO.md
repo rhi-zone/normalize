@@ -23,10 +23,13 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ~~**Bug: `Turn::token_usage` only captures the last API call per turn.**~~ Already fixed in claude_code.rs — `turn_request_ids: Vec<String>` accumulates all request IDs and `sum_turn_tokens` sums them on flush.
 
-### LSP diagnostics improvements (basic implementation done, needs incrementality)
+### LSP diagnostics improvements
 
-- Per-file syntax rules (only re-run on the saved file, not the whole workspace)
-- Incremental fact rules (currently rebuilds full index each run)
+- [x] Per-file syntax rules (only re-run on the saved file, not the whole workspace)
+- [x] Incremental index update on save via `FileIndex::update_file()`
+- [x] Two-tier diagnostics: immediate syntax, debounced (1500ms) fact rules
+- [x] Daemon calls `incremental_call_graph_refresh()` after detecting changes
+- Incremental Datalog for fact rules (research: semi-naive evaluation with change tracking)
 - Configurable debounce interval
 - Progress reporting during long runs
 
@@ -223,23 +226,21 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 
 The current architecture is batch-oriented: commands scan the whole workspace, produce a report, and exit. This works for CLI but is wrong for LSP and other interactive consumers. The goal is to make incrementality a first-class concern throughout the stack.
 
-**Where batch hurts today:**
-- LSP diagnostics re-run all rule engines on every save (syntax rules re-parse every file, fact rules rebuild the full index)
-- `FileIndex` is rebuilt from scratch — no way to update a single file's symbols/imports/calls
-- Syntax rules load and compile all tree-sitter queries on every invocation
+**What's done:**
+- [x] `FileIndex::update_file()` — single-file re-index without full rebuild
+- [x] Per-file syntax rule evaluation in LSP (run rules only on saved file)
+- [x] Two-tier LSP diagnostics: immediate syntax, debounced fact rules
+- [x] Daemon calls `incremental_call_graph_refresh()` after detecting changes
 
-**Target architecture:**
-- **FileIndex**: `update_file(path, content)` — re-index one file, update SQLite incrementally (delete old rows, insert new). Dependency graph tracks which files' diagnostics to invalidate.
-- **Syntax rules**: per-file evaluation. On save, re-run rules only on the saved file. Cache compiled queries across invocations (already cached per-process via `GrammarLoader`, but lost between LSP requests).
-- **Fact rules**: incremental Datalog. When facts for one file change, re-derive only affected conclusions. This is hard — may need semi-naive evaluation with change tracking, or accept batch for fact rules and optimize syntax rules first.
+**Remaining:**
+- Syntax rules load and compile all tree-sitter queries on every invocation
+- **Fact rules**: incremental Datalog. When facts for one file change, re-derive only affected conclusions. This is hard — may need semi-naive evaluation with change tracking.
 - **Watch mode**: `normalize watch` that keeps the index live and re-runs checks on file changes (inotify/fsevents). The LSP server is one consumer; a TUI dashboard could be another.
 
-**Incremental steps (not all-or-nothing):**
-1. `FileIndex::update_file()` — single-file re-index without full rebuild
-2. Per-file syntax rule evaluation in LSP (run rules only on saved file)
-3. Persistent `GrammarLoader` in LSP (don't re-create `SkeletonExtractor` per request)
-4. File-level dependency tracking for diagnostic invalidation
-5. Incremental fact rule evaluation (long-term, research needed)
+**Next incremental steps:**
+1. Persistent `GrammarLoader` in LSP (don't re-create `SkeletonExtractor` per request)
+2. File-level dependency tracking for diagnostic invalidation
+3. Incremental fact rule evaluation (long-term, research needed)
 
 ### Lint / Analysis Architecture
 

@@ -442,8 +442,16 @@ impl DaemonServer {
             let rt = tokio::runtime::Runtime::new().unwrap();
             match rt.block_on(crate::index::open(root)) {
                 Ok(mut idx) => {
-                    if let Err(e) = rt.block_on(idx.incremental_refresh()) {
-                        eprintln!("Refresh error for {:?}: {}", root, e);
+                    match rt.block_on(idx.incremental_refresh()) {
+                        Ok(changes) if changes > 0 => {
+                            if let Err(e) = rt.block_on(idx.incremental_call_graph_refresh()) {
+                                eprintln!("Call graph refresh error for {:?}: {}", root, e);
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Refresh error for {:?}: {}", root, e);
+                        }
+                        _ => {}
                     }
                     watched.last_refresh = Instant::now();
                 }

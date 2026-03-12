@@ -1,6 +1,6 @@
 # LSP Diagnostics from Rule Engines
 
-Status: **in progress**
+Status: **implemented**
 
 ## Problem
 
@@ -22,52 +22,48 @@ Fields align directly:
 | `source` | `source` (e.g. "normalize/syntax-rules") |
 | `related` | `relatedInformation` |
 
-### Architecture
+### Architecture: two-tier diagnostics
 
 ```
-did_save notification
-  → debounce (500ms)
-  → spawn background task
-  → run_rules_report(root, ...) on workspace
-  → group Issues by file
-  → publish_diagnostics per file
+did_save(uri)
+├── run_syntax_diagnostics(uri)          # immediate, per-file
+│   ├── run_rules_report(file, root, Syntax)  # ~10-50ms
+│   └── publish syntax diagnostics for file
+│
+└── schedule_fact_diagnostics()           # debounced 1500ms
+    ├── update_file(rel_path) on index    # incremental reindex
+    ├── run_rules_report(root, root, Fact)# full Datalog on fresh index
+    └── publish fact diagnostics for all files
 ```
 
-### Approach: on-save with debounce
+### Tier 1: per-file syntax diagnostics (immediate)
 
-1. **`did_save`** triggers diagnostics run (not `did_change` — rules work on disk content)
-2. **Debounce**: 500ms after last save, run once. Cancels pending runs.
-3. **Background**: rules run on a background tokio task, don't block LSP responses
-4. **Per-file publishing**: group issues by `file`, call `client.publish_diagnostics()` for each
-5. **Clear stale**: when re-running, publish empty diagnostics for files that previously had issues but no longer do
+1. **`did_save`** triggers per-file syntax rules immediately
+2. Runs `run_rules_report(file_path, root, RuleType::Syntax)` — only syntax rules on the saved file
+3. Publishes diagnostics for that single file, tracking syntax-diagnosed files separately
+4. Fast: ~10-50ms for a single file
 
-### Why not incremental?
+### Tier 2: workspace-wide fact diagnostics (debounced)
 
-- Syntax rules scan whole files (tree-sitter parse + pattern match) — file-level is the natural granularity
-- Fact rules need full index — no incremental path exists
-- A full run on save is fast enough for most projects (syntax rules: <1s for ~1000 files)
+1. **`did_save`** also schedules fact diagnostics with 1500ms debounce
+2. Before running fact rules, incrementally updates the index via `FileIndex::update_file()`
+3. Runs `run_rules_report(root, root, RuleType::Fact)` on the full workspace
+4. Publishes fact diagnostics workspace-wide, tracking fact-diagnosed files separately
 
-### State needed in MossBackend
+### Diagnostic source separation
+
+Issues have a `source` field (`"syntax-rules"` or `"fact-rules"`). Each tier only replaces diagnostics from its own source:
+- Syntax tier replaces `normalize/syntax-rules` diagnostics for the saved file
+- Fact tier replaces `normalize/fact-rules` diagnostics workspace-wide
+
+### State in NormalizeBackend
 
 ```rust
-/// Files that had diagnostics in the last run (to clear stale ones).
-diagnosed_files: Mutex<HashSet<Url>>,
-/// Cancel token for debounced runs.
-diagnostics_cancel: Mutex<Option<tokio::sync::watch::Sender<()>>>,
+syntax_diagnosed_files: Arc<Mutex<HashSet<Url>>>,
+fact_diagnosed_files: Arc<Mutex<HashSet<Url>>>,
+fact_diagnostics_generation: Arc<AtomicU64>,
 ```
-
-### Implementation steps
-
-1. Add `did_save` handler to `MossBackend`
-2. Add `issue_to_lsp_diagnostic()` conversion function
-3. Run `run_rules_report()` in background task after debounce
-4. Publish diagnostics per file, clear stale files
-5. Add `diagnosed_files` tracking to clear removed issues
 
 ### Config
 
-No new config needed initially. The existing `normalize.toml` rule configuration (`rules`) applies. The LSP server reads it the same way the CLI does.
-
-### Future: per-file syntax rules
-
-For syntax rules specifically, we could run only on the saved file (not the whole workspace). This would be a performance optimization for large repos — run workspace-wide on startup, then per-file on save.
+No new config needed. The existing `normalize.toml` rule configuration (`rules`) applies.

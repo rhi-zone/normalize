@@ -1882,35 +1882,15 @@ impl FileIndex {
         })
     }
 
-    /// Incrementally update call graph for changed files only
-    /// Much faster than full refresh when few files changed
-    pub async fn incremental_call_graph_refresh(
-        &mut self,
+    /// Reindex specific files: delete old data and re-extract symbols/calls/imports.
+    /// Expects to be called inside a transaction.
+    async fn reindex_files(
+        &self,
+        deleted_files: &[String],
+        changed_files: &[String],
     ) -> Result<CallGraphStats, libsql::Error> {
-        let changed = self.get_changed_files().await?;
-
-        // Only process supported source and data files
-        let changed_files: Vec<String> = changed
-            .added
-            .into_iter()
-            .chain(changed.modified.into_iter())
-            .filter(|f| is_source_file(f))
-            .collect();
-
-        let deleted_source_files: Vec<String> = changed
-            .deleted
-            .into_iter()
-            .filter(|f| is_source_file(f))
-            .collect();
-
-        if changed_files.is_empty() && deleted_source_files.is_empty() {
-            return Ok(CallGraphStats::default());
-        }
-
-        self.conn.execute("BEGIN", ()).await?;
-
         // Remove data for deleted/modified files
-        for path in deleted_source_files.iter().chain(changed_files.iter()) {
+        for path in deleted_files.iter().chain(changed_files.iter()) {
             self.conn
                 .execute("DELETE FROM symbols WHERE file = ?1", params![path.clone()])
                 .await?;
@@ -1949,7 +1929,7 @@ impl FileIndex {
         let mut import_count = 0;
 
         // Parse changed files
-        for file_path in &changed_files {
+        for file_path in changed_files {
             let full_path = self.root.join(file_path);
             let content = match std::fs::read_to_string(&full_path) {
                 Ok(c) => c,
@@ -2010,6 +1990,42 @@ impl FileIndex {
             }
         }
 
+        Ok(CallGraphStats {
+            symbols: symbol_count,
+            calls: call_count,
+            imports: import_count,
+        })
+    }
+
+    /// Incrementally update call graph for changed files only.
+    /// Much faster than full refresh when few files changed.
+    pub async fn incremental_call_graph_refresh(
+        &mut self,
+    ) -> Result<CallGraphStats, libsql::Error> {
+        let changed = self.get_changed_files().await?;
+
+        // Only process supported source and data files
+        let changed_files: Vec<String> = changed
+            .added
+            .into_iter()
+            .chain(changed.modified.into_iter())
+            .filter(|f| is_source_file(f))
+            .collect();
+
+        let deleted_source_files: Vec<String> = changed
+            .deleted
+            .into_iter()
+            .filter(|f| is_source_file(f))
+            .collect();
+
+        if changed_files.is_empty() && deleted_source_files.is_empty() {
+            return Ok(CallGraphStats::default());
+        }
+
+        self.conn.execute("BEGIN", ()).await?;
+        let stats = self
+            .reindex_files(&deleted_source_files, &changed_files)
+            .await?;
         self.conn.execute("COMMIT", ()).await?;
 
         // Resolve any newly inserted imports to root-relative file paths.
@@ -2017,11 +2033,47 @@ impl FileIndex {
         // Resolve call targets using the now-populated import graph.
         self.resolve_all_calls().await.ok();
 
-        Ok(CallGraphStats {
-            symbols: symbol_count,
-            calls: call_count,
-            imports: import_count,
-        })
+        Ok(stats)
+    }
+
+    /// Update the index for a single file (used by LSP on save).
+    /// Skips filesystem walk — directly reindexes the given path and resolves imports/calls.
+    pub async fn update_file(&mut self, rel_path: &str) -> Result<CallGraphStats, libsql::Error> {
+        let full_path = self.root.join(rel_path);
+        let exists = full_path.exists();
+
+        // Update the files table mtime
+        if exists {
+            let metadata = std::fs::metadata(&full_path).ok();
+            let mtime = metadata
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            self.conn
+                .execute(
+                    "UPDATE files SET mtime = ?1 WHERE path = ?2",
+                    params![mtime, rel_path.to_string()],
+                )
+                .await?;
+        }
+
+        if !is_source_file(rel_path) {
+            return Ok(CallGraphStats::default());
+        }
+
+        self.conn.execute("BEGIN", ()).await?;
+        let stats = if exists {
+            self.reindex_files(&[], &[rel_path.to_string()]).await?
+        } else {
+            self.reindex_files(&[rel_path.to_string()], &[]).await?
+        };
+        self.conn.execute("COMMIT", ()).await?;
+
+        self.resolve_all_imports().await.ok();
+        self.resolve_all_calls().await.ok();
+
+        Ok(stats)
     }
 
     /// Check if call graph needs refresh
