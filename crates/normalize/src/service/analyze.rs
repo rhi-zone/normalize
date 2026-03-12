@@ -868,10 +868,13 @@ impl AnalyzeService {
         >,
     ) -> Result<FileLengthReport, String> {
         let root_path = Self::root_path(root);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let mut merged_exclude = config.analyze.excludes_for("files");
+        merged_exclude.extend(exclude);
         let mut report = crate::commands::analyze::files::analyze_files(
             &root_path,
             limit.unwrap_or(20),
-            &exclude,
+            &merged_exclude,
         );
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
@@ -881,7 +884,7 @@ impl AnalyzeService {
                 Ok(crate::commands::analyze::files::analyze_files(
                     wt,
                     usize::MAX,
-                    &exclude,
+                    &merged_exclude,
                 ))
             })?;
             compute_ranked_diff(&mut report.files, &baseline.files);
@@ -901,8 +904,12 @@ impl AnalyzeService {
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
     ) -> Result<SizeReport, String> {
         let root_path = Self::root_path(root);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let mut merged_exclude = config.analyze.excludes_for("size");
+        merged_exclude.extend(exclude);
         Ok(crate::commands::analyze::size::analyze_size(
-            &root_path, &exclude,
+            &root_path,
+            &merged_exclude,
         ))
     }
 
@@ -961,16 +968,28 @@ impl AnalyzeService {
     ) -> Result<CouplingReport, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let mut merged_exclude = config.analyze.excludes_for("coupling");
+        merged_exclude.extend(exclude);
         let min = min_commits.unwrap_or(3);
         let lim = limit.unwrap_or(20);
-        let mut report =
-            crate::commands::analyze::coupling::analyze_coupling(&root_path, min, lim, &exclude)?;
+        let mut report = crate::commands::analyze::coupling::analyze_coupling(
+            &root_path,
+            min,
+            lim,
+            &merged_exclude,
+        )?;
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
             use normalize_analyze::ranked::compute_ranked_diff;
             let hash = resolve_ref(&root_path, diff_ref)?;
             let baseline = run_in_worktree(&root_path, &hash, |wt| {
-                crate::commands::analyze::coupling::analyze_coupling(wt, min, usize::MAX, &exclude)
+                crate::commands::analyze::coupling::analyze_coupling(
+                    wt,
+                    min,
+                    usize::MAX,
+                    &merged_exclude,
+                )
             })?;
             compute_ranked_diff(&mut report.pairs, &baseline.pairs);
             report.diff_ref = Some(diff_ref.clone());
@@ -997,6 +1016,9 @@ impl AnalyzeService {
     ) -> Result<CouplingClustersReport, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let mut merged_exclude = config.analyze.excludes_for("coupling-clusters");
+        merged_exclude.extend(exclude);
         let effective_min = min_commits.unwrap_or_else(|| {
             let total = std::process::Command::new("git")
                 .args(["rev-list", "--count", "HEAD"])
@@ -1016,7 +1038,7 @@ impl AnalyzeService {
             &root_path,
             effective_min,
             limit.unwrap_or(20),
-            &exclude,
+            &merged_exclude,
             &only,
         )
     }
@@ -1104,6 +1126,9 @@ impl AnalyzeService {
         >,
     ) -> Result<OwnershipReport, String> {
         let root_path = Self::root_path(root);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let mut merged_exclude = config.analyze.excludes_for("ownership");
+        merged_exclude.extend(exclude);
         let lim = limit.unwrap_or(20);
         if let Some(repos_dir) = repos_dir {
             let repo_paths = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
@@ -1116,7 +1141,9 @@ impl AnalyzeService {
                         .unwrap_or("unknown")
                         .to_string();
                     match crate::commands::analyze::ownership::analyze_ownership(
-                        &repo_path, lim, &exclude,
+                        &repo_path,
+                        lim,
+                        &merged_exclude,
                     ) {
                         Ok(r) => OwnershipRepoEntry {
                             name,
@@ -1137,14 +1164,21 @@ impl AnalyzeService {
                 diff_ref: None,
             });
         }
-        let mut report =
-            crate::commands::analyze::ownership::analyze_ownership(&root_path, lim, &exclude)?;
+        let mut report = crate::commands::analyze::ownership::analyze_ownership(
+            &root_path,
+            lim,
+            &merged_exclude,
+        )?;
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
             use normalize_analyze::ranked::compute_ranked_diff;
             let hash = resolve_ref(&root_path, diff_ref)?;
             let baseline = run_in_worktree(&root_path, &hash, |wt| {
-                crate::commands::analyze::ownership::analyze_ownership(wt, usize::MAX, &exclude)
+                crate::commands::analyze::ownership::analyze_ownership(
+                    wt,
+                    usize::MAX,
+                    &merged_exclude,
+                )
             })?;
             compute_ranked_diff(&mut report.files, &baseline.files);
             report.diff_ref = Some(diff_ref.clone());
@@ -2084,8 +2118,14 @@ impl AnalyzeService {
     ) -> Result<SkeletonDiffReport, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let mut merged_exclude = config.analyze.excludes_for("skeleton-diff");
+        merged_exclude.extend(exclude);
         crate::commands::analyze::skeleton_diff::analyze_skeleton_diff(
-            &root_path, &base, &exclude, &only,
+            &root_path,
+            &base,
+            &merged_exclude,
+            &only,
         )
     }
 
@@ -2149,6 +2189,9 @@ impl AnalyzeService {
             .unwrap_or("all")
             .parse()
             .map_err(|e: String| e)?;
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let mut merged_exclude = config.analyze.excludes_for("fragments");
+        merged_exclude.extend(exclude);
         crate::commands::analyze::fragments::analyze_fragments(
             &root_path,
             min_nodes.unwrap_or(10),
@@ -2159,7 +2202,7 @@ impl AnalyzeService {
             limit.unwrap_or(30),
             skeleton,
             min_members.unwrap_or(2),
-            &exclude,
+            &merged_exclude,
             &only,
         )
     }
