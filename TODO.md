@@ -216,7 +216,7 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 
 ### SARIF engine actionable output
 
-- `rules run --engine sarif` could show which SARIF tools had errors (not done)
+- ~~`rules run --engine sarif` could show which SARIF tools had errors (not done)~~ Done: tool errors captured in `DiagnosticsReport.tool_errors` and shown in text/pretty output
 
 ### Duplicate/clone detection improvements
 

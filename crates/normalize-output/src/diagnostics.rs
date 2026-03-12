@@ -71,6 +71,15 @@ impl Issue {
     }
 }
 
+/// An error from a SARIF tool that failed to run or produce valid output.
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct ToolError {
+    /// Name of the tool that failed.
+    pub tool: String,
+    /// Human-readable error message.
+    pub message: String,
+}
+
 /// Report containing diagnostic issues from one or more checks.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct DiagnosticsReport {
@@ -78,6 +87,9 @@ pub struct DiagnosticsReport {
     pub files_checked: usize,
     /// Which checks/engines produced issues in this report.
     pub sources_run: Vec<String>,
+    /// Errors from tools that failed to run or produce valid output.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub tool_errors: Vec<ToolError>,
 }
 
 impl DiagnosticsReport {
@@ -87,6 +99,7 @@ impl DiagnosticsReport {
             issues: Vec::new(),
             files_checked: 0,
             sources_run: Vec::new(),
+            tool_errors: Vec::new(),
         }
     }
 
@@ -99,6 +112,7 @@ impl DiagnosticsReport {
                 self.sources_run.push(source);
             }
         }
+        self.tool_errors.extend(other.tool_errors);
     }
 
     /// Sort issues by file, then line, then severity (most severe first).
@@ -205,6 +219,20 @@ impl DiagnosticsReport {
     /// Only errors and warnings are shown in detail; info/hints are summarized at the end.
     pub fn format_text_limited(&self, limit: Option<usize>) -> String {
         let mut out = String::new();
+
+        // Show tool errors first so they're visible even when there are no issues.
+        if !self.tool_errors.is_empty() {
+            out.push_str(&format!(
+                "{} tool error{}:\n",
+                self.tool_errors.len(),
+                if self.tool_errors.len() == 1 { "" } else { "s" }
+            ));
+            for err in &self.tool_errors {
+                out.push_str(&format!("  {}: {}\n", err.tool, err.message));
+            }
+            out.push('\n');
+        }
+
         if self.issues.is_empty() {
             out.push_str(&format!(
                 "No issues found ({} files checked, sources: {}).\n",
@@ -325,15 +353,36 @@ impl OutputFormatter for DiagnosticsReport {
     fn format_pretty(&self) -> String {
         use nu_ansi_term::Color;
 
+        let mut out = String::new();
+
+        // Show tool errors prominently at the top.
+        if !self.tool_errors.is_empty() {
+            out.push_str(&format!(
+                "{}\n",
+                Color::Red.bold().paint(format!(
+                    "{} tool error{}:",
+                    self.tool_errors.len(),
+                    if self.tool_errors.len() == 1 { "" } else { "s" }
+                ))
+            ));
+            for err in &self.tool_errors {
+                out.push_str(&format!(
+                    "  {}: {}\n",
+                    Color::Red.paint(&err.tool),
+                    err.message,
+                ));
+            }
+            out.push('\n');
+        }
+
         if self.issues.is_empty() {
-            return format!(
+            out.push_str(&format!(
                 "{} No issues found ({} files checked)\n",
                 Color::Green.paint("✓"),
                 self.files_checked
-            );
+            ));
+            return out;
         }
-
-        let mut out = String::new();
         let errors = self.count_by_severity(Severity::Error);
         let warnings = self.count_by_severity(Severity::Warning);
 
@@ -474,6 +523,7 @@ mod tests {
             issues: vec![],
             files_checked: 10,
             sources_run: vec!["check-refs".into()],
+            tool_errors: vec![],
         };
         let text = report.format_text();
         assert!(text.contains("No issues found"));
@@ -534,6 +584,7 @@ mod tests {
             }],
             files_checked: 5,
             sources_run: vec!["check-refs".into()],
+            tool_errors: vec![],
         };
         let b = DiagnosticsReport {
             issues: vec![Issue {
@@ -551,6 +602,7 @@ mod tests {
             }],
             files_checked: 8,
             sources_run: vec!["stale-docs".into()],
+            tool_errors: vec![],
         };
         a.merge(b);
         assert_eq!(a.issues.len(), 2);
@@ -598,9 +650,59 @@ mod tests {
             ],
             files_checked: 2,
             sources_run: vec!["s".into()],
+            tool_errors: vec![],
         };
         report.sort();
         assert_eq!(report.issues[0].file, "a.rs");
         assert_eq!(report.issues[1].file, "b.rs");
+    }
+
+    #[test]
+    fn test_tool_errors_shown_in_text() {
+        let report = DiagnosticsReport {
+            issues: vec![],
+            files_checked: 0,
+            sources_run: vec!["sarif".into()],
+            tool_errors: vec![
+                ToolError {
+                    tool: "eslint".into(),
+                    message: "failed to run: No such file or directory".into(),
+                },
+                ToolError {
+                    tool: "clippy-sarif".into(),
+                    message: "did not emit valid JSON: expected value at line 1".into(),
+                },
+            ],
+        };
+        let text = report.format_text();
+        assert!(text.contains("2 tool errors:"));
+        assert!(text.contains("eslint: failed to run"));
+        assert!(text.contains("clippy-sarif: did not emit valid JSON"));
+    }
+
+    #[test]
+    fn test_merge_combines_tool_errors() {
+        let mut a = DiagnosticsReport {
+            issues: vec![],
+            files_checked: 0,
+            sources_run: vec![],
+            tool_errors: vec![ToolError {
+                tool: "tool-a".into(),
+                message: "error a".into(),
+            }],
+        };
+        let b = DiagnosticsReport {
+            issues: vec![],
+            files_checked: 0,
+            sources_run: vec![],
+            tool_errors: vec![ToolError {
+                tool: "tool-b".into(),
+                message: "error b".into(),
+            }],
+        };
+        a.merge(b);
+        assert_eq!(a.tool_errors.len(), 2);
+        assert_eq!(a.tool_errors[0].tool, "tool-a");
+        assert_eq!(a.tool_errors[1].tool, "tool-b");
     }
 }

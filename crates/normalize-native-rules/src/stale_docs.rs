@@ -208,6 +208,7 @@ impl From<StaleDocsReport> for DiagnosticsReport {
                 .collect(),
             files_checked: report.files_checked,
             sources_run: vec!["stale-docs".into()],
+            tool_errors: vec![],
         }
     }
 }

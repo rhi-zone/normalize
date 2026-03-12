@@ -1241,7 +1241,14 @@ pub fn run_sarif_tools(
         let stdout = match output {
             Ok(o) => String::from_utf8_lossy(&o.stdout).into_owned(),
             Err(e) => {
-                eprintln!("normalize: SARIF tool '{}' failed to run: {}", tool.name, e);
+                let msg = format!("failed to run: {e}");
+                eprintln!("normalize: SARIF tool '{}' {}", tool.name, msg);
+                report
+                    .tool_errors
+                    .push(normalize_output::diagnostics::ToolError {
+                        tool: tool.name.clone(),
+                        message: msg,
+                    });
                 continue;
             }
         };
@@ -1249,10 +1256,14 @@ pub fn run_sarif_tools(
         let sarif: serde_json::Value = match serde_json::from_str(&stdout) {
             Ok(v) => v,
             Err(e) => {
-                eprintln!(
-                    "normalize: SARIF tool '{}' did not emit valid JSON: {}",
-                    tool.name, e
-                );
+                let msg = format!("did not emit valid JSON: {e}");
+                eprintln!("normalize: SARIF tool '{}' {}", tool.name, msg);
+                report
+                    .tool_errors
+                    .push(normalize_output::diagnostics::ToolError {
+                        tool: tool.name.clone(),
+                        message: msg,
+                    });
                 continue;
             }
         };
@@ -1260,10 +1271,14 @@ pub fn run_sarif_tools(
         let runs = match sarif.get("runs").and_then(|v| v.as_array()) {
             Some(r) => r,
             None => {
-                eprintln!(
-                    "normalize: SARIF tool '{}' output missing 'runs' array",
-                    tool.name
-                );
+                let msg = "output missing 'runs' array".to_string();
+                eprintln!("normalize: SARIF tool '{}' {}", tool.name, msg);
+                report
+                    .tool_errors
+                    .push(normalize_output::diagnostics::ToolError {
+                        tool: tool.name.clone(),
+                        message: msg,
+                    });
                 continue;
             }
         };
