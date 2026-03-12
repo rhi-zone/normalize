@@ -208,11 +208,13 @@ impl FileIndex {
             (),
         )
         .await?;
+        // May fail on old DBs where the column doesn't exist yet; migration below adds it.
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_calls_resolved ON calls(callee_resolved_file)",
             (),
         )
-        .await?;
+        .await
+        .ok();
 
         // Symbol definitions
         conn.execute(
@@ -397,6 +399,12 @@ impl FileIndex {
             conn.execute("ALTER TABLE calls ADD COLUMN callee_resolved_file TEXT", ())
                 .await
                 .ok(); // ignore "duplicate column" error on fresh DBs
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_calls_resolved ON calls(callee_resolved_file)",
+                (),
+            )
+            .await
+            .ok();
             conn.execute("DELETE FROM type_methods", ()).await.ok();
             conn.execute("DELETE FROM type_refs", ()).await.ok();
             conn.execute("DELETE FROM symbol_attributes", ()).await.ok();
