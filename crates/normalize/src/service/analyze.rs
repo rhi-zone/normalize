@@ -837,13 +837,31 @@ impl AnalyzeService {
             String,
         >,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
     ) -> Result<FileLengthReport, String> {
         let root_path = Self::root_path(root);
-        Ok(crate::commands::analyze::files::analyze_files(
+        let mut report = crate::commands::analyze::files::analyze_files(
             &root_path,
             limit.unwrap_or(20),
             &exclude,
-        ))
+        );
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                Ok(crate::commands::analyze::files::analyze_files(
+                    wt,
+                    usize::MAX,
+                    &exclude,
+                ))
+            })?;
+            compute_ranked_diff(&mut report.files, &baseline.files);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
     }
 
     /// Show hierarchical LOC breakdown (ncdu-style)
@@ -873,17 +891,33 @@ impl AnalyzeService {
         #[param(short = 'l', help = "Maximum number of files to show (0=no limit)")] limit: Option<
             usize,
         >,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
     ) -> Result<CeremonyReport, String> {
         let root_path = Self::root_path(root);
-        Ok(crate::commands::analyze::ceremony::analyze_ceremony(
-            &root_path,
-            limit.unwrap_or(15),
-        ))
+        let mut report =
+            crate::commands::analyze::ceremony::analyze_ceremony(&root_path, limit.unwrap_or(15));
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                Ok(crate::commands::analyze::ceremony::analyze_ceremony(
+                    wt,
+                    usize::MAX,
+                ))
+            })?;
+            compute_ranked_diff(&mut report.top_files, &baseline.top_files);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
     }
 
     /// Temporal coupling: file pairs that change together in git history
     #[server(group = "git")]
     #[cli(display_with = "display_coupling")]
+    #[allow(clippy::too_many_arguments)]
     pub fn coupling(
         &self,
         #[param(help = "Minimum shared commits for coupling edges")] min_commits: Option<usize>,
@@ -893,6 +927,9 @@ impl AnalyzeService {
             String,
         >,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<CouplingReport, String> {
@@ -900,7 +937,19 @@ impl AnalyzeService {
         self.resolve_format(pretty, compact, &root_path);
         let min = min_commits.unwrap_or(3);
         let lim = limit.unwrap_or(20);
-        crate::commands::analyze::coupling::analyze_coupling(&root_path, min, lim, &exclude)
+        let mut report =
+            crate::commands::analyze::coupling::analyze_coupling(&root_path, min, lim, &exclude)?;
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                crate::commands::analyze::coupling::analyze_coupling(wt, min, usize::MAX, &exclude)
+            })?;
+            compute_ranked_diff(&mut report.pairs, &baseline.pairs);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
     }
 
     /// Change-clusters: connected components of temporally coupled files
@@ -1022,6 +1071,9 @@ impl AnalyzeService {
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Run across all git repos under DIR")] repos_dir: Option<String>,
         #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
     ) -> Result<OwnershipReport, String> {
         let root_path = Self::root_path(root);
         let lim = limit.unwrap_or(20);
@@ -1054,9 +1106,22 @@ impl AnalyzeService {
             return Ok(OwnershipReport {
                 files: vec![],
                 repos: Some(entries),
+                diff_ref: None,
             });
         }
-        crate::commands::analyze::ownership::analyze_ownership(&root_path, lim, &exclude)
+        let mut report =
+            crate::commands::analyze::ownership::analyze_ownership(&root_path, lim, &exclude)?;
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                crate::commands::analyze::ownership::analyze_ownership(wt, usize::MAX, &exclude)
+            })?;
+            compute_ranked_diff(&mut report.files, &baseline.files);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
     }
 
     /// Analyze contributors across repos
@@ -1390,6 +1455,9 @@ impl AnalyzeService {
         >,
         #[param(short = 'l', help = "Maximum number of entries to show (0=no limit)")]
         limit: Option<usize>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<BudgetReport, String> {
@@ -1399,10 +1467,22 @@ impl AnalyzeService {
             0 => usize::MAX,
             n => n,
         };
-        Ok(crate::commands::analyze::budget::analyze_budget(
-            &root_path,
-            effective_limit,
-        ))
+        let mut report =
+            crate::commands::analyze::budget::analyze_budget(&root_path, effective_limit);
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                Ok(crate::commands::analyze::budget::analyze_budget(
+                    wt,
+                    usize::MAX,
+                ))
+            })?;
+            compute_ranked_diff(&mut report.modules, &baseline.modules);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
     }
 
     /// Show test ratio trend over git history
@@ -1672,6 +1752,9 @@ impl AnalyzeService {
         #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
         limit: Option<usize>,
         #[param(help = "Show only internal (crate-local) modules")] internal: bool,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<ImportCentralityReport, String> {
@@ -1681,12 +1764,32 @@ impl AnalyzeService {
             0 => usize::MAX,
             n => n,
         };
-        crate::commands::analyze::imports::analyze_import_centrality(
+        let mut report = crate::commands::analyze::imports::analyze_import_centrality(
             &root_path,
             effective_limit,
             internal,
         )
-        .await
+        .await?;
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                let handle = tokio::runtime::Handle::current();
+                tokio::task::block_in_place(|| {
+                    handle.block_on(
+                        crate::commands::analyze::imports::analyze_import_centrality(
+                            wt,
+                            usize::MAX,
+                            internal,
+                        ),
+                    )
+                })
+            })?;
+            compute_ranked_diff(&mut report.entries, &baseline.entries);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
     }
 
     /// Per-module dependency depth + ripple risk
@@ -1699,6 +1802,9 @@ impl AnalyzeService {
         >,
         #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
         limit: Option<usize>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<DepthMapReport, String> {
@@ -1709,9 +1815,29 @@ impl AnalyzeService {
             n => n,
         };
         let idx = crate::index::ensure_ready(&root_path).await?;
-        crate::commands::analyze::depth_map::analyze_depth_map(&idx, effective_limit)
-            .await
-            .map_err(|e| format!("Depth map analysis failed: {}", e))
+        let mut report =
+            crate::commands::analyze::depth_map::analyze_depth_map(&idx, effective_limit)
+                .await
+                .map_err(|e| format!("Depth map analysis failed: {}", e))?;
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                let handle = tokio::runtime::Handle::current();
+                tokio::task::block_in_place(|| {
+                    handle.block_on(async {
+                        let wt_idx = crate::index::ensure_ready(wt).await?;
+                        crate::commands::analyze::depth_map::analyze_depth_map(&wt_idx, usize::MAX)
+                            .await
+                            .map_err(|e| format!("Baseline depth map failed: {}", e))
+                    })
+                })
+            })?;
+            compute_ranked_diff(&mut report.modules, &baseline.modules);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
     }
 
     /// Graph-theoretic properties of the dependency graph
@@ -1774,6 +1900,9 @@ impl AnalyzeService {
         >,
         #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
         limit: Option<usize>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<SurfaceReport, String> {
@@ -1784,9 +1913,28 @@ impl AnalyzeService {
             n => n,
         };
         let idx = crate::index::ensure_ready(&root_path).await?;
-        crate::commands::analyze::surface::analyze_surface(&idx, effective_limit)
+        let mut report = crate::commands::analyze::surface::analyze_surface(&idx, effective_limit)
             .await
-            .map_err(|e| format!("Surface analysis failed: {}", e))
+            .map_err(|e| format!("Surface analysis failed: {}", e))?;
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                let handle = tokio::runtime::Handle::current();
+                tokio::task::block_in_place(|| {
+                    handle.block_on(async {
+                        let wt_idx = crate::index::ensure_ready(wt).await?;
+                        crate::commands::analyze::surface::analyze_surface(&wt_idx, usize::MAX)
+                            .await
+                            .map_err(|e| format!("Baseline surface failed: {}", e))
+                    })
+                })
+            })?;
+            compute_ranked_diff(&mut report.modules, &baseline.modules);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
     }
 
     /// Per-module import layering compliance — are imports flowing downward?
@@ -1799,6 +1947,9 @@ impl AnalyzeService {
         >,
         #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
         limit: Option<usize>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<LayeringReport, String> {
@@ -1809,9 +1960,29 @@ impl AnalyzeService {
             n => n,
         };
         let idx = crate::index::ensure_ready(&root_path).await?;
-        crate::commands::analyze::layering::analyze_layering(&idx, effective_limit)
-            .await
-            .map_err(|e| format!("Layering analysis failed: {}", e))
+        let mut report =
+            crate::commands::analyze::layering::analyze_layering(&idx, effective_limit)
+                .await
+                .map_err(|e| format!("Layering analysis failed: {}", e))?;
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                let handle = tokio::runtime::Handle::current();
+                tokio::task::block_in_place(|| {
+                    handle.block_on(async {
+                        let wt_idx = crate::index::ensure_ready(wt).await?;
+                        crate::commands::analyze::layering::analyze_layering(&wt_idx, usize::MAX)
+                            .await
+                            .map_err(|e| format!("Baseline layering failed: {}", e))
+                    })
+                })
+            })?;
+            compute_ranked_diff(&mut report.modules, &baseline.modules);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
     }
 
     /// Provenance graph: git blame → session mapping + code relations

@@ -3,7 +3,9 @@
 use super::is_source_file;
 use crate::output::OutputFormatter;
 use glob::Pattern;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
+use normalize_analyze::ranked::{
+    Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
+};
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -21,6 +23,9 @@ pub struct FileOwnership {
     pub top_author_pct: f64,
     /// Bus factor: number of authors needed to cover >50% of lines
     pub bus_factor: usize,
+    /// Delta vs baseline (set by `--diff`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta: Option<f64>,
 }
 
 impl RankEntry for FileOwnership {
@@ -41,13 +46,32 @@ impl RankEntry for FileOwnership {
         } else {
             top
         };
+        let bf_str = match self.delta {
+            Some(d) => format!("{} ({})", self.bus_factor, format_delta(d, false)),
+            None => self.bus_factor.to_string(),
+        };
         vec![
             self.path.clone(),
             self.total_lines.to_string(),
             self.authors.to_string(),
-            self.bus_factor.to_string(),
+            bf_str,
             top_display,
         ]
+    }
+}
+
+impl DiffableRankEntry for FileOwnership {
+    fn diff_key(&self) -> &str {
+        &self.path
+    }
+    fn diff_score(&self) -> f64 {
+        self.bus_factor as f64
+    }
+    fn set_delta(&mut self, delta: Option<f64>) {
+        self.delta = delta;
+    }
+    fn delta(&self) -> Option<f64> {
+        self.delta
     }
 }
 
@@ -67,6 +91,9 @@ pub struct OwnershipReport {
     /// Per-repo results when run with --repos
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repos: Option<Vec<OwnershipRepoEntry>>,
+    /// Set when `--diff` is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diff_ref: Option<String>,
 }
 
 fn format_ownership_data(files: &[FileOwnership]) -> String {
@@ -158,6 +185,7 @@ fn blame_file(root: &Path, path: &str) -> Option<FileOwnership> {
         top_author,
         top_author_pct,
         bus_factor,
+        delta: None,
     })
 }
 
@@ -227,5 +255,9 @@ pub fn analyze_ownership(
         |f| f.bus_factor as f64,
     );
 
-    Ok(OwnershipReport { files, repos: None })
+    Ok(OwnershipReport {
+        files,
+        repos: None,
+        diff_ref: None,
+    })
 }

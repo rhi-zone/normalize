@@ -5,7 +5,9 @@
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
+use normalize_analyze::ranked::{
+    Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
+};
 use normalize_architecture::{
     build_import_graph, compute_depth, compute_layering_compliance, extract_layer,
 };
@@ -29,6 +31,9 @@ pub struct LayeringEntry {
     pub self_imports: usize,
     /// downward / (downward + upward); 1.0 if no cross-layer imports
     pub compliance: f64,
+    /// Delta vs baseline (set by `--diff`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta: Option<f64>,
 }
 
 impl RankEntry for LayeringEntry {
@@ -52,8 +57,30 @@ impl RankEntry for LayeringEntry {
             self.downward_imports.to_string(),
             self.upward_imports.to_string(),
             self.self_imports.to_string(),
-            format!("{:.0}%", self.compliance * 100.0),
+            match self.delta {
+                Some(d) => format!(
+                    "{:.0}% ({})",
+                    self.compliance * 100.0,
+                    format_delta(d, false)
+                ),
+                None => format!("{:.0}%", self.compliance * 100.0),
+            },
         ]
+    }
+}
+
+impl DiffableRankEntry for LayeringEntry {
+    fn diff_key(&self) -> &str {
+        &self.module
+    }
+    fn diff_score(&self) -> f64 {
+        self.compliance
+    }
+    fn set_delta(&mut self, delta: Option<f64>) {
+        self.delta = delta;
+    }
+    fn delta(&self) -> Option<f64> {
+        self.delta
     }
 }
 
@@ -110,6 +137,9 @@ pub struct LayeringReport {
     pub modules: Vec<LayeringEntry>,
     pub layers: Vec<LayerSummary>,
     pub stats: LayeringStats,
+    /// Set when `--diff` is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diff_ref: Option<String>,
 }
 
 /// Analyze import layering compliance.
@@ -176,6 +206,7 @@ pub async fn analyze_layering(
             upward_imports: r.upward_imports,
             self_imports: r.self_imports,
             compliance: r.compliance,
+            delta: None,
         })
         .collect();
 
@@ -242,6 +273,7 @@ pub async fn analyze_layering(
         modules: entries,
         layers,
         stats,
+        diff_ref: None,
     })
 }
 

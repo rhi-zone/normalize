@@ -5,7 +5,9 @@
 //! Requires a built facts index (`normalize structure rebuild`).
 
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
+use normalize_analyze::ranked::{
+    Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
+};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
@@ -19,6 +21,9 @@ pub struct ImportEntry {
     pub fan_in: usize,
     /// Representative names imported from this module (up to 5)
     pub names: Vec<String>,
+    /// Delta vs baseline (set by `--diff`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta: Option<f64>,
 }
 
 impl RankEntry for ImportEntry {
@@ -31,11 +36,26 @@ impl RankEntry for ImportEntry {
     }
 
     fn values(&self) -> Vec<String> {
-        vec![
-            self.module.clone(),
-            self.fan_in.to_string(),
-            self.names.join(", "),
-        ]
+        let fan_in_str = match self.delta {
+            Some(d) => format!("{} ({})", self.fan_in, format_delta(d, false)),
+            None => self.fan_in.to_string(),
+        };
+        vec![self.module.clone(), fan_in_str, self.names.join(", ")]
+    }
+}
+
+impl DiffableRankEntry for ImportEntry {
+    fn diff_key(&self) -> &str {
+        &self.module
+    }
+    fn diff_score(&self) -> f64 {
+        self.fan_in as f64
+    }
+    fn set_delta(&mut self, delta: Option<f64>) {
+        self.delta = delta;
+    }
+    fn delta(&self) -> Option<f64> {
+        self.delta
     }
 }
 
@@ -50,6 +70,9 @@ pub struct ImportCentralityReport {
     pub internal_only: bool,
     /// Entries sorted by fan-in descending
     pub entries: Vec<ImportEntry>,
+    /// Set when `--diff` is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diff_ref: Option<String>,
 }
 
 impl OutputFormatter for ImportCentralityReport {
@@ -127,6 +150,7 @@ pub async fn analyze_import_centrality(
                 module,
                 fan_in,
                 names,
+                delta: None,
             }
         })
         .collect();
@@ -143,6 +167,7 @@ pub async fn analyze_import_centrality(
         total_imports,
         internal_only,
         entries,
+        diff_ref: None,
     })
 }
 

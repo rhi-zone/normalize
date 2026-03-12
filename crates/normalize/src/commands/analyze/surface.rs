@@ -5,7 +5,9 @@
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
+use normalize_analyze::ranked::{
+    Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
+};
 use serde::Serialize;
 use std::collections::HashMap;
 
@@ -26,6 +28,9 @@ pub struct SurfaceEntry {
     pub fan_in: usize,
     /// public_symbols × fan_in — composite constraint metric
     pub constraint_score: usize,
+    /// Delta vs baseline (set by `--diff`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta: Option<f64>,
 }
 
 impl RankEntry for SurfaceEntry {
@@ -49,8 +54,26 @@ impl RankEntry for SurfaceEntry {
             self.private_symbols.to_string(),
             format!("{:.0}%", self.public_ratio * 100.0),
             self.fan_in.to_string(),
-            self.constraint_score.to_string(),
+            match self.delta {
+                Some(d) => format!("{} ({})", self.constraint_score, format_delta(d, false)),
+                None => self.constraint_score.to_string(),
+            },
         ]
+    }
+}
+
+impl DiffableRankEntry for SurfaceEntry {
+    fn diff_key(&self) -> &str {
+        &self.module
+    }
+    fn diff_score(&self) -> f64 {
+        self.constraint_score as f64
+    }
+    fn set_delta(&mut self, delta: Option<f64>) {
+        self.delta = delta;
+    }
+    fn delta(&self) -> Option<f64> {
+        self.delta
     }
 }
 
@@ -72,6 +95,9 @@ pub struct SurfaceStats {
 pub struct SurfaceReport {
     pub modules: Vec<SurfaceEntry>,
     pub stats: SurfaceStats,
+    /// Set when `--diff` is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diff_ref: Option<String>,
 }
 
 /// Analyze interface surface area.
@@ -123,6 +149,7 @@ pub async fn analyze_surface(
                 public_ratio,
                 fan_in,
                 constraint_score,
+                delta: None,
             }
         })
         .collect();
@@ -166,6 +193,7 @@ pub async fn analyze_surface(
     Ok(SurfaceReport {
         modules: entries,
         stats,
+        diff_ref: None,
     })
 }
 

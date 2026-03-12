@@ -55,9 +55,9 @@ tool, another command). Don't extract for line count alone.
 - Not migrated (conditional columns): hotspots (has_complexity flag changes column set)
 - Not migrated (different structure): complexity, length (use `FileReport<T>` with `FullStats`), test-gaps (not tabular), coupling-clusters (prose), architecture, call-complexity
 - `DiffableRankEntry` trait + `compute_ranked_diff()` + `format_delta()` in `normalize-analyze::ranked` — generic `--diff <ref>` support for rank commands
-- Added `--diff` to: test-ratio, density, uniqueness (3 commands; pattern: add `delta: Option<f64>` + `diff_ref: Option<String>`, impl `DiffableRankEntry`, call `compute_ranked_diff` in service)
+- Added `--diff` to all 12 rank commands: test-ratio, density, uniqueness, files, imports, ownership, ceremony, surface, depth-map, layering, budget, coupling
+- Async commands (imports, surface, depth-map, layering) use `block_in_place` + `ensure_ready` in worktree for baseline
 - `--trend` already generic via `analyze_scalar_trend` (4 existing trend commands use it)
-- **Next:** add `--diff` to remaining rank commands (files, imports, ownership, ceremony, surface, depth-map, layering, budget, coupling)
 
 **Future (low priority):** `security` → SARIF rules engine (wraps bandit; could be `normalize rules run --engine sarif` with bandit configured). `docs`/`security` → rules migration (~-3 commands, see design doc).
 

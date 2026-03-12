@@ -3,7 +3,9 @@
 use crate::output::OutputFormatter;
 use crate::path_resolve;
 use glob::Pattern;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
+use normalize_analyze::ranked::{
+    Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
+};
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -15,6 +17,9 @@ pub struct FileLength {
     pub path: String,
     pub lines: usize,
     pub language: String,
+    /// Delta vs baseline (set by `--diff`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta: Option<f64>,
 }
 
 impl RankEntry for FileLength {
@@ -23,7 +28,26 @@ impl RankEntry for FileLength {
     }
 
     fn values(&self) -> Vec<String> {
-        vec![self.lines.to_string(), self.path.clone()]
+        let lines_str = match self.delta {
+            Some(d) => format!("{} ({})", self.lines, format_delta(d, false)),
+            None => self.lines.to_string(),
+        };
+        vec![lines_str, self.path.clone()]
+    }
+}
+
+impl DiffableRankEntry for FileLength {
+    fn diff_key(&self) -> &str {
+        &self.path
+    }
+    fn diff_score(&self) -> f64 {
+        self.lines as f64
+    }
+    fn set_delta(&mut self, delta: Option<f64>) {
+        self.delta = delta;
+    }
+    fn delta(&self) -> Option<f64> {
+        self.delta
     }
 }
 
@@ -33,6 +57,9 @@ pub struct FileLengthReport {
     pub files: Vec<FileLength>,
     pub total_lines: usize,
     pub by_language: HashMap<String, usize>,
+    /// Set when `--diff` is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diff_ref: Option<String>,
 }
 
 impl OutputFormatter for FileLengthReport {
@@ -88,6 +115,7 @@ pub fn analyze_files(root: &Path, limit: usize, exclude: &[String]) -> FileLengt
                 path: file.path.clone(),
                 lines,
                 language: lang.name().to_string(),
+                delta: None,
             })
         })
         .collect();
@@ -111,5 +139,6 @@ pub fn analyze_files(root: &Path, limit: usize, exclude: &[String]) -> FileLengt
         files: sorted,
         total_lines,
         by_language,
+        diff_ref: None,
     }
 }

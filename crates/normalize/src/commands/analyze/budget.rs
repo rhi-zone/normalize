@@ -6,7 +6,9 @@ use crate::commands::analyze::test_ratio::{
     discover_module_dirs, module_key, split_rust_test_lines,
 };
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
+use normalize_analyze::ranked::{
+    Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
+};
 use normalize_languages::is_test_path;
 use rayon::prelude::*;
 use serde::Serialize;
@@ -57,6 +59,9 @@ pub struct ModuleBudget {
     pub logic_pct: f64,
     pub test_pct: f64,
     pub other_pct: f64,
+    /// Delta vs baseline (set by `--diff`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta: Option<f64>,
 }
 
 impl RankEntry for CategoryEntry {
@@ -89,13 +94,36 @@ impl RankEntry for ModuleBudget {
     }
 
     fn values(&self) -> Vec<String> {
+        let lines_str = match self.delta {
+            Some(d) => format!(
+                "{:.0}K ({})",
+                self.total_lines as f64 / 1000.0,
+                format_delta(d, false)
+            ),
+            None => format!("{:.0}K", self.total_lines as f64 / 1000.0),
+        };
         vec![
             self.module.clone(),
-            format!("{:.0}K", self.total_lines as f64 / 1000.0),
+            lines_str,
             format!("{:.0}%", self.logic_pct),
             format!("{:.0}%", self.test_pct),
             format!("{:.0}%", self.other_pct),
         ]
+    }
+}
+
+impl DiffableRankEntry for ModuleBudget {
+    fn diff_key(&self) -> &str {
+        &self.module
+    }
+    fn diff_score(&self) -> f64 {
+        self.total_lines as f64
+    }
+    fn set_delta(&mut self, delta: Option<f64>) {
+        self.delta = delta;
+    }
+    fn delta(&self) -> Option<f64> {
+        self.delta
     }
 }
 
@@ -106,6 +134,9 @@ pub struct BudgetReport {
     pub total_lines: usize,
     pub categories: Vec<CategoryEntry>,
     pub modules: Vec<ModuleBudget>,
+    /// Set when `--diff` is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diff_ref: Option<String>,
 }
 
 impl OutputFormatter for BudgetReport {
@@ -510,6 +541,7 @@ pub fn analyze_budget(root: &Path, module_limit: usize) -> BudgetReport {
                 } else {
                     0.0
                 },
+                delta: None,
             }
         })
         .collect();
@@ -526,5 +558,6 @@ pub fn analyze_budget(root: &Path, module_limit: usize) -> BudgetReport {
         total_lines,
         categories,
         modules,
+        diff_ref: None,
     }
 }

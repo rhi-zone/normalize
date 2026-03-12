@@ -5,7 +5,9 @@
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
+use normalize_analyze::ranked::{
+    Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
+};
 use normalize_architecture::{build_import_graph, compute_depth, compute_downstream};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
@@ -25,6 +27,9 @@ pub struct DepthEntry {
     pub downstream: usize,
     /// Composite blast radius: fan_out × depth × downstream
     pub ripple_score: usize,
+    /// Delta vs baseline (set by `--diff`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta: Option<f64>,
 }
 
 impl RankEntry for DepthEntry {
@@ -46,8 +51,26 @@ impl RankEntry for DepthEntry {
             self.fan_in.to_string(),
             self.fan_out.to_string(),
             self.downstream.to_string(),
-            self.ripple_score.to_string(),
+            match self.delta {
+                Some(d) => format!("{} ({})", self.ripple_score, format_delta(d, false)),
+                None => self.ripple_score.to_string(),
+            },
         ]
+    }
+}
+
+impl DiffableRankEntry for DepthEntry {
+    fn diff_key(&self) -> &str {
+        &self.module
+    }
+    fn diff_score(&self) -> f64 {
+        self.ripple_score as f64
+    }
+    fn set_delta(&mut self, delta: Option<f64>) {
+        self.delta = delta;
+    }
+    fn delta(&self) -> Option<f64> {
+        self.delta
     }
 }
 
@@ -66,6 +89,9 @@ pub struct DepthMapStats {
 pub struct DepthMapReport {
     pub modules: Vec<DepthEntry>,
     pub stats: DepthMapStats,
+    /// Set when `--diff` is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diff_ref: Option<String>,
 }
 
 /// Analyze the dependency depth map.
@@ -127,6 +153,7 @@ pub async fn analyze_depth_map(
                 fan_out,
                 downstream,
                 ripple_score,
+                delta: None,
             }
         })
         .collect();
@@ -165,6 +192,7 @@ pub async fn analyze_depth_map(
     Ok(DepthMapReport {
         modules: entries,
         stats,
+        diff_ref: None,
     })
 }
 

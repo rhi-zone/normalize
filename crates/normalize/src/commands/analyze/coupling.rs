@@ -3,7 +3,9 @@
 use super::is_source_file;
 use crate::output::OutputFormatter;
 use glob::Pattern;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
+use normalize_analyze::ranked::{
+    Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
+};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
@@ -21,6 +23,12 @@ pub struct CoupledPair {
     pub commits_b: usize,
     /// Confidence: shared / max(commits_a, commits_b)
     pub confidence: f64,
+    /// Composite key for diff matching (file_a::file_b).
+    #[serde(skip)]
+    pub pair_key: String,
+    /// Delta vs baseline (set by `--diff`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta: Option<f64>,
 }
 
 impl RankEntry for CoupledPair {
@@ -34,12 +42,31 @@ impl RankEntry for CoupledPair {
     }
 
     fn values(&self) -> Vec<String> {
+        let shared_str = match self.delta {
+            Some(d) => format!("{} ({})", self.shared_commits, format_delta(d, false)),
+            None => self.shared_commits.to_string(),
+        };
         vec![
             self.file_a.clone(),
             self.file_b.clone(),
-            self.shared_commits.to_string(),
+            shared_str,
             format!("{:.0}%", self.confidence * 100.0),
         ]
+    }
+}
+
+impl DiffableRankEntry for CoupledPair {
+    fn diff_key(&self) -> &str {
+        &self.pair_key
+    }
+    fn diff_score(&self) -> f64 {
+        self.shared_commits as f64
+    }
+    fn set_delta(&mut self, delta: Option<f64>) {
+        self.delta = delta;
+    }
+    fn delta(&self) -> Option<f64> {
+        self.delta
     }
 }
 
@@ -59,6 +86,9 @@ pub struct CouplingReport {
     /// Per-repo results when run with --repos
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repos: Option<Vec<CouplingRepoEntry>>,
+    /// Set when `--diff` is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diff_ref: Option<String>,
 }
 
 fn format_coupling_data(pairs: &[CoupledPair]) -> String {
@@ -195,6 +225,7 @@ pub fn analyze_coupling(
             let ca = file_commits.get(&a).copied().unwrap_or(0);
             let cb = file_commits.get(&b).copied().unwrap_or(0);
             let confidence = shared as f64 / ca.max(cb) as f64;
+            let pair_key = format!("{}::{}", a, b);
             CoupledPair {
                 file_a: a,
                 file_b: b,
@@ -202,6 +233,8 @@ pub fn analyze_coupling(
                 commits_a: ca,
                 commits_b: cb,
                 confidence,
+                pair_key,
+                delta: None,
             }
         })
         .collect();
@@ -220,5 +253,9 @@ pub fn analyze_coupling(
         |p| p.shared_commits as f64,
     );
 
-    Ok(CouplingReport { pairs, repos: None })
+    Ok(CouplingReport {
+        pairs,
+        repos: None,
+        diff_ref: None,
+    })
 }

@@ -1,7 +1,9 @@
 //! Ceremony ratio analysis: fraction of callable code that is trait/interface boilerplate.
 
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
+use normalize_analyze::ranked::{
+    Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
+};
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -35,6 +37,9 @@ pub struct FileCeremony {
     pub free_functions: usize,
     pub inherent_methods: usize,
     pub ceremony_ratio: f64,
+    /// Delta vs baseline (set by `--diff`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delta: Option<f64>,
 }
 
 impl RankEntry for FileCeremony {
@@ -48,12 +53,35 @@ impl RankEntry for FileCeremony {
     }
 
     fn values(&self) -> Vec<String> {
+        let ratio_str = match self.delta {
+            Some(d) => format!(
+                "{:.1}% ({})",
+                self.ceremony_ratio * 100.0,
+                format_delta(d, false)
+            ),
+            None => format!("{:.1}%", self.ceremony_ratio * 100.0),
+        };
         vec![
-            format!("{:.1}%", self.ceremony_ratio * 100.0),
+            ratio_str,
             self.interface_impl.to_string(),
             self.total.to_string(),
             self.file_path.clone(),
         ]
+    }
+}
+
+impl DiffableRankEntry for FileCeremony {
+    fn diff_key(&self) -> &str {
+        &self.file_path
+    }
+    fn diff_score(&self) -> f64 {
+        self.ceremony_ratio
+    }
+    fn set_delta(&mut self, delta: Option<f64>) {
+        self.delta = delta;
+    }
+    fn delta(&self) -> Option<f64> {
+        self.delta
     }
 }
 
@@ -74,6 +102,9 @@ pub struct CeremonyReport {
     pub by_language: HashMap<String, CeremonyLangStats>,
     /// Files with the highest ceremony ratio (at least 2 callables)
     pub top_files: Vec<FileCeremony>,
+    /// Set when `--diff` is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diff_ref: Option<String>,
 }
 
 impl OutputFormatter for CeremonyReport {
@@ -265,6 +296,7 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
             free_functions: file_free,
             inherent_methods: file_inherent,
             ceremony_ratio: ratio,
+            delta: None,
         });
     }
 
@@ -297,5 +329,6 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
         ceremony_ratio,
         by_language,
         top_files,
+        diff_ref: None,
     }
 }
