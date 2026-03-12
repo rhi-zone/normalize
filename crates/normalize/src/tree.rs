@@ -204,34 +204,54 @@ enum DocstringStyle {
     Block(&'static str, &'static str),
 }
 
+/// Line-prefix docstring styles: (grammar_name, prefix).
+const LINE_PREFIX_STYLES: &[(&[&str], &str)] = &[
+    (&["rust"], "/// "),
+    (&["go", "c", "cpp"], "// "),
+    (&["ruby", "bash", "fish", "zsh", "perl", "r"], "# "),
+    (&["nim"], "## "),
+    (&["haskell", "sql"], "-- "),
+    (&["lua"], "--- "),
+    (&["elisp", "commonlisp", "scheme", "clojure"], "; "),
+];
+
+/// Block docstring styles: (grammar_name, open, close).
+const BLOCK_STYLES: &[(&[&str], &str, &str)] = &[
+    (&["python"], "\"\"\"", "\"\"\""),
+    (
+        &[
+            "javascript",
+            "typescript",
+            "tsx",
+            "jsx",
+            "java",
+            "kotlin",
+            "scala",
+            "swift",
+            "php",
+        ],
+        "/** ",
+        " */",
+    ),
+    (&["css"], "/* ", " */"),
+];
+
 /// Get appropriate docstring style for a grammar.
 fn docstring_style_for_grammar(grammar: Option<&str>) -> DocstringStyle {
-    match grammar {
-        // Line-prefix languages
-        Some("rust") => DocstringStyle::LinePrefix("/// "),
-        Some("go") => DocstringStyle::LinePrefix("// "),
-        Some("c" | "cpp") => DocstringStyle::LinePrefix("// "),
-        Some("ruby") => DocstringStyle::LinePrefix("# "),
-        Some("bash" | "fish" | "zsh") => DocstringStyle::LinePrefix("# "),
-        Some("perl") => DocstringStyle::LinePrefix("# "),
-        Some("r") => DocstringStyle::LinePrefix("# "),
-        Some("nim") => DocstringStyle::LinePrefix("## "),
-        Some("haskell") => DocstringStyle::LinePrefix("-- "),
-        Some("lua") => DocstringStyle::LinePrefix("--- "),
-        Some("sql") => DocstringStyle::LinePrefix("-- "),
-        Some("elisp" | "commonlisp" | "scheme" | "clojure") => DocstringStyle::LinePrefix("; "),
-
-        // Block-style languages
-        Some("python") => DocstringStyle::Block("\"\"\"", "\"\"\""),
-        Some("javascript" | "typescript" | "tsx" | "jsx") => DocstringStyle::Block("/** ", " */"),
-        Some("java" | "kotlin" | "scala") => DocstringStyle::Block("/** ", " */"),
-        Some("swift") => DocstringStyle::Block("/** ", " */"),
-        Some("php") => DocstringStyle::Block("/** ", " */"),
-        Some("css") => DocstringStyle::Block("/* ", " */"),
-
-        // Default to Python-style for unknown
-        _ => DocstringStyle::Block("\"\"\"", "\"\"\""),
+    let Some(g) = grammar else {
+        return DocstringStyle::Block("\"\"\"", "\"\"\"");
+    };
+    for (names, prefix) in LINE_PREFIX_STYLES {
+        if names.contains(&g) {
+            return DocstringStyle::LinePrefix(prefix);
+        }
     }
+    for (names, open, close) in BLOCK_STYLES {
+        if names.contains(&g) {
+            return DocstringStyle::Block(open, close);
+        }
+    }
+    DocstringStyle::Block("\"\"\"", "\"\"\"")
 }
 
 /// Format a docstring according to the display mode and language.
@@ -669,85 +689,54 @@ fn collect_query_spans(query: &Query, root: tree_sitter::Node, source: &str) -> 
     spans
 }
 
+/// Map a full capture name (with dots) to a HighlightKind for document formats.
+fn full_capture_name_kind(name: &str) -> Option<Option<HighlightKind>> {
+    let kind = match name {
+        "text.title" | "markup.heading" | "title" => Some(HighlightKind::Keyword),
+        "text.literal" | "markup.raw" | "markup.raw.inline" | "markup.raw.block" => {
+            Some(HighlightKind::String)
+        }
+        "text.uri" | "markup.link" | "markup.link.url" | "text.reference" => {
+            Some(HighlightKind::Attribute)
+        }
+        "text.strong" | "text.emphasis" | "markup.bold" | "markup.italic" => {
+            Some(HighlightKind::Keyword)
+        }
+        "none" | "text" | "markup" => None,
+        _ => return None, // not a full-name match — fall through to base matching
+    };
+    Some(kind)
+}
+
+/// Map a base capture name (before any dot) to a HighlightKind.
+fn base_capture_name_kind(base: &str) -> Option<HighlightKind> {
+    match base {
+        "keyword" | "constructor" | "operator" | "conditional" | "repeat" | "exception" | "tag" => {
+            Some(HighlightKind::Keyword)
+        }
+        "type" => Some(HighlightKind::Type),
+        "comment" | "punctuation" => Some(HighlightKind::Comment),
+        "string" | "character" => Some(HighlightKind::String),
+        "number" | "float" => Some(HighlightKind::Number),
+        "constant" | "boolean" => Some(HighlightKind::Constant),
+        "attribute" => Some(HighlightKind::Attribute),
+        "function" | "method" => Some(HighlightKind::FunctionName),
+        _ => None,
+    }
+}
+
 /// Map tree-sitter query capture names to HighlightKind.
 ///
 /// Standard capture names from tree-sitter highlight queries:
 /// <https://tree-sitter.github.io/tree-sitter/syntax-highlighting#theme>
 fn capture_name_to_highlight_kind(name: &str) -> Option<HighlightKind> {
     // Check full name first for specific mappings (document formats, etc.)
-    match name {
-        // Document formats: headings, titles
-        "text.title" | "markup.heading" | "title" => return Some(HighlightKind::Keyword),
-
-        // Document formats: code blocks, literals, raw text
-        "text.literal" | "markup.raw" | "markup.raw.inline" | "markup.raw.block" => {
-            return Some(HighlightKind::String);
-        }
-
-        // Document formats: links, URIs
-        "text.uri" | "markup.link" | "markup.link.url" | "text.reference" => {
-            return Some(HighlightKind::Attribute);
-        }
-
-        // Document formats: bold, italic (treat as keywords for emphasis)
-        "text.strong" | "text.emphasis" | "markup.bold" | "markup.italic" => {
-            return Some(HighlightKind::Keyword);
-        }
-
-        // Explicitly skip these (no highlighting)
-        "none" | "text" | "markup" => return None,
-
-        _ => {}
+    if let Some(kind) = full_capture_name_kind(name) {
+        return kind;
     }
-
     // Match on base name (before any dot) for code-oriented captures
     let base = name.split('.').next().unwrap_or(name);
-
-    match base {
-        // Keywords
-        "keyword" => Some(HighlightKind::Keyword),
-
-        // Types
-        "type" => Some(HighlightKind::Type),
-
-        // Comments
-        "comment" => Some(HighlightKind::Comment),
-
-        // Strings
-        "string" | "character" => Some(HighlightKind::String),
-
-        // Numbers
-        "number" | "float" => Some(HighlightKind::Number),
-
-        // Constants (boolean, nil, etc.)
-        "constant" | "boolean" => Some(HighlightKind::Constant),
-
-        // Attributes/annotations
-        "attribute" => Some(HighlightKind::Attribute),
-
-        // Functions
-        "function" | "method" => Some(HighlightKind::FunctionName),
-
-        // Also treat constructors and some operators as keywords
-        "constructor" | "operator" => Some(HighlightKind::Keyword),
-
-        // Control flow (if/else, for/while, try/catch) - highlight as keywords
-        "conditional" | "repeat" | "exception" => Some(HighlightKind::Keyword),
-
-        // Punctuation - subtle highlighting (grey like comments)
-        "punctuation" => Some(HighlightKind::Comment),
-
-        // Tags (HTML/XML elements) - highlight as keywords
-        "tag" => Some(HighlightKind::Keyword),
-
-        // Properties/fields - show as default (not highlighted)
-        "property" | "field" | "variable" | "parameter" | "label" | "namespace" | "module"
-        | "include" | "define" | "preproc" | "storageclass" | "structure" | "text" | "title"
-        | "uri" | "underline" | "todo" | "note" | "warning" | "danger" | "embedded" | "error"
-        | "conceal" | "spell" | "diff" | "debug" | "symbol" | "identifier" | "markup" => None,
-
-        _ => None,
-    }
+    base_capture_name_kind(base)
 }
 
 /// Collect highlight spans using manual node classification (fallback).
@@ -757,12 +746,9 @@ fn collect_manual_spans(root: tree_sitter::Node) -> Vec<HighlightSpan> {
     spans
 }
 
-/// Render source with highlight spans applied.
-fn render_highlighted(source: &str, mut spans: Vec<HighlightSpan>) -> String {
-    // Sort spans by start position
+/// Remove overlapping spans, keeping the first encountered at each position.
+fn deduplicate_spans(mut spans: Vec<HighlightSpan>) -> Vec<HighlightSpan> {
     spans.sort_by_key(|s| s.start);
-
-    // Remove overlapping spans - keep the first one encountered
     let mut filtered: Vec<HighlightSpan> = Vec::new();
     for span in spans {
         let overlaps = filtered
@@ -772,45 +758,153 @@ fn render_highlighted(source: &str, mut spans: Vec<HighlightSpan>) -> String {
             filtered.push(span);
         }
     }
+    filtered
+}
 
-    // Build highlighted string
+/// Apply ANSI color to text based on highlight kind (Monokai-inspired palette).
+fn style_span(text: &str, kind: HighlightKind) -> String {
+    match kind {
+        HighlightKind::Keyword => Red.paint(text).to_string(),
+        HighlightKind::Type => LightCyan.paint(text).to_string(),
+        HighlightKind::Comment => LightGray.paint(text).to_string(),
+        HighlightKind::String => LightGreen.paint(text).to_string(),
+        HighlightKind::Number | HighlightKind::Constant => LightMagenta.paint(text).to_string(),
+        HighlightKind::Attribute => LightCyan.paint(text).to_string(),
+        HighlightKind::FunctionName => Yellow.paint(text).to_string(),
+        HighlightKind::Default => text.to_string(),
+    }
+}
+
+/// Render source with highlight spans applied.
+fn render_highlighted(source: &str, spans: Vec<HighlightSpan>) -> String {
+    let filtered = deduplicate_spans(spans);
     let mut result = String::new();
     let mut pos = 0;
 
     for span in filtered {
-        // Skip if we've passed this span already
         if span.start < pos {
             continue;
         }
-
-        // Add unhighlighted text before this span
         if span.start > pos {
             result.push_str(&source[pos..span.start]);
         }
-
-        // Add highlighted span (Monokai-inspired colors)
-        let text = &source[span.start..span.end];
-        let styled = match span.kind {
-            HighlightKind::Keyword => Red.paint(text).to_string(), // Red for keywords
-            HighlightKind::Type => LightCyan.paint(text).to_string(), // Light cyan for types
-            HighlightKind::Comment => LightGray.paint(text).to_string(), // Grey for comments
-            HighlightKind::String => LightGreen.paint(text).to_string(), // Light green for strings
-            HighlightKind::Number => LightMagenta.paint(text).to_string(), // Magenta for numbers
-            HighlightKind::Constant => LightMagenta.paint(text).to_string(), // Magenta for constants
-            HighlightKind::Attribute => LightCyan.paint(text).to_string(),   // Cyan for attributes
-            HighlightKind::FunctionName => Yellow.paint(text).to_string(),   // Yellow for functions
-            HighlightKind::Default => text.to_string(),
-        };
-        result.push_str(&styled);
+        result.push_str(&style_span(&source[span.start..span.end], span.kind));
         pos = span.end;
     }
 
-    // Add remaining text
     if pos < source.len() {
         result.push_str(&source[pos..]);
     }
-
     result
+}
+
+/// Check if a leaf node is a function/method name based on its parent context.
+fn classify_leaf_by_parent(node: tree_sitter::Node) -> Option<HighlightKind> {
+    let parent = node.parent()?;
+    let kind = node.kind();
+    let parent_kind = parent.kind();
+
+    if kind == "identifier"
+        && let Some(k) = classify_identifier_in_context(node, parent_kind, &parent)
+    {
+        return Some(k);
+    }
+
+    // Method calls: field_identifier/property_identifier in call context
+    if is_method_call_node(node, kind, parent_kind, &parent) {
+        return Some(HighlightKind::FunctionName);
+    }
+
+    // XML: Name nodes in tag/attribute context
+    if kind == "Name" && matches!(parent_kind, "STag" | "ETag" | "Attribute") {
+        return Some(HighlightKind::Keyword);
+    }
+
+    None
+}
+
+/// Classify an identifier node based on its parent/grandparent context.
+fn classify_identifier_in_context(
+    node: tree_sitter::Node,
+    parent_kind: &str,
+    parent: &tree_sitter::Node,
+) -> Option<HighlightKind> {
+    // Function/method definitions
+    if matches!(
+        parent_kind,
+        "function_item"
+            | "function_signature_item"
+            | "function_definition"
+            | "method_definition"
+            | "function_declaration"
+    ) {
+        return Some(HighlightKind::FunctionName);
+    }
+
+    // Direct function/macro calls
+    if matches!(
+        parent_kind,
+        "call_expression" | "call" | "macro_invocation" | "function_call"
+    ) {
+        return Some(HighlightKind::FunctionName);
+    }
+
+    // Scoped function calls: identifier → scoped_identifier → call_expression
+    if parent_kind == "scoped_identifier"
+        && let Some(gp) = parent.parent()
+        && matches!(gp.kind(), "call_expression" | "call")
+    {
+        let is_last = node.next_sibling().is_none_or(|s| s.kind() != "::");
+        if is_last {
+            return Some(HighlightKind::FunctionName);
+        }
+    }
+
+    // Inside macro token_tree: heuristic for function calls
+    if parent_kind == "token_tree"
+        && let Some(next) = node.next_sibling()
+        && matches!(next.kind(), "token_tree" | "(")
+    {
+        return Some(HighlightKind::FunctionName);
+    }
+
+    None
+}
+
+/// Check if a node is a method call identifier (bar.baz() pattern).
+fn is_method_call_node(
+    node: tree_sitter::Node,
+    kind: &str,
+    parent_kind: &str,
+    parent: &tree_sitter::Node,
+) -> bool {
+    let is_method_id = matches!(kind, "field_identifier" | "property_identifier")
+        || (kind == "identifier" && parent_kind == "attribute");
+    let is_lua_method = kind == "identifier"
+        && matches!(
+            parent_kind,
+            "dot_index_expression" | "method_index_expression"
+        )
+        && node
+            .prev_sibling()
+            .is_some_and(|s| matches!(s.kind(), "." | ":"));
+
+    if !(is_method_id || is_lua_method) {
+        return false;
+    }
+    if !matches!(
+        parent_kind,
+        "field_expression"
+            | "member_expression"
+            | "attribute"
+            | "dot_index_expression"
+            | "method_index_expression"
+    ) {
+        return false;
+    }
+    parent
+        .parent()
+        .is_some_and(|gp| matches!(gp.kind(), "call_expression" | "call" | "function_call"))
 }
 
 /// Collect highlight spans from AST nodes.
@@ -836,8 +930,6 @@ pub fn collect_highlight_spans(node: tree_sitter::Node, spans: &mut Vec<Highligh
     }
 
     // Only highlight leaf nodes (no children) to avoid duplication
-    // This means keywords and simple type identifiers get highlighted,
-    // but complex types like `Vec<String>` highlight `Vec` and `String` separately
     if highlight != HighlightKind::Default && node.child_count() == 0 {
         spans.push(HighlightSpan {
             start: node.start_byte(),
@@ -846,129 +938,15 @@ pub fn collect_highlight_spans(node: tree_sitter::Node, spans: &mut Vec<Highligh
         });
     }
 
-    // Check for function/method names and calls
+    // Check for function/method names and calls (leaf nodes only)
     if node.child_count() == 0
-        && let Some(parent) = node.parent()
+        && let Some(parent_kind) = classify_leaf_by_parent(node)
     {
-        let parent_kind = parent.kind();
-
-        // Function/method definitions
-        if kind == "identifier"
-            && matches!(
-                parent_kind,
-                "function_item"
-                    | "function_signature_item"
-                    | "function_definition"
-                    | "method_definition"
-                    | "function_declaration"
-            )
-        {
-            spans.push(HighlightSpan {
-                start: node.start_byte(),
-                end: node.end_byte(),
-                kind: HighlightKind::FunctionName,
-            });
-        }
-
-        // Function/macro calls: foo() - Rust: call_expression/macro_invocation, JS: call_expression, Python: call, Lua: function_call
-        if kind == "identifier"
-            && matches!(
-                parent_kind,
-                "call_expression" | "call" | "macro_invocation" | "function_call"
-            )
-        {
-            spans.push(HighlightSpan {
-                start: node.start_byte(),
-                end: node.end_byte(),
-                kind: HighlightKind::FunctionName,
-            });
-        }
-
-        // Scoped function calls: serde_json::to_value()
-        // identifier → scoped_identifier → call_expression
-        // Only highlight the last identifier (the function name, not module path)
-        if kind == "identifier"
-            && parent_kind == "scoped_identifier"
-            && let Some(grandparent) = parent.parent()
-            && matches!(grandparent.kind(), "call_expression" | "call")
-        {
-            // Check this is the last identifier (no :: after it)
-            let is_last = node.next_sibling().is_none_or(|s| s.kind() != "::");
-            if is_last {
-                spans.push(HighlightSpan {
-                    start: node.start_byte(),
-                    end: node.end_byte(),
-                    kind: HighlightKind::FunctionName,
-                });
-            }
-        }
-
-        // Method calls: bar.baz()
-        // - Rust: field_identifier → field_expression → call_expression
-        // - JS/TS: property_identifier → member_expression → call_expression
-        // - Python: identifier → attribute → call
-        // - Lua: identifier → dot_index_expression/method_index_expression → function_call
-        //   For Lua, only the second identifier (after . or :) is the method name
-        let is_method_id = matches!(kind, "field_identifier" | "property_identifier")
-            || (kind == "identifier" && parent_kind == "attribute");
-        let is_lua_method = kind == "identifier"
-            && matches!(
-                parent_kind,
-                "dot_index_expression" | "method_index_expression"
-            )
-            && node
-                .prev_sibling()
-                .is_some_and(|s| matches!(s.kind(), "." | ":"));
-        let is_method_parent = matches!(
-            parent_kind,
-            "field_expression"
-                | "member_expression"
-                | "attribute"
-                | "dot_index_expression"
-                | "method_index_expression"
-        );
-        if (is_method_id || is_lua_method)
-            && is_method_parent
-            && let Some(grandparent) = parent.parent()
-            && matches!(
-                grandparent.kind(),
-                "call_expression" | "call" | "function_call"
-            )
-        {
-            spans.push(HighlightSpan {
-                start: node.start_byte(),
-                end: node.end_byte(),
-                kind: HighlightKind::FunctionName,
-            });
-        }
-
-        // Inside macro token_tree: heuristic for function/method calls
-        // Pattern: identifier followed by token_tree starting with (
-        // Or: identifier preceded by . (method call)
-        if kind == "identifier"
-            && parent_kind == "token_tree"
-            && let Some(next) = node.next_sibling()
-        {
-            // Check if next sibling is () or token_tree starting with (
-            let next_kind = next.kind();
-            if next_kind == "token_tree" || next_kind == "(" {
-                spans.push(HighlightSpan {
-                    start: node.start_byte(),
-                    end: node.end_byte(),
-                    kind: HighlightKind::FunctionName,
-                });
-            }
-        }
-
-        // XML: Anonymous Name nodes in tag/attribute context
-        // STag > Name (tag name), ETag > Name (closing tag), Attribute > Name (attr name)
-        if kind == "Name" && matches!(parent_kind, "STag" | "ETag" | "Attribute") {
-            spans.push(HighlightSpan {
-                start: node.start_byte(),
-                end: node.end_byte(),
-                kind: HighlightKind::Keyword,
-            });
-        }
+        spans.push(HighlightSpan {
+            start: node.start_byte(),
+            end: node.end_byte(),
+            kind: parent_kind,
+        });
     }
 
     // Recurse into children

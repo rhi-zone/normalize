@@ -174,14 +174,20 @@ Candidates: `[workflow]` (directory, auto-run)
 - Propose `#[config]` proc macro to server-less (stretch goal — superseded by `#[derive(Config)]`;
   filed nested struct support + merge semantics requests in server-less TODO.md 2026-03-10)
 
-### Complexity Hotspots (reduced - max now 58)
+### ~~Complexity Hotspots~~ (resolved - max now 22)
 
-- [ ] `crates/normalize/src/commands/analyze/query.rs:cmd_query` (58)
-- [ ] `crates/normalize/src/commands/daemon.rs:cmd_daemon` (54)
-- [ ] `crates/normalize-syntax-rules/src/runner.rs:evaluate_predicates` (53)
-- [ ] `crates/normalize/src/commands/analyze/mod.rs:run` (51)
-- [ ] `crates/normalize/src/commands/tools/lint.rs:cmd_lint_run` (48)
-- [ ] `crates/normalize/src/tree.rs:collect_highlight_spans` (46)
+All original hotspots resolved. Remaining max is `split_query_patterns` (22) in runner.rs.
+
+- [x] `crates/normalize/src/commands/analyze/query.rs:cmd_query` (58→15) — already resolved
+- [x] `crates/normalize/src/commands/daemon.rs:cmd_daemon` (54→1) — already resolved
+- [x] `crates/normalize-syntax-rules/src/runner.rs:run_rules` (53→18)
+- [x] `crates/normalize-syntax-rules/src/runner.rs:evaluate_predicates` (53→11)
+- [x] `crates/normalize/src/commands/analyze/mod.rs:run` (51→5) — already resolved
+- [x] `crates/normalize/src/commands/tools/lint.rs:cmd_lint_run` (48→15) — already resolved
+- [x] `crates/normalize/src/tree.rs:collect_highlight_spans` (42→9)
+- [x] `crates/normalize/src/tree.rs:capture_name_to_highlight_kind` (23→2)
+- [x] `crates/normalize/src/tree.rs:render_highlighted` (23→8)
+- [x] `crates/normalize/src/tree.rs:docstring_style_for_grammar` (21→5)
 
 ### CLI Internal Consolidation
 

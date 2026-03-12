@@ -127,6 +127,218 @@ struct CombinedQuery<'a> {
     pattern_to_rule: Vec<(&'a Rule, usize)>,
 }
 
+/// Try to compile a cross-language rule for a grammar, falling back to
+/// per-pattern compilation when the full query fails.
+fn compile_cross_language_rule(
+    rule: &Rule,
+    grammar: &tree_sitter::Language,
+) -> Option<(tree_sitter::Query, String)> {
+    if let Ok(q) = tree_sitter::Query::new(grammar, &rule.query_str) {
+        return Some((q, rule.query_str.clone()));
+    }
+    // Full query failed — try each pattern separately
+    let patterns: Vec<&str> = split_query_patterns(&rule.query_str);
+    if patterns.len() <= 1 {
+        return None;
+    }
+    let valid: Vec<&str> = patterns
+        .into_iter()
+        .filter(|p| tree_sitter::Query::new(grammar, p).is_ok())
+        .collect();
+    if valid.is_empty() {
+        return None;
+    }
+    let combined = valid.join("\n");
+    tree_sitter::Query::new(grammar, &combined)
+        .ok()
+        .map(|q| (q, combined))
+}
+
+/// Compile per-grammar rules and build a combined query.
+fn build_combined_query<'a>(
+    grammar_name: &str,
+    grammar: &tree_sitter::Language,
+    specific_rules: &[&&'a Rule],
+    global_rules: &[&&'a Rule],
+) -> Option<CombinedQuery<'a>> {
+    let mut compiled_rules: Vec<(&Rule, tree_sitter::Query, String)> = Vec::new();
+
+    // Pass 1: Language-specific rules - compile directly (trust the author)
+    for rule in specific_rules {
+        if rule.languages.iter().any(|l| l == grammar_name)
+            && let Ok(q) = tree_sitter::Query::new(grammar, &rule.query_str)
+        {
+            compiled_rules.push((rule, q, rule.query_str.clone()));
+        }
+    }
+
+    // Pass 2: Cross-language rules - validate each one with pattern fallback
+    for rule in global_rules {
+        if let Some((q, qs)) = compile_cross_language_rule(rule, grammar) {
+            compiled_rules.push((rule, q, qs));
+        }
+    }
+
+    if compiled_rules.is_empty() {
+        return None;
+    }
+
+    // Combine all into one query
+    let combined_str = compiled_rules
+        .iter()
+        .map(|(_, _, qs)| qs.as_str())
+        .collect::<Vec<_>>()
+        .join("\n\n");
+
+    let query = match tree_sitter::Query::new(grammar, &combined_str) {
+        Ok(q) => q,
+        Err(e) => {
+            eprintln!("Warning: combined query failed for {}: {}", grammar_name, e);
+            return None;
+        }
+    };
+
+    // Map pattern indices to rules
+    let combined_match_idx = query
+        .capture_names()
+        .iter()
+        .position(|n| *n == "match")
+        .unwrap_or(0);
+
+    let mut pattern_to_rule: Vec<(&Rule, usize)> = Vec::new();
+    for (rule, individual_query, _) in &compiled_rules {
+        for _ in 0..individual_query.pattern_count() {
+            pattern_to_rule.push((*rule, combined_match_idx));
+        }
+    }
+
+    Some(CombinedQuery {
+        query,
+        pattern_to_rule,
+    })
+}
+
+/// Build a Finding from a matched capture node.
+fn build_finding(
+    rule: &Rule,
+    node: tree_sitter::Node,
+    content: &str,
+    query: &tree_sitter::Query,
+    m: &tree_sitter::QueryMatch,
+    file: &Path,
+) -> Finding {
+    let text = node.utf8_text(content.as_bytes()).unwrap_or("");
+
+    let mut captures_map: HashMap<String, String> = HashMap::new();
+    for cap in m.captures {
+        let name = query.capture_names()[cap.index as usize].to_string();
+        if let Ok(cap_text) = cap.node.utf8_text(content.as_bytes()) {
+            captures_map.insert(name, cap_text.to_string());
+        }
+    }
+
+    Finding {
+        rule_id: rule.id.clone(),
+        file: file.to_path_buf(),
+        start_line: node.start_position().row + 1,
+        start_col: node.start_position().column + 1,
+        end_line: node.end_position().row + 1,
+        end_col: node.end_position().column + 1,
+        start_byte: node.start_byte(),
+        end_byte: node.end_byte(),
+        message: rule.message.clone(),
+        severity: rule.severity,
+        matched_text: text.lines().next().unwrap_or("").to_string(),
+        fix: rule.fix.clone(),
+        captures: captures_map,
+    }
+}
+
+/// Resolved allow-list path for a file.
+struct AllowPath<'a> {
+    /// Full path (if root_in_project was set).
+    _full: Option<PathBuf>,
+    /// String representation for allow-list matching.
+    display: std::borrow::Cow<'a, str>,
+}
+
+/// Compute the allow-list path for a file (project-root-relative).
+fn allow_path_for_file<'a>(
+    rel_path: &Path,
+    rel_path_str: &'a str,
+    root_in_project: &Option<PathBuf>,
+) -> AllowPath<'a> {
+    if let Some(prefix) = root_in_project {
+        let buf = prefix.join(rel_path);
+        let s = buf.to_string_lossy().into_owned();
+        AllowPath {
+            _full: Some(buf),
+            display: std::borrow::Cow::Owned(s),
+        }
+    } else {
+        AllowPath {
+            _full: None,
+            display: std::borrow::Cow::Borrowed(rel_path_str),
+        }
+    }
+}
+
+/// Context needed to process matches for a single file.
+struct FileContext<'a> {
+    file: &'a Path,
+    content: &'a str,
+    source_registry: &'a SourceRegistry,
+    source_ctx: SourceContext<'a>,
+    allow_path_str: &'a str,
+}
+
+/// Process all query matches for a single file and append findings.
+fn process_file_matches(
+    ctx: &FileContext,
+    tree: &tree_sitter::Tree,
+    combined: &CombinedQuery,
+    findings: &mut Vec<Finding>,
+) {
+    let mut cursor = tree_sitter::QueryCursor::new();
+    let mut matches = cursor.matches(&combined.query, tree.root_node(), ctx.content.as_bytes());
+
+    while let Some(m) = matches.next() {
+        let Some((rule, match_idx)) = combined.pattern_to_rule.get(m.pattern_index) else {
+            continue;
+        };
+
+        if rule.allow.iter().any(|p| p.matches(ctx.allow_path_str)) {
+            continue;
+        }
+
+        if !check_requires(rule, ctx.source_registry, &ctx.source_ctx) {
+            continue;
+        }
+
+        if !evaluate_predicates(&combined.query, m, ctx.content.as_bytes()) {
+            continue;
+        }
+
+        let Some(cap) = m.captures.iter().find(|c| c.index as usize == *match_idx) else {
+            continue;
+        };
+
+        let start_line = cap.node.start_position().row + 1;
+        if is_allowed_by_comment(ctx.content, start_line, &rule.id) {
+            continue;
+        }
+
+        findings.push(build_finding(
+            rule,
+            cap.node,
+            ctx.content,
+            &combined.query,
+            m,
+            ctx.file,
+        ));
+    }
+}
+
 /// Run rules against files in a directory.
 /// Optimized: combines all rules into single query per grammar for single-traversal matching.
 #[allow(clippy::too_many_arguments)]
@@ -141,8 +353,6 @@ pub fn run_rules(
     debug: &DebugFlags,
 ) -> Vec<Finding> {
     let start = std::time::Instant::now();
-    // Canonicalize for reliable strip_prefix comparisons.
-    // If root is a file, use its parent directory for path calculations.
     let raw_abs_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let abs_root = if raw_abs_root.is_file() {
         raw_abs_root
@@ -155,10 +365,6 @@ pub fn run_rules(
     let abs_project_root = project_root
         .canonicalize()
         .unwrap_or_else(|_| project_root.to_path_buf());
-    // Path of the scan root expressed relative to the project root.
-    // Used to prefix rel_path so allow-list patterns (which are always
-    // written relative to the project root) match correctly regardless of
-    // which subdirectory was passed as the scan target.
     let root_in_project = abs_root
         .strip_prefix(&abs_project_root)
         .ok()
@@ -167,9 +373,6 @@ pub fn run_rules(
     let mut findings = Vec::new();
     let source_registry = builtin_registry();
 
-    // Filter rules: --rule / --ids explicitly requesting a rule bypasses enabled=false.
-    // Tag filters still require the rule to be enabled (we don't want --tag to activate
-    // disabled rules wholesale, only explicit rule selection does).
     let explicitly_requested = |r: &&Rule| {
         filter_rule.is_some_and(|f| r.id == f) || filter_ids.is_some_and(|ids| ids.contains(&r.id))
     };
@@ -185,7 +388,6 @@ pub fn run_rules(
         return findings;
     }
 
-    // Collect all source files and group by grammar.
     let files = collect_source_files(root);
     let mut files_by_grammar: HashMap<String, Vec<PathBuf>> = HashMap::new();
     for file in files {
@@ -200,96 +402,19 @@ pub fn run_rules(
     }
     let compile_start = std::time::Instant::now();
 
-    // Separate rules: language-specific vs cross-language (need per-grammar validation)
     let (specific_rules, global_rules): (Vec<&&Rule>, Vec<&&Rule>) =
         active_rules.iter().partition(|r| !r.languages.is_empty());
 
-    // Build combined queries: one per grammar
     let mut combined_by_grammar: HashMap<String, CombinedQuery> = HashMap::new();
-
     for grammar_name in files_by_grammar.keys() {
         let Some(grammar) = loader.get(grammar_name) else {
             continue;
         };
-
-        // (rule, compiled_query, effective_query_str)
-        // effective_query_str may differ from rule.query_str when patterns were filtered
-        let mut compiled_rules: Vec<(&Rule, tree_sitter::Query, String)> = Vec::new();
-
-        // Pass 1: Language-specific rules - compile directly (trust the author)
-        for rule in &specific_rules {
-            if rule.languages.iter().any(|l| l == grammar_name)
-                && let Ok(q) = tree_sitter::Query::new(&grammar, &rule.query_str)
-            {
-                compiled_rules.push((rule, q, rule.query_str.clone()));
-            }
+        if let Some(cq) =
+            build_combined_query(grammar_name, &grammar, &specific_rules, &global_rules)
+        {
+            combined_by_grammar.insert(grammar_name.clone(), cq);
         }
-
-        // Pass 2: Cross-language rules - validate each one.
-        // For multi-pattern rules, try each pattern individually so that rules
-        // using alternation across node types (e.g. `comment` + `line_comment`)
-        // work even when some patterns reference node types not in this grammar.
-        for rule in &global_rules {
-            if let Ok(q) = tree_sitter::Query::new(&grammar, &rule.query_str) {
-                compiled_rules.push((rule, q, rule.query_str.clone()));
-            } else {
-                // Full query failed — try each pattern separately
-                let patterns: Vec<&str> = split_query_patterns(&rule.query_str);
-                if patterns.len() > 1 {
-                    let valid: Vec<&str> = patterns
-                        .into_iter()
-                        .filter(|p| tree_sitter::Query::new(&grammar, p).is_ok())
-                        .collect();
-                    if !valid.is_empty() {
-                        let combined = valid.join("\n");
-                        if let Ok(q) = tree_sitter::Query::new(&grammar, &combined) {
-                            compiled_rules.push((rule, q, combined));
-                        }
-                    }
-                }
-            }
-        }
-
-        if compiled_rules.is_empty() {
-            continue;
-        }
-
-        // Combine all into one query using effective (possibly filtered) query strings
-        let combined_str = compiled_rules
-            .iter()
-            .map(|(_, _, qs)| qs.as_str())
-            .collect::<Vec<_>>()
-            .join("\n\n");
-
-        let query = match tree_sitter::Query::new(&grammar, &combined_str) {
-            Ok(q) => q,
-            Err(e) => {
-                eprintln!("Warning: combined query failed for {}: {}", grammar_name, e);
-                continue;
-            }
-        };
-
-        // Map pattern indices to rules
-        let mut pattern_to_rule: Vec<(&Rule, usize)> = Vec::new();
-        let combined_match_idx = query
-            .capture_names()
-            .iter()
-            .position(|n| *n == "match")
-            .unwrap_or(0);
-
-        for (rule, individual_query, _) in &compiled_rules {
-            for _ in 0..individual_query.pattern_count() {
-                pattern_to_rule.push((*rule, combined_match_idx));
-            }
-        }
-
-        combined_by_grammar.insert(
-            grammar_name.clone(),
-            CombinedQuery {
-                query,
-                pattern_to_rule,
-            },
-        );
     }
 
     if debug.timing {
@@ -301,123 +426,44 @@ pub fn run_rules(
     }
     let process_start = std::time::Instant::now();
 
-    // Process files: single query execution per file
     for (grammar_name, files) in &files_by_grammar {
         let Some(combined) = combined_by_grammar.get(grammar_name) else {
             continue;
         };
-
         let Some(grammar) = loader.get(grammar_name) else {
             continue;
         };
-
         let mut parser = tree_sitter::Parser::new();
         if parser.set_language(&grammar).is_err() {
             continue;
         }
 
         for file in files {
-            // Scan-root-relative path: stored in Finding.file and used for display.
             let rel_path = file.strip_prefix(root).unwrap_or(file);
             let rel_path_str = rel_path.to_string_lossy();
 
-            // Project-root-relative path: used for allow-list matching.
-            // Allow list entries are always written relative to the project root
-            // (e.g. "crates/normalize/src/rg/**"), so we must construct a path
-            // relative to project_root, not the scan root, to make them match
-            // correctly regardless of which subdirectory was passed as the target.
-            let allow_path_buf;
-            let allow_path_str: std::borrow::Cow<str> = if let Some(ref prefix) = root_in_project {
-                allow_path_buf = prefix.join(rel_path);
-                allow_path_buf.to_string_lossy()
-            } else {
-                // Scan root is not under project root (or same as it): fall
-                // back to rel_path, which is the same as before.
-                std::borrow::Cow::Borrowed(&*rel_path_str)
+            let allow_path = allow_path_for_file(rel_path, &rel_path_str, &root_in_project);
+
+            let Ok(content) = std::fs::read_to_string(file) else {
+                continue;
+            };
+            let Some(tree) = parser.parse(&content, None) else {
+                continue;
             };
 
-            // Build source context for this file (used for requires evaluation)
-            let source_ctx = SourceContext {
-                file_path: file,
-                rel_path: &rel_path_str,
-                project_root: &abs_project_root,
+            let file_ctx = FileContext {
+                file,
+                content: &content,
+                source_registry: &source_registry,
+                source_ctx: SourceContext {
+                    file_path: file,
+                    rel_path: &rel_path_str,
+                    project_root: &abs_project_root,
+                },
+                allow_path_str: &allow_path.display,
             };
 
-            let content = match std::fs::read_to_string(file) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-
-            let tree = match parser.parse(&content, None) {
-                Some(t) => t,
-                None => continue,
-            };
-
-            // Single query execution - one traversal for all rules
-            let mut cursor = tree_sitter::QueryCursor::new();
-            let mut matches = cursor.matches(&combined.query, tree.root_node(), content.as_bytes());
-
-            while let Some(m) = matches.next() {
-                // Look up which rule this pattern belongs to
-                let Some((rule, match_idx)) = combined.pattern_to_rule.get(m.pattern_index) else {
-                    continue;
-                };
-
-                // Check allow patterns for this specific rule.
-                // Use allow_path_str (project-root-relative) so that patterns
-                // like "crates/normalize/src/rg/**" work regardless of whether
-                // the user ran `normalize rules run` or `normalize rules run crates/`.
-                if rule.allow.iter().any(|p| p.matches(&allow_path_str)) {
-                    continue;
-                }
-
-                // Check requires conditions
-                if !check_requires(rule, &source_registry, &source_ctx) {
-                    continue;
-                }
-
-                if !evaluate_predicates(&combined.query, m, content.as_bytes()) {
-                    continue;
-                }
-
-                let capture = m.captures.iter().find(|c| c.index as usize == *match_idx);
-
-                if let Some(cap) = capture {
-                    let node = cap.node;
-                    let start_line = node.start_position().row + 1;
-
-                    if is_allowed_by_comment(&content, start_line, &rule.id) {
-                        continue;
-                    }
-
-                    let text = node.utf8_text(content.as_bytes()).unwrap_or("");
-
-                    // Collect all captures for fix substitution
-                    let mut captures_map: HashMap<String, String> = HashMap::new();
-                    for cap in m.captures {
-                        let name = combined.query.capture_names()[cap.index as usize].to_string();
-                        if let Ok(cap_text) = cap.node.utf8_text(content.as_bytes()) {
-                            captures_map.insert(name, cap_text.to_string());
-                        }
-                    }
-
-                    findings.push(Finding {
-                        rule_id: rule.id.clone(),
-                        file: file.clone(),
-                        start_line,
-                        start_col: node.start_position().column + 1,
-                        end_line: node.end_position().row + 1,
-                        end_col: node.end_position().column + 1,
-                        start_byte: node.start_byte(),
-                        end_byte: node.end_byte(),
-                        message: rule.message.clone(),
-                        severity: rule.severity,
-                        matched_text: text.lines().next().unwrap_or("").to_string(),
-                        fix: rule.fix.clone(),
-                        captures: captures_map,
-                    });
-                }
-            }
+            process_file_matches(&file_ctx, &tree, combined, &mut findings);
         }
     }
 
@@ -433,6 +479,97 @@ pub fn run_rules(
     findings
 }
 
+/// Resolve a predicate argument to its text value.
+fn resolve_arg_text<'a>(
+    arg: &'a tree_sitter::QueryPredicateArg,
+    match_: &tree_sitter::QueryMatch,
+    source: &'a [u8],
+) -> Option<&'a str> {
+    match arg {
+        tree_sitter::QueryPredicateArg::Capture(idx) => Some(
+            match_
+                .captures
+                .iter()
+                .find(|c| c.index == *idx)
+                .and_then(|c| c.node.utf8_text(source).ok())
+                .unwrap_or(""),
+        ),
+        tree_sitter::QueryPredicateArg::String(s) => Some(s.as_ref()),
+    }
+}
+
+/// Resolve the first argument as a capture's text (not a string literal).
+fn resolve_capture_text<'a>(
+    arg: &'a tree_sitter::QueryPredicateArg,
+    match_: &tree_sitter::QueryMatch,
+    source: &'a [u8],
+) -> Option<&'a str> {
+    match arg {
+        tree_sitter::QueryPredicateArg::Capture(idx) => Some(
+            match_
+                .captures
+                .iter()
+                .find(|c| c.index == *idx)
+                .and_then(|c| c.node.utf8_text(source).ok())
+                .unwrap_or(""),
+        ),
+        _ => None,
+    }
+}
+
+/// Evaluate an eq?/not-eq? predicate. Returns None to skip, Some(false) to reject.
+fn eval_eq(
+    args: &[tree_sitter::QueryPredicateArg],
+    match_: &tree_sitter::QueryMatch,
+    source: &[u8],
+    negated: bool,
+) -> Option<bool> {
+    if args.len() < 2 {
+        return None;
+    }
+    let first = resolve_arg_text(&args[0], match_, source)?;
+    let second = resolve_arg_text(&args[1], match_, source)?;
+    let equal = first == second;
+    Some(if negated { !equal } else { equal })
+}
+
+/// Evaluate a match?/not-match? predicate. Returns None to skip, Some(false) to reject.
+fn eval_match(
+    args: &[tree_sitter::QueryPredicateArg],
+    match_: &tree_sitter::QueryMatch,
+    source: &[u8],
+    negated: bool,
+) -> Option<bool> {
+    if args.len() < 2 {
+        return None;
+    }
+    let capture_text = resolve_capture_text(&args[0], match_, source)?;
+    let pattern = match &args[1] {
+        tree_sitter::QueryPredicateArg::String(s) => s.as_ref(),
+        _ => return None,
+    };
+    let regex = regex::Regex::new(pattern).ok()?;
+    let matched = regex.is_match(capture_text);
+    Some(if negated { !matched } else { matched })
+}
+
+/// Evaluate an any-of? predicate. Returns None to skip, Some(false) to reject.
+fn eval_any_of(
+    args: &[tree_sitter::QueryPredicateArg],
+    match_: &tree_sitter::QueryMatch,
+    source: &[u8],
+) -> Option<bool> {
+    if args.len() < 2 {
+        return None;
+    }
+    let capture_text = resolve_capture_text(&args[0], match_, source)?;
+    let any_match = args[1..].iter().any(|arg| match arg {
+        tree_sitter::QueryPredicateArg::String(s) => s.as_ref() == capture_text,
+        _ => false,
+    });
+    Some(any_match)
+}
+
 /// Evaluate predicates for a match.
 pub fn evaluate_predicates(
     query: &tree_sitter::Query,
@@ -441,110 +578,21 @@ pub fn evaluate_predicates(
 ) -> bool {
     let predicates = query.general_predicates(match_.pattern_index);
     for predicate in predicates {
-        let name = &predicate.operator;
+        let name = predicate.operator.as_ref();
         let args = &predicate.args;
 
-        match name.as_ref() {
-            "eq?" | "not-eq?" => {
-                if args.len() < 2 {
-                    continue;
-                }
+        let result = match name {
+            "eq?" => eval_eq(args, match_, source, false),
+            "not-eq?" => eval_eq(args, match_, source, true),
+            "match?" => eval_match(args, match_, source, false),
+            "not-match?" => eval_match(args, match_, source, true),
+            "any-of?" => eval_any_of(args, match_, source),
+            _ => None,
+        };
 
-                // Get first capture's text
-                let first_text = match &args[0] {
-                    tree_sitter::QueryPredicateArg::Capture(idx) => match_
-                        .captures
-                        .iter()
-                        .find(|c| c.index == *idx)
-                        .and_then(|c| c.node.utf8_text(source).ok())
-                        .unwrap_or(""),
-                    tree_sitter::QueryPredicateArg::String(s) => s.as_ref(),
-                };
-
-                // Get second value (capture or string)
-                let second_text = match &args[1] {
-                    tree_sitter::QueryPredicateArg::Capture(idx) => match_
-                        .captures
-                        .iter()
-                        .find(|c| c.index == *idx)
-                        .and_then(|c| c.node.utf8_text(source).ok())
-                        .unwrap_or(""),
-                    tree_sitter::QueryPredicateArg::String(s) => s.as_ref(),
-                };
-
-                let equal = first_text == second_text;
-                if name.as_ref() == "eq?" && !equal {
-                    return false;
-                }
-                if name.as_ref() == "not-eq?" && equal {
-                    return false;
-                }
-            }
-            "match?" | "not-match?" => {
-                if args.len() < 2 {
-                    continue;
-                }
-
-                // Get capture's text
-                let capture_text = match &args[0] {
-                    tree_sitter::QueryPredicateArg::Capture(idx) => match_
-                        .captures
-                        .iter()
-                        .find(|c| c.index == *idx)
-                        .and_then(|c| c.node.utf8_text(source).ok())
-                        .unwrap_or(""),
-                    _ => continue,
-                };
-
-                // Get regex pattern
-                let pattern = match &args[1] {
-                    tree_sitter::QueryPredicateArg::String(s) => s.as_ref(),
-                    _ => continue,
-                };
-
-                // Compile and match regex
-                let regex = match regex::Regex::new(pattern) {
-                    Ok(r) => r,
-                    Err(_) => continue,
-                };
-
-                let matches = regex.is_match(capture_text);
-                if name.as_ref() == "match?" && !matches {
-                    return false;
-                }
-                if name.as_ref() == "not-match?" && matches {
-                    return false;
-                }
-            }
-            "any-of?" => {
-                if args.len() < 2 {
-                    continue;
-                }
-
-                // Get capture's text
-                let capture_text = match &args[0] {
-                    tree_sitter::QueryPredicateArg::Capture(idx) => match_
-                        .captures
-                        .iter()
-                        .find(|c| c.index == *idx)
-                        .and_then(|c| c.node.utf8_text(source).ok())
-                        .unwrap_or(""),
-                    _ => continue,
-                };
-
-                // Check if any of the remaining args match
-                let any_match = args[1..].iter().any(|arg| match arg {
-                    tree_sitter::QueryPredicateArg::String(s) => s.as_ref() == capture_text,
-                    _ => false,
-                });
-
-                if !any_match {
-                    return false;
-                }
-            }
-            _ => {
-                // Unknown predicate - ignore
-            }
+        // None means skip (bad args), Some(false) means predicate failed
+        if result == Some(false) {
+            return false;
         }
     }
     true
