@@ -51,8 +51,10 @@ tool, another command). Don't extract for line count alone.
 
 **Phase 3 rank infrastructure (in progress, 2026-03-12):**
 - `RankEntry` trait + `Column`/`Align` + `format_ranked_table()` in `normalize-analyze::ranked` — shared tabular rendering for all rank-pattern commands
-- Migrated 8 commands: files, imports, ownership, docs, ceremony, surface, depth-map, layering
-- **Next:** migrate remaining rank commands (complexity, length, density, uniqueness, test-ratio, test-gaps, budget, hotspots), then generic `--diff`/`--trend` infrastructure
+- Migrated 13 commands: files, imports, ownership, docs, ceremony, surface, depth-map, layering, test-ratio, budget, density, coupling, uniqueness
+- Not migrated (conditional columns): hotspots (has_complexity flag changes column set)
+- Not migrated (different structure): complexity, length (use `FileReport<T>` with `FullStats`), test-gaps (not tabular), coupling-clusters (prose), architecture, call-complexity
+- **Next:** generic `--diff`/`--trend` infrastructure — the big leverage win that gives all rank commands temporal analysis for free
 
 **Future (low priority):** `security` → SARIF rules engine (wraps bandit; could be `normalize rules run --engine sarif` with bandit configured). `docs`/`security` → rules migration (~-3 commands, see design doc).
 
