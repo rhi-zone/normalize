@@ -111,14 +111,15 @@ Config/markup:
       then human-verify before committing
 - [ ] CI integration: `nix flake check` runs all language fixture suites in parallel
 
-### Qualified/namespaced import resolution in the facts index
+### ~~Qualified/namespaced import resolution in the facts index~~ (done 2026-03-12)
 
-`find_callers(name)` is name-only — it will rename two unrelated `foo()` functions in different
-modules simultaneously. Fix: store module-qualified caller/callee names in the index so lookups
-resolve to a specific definition, not a name string.
-- [ ] Store caller/callee with module qualification in facts index
-- [ ] Post-filter in `find_callers`: verify callee resolves to definition file via import graph
-- [ ] Update `edit rename` to use qualified lookup (eliminates false positives)
+`calls` table now has `callee_resolved_file TEXT` column (schema v6). After import resolution,
+`resolve_all_calls()` populates it by joining calls with imports and same-file symbol defs.
+`find_callers()` uses `callee_resolved_file` for precise disambiguation; falls back to
+import-based matching when NULL (external/unresolved modules).
+- [x] Store caller/callee with module qualification in facts index (`callee_resolved_file` column)
+- [x] Resolve calls after imports in both full and incremental refresh paths
+- [x] `find_callers` uses resolved file — `edit rename`, `call-graph`, LSP references all benefit
 
 ### Remaining work (short items)
 

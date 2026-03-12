@@ -36,7 +36,7 @@ struct ParsedFileData {
 }
 
 // Not yet public - just delete .normalize/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 5;
+const SCHEMA_VERSION: i64 = 6;
 
 /// Check if a file path has a supported source extension.
 fn is_source_file(path: &str) -> bool {
@@ -187,6 +187,7 @@ impl FileIndex {
                 caller_symbol TEXT NOT NULL,
                 callee_name TEXT NOT NULL,
                 callee_qualifier TEXT,
+                callee_resolved_file TEXT,
                 line INTEGER NOT NULL
             )",
             (),
@@ -204,6 +205,11 @@ impl FileIndex {
         .await?;
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_calls_qualifier ON calls(callee_qualifier)",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_calls_resolved ON calls(callee_resolved_file)",
             (),
         )
         .await?;
@@ -386,6 +392,9 @@ impl FileIndex {
             conn.execute("DELETE FROM imports", ()).await.ok();
             // Add new columns that may not exist in older schema versions.
             conn.execute("ALTER TABLE imports ADD COLUMN resolved_file TEXT", ())
+                .await
+                .ok(); // ignore "duplicate column" error on fresh DBs
+            conn.execute("ALTER TABLE calls ADD COLUMN callee_resolved_file TEXT", ())
                 .await
                 .ok(); // ignore "duplicate column" error on fresh DBs
             conn.execute("DELETE FROM type_methods", ()).await.ok();
@@ -871,33 +880,39 @@ impl FileIndex {
             }
         }
 
-        // Direct calls restricted to def_file (self-recursive calls only).
+        // Use callee_resolved_file when available for precise call resolution.
+        // Falls back to import-based matching when callee_resolved_file is NULL
+        // (external packages, unresolved modules).
         //
-        // Import-based branches use resolved_file for precise filtering:
-        //   - resolved_file = def_file  → this import provably references our definition
-        //   - resolved_file IS NULL     → module couldn't be resolved (external package,
-        //                                 no LocalDeps support); include as fallback so we
-        //                                 don't silently drop real callers
-        //   - resolved_file = other     → different module's symbol with the same name; exclude
+        // Branch 1: callee_resolved_file = def_file (precise match)
+        // Branch 2: Same-file calls (caller_file = def_file, no qualifier)
+        // Branch 3: Import-based fallback for unresolved calls (callee_resolved_file IS NULL)
+        // Branch 4: self.method() calls within a class
         let mut rows = self.conn.query(
-            "SELECT caller_file, caller_symbol, line FROM calls WHERE callee_name = ?1 AND caller_file = ?2
+            "SELECT caller_file, caller_symbol, line FROM calls
+             WHERE callee_name = ?1 AND callee_resolved_file = ?2
+             UNION
+             SELECT caller_file, caller_symbol, line FROM calls
+             WHERE callee_name = ?1 AND caller_file = ?2
+               AND callee_resolved_file IS NULL AND callee_qualifier IS NULL
              UNION
              SELECT c.caller_file, c.caller_symbol, c.line
              FROM calls c
              JOIN imports i ON c.caller_file = i.file AND c.callee_name = COALESCE(i.alias, i.name)
-             WHERE i.name = ?1
+             WHERE i.name = ?1 AND c.callee_resolved_file IS NULL
                AND (i.resolved_file = ?2 OR i.resolved_file IS NULL)
              UNION
              SELECT c.caller_file, c.caller_symbol, c.line
              FROM calls c
              JOIN imports i ON c.caller_file = i.file AND c.callee_qualifier = COALESCE(i.alias, i.name)
-             WHERE c.callee_name = ?1 AND i.module IS NULL
+             WHERE c.callee_name = ?1 AND i.module IS NULL AND c.callee_resolved_file IS NULL
                AND (i.resolved_file = ?2 OR i.resolved_file IS NULL)
              UNION
              SELECT c.caller_file, c.caller_symbol, c.line
              FROM calls c
              JOIN symbols s ON c.caller_file = s.file AND c.caller_symbol = s.name
-             WHERE c.callee_name = ?1 AND c.callee_qualifier = 'self' AND s.parent IS NOT NULL",
+             WHERE c.callee_name = ?1 AND c.callee_qualifier = 'self'
+               AND s.parent IS NOT NULL AND c.callee_resolved_file IS NULL",
             params![method_name, def_file],
         ).await?;
         let mut callers = Vec::new();
@@ -1401,6 +1416,94 @@ impl FileIndex {
         Ok(resolved_count)
     }
 
+    /// Resolve call targets: for each call, try to determine which file defines the callee.
+    ///
+    /// Uses the import graph: if caller_file imports a name that matches callee_name (or its alias),
+    /// and that import has a resolved_file, set callee_resolved_file on the call row.
+    /// Same-file calls (caller_file has a symbol matching callee_name) also get resolved.
+    pub async fn resolve_all_calls(&self) -> Result<usize, libsql::Error> {
+        let mut resolved = 0usize;
+
+        // 1. Same-file calls: callee defined in the same file as the caller
+        resolved += self
+            .conn
+            .execute(
+                "UPDATE calls SET callee_resolved_file = caller_file
+                 WHERE callee_resolved_file IS NULL
+                   AND callee_qualifier IS NULL
+                   AND EXISTS (
+                       SELECT 1 FROM symbols
+                       WHERE symbols.file = calls.caller_file
+                         AND symbols.name = calls.callee_name
+                   )",
+                (),
+            )
+            .await? as usize;
+
+        // 2. Import-resolved calls: callee_name matches an import name (or alias)
+        //    that has a resolved_file
+        resolved += self
+            .conn
+            .execute(
+                "UPDATE calls SET callee_resolved_file = (
+                     SELECT i.resolved_file FROM imports i
+                     WHERE i.file = calls.caller_file
+                       AND calls.callee_name = COALESCE(i.alias, i.name)
+                       AND i.resolved_file IS NOT NULL
+                     LIMIT 1
+                 )
+                 WHERE callee_resolved_file IS NULL
+                   AND callee_qualifier IS NULL
+                   AND EXISTS (
+                       SELECT 1 FROM imports i
+                       WHERE i.file = calls.caller_file
+                         AND calls.callee_name = COALESCE(i.alias, i.name)
+                         AND i.resolved_file IS NOT NULL
+                   )",
+                (),
+            )
+            .await? as usize;
+
+        // 3. Qualifier-resolved calls: callee_qualifier matches an import name (or alias)
+        //    e.g., `module.foo()` where `module` is imported
+        resolved += self
+            .conn
+            .execute(
+                "UPDATE calls SET callee_resolved_file = (
+                     SELECT i.resolved_file FROM imports i
+                     WHERE i.file = calls.caller_file
+                       AND calls.callee_qualifier = COALESCE(i.alias, i.name)
+                       AND i.resolved_file IS NOT NULL
+                     LIMIT 1
+                 )
+                 WHERE callee_resolved_file IS NULL
+                   AND callee_qualifier IS NOT NULL
+                   AND callee_qualifier != 'self'
+                   AND EXISTS (
+                       SELECT 1 FROM imports i
+                       WHERE i.file = calls.caller_file
+                         AND calls.callee_qualifier = COALESCE(i.alias, i.name)
+                         AND i.resolved_file IS NOT NULL
+                   )",
+                (),
+            )
+            .await? as usize;
+
+        // 4. Self-calls: `self.method()` — resolve to the file containing the parent type
+        //    The caller's parent type is in the same file, so resolve to caller_file.
+        resolved += self
+            .conn
+            .execute(
+                "UPDATE calls SET callee_resolved_file = caller_file
+                 WHERE callee_resolved_file IS NULL
+                   AND callee_qualifier = 'self'",
+                (),
+            )
+            .await? as usize;
+
+        Ok(resolved)
+    }
+
     /// Check if a file exports (defines) a given symbol
     async fn file_exports_symbol(&self, file: &str, symbol: &str) -> Result<bool, libsql::Error> {
         // Check if symbol is defined in this file (top-level only, parent IS NULL)
@@ -1761,6 +1864,8 @@ impl FileIndex {
         // Resolve import module specifiers to root-relative file paths now that all
         // files are indexed. Must run after COMMIT so module_to_files() can query them.
         self.resolve_all_imports().await.ok();
+        // Resolve call targets using the now-populated import graph.
+        self.resolve_all_calls().await.ok();
 
         Ok(CallGraphStats {
             symbols: symbol_count,
@@ -1901,6 +2006,8 @@ impl FileIndex {
 
         // Resolve any newly inserted imports to root-relative file paths.
         self.resolve_all_imports().await.ok();
+        // Resolve call targets using the now-populated import graph.
+        self.resolve_all_calls().await.ok();
 
         Ok(CallGraphStats {
             symbols: symbol_count,
@@ -2169,5 +2276,129 @@ class MyClass:
             !callers.is_empty(),
             "Should find callers of MyClass.method_b"
         );
+    }
+
+    /// Regression test: find_callers must not return callers of a same-named function
+    /// in a different module. Two modules define `helper()`, and `main.py` imports only
+    /// one of them. `find_callers("helper", "src/utils_a.py")` must not include calls
+    /// that target `src/utils_b.py`'s `helper()`.
+    #[tokio::test]
+    async fn test_find_callers_cross_module_disambiguation() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+
+        // Two modules with the same function name
+        fs::write(
+            dir.path().join("src/utils_a.py"),
+            "def helper():\n    return 'A'\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("src/utils_b.py"),
+            "def helper():\n    return 'B'\n",
+        )
+        .unwrap();
+
+        // caller_a.py imports from utils_a and calls helper()
+        fs::write(
+            dir.path().join("src/caller_a.py"),
+            "from utils_a import helper\n\ndef do_a():\n    helper()\n",
+        )
+        .unwrap();
+
+        // caller_b.py imports from utils_b and calls helper()
+        fs::write(
+            dir.path().join("src/caller_b.py"),
+            "from utils_b import helper\n\ndef do_b():\n    helper()\n",
+        )
+        .unwrap();
+
+        let mut index = FileIndex::open(&dir.path().join("index.sqlite"), dir.path())
+            .await
+            .unwrap();
+        index.refresh().await.unwrap();
+        index.refresh_call_graph().await.unwrap();
+
+        // Check whether imports got resolved (depends on normalize-local-deps Python support)
+        let mut rows = index
+            .connection()
+            .query(
+                "SELECT file, resolved_file FROM imports WHERE name = 'helper' ORDER BY file",
+                (),
+            )
+            .await
+            .unwrap();
+        let mut import_resolution: Vec<(String, Option<String>)> = Vec::new();
+        while let Some(row) = rows.next().await.unwrap() {
+            import_resolution.push((row.get(0).unwrap(), row.get(1).unwrap()));
+        }
+
+        // Check whether calls got resolved
+        let mut rows = index
+            .connection()
+            .query(
+                "SELECT caller_file, callee_name, callee_resolved_file FROM calls WHERE callee_name = 'helper' ORDER BY caller_file",
+                (),
+            )
+            .await
+            .unwrap();
+        let mut call_resolution: Vec<(String, String, Option<String>)> = Vec::new();
+        while let Some(row) = rows.next().await.unwrap() {
+            call_resolution.push((
+                row.get(0).unwrap(),
+                row.get(1).unwrap(),
+                row.get(2).unwrap(),
+            ));
+        }
+
+        // Ask for callers of utils_a's helper
+        let callers = index
+            .find_callers("helper", "src/utils_a.py")
+            .await
+            .unwrap();
+        let caller_files: Vec<&str> = callers.iter().map(|(f, _, _)| f.as_str()).collect();
+
+        // When imports are resolved, disambiguation is precise — only the correct
+        // caller appears. When unresolved (no LocalDeps for test setup), both
+        // callers may appear via the NULL fallback. Either way caller_a must appear.
+        assert!(
+            caller_files.contains(&"src/caller_a.py"),
+            "caller_a.py calls helper() (imports utils_a), must be a caller. Got: {:?}\nimports: {:?}\ncalls: {:?}",
+            caller_files,
+            import_resolution,
+            call_resolution,
+        );
+
+        let imports_resolved = import_resolution
+            .iter()
+            .any(|(_, r)| r.as_deref() == Some("src/utils_a.py"));
+        if imports_resolved {
+            assert!(
+                !caller_files.contains(&"src/caller_b.py"),
+                "caller_b.py imports utils_b, should NOT be a caller of utils_a::helper. Got: {:?}",
+                caller_files
+            );
+        }
+
+        // Ask for callers of utils_b's helper
+        let callers = index
+            .find_callers("helper", "src/utils_b.py")
+            .await
+            .unwrap();
+        let caller_files: Vec<&str> = callers.iter().map(|(f, _, _)| f.as_str()).collect();
+        assert!(
+            caller_files.contains(&"src/caller_b.py"),
+            "caller_b.py calls helper() (imports utils_b), must be a caller. Got: {:?}\nimports: {:?}\ncalls: {:?}",
+            caller_files,
+            import_resolution,
+            call_resolution,
+        );
+        if imports_resolved {
+            assert!(
+                !caller_files.contains(&"src/caller_a.py"),
+                "caller_a.py imports utils_a, should NOT be a caller of utils_b::helper. Got: {:?}",
+                caller_files
+            );
+        }
     }
 }
