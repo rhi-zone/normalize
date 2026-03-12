@@ -6,11 +6,10 @@
 # auto_start = true
 
 [analyze]
-clones = true
 # Exclude normalize-languages/src from clone detection: ~98 language files all implement
 # the same Language trait with nearly-identical Symbol constructors across extract_function,
 # extract_container, extract_type. These are intentionally parallel, not copy-paste.
-# Affects all analyze subcommands (no per-subcommand exclude yet — see TODO.md).
+# Affects all analyze subcommands. Per-subcommand overrides: [analyze.<subcommand>] exclude = [...]
 exclude = [
     # ~98 language files implement the same Language trait with nearly-identical
     # Symbol constructors. Intentionally parallel, not copy-paste.

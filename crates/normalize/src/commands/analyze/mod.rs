@@ -46,6 +46,7 @@ pub mod uniqueness;
 
 use crate::filter::Filter;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::Path;
 
 /// Analyze command configuration.
@@ -76,6 +77,23 @@ pub struct AnalyzeConfig {
     #[serde(rename = "query-context-lines")]
     pub query_context_lines: Option<usize>,
     /// Patterns to exclude from all analysis (e.g., generated or intentionally parallel code)
+    #[serde(default)]
+    pub exclude: Vec<String>,
+    /// Per-subcommand configuration overrides.
+    /// Configured via `[analyze.<subcommand>]` sections, e.g.:
+    /// ```toml
+    /// [analyze.duplicates]
+    /// exclude = ["**/generated/**"]
+    /// ```
+    #[serde(flatten)]
+    pub subcommands: HashMap<String, SubcommandConfig>,
+}
+
+/// Per-subcommand configuration (used in `[analyze.<subcommand>]` sections).
+#[derive(Debug, Clone, Deserialize, Serialize, Default, schemars::JsonSchema)]
+#[serde(default)]
+pub struct SubcommandConfig {
+    /// Patterns to exclude from this specific subcommand
     #[serde(default)]
     pub exclude: Vec<String>,
 }
@@ -136,6 +154,16 @@ impl AnalyzeConfig {
 
     pub fn exclude_interface_impls(&self) -> bool {
         self.exclude_interface_impls.unwrap_or(true)
+    }
+
+    /// Get excludes for a specific subcommand, merging global + per-subcommand patterns.
+    /// CLI `--exclude` args should be appended by the caller.
+    pub fn excludes_for(&self, subcommand: &str) -> Vec<String> {
+        let mut result = self.exclude.clone();
+        if let Some(sub) = self.subcommands.get(subcommand) {
+            result.extend(sub.exclude.clone());
+        }
+        result
     }
 }
 

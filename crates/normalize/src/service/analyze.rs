@@ -409,6 +409,19 @@ impl AnalyzeService {
             crate::commands::build_filter(root, exclude, only)
         }
     }
+
+    /// Build a filter with merged excludes: config global + per-subcommand + CLI args.
+    fn build_filter_with_config(
+        root: &std::path::Path,
+        config: &crate::commands::analyze::AnalyzeConfig,
+        subcommand: &str,
+        cli_exclude: &[String],
+        only: &[String],
+    ) -> Option<crate::filter::Filter> {
+        let mut excludes = config.excludes_for(subcommand);
+        excludes.extend(cli_exclude.iter().cloned());
+        Self::build_filter(root, &excludes, only)
+    }
 }
 
 #[cli(
@@ -515,7 +528,9 @@ impl AnalyzeService {
             }
         }
         self.resolve_format(pretty, compact, &root_path);
-        let filter = Self::build_filter(&root_path, &exclude, &only);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let filter =
+            Self::build_filter_with_config(&root_path, &config.analyze, "health", &exclude, &only);
         Ok(crate::commands::analyze::report::analyze(
             target.as_deref(),
             &root_path,
@@ -544,7 +559,9 @@ impl AnalyzeService {
     ) -> Result<AnalyzeReport, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
-        let filter = Self::build_filter(&root_path, &exclude, &only);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let filter =
+            Self::build_filter_with_config(&root_path, &config.analyze, "all", &exclude, &only);
         Ok(crate::commands::analyze::report::analyze(
             target.as_deref(),
             &root_path,
@@ -599,8 +616,14 @@ impl AnalyzeService {
     ) -> Result<ComplexityReport, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
-        let filter = Self::build_filter(&root_path, &exclude, &only);
         let config = crate::config::NormalizeConfig::load(&root_path);
+        let filter = Self::build_filter_with_config(
+            &root_path,
+            &config.analyze,
+            "complexity",
+            &exclude,
+            &only,
+        );
         let effective_threshold = threshold.or_else(|| config.analyze.threshold());
         let effective_limit = match limit.unwrap_or(10) {
             0 => usize::MAX,
@@ -714,7 +737,9 @@ impl AnalyzeService {
     ) -> Result<LengthReport, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
-        let filter = Self::build_filter(&root_path, &exclude, &only);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let filter =
+            Self::build_filter_with_config(&root_path, &config.analyze, "length", &exclude, &only);
         let effective_limit = match limit.unwrap_or(10) {
             0 => usize::MAX,
             n => n,
@@ -814,8 +839,9 @@ impl AnalyzeService {
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
     ) -> Result<DocCoverageReport, String> {
         let root_path = Self::root_path(root);
-        let filter = Self::build_filter(&root_path, &exclude, &only);
         let config = crate::config::NormalizeConfig::load(&root_path);
+        let filter =
+            Self::build_filter_with_config(&root_path, &config.analyze, "docs", &exclude, &only);
         Ok(crate::commands::analyze::docs::analyze_docs(
             &root_path,
             limit.unwrap_or(10),
@@ -1012,7 +1038,9 @@ impl AnalyzeService {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
-        let mut excludes = config.analyze.hotspots_exclude.clone();
+        // Merge: global excludes + [analyze.hotspots] excludes + legacy hotspots_exclude + allow file
+        let mut excludes = config.analyze.excludes_for("hotspots");
+        excludes.extend(config.analyze.hotspots_exclude.clone());
         excludes.extend(crate::commands::analyze::load_allow_file(
             &root_path,
             "hotspots-allow",
@@ -1234,7 +1262,14 @@ impl AnalyzeService {
         self.resolve_format(pretty, compact, &root_path);
         let scope = scope.unwrap_or(DuplicateScope::Functions);
         let mode = mode.unwrap_or(DuplicateMode::Exact);
-        let filter = Self::build_filter(&root_path, &exclude, &only);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let filter = Self::build_filter_with_config(
+            &root_path,
+            &config.analyze,
+            "duplicates",
+            &exclude,
+            &only,
+        );
 
         // Blocks scope defaults to eliding literals (structurally-identical blocks that differ
         // only in literal values are real duplication). Use --no-elide-literals to opt out.
@@ -1427,7 +1462,14 @@ impl AnalyzeService {
     ) -> Result<TestGapsReport, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
-        let filter = Self::build_filter(&root_path, &exclude, &only);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let filter = Self::build_filter_with_config(
+            &root_path,
+            &config.analyze,
+            "test-gaps",
+            &exclude,
+            &only,
+        );
         let allowlist = crate::commands::analyze::load_allow_file(&root_path, "test-gaps-allow");
         let effective_limit = match limit.unwrap_or(20) {
             0 => usize::MAX,
@@ -1620,7 +1662,14 @@ impl AnalyzeService {
             0 => usize::MAX,
             n => n,
         };
-        let filter = Self::build_filter(&root_path, &exclude, &only);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let filter = Self::build_filter_with_config(
+            &root_path,
+            &config.analyze,
+            "uniqueness",
+            &exclude,
+            &only,
+        );
         let sim = similarity.unwrap_or(0.80);
         let min = min_lines.unwrap_or(5);
         let clust = clusters.unwrap_or(10);
