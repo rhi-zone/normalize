@@ -33,6 +33,9 @@ Not all rules are appropriate for all project types:
 | `python/breakpoint` | ✓ Use | ✓ Use | ✓ Use | Never commit breakpoint() |
 | `go/fmt-print` | ✓ Use | ❌ Disable | ✓ Use | CLI tools use fmt.Print |
 | `ruby/binding-pry` | ✓ Use | ✓ Use | ✓ Use | Never commit binding.pry |
+| `java/system-print` | ✓ Use | ❌ Disable | ✓ Use | CLI tools use System.out |
+| `java/empty-catch` | ✓ Use | ✓ Use | ✓ Use | Silent exception swallowing |
+| `java/print-stack-trace` | ✓ Use | ⚠️ Noisy | ✓ Use | Use structured logging |
 
 **Library code** should avoid stdout/stderr side effects - use logging crates instead.
 
@@ -188,6 +191,53 @@ Flags `fmt.Print`, `fmt.Println`, `fmt.Printf` calls.
 
 **When to use:** Library code where structured logging is preferred.
 **When to disable:** CLI tools in `cmd/` directories.
+
+### Java Rules
+
+#### `java/system-print`
+**Severity:** info | **Languages:** java
+
+Flags `System.out.println`, `System.err.println`, `System.out.printf`, and variants.
+
+**Default allow:** `**/test/**`, `**/tests/**`, `**/examples/**`
+
+**When to use:** Production code where a logging framework (SLF4J, Log4j2) is preferred.
+**When to disable:** CLI tools that intentionally write to stdout. Disabled by default.
+
+#### `java/empty-catch`
+**Severity:** warning | **Languages:** java
+
+Flags empty `catch` blocks that silently swallow exceptions.
+
+**Always use.** Silent exception swallowing hides bugs. Add logging, rethrow, or at minimum a comment.
+
+#### `java/print-stack-trace`
+**Severity:** warning | **Languages:** java
+
+Flags `e.printStackTrace()` calls.
+
+**Default allow:** `**/test/**`, `**/tests/**`
+
+**When to use:** Production code. Stack traces to stderr bypass logging configuration.
+
+#### `java/magic-number`
+**Severity:** info | **Languages:** java
+
+Flags numeric literals in comparisons (excluding single-digit 0-9).
+
+**When to disable:** Disabled by default. Enable for no-magic-numbers policy.
+
+#### `java/suppress-warnings`
+**Severity:** info | **Languages:** java
+
+Flags `@SuppressWarnings` annotations. Disabled by default.
+
+#### `java/thread-sleep`
+**Severity:** warning | **Languages:** java
+
+Flags `Thread.sleep()` calls in production code. Often indicates polling or timing hacks.
+
+**Default allow:** `**/test/**`, `**/tests/**`. Disabled by default.
 
 ### Ruby Rules
 

@@ -211,6 +211,31 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "go/magic-number",
         content: include_str!("go_magic_number.scm"),
     },
+    // Java rules
+    BuiltinRule {
+        id: "java/system-print",
+        content: include_str!("java_system_print.scm"),
+    },
+    BuiltinRule {
+        id: "java/empty-catch",
+        content: include_str!("java_empty_catch.scm"),
+    },
+    BuiltinRule {
+        id: "java/print-stack-trace",
+        content: include_str!("java_print_stack_trace.scm"),
+    },
+    BuiltinRule {
+        id: "java/magic-number",
+        content: include_str!("java_magic_number.scm"),
+    },
+    BuiltinRule {
+        id: "java/suppress-warnings",
+        content: include_str!("java_suppress_warnings.scm"),
+    },
+    BuiltinRule {
+        id: "java/thread-sleep",
+        content: include_str!("java_thread_sleep.scm"),
+    },
     // Ruby rules
     BuiltinRule {
         id: "ruby/binding-pry",
