@@ -17,6 +17,8 @@ Manage and run analysis rules (syntax + fact). This is the unified entry point f
 | `add` | Add a rule from a URL |
 | `update` | Update imported rules from their sources |
 | `remove` | Remove an imported rule |
+| `setup` | Interactive setup wizard — run all rules and walk through enable/disable |
+| `validate` | Validate rule configuration for errors |
 
 ### list
 
@@ -160,6 +162,25 @@ normalize rules remove no-console-log
 ```
 
 This removes both the rule file and its entry in the lock file.
+
+### setup
+
+Interactive wizard that runs all rules against the codebase, groups violations by rule, and walks you through each rule — showing example violations and prompting to enable or disable. Recommended rules (correctness, security, bug-prone) are shown first.
+
+```bash
+normalize rules setup                  # Interactive rule configuration
+normalize rules setup --root /path     # Run against a specific project
+```
+
+This is the same wizard available via `normalize init --setup`, but can be run standalone at any time without re-initializing.
+
+### validate
+
+Validate the rules configuration — check rule IDs, TOML syntax, and report issues:
+
+```bash
+normalize rules validate
+```
 
 ## Lock File
 

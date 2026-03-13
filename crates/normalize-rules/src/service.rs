@@ -550,6 +550,34 @@ impl RulesService {
         })
     }
 
+    /// Interactive setup wizard — run all rules and walk through enable/disable decisions
+    ///
+    /// Examples:
+    ///   normalize rules setup                    # interactive rule configuration
+    pub fn setup(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+    ) -> Result<RuleResult, String> {
+        let effective_root = root
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+        let exit_code = crate::setup::run_setup_wizard(&effective_root);
+        if exit_code == 0 {
+            Ok(RuleResult {
+                success: true,
+                message: None,
+                data: None,
+            })
+        } else {
+            Err("Setup wizard failed".to_string())
+        }
+    }
+
     /// Validate the rules configuration — check rule IDs, TOML syntax, and report issues
     ///
     /// Examples:

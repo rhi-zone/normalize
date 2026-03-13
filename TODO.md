@@ -202,17 +202,18 @@ setup is the cure. Also: `normalize init --setup` currently only covers rules â€
 other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md enforcement).
 
 **Default-enabled inconsistencies (2026-03-13 audit):**
-- Debug-print rules: Go (`fmt-print`) and Python (`print-debug`) enabled by default, but C/C++/Java/Kotlin/PHP/Rust/Swift/C# equivalents all disabled. Should be consistent.
-- Correctness rules that should be enabled by default: `go/defer-in-loop` (bug: defer runs at function return), `go/sync-mutex-copied` (concurrency bug), `swift/force-unwrap` (crash â€” inconsistent with Rust unwrap being enabled), `python/raise-without-from` (lost traceback), `python/use-with` (resource leak), `ruby/method-missing` (footgun without `respond_to_missing?`).
-- Potentially too aggressive defaults: `rust/chained-if-let` (error severity for style), `rust/numeric-type-annotation` (error for style), tuple-return rules (noisy on existing code).
+- ~~Debug-print rules: Go (`fmt-print`) and Python (`print-debug`) enabled by default, but C/C++/Java/Kotlin/PHP/Rust/Swift/C# equivalents all disabled. Should be consistent.~~ Resolved: all debug-print rules were already consistently disabled by the frictionless OOTB change; Go/Python/JS only enabled via local config override for dogfooding.
+- ~~Correctness rules that should be enabled by default: `go/defer-in-loop`, `go/sync-mutex-copied`, `swift/force-unwrap`, `python/raise-without-from`, `python/use-with`, `ruby/method-missing`.~~ Done: all 6 enabled by default with `recommended = true`.
+- ~~Potentially too aggressive defaults: `rust/chained-if-let` (error severity for style).~~ Done: downgraded to warning. `rust/numeric-type-annotation` already disabled. Tuple-return rules already info-level and disabled.
 
 **Wizard UX improvements:**
-- Show rules with zero violations too (at least a summary count + pointer to `rules list`)
+- [x] Show rules with zero violations (summary count + pointer to `rules list`)
+- [x] `recommended = true` frontmatter for genuine bug/correctness rules vs style opinions
+- [x] Recommended rules shown first in wizard (sorted before violation count)
+- [x] Standalone `normalize rules setup` command (don't require re-running `init`)
 - Group by tag/category instead of flat violation-count sort
 - Add batch operations: "enable all [correctness] rules", "disable all [style] rules"
-- Add `recommended = true` frontmatter for genuine bug/correctness rules vs style opinions
 - Show practical impact: "2 violations (quick fix)" vs "847 violations (major cleanup)"
-- Standalone `normalize rules setup` command (don't require re-running `init`)
 
 ### SARIF engine actionable output
 

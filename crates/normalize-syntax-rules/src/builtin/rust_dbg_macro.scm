@@ -5,6 +5,7 @@
 # message = "dbg!() macro found - remove before committing"
 # languages = ["rust"]
 # allow = ["**/tests/**"]
+# recommended = true
 # ---
 #
 # `dbg!()` is a development-only debugging tool that prints the expression,

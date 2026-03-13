@@ -4,7 +4,8 @@
 # tags = ["bug-prone", "correctness"]
 # message = "`defer` inside a loop runs at function return, not end of iteration"
 # languages = ["go"]
-# enabled = false
+# enabled = true
+# recommended = true
 # ---
 #
 # `defer` schedules a call to run when the *enclosing function* returns,

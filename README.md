@@ -166,6 +166,7 @@ Manage and run syntax + fact rules:
 ```bash
 normalize rules list                 # List all rules
 normalize rules run                  # Run all rules
+normalize rules setup                # Interactive rule configuration
 normalize rules add <url>            # Add a rule from URL
 normalize rules enable <id>          # Enable a rule
 normalize rules tags                 # List rule tags

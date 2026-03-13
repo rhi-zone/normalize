@@ -4,6 +4,7 @@
 # tags = ["error-handling", "bug-prone"]
 # message = "Empty catch block silently swallows exception"
 # languages = ["c-sharp"]
+# recommended = true
 # ---
 #
 # An empty catch block silently discards the exception, hiding errors

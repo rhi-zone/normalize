@@ -4,6 +4,7 @@
 # tags = ["error-handling", "bug-prone"]
 # message = "Empty catch block silently swallows error"
 # languages = ["swift"]
+# recommended = true
 # ---
 #
 # An empty catch block silently discards the error, hiding failures

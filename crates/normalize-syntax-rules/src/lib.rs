@@ -110,6 +110,8 @@ pub struct Rule {
     pub tags: Vec<String>,
     /// Documentation from the markdown comment block between frontmatter and query.
     pub doc: Option<String>,
+    /// Whether this rule is recommended for most projects (catches real bugs, not style).
+    pub recommended: bool,
 }
 
 /// A builtin rule definition (id, content).

@@ -4,7 +4,8 @@
 # tags = ["correctness", "concurrency"]
 # message = "`sync.Mutex` (or `sync.RWMutex`) must not be copied after first use — pass a pointer instead"
 # languages = ["go"]
-# enabled = false
+# enabled = true
+# recommended = true
 # ---
 #
 # A `sync.Mutex` (and `sync.RWMutex`) must not be copied after first use.

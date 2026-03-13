@@ -13,6 +13,8 @@ pub mod runner;
 
 #[cfg(feature = "cli")]
 pub mod service;
+#[cfg(feature = "cli")]
+pub mod setup;
 
 pub use runner::{
     ListFilters, RuleEntry, RuleOverride, RuleType, RulesConfig, RulesListReport, RulesRunConfig,

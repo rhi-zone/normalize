@@ -4,7 +4,8 @@
 # tags = ["correctness", "error-handling"]
 # message = "Raise inside `except` block should chain the cause: `raise X from e` preserves the original traceback"
 # languages = ["python"]
-# enabled = false
+# enabled = true
+# recommended = true
 # ---
 #
 # When raising a new exception inside an `except` block, Python 3 allows

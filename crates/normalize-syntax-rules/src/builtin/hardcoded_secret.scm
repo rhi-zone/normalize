@@ -5,6 +5,7 @@
 # message = "Potential hardcoded secret - use environment variables or config"
 # languages = ["rust"]
 # allow = ["**/tests/**", "**/examples/**", "**/*.md"]
+# recommended = true
 # ---
 #
 # Hardcoded secrets — passwords, API keys, tokens, credentials — committed

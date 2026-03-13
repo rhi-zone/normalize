@@ -223,6 +223,7 @@ pub struct RuleEntry {
     pub message: String,
     pub enabled: bool,
     pub tags: Vec<String>,
+    pub recommended: bool,
 }
 
 /// Report returned by `normalize rules list`.
@@ -443,6 +444,7 @@ struct UnifiedRule {
     message: String,
     enabled: bool,
     tags: Vec<String>,
+    recommended: bool,
 }
 
 pub struct ListFilters<'a> {
@@ -477,6 +479,7 @@ pub fn build_list_report(
                 message: r.message.clone(),
                 enabled: r.enabled,
                 tags: r.tags.clone(),
+                recommended: r.recommended,
             });
         }
     }
@@ -494,6 +497,7 @@ pub fn build_list_report(
                 message: r.message.clone(),
                 enabled: r.enabled,
                 tags: r.tags.clone(),
+                recommended: r.recommended,
             });
         }
     }
@@ -519,6 +523,7 @@ pub fn build_list_report(
                 message: desc.message.to_string(),
                 enabled,
                 tags,
+                recommended: false,
             });
         }
     }
@@ -559,6 +564,7 @@ pub fn build_list_report(
             message: r.message,
             enabled: r.enabled,
             tags: r.tags,
+            recommended: r.recommended,
         })
         .collect();
 
@@ -592,6 +598,7 @@ fn build_unified_rules(
             message: r.message.clone(),
             enabled: r.enabled,
             tags: r.tags.clone(),
+            recommended: r.recommended,
         })
         .chain(fact_rules.iter().map(|r| UnifiedRule {
             id: r.id.clone(),
@@ -601,6 +608,7 @@ fn build_unified_rules(
             message: r.message.clone(),
             enabled: r.enabled,
             tags: r.tags.clone(),
+            recommended: r.recommended,
         }))
         .collect()
 }

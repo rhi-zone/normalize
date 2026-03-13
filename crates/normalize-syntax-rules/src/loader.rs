@@ -249,6 +249,11 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         })
         .unwrap_or_default();
 
+    let recommended = frontmatter
+        .get("recommended")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
     Some(Rule {
         id,
         query_str: query_str.trim().to_string(),
@@ -263,6 +268,7 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         fix,
         tags,
         doc,
+        recommended,
     })
 }
 

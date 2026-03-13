@@ -5,7 +5,8 @@
 # message = "Force unwrap (!) will crash at runtime if the value is nil"
 # languages = ["swift"]
 # allow = ["**/test/**", "**/tests/**"]
-# enabled = false
+# enabled = true
+# recommended = true
 # ---
 #
 # The force unwrap operator (`!`) crashes at runtime with a fatal error

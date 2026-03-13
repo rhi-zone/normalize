@@ -4,7 +4,8 @@
 # tags = ["correctness", "resources"]
 # message = "Use 'with open(...)' to ensure the file is closed — bare open() may leak handles"
 # languages = ["python"]
-# enabled = false
+# enabled = true
+# recommended = true
 # ---
 #
 # Assigning the result of `open()` directly to a variable risks leaking the

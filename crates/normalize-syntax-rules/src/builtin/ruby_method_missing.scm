@@ -4,7 +4,8 @@
 # tags = ["correctness"]
 # message = "method_missing defined without respond_to_missing? — objects won't respond correctly to respond_to?"
 # languages = ["ruby"]
-# enabled = false
+# enabled = true
+# recommended = true
 # ---
 #
 # When you override `method_missing` in Ruby, you should also override

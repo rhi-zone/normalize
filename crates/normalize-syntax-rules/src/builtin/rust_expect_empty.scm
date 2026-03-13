@@ -4,6 +4,7 @@
 # tags = ["error-handling"]
 # message = ".expect() with empty string - provide context message"
 # languages = ["rust"]
+# recommended = true
 # ---
 #
 # `.expect("")` with an empty message provides no diagnostic value when it

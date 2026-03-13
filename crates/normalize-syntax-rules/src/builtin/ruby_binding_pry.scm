@@ -5,6 +5,7 @@
 # message = "binding.pry found - remove debug statement before committing"
 # languages = ["ruby"]
 # allow = ["**/tests/**", "**/test/**", "**/spec/**"]
+# recommended = true
 # ---
 #
 # `binding.pry` and `binding.irb` drop into an interactive Ruby debugger

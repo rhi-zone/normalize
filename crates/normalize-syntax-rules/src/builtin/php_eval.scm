@@ -4,6 +4,7 @@
 # tags = ["security", "bug-prone"]
 # message = "eval() executes arbitrary code - security risk"
 # languages = ["php"]
+# recommended = true
 # ---
 #
 # `eval()` interprets a string as PHP code at runtime, enabling code

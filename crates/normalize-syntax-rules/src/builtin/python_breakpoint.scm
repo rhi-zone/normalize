@@ -5,6 +5,7 @@
 # message = "breakpoint() found - remove before committing"
 # languages = ["python"]
 # allow = ["**/tests/**"]
+# recommended = true
 # ---
 #
 # `breakpoint()` drops into the Python debugger (pdb or a configured

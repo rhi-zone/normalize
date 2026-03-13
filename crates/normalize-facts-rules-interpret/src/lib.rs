@@ -133,6 +133,8 @@ pub struct FactsRule {
     pub tags: Vec<String>,
     /// Documentation from the markdown comment block between frontmatter and source.
     pub doc: Option<String>,
+    /// Whether this rule is recommended for most projects (catches real bugs, not style).
+    pub recommended: bool,
 }
 
 /// A builtin rule definition (id + embedded content).
@@ -425,6 +427,11 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         })
         .unwrap_or_default();
 
+    let recommended = frontmatter
+        .get("recommended")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
     Some(FactsRule {
         id,
         source: source_str.trim().to_string(),
@@ -436,6 +443,7 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         source_path: PathBuf::new(),
         tags,
         doc,
+        recommended,
     })
 }
 

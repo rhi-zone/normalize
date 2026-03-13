@@ -98,6 +98,7 @@ rules disable  <tag-or-id>   [--dry-run]
 rules add      <url>
 rules update
 rules remove   <id>
+rules setup
 rules validate
 ```
 
