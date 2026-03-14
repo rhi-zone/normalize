@@ -2,7 +2,8 @@
 
 use super::resolve_pretty;
 use crate::commands::sessions::{
-    MessagesReport, PlanContent, PlansListReport, SessionListReport, SessionShowReport,
+    MessagesReport, PlanContent, PlansListReport, SessionGrepReport, SessionListReport,
+    SessionShowReport,
 };
 use crate::output::OutputFormatter;
 use crate::sessions::SessionAnalysis;
@@ -49,6 +50,16 @@ impl std::fmt::Display for PlansListReport {
 }
 
 impl std::fmt::Display for MessagesReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.pretty {
+            write!(f, "{}", self.format_pretty())
+        } else {
+            write!(f, "{}", self.format_text())
+        }
+    }
+}
+
+impl std::fmt::Display for SessionGrepReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.pretty {
             write!(f, "{}", self.format_pretty())
@@ -332,6 +343,59 @@ impl SessionsService {
             no_truncate,
             show_usage,
             sort_by_tokens,
+            is_pretty,
+        )
+    }
+
+    /// Search session messages by pattern, showing matching lines with optional context
+    ///
+    /// Examples:
+    ///   normalize sessions grep "cargo build"            # find messages mentioning cargo build
+    ///   normalize sessions grep "error" --context 2      # show 2 lines of context around matches
+    ///   normalize sessions grep "TODO" --role user       # search only user messages
+    ///   normalize sessions grep "fn " --days 7           # search sessions from last 7 days
+    ///   normalize sessions grep "test" --ignore-case     # case-insensitive search
+    ///   normalize sessions grep "panic" --all-projects   # search across all projects
+    #[allow(clippy::too_many_arguments)]
+    pub fn grep(
+        &self,
+        #[param(positional, help = "Regex pattern to search for")] pattern: String,
+        #[param(short = 'C', help = "Lines of context around each match")] context: Option<usize>,
+        #[param(help = "Filter by role: user, assistant, all (default: all)")] role: Option<String>,
+        #[param(help = "Filter sessions from the last N days")] days: Option<u32>,
+        #[param(help = "Filter sessions since date (YYYY-MM-DD)")] since: Option<String>,
+        #[param(help = "Filter sessions until date (YYYY-MM-DD)")] until: Option<String>,
+        #[param(help = "Filter by specific project path")] project: Option<String>,
+        #[param(help = "Search sessions from all projects")] all_projects: bool,
+        #[param(help = "Force specific format: claude, codex, gemini, normalize")] format: Option<
+            String,
+        >,
+        #[param(short = 'n', help = "Maximum number of sessions to search")] limit: Option<usize>,
+        #[param(short = 'i', help = "Case-insensitive search")] ignore_case: bool,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<SessionGrepReport, String> {
+        let limit = limit.unwrap_or(50);
+        let root_path = root.as_deref().map(std::path::Path::new);
+        let project_path = project.as_deref().map(std::path::Path::new);
+        let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
+        let is_pretty = resolve_pretty(resolved_root, pretty, compact);
+        crate::commands::sessions::build_grep_report(
+            root_path,
+            &pattern,
+            context.unwrap_or(0),
+            role.as_deref(),
+            days,
+            since.as_deref(),
+            until.as_deref(),
+            project_path,
+            all_projects,
+            format.as_deref(),
+            limit,
+            ignore_case,
             is_pretty,
         )
     }

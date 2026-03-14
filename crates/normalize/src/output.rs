@@ -60,6 +60,7 @@ mod tests {
             HistoryDiffReport, HistoryListReport, HistoryPruneReport, HistoryStatusReport,
             HistoryTreeReport,
         };
+        use crate::commands::sessions::SessionGrepReport;
         use crate::commands::sessions::SessionShowReport;
         use crate::commands::sessions::list::SessionListReport;
         use crate::commands::sessions::messages::MessagesReport;
@@ -116,6 +117,7 @@ mod tests {
         assert_output_formatter::<RepoCouplingReport>();
         assert_output_formatter::<SecurityReport>();
         assert_output_formatter::<MessagesReport>();
+        assert_output_formatter::<SessionGrepReport>();
         assert_output_formatter::<SessionAnalysis>();
         assert_output_formatter::<SessionListReport>();
         assert_output_formatter::<SessionShowReport>();

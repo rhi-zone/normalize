@@ -1,6 +1,7 @@
 //! Sessions command - analyze Claude Code and other agent session logs.
 
 pub mod analyze;
+pub mod grep;
 pub mod list;
 pub mod messages;
 pub mod plans;
@@ -9,6 +10,7 @@ mod serve;
 pub mod show;
 pub mod stats;
 
+pub use grep::{SessionGrepReport, build_grep_report};
 pub use list::{SessionListReport, build_session_list};
 pub use messages::{MessagesReport, build_messages_report};
 pub use plans::{PlanContent, PlansListReport, build_plan_content, build_plans_list};
