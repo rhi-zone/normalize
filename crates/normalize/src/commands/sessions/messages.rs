@@ -63,6 +63,15 @@ pub struct MessageRecord {
     /// Token usage for this turn (present on assistant messages when available).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage: Option<TokenUsage>,
+    /// Line number within the message (0-based). Only set when --context is used with --grep.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line_num: Option<usize>,
+    /// Lines before the match. Only set when --context is used with --grep.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub context_before: Vec<String>,
+    /// Lines after the match. Only set when --context is used with --grep.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub context_after: Vec<String>,
 }
 
 /// Report containing all extracted messages.
@@ -76,6 +85,10 @@ pub struct MessagesReport {
     #[serde(skip)]
     #[schemars(skip)]
     pub(crate) show_usage: bool,
+    /// Whether records are line-granularity matches (--context was set).
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) line_mode: bool,
 }
 
 /// Aggregate stats for the messages report.
@@ -96,6 +109,7 @@ pub struct MessagesStats {
 impl OutputFormatter for MessagesReport {
     fn format_text(&self) -> String {
         let mut lines = Vec::new();
+        let mut last_header: Option<(String, usize)> = None;
 
         for msg in &self.messages {
             let id_short = if msg.session_id.len() > 8 {
@@ -114,10 +128,34 @@ impl OutputFormatter for MessagesReport {
                 String::new()
             };
 
-            lines.push(format!(
-                "[{}] turn {} ({}, {}){} {}",
-                id_short, msg.turn, msg.role, ts_display, usage_suffix, msg.text
-            ));
+            if self.line_mode {
+                // In line mode, group matches under a shared header per turn
+                let key = (msg.session_id.clone(), msg.turn);
+                if last_header.as_ref() != Some(&key) {
+                    if last_header.is_some() {
+                        lines.push(String::new());
+                    }
+                    lines.push(format!(
+                        "[{}] turn {} ({}, {}){}",
+                        id_short, msg.turn, msg.role, ts_display, usage_suffix
+                    ));
+                    last_header = Some(key);
+                }
+                let line_num = msg.line_num.unwrap_or(0);
+                for (i, ctx) in msg.context_before.iter().enumerate() {
+                    let n = line_num - msg.context_before.len() + i;
+                    lines.push(format!("  {:>4}-  {}", n + 1, ctx));
+                }
+                lines.push(format!("  {:>4}:  {}", line_num + 1, msg.text));
+                for (i, ctx) in msg.context_after.iter().enumerate() {
+                    lines.push(format!("  {:>4}-  {}", line_num + 1 + i + 1, ctx));
+                }
+            } else {
+                lines.push(format!(
+                    "[{}] turn {} ({}, {}){} {}",
+                    id_short, msg.turn, msg.role, ts_display, usage_suffix, msg.text
+                ));
+            }
         }
 
         // Summary line
@@ -150,6 +188,7 @@ impl OutputFormatter for MessagesReport {
 
     fn format_pretty(&self) -> String {
         let mut lines = Vec::new();
+        let mut last_header: Option<(String, usize)> = None;
 
         for msg in &self.messages {
             let id_short = if msg.session_id.len() > 8 {
@@ -181,10 +220,41 @@ impl OutputFormatter for MessagesReport {
                 String::new()
             };
 
-            lines.push(format!(
-                "\x1b[33m{}\x1b[0m {} \x1b[90m{}\x1b[0m{}{} {}",
-                id_short, role_badge, ts_display, project_tag, usage_tag, msg.text
-            ));
+            if self.line_mode {
+                let key = (msg.session_id.clone(), msg.turn);
+                if last_header.as_ref() != Some(&key) {
+                    if last_header.is_some() {
+                        lines.push(String::new());
+                    }
+                    lines.push(format!(
+                        "\x1b[33m{}\x1b[0m {} \x1b[90m{}\x1b[0m{}{}",
+                        id_short, role_badge, ts_display, project_tag, usage_tag
+                    ));
+                    last_header = Some(key);
+                }
+                let line_num = msg.line_num.unwrap_or(0);
+                for (i, ctx) in msg.context_before.iter().enumerate() {
+                    let n = line_num - msg.context_before.len() + i;
+                    lines.push(format!("  \x1b[90m{:>4}-  {}\x1b[0m", n + 1, ctx));
+                }
+                lines.push(format!(
+                    "  \x1b[32m{:>4}\x1b[0m:  {}",
+                    line_num + 1,
+                    msg.text
+                ));
+                for (i, ctx) in msg.context_after.iter().enumerate() {
+                    lines.push(format!(
+                        "  \x1b[90m{:>4}-  {}\x1b[0m",
+                        line_num + 1 + i + 1,
+                        ctx
+                    ));
+                }
+            } else {
+                lines.push(format!(
+                    "\x1b[33m{}\x1b[0m {} \x1b[90m{}\x1b[0m{}{} {}",
+                    id_short, role_badge, ts_display, project_tag, usage_tag, msg.text
+                ));
+            }
         }
 
         // Summary
@@ -267,6 +337,7 @@ pub fn build_messages_report(
     no_truncate: bool,
     show_usage: bool,
     sort_by_tokens: bool,
+    context_lines: usize,
     pretty: bool,
 ) -> Result<MessagesReport, String> {
     let registry = FormatRegistry::new();
@@ -387,7 +458,7 @@ pub fn build_messages_report(
                         _ => None,
                     })
                     .collect::<Vec<_>>()
-                    .join(" ");
+                    .join("\n");
 
                 if text.is_empty() {
                     continue;
@@ -400,9 +471,6 @@ pub fn build_messages_report(
                     continue;
                 }
 
-                // Truncate + collapse whitespace for display
-                let display_text = truncate_text(&text, max_text_len);
-
                 // Token usage: attach to user messages (the trigger) and the first
                 // assistant message. This way --role user (default) shows cost-per-prompt,
                 // and --role assistant shows cost-per-response.
@@ -412,16 +480,55 @@ pub fn build_messages_report(
                     None
                 };
 
-                messages.push(MessageRecord {
-                    session_id: session_id.clone(),
-                    project: project.clone(),
-                    turn: turn_idx,
-                    role: role_str,
-                    timestamp: msg.timestamp.clone(),
-                    char_count: text.len(),
-                    text: display_text,
-                    usage,
-                });
+                if context_lines > 0 {
+                    // Line-mode: emit one record per matching line with context
+                    let re = grep_re.as_ref().expect("context_lines > 0 requires --grep");
+                    let msg_lines: Vec<&str> = text.lines().collect();
+                    for (line_idx, line) in msg_lines.iter().enumerate() {
+                        if !re.is_match(line) {
+                            continue;
+                        }
+                        let before_start = line_idx.saturating_sub(context_lines);
+                        let context_before: Vec<String> = msg_lines[before_start..line_idx]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect();
+                        let after_end = (line_idx + 1 + context_lines).min(msg_lines.len());
+                        let context_after: Vec<String> = msg_lines[line_idx + 1..after_end]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect();
+                        messages.push(MessageRecord {
+                            session_id: session_id.clone(),
+                            project: project.clone(),
+                            turn: turn_idx,
+                            role: role_str.clone(),
+                            timestamp: msg.timestamp.clone(),
+                            char_count: line.len(),
+                            text: line.to_string(),
+                            usage: usage.clone(),
+                            line_num: Some(line_idx),
+                            context_before,
+                            context_after,
+                        });
+                    }
+                } else {
+                    // Normal mode: emit one record per message
+                    let display_text = truncate_text(&text, max_text_len);
+                    messages.push(MessageRecord {
+                        session_id: session_id.clone(),
+                        project: project.clone(),
+                        turn: turn_idx,
+                        role: role_str,
+                        timestamp: msg.timestamp.clone(),
+                        char_count: text.len(),
+                        text: display_text,
+                        usage,
+                        line_num: None,
+                        context_before: Vec::new(),
+                        context_after: Vec::new(),
+                    });
+                }
             }
         }
     }
@@ -465,6 +572,7 @@ pub fn build_messages_report(
         stats,
         pretty,
         show_usage,
+        line_mode: context_lines > 0,
     })
 }
 

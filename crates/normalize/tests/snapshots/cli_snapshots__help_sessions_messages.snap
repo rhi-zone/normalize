@@ -27,6 +27,7 @@ Options:
       --no-truncate                Don't truncate message text
       --show-usage                 Show per-turn token usage (input/output/cache)
       --sort-by-tokens             Sort by descending token count (heaviest turns first)
+  -C, --context <context>          Lines of context around each matching line (requires --grep)
   -r, --root <root>                Root directory (defaults to current directory)
       --pretty                     Enable pretty
       --compact                    Enable compact
@@ -36,4 +37,5 @@ Examples:
 normalize sessions messages                                # user messages from recent sessions
 normalize sessions messages --role all                     # all roles (user + assistant)
 normalize sessions messages --grep "error" --no-truncate   # search messages, full text
+normalize sessions messages --grep "panic" --context 2     # matching lines with 2 lines of context
 normalize sessions messages --show-usage --sort-by-tokens  # heaviest turns first
