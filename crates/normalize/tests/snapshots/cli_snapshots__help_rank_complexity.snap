@@ -1,10 +1,10 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-expression: "snapshot_help(&[\"analyze\", \"complexity\"])"
+expression: "snapshot_help(&[\"rank\", \"complexity\"])"
 ---
 Run complexity analysis
 
-Usage: normalize analyze complexity [OPTIONS] [target]
+Usage: normalize rank complexity [OPTIONS] [target]
 
 Arguments:
   [target]  Target file or directory

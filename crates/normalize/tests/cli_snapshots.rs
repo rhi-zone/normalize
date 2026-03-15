@@ -216,16 +216,39 @@ fn test_help_grammars_paths() {
     insta::assert_snapshot!(snapshot_help(&["grammars", "paths"]));
 }
 
+// rank subcommands
+#[test]
+fn test_help_rank() {
+    insta::assert_snapshot!(snapshot_help(&["rank"]));
+}
+
+#[test]
+fn test_help_rank_complexity() {
+    insta::assert_snapshot!(snapshot_help(&["rank", "complexity"]));
+}
+
+#[test]
+fn test_help_rank_files() {
+    insta::assert_snapshot!(snapshot_help(&["rank", "files"]));
+}
+
+#[test]
+fn test_help_rank_hotspots() {
+    insta::assert_snapshot!(snapshot_help(&["rank", "hotspots"]));
+}
+
+#[test]
+fn test_help_rank_duplicates() {
+    insta::assert_snapshot!(snapshot_help(&["rank", "duplicates"]));
+}
+
 // analyze subcommands
 #[test]
 fn test_help_analyze_health() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "health"]));
 }
 
-#[test]
-fn test_help_analyze_complexity() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "complexity"]));
-}
+// complexity moved to rank
 
 #[test]
 fn test_help_analyze_length() {
@@ -247,30 +270,21 @@ fn test_help_analyze_docs() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "docs"]));
 }
 
-#[test]
-fn test_help_analyze_files() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "files"]));
-}
+// files moved to rank
 
 #[test]
 fn test_help_analyze_trace() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "trace"]));
 }
 
-#[test]
-fn test_help_analyze_ownership() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "ownership"]));
-}
+// ownership moved to rank
 
 #[test]
 fn test_help_analyze_repo_coupling() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "repo-coupling"]));
 }
 
-#[test]
-fn test_help_analyze_duplicate_types() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "duplicate-types"]));
-}
+// duplicate-types moved to rank
 
 // sessions subcommands
 #[test]

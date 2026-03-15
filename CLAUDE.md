@@ -20,7 +20,11 @@ Behavioral rules for Claude Code in this repository.
 
 **server-less is our own project** (dogfooding). Source at `/home/me/git/rhizone/server-less`. When the proc macro causes confusing behavior, investigate and fix it in server-less — don't document workarounds here. If a rule about server-less needs to exist in CLAUDE.md, that's a server-less UX bug.
 
-**Generally useful functionality belongs in its own crate, not `normalize`.** The main crate is for CLI wiring (service layer, command dispatch, output formatting). The test: would anything other than one CLI command want this — another command, the LSP server, an external tool, a future library consumer? If yes, it belongs in a domain crate (`normalize-facts`, `normalize-session-analysis`, etc.). If it's purely "compute something and format it for this one command", it can stay in `commands/`. The `normalize` binary is a consumer of the ecosystem, not a home for reusable logic.
+**Generally useful functionality belongs in its own crate, not `normalize`.** The main crate is for CLI wiring (service layer, command dispatch, output formatting). The `normalize` binary is a consumer of the ecosystem, not a home for reusable logic.
+
+**A crate should only exist if:** (a) it has multiple actual dependents within the workspace, or (b) it is clearly useful standalone — meaning it could be published independently and people would use it without normalize (e.g. `normalize-graph`, `normalize-code-similarity`). "Could theoretically be reused someday" doesn't count. If neither condition is met, the code belongs in `commands/` or the single crate that uses it.
+
+The test for extraction: is this domain logic (algorithms, data models, extraction) or CLI wiring (formatting, dispatch, service layer)? Domain logic can be extracted when the above conditions are met. CLI wiring stays in `normalize`. If it's purely "compute something and format it for this one command", it stays in `commands/`.
 
 
 ## Core Rule
@@ -113,9 +117,15 @@ exploration (many files, deep search, multi-step research), delegate to an Explo
 general-purpose subagent rather than running the searches inline. The subagent returns
 a distilled summary; raw tool output stays out of the main context.
 
+**"Do it inline" poisons context.** Even a "small" edit that touches the service layer,
+snapshot tests, and help output is the same scope as any other agent task. The temptation
+to do it inline is always wrong — inline work accumulates tool output in the main context
+and crowds out the actual conversation. If it needs a test run, it needs an agent.
+
 Rules of thumb:
 - Expect to search >5 files or run >3 rounds of grep/read → use a subagent
 - Codebase-wide analysis (architecture, patterns, cross-crate survey) → always subagent
+- Any edit that requires a `cargo test` or `cargo clippy` run → use an agent
 - Single targeted lookup (one file, one symbol) → inline is fine
 
 ## Commit Convention
@@ -127,7 +137,8 @@ Conventional commits: `type(scope): message`. Scope recommended for multi-crate 
 Do not:
 - Hardcode file extensions — extension → language mapping belongs in the `Language` registry. Use `support_for_path(path)` or equivalent.
 - Ship mutating commands without `--dry-run`
-- Do half measures — when introducing a new abstraction, replace all existing ad-hoc code with it
+- Do half measures — when introducing a new abstraction, replace all existing ad-hoc code with it. "We'll clean it up later" means it never gets cleaned up.
+- Defer cleanup that should happen now — if something doesn't meet the bar (crate with one dependent and no standalone value, dead code, stale doc), remove it immediately. Don't wait for a "maintenance burden" to materialise.
 - "Unify" commands by wrapping N report types in an enum — real consolidation means one report struct with shared fields. If reports have nothing in common, they shouldn't be forced under one command.
 - Write stub implementations — `None`/empty is only correct when the concept genuinely doesn't exist in that language
 - Put node classification in Rust when a `.scm` query file fits — `*.calls.scm`, `*.complexity.scm` etc. Extraction (getting names/fields from identified nodes) stays in Rust.

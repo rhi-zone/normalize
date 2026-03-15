@@ -1,0 +1,50 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+expression: "snapshot_help(&[\"rank\"])"
+---
+Rank code by metrics (complexity, size, coupling, duplicates, and more)
+
+Usage: normalize rank [OPTIONS]
+
+Options:
+      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help
+  -V, --version                    Print version
+
+Code quality:
+  complexity       Run complexity analysis
+  ceremony         Show ceremony ratio: fraction of callables that are trait/interface boilerplate
+  uniqueness       Measure what fraction of functions have no structural near-twin per module
+  call-complexity  Compute effective (reachable) cyclomatic complexity via call-graph BFS
+  duplicates       Detect duplicate/similar code (functions or blocks)
+  duplicate-types  Detect duplicate type definitions
+  fragments        Find repeated AST fragments across the codebase
+
+Module structure:
+  size             Show hierarchical LOC breakdown (ncdu-style)
+  density          Measure information density (compression ratio + token uniqueness) per module
+  imports          Rank modules by import fan-in (requires facts index)
+  surface          Per-module public symbol count, public ratio, and constraint score
+  depth-map        Per-module dependency depth + ripple risk
+  layering         Per-module import layering compliance — are imports flowing downward?
+  module-health    Score each module across test ratio, uniqueness, and density (worst first)
+
+Repository:
+  files            Show longest files in codebase
+
+Git history:
+  hotspots         Churn × complexity hotspots: files ranked by change frequency and complexity
+  coupling         Temporal coupling: file pairs that change together in git history
+  ownership        Show per-file ownership concentration from git blame
+  contributors     Analyze contributors across repos
+
+Testing:
+  test-ratio       Test/impl line ratio per module
+  budget           Line budget breakdown by purpose (business logic, tests, docs, config, etc.)

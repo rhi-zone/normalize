@@ -22,7 +22,7 @@ normalize view src/main.rs
 | `normalize analyze health` | Codebase metrics and health score | First thing when entering a codebase |
 | `normalize view src/` | Code structure (symbols, hierarchy) | Understanding architecture |
 | `normalize view --deps FILE` | Import/export analysis | Before modifying a file |
-| `normalize analyze complexity` | Cyclomatic complexity report | Checking code quality |
+| `normalize rank complexity` | Cyclomatic complexity report | Checking code quality |
 | `normalize grep "pattern"` | Search code | Finding usage, definitions |
 | `normalize package audit` | Security vulnerability scan | Checking dependencies |
 
@@ -53,10 +53,10 @@ normalize view FILE/ClassName  # View specific symbol
 
 **Understanding a symbol:**
 ```bash
-normalize view FILE/symbol            # See signature and docstring
-normalize view --full FILE/symbol     # Full source code
-normalize analyze callers FILE/symbol # What calls it?
-normalize analyze callees FILE/symbol # What does it call?
+normalize view FILE/symbol                        # See signature and docstring
+normalize view --full FILE/symbol                 # Full source code
+normalize analyze call-graph FILE/symbol --callers  # What calls it?
+normalize analyze call-graph FILE/symbol --callees  # What does it call?
 ```
 
 **After making changes:**
@@ -96,12 +96,21 @@ normalize view -d 2                # Depth 2 (nested symbols)
 
 ```bash
 normalize analyze health           # Health metrics
-normalize analyze complexity       # Cyclomatic complexity
 normalize analyze security         # Security scan
-normalize analyze hotspots         # High-churn files
 normalize analyze call-graph symbol --callers  # What calls this?
 normalize analyze call-graph symbol --callees  # What does this call?
 normalize analyze graph            # Dependency graph analysis
+```
+
+### rank - Ranked Metrics
+
+```bash
+normalize rank complexity          # Cyclomatic complexity
+normalize rank hotspots            # High-churn files
+normalize rank duplicates          # Code clones
+normalize rank coupling            # Temporal coupling
+normalize rank test-ratio          # Test/impl ratio per module
+normalize rank module-health       # Worst modules by combined score
 ```
 
 ### tools - Linters and Test Runners
@@ -123,7 +132,7 @@ normalize grep "TODO" --only "*.rs"
 ## Key Insights
 
 - `normalize view` is the primary navigation command - works on dirs, files, and symbols
-- `normalize analyze` is the primary analysis command with 40 subcommands: health, complexity, security, hotspots, coupling, graph, duplicates, etc.
+- `normalize analyze` handles health, security, call graphs, docs, and trends; `normalize rank` handles all ranked-list metrics (complexity, hotspots, coupling, duplicates, etc.)
 - `normalize grep` for text search, `normalize view` for structural navigation
 - Use `--json` when you need to parse output programmatically
 - The structure DB (`.normalize/facts.db`) caches symbols for fast lookups

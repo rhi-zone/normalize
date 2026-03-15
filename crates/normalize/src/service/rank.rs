@@ -1,0 +1,1288 @@
+//! Rank sub-service for server-less CLI.
+//!
+//! Hosts all commands that produce an ordered list of items by some metric.
+
+use crate::analyze::complexity::ComplexityReport;
+use crate::commands::analyze::budget::BudgetReport;
+use crate::commands::analyze::call_complexity::CallComplexityReport;
+use crate::commands::analyze::ceremony::CeremonyReport;
+use crate::commands::analyze::contributors::ContributorsReport;
+use crate::commands::analyze::coupling::CouplingReport;
+use crate::commands::analyze::density::DensityReport;
+use crate::commands::analyze::depth_map::DepthMapReport;
+use crate::commands::analyze::duplicates::{
+    DuplicateBlocksConfig, DuplicateFunctionsConfig, DuplicateTypesReport, SimilarBlocksConfig,
+    SimilarFunctionsConfig,
+};
+use crate::commands::analyze::duplicates_views::{DuplicateMode, DuplicateScope, DuplicatesReport};
+use crate::commands::analyze::files::FileLengthReport;
+use crate::commands::analyze::fragments::{FragmentScope, FragmentsReport};
+use crate::commands::analyze::hotspots::HotspotsReport;
+use crate::commands::analyze::imports::ImportCentralityReport;
+use crate::commands::analyze::layering::LayeringReport;
+use crate::commands::analyze::module_health::ModuleHealthReport;
+use crate::commands::analyze::ownership::{OwnershipRepoEntry, OwnershipReport};
+use crate::commands::analyze::size::SizeReport;
+use crate::commands::analyze::surface::SurfaceReport;
+use crate::commands::analyze::test_ratio::TestRatioReport;
+use crate::commands::analyze::uniqueness::UniquenessReport;
+use crate::output::OutputFormatter;
+use server_less::cli;
+use std::cell::Cell;
+use std::path::PathBuf;
+
+fn discover_repos(dir: &str, depth: usize) -> Result<Vec<PathBuf>, String> {
+    crate::multi_repo::discover_repos_depth(&PathBuf::from(dir), depth)
+}
+
+/// Rank sub-service: ranked-list commands (ordered by a metric).
+pub struct RankService {
+    pretty: Cell<bool>,
+}
+
+impl RankService {
+    pub fn new(pretty: &Cell<bool>) -> Self {
+        Self {
+            pretty: Cell::new(pretty.get()),
+        }
+    }
+
+    fn root_path(root: Option<String>) -> PathBuf {
+        root.map(PathBuf::from)
+            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
+            .unwrap_or_else(|| std::env::current_dir().unwrap())
+    }
+
+    fn resolve_format(&self, pretty: bool, compact: bool, root: &std::path::Path) {
+        use crate::config::NormalizeConfig;
+        let config = NormalizeConfig::load(root);
+        let is_pretty = !compact && (pretty || config.pretty.enabled());
+        self.pretty.set(is_pretty);
+    }
+
+    fn display_output<T: OutputFormatter>(&self, r: &T) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
+    fn display_complexity(&self, r: &ComplexityReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_file_length(&self, r: &FileLengthReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_size(&self, r: &SizeReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_ceremony(&self, r: &CeremonyReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_hotspots(&self, r: &HotspotsReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_coupling(&self, r: &CouplingReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_ownership(&self, r: &OwnershipReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_test_ratio(&self, r: &TestRatioReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_budget(&self, r: &BudgetReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_density(&self, r: &DensityReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_uniqueness(&self, r: &UniquenessReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_imports(&self, r: &ImportCentralityReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_surface(&self, r: &SurfaceReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_depth_map(&self, r: &DepthMapReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_layering(&self, r: &LayeringReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_module_health(&self, r: &ModuleHealthReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_call_complexity(&self, r: &CallComplexityReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_duplicates(&self, r: &DuplicatesReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_dup_types(&self, r: &DuplicateTypesReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_fragments(&self, r: &FragmentsReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_contributors(&self, r: &ContributorsReport) -> String {
+        self.display_output(r)
+    }
+
+    fn build_filter(
+        root: &std::path::Path,
+        exclude: &[String],
+        only: &[String],
+    ) -> Option<crate::filter::Filter> {
+        if exclude.is_empty() && only.is_empty() {
+            None
+        } else {
+            crate::commands::build_filter(root, exclude, only)
+        }
+    }
+
+    /// Build a filter with merged excludes: config global + per-subcommand + CLI args.
+    fn build_filter_with_config(
+        root: &std::path::Path,
+        config: &crate::commands::analyze::AnalyzeConfig,
+        subcommand: &str,
+        cli_exclude: &[String],
+        only: &[String],
+    ) -> Option<crate::filter::Filter> {
+        let mut excludes = config.excludes_for(subcommand);
+        excludes.extend(cli_exclude.iter().cloned());
+        Self::build_filter(root, &excludes, only)
+    }
+}
+
+#[cli(
+    name = "rank",
+    description = "Rank code by metrics (complexity, size, coupling, duplicates, and more)"
+)]
+#[server(groups(
+    code = "Code quality",
+    modules = "Module structure",
+    repo = "Repository",
+    git = "Git history",
+    test = "Testing",
+))]
+impl RankService {
+    /// Run complexity analysis
+    #[server(group = "code")]
+    #[cli(display_with = "display_complexity")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn complexity(
+        &self,
+        #[param(positional, help = "Target file or directory")] target: Option<String>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 't', help = "Only show functions above this threshold")] threshold: Option<
+            usize,
+        >,
+        #[param(short = 'l', help = "Maximum number of functions to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ComplexityReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let filter = Self::build_filter_with_config(
+            &root_path,
+            &config.analyze,
+            "complexity",
+            &exclude,
+            &only,
+        );
+        let effective_threshold = threshold.or_else(|| config.analyze.threshold());
+        let effective_limit = match limit.unwrap_or(10) {
+            0 => usize::MAX,
+            n => n,
+        };
+        let allowlist = crate::commands::analyze::load_allow_file(&root_path, "complexity-allow");
+        let analysis_root = target
+            .as_ref()
+            .map(|t| root_path.join(t))
+            .unwrap_or_else(|| root_path.clone());
+        if analysis_root.is_file() {
+            return crate::commands::analyze::complexity::analyze_file_complexity(&analysis_root)
+                .ok_or_else(|| {
+                    format!(
+                        "could not analyze '{}' — unsupported file type",
+                        analysis_root.display()
+                    )
+                });
+        }
+        if !analysis_root.is_dir() {
+            return Err(format!(
+                "'{}' is not a file or directory",
+                analysis_root.display()
+            ));
+        }
+        let mut report = crate::commands::analyze::complexity::analyze_codebase_complexity(
+            &analysis_root,
+            effective_limit,
+            effective_threshold,
+            filter.as_ref(),
+            &allowlist,
+        );
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::complexity::apply_complexity_diff;
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            // Compute relative sub-path of analysis_root within root_path (if any)
+            let sub = analysis_root
+                .strip_prefix(&root_path)
+                .unwrap_or(std::path::Path::new(""))
+                .to_path_buf();
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                let wt_root = wt.join(&sub);
+                Ok(
+                    crate::commands::analyze::complexity::analyze_codebase_complexity(
+                        &wt_root,
+                        usize::MAX, // get all functions for accurate baseline matching
+                        None,
+                        None,
+                        &[],
+                    ),
+                )
+            })?;
+            apply_complexity_diff(&mut report, &baseline, diff_ref);
+        }
+        Ok(report)
+    }
+
+    /// Show longest files in codebase
+    #[server(group = "repo")]
+    #[cli(display_with = "display_file_length")]
+    pub fn files(
+        &self,
+        #[param(short = 'l', help = "Maximum number of files to show (0=no limit)")] limit: Option<
+            usize,
+        >,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
+    ) -> Result<FileLengthReport, String> {
+        let root_path = Self::root_path(root);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let mut merged_exclude = config.analyze.excludes_for("files");
+        merged_exclude.extend(exclude);
+        let mut report = crate::commands::analyze::files::analyze_files(
+            &root_path,
+            limit.unwrap_or(20),
+            &merged_exclude,
+        );
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                Ok(crate::commands::analyze::files::analyze_files(
+                    wt,
+                    usize::MAX,
+                    &merged_exclude,
+                ))
+            })?;
+            compute_ranked_diff(&mut report.files, &baseline.files);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
+    }
+
+    /// Show hierarchical LOC breakdown (ncdu-style)
+    #[server(group = "modules")]
+    #[cli(display_with = "display_size")]
+    pub fn size(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+    ) -> Result<SizeReport, String> {
+        let root_path = Self::root_path(root);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let mut merged_exclude = config.analyze.excludes_for("size");
+        merged_exclude.extend(exclude);
+        Ok(crate::commands::analyze::size::analyze_size(
+            &root_path,
+            &merged_exclude,
+        ))
+    }
+
+    /// Show ceremony ratio: fraction of callables that are trait/interface boilerplate
+    #[server(group = "code")]
+    #[cli(display_with = "display_ceremony")]
+    pub fn ceremony(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of files to show (0=no limit)")] limit: Option<
+            usize,
+        >,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
+    ) -> Result<CeremonyReport, String> {
+        let root_path = Self::root_path(root);
+        let mut report =
+            crate::commands::analyze::ceremony::analyze_ceremony(&root_path, limit.unwrap_or(15));
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                Ok(crate::commands::analyze::ceremony::analyze_ceremony(
+                    wt,
+                    usize::MAX,
+                ))
+            })?;
+            compute_ranked_diff(&mut report.top_files, &baseline.top_files);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
+    }
+
+    /// Churn × complexity hotspots: files ranked by change frequency and complexity
+    #[server(group = "git")]
+    #[cli(display_with = "display_hotspots")]
+    pub fn hotspots(
+        &self,
+        #[param(help = "Weight recent changes higher (exponential decay)")] recency: bool,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Run across all git repos under DIR")] repos_dir: Option<String>,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<HotspotsReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        // Merge: global excludes + [analyze.hotspots] excludes + legacy hotspots_exclude + allow file
+        let mut excludes = config.analyze.excludes_for("hotspots");
+        excludes.extend(config.analyze.hotspots_exclude.clone());
+        excludes.extend(crate::commands::analyze::load_allow_file(
+            &root_path,
+            "hotspots-allow",
+        ));
+        if let Some(repos_dir) = repos_dir {
+            let repo_paths = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
+            let entries: Vec<crate::commands::analyze::hotspots::HotspotsRepoEntry> = repo_paths
+                .into_iter()
+                .map(|repo_path| {
+                    let name = repo_path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+                    match crate::commands::analyze::hotspots::analyze_hotspots(
+                        &repo_path, &excludes, recency,
+                    ) {
+                        Ok(r) => crate::commands::analyze::hotspots::HotspotsRepoEntry {
+                            name,
+                            error: None,
+                            hotspots: r.hotspots,
+                            has_complexity: r.has_complexity,
+                            recency_weighted: r.recency_weighted,
+                        },
+                        Err(e) => crate::commands::analyze::hotspots::HotspotsRepoEntry {
+                            name,
+                            error: Some(e),
+                            hotspots: vec![],
+                            has_complexity: false,
+                            recency_weighted: recency,
+                        },
+                    }
+                })
+                .collect();
+            return Ok(HotspotsReport {
+                hotspots: vec![],
+                has_complexity: false,
+                recency_weighted: recency,
+                repos: Some(entries),
+            });
+        }
+        crate::commands::analyze::hotspots::analyze_hotspots(&root_path, &excludes, recency)
+    }
+
+    /// Temporal coupling: file pairs that change together in git history
+    #[server(group = "git")]
+    #[cli(display_with = "display_coupling")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn coupling(
+        &self,
+        #[param(help = "Minimum shared commits for coupling edges")] min_commits: Option<usize>,
+        #[param(short = 'l', help = "Maximum number of entries to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<CouplingReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let mut merged_exclude = config.analyze.excludes_for("coupling");
+        merged_exclude.extend(exclude);
+        let min = min_commits.unwrap_or(3);
+        let lim = limit.unwrap_or(20);
+        let mut report = crate::commands::analyze::coupling::analyze_coupling(
+            &root_path,
+            min,
+            lim,
+            &merged_exclude,
+        )?;
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                crate::commands::analyze::coupling::analyze_coupling(
+                    wt,
+                    min,
+                    usize::MAX,
+                    &merged_exclude,
+                )
+            })?;
+            compute_ranked_diff(&mut report.pairs, &baseline.pairs);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
+    }
+
+    /// Show per-file ownership concentration from git blame
+    #[server(group = "git")]
+    #[cli(display_with = "display_ownership")]
+    pub fn ownership(
+        &self,
+        #[param(short = 'l', help = "Maximum number of files to show (0=no limit)")] limit: Option<
+            usize,
+        >,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Run across all git repos under DIR")] repos_dir: Option<String>,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
+    ) -> Result<OwnershipReport, String> {
+        let root_path = Self::root_path(root);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let mut merged_exclude = config.analyze.excludes_for("ownership");
+        merged_exclude.extend(exclude);
+        let lim = limit.unwrap_or(20);
+        if let Some(repos_dir) = repos_dir {
+            let repo_paths = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
+            let entries: Vec<OwnershipRepoEntry> = repo_paths
+                .into_iter()
+                .map(|repo_path| {
+                    let name = repo_path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+                    match crate::commands::analyze::ownership::analyze_ownership(
+                        &repo_path,
+                        lim,
+                        &merged_exclude,
+                    ) {
+                        Ok(r) => OwnershipRepoEntry {
+                            name,
+                            error: None,
+                            files: r.files,
+                        },
+                        Err(e) => OwnershipRepoEntry {
+                            name,
+                            error: Some(e),
+                            files: vec![],
+                        },
+                    }
+                })
+                .collect();
+            return Ok(OwnershipReport {
+                files: vec![],
+                repos: Some(entries),
+                diff_ref: None,
+            });
+        }
+        let mut report = crate::commands::analyze::ownership::analyze_ownership(
+            &root_path,
+            lim,
+            &merged_exclude,
+        )?;
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                crate::commands::analyze::ownership::analyze_ownership(
+                    wt,
+                    usize::MAX,
+                    &merged_exclude,
+                )
+            })?;
+            compute_ranked_diff(&mut report.files, &baseline.files);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
+    }
+
+    /// Test/impl line ratio per module
+    #[server(group = "test")]
+    #[cli(display_with = "display_test_ratio")]
+    pub fn test_ratio(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of entries to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<TestRatioReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        let mut report =
+            crate::commands::analyze::test_ratio::analyze_test_ratio(&root_path, effective_limit);
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                Ok(crate::commands::analyze::test_ratio::analyze_test_ratio(
+                    wt,
+                    usize::MAX,
+                ))
+            })?;
+            compute_ranked_diff(&mut report.entries, &baseline.entries);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
+    }
+
+    /// Line budget breakdown by purpose (business logic, tests, docs, config, etc.)
+    #[server(group = "test")]
+    #[cli(display_with = "display_budget")]
+    pub fn budget(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of entries to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<BudgetReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        let mut report =
+            crate::commands::analyze::budget::analyze_budget(&root_path, effective_limit);
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                Ok(crate::commands::analyze::budget::analyze_budget(
+                    wt,
+                    usize::MAX,
+                ))
+            })?;
+            compute_ranked_diff(&mut report.modules, &baseline.modules);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
+    }
+
+    /// Measure information density (compression ratio + token uniqueness) per module
+    #[server(group = "modules")]
+    #[cli(display_with = "display_density")]
+    pub fn density(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(short = 'w', help = "Number of worst files to show (default: 10)")] worst: Option<
+            usize,
+        >,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<DensityReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let module_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        let mut report = crate::commands::analyze::density::analyze_density(
+            &root_path,
+            module_limit,
+            worst.unwrap_or(10),
+        );
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                Ok(crate::commands::analyze::density::analyze_density(
+                    wt,
+                    usize::MAX,
+                    0,
+                ))
+            })?;
+            compute_ranked_diff(&mut report.modules, &baseline.modules);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
+    }
+
+    /// Measure what fraction of functions have no structural near-twin per module
+    #[server(group = "code")]
+    #[cli(display_with = "display_uniqueness")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn uniqueness(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Similarity threshold 0.0–1.0 (default: 0.80)")] similarity: Option<f64>,
+        #[param(help = "Minimum function line count to include (default: 5)")] min_lines: Option<
+            usize,
+        >,
+        #[param(help = "Match on control-flow skeleton only")] skeleton: bool,
+        #[param(help = "Include groups where all functions share the same name")]
+        include_trait_impls: bool,
+        #[param(help = "Number of top clusters to show (default: 10)")] clusters: Option<usize>,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<UniquenessReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let module_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let filter = Self::build_filter_with_config(
+            &root_path,
+            &config.analyze,
+            "uniqueness",
+            &exclude,
+            &only,
+        );
+        let sim = similarity.unwrap_or(0.80);
+        let min = min_lines.unwrap_or(5);
+        let clust = clusters.unwrap_or(10);
+        let mut report = crate::commands::analyze::uniqueness::analyze_uniqueness(
+            &root_path,
+            sim,
+            min,
+            skeleton,
+            include_trait_impls,
+            module_limit,
+            clust,
+            filter.as_ref(),
+        );
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                Ok(crate::commands::analyze::uniqueness::analyze_uniqueness(
+                    wt,
+                    sim,
+                    min,
+                    skeleton,
+                    include_trait_impls,
+                    usize::MAX,
+                    0,
+                    None,
+                ))
+            })?;
+            compute_ranked_diff(&mut report.modules, &baseline.modules);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
+    }
+
+    /// Rank modules by import fan-in (requires facts index)
+    #[server(group = "modules")]
+    #[cli(display_with = "display_imports")]
+    pub async fn imports(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Show only internal (crate-local) modules")] internal: bool,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ImportCentralityReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        let mut report = crate::commands::analyze::imports::analyze_import_centrality(
+            &root_path,
+            effective_limit,
+            internal,
+        )
+        .await?;
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                let handle = tokio::runtime::Handle::current();
+                tokio::task::block_in_place(|| {
+                    handle.block_on(
+                        crate::commands::analyze::imports::analyze_import_centrality(
+                            wt,
+                            usize::MAX,
+                            internal,
+                        ),
+                    )
+                })
+            })?;
+            compute_ranked_diff(&mut report.entries, &baseline.entries);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
+    }
+
+    /// Per-module public symbol count, public ratio, and constraint score
+    #[server(group = "modules")]
+    #[cli(display_with = "display_surface")]
+    pub async fn surface(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<SurfaceReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        let idx = crate::index::ensure_ready(&root_path).await?;
+        let mut report = crate::commands::analyze::surface::analyze_surface(&idx, effective_limit)
+            .await
+            .map_err(|e| format!("Surface analysis failed: {}", e))?;
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                let handle = tokio::runtime::Handle::current();
+                tokio::task::block_in_place(|| {
+                    handle.block_on(async {
+                        let wt_idx = crate::index::ensure_ready(wt).await?;
+                        crate::commands::analyze::surface::analyze_surface(&wt_idx, usize::MAX)
+                            .await
+                            .map_err(|e| format!("Baseline surface failed: {}", e))
+                    })
+                })
+            })?;
+            compute_ranked_diff(&mut report.modules, &baseline.modules);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
+    }
+
+    /// Per-module dependency depth + ripple risk
+    #[server(group = "modules")]
+    #[cli(display_with = "display_depth_map")]
+    pub async fn depth_map(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<DepthMapReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        let idx = crate::index::ensure_ready(&root_path).await?;
+        let mut report =
+            crate::commands::analyze::depth_map::analyze_depth_map(&idx, effective_limit)
+                .await
+                .map_err(|e| format!("Depth map analysis failed: {}", e))?;
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                let handle = tokio::runtime::Handle::current();
+                tokio::task::block_in_place(|| {
+                    handle.block_on(async {
+                        let wt_idx = crate::index::ensure_ready(wt).await?;
+                        crate::commands::analyze::depth_map::analyze_depth_map(&wt_idx, usize::MAX)
+                            .await
+                            .map_err(|e| format!("Baseline depth map failed: {}", e))
+                    })
+                })
+            })?;
+            compute_ranked_diff(&mut report.modules, &baseline.modules);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
+    }
+
+    /// Per-module import layering compliance — are imports flowing downward?
+    #[server(group = "modules")]
+    #[cli(display_with = "display_layering")]
+    pub async fn layering(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<LayeringReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        let idx = crate::index::ensure_ready(&root_path).await?;
+        let mut report =
+            crate::commands::analyze::layering::analyze_layering(&idx, effective_limit)
+                .await
+                .map_err(|e| format!("Layering analysis failed: {}", e))?;
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use normalize_analyze::ranked::compute_ranked_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                let handle = tokio::runtime::Handle::current();
+                tokio::task::block_in_place(|| {
+                    handle.block_on(async {
+                        let wt_idx = crate::index::ensure_ready(wt).await?;
+                        crate::commands::analyze::layering::analyze_layering(&wt_idx, usize::MAX)
+                            .await
+                            .map_err(|e| format!("Baseline layering failed: {}", e))
+                    })
+                })
+            })?;
+            compute_ranked_diff(&mut report.modules, &baseline.modules);
+            report.diff_ref = Some(diff_ref.clone());
+        }
+        Ok(report)
+    }
+
+    /// Score each module across test ratio, uniqueness, and density (worst first)
+    #[server(group = "modules")]
+    #[cli(display_with = "display_module_health")]
+    pub fn module_health(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of modules to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Minimum lines for a module to be included (default: 100)")]
+        min_lines: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ModuleHealthReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = match limit.unwrap_or(0) {
+            0 => usize::MAX,
+            n => n,
+        };
+        Ok(
+            crate::commands::analyze::module_health::analyze_module_health(
+                &root_path,
+                effective_limit,
+                min_lines.unwrap_or(100),
+            ),
+        )
+    }
+
+    /// Compute effective (reachable) cyclomatic complexity via call-graph BFS
+    #[server(group = "code")]
+    #[cli(display_with = "display_call_complexity")]
+    pub fn call_complexity(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum functions to show per list (default: 20)")]
+        limit: Option<usize>,
+        #[param(short = 'm', help = "Maximum number of modules to show (0=no limit)")]
+        module_limit: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<CallComplexityReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let effective_limit = limit.unwrap_or(20);
+        let effective_module_limit = match module_limit.unwrap_or(30) {
+            0 => usize::MAX,
+            n => n,
+        };
+        Ok(
+            crate::commands::analyze::call_complexity::analyze_call_complexity(
+                &root_path,
+                effective_limit,
+                effective_module_limit,
+            ),
+        )
+    }
+
+    /// Detect duplicate/similar code (functions or blocks)
+    ///
+    /// Modes: exact (default), similar (fuzzy MinHash), clusters (connected components).
+    #[server(group = "code")]
+    #[cli(display_with = "display_duplicates")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn duplicates(
+        &self,
+        #[param(help = "Scope: functions (default) or blocks")] scope: Option<DuplicateScope>,
+        #[param(help = "Detection mode: exact (default), similar (fuzzy), or clusters")]
+        mode: Option<DuplicateMode>,
+        #[param(help = "Elide identifier names when comparing")] elide_identifiers: bool,
+        #[param(help = "Elide literal values when comparing (default: true for blocks scope)")]
+        elide_literals: bool,
+        #[param(
+            help = "Keep literal values distinct when comparing (blocks scope: opt out of default elision)"
+        )]
+        no_elide_literals: bool,
+        #[param(help = "Show source code for matches")] show_source: bool,
+        #[param(help = "Minimum lines to be considered")] min_lines: Option<usize>,
+        #[param(help = "Include groups where all items share the same name")]
+        include_trait_impls: bool,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        pretty: bool,
+        compact: bool,
+        #[param(help = "Minimum similarity threshold (0.0-1.0, similar/clusters mode)")]
+        similarity: Option<f64>,
+        #[param(help = "Match on control-flow structure (similar/clusters mode)")] skeleton: bool,
+        #[param(help = "Scan across all git repos under DIR (functions scope only)")]
+        repos_dir: Option<String>,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
+        #[param(help = "Skip function/method nodes (blocks scope only)")] skip_functions: bool,
+        #[param(
+            short = 'l',
+            help = "Maximum number of results to show (0=no limit, clusters mode)"
+        )]
+        limit: Option<usize>,
+    ) -> Result<DuplicatesReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let scope = scope.unwrap_or(DuplicateScope::Functions);
+        let mode = mode.unwrap_or(DuplicateMode::Exact);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let filter = Self::build_filter_with_config(
+            &root_path,
+            &config.analyze,
+            "duplicates",
+            &exclude,
+            &only,
+        );
+        let config_min_lines = config.analyze.duplicates_min_lines();
+
+        // Blocks scope defaults to eliding literals (structurally-identical blocks that differ
+        // only in literal values are real duplication). Use --no-elide-literals to opt out.
+        let elide_literals = match scope {
+            DuplicateScope::Blocks => !no_elide_literals,
+            _ => elide_literals,
+        };
+
+        match (mode, scope) {
+            (DuplicateMode::Exact, DuplicateScope::Functions) => {
+                let roots: Vec<PathBuf> = if let Some(repos_dir) = repos_dir {
+                    discover_repos(&repos_dir, repos_depth.unwrap_or(1))?
+                } else {
+                    vec![root_path.clone()]
+                };
+                Ok(
+                    crate::commands::analyze::duplicates::build_duplicate_functions_report(
+                        DuplicateFunctionsConfig {
+                            roots: &roots,
+                            elide_identifiers,
+                            elide_literals,
+                            show_source,
+                            min_lines: min_lines.or(config_min_lines).unwrap_or(1),
+                            include_trait_impls,
+                            filter: filter.as_ref(),
+                        },
+                    ),
+                )
+            }
+            (DuplicateMode::Exact, DuplicateScope::Blocks) => Ok(
+                crate::commands::analyze::duplicates::build_duplicate_blocks_report(
+                    DuplicateBlocksConfig {
+                        root: &root_path,
+                        min_lines: min_lines.or(config_min_lines).unwrap_or(5),
+                        elide_identifiers,
+                        elide_literals,
+                        skip_functions,
+                        show_source,
+                        allow: None,
+                        reason: None,
+                        filter: filter.as_ref(),
+                    },
+                ),
+            ),
+            (DuplicateMode::Similar, DuplicateScope::Functions) => {
+                let roots: Vec<PathBuf> = if let Some(repos_dir) = repos_dir {
+                    discover_repos(&repos_dir, repos_depth.unwrap_or(1))?
+                } else {
+                    vec![root_path.clone()]
+                };
+                Ok(
+                    crate::commands::analyze::duplicates::build_similar_functions_report(
+                        SimilarFunctionsConfig {
+                            roots: &roots,
+                            min_lines: min_lines.or(config_min_lines).unwrap_or(10),
+                            similarity: similarity.unwrap_or(0.85),
+                            elide_identifiers,
+                            elide_literals,
+                            skeleton,
+                            show_source,
+                            include_trait_impls,
+                            allow: None,
+                            reason: None,
+                            filter: filter.as_ref(),
+                        },
+                    ),
+                )
+            }
+            (DuplicateMode::Similar, DuplicateScope::Blocks) => Ok(
+                crate::commands::analyze::duplicates::build_similar_blocks_report(
+                    SimilarBlocksConfig {
+                        root: &root_path,
+                        min_lines: min_lines.or(config_min_lines).unwrap_or(15),
+                        similarity: similarity.unwrap_or(0.85),
+                        elide_identifiers,
+                        elide_literals,
+                        skeleton,
+                        show_source,
+                        include_trait_impls,
+                        allow: None,
+                        reason: None,
+                        filter: filter.as_ref(),
+                    },
+                ),
+            ),
+            (DuplicateMode::Clusters, _) => {
+                let roots: Vec<PathBuf> = if let Some(repos_dir) = repos_dir {
+                    discover_repos(&repos_dir, repos_depth.unwrap_or(1))?
+                } else {
+                    vec![root_path.clone()]
+                };
+                Ok(
+                    crate::commands::analyze::clusters::build_clusters_report_multi(
+                        &roots,
+                        min_lines.or(config_min_lines).unwrap_or(10),
+                        similarity.unwrap_or(0.85),
+                        elide_identifiers,
+                        skeleton,
+                        include_trait_impls,
+                        limit.unwrap_or(20),
+                        filter.as_ref(),
+                    ),
+                )
+            }
+        }
+    }
+
+    /// Detect duplicate type definitions
+    #[server(group = "code")]
+    #[cli(display_with = "display_dup_types")]
+    pub fn duplicate_types(
+        &self,
+        #[param(positional, help = "Target directory to scan")] target: Option<String>,
+        #[param(help = "Minimum field overlap percentage")] min_overlap: Option<usize>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+    ) -> Result<DuplicateTypesReport, String> {
+        let root_path = Self::root_path(root);
+        let scan_root = target
+            .map(PathBuf::from)
+            .unwrap_or_else(|| root_path.clone());
+        Ok(
+            crate::commands::analyze::duplicates::build_duplicate_types_report(
+                &scan_root,
+                &root_path,
+                min_overlap.unwrap_or(70),
+            ),
+        )
+    }
+
+    /// Find repeated AST fragments across the codebase
+    #[server(group = "code")]
+    #[cli(display_with = "display_fragments")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn fragments(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'n', help = "Minimum subtree size to consider (default: 10)")]
+        min_nodes: Option<usize>,
+        #[param(
+            short = 's',
+            help = "What to hash: all|functions|blocks (default: all)"
+        )]
+        scope: Option<String>,
+        #[param(
+            short = 'e',
+            help = "Only analyze symbols matching unified path glob (requires --scope functions)"
+        )]
+        entry: Option<String>,
+        #[param(help = "Resolve calls and inline callee bodies (default: 0, requires index)")]
+        inline_depth: Option<usize>,
+        #[param(help = "MinHash similarity threshold for fuzzy grouping (default: 1.0 = exact)")]
+        similarity: Option<f64>,
+        #[param(short = 'l', help = "Max clusters to report (0=no limit, default: 30)")]
+        limit: Option<usize>,
+        #[param(help = "Match on control-flow structure only")] skeleton: bool,
+        #[param(short = 'm', help = "Minimum cluster size to report (default: 2)")]
+        min_members: Option<usize>,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<FragmentsReport, String> {
+        let root_path = Self::root_path(root);
+        self.resolve_format(pretty, compact, &root_path);
+        let scope_val: FragmentScope = scope
+            .as_deref()
+            .unwrap_or("all")
+            .parse()
+            .map_err(|e: String| e)?;
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let mut merged_exclude = config.analyze.excludes_for("fragments");
+        merged_exclude.extend(exclude);
+        crate::commands::analyze::fragments::analyze_fragments(
+            &root_path,
+            min_nodes.unwrap_or(10),
+            scope_val,
+            entry.as_deref(),
+            inline_depth.unwrap_or(0),
+            similarity.unwrap_or(1.0),
+            limit.unwrap_or(30),
+            skeleton,
+            min_members.unwrap_or(2),
+            &merged_exclude,
+            &only,
+        )
+    }
+
+    /// Analyze contributors across repos
+    #[server(group = "git")]
+    #[cli(display_with = "display_contributors")]
+    pub fn contributors(
+        &self,
+        #[param(help = "Directory containing git repos")] repos_dir: String,
+        #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
+    ) -> Result<ContributorsReport, String> {
+        let repos = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
+        crate::commands::analyze::contributors::analyze_contributors(&repos)
+    }
+}

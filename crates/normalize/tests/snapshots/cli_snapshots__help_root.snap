@@ -25,6 +25,7 @@ Commands:
   tools      External ecosystem tools (linters, formatters, test runners)
   edit       Structural editing of code symbols
   analyze    Analyze codebase (health, complexity, security, duplicates, docs)
+  rank       Rank code by metrics (complexity, size, coupling, duplicates, and more)
   rules      Manage and run syntax/fact rules
   config     Inspect and validate config files using JSON Schema
   serve      Start a normalize server (MCP, HTTP, LSP)

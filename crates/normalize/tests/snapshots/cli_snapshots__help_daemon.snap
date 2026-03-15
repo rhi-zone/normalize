@@ -13,6 +13,7 @@ Commands:
   run     Run the daemon in foreground (for debugging)
   add     Add a root to watch
   remove  Remove a root from watching
+  watch   Watch a root for file changes, streaming events to the terminal
   list    List all watched roots
   help    Print this message or the help of the given subcommand(s)
 

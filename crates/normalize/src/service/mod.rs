@@ -27,6 +27,7 @@ pub mod grammars;
 pub mod guide;
 pub mod history;
 pub mod package;
+pub mod rank;
 // rules module moved to normalize-rules crate; re-exported for internal use
 pub mod serve;
 pub mod sessions;
@@ -58,6 +59,7 @@ pub struct NormalizeService {
     guide: guide::GuideService,
     generate: generate::GenerateService,
     package: package::PackageService,
+    rank: rank::RankService,
     rules: normalize_rules::RulesService,
     serve: serve::ServeService,
     syntax: syntax::SyntaxService,
@@ -94,6 +96,7 @@ impl NormalizeService {
             guide: guide::GuideService,
             generate: generate::GenerateService,
             package: package::PackageService::new(&pretty),
+            rank: rank::RankService::new(&pretty),
             rules: normalize_rules::RulesService::new(&pretty),
             serve: serve::ServeService,
             syntax: syntax::SyntaxService::new(),
@@ -889,6 +892,11 @@ impl NormalizeService {
     /// Analyze codebase (health, complexity, security, duplicates, docs)
     pub fn analyze(&self) -> &analyze::AnalyzeService {
         &self.analyze
+    }
+
+    /// Rank code by metrics (complexity, size, coupling, duplicates, and more)
+    pub fn rank(&self) -> &rank::RankService {
+        &self.rank
     }
 
     /// Manage and run syntax/fact rules

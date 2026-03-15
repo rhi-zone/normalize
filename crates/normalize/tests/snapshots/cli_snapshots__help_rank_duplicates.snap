@@ -1,0 +1,37 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+expression: "snapshot_help(&[\"rank\", \"duplicates\"])"
+---
+Detect duplicate/similar code (functions or blocks)
+
+Usage: normalize rank duplicates [OPTIONS]
+
+Options:
+      --jsonl                      Output one JSON object per line (for arrays)
+      --scope <scope>              Scope: functions (default) or blocks [possible values: functions, blocks]
+      --json                       Output machine-readable JSON
+      --mode <mode>                Detection mode: exact (default), similar (fuzzy), or clusters [possible values: exact, similar, clusters]
+      --elide-identifiers          Elide identifier names when comparing
+      --jq <jq>                    Filter output through jq expression
+      --elide-literals             Elide literal values when comparing (default: true for blocks scope)
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --no-elide-literals          Keep literal values distinct when comparing (blocks scope: opt out of default elision)
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --show-source                Show source code for matches
+      --min-lines <min-lines>      Minimum lines to be considered
+      --include-trait-impls        Include groups where all items share the same name
+  -r, --root <root>                Root directory (defaults to current directory)
+      --exclude <exclude>          Exclude paths matching pattern
+      --only <only>                Include only paths matching pattern
+      --pretty                     Enable pretty
+      --compact                    Enable compact
+      --similarity <similarity>    Minimum similarity threshold (0.0-1.0, similar/clusters mode)
+      --skeleton                   Match on control-flow structure (similar/clusters mode)
+      --repos-dir <repos-dir>      Scan across all git repos under DIR (functions scope only)
+      --repos-depth <repos-depth>  Max depth to search for repos (default: 1)
+      --skip-functions             Skip function/method nodes (blocks scope only)
+  -l, --limit <limit>              Maximum number of results to show (0=no limit, clusters mode)
+  -h, --help                       Print help
+
+Modes: exact (default), similar (fuzzy MinHash), clusters (connected components).

@@ -1,6 +1,6 @@
 //! Daemon management service for server-less CLI.
 
-use crate::daemon::{self, DaemonClient, global_socket_path};
+use crate::daemon::{self, DaemonClient, Event, global_socket_path};
 use server_less::cli;
 use std::path::PathBuf;
 
@@ -319,6 +319,71 @@ impl DaemonService {
             }
             Ok(resp) => Err(resp.error.unwrap_or_default()),
             Err(e) => Err(format!("Failed: {}", e)),
+        }
+    }
+
+    /// Watch a root for file changes, streaming events to the terminal
+    ///
+    /// Starts the daemon if it is not running, ensures the root is watched,
+    /// then streams events in real time until Ctrl-C. Output format:
+    /// `[HH:MM:SS] modified src/main.rs`
+    /// `[HH:MM:SS] index refreshed (3 files)`
+    ///
+    /// Examples:
+    ///   normalize daemon watch               # watch current directory
+    ///   normalize daemon watch ~/projects/app  # watch a specific root
+    pub fn watch(
+        &self,
+        #[param(positional, help = "Path to the project root to watch")] path: Option<String>,
+    ) -> Result<String, String> {
+        let path = path
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
+        let root = std::fs::canonicalize(&path).unwrap_or(path);
+
+        let client = DaemonClient::new();
+
+        if !client.ensure_running() {
+            return Err("Failed to start daemon".to_string());
+        }
+
+        eprintln!("Watching {} (press Ctrl-C to stop)", root.display());
+
+        let result = client.watch_events(Some(&root), |event| {
+            use std::time::SystemTime;
+            use std::time::UNIX_EPOCH;
+
+            // Format timestamp as [HH:MM:SS]
+            let secs = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            let h = (secs / 3600) % 24;
+            let m = (secs / 60) % 60;
+            let s = secs % 60;
+            let ts = format!("[{:02}:{:02}:{:02}]", h, m, s);
+
+            match &event {
+                Event::FileChanged { path, .. } => {
+                    println!("{} modified {}", ts, path.display());
+                }
+                Event::IndexRefreshed { files, .. } => {
+                    println!("{} index refreshed ({} files)", ts, files);
+                }
+            }
+
+            true // continue streaming
+        });
+
+        match result {
+            Ok(()) => Ok("Watch ended".to_string()),
+            Err(e) if e.contains("Interrupted") || e.contains("EINTR") => {
+                Ok("Watch ended".to_string())
+            }
+            Err(e) if e.contains("Connection reset") || e.contains("Broken pipe") => {
+                Ok("Daemon disconnected".to_string())
+            }
+            Err(e) => Err(format!("Watch error: {}", e)),
         }
     }
 

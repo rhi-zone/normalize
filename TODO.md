@@ -57,24 +57,42 @@ Crate split is correct. All 38 published crates justified. No reusable logic tra
 
 ### Analyze Command Consolidation — remaining work
 
-**Current: 42 commands** (was 44; `analyze parse` and `analyze query` deleted 2026-03-12 — duplicates of `syntax ast`/`syntax query`). All Phase 2/3 merges that were feasible have been completed.
+**Current: ~38 commands** (after 2026-03-15/16 consolidation: deleted `analyze parse`, `analyze query`, `analyze all`, `analyze node-types` → moved to `syntax`; merged 4 trend commands; deleted `normalize-rules-loader`).
 
-**Phase 3 rank infrastructure (in progress, 2026-03-12):**
-- `RankEntry` trait + `Column`/`Align` + `format_ranked_table()` in `normalize-analyze::ranked` — shared tabular rendering for all rank-pattern commands
-- Migrated 13 commands: files, imports, ownership, docs, ceremony, surface, depth-map, layering, test-ratio, budget, density, coupling, uniqueness
-- Not migrated (conditional columns): hotspots (has_complexity flag changes column set)
-- Not migrated (different structure): complexity, length (use `FileReport<T>` with `FullStats`), test-gaps (not tabular), coupling-clusters (prose), architecture, call-complexity
-- `DiffableRankEntry` trait + `compute_ranked_diff()` + `format_delta()` in `normalize-analyze::ranked` — generic `--diff <ref>` support for rank commands
-- Added `--diff` to all 12 rank commands: test-ratio, density, uniqueness, files, imports, ownership, ceremony, surface, depth-map, layering, budget, coupling
-- Async commands (imports, surface, depth-map, layering) use `block_in_place` + `ensure_ready` in worktree for baseline
-- `--trend` already generic via `analyze_scalar_trend` (4 existing trend commands use it)
+**Phase 3 rank infrastructure (done 2026-03-12):**
+- `RankEntry` trait + `Column`/`Align` + `format_ranked_table()` in `normalize-analyze::ranked`
+- Migrated 13 commands to shared tabular rendering
+- `DiffableRankEntry` + `--diff` on all 12 rank commands
 
-**Future (low priority):** `security` → SARIF rules engine (wraps bandit; could be `normalize rules run --engine sarif` with bandit configured). `docs`/`security` → rules migration (~-3 commands, see design doc).
+**Future (low priority):** `security` → SARIF rules engine. `docs`/`security` → rules migration (~-3 commands).
 
-**Design pressure:** ~39 commands (after 2026-03-15 consolidation) is still too spread out. The goal is a surface small enough that a user can hold it in working memory.
+---
 
-**High priority — unify analysis orchestration the way rules did it:**
-`normalize rules run --engine <syntax|facts|native|sarif>` unified four rule engines under one command. Analysis should reach the same shape: individual analyses stay as focused commands for direct use, but there should be a `normalize analyze run --pass <complexity|coupling|hotspots|...>` (or similar) that orchestrates multiple passes, streams results, and is the entry point for "run everything meaningful." This is the same architectural pattern — plugin dispatch via a flag rather than N sibling commands. `normalize analyze all` has been deleted (2026-03-15) — it hardcoded four passes and added no value over running them separately. `normalize analyze summary` is close but index-only and non-composable. The proper orchestration command remains to be built.
+### `analyze` Architecture Redesign (high priority)
+
+**Key insight (2026-03-16):** Every other top-level subcommand unifies a domain via a trait with multiple implementations (`rules` → `RuleEngine`, `tools` → tool trait, `syntax` → `Language`). `analyze` has no such trait — it's a grab-bag.
+
+**User intent audit reveals three distinct intents:**
+
+1. **"Rank my codebase by X"** — the user wants an ordered list of files/modules/functions by some metric. Input tier (file-only, git, index) is an implementation detail, not a user-facing concept. This is ~80% of current `analyze` commands. **→ belongs in `normalize rank`**
+
+2. **"Navigate this symbol/module"** — the user has a specific thing and wants to see what's connected. `call_graph`, `trace`, `dependents`, `provenance`. Cross-file extension of `view`. **→ design pending; possibly folds into `view`**
+
+3. **"Give me the big picture"** — synthesized understanding, not a list. `architecture`, `summary`, `health`. **→ design pending**
+
+**Decided: introduce `normalize rank` as a top-level subcommand.**
+- Unifying primitive: `Rankable` trait — produce an ordered list of (item, score) pairs
+- All current `analyze` commands that produce ranked tables migrate here
+- Input tier (files/git/index) is a precondition, not part of the interface
+- `RankEntry` infrastructure already exists in `normalize-analyze::ranked` — rename/repurpose
+- Commands to migrate: complexity, files, size, ceremony, hotspots, coupling, ownership, test-ratio, test-gaps, budget, density, uniqueness, imports, surface, depth-map, layering, module-health, call-complexity, duplicates (all variants), fragments, docs, security, contributors, activity, trend-metric, skeleton-diff
+- `analyze` shrinks to only the non-ranking commands (graph navigation + big picture) during transition; eventually dissolves or gets renamed
+
+**Not yet decided:**
+- Graph navigation commands (`call_graph`, `trace`, `dependents`, `provenance`) — these are ad hoc; need to understand *why* before deciding where they live. What's the unifying trait? What does the user actually want when they reach for these?
+- Where big-picture commands live (`architecture`, `summary`, `health`)
+- Non-ranked `analyze` commands stay put for now: `activity`, `trend-metric`, `docs`, `security`, `skeleton-diff`, `test-gaps`, `coupling-clusters`
+- Whether `analyze` dissolves entirely or gets a new identity
 
 ### Language trait: remaining .scm migration
 
