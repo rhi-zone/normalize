@@ -544,37 +544,6 @@ impl AnalyzeService {
         ))
     }
 
-    /// Run all analysis passes
-    #[cli(display_with = "display_report")]
-    pub fn all(
-        &self,
-        #[param(positional, help = "Target file or directory")] target: Option<String>,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
-        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<AnalyzeReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        let config = crate::config::NormalizeConfig::load(&root_path);
-        let filter =
-            Self::build_filter_with_config(&root_path, &config.analyze, "all", &exclude, &only);
-        Ok(crate::commands::analyze::report::analyze(
-            target.as_deref(),
-            &root_path,
-            true, // health
-            true, // complexity
-            true, // length
-            true, // security
-            None,
-            None,
-            filter.as_ref(),
-        ))
-    }
-
     /// Run security analysis
     #[server(group = "security")]
     #[cli(display_with = "display_security")]

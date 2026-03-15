@@ -272,11 +272,6 @@ fn test_help_analyze_duplicate_types() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "duplicate-types"]));
 }
 
-#[test]
-fn test_help_analyze_all() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "all"]));
-}
-
 // sessions subcommands
 #[test]
 fn test_help_sessions_list() {

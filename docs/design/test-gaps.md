@@ -234,19 +234,6 @@ src/ffi.rs:*  # Tested via integration tests in tests/
 
 Supports exact symbols and glob patterns per file. Follows the same pattern as `complexity-allow`, `length-allow`, etc.
 
-## Integration with `analyze all`
-
-`test-gaps` should be included in `analyze all` with a weight that reflects its importance:
-
-```rust
-pub struct AnalyzeWeights {
-    // ... existing weights ...
-    pub test_gaps: f64,  // default 1.0
-}
-```
-
-The health score contribution: `(tested_count / total_count) * weight`. A codebase with 80% directly-tested public functions gets 0.8 * 1.0 = 0.8 contribution from this metric.
-
 ## Non-Goals
 
 - **Mutation testing** - That's a separate tool (cargo-mutants). We answer "is there a test?" not "is the test good?"

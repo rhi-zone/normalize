@@ -57,7 +57,7 @@ Managing accumulated technical debt: tracking, prioritizing, paying down.
 
 | Phase | Tools |
 |-------|-------|
-| Inventory | `normalize analyze all`, `grep TODO/FIXME/HACK` |
+| Inventory | `normalize analyze health`, `grep TODO/FIXME/HACK` |
 | Assess | `view`, `analyze complexity/coverage` |
 | Prioritize | Judgment, stakeholder input |
 | Address | Normal development workflow |
@@ -133,14 +133,7 @@ Managing accumulated technical debt: tracking, prioritizing, paying down.
 **Goal**: Assess and prioritize tech debt
 
 ```
-Turn 1: Run quality analysis
-  $(normalize analyze all)
-  → Grade: C
-  → 15 complexity warnings
-  → 8 duplicate code blocks
-  → 45% test coverage
-
-Turn 2: Find TODO/FIXME markers
+Turn 1: Find TODO/FIXME markers
   $(grep "TODO|FIXME|HACK|XXX" --only "*.rs")
   → 23 TODO markers
   → 8 FIXME markers

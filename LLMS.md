@@ -102,7 +102,6 @@ normalize analyze hotspots         # High-churn files
 normalize analyze call-graph symbol --callers  # What calls this?
 normalize analyze call-graph symbol --callees  # What does this call?
 normalize analyze graph            # Dependency graph analysis
-normalize analyze all              # Run all analysis passes
 ```
 
 ### tools - Linters and Test Runners

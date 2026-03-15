@@ -87,8 +87,6 @@ normalize analyze duplicate-types
 # Overall health check
 normalize analyze health
 
-# Full analysis with grades
-normalize analyze all
 ```
 
 ### Testing
@@ -133,14 +131,7 @@ normalize view src --types-only --undocumented
 **Goal**: Audit quality of a mid-size codebase
 
 ```
-Turn 1: Run comprehensive analysis
-  $(normalize analyze all)
-  → Overall grade: C
-  → Complexity: B
-  → Duplication: D
-  → Coverage: C
-
-Turn 2: Investigate duplication
+Turn 1: Investigate duplication
   $(normalize analyze duplicate-functions)
   → 12 duplicate function pairs
   → 3 clusters of similar validation logic

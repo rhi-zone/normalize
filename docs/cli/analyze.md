@@ -12,7 +12,6 @@ Analyze codebase quality: health, complexity, security, duplicates, docs.
 | `cross-repo-health` | Rank repos by tech debt (churn + complexity + coupling) |
 | `summary` | Auto-generated single-page codebase overview |
 | `trend` | Track health metrics over git history at regular intervals |
-| `all` | Run all analysis passes with overall grade |
 
 ### Complexity
 | Subcommand | Description |

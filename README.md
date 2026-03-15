@@ -70,7 +70,6 @@ normalize analyze duplicates         # Detect code clones
 normalize analyze duplicate-types    # Detect duplicate type definitions
 normalize analyze graph              # Dependency graph analysis
 normalize analyze docs               # Documentation coverage
-normalize analyze all                # Run all analysis passes
 ```
 
 ### tools - Linters and Test Runners

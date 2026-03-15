@@ -51,16 +51,9 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ## P1 — Short-term Improvements (coherence / usability)
 
-### Main Crate Responsibility Boundaries
+### ~~Main Crate Responsibility Boundaries~~ (audited 2026-03-15 — no action needed)
 
-Size isn't the concern — multiple responsibilities in one crate is. Extract when reusable
-domain logic is trapped in the CLI crate and a real second consumer exists (LSP, external
-tool, another command). Don't extract for line count alone.
-
-**Candidates (extract when a second consumer appears):**
-- `serve/` (LSP + HTTP + MCP) → `normalize-serve`
-- `src/analyze/` (pure computation) → `normalize-architecture`
-- `commands/sessions/` — circular dep risk, needs care
+Crate split is correct. All 38 published crates justified. No reusable logic trapped in `normalize`; no unjustified extractions. Single-consumer domain libraries (graph, scope, edit, deps, etc.) are correctly placed — the test is "CLI wiring vs. domain logic", not "has 2+ consumers". Revisit only if a concrete second consumer appears for a specific module.
 
 ### Analyze Command Consolidation — remaining work
 
@@ -78,7 +71,10 @@ tool, another command). Don't extract for line count alone.
 
 **Future (low priority):** `security` → SARIF rules engine (wraps bandit; could be `normalize rules run --engine sarif` with bandit configured). `docs`/`security` → rules migration (~-3 commands, see design doc).
 
-**Design pressure:** ~42 commands is still too spread out. Phase 3 must continue. The goal is a surface small enough that a user can hold it in working memory — not just "fewer than 49".
+**Design pressure:** ~39 commands (after 2026-03-15 consolidation) is still too spread out. The goal is a surface small enough that a user can hold it in working memory.
+
+**High priority — unify analysis orchestration the way rules did it:**
+`normalize rules run --engine <syntax|facts|native|sarif>` unified four rule engines under one command. Analysis should reach the same shape: individual analyses stay as focused commands for direct use, but there should be a `normalize analyze run --pass <complexity|coupling|hotspots|...>` (or similar) that orchestrates multiple passes, streams results, and is the entry point for "run everything meaningful." This is the same architectural pattern — plugin dispatch via a flag rather than N sibling commands. `normalize analyze all` has been deleted (2026-03-15) — it hardcoded four passes and added no value over running them separately. `normalize analyze summary` is close but index-only and non-composable. The proper orchestration command remains to be built.
 
 ### Language trait: remaining .scm migration
 
@@ -664,9 +660,6 @@ to depend on. The LSP is useful day-to-day.
 - [x] `normalize watch` CLI — expose daemon file-watching with TUI output (`normalize daemon watch`; streams `[HH:MM:SS] modified <file>` / `[HH:MM:SS] index refreshed (N files)` until Ctrl-C)
 - [ ] File-level dependency tracking (import graph edges to scope fact re-evaluation)
 - [ ] Integrate incremental Datalog from ascent-interpreter (steps 1-3 done: interning, flat tuples, incremental eval; JIT work ongoing but not needed for integration)
-
-*Crate structure (from P1):*
-- [ ] Extract `serve/` → `normalize-serve` (LSP is already a second consumer)
 
 *CLI surface (from P1):*
 - [ ] Analyze command consolidation — continue Phase 3; target meaningfully below 42
