@@ -67,19 +67,12 @@ pub async fn build_view_service(
     exclude: &[String],
     only: &[String],
     case_insensitive: bool,
-    history_limit: Option<usize>,
 ) -> Result<report::ViewOutput, String> {
     // Ensure daemon is running if configured
     daemon::maybe_start_daemon(root);
 
     // Build filter if exclude/only patterns are specified
     let filter = super::build_filter(root, exclude, only);
-
-    // Handle --history mode
-    if let Some(limit) = history_limit {
-        let t = target.ok_or("--history requires a target")?;
-        return history::build_view_history_service(t, root, limit, case_insensitive);
-    }
 
     // If kind filter is specified without target (or with "."), list matching symbols
     if let Some(kind) = kind_filter {

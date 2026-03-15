@@ -41,10 +41,6 @@ pub enum ViewOutput {
     #[serde(rename = "glob_matches")]
     GlobMatches(ViewGlobReport),
 
-    /// Git history for a symbol or file
-    #[serde(rename = "history")]
-    History(ViewHistoryReport),
-
     /// Symbols filtered by kind (class, function, method)
     #[serde(rename = "kind_filter")]
     KindFilter(ViewKindFilterReport),
@@ -382,23 +378,6 @@ impl OutputFormatter for ViewOutput {
                 }
                 text
             }
-            ViewOutput::History(r) => {
-                let mut text = format!("History for {} (L{}):\n\n", r.file, r.lines);
-                if r.commits.is_empty() {
-                    text.push_str("  No history found.");
-                } else {
-                    for c in &r.commits {
-                        text.push_str(&format!(
-                            "  {} {} {} {}\n",
-                            &c.hash[..8.min(c.hash.len())],
-                            c.date,
-                            c.author,
-                            c.message
-                        ));
-                    }
-                }
-                text
-            }
             ViewOutput::KindFilter(r) => {
                 let mut text = String::new();
                 for e in &r.symbols {
@@ -470,6 +449,26 @@ impl OutputFormatter for ViewOutput {
 impl std::fmt::Display for ViewOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.format_text())
+    }
+}
+
+impl OutputFormatter for ViewHistoryReport {
+    fn format_text(&self) -> String {
+        let mut text = format!("History for {} (L{}):\n\n", self.file, self.lines);
+        if self.commits.is_empty() {
+            text.push_str("  No history found.");
+        } else {
+            for c in &self.commits {
+                text.push_str(&format!(
+                    "  {} {} {} {}\n",
+                    &c.hash[..8.min(c.hash.len())],
+                    c.date,
+                    c.author,
+                    c.message
+                ));
+            }
+        }
+        text
     }
 }
 

@@ -1,6 +1,6 @@
 //! Symbol history via git log.
 
-use super::report::{ViewHistoryCommit, ViewHistoryReport, ViewOutput};
+use super::report::{ViewHistoryCommit, ViewHistoryReport};
 use super::symbol::find_symbol_ci;
 use std::path::Path;
 use std::process::Command;
@@ -40,13 +40,13 @@ fn find_symbol_by_path<'a>(
     None
 }
 
-/// Build history view for the service layer.
-pub fn build_view_history_service(
+/// Build history report for the view service layer.
+pub fn build_view_history_report(
     target: &str,
     root: &Path,
     limit: usize,
     case_insensitive: bool,
-) -> Result<ViewOutput, String> {
+) -> Result<ViewHistoryReport, String> {
     let Some(resolved) = crate::path_resolve::resolve_unified(target, root) else {
         return Err(format!("Could not resolve path: {}", target));
     };
@@ -94,7 +94,7 @@ fn build_line_history_service(
     start_line: usize,
     end_line: usize,
     limit: usize,
-) -> Result<ViewOutput, String> {
+) -> Result<ViewHistoryReport, String> {
     let line_range = format!("{},{}:{}", start_line, end_line, file_path);
 
     let output = Command::new("git")
@@ -135,9 +135,9 @@ fn build_line_history_service(
         })
         .collect();
 
-    Ok(ViewOutput::History(ViewHistoryReport {
+    Ok(ViewHistoryReport {
         file: file_path.to_string(),
         lines: format!("{}-{}", start_line, end_line),
         commits,
-    }))
+    })
 }

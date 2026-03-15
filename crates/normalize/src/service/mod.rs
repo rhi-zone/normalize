@@ -33,6 +33,7 @@ pub mod serve;
 pub mod sessions;
 pub mod syntax;
 pub mod tools;
+pub mod view;
 
 use crate::commands;
 use crate::commands::aliases::{AliasesReport, detect_project_languages};
@@ -48,8 +49,6 @@ use std::path::PathBuf;
 pub struct NormalizeService {
     /// Whether pretty output is active (resolved per-command from globals + config).
     pretty: Cell<bool>,
-    /// Text prefix to prepend to view output (used for --dir-context).
-    view_prefix: Cell<String>,
     analyze: analyze::AnalyzeService,
     config: config::ConfigService,
     daemon: daemon::DaemonService,
@@ -65,6 +64,7 @@ pub struct NormalizeService {
     syntax: syntax::SyntaxService,
     sessions: sessions::SessionsService,
     tools: tools::ToolsService,
+    view: view::ViewService,
 }
 
 impl Default for NormalizeService {
@@ -84,7 +84,6 @@ impl NormalizeService {
     pub fn new() -> Self {
         let pretty = Cell::new(false);
         Self {
-            view_prefix: Cell::new(String::new()),
             analyze: analyze::AnalyzeService::new(&pretty),
             config: config::ConfigService::new(&pretty),
             daemon: daemon::DaemonService,
@@ -102,6 +101,7 @@ impl NormalizeService {
             syntax: syntax::SyntaxService::new(),
             sessions: sessions::SessionsService::new(&pretty),
             tools: tools::ToolsService::new(),
+            view: view::ViewService::new(&pretty),
             pretty,
         }
     }
@@ -155,17 +155,6 @@ impl NormalizeService {
             )
         } else {
             value.code.clone()
-        }
-    }
-
-    /// Display bridge for ViewOutput.
-    fn display_view(&self, value: &crate::commands::view::report::ViewOutput) -> String {
-        let prefix = self.view_prefix.take();
-        let text = self.display_output(value);
-        if prefix.is_empty() {
-            text
-        } else {
-            format!("{}{}", prefix, text)
         }
     }
 }
@@ -245,112 +234,9 @@ impl std::fmt::Display for TranslateResult {
     ]
 )]
 impl NormalizeService {
-    /// View a node in the codebase tree (directory, file, or symbol)
-    ///
-    /// Examples:
-    ///   normalize view                           # top-level directory tree
-    ///   normalize view src/                      # expand a subdirectory
-    ///   normalize view src/main.rs               # file skeleton (functions, classes)
-    ///   normalize view src/main.rs/ClassName     # single symbol and its children
-    ///   normalize view SymbolName                # search by symbol name
-    ///   normalize view file.rs:42                # jump to line 42
-    ///   normalize view src/ --depth 2            # deeper expansion
-    ///   normalize view src/main.rs --full        # full source code
-    ///   normalize view src/main.rs --deps        # show imports/exports
-    ///   normalize view src/main.rs --context     # skeleton + imports combined
-    #[cli(display_with = "display_view")]
-    #[allow(clippy::too_many_arguments)]
-    pub async fn view(
-        &self,
-        #[param(
-            positional,
-            help = "Target: path, path/Symbol, Parent/method, file:line, or SymbolName"
-        )]
-        target: Option<String>,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(
-            short = 'd',
-            help = "Depth of expansion (0=names only, 1=signatures, 2=with children, -1=all)"
-        )]
-        depth: i32,
-        #[param(short = 'n', help = "Show line numbers")] line_numbers: bool,
-        #[param(help = "Show dependencies (imports/exports)")] deps: bool,
-        #[param(short = 'k', help = "Filter by symbol kind: class, function, method")] kind: Option<
-            crate::commands::view::tree::SymbolKindFilter,
-        >,
-        #[param(help = "Show only type definitions")] types_only: bool,
-        #[param(help = "Include test functions and test modules")] tests: bool,
-        #[param(help = "Disable smart display (no collapsing single-child dirs)")] raw: bool,
-        #[param(help = "Focus view on module")] focus: Option<String>,
-        #[param(help = "Inline signatures of specific imported symbols")] resolve_imports: bool,
-        #[param(help = "Show full source code")] full: bool,
-        #[param(help = "Show full docstrings")] docs: bool,
-        #[param(help = "Hide all docstrings")] no_docs: bool,
-        #[param(help = "Hide parent/ancestor context")] no_parent: bool,
-        #[param(help = "Context view: skeleton + imports combined")] context: bool,
-        #[param(help = "Prepend directory context (.context.md files)")] dir_context: bool,
-        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
-        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-        #[param(short = 'i', help = "Case-insensitive symbol matching")] case_insensitive: bool,
-        #[param(help = "Show git history for symbol (last N changes)")] history: Option<usize>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<crate::commands::view::report::ViewOutput, String> {
-        let root_path = root
-            .map(PathBuf::from)
-            .map(Ok)
-            .unwrap_or_else(std::env::current_dir)
-            .map_err(|e| format!("Failed to get current directory: {e}"))?;
-
-        self.resolve_format(pretty, compact, &root_path);
-
-        let config = NormalizeConfig::load(&root_path);
-
-        let docstring_mode = if no_docs {
-            crate::tree::DocstringDisplay::None
-        } else if docs || config.view.show_docs() {
-            crate::tree::DocstringDisplay::Full
-        } else {
-            crate::tree::DocstringDisplay::Summary
-        };
-
-        // Handle --dir-context: store prefix so display_view can prepend it
-        if dir_context {
-            let target_path = target
-                .as_ref()
-                .map(|t| root_path.join(t))
-                .unwrap_or_else(|| root_path.clone());
-            if let Some(ctx) =
-                crate::commands::context::get_merged_context(&root_path, &target_path)
-            {
-                self.view_prefix.set(format!("{}\n\n---\n\n", ctx));
-            }
-        }
-
-        crate::commands::view::build_view_service(
-            target.as_deref(),
-            &root_path,
-            depth,
-            line_numbers,
-            deps,
-            kind.as_ref(),
-            types_only,
-            tests,
-            raw,
-            focus.as_deref(),
-            resolve_imports,
-            full,
-            docstring_mode,
-            context,
-            !no_parent,
-            &exclude,
-            &only,
-            case_insensitive,
-            history,
-        )
-        .await
+    /// View a node in the codebase tree, or navigate symbol relationships
+    pub fn view(&self) -> &view::ViewService {
+        &self.view
     }
 
     /// Search for text patterns in files (fast ripgrep-based search)

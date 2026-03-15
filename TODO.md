@@ -702,7 +702,7 @@ to depend on. The LSP is useful day-to-day.
 - [ ] Integrate incremental Datalog from ascent-interpreter (steps 1-3 done: interning, flat tuples, incremental eval; JIT ongoing but not blocking integration)
 
 *CLI surface (from P1):*
-- [ ] `view` refactor: graph navigation + history as subcommands (`normalize view <target> callers|history|dependents|...`), fix `ViewOutput` enum
+- [x] `view` refactor: graph navigation + history as subcommands (`normalize view callers|callees|history|dependents|trace|graph|provenance`), fix `ViewOutput` enum — done 2026-03-16
 
 *Release mechanics:*
 - [ ] Verify `normalize update` works against a real GitHub release (cross-platform smoke test)

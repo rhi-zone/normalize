@@ -26,55 +26,34 @@ Options:
 
 Commands:
   health             Run health analysis (file counts, complexity stats, large file warnings)
+  all                Run all analysis passes
   summary            Auto-generated single-page codebase overview
 
 Code quality:
-  complexity         Run complexity analysis
-  trend-metric       Show scalar metric trend over git history
+  complexity-trend   Show complexity trend over git history
   length             Run function length analysis
-  ceremony           Show ceremony ratio: fraction of callables that are trait/interface boilerplate
-  duplicates         Detect duplicate/similar code (functions or blocks)
-  duplicate-types    Detect duplicate type definitions
-  uniqueness         Measure what fraction of functions have no structural near-twin per module
-  call-complexity    Compute effective (reachable) cyclomatic complexity via call-graph BFS
-  fragments          Find repeated AST fragments across the codebase
+  length-trend       Show function length trend over git history
+  node-types         List node kinds and field names for a tree-sitter grammar
 
 Module structure:
-  size               Show hierarchical LOC breakdown (ncdu-style)
-  density            Measure information density (compression ratio + token uniqueness) per module
-  module-health      Score each module across test ratio, uniqueness, and density (worst first)
-  imports            Rank modules by import fan-in (requires facts index)
-  depth-map          Per-module dependency depth + ripple risk
-  surface            Per-module public symbol count, public ratio, and constraint score
-  layering           Per-module import layering compliance — are imports flowing downward?
+  density-trend      Show information density trend over git history
 
 Repository:
   docs               Analyze documentation coverage
-  files              Show longest files in codebase
 
 Graph analysis:
-  call-graph         Show callers and/or callees of a symbol
-  trace              Trace value provenance for a symbol
   architecture       Show architecture analysis (coupling, cycles, hubs)
-  graph              Graph-theoretic properties of the dependency graph
-  dependents         Reverse-dependency closure: who depends on this file/symbol? Modules mode shows blast radius with test coverage; symbols/types mode shows a flat list.
 
 Git history:
-  coupling           Temporal coupling: file pairs that change together in git history
   coupling-clusters  Change-clusters: connected components of temporally coupled files
-  hotspots           Churn × complexity hotspots: files ranked by change frequency and complexity
-  ownership          Show per-file ownership concentration from git blame
-  contributors       Analyze contributors across repos
   activity           Analyze cross-repo activity over time
   repo-coupling      Analyze cross-repo coupling
   cross-repo-health  Rank repos by tech debt (churn + complexity + coupling)
-  provenance         Provenance graph: git blame → session mapping + code relations
   trend              Track health metrics over git history at regular intervals
 
 Testing:
-  test-ratio         Test/impl line ratio per module
   test-gaps          Find untested public functions ranked by risk
-  budget             Line budget breakdown by purpose (business logic, tests, docs, config, etc.)
+  test-ratio-trend   Show test ratio trend over git history
 
 Security:
   security           Run security analysis

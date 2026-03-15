@@ -2,23 +2,61 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"trace\"])"
 ---
-Trace value provenance for a symbol
+Analyze codebase (health, complexity, security, duplicates, docs)
 
-Usage: normalize analyze trace [OPTIONS] [symbol]
+Usage: normalize analyze [OPTIONS] [target]
 
 Arguments:
-  [symbol]  Symbol to trace (file/symbol or symbol name)
+  [target]  Target file or directory
 
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
-  -t, --target <target>            Target file containing the symbol
-  -d, --max-depth <max-depth>      Maximum depth
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression
-      --recursive                  Recursively trace called functions
-  -i, --case-insensitive           Case-insensitive matching
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --output-schema              Print JSON Schema of the subcommand's return type and exit
-  -r, --root <root>                Root directory (defaults to current directory)
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -r, --root <root>                Root directory (defaults to current directory)
+      --exclude <exclude>          Exclude paths matching pattern
+      --only <only>                Include only paths matching pattern
+      --pretty                     Enable pretty
+      --compact                    Enable compact
   -h, --help                       Print help
+  -V, --version                    Print version
+
+Commands:
+  health             Run health analysis (file counts, complexity stats, large file warnings)
+  all                Run all analysis passes
+  summary            Auto-generated single-page codebase overview
+
+Code quality:
+  complexity-trend   Show complexity trend over git history
+  length             Run function length analysis
+  length-trend       Show function length trend over git history
+  node-types         List node kinds and field names for a tree-sitter grammar
+
+Module structure:
+  density-trend      Show information density trend over git history
+
+Repository:
+  docs               Analyze documentation coverage
+
+Graph analysis:
+  architecture       Show architecture analysis (coupling, cycles, hubs)
+
+Git history:
+  coupling-clusters  Change-clusters: connected components of temporally coupled files
+  activity           Analyze cross-repo activity over time
+  repo-coupling      Analyze cross-repo coupling
+  cross-repo-health  Rank repos by tech debt (churn + complexity + coupling)
+  trend              Track health metrics over git history at regular intervals
+
+Testing:
+  test-gaps          Find untested public functions ranked by risk
+  test-ratio-trend   Show test ratio trend over git history
+
+Security:
+  security           Run security analysis
+
+Diff:
+  skeleton-diff      Show structural changes between a base ref and HEAD

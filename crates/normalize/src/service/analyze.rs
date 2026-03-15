@@ -4,18 +4,15 @@ use crate::analyze::function_length::LengthReport;
 use crate::analyze::test_gaps::TestGapsReport;
 use crate::commands::analyze::activity::ActivityReport;
 use crate::commands::analyze::architecture::ArchitectureReport;
-use crate::commands::analyze::call_graph::CallEntry;
 use crate::commands::analyze::coupling_clusters::CouplingClustersReport;
 use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
 use crate::commands::analyze::docs::DocCoverageReport;
-use crate::commands::analyze::graph::{DependentsReport, GraphReport, GraphTarget};
-use crate::commands::analyze::provenance::ProvenanceReport;
 use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
 use crate::commands::analyze::skeleton_diff::SkeletonDiffReport;
 use crate::commands::analyze::summary::SummaryReport;
 use crate::commands::analyze::trend::{ScalarTrendReport, TrendReport};
-use crate::commands::analyze::ts_node_types::NodeTypesReport;
+use crate::commands::syntax::node_types::NodeTypesReport;
 use crate::output::OutputFormatter;
 use server_less::cli;
 use std::cell::Cell;
@@ -48,18 +45,6 @@ impl AnalyzeService {
         let config = NormalizeConfig::load(root);
         let is_pretty = !compact && (pretty || config.pretty.enabled());
         self.pretty.set(is_pretty);
-    }
-
-    fn display_call_graph(&self, entries: &[CallEntry]) -> String {
-        entries
-            .iter()
-            .map(|e| format!("  {}:{}:{}", e.file, e.line, e.symbol))
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
-    fn display_trace(&self, text: &str) -> String {
-        text.to_string()
     }
 
     fn display_architecture(&self, r: &ArchitectureReport) -> String {
@@ -127,30 +112,6 @@ impl AnalyzeService {
     }
 
     fn display_cross_repo_health(&self, r: &CrossRepoHealthReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_graph(&self, r: &GraphReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_dependents(&self, r: &DependentsReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_provenance(&self, r: &ProvenanceReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -247,57 +208,6 @@ impl AnalyzeService {
     diff = "Diff",
 ))]
 impl AnalyzeService {
-    /// Show callers and/or callees of a symbol
-    #[server(group = "graph")]
-    #[cli(display_with = "display_call_graph")]
-    pub async fn call_graph(
-        &self,
-        #[param(positional, help = "Symbol to look up (or file#symbol)")] target: String,
-        #[param(help = "Show callers")] callers: bool,
-        #[param(help = "Show callees")] callees: bool,
-        #[param(short = 'i', help = "Case-insensitive matching")] case_insensitive: bool,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-    ) -> Result<Vec<CallEntry>, String> {
-        let root_path = Self::root_path(root);
-        let show_callers = callers || !callees;
-        crate::commands::analyze::call_graph::build_call_graph(
-            &root_path,
-            &target,
-            show_callers,
-            callees,
-            case_insensitive,
-        )
-        .await
-    }
-
-    /// Trace value provenance for a symbol
-    #[server(group = "graph")]
-    #[cli(display_with = "display_trace")]
-    pub async fn trace(
-        &self,
-        #[param(positional, help = "Symbol to trace (file/symbol or symbol name)")] symbol: String,
-        #[param(short = 't', help = "Target file containing the symbol")] target: Option<String>,
-        #[param(short = 'd', help = "Maximum depth")] max_depth: Option<usize>,
-        #[param(help = "Recursively trace called functions")] recursive: bool,
-        #[param(short = 'i', help = "Case-insensitive matching")] case_insensitive: bool,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-    ) -> Result<String, String> {
-        let root_path = Self::root_path(root);
-        crate::commands::analyze::trace::build_trace_text(
-            &symbol,
-            target.as_deref(),
-            &root_path,
-            max_depth.unwrap_or(50),
-            recursive,
-            case_insensitive,
-        )
-        .await
-    }
-
     /// Show architecture analysis (coupling, cycles, hubs)
     #[server(group = "graph")]
     #[cli(display_with = "display_architecture")]
@@ -791,89 +701,6 @@ impl AnalyzeService {
         Ok(crate::commands::analyze::summary::analyze_summary(&root_path, effective_limit).await)
     }
 
-    /// Graph-theoretic properties of the dependency graph
-    #[server(group = "graph")]
-    #[cli(display_with = "display_graph")]
-    pub async fn graph(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(short = 'l', help = "Max examples per section (0=no limit)")] limit: Option<usize>,
-        #[param(help = "Graph nodes: modules (default) or symbols")] on: Option<GraphTarget>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<GraphReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        let effective_limit = match limit.unwrap_or(10) {
-            0 => usize::MAX,
-            n => n,
-        };
-        let target = on.unwrap_or(GraphTarget::Modules);
-        let idx = crate::index::ensure_ready(&root_path).await?;
-        crate::commands::analyze::graph::analyze_graph(&idx, effective_limit, target)
-            .await
-            .map_err(|e| format!("Graph analysis failed: {}", e))
-    }
-
-    /// Reverse-dependency closure: who depends on this file/symbol? Modules mode shows blast radius with test coverage; symbols/types mode shows a flat list.
-    #[server(group = "graph")]
-    #[cli(display_with = "display_dependents")]
-    pub async fn dependents(
-        &self,
-        #[param(positional, help = "File or symbol to find dependents for")] target: String,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(help = "Graph nodes: modules (default), symbols, or types")] on: Option<
-            GraphTarget,
-        >,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<DependentsReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        let graph_target = on.unwrap_or(GraphTarget::Modules);
-        let idx = crate::index::ensure_ready(&root_path).await?;
-        crate::commands::analyze::graph::analyze_dependents(&idx, &target, graph_target)
-            .await
-            .map_err(|e| format!("Dependents query failed: {}", e))
-    }
-
-    /// Provenance graph: git blame → session mapping + code relations
-    #[server(group = "git")]
-    #[cli(display_with = "display_provenance")]
-    #[allow(clippy::too_many_arguments)]
-    pub async fn provenance(
-        &self,
-        #[param(positional, help = "Target file or directory scope")] target: Option<String>,
-        #[param(help = "Include call graph edges (requires facts index)")] calls: bool,
-        #[param(help = "Include co-change edges (from git history)")] coupling: bool,
-        #[param(help = "Override session directory")] sessions: Option<String>,
-        #[param(short = 'l', help = "Maximum number of files (0=no limit)")] limit: Option<usize>,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<ProvenanceReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        let effective_limit = match limit.unwrap_or(50) {
-            0 => usize::MAX,
-            n => n,
-        };
-        let opts = crate::commands::analyze::provenance::ProvenanceOptions {
-            target,
-            include_calls: calls,
-            include_coupling: coupling,
-            sessions_path: sessions,
-            limit: effective_limit,
-        };
-        Ok(crate::commands::analyze::provenance::analyze_provenance(&root_path, &opts).await)
-    }
-
     /// Show structural changes between a base ref and HEAD
     #[server(group = "diff")]
     #[cli(display_with = "display_skeleton_diff")]
@@ -934,9 +761,6 @@ impl AnalyzeService {
     ) -> Result<NodeTypesReport, String> {
         let root_path = Self::root_path(None);
         self.resolve_format(pretty, compact, &root_path);
-        crate::commands::analyze::ts_node_types::node_types_for_language(
-            &language,
-            search.as_deref(),
-        )
+        crate::commands::syntax::node_types::node_types_for_language(&language, search.as_deref())
     }
 }

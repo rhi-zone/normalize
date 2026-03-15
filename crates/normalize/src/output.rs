@@ -65,7 +65,7 @@ mod tests {
         use crate::commands::sessions::messages::MessagesReport;
         use crate::commands::sessions::plans::PlansListReport;
         use crate::commands::tools::lint::LintListResult;
-        use crate::commands::view::report::ViewOutput;
+        use crate::commands::view::report::{ViewHistoryReport, ViewOutput};
         use crate::sessions::SessionAnalysis;
         use crate::text_search::GrepResult;
         use normalize_output::diagnostics::DiagnosticsReport;
@@ -127,6 +127,7 @@ mod tests {
         assert_output_formatter::<TestGapsReport>();
         assert_output_formatter::<TestRatioReport>();
         assert_output_formatter::<TrendReport>();
+        assert_output_formatter::<ViewHistoryReport>();
         assert_output_formatter::<ViewOutput>();
 
         use crate::service::config::{ConfigSetReport, ConfigShowReport, ConfigValidateReport};

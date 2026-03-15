@@ -7,13 +7,13 @@ Fast code intelligence CLI
 Usage: normalize [OPTIONS] [COMMAND]
 
 Commands:
-  view       View a node in the codebase tree (directory, file, or symbol)
   grep       Search for text patterns in files (fast ripgrep-based search)
   aliases    List filter aliases (used by --exclude/--only)
   context    Show directory context (hierarchical .context.md files)
   init       Initialize normalize in current directory
   update     Check for and install updates
   translate  Translate code between programming languages
+  view       View a node in the codebase tree, or navigate symbol relationships
   daemon     Manage the global normalize daemon
   grammars   Manage tree-sitter grammars for parsing
   guide      Workflow guides with examples
