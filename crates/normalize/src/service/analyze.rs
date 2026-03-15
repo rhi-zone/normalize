@@ -37,7 +37,7 @@ use crate::commands::analyze::skeleton_diff::SkeletonDiffReport;
 use crate::commands::analyze::summary::SummaryReport;
 use crate::commands::analyze::surface::SurfaceReport;
 use crate::commands::analyze::test_ratio::TestRatioReport;
-use crate::commands::analyze::trend::{ScalarTrendReport, TrendReport};
+use crate::commands::analyze::trend::{ScalarTrendReport, TrendMetric, TrendReport};
 use crate::commands::analyze::ts_node_types::NodeTypesReport;
 use crate::commands::analyze::uniqueness::UniquenessReport;
 use crate::output::OutputFormatter;
@@ -682,11 +682,13 @@ impl AnalyzeService {
         Ok(report)
     }
 
-    /// Show complexity trend over git history
+    /// Show scalar metric trend over git history
     #[server(group = "code")]
     #[cli(display_with = "display_scalar_trend")]
-    pub fn complexity_trend(
+    pub fn trend_metric(
         &self,
+        #[param(help = "Metric to track: complexity, length, density, test-ratio")]
+        metric: TrendMetric,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -697,22 +699,62 @@ impl AnalyzeService {
     ) -> Result<ScalarTrendReport, String> {
         let root_path = Self::root_path(root);
         self.resolve_format(pretty, compact, &root_path);
-        crate::commands::analyze::trend::analyze_scalar_trend(
-            &root_path,
-            "avg_complexity",
-            snapshots.unwrap_or(10),
-            false, // lower complexity is better
-            |wt| {
-                let report = crate::commands::analyze::complexity::analyze_codebase_complexity(
-                    wt,
-                    usize::MAX,
-                    None,
-                    None,
-                    &[],
-                );
-                report.full_stats.map(|s| s.total_avg)
-            },
-        )
+        let n = snapshots.unwrap_or(10);
+        match metric {
+            TrendMetric::Complexity => crate::commands::analyze::trend::analyze_scalar_trend(
+                &root_path,
+                "avg_complexity",
+                n,
+                false, // lower complexity is better
+                |wt| {
+                    let report = crate::commands::analyze::complexity::analyze_codebase_complexity(
+                        wt,
+                        usize::MAX,
+                        None,
+                        None,
+                        &[],
+                    );
+                    report.full_stats.map(|s| s.total_avg)
+                },
+            ),
+            TrendMetric::Length => crate::commands::analyze::trend::analyze_scalar_trend(
+                &root_path,
+                "avg_length",
+                n,
+                false, // shorter functions is better
+                |wt| {
+                    let report = crate::commands::analyze::length::analyze_codebase_length(
+                        wt,
+                        usize::MAX,
+                        None,
+                        &[],
+                    );
+                    report.full_stats.map(|s| s.total_avg)
+                },
+            ),
+            TrendMetric::Density => crate::commands::analyze::trend::analyze_scalar_trend(
+                &root_path,
+                "overall_density_score",
+                n,
+                true, // higher density score is better
+                |wt| {
+                    let report =
+                        crate::commands::analyze::density::analyze_density(wt, usize::MAX, 0);
+                    Some((report.overall_compression_ratio + report.overall_token_uniqueness) / 2.0)
+                },
+            ),
+            TrendMetric::TestRatio => crate::commands::analyze::trend::analyze_scalar_trend(
+                &root_path,
+                "overall_test_ratio",
+                n,
+                true, // higher test ratio is better
+                |wt| {
+                    let report =
+                        crate::commands::analyze::test_ratio::analyze_test_ratio(wt, usize::MAX);
+                    Some(report.overall_ratio)
+                },
+            ),
+        }
     }
 
     /// Run function length analysis
@@ -790,38 +832,6 @@ impl AnalyzeService {
             apply_length_diff(&mut report, &baseline, diff_ref);
         }
         Ok(report)
-    }
-
-    /// Show function length trend over git history
-    #[server(group = "code")]
-    #[cli(display_with = "display_scalar_trend")]
-    pub fn length_trend(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(short = 'n', help = "Number of snapshots to collect (default: 10)")]
-        snapshots: Option<usize>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<ScalarTrendReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        crate::commands::analyze::trend::analyze_scalar_trend(
-            &root_path,
-            "avg_length",
-            snapshots.unwrap_or(10),
-            false, // shorter functions is better
-            |wt| {
-                let report = crate::commands::analyze::length::analyze_codebase_length(
-                    wt,
-                    usize::MAX,
-                    None,
-                    &[],
-                );
-                report.full_stats.map(|s| s.total_avg)
-            },
-        )
     }
 
     /// Analyze documentation coverage
@@ -1562,34 +1572,6 @@ impl AnalyzeService {
         Ok(report)
     }
 
-    /// Show test ratio trend over git history
-    #[server(group = "test")]
-    #[cli(display_with = "display_scalar_trend")]
-    pub fn test_ratio_trend(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(short = 'n', help = "Number of snapshots to collect (default: 10)")]
-        snapshots: Option<usize>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<ScalarTrendReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        crate::commands::analyze::trend::analyze_scalar_trend(
-            &root_path,
-            "overall_test_ratio",
-            snapshots.unwrap_or(10),
-            true, // higher test ratio is better
-            |wt| {
-                let report =
-                    crate::commands::analyze::test_ratio::analyze_test_ratio(wt, usize::MAX);
-                Some(report.overall_ratio)
-            },
-        )
-    }
-
     /// Measure information density (compression ratio + token uniqueness) per module
     #[server(group = "modules")]
     #[cli(display_with = "display_density")]
@@ -1635,33 +1617,6 @@ impl AnalyzeService {
             report.diff_ref = Some(diff_ref.clone());
         }
         Ok(report)
-    }
-
-    /// Show information density trend over git history
-    #[server(group = "modules")]
-    #[cli(display_with = "display_scalar_trend")]
-    pub fn density_trend(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(short = 'n', help = "Number of snapshots to collect (default: 10)")]
-        snapshots: Option<usize>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<ScalarTrendReport, String> {
-        let root_path = Self::root_path(root);
-        self.resolve_format(pretty, compact, &root_path);
-        crate::commands::analyze::trend::analyze_scalar_trend(
-            &root_path,
-            "overall_density_score",
-            snapshots.unwrap_or(10),
-            true, // higher density score is better
-            |wt| {
-                let report = crate::commands::analyze::density::analyze_density(wt, usize::MAX, 0);
-                Some((report.overall_compression_ratio + report.overall_token_uniqueness) / 2.0)
-            },
-        )
     }
 
     /// Measure what fraction of functions have no structural near-twin per module

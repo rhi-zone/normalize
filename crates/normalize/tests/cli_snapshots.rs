@@ -228,28 +228,13 @@ fn test_help_analyze_complexity() {
 }
 
 #[test]
-fn test_help_analyze_complexity_trend() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "complexity-trend"]));
-}
-
-#[test]
 fn test_help_analyze_length() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "length"]));
 }
 
 #[test]
-fn test_help_analyze_length_trend() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "length-trend"]));
-}
-
-#[test]
-fn test_help_analyze_density_trend() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "density-trend"]));
-}
-
-#[test]
-fn test_help_analyze_test_ratio_trend() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "test-ratio-trend"]));
+fn test_help_analyze_trend_metric() {
+    insta::assert_snapshot!(snapshot_help(&["analyze", "trend-metric"]));
 }
 
 #[test]

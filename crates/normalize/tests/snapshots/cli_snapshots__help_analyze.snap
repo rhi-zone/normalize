@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 72
 expression: "snapshot_help(&[\"analyze\"])"
 ---
 Analyze codebase (health, complexity, security, duplicates, docs)
@@ -31,9 +32,8 @@ Commands:
 
 Code quality:
   complexity         Run complexity analysis
-  complexity-trend   Show complexity trend over git history
+  trend-metric       Show scalar metric trend over git history
   length             Run function length analysis
-  length-trend       Show function length trend over git history
   ceremony           Show ceremony ratio: fraction of callables that are trait/interface boilerplate
   duplicates         Detect duplicate/similar code (functions or blocks)
   duplicate-types    Detect duplicate type definitions
@@ -45,7 +45,6 @@ Code quality:
 Module structure:
   size               Show hierarchical LOC breakdown (ncdu-style)
   density            Measure information density (compression ratio + token uniqueness) per module
-  density-trend      Show information density trend over git history
   module-health      Score each module across test ratio, uniqueness, and density (worst first)
   imports            Rank modules by import fan-in (requires facts index)
   depth-map          Per-module dependency depth + ripple risk
@@ -79,7 +78,6 @@ Testing:
   test-ratio         Test/impl line ratio per module
   test-gaps          Find untested public functions ranked by risk
   budget             Line budget breakdown by purpose (business logic, tests, docs, config, etc.)
-  test-ratio-trend   Show test ratio trend over git history
 
 Security:
   security           Run security analysis

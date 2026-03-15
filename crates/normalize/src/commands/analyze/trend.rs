@@ -8,10 +8,51 @@ use crate::output::OutputFormatter;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::Path;
+use std::str::FromStr;
 
 pub use crate::commands::analyze::git_history::{
     CommitInfo, format_unix_date, git_log_timestamps, run_in_worktree, select_snapshots,
 };
+
+/// Which scalar metric to track with `normalize analyze trend-metric`.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum TrendMetric {
+    /// Average cyclomatic complexity across the codebase
+    Complexity,
+    /// Average function length (lines) across the codebase
+    Length,
+    /// Overall information density score (compression + token uniqueness)
+    Density,
+    /// Overall test-to-implementation line ratio
+    TestRatio,
+}
+
+impl FromStr for TrendMetric {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "complexity" => Ok(TrendMetric::Complexity),
+            "length" => Ok(TrendMetric::Length),
+            "density" => Ok(TrendMetric::Density),
+            "test-ratio" | "test_ratio" => Ok(TrendMetric::TestRatio),
+            other => Err(format!(
+                "unknown metric '{other}'; expected one of: complexity, length, density, test-ratio"
+            )),
+        }
+    }
+}
+
+impl fmt::Display for TrendMetric {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TrendMetric::Complexity => write!(f, "complexity"),
+            TrendMetric::Length => write!(f, "length"),
+            TrendMetric::Density => write!(f, "density"),
+            TrendMetric::TestRatio => write!(f, "test-ratio"),
+        }
+    }
+}
 
 /// Direction of a metric's change over time.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, schemars::JsonSchema)]
