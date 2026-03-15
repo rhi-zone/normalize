@@ -5,7 +5,7 @@ use normalize_output::OutputFormatter;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// Report returned by `normalize analyze node-types`.
+/// Report returned by `normalize syntax node-types`.
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct NodeTypesReport {
     /// Language name that was inspected.

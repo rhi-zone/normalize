@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 72
 expression: "snapshot_help(&[\"analyze\"])"
 ---
 Analyze codebase (health, complexity, security, duplicates, docs)
@@ -39,7 +38,6 @@ Code quality:
   uniqueness         Measure what fraction of functions have no structural near-twin per module
   call-complexity    Compute effective (reachable) cyclomatic complexity via call-graph BFS
   fragments          Find repeated AST fragments across the codebase
-  node-types         List node kinds and field names for a tree-sitter grammar
 
 Module structure:
   size               Show hierarchical LOC breakdown (ncdu-style)

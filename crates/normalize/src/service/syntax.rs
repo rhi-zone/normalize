@@ -1,8 +1,9 @@
 //! Syntax sub-service for server-less CLI.
 //!
-//! Covers AST-level operations (ast, query).
+//! Covers AST-level operations (ast, query, node-types).
 //! Rules management has been lifted to the top-level `rules` service.
 
+use crate::commands::syntax::node_types::NodeTypesReport;
 use normalize_syntax_rules::MatchResult;
 use server_less::cli;
 use std::path::PathBuf;
@@ -22,6 +23,11 @@ impl SyntaxService {
 
     fn display_query(&self, results: &[MatchResult]) -> String {
         format!("{} matches", results.len())
+    }
+
+    fn display_node_types(&self, r: &NodeTypesReport) -> String {
+        use normalize_output::OutputFormatter;
+        r.format_text()
     }
 }
 
@@ -80,5 +86,17 @@ impl SyntaxService {
             &root_path,
             None,
         )
+    }
+
+    /// List node kinds and field names for a tree-sitter grammar
+    #[cli(display_with = "display_node_types")]
+    pub fn node_types(
+        &self,
+        #[param(positional, help = "Language name (e.g. rust, python, go)")] language: String,
+        #[param(help = "Filter types and fields by substring (case-insensitive)")] search: Option<
+            String,
+        >,
+    ) -> Result<NodeTypesReport, String> {
+        crate::commands::syntax::node_types::node_types_for_language(&language, search.as_deref())
     }
 }

@@ -377,6 +377,17 @@ fn test_help_generate_typegen() {
     insta::assert_snapshot!(snapshot_help(&["generate", "typegen"]));
 }
 
+// syntax subcommands
+#[test]
+fn test_help_syntax() {
+    insta::assert_snapshot!(snapshot_help(&["syntax"]));
+}
+
+#[test]
+fn test_help_syntax_node_types() {
+    insta::assert_snapshot!(snapshot_help(&["syntax", "node-types"]));
+}
+
 // rules subcommands
 #[test]
 fn test_help_rules_add() {

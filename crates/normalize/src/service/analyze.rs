@@ -38,7 +38,6 @@ use crate::commands::analyze::summary::SummaryReport;
 use crate::commands::analyze::surface::SurfaceReport;
 use crate::commands::analyze::test_ratio::TestRatioReport;
 use crate::commands::analyze::trend::{ScalarTrendReport, TrendMetric, TrendReport};
-use crate::commands::analyze::ts_node_types::NodeTypesReport;
 use crate::commands::analyze::uniqueness::UniquenessReport;
 use crate::output::OutputFormatter;
 use server_less::cli;
@@ -383,14 +382,6 @@ impl AnalyzeService {
     }
 
     fn display_hotspots(&self, r: &HotspotsReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_node_types(&self, r: &NodeTypesReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -2129,26 +2120,6 @@ impl AnalyzeService {
             min_members.unwrap_or(2),
             &merged_exclude,
             &only,
-        )
-    }
-
-    /// List node kinds and field names for a tree-sitter grammar
-    #[server(group = "code")]
-    #[cli(display_with = "display_node_types")]
-    pub fn node_types(
-        &self,
-        #[param(positional, help = "Language name (e.g. rust, python, go)")] language: String,
-        #[param(help = "Filter types and fields by substring (case-insensitive)")] search: Option<
-            String,
-        >,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<NodeTypesReport, String> {
-        let root_path = Self::root_path(None);
-        self.resolve_format(pretty, compact, &root_path);
-        crate::commands::analyze::ts_node_types::node_types_for_language(
-            &language,
-            search.as_deref(),
         )
     }
 }

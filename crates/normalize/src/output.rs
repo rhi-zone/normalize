@@ -134,7 +134,7 @@ mod tests {
         assert_output_formatter::<ConfigValidateReport>();
         assert_output_formatter::<ConfigSetReport>();
 
-        use crate::commands::analyze::ts_node_types::NodeTypesReport;
+        use crate::commands::syntax::node_types::NodeTypesReport;
         assert_output_formatter::<NodeTypesReport>();
     }
 }
