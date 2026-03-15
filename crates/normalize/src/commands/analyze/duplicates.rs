@@ -430,6 +430,12 @@ fn collect_block_signatures(
 /// Minimum pairs from the same directory pair before suppression kicks in.
 const PARALLEL_IMPL_THRESHOLD: usize = 5;
 
+/// Minimum number of pairs in a body-pattern cluster before widespread suppression kicks in.
+const BODY_PATTERN_MIN_PAIRS: usize = 5;
+
+/// Minimum number of distinct files a body-pattern cluster must span before suppression.
+const BODY_PATTERN_MIN_FILES: usize = 3;
+
 /// Extract the parent directory from a relative file path, returning the path
 /// up to the last `/` (or "." for top-level files).
 fn parent_dir(path: &str) -> &str {
@@ -529,6 +535,173 @@ fn suppress_parallel_directory_groups(groups: Vec<DuplicateGroup>) -> DirectoryS
     summaries.sort_by(|a, b| b.pair_count.cmp(&a.pair_count));
 
     DirectorySuppressionResult {
+        kept,
+        suppressed: summaries,
+    }
+}
+
+struct BodyPatternSuppressionResult {
+    kept: Vec<SimilarFunctionPair>,
+    suppressed: Vec<crate::commands::analyze::duplicates_views::SuppressedBodyPatternGroup>,
+}
+
+/// Suppress pairs where the same body pattern appears across many files (different method names).
+///
+/// This catches the "Language trait impl" pattern: e.g., `extract_imports` implemented
+/// identically across 20 language structs. We use connected-component analysis on the
+/// pair graph: components spanning at least `BODY_PATTERN_MIN_FILES` distinct files with
+/// at least `BODY_PATTERN_MIN_PAIRS` pairs are suppressed and folded into a
+/// suppressed-summary entry.
+///
+/// Only runs when `!include_trait_impls` (callers gate this).
+fn suppress_widespread_body_patterns(
+    pairs: Vec<SimilarFunctionPair>,
+) -> BodyPatternSuppressionResult {
+    use crate::commands::analyze::duplicates_views::SuppressedBodyPatternGroup;
+
+    if pairs.is_empty() {
+        return BodyPatternSuppressionResult {
+            kept: pairs,
+            suppressed: Vec::new(),
+        };
+    }
+
+    // Assign a stable integer id to each unique (file, symbol, start_line) function instance.
+    let mut fn_id_map: HashMap<(String, String, usize), usize> = HashMap::new();
+    let mut fn_names: Vec<String> = Vec::new();
+    let mut fn_files: Vec<String> = Vec::new();
+
+    let mut get_id = |file: &str, sym: &str, start: usize| -> usize {
+        let key = (file.to_owned(), sym.to_owned(), start);
+        if let Some(&id) = fn_id_map.get(&key) {
+            return id;
+        }
+        let id = fn_names.len();
+        fn_names.push(sym.to_owned());
+        fn_files.push(file.to_owned());
+        fn_id_map.insert(key, id);
+        id
+    };
+
+    // Build adjacency list for union-find.
+    let mut edges: Vec<(usize, usize)> = Vec::with_capacity(pairs.len());
+    for p in &pairs {
+        let a = get_id(&p.file_a, &p.symbol_a, p.start_line_a);
+        let b = get_id(&p.file_b, &p.symbol_b, p.start_line_b);
+        edges.push((a, b));
+    }
+
+    let n = fn_names.len();
+    // Union-find with path compression + union by rank.
+    let mut parent: Vec<usize> = (0..n).collect();
+    let mut rank: Vec<usize> = vec![0; n];
+
+    fn find(parent: &mut [usize], x: usize) -> usize {
+        if parent[x] != x {
+            parent[x] = find(parent, parent[x]);
+        }
+        parent[x]
+    }
+
+    fn union(parent: &mut [usize], rank: &mut [usize], a: usize, b: usize) {
+        let ra = find(parent, a);
+        let rb = find(parent, b);
+        if ra == rb {
+            return;
+        }
+        if rank[ra] < rank[rb] {
+            parent[ra] = rb;
+        } else if rank[ra] > rank[rb] {
+            parent[rb] = ra;
+        } else {
+            parent[rb] = ra;
+            rank[ra] += 1;
+        }
+    }
+
+    for &(a, b) in &edges {
+        union(&mut parent, &mut rank, a, b);
+    }
+
+    // For each component root: collect distinct files, distinct names, and pair count.
+    let mut component_files: HashMap<usize, HashSet<String>> = HashMap::new();
+    let mut component_names: HashMap<usize, HashMap<String, usize>> = HashMap::new();
+
+    for i in 0..n {
+        let root = find(&mut parent, i);
+        component_files
+            .entry(root)
+            .or_default()
+            .insert(fn_files[i].clone());
+        *component_names
+            .entry(root)
+            .or_default()
+            .entry(fn_names[i].clone())
+            .or_default() += 1;
+    }
+
+    // Count pairs per component.
+    let mut component_pair_counts: HashMap<usize, usize> = HashMap::new();
+    for &(a, b) in &edges {
+        let root = find(&mut parent, a);
+        debug_assert_eq!(root, find(&mut parent, b));
+        *component_pair_counts.entry(root).or_default() += 1;
+    }
+
+    // Identify "hot" components that meet both thresholds.
+    let hot_components: HashSet<usize> = component_pair_counts
+        .iter()
+        .filter(|&(&root, &pair_count)| {
+            pair_count >= BODY_PATTERN_MIN_PAIRS
+                && component_files.get(&root).map_or(0, |f| f.len()) >= BODY_PATTERN_MIN_FILES
+        })
+        .map(|(&root, _)| root)
+        .collect();
+
+    if hot_components.is_empty() {
+        return BodyPatternSuppressionResult {
+            kept: pairs,
+            suppressed: Vec::new(),
+        };
+    }
+
+    // Partition pairs.
+    let mut kept = Vec::new();
+    let mut suppressed_by_component: HashMap<usize, usize> = HashMap::new();
+
+    for p in pairs {
+        let a = fn_id_map[&(p.file_a.clone(), p.symbol_a.clone(), p.start_line_a)];
+        let root = find(&mut parent, a);
+        if hot_components.contains(&root) {
+            *suppressed_by_component.entry(root).or_default() += 1;
+        } else {
+            kept.push(p);
+        }
+    }
+
+    // Build summaries.
+    let mut summaries: Vec<SuppressedBodyPatternGroup> = suppressed_by_component
+        .into_iter()
+        .map(|(root, pair_count)| {
+            let file_count = component_files.get(&root).map_or(0, |f| f.len());
+            let names = component_names.entry(root).or_default();
+            let name_count = names.len();
+            // Pick the most common name as representative.
+            let representative_name = names
+                .iter()
+                .max_by_key(|&(_, &count)| count)
+                .map(|(name, _)| name.clone());
+            SuppressedBodyPatternGroup {
+                pair_count,
+                file_count,
+                name_count,
+                representative_name,
+            }
+        })
+        .collect();
+    summaries.sort_by(|a, b| b.pair_count.cmp(&a.pair_count));
+
+    BodyPatternSuppressionResult {
         kept,
         suppressed: summaries,
     }
@@ -1095,6 +1268,7 @@ pub fn build_duplicate_functions_report(cfg: DuplicateFunctionsConfig<'_>) -> Du
         stats: None,
         groups: unified_groups,
         suppressed_directory_pairs,
+        suppressed_body_pattern_groups: Vec::new(),
         show_source,
         roots: roots.to_vec(),
     }
@@ -1265,6 +1439,7 @@ pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> Duplicat
         stats: None,
         groups: unified_groups,
         suppressed_directory_pairs: Vec::new(),
+        suppressed_body_pattern_groups: Vec::new(),
         show_source,
         roots: vec![root.to_path_buf()],
     }
@@ -1343,6 +1518,20 @@ pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> Duplic
         })
         .collect();
 
+    // Suppress widespread body-pattern clusters (same body across many files, different names).
+    // Only when !include_trait_impls — this is exactly the trait-impl pattern we want to hide.
+    let BodyPatternSuppressionResult {
+        kept: pairs,
+        suppressed: suppressed_body_pattern_groups,
+    } = if include_trait_impls {
+        BodyPatternSuppressionResult {
+            kept: pairs,
+            suppressed: Vec::new(),
+        }
+    } else {
+        suppress_widespread_body_patterns(pairs)
+    };
+
     let unified_groups: Vec<DuplicateGroup> = pairs
         .into_iter()
         .map(|p| DuplicateGroup {
@@ -1393,6 +1582,7 @@ pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> Duplic
         stats: None,
         groups: unified_groups,
         suppressed_directory_pairs,
+        suppressed_body_pattern_groups,
         show_source,
         roots: roots.to_vec(),
     }
@@ -1665,6 +1855,7 @@ pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> DuplicatesRe
         stats: None,
         groups: unified_groups,
         suppressed_directory_pairs,
+        suppressed_body_pattern_groups: Vec::new(),
         show_source,
         roots: vec![root.to_path_buf()],
     }

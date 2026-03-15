@@ -274,6 +274,7 @@ pub(crate) fn build_clusters_report_multi(
         stats: None,
         groups: unified_groups,
         suppressed_directory_pairs: Vec::new(),
+        suppressed_body_pattern_groups: Vec::new(),
         show_source: false,
         roots: roots.to_vec(),
     }

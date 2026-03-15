@@ -106,6 +106,21 @@ pub struct SuppressedDirectoryPair {
     pub pair_count: usize,
 }
 
+/// A cluster of pairs sharing the same body pattern across many files (different method names).
+/// Suppressed because the pattern is too widespread to be actionable duplication.
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+pub struct SuppressedBodyPatternGroup {
+    /// Number of similar-function pairs suppressed in this cluster.
+    pub pair_count: usize,
+    /// Number of distinct files whose functions participate in this cluster.
+    pub file_count: usize,
+    /// Number of distinct method names in this cluster (typically >1 for the cross-name case).
+    pub name_count: usize,
+    /// A representative method name from this cluster (most common, or first alphabetically).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub representative_name: Option<String>,
+}
+
 /// A group of duplicate/similar code locations.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct DuplicateGroup {
@@ -144,6 +159,9 @@ pub struct DuplicatesReport {
     /// Directory pairs suppressed because they had too many parallel-impl pairs.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub suppressed_directory_pairs: Vec<SuppressedDirectoryPair>,
+    /// Body-pattern clusters suppressed because the same body appears across too many files.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub suppressed_body_pattern_groups: Vec<SuppressedBodyPatternGroup>,
     /// For show_source rendering (not serialized).
     #[serde(skip)]
     pub show_source: bool,
@@ -283,6 +301,30 @@ impl OutputFormatter for DuplicatesReport {
                 } else {
                     out.push(format!("   within {}  ({} pairs)", s.dir_a, s.pair_count));
                 }
+            }
+        }
+
+        if !self.suppressed_body_pattern_groups.is_empty() {
+            let total_pairs: usize = self
+                .suppressed_body_pattern_groups
+                .iter()
+                .map(|g| g.pair_count)
+                .sum();
+            out.push(format!(
+                "Suppressed: {} pairs across {} body-pattern clusters (same body across many files, different method names; use --include-trait-impls to show)",
+                total_pairs,
+                self.suppressed_body_pattern_groups.len()
+            ));
+            for g in &self.suppressed_body_pattern_groups {
+                let name_part = if let Some(name) = &g.representative_name {
+                    format!(" (e.g. `{}`)", name)
+                } else {
+                    String::new()
+                };
+                out.push(format!(
+                    "   {} pairs suppressed: same body pattern across {} files ({} method names){}",
+                    g.pair_count, g.file_count, g.name_count, name_part
+                ));
             }
         }
 
@@ -545,6 +587,35 @@ impl OutputFormatter for DuplicatesReport {
                 } else {
                     format!("   within {}  ({} pairs)", s.dir_a, s.pair_count)
                 };
+                out.push(Color::Fixed(245).paint(line).to_string());
+            }
+        }
+
+        if !self.suppressed_body_pattern_groups.is_empty() {
+            let total_pairs: usize = self
+                .suppressed_body_pattern_groups
+                .iter()
+                .map(|g| g.pair_count)
+                .sum();
+            out.push(
+                Color::Fixed(245)
+                    .paint(format!(
+                        "Suppressed: {} pairs across {} body-pattern clusters (same body, different method names)",
+                        total_pairs,
+                        self.suppressed_body_pattern_groups.len()
+                    ))
+                    .to_string(),
+            );
+            for g in &self.suppressed_body_pattern_groups {
+                let name_part = if let Some(name) = &g.representative_name {
+                    format!(" (e.g. `{}`)", name)
+                } else {
+                    String::new()
+                };
+                let line = format!(
+                    "   {} pairs: body pattern across {} files ({} method names){}",
+                    g.pair_count, g.file_count, g.name_count, name_part
+                );
                 out.push(Color::Fixed(245).paint(line).to_string());
             }
         }

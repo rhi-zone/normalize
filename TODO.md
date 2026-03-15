@@ -43,7 +43,7 @@ extract, inline, move — correct, without LSPs, without false positives.
   5. Arity-specialized eval routines (generic over `[u32; N]`, stamped out via macro)
   6. Cranelift JIT (feature-gated; defer decision until after step 4)
 - File-level dependency tracking (import graph edges to scope fact re-evaluation)
-- `normalize watch` CLI (expose daemon file-watching with TUI output)
+- [x] `normalize watch` CLI (expose daemon file-watching with TUI output)
 - [x] Progress reporting for `structure rebuild` (indicatif bars for file scan, symbol parsing, index storage)
 - [x] Progress reporting for `analyze duplicates`, `analyze architecture`, `analyze duplicate-types` (indicatif bars for file processing, spinners for architecture phases)
 
@@ -223,7 +223,7 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 
 - [x] Per-subcommand excludes in config: `[analyze.duplicates] exclude = [...]` via `#[serde(flatten)]` HashMap on `AnalyzeConfig`. Wired into all analyze subcommands that accept `--exclude`: duplicates, complexity, length, docs, health, all, test-gaps, uniqueness, hotspots, files, size, coupling, coupling-clusters, ownership, fragments, skeleton-diff.
 - [x] "Parallel impl directory" heuristic: if >=5 pairs originate from the same directory pair, fold them into a suppressed note (e.g., "388 pairs suppressed across 10 directory groups"). Applied to exact-functions, similar-functions, and similar-blocks when `!include_trait_impls`. Handles 2-location pairs and multi-location groups (up to 2 distinct directories).
-- `similar-blocks` / `similar-functions`: cross-file same-containing-function suppression covers same-method-name in different files; doesn't cover same-body-pattern across different method names (the Language impl case)
+- [x] `similar-functions`: body-pattern cluster suppression — connected-component analysis on pair graph; components spanning 3+ files with 5+ pairs are suppressed as `SuppressedBodyPatternGroup`. Catches Language trait impl case (e.g. `extract_imports` across 20 structs). Applied when `!include_trait_impls`. `suppress_widespread_body_patterns()` in `duplicates.rs`.
 - ~~Consider min-lines bump for `similar-blocks` (currently 10)~~ **Done**: bumped default to 15 for similar-blocks, made configurable via `--min-lines` CLI flag and `[analyze.duplicates] min_lines` in config
 
 ### Syntax Ruleset Breadth
@@ -639,6 +639,49 @@ git push --tags
 - Verify cross-platform builds in GitHub Actions
 - Test `normalize update` against real release
 - VS Code extension: test and publish to marketplace (after first CLI release)
+
+### 0.2.0 — "Coherent surface, reliable index"
+
+**Theme:** The CLI is small enough to hold in working memory. The index is reliable enough
+to depend on. The LSP is useful day-to-day.
+
+**Already done (since 0.1.0):**
+- Qualified import resolution + `callee_resolved_file` in facts (schema v6)
+- Two-tier LSP diagnostics (immediate syntax, debounced fact rules)
+- Incremental index updates on save (`FileIndex::update_file()`)
+- Compiled query caching in `GrammarLoader`
+- Language coverage audit: 47/84 languages at 100% .scm coverage; all feasible gaps filled
+- `RankEntry` trait + `format_ranked_table()` — shared rendering for 13 rank commands
+- `--diff <ref>` on all 12 rank commands
+- Progress bars for `structure rebuild`, `analyze duplicates`, `analyze architecture`
+- Per-subcommand excludes in config
+- `rules recommended` field + `normalize init --setup` interactive wizard
+- 30+ new syntax rules (Java, C/C++, C#, Kotlin, Swift, PHP)
+
+**Remaining before 0.2.0:**
+
+*LSP / index (from P0):*
+- [x] `normalize watch` CLI — expose daemon file-watching with TUI output (`normalize daemon watch`; streams `[HH:MM:SS] modified <file>` / `[HH:MM:SS] index refreshed (N files)` until Ctrl-C)
+- [ ] File-level dependency tracking (import graph edges to scope fact re-evaluation)
+- [ ] Integrate incremental Datalog from ascent-interpreter (steps 1-3 done: interning, flat tuples, incremental eval; JIT work ongoing but not needed for integration)
+
+*Crate structure (from P1):*
+- [ ] Extract `serve/` → `normalize-serve` (LSP is already a second consumer)
+
+*CLI surface (from P1):*
+- [ ] Analyze command consolidation — continue Phase 3; target meaningfully below 42
+- [ ] `normalize init --setup` UX: group rules by tag/category; batch ops ("enable all correctness"); show practical impact ("2 violations" vs "847 violations")
+- [x] Duplicate detection: cross-file same-body-pattern suppression (different method names, same body — the Language impl case) — done 2026-03-15
+
+*Release mechanics:*
+- [ ] Verify `normalize update` works against a real GitHub release (cross-platform smoke test)
+- [ ] Bump all crate versions to 0.2.0 in Cargo.toml files
+- [ ] Tag and push `v0.2.0`
+
+**Not blocking 0.2.0:**
+- Comprehensive language fixtures (explicitly long-term)
+- Semantic rules system (separate infrastructure, post-0.2.0)
+- Shadow worktree / namespace-qualified lookups (low priority)
 
 ---
 
