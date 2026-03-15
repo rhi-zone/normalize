@@ -88,11 +88,27 @@ Crate split is correct. All 38 published crates justified. No reusable logic tra
 - Commands to migrate: complexity, files, size, ceremony, hotspots, coupling, ownership, test-ratio, test-gaps, budget, density, uniqueness, imports, surface, depth-map, layering, module-health, call-complexity, duplicates (all variants), fragments, docs, security, contributors, activity, trend-metric, skeleton-diff
 - `analyze` shrinks to only the non-ranking commands (graph navigation + big picture) during transition; eventually dissolves or gets renamed
 
+**Decided (2026-03-16): graph navigation folds into `view`.**
+- `call_graph`, `trace`, `dependents`, `provenance` are all "given a named entity, show me
+  its neighborhood in the graph" — same mental model as `view`, just cross-file.
+- Pattern: `normalize view <target> <subcommand>` — target first, operation second.
+  e.g. `normalize view src/foo.rs/Bar callers`, `normalize view src/foo.rs/Bar history`
+- `--history` flag on `view` becomes `normalize view <target> history` (same target syntax)
+- These are navigation, not ranking — belong in `view`, not `analyze` or `rank`
+- See ADR in `docs/architecture-decisions.md` for full rationale
+
+**Next steps for `view` refactor:**
+- [ ] Read `ViewOutput` enum in `crates/normalize/src/commands/view/report.rs` — understand all 9 variants
+- [ ] Convert flag-driven variants into proper subcommands: `history`, `callers`, `callees`, `dependents`, `provenance`, `trace`
+- [ ] Each subcommand gets one output shape — no more `ViewOutput` enum variants for different operations
+- [ ] `--kind` filter stays as a flag (narrows output, doesn't change shape)
+- [ ] Move `call_graph`, `trace`, `dependents`, `provenance` methods from `service/analyze.rs` to `service/mod.rs` (view service) — or a new `service/view.rs`
+- [ ] Delete from `analyze` after migration
+
 **Not yet decided:**
-- Graph navigation commands (`call_graph`, `trace`, `dependents`, `provenance`) — these are ad hoc; need to understand *why* before deciding where they live. What's the unifying trait? What does the user actually want when they reach for these?
-- Where big-picture commands live (`architecture`, `summary`, `health`)
+- Where big-picture commands live (`architecture`, `summary`, `health`) — synthesized understanding, not ranking, not navigation. No trait identified yet. Leave in `analyze` until pattern is clear.
 - Non-ranked `analyze` commands stay put for now: `activity`, `trend-metric`, `docs`, `security`, `skeleton-diff`, `test-gaps`, `coupling-clusters`
-- Whether `analyze` dissolves entirely or gets a new identity
+- Whether `analyze` dissolves entirely or gets a new identity — will become clear as view and rank absorb more commands
 
 ### Language trait: remaining .scm migration
 
@@ -669,20 +685,24 @@ to depend on. The LSP is useful day-to-day.
 - `--diff <ref>` on all 12 rank commands
 - Progress bars for `structure rebuild`, `analyze duplicates`, `analyze architecture`
 - Per-subcommand excludes in config
-- `rules recommended` field + `normalize init --setup` interactive wizard
+- `rules recommended` field + `normalize init --setup` interactive wizard (tag grouping, impact labels, batch ops — done 2026-03-15)
 - 30+ new syntax rules (Java, C/C++, C#, Kotlin, Swift, PHP)
+- [x] `normalize daemon watch` — file change streaming (2026-03-15)
+- [x] File-level reverse-dep tracking in daemon (2026-03-15)
+- [x] Duplicate detection: cross-file same-body-pattern suppression (2026-03-15)
+- [x] `normalize-rules-loader` folded into `normalize-rules` (2026-03-15)
+- [x] `normalize rank` introduced; 20 ranked commands migrated from `analyze` (2026-03-16)
+- [x] `normalize analyze all` deleted; `analyze node-types` moved to `syntax` (2026-03-16)
+- [x] 4 trend commands merged into `normalize analyze trend-metric --metric <...>` (2026-03-16)
+- [x] CLI command organization ADR written (2026-03-16)
 
 **Remaining before 0.2.0:**
 
 *LSP / index (from P0):*
-- [x] `normalize watch` CLI — expose daemon file-watching with TUI output (`normalize daemon watch`; streams `[HH:MM:SS] modified <file>` / `[HH:MM:SS] index refreshed (N files)` until Ctrl-C)
-- [ ] File-level dependency tracking (import graph edges to scope fact re-evaluation)
-- [ ] Integrate incremental Datalog from ascent-interpreter (steps 1-3 done: interning, flat tuples, incremental eval; JIT work ongoing but not needed for integration)
+- [ ] Integrate incremental Datalog from ascent-interpreter (steps 1-3 done: interning, flat tuples, incremental eval; JIT ongoing but not blocking integration)
 
 *CLI surface (from P1):*
-- [ ] Analyze command consolidation — continue Phase 3; target meaningfully below 42
-- [ ] `normalize init --setup` UX: group rules by tag/category; batch ops ("enable all correctness"); show practical impact ("2 violations" vs "847 violations")
-- [x] Duplicate detection: cross-file same-body-pattern suppression (different method names, same body — the Language impl case) — done 2026-03-15
+- [ ] `view` refactor: graph navigation + history as subcommands (`normalize view <target> callers|history|dependents|...`), fix `ViewOutput` enum
 
 *Release mechanics:*
 - [ ] Verify `normalize update` works against a real GitHub release (cross-platform smoke test)
