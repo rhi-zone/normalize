@@ -1810,5 +1810,5 @@ fn abi_level(
 
 /// Format a diagnostic for terminal display.
 pub fn format_diagnostic(diag: &normalize_facts_rules_api::Diagnostic, use_colors: bool) -> String {
-    normalize_rules_loader::format_diagnostic(diag, use_colors)
+    crate::loader::format_diagnostic(diag, use_colors)
 }

@@ -31,7 +31,6 @@ members = [
     "crates/normalize-path-resolve",
     "crates/normalize-shadow",
     "crates/normalize-edit",
-    "crates/normalize-rules-loader",
     "crates/normalize-deps",
     "crates/normalize-filter",
     "crates/normalize-scope",

@@ -3727,7 +3727,6 @@ dependencies = [
  "normalize-output",
  "normalize-path-resolve",
  "normalize-rules",
- "normalize-rules-loader",
  "normalize-scope",
  "normalize-session-analysis",
  "normalize-shadow",
@@ -4179,7 +4178,6 @@ dependencies = [
  "normalize-native-rules",
  "normalize-output",
  "normalize-rules-config",
- "normalize-rules-loader",
  "normalize-syntax-rules",
  "nu-ansi-term",
  "schemars",
@@ -4199,15 +4197,6 @@ dependencies = [
  "normalize-core",
  "schemars",
  "serde",
-]
-
-[[package]]
-name = "normalize-rules-loader"
-version = "0.1.0"
-dependencies = [
- "abi_stable",
- "dirs",
- "normalize-facts-rules-api",
 ]
 
 [[package]]

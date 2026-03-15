@@ -65,7 +65,6 @@ normalize-session-analysis = { path = "../normalize-session-analysis", version =
 normalize-path-resolve = { path = "../normalize-path-resolve", version = "0.1.0" }
 normalize-shadow = { path = "../normalize-shadow", version = "0.1.0" }
 normalize-edit = { path = "../normalize-edit", version = "0.1.0" }
-normalize-rules-loader = { path = "../normalize-rules-loader", version = "0.1.0" }
 normalize-deps = { path = "../normalize-deps", version = "0.1.0" }
 normalize-filter = { path = "../normalize-filter", version = "0.1.0", features = ["config"] }
 normalize-scope = { path = "../normalize-scope", version = "0.1.0" }
