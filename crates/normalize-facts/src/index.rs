@@ -598,18 +598,19 @@ impl FileIndex {
         false
     }
 
-    /// Refresh only files that have changed (faster than full refresh)
-    /// Returns number of files updated
-    pub async fn incremental_refresh(&mut self) -> Result<usize, libsql::Error> {
+    /// Refresh only files that have changed (faster than full refresh).
+    /// Returns the list of changed file paths (absolute) that were added, modified, or deleted.
+    /// The count can be derived from `.len()`.
+    pub async fn incremental_refresh(&mut self) -> Result<Vec<PathBuf>, libsql::Error> {
         if !self.needs_refresh().await {
-            return Ok(0);
+            return Ok(Vec::new());
         }
 
         let changed = self.get_changed_files().await?;
         let total_changes = changed.added.len() + changed.modified.len() + changed.deleted.len();
 
         if total_changes == 0 {
-            return Ok(0);
+            return Ok(Vec::new());
         }
 
         self.conn.execute("BEGIN", ()).await?;
@@ -661,7 +662,16 @@ impl FileIndex {
 
         self.conn.execute("COMMIT", ()).await?;
 
-        Ok(total_changes)
+        // Collect all changed paths as absolute PathBufs
+        let all_changed: Vec<PathBuf> = changed
+            .added
+            .iter()
+            .chain(changed.modified.iter())
+            .chain(changed.deleted.iter())
+            .map(|p| self.root.join(p))
+            .collect();
+
+        Ok(all_changed)
     }
 
     /// Execute a raw SQL statement (for maintenance operations).
@@ -1212,6 +1222,46 @@ impl FileIndex {
             ));
         }
         Ok(imports)
+    }
+
+    /// Load all resolved import edges from the imports table.
+    /// Returns Vec<(importer_file, imported_file)> for rows where `resolved_file IS NOT NULL`.
+    /// The paths are root-relative strings as stored in the database.
+    /// Used by the daemon to build the reverse-dep graph on startup.
+    pub async fn all_resolved_import_edges(&self) -> Result<Vec<(String, String)>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT file, resolved_file FROM imports WHERE resolved_file IS NOT NULL",
+                (),
+            )
+            .await?;
+        let mut edges = Vec::new();
+        while let Some(row) = rows.next().await? {
+            edges.push((row.get(0)?, row.get(1)?));
+        }
+        Ok(edges)
+    }
+
+    /// Load resolved import edges for a specific importer file (root-relative path).
+    /// Returns Vec<imported_file> where `resolved_file IS NOT NULL`.
+    /// Used by the daemon to update outgoing edges for a changed file.
+    pub async fn resolved_imports_for_file(
+        &self,
+        file: &str,
+    ) -> Result<Vec<String>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT resolved_file FROM imports WHERE file = ?1 AND resolved_file IS NOT NULL",
+                params![file.to_string()],
+            )
+            .await?;
+        let mut targets = Vec::new();
+        while let Some(row) = rows.next().await? {
+            targets.push(row.get(0)?);
+        }
+        Ok(targets)
     }
 
     /// Load all symbol implements from the symbol_implements table.

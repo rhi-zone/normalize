@@ -42,7 +42,7 @@ extract, inline, move — correct, without LSPs, without false positives.
   4. Bytecode for expressions (measure after step 2 — joins may dominate, not expression eval)
   5. Arity-specialized eval routines (generic over `[u32; N]`, stamped out via macro)
   6. Cranelift JIT (feature-gated; defer decision until after step 4)
-- File-level dependency tracking (import graph edges to scope fact re-evaluation)
+- [x] File-level dependency tracking (import graph edges to scope fact re-evaluation) — `WatchedRoot.rev_deps` in daemon, `affected = changed ∪ reverse-deps`, `last_affected` stored for Datalog integration
 - [x] `normalize watch` CLI (expose daemon file-watching with TUI output)
 - [x] Progress reporting for `structure rebuild` (indicatif bars for file scan, symbol parsing, index storage)
 - [x] Progress reporting for `analyze duplicates`, `analyze architecture`, `analyze duplicate-types` (indicatif bars for file processing, spinners for architecture phases)

@@ -71,8 +71,8 @@ pub async fn ensure_ready(root: &Path) -> Result<FileIndex, String> {
             .incremental_refresh()
             .await
             .map_err(|e| format!("Incremental refresh failed: {}", e))?;
-        if file_changes > 0 {
-            eprintln!("Refreshing index ({} files changed)...", file_changes);
+        if !file_changes.is_empty() {
+            eprintln!("Refreshing index ({} files changed)...", file_changes.len());
             let updated = idx
                 .incremental_call_graph_refresh()
                 .await

@@ -6,7 +6,7 @@
 use crate::config::NormalizeConfig;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
@@ -15,6 +15,27 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 use tokio::net::UnixListener;
+use tokio::sync::broadcast;
+
+/// An event broadcast to all subscribers when files change or the index refreshes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Event {
+    /// A file was modified, created, or deleted.
+    FileChanged {
+        /// Canonical path of the file that changed.
+        path: PathBuf,
+        /// The watched root that owns this file.
+        root: PathBuf,
+    },
+    /// The index was refreshed after file changes.
+    IndexRefreshed {
+        /// The root whose index was refreshed.
+        root: PathBuf,
+        /// Number of files reindexed.
+        files: usize,
+    },
+}
 
 /// Get the daemon lock file path (~/.config/normalize/daemon.lock)
 /// Used by the daemon process to ensure only one instance runs.
@@ -123,6 +144,12 @@ pub enum Request {
     /// Shutdown daemon
     #[serde(rename = "shutdown")]
     Shutdown,
+    /// Subscribe to file-change and index-refresh events.
+    /// The connection stays open; the daemon streams Event JSON lines until
+    /// the client disconnects. If `root` is given and not yet watched, it is
+    /// added automatically.
+    #[serde(rename = "subscribe")]
+    Subscribe { root: Option<PathBuf> },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -179,10 +206,10 @@ impl DaemonClient {
 
         // Take the spawn lock to prevent multiple clients from spawning
         // concurrently. If we can't get the lock, another client is already
-        // spawning — just wait for the socket to appear.
+        // spawning -- just wait for the socket to appear.
         match try_flock(&spawn_lock_path()) {
             Ok(_lock) => {
-                // Re-check after acquiring lock — another client may have
+                // Re-check after acquiring lock -- another client may have
                 // finished spawning while we waited.
                 if self.is_available() {
                     return true;
@@ -193,7 +220,7 @@ impl DaemonClient {
                 self.start_daemon().is_ok()
             }
             Err(_) => {
-                // Spawn lock held — another client is spawning. Wait for socket.
+                // Spawn lock held -- another client is spawning. Wait for socket.
                 self.wait_for_socket()
             }
         }
@@ -286,6 +313,52 @@ impl DaemonClient {
         let _ = self.send(&Request::Shutdown);
         Ok(())
     }
+
+    /// Subscribe to daemon events, calling `on_event` for each one.
+    ///
+    /// Blocks until the connection is closed or `on_event` returns `false`.
+    /// If `root` is `Some`, it is automatically added to the daemon's watch list.
+    pub fn watch_events(
+        &self,
+        root: Option<&Path>,
+        mut on_event: impl FnMut(Event) -> bool,
+    ) -> Result<(), String> {
+        let mut stream = UnixStream::connect(&self.socket_path)
+            .map_err(|e| format!("Failed to connect: {}", e))?;
+
+        // No read timeout -- block indefinitely waiting for events.
+        stream.set_read_timeout(None).ok();
+        stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
+
+        let req = Request::Subscribe {
+            root: root.map(|p| p.to_path_buf()),
+        };
+        let json = serde_json::to_string(&req).map_err(|e| e.to_string())?;
+        stream
+            .write_all(json.as_bytes())
+            .map_err(|e| e.to_string())?;
+        stream.write_all(b"\n").map_err(|e| e.to_string())?;
+
+        let reader = BufReader::new(&stream);
+        for line in reader.lines() {
+            let line = line.map_err(|e| format!("Read error: {}", e))?;
+            if line.is_empty() {
+                continue;
+            }
+            match serde_json::from_str::<Event>(&line) {
+                Ok(event) => {
+                    if !on_event(event) {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Warning: failed to parse daemon event: {}", e);
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl Default for DaemonClient {
@@ -303,6 +376,12 @@ struct WatchedRoot {
     #[allow(dead_code)] // Watcher must be kept alive
     watcher: RecommendedWatcher,
     last_refresh: Instant,
+    /// Reverse-dependency graph: file → set of files that import it.
+    /// Keys and values are absolute paths. Populated on root add, updated incrementally.
+    rev_deps: HashMap<PathBuf, HashSet<PathBuf>>,
+    /// Affected set from the most recent refresh: changed files ∪ their reverse dependents.
+    /// Stored for future Datalog integration.
+    last_affected: Vec<PathBuf>,
 }
 
 /// Global daemon server managing multiple roots.
@@ -310,14 +389,22 @@ struct DaemonServer {
     roots: Mutex<HashMap<PathBuf, WatchedRoot>>,
     refresh_tx: Sender<PathBuf>,
     start_time: Instant,
+    /// Broadcast channel for file-change and index-refresh events.
+    /// Subscribers call `event_tx.subscribe()` to get a `broadcast::Receiver`.
+    event_tx: broadcast::Sender<Event>,
 }
 
 impl DaemonServer {
     fn new(refresh_tx: Sender<PathBuf>) -> Self {
+        // Capacity 1024: if a subscriber falls behind by more than 1024 events
+        // it receives a RecvError::Lagged and we log the drop.
+        let (event_tx, _) = broadcast::channel(1024);
+
         Self {
             roots: Mutex::new(HashMap::new()),
             refresh_tx,
             start_time: Instant::now(),
+            event_tx,
         }
     }
 
@@ -335,9 +422,10 @@ impl DaemonServer {
             return Response::err("Indexing disabled for this root");
         }
 
-        // Initial index refresh
+        // Initial index refresh and reverse-dep graph population
         // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
         let rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rev_deps: HashMap<PathBuf, HashSet<PathBuf>> = HashMap::new();
         match rt.block_on(crate::index::open(&root)) {
             Ok(mut idx) => {
                 if let Err(e) = rt.block_on(idx.refresh()) {
@@ -346,13 +434,29 @@ impl DaemonServer {
                 if let Err(e) = rt.block_on(idx.incremental_call_graph_refresh()) {
                     eprintln!("Warning: call graph refresh failed: {}", e);
                 }
+                // Build reverse-dep graph from all resolved imports
+                match rt.block_on(idx.all_resolved_import_edges()) {
+                    Ok(edges) => {
+                        for (importer_rel, imported_rel) in edges {
+                            let importer = root.join(&importer_rel);
+                            let imported = root.join(&imported_rel);
+                            rev_deps.entry(imported).or_default().insert(importer);
+                        }
+                    }
+                    Err(e) => eprintln!(
+                        "Warning: failed to build rev-dep graph for {:?}: {}",
+                        root, e
+                    ),
+                }
             }
             Err(e) => return Response::err(&format!("Failed to open index: {}", e)),
         }
 
         // Set up file watcher
         let tx = self.refresh_tx.clone();
+        let event_tx = self.event_tx.clone();
         let root_clone = root.clone();
+        let root_for_events = root.clone();
         let (notify_tx, notify_rx) = channel();
 
         let mut watcher = match RecommendedWatcher::new(notify_tx, Config::default()) {
@@ -379,6 +483,15 @@ impl DaemonServer {
                     continue;
                 }
 
+                // Broadcast individual file-change events (un-debounced).
+                // SendError means no subscribers -- that is fine.
+                for path in &event.paths {
+                    let _ = event_tx.send(Event::FileChanged {
+                        path: path.clone(),
+                        root: root_for_events.clone(),
+                    });
+                }
+
                 if last_event.elapsed() >= debounce {
                     let _ = tx.send(root_clone.clone());
                     last_event = Instant::now();
@@ -391,6 +504,8 @@ impl DaemonServer {
             WatchedRoot {
                 watcher,
                 last_refresh: Instant::now(),
+                rev_deps,
+                last_affected: Vec::new(),
             },
         );
 
@@ -431,6 +546,11 @@ impl DaemonServer {
             Request::List => self.list_roots(),
             Request::Status => self.status(),
             Request::Shutdown => Response::ok(serde_json::json!({"message": "shutting down"})),
+            // Subscribe is handled directly in the socket loop -- it keeps the
+            // connection open and streams events rather than returning a Response.
+            Request::Subscribe { .. } => {
+                Response::err("Subscribe must be handled in the socket loop")
+            }
         }
     }
 
@@ -443,10 +563,80 @@ impl DaemonServer {
             match rt.block_on(crate::index::open(root)) {
                 Ok(mut idx) => {
                     match rt.block_on(idx.incremental_refresh()) {
-                        Ok(changes) if changes > 0 => {
+                        Ok(changed) if !changed.is_empty() => {
                             if let Err(e) = rt.block_on(idx.incremental_call_graph_refresh()) {
                                 eprintln!("Call graph refresh error for {:?}: {}", root, e);
                             }
+
+                            // Update reverse-dep graph for each changed file:
+                            // remove its old outgoing edges, re-query, add new edges.
+                            for abs_path in &changed {
+                                // Remove old forward-to-reverse edges for this file as importer
+                                let old_targets: Vec<PathBuf> = watched
+                                    .rev_deps
+                                    .iter()
+                                    .filter_map(|(imported, importers)| {
+                                        if importers.contains(abs_path) {
+                                            Some(imported.clone())
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .collect();
+                                for imported in &old_targets {
+                                    if let Some(set) = watched.rev_deps.get_mut(imported) {
+                                        set.remove(abs_path);
+                                        if set.is_empty() {
+                                            watched.rev_deps.remove(imported);
+                                        }
+                                    }
+                                }
+
+                                // Re-query and add new outgoing edges for this file
+                                if let Ok(rel) = abs_path.strip_prefix(root) {
+                                    let rel_str = rel.to_string_lossy();
+                                    if let Ok(new_targets) =
+                                        rt.block_on(idx.resolved_imports_for_file(&rel_str))
+                                    {
+                                        for target_rel in new_targets {
+                                            let target_abs = root.join(&target_rel);
+                                            watched
+                                                .rev_deps
+                                                .entry(target_abs)
+                                                .or_default()
+                                                .insert(abs_path.clone());
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Compute affected set: changed ∪ reverse dependents of changed
+                            let changed_set: HashSet<&PathBuf> = changed.iter().collect();
+                            let mut affected: HashSet<PathBuf> = changed.iter().cloned().collect();
+                            for changed_file in &changed {
+                                if let Some(dependents) = watched.rev_deps.get(changed_file) {
+                                    for dep in dependents {
+                                        if !changed_set.contains(dep) {
+                                            affected.insert(dep.clone());
+                                        }
+                                    }
+                                }
+                            }
+
+                            let affected_vec: Vec<PathBuf> = affected.into_iter().collect();
+                            eprintln!(
+                                "[watch] {} changed, {} affected by dep tracking",
+                                changed.len(),
+                                affected_vec.len()
+                            );
+                            watched.last_affected = affected_vec.clone();
+
+                            // Broadcast index-refresh event. SendError means no
+                            // active subscribers -- that is fine.
+                            let _ = self.event_tx.send(Event::IndexRefreshed {
+                                root: root.to_path_buf(),
+                                files: affected_vec.len(),
+                            });
                         }
                         Err(e) => {
                             eprintln!("Refresh error for {:?}: {}", root, e);
@@ -471,7 +661,7 @@ pub async fn run_daemon() -> Result<i32, Box<dyn std::error::Error>> {
         std::fs::create_dir_all(parent)?;
     }
 
-    // Acquire exclusive lock — only one daemon process can run at a time.
+    // Acquire exclusive lock -- only one daemon process can run at a time.
     // The lock is held for the lifetime of the process (leaked intentionally).
     let lock = acquire_daemon_lock().map_err(|e| {
         eprintln!("Cannot start daemon: {}", e);
@@ -480,7 +670,7 @@ pub async fn run_daemon() -> Result<i32, Box<dyn std::error::Error>> {
     // Leak the File so the flock is held until process exit
     std::mem::forget(lock);
 
-    // Safe to remove socket now — we hold the lock
+    // Safe to remove socket now -- we hold the lock
     let _ = std::fs::remove_file(&socket_path);
 
     // Channel for refresh requests from watchers
@@ -510,7 +700,7 @@ pub async fn run_daemon() -> Result<i32, Box<dyn std::error::Error>> {
             let mut line = String::new();
 
             while reader.read_line(&mut line).await.unwrap_or(0) > 0 {
-                let response = match serde_json::from_str::<Request>(&line) {
+                match serde_json::from_str::<Request>(&line) {
                     Ok(Request::Shutdown) => {
                         let resp = server.handle_request(Request::Shutdown);
                         // normalize-syntax-allow: rust/unwrap-in-impl - Response is always JSON-serializable
@@ -519,14 +709,53 @@ pub async fn run_daemon() -> Result<i32, Box<dyn std::error::Error>> {
                         let _ = writer.write_all(b"\n").await;
                         std::process::exit(0);
                     }
-                    Ok(req) => server.handle_request(req),
-                    Err(e) => Response::err(&format!("Invalid request: {}", e)),
+                    Ok(Request::Subscribe { root }) => {
+                        // Ensure the root is being watched (add if not already).
+                        if let Some(r) = root {
+                            server.add_root(r);
+                        }
+                        // Subscribe to the broadcast channel and stream events
+                        // until the client disconnects or the daemon shuts down.
+                        let mut rx = server.event_tx.subscribe();
+                        loop {
+                            match rx.recv().await {
+                                Ok(event) => {
+                                    // normalize-syntax-allow: rust/unwrap-in-impl - Event is always JSON-serializable
+                                    let json = serde_json::to_string(&event).unwrap();
+                                    if writer.write_all(json.as_bytes()).await.is_err()
+                                        || writer.write_all(b"\n").await.is_err()
+                                    {
+                                        // Client disconnected
+                                        return;
+                                    }
+                                }
+                                Err(broadcast::error::RecvError::Lagged(n)) => {
+                                    // Subscriber fell behind -- log and continue.
+                                    eprintln!("Subscriber lagged, dropped {} events", n);
+                                }
+                                Err(broadcast::error::RecvError::Closed) => {
+                                    // Daemon is shutting down
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    Ok(req) => {
+                        let response = server.handle_request(req);
+                        // normalize-syntax-allow: rust/unwrap-in-impl - Response is always JSON-serializable
+                        let resp_str = serde_json::to_string(&response).unwrap();
+                        let _ = writer.write_all(resp_str.as_bytes()).await;
+                        let _ = writer.write_all(b"\n").await;
+                    }
+                    Err(e) => {
+                        let response = Response::err(&format!("Invalid request: {}", e));
+                        // normalize-syntax-allow: rust/unwrap-in-impl - Response is always JSON-serializable
+                        let resp_str = serde_json::to_string(&response).unwrap();
+                        let _ = writer.write_all(resp_str.as_bytes()).await;
+                        let _ = writer.write_all(b"\n").await;
+                    }
                 };
 
-                // normalize-syntax-allow: rust/unwrap-in-impl - Response is always JSON-serializable
-                let resp_str = serde_json::to_string(&response).unwrap();
-                let _ = writer.write_all(resp_str.as_bytes()).await;
-                let _ = writer.write_all(b"\n").await;
                 line.clear();
             }
         });
