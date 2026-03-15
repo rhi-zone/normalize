@@ -439,3 +439,58 @@ The top-level fields of a report are always present and always mean the same thi
 - `*.calls.scm`: 7 languages (Python, Rust, TS, TSX, JS, Java, Go). Old per-language walkers removed; generic query walker is the only path.
 - `complexity_nodes()` / `nesting_nodes()` trait methods preserved for backward compat (used by languages without `.scm` files).
 - Future: `scope_creating_kinds()`, `control_flow_kinds()` are candidates for the same migration.
+
+## CLI Command Organization (2026-03-16)
+
+### Context
+
+`normalize analyze` accumulated ~42 subcommands with no guiding principle. Auditing the
+existing top-level subcommands revealed the structural problem: every other top-level
+subcommand unifies a domain via a trait with multiple implementations (`rules` →
+`RuleEngine`, `tools` → tool trait, `syntax` → `Language`). `analyze` had no such trait.
+
+### Decisions
+
+**1. Top-level subcommands must unify a domain via a trait.**
+A subcommand is not a namespace for loosely related operations. The test: is there a trait
+where each subcommand variant is an implementation? If not, the commands belong elsewhere.
+
+**2. Introduce `normalize rank` — the ranking primitive.**
+~80% of `analyze` commands answer "rank this codebase by metric X." The unifying primitive
+is `Rankable`: produce an ordered list of (item, score) pairs. Input tier (file-only, git,
+index) is an implementation detail, not a user-facing concept. `normalize rank complexity`,
+`normalize rank coupling`, etc. The `RankEntry` infrastructure already existed in
+`normalize-analyze::ranked`.
+
+**3. `normalize view <target> <subcommand>` — target-first navigation.**
+Graph operations (`call_graph`, `trace`, `dependents`, `provenance`) and `--history` are
+navigation of a specific named entity: "show me what's connected to / around this thing."
+They belong in `view`, not `analyze`. The pattern is `path subcommand` (target first,
+operation second): `normalize view src/foo.rs/Bar callers`, `normalize view src/foo.rs/Bar
+history`. This is consistent with `view`'s existing target-first convention.
+
+**4. `ViewOutput` enum is a symptom to fix.**
+A command with one coherent purpose has one output shape. `ViewOutput` having 9 variants is
+a sign that `view` accumulated operations that should be subcommands. Each subcommand on
+`view` gets one output shape. The fix is mechanical: convert flag-driven output variants
+into proper subcommands.
+
+**5. `analyze` dissolves.**
+What remains in `analyze` after extracting `rank` and moving graph/history ops to `view`:
+prose summaries (`health`, `summary`, `architecture`), time series (`activity`, `trend-metric`),
+and a few other non-ranking commands. These are deferred — no forced unification until the
+right primitive is identified. `analyze` shrinks toward zero; it doesn't get a new identity.
+
+### Rejected alternatives
+
+- **Arbitrary graph query interface** (Datalog, Cypher, jq): every tool that achieved this
+  either embedded a full query engine or exposed facts for an external tool. Neither is
+  lightweight. The canned commands are fine for real use cases; the issue was the set had
+  no closure property. Giving `view` a `callers`/`dependents`/etc. subcommand model gives
+  the closure property without a query language.
+- **`analyze run --pass <...>`** modeled on `rules run --engine`: rejected because `rank`
+  already provides the right abstraction for the orchestration case (run multiple metrics,
+  get ranked output). The `rules` model works because all engines share input/output shape;
+  analysis passes don't.
+- **Reorganize `analyze` into sub-services** (graph, quality, structure): reorganizing a
+  grab-bag produces a smaller grab-bag. The root cause was no unifying trait, not bad grouping.
