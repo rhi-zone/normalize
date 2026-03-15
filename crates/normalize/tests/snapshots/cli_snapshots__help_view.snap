@@ -9,6 +9,7 @@ Usage: normalize view [OPTIONS] [target] [COMMAND]
 Commands:
   view        View a node in the codebase tree (directory, file, or symbol)
   callers     Show callers of a symbol (requires facts index)
+  list        List code entities matching filters in a scope
   callees     Show callees of a symbol (requires facts index)
   history     Show git history for a symbol or file
   dependents  Reverse-dependency closure: who depends on this file/symbol? (requires facts index)

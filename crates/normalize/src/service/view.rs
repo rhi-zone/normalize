@@ -6,7 +6,7 @@
 use crate::commands::analyze::call_graph::CallEntry;
 use crate::commands::analyze::graph::{DependentsReport, GraphReport, GraphTarget};
 use crate::commands::analyze::provenance::ProvenanceReport;
-use crate::commands::view::report::{ViewHistoryReport, ViewOutput};
+use crate::commands::view::report::{ViewHistoryReport, ViewListReport, ViewReport};
 use crate::output::OutputFormatter;
 use server_less::cli;
 use std::cell::Cell;
@@ -48,7 +48,7 @@ impl ViewService {
         }
     }
 
-    fn display_view(&self, value: &ViewOutput) -> String {
+    fn display_view(&self, value: &ViewReport) -> String {
         let prefix = self.view_prefix.take();
         let text = self.display_output(value);
         if prefix.is_empty() {
@@ -56,6 +56,11 @@ impl ViewService {
         } else {
             format!("{}{}", prefix, text)
         }
+    }
+
+    #[allow(dead_code)] // called by server-less proc macro via display_with = "display_view_list"
+    fn display_view_list(&self, value: &ViewListReport) -> String {
+        self.display_output(value)
     }
 
     fn display_call_graph(&self, entries: &[CallEntry]) -> String {
@@ -147,7 +152,7 @@ impl ViewService {
         #[param(short = 'i', help = "Case-insensitive symbol matching")] case_insensitive: bool,
         pretty: bool,
         compact: bool,
-    ) -> Result<ViewOutput, String> {
+    ) -> Result<ViewReport, String> {
         let root_path = root
             .map(PathBuf::from)
             .map(Ok)
@@ -222,6 +227,81 @@ impl ViewService {
             &target,
             true,
             false,
+            case_insensitive,
+        )
+        .await
+    }
+
+    /// List code entities matching filters in a scope
+    ///
+    /// Examples:
+    ///   normalize view list                            # list top-level entries
+    ///   normalize view list src/                       # list entries in src/
+    ///   normalize view list --kind function            # list all functions
+    ///   normalize view list src/ --kind class          # list classes in src/
+    #[cli(display_with = "display_view_list")]
+    #[allow(clippy::too_many_arguments)]
+    pub async fn list(
+        &self,
+        #[param(positional, help = "Target scope (path, or symbol pattern)")] target: Option<
+            String,
+        >,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(
+            short = 'd',
+            help = "Depth of expansion (0=names only, 1=signatures, 2=with children, -1=all)"
+        )]
+        depth: Option<i32>,
+        #[param(short = 'k', help = "Filter by symbol kind: class, function, method")] kind: Option<
+            crate::commands::view::tree::SymbolKindFilter,
+        >,
+        #[param(help = "Show only type definitions")] types_only: bool,
+        #[param(help = "Include test functions and test modules")] tests: bool,
+        #[param(help = "Disable smart display (no collapsing single-child dirs)")] raw: bool,
+        #[param(help = "Show full docstrings")] docs: bool,
+        #[param(help = "Hide all docstrings")] no_docs: bool,
+        #[param(help = "Hide parent/ancestor context")] no_parent: bool,
+        #[param(help = "Context view: skeleton + imports combined")] context: bool,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        #[param(short = 'i', help = "Case-insensitive symbol matching")] case_insensitive: bool,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ViewListReport, String> {
+        let root_path = root
+            .map(std::path::PathBuf::from)
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+
+        self.resolve_format(pretty, compact, &root_path);
+
+        let config = crate::config::NormalizeConfig::load(&root_path);
+
+        let docstring_mode = if no_docs {
+            crate::tree::DocstringDisplay::None
+        } else if docs || config.view.show_docs() {
+            crate::tree::DocstringDisplay::Full
+        } else {
+            crate::tree::DocstringDisplay::Summary
+        };
+
+        crate::commands::view::build_view_list_service(
+            target.as_deref(),
+            &root_path,
+            depth.unwrap_or_else(|| config.view.depth()),
+            kind.as_ref(),
+            types_only,
+            tests,
+            raw,
+            false, // show_deps
+            docstring_mode,
+            context,
+            !no_parent,
+            &exclude,
+            &only,
             case_insensitive,
         )
         .await

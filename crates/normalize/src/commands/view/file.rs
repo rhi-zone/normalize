@@ -1,8 +1,8 @@
 //! File skeleton viewing for view command.
 
-use super::report::{ViewFileContentReport, ViewFileReport, ViewOutput};
+use super::report::ViewReport;
 use crate::skeleton::ExtractResultExt;
-use crate::tree::DocstringDisplay;
+use crate::tree::{DocstringDisplay, ViewNode, ViewNodeKind};
 use crate::{deps, skeleton};
 use normalize_languages::support_for_path;
 use std::path::Path;
@@ -18,18 +18,34 @@ pub fn build_view_file_service(
     show_tests: bool,
     _docstring_mode: DocstringDisplay,
     context: bool,
-) -> Result<ViewOutput, String> {
+) -> Result<ViewReport, String> {
     let full_path = root.join(file_path);
     let content = std::fs::read_to_string(&full_path)
         .map_err(|e| format!("Error reading {}: {}", file_path, e))?;
 
     if !(0..=2).contains(&depth) {
+        // depth < 0 or > 2: emit raw source
         let grammar = support_for_path(&full_path).map(|s| s.grammar_name().to_string());
-        return Ok(ViewOutput::FileContent(ViewFileContentReport {
-            path: file_path.to_string(),
-            content,
+        let line_count = content.lines().count();
+        let mut node = ViewNode::file(
+            Path::new(file_path)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| file_path.to_string()),
+            file_path,
+        );
+        node.line_range = Some((1, line_count));
+        return Ok(ViewReport {
+            target: file_path.to_string(),
+            node,
+            source: Some(content),
+            imports: Vec::new(),
+            exports: Vec::new(),
+            parent_signatures: Vec::new(),
+            line_range: None,
             grammar,
-        }));
+            warnings: Vec::new(),
+        });
     }
 
     let support = support_for_path(&full_path);
@@ -63,8 +79,10 @@ pub fn build_view_file_service(
         None
     };
 
-    let view_node = skeleton_result.to_view_node(grammar.as_deref());
+    let mut view_node = skeleton_result.to_view_node(grammar.as_deref());
     let line_count = content.lines().count();
+    // Store line_count in the file node's line_range so the renderer can display "Lines: N"
+    view_node.line_range = Some((1, line_count));
 
     let mut imports = Vec::new();
     let mut exports = Vec::new();
@@ -86,12 +104,18 @@ pub fn build_view_file_service(
         }
     }
 
-    Ok(ViewOutput::File(ViewFileReport {
-        path: file_path.to_string(),
-        line_count,
+    // Ensure the node kind is File (it should be from to_view_node)
+    debug_assert!(matches!(view_node.kind, ViewNodeKind::File));
+
+    Ok(ViewReport {
+        target: file_path.to_string(),
+        node: view_node,
+        source: None,
         imports,
         exports,
-        node: view_node,
+        parent_signatures: Vec::new(),
+        line_range: None,
+        grammar,
         warnings,
-    }))
+    })
 }

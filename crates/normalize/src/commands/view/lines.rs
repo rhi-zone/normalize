@@ -1,7 +1,8 @@
 //! Line range viewing for view command.
 
-use super::report::{ViewLineRangeReport, ViewOutput};
+use super::report::ViewReport;
 use crate::parsers;
+use crate::tree::{ViewNode, ViewNodeKind};
 use std::collections::HashSet;
 
 /// Parse a line target like "file.rs:30" or "file.rs:30-55".
@@ -34,7 +35,7 @@ pub fn build_view_line_range_service(
     end: usize,
     root: &std::path::Path,
     docstring_mode: crate::tree::DocstringDisplay,
-) -> Result<ViewOutput, String> {
+) -> Result<ViewReport, String> {
     let matches = crate::path_resolve::resolve_unified_all(file_path, root);
     let resolved = match matches.len() {
         0 => return Err(format!("File not found: {}", file_path)),
@@ -95,13 +96,31 @@ pub fn build_view_line_range_service(
         lines[range_start..range_end].join("\n")
     };
 
-    Ok(ViewOutput::LineRange(ViewLineRangeReport {
-        file: display_path,
-        start: actual_start,
-        end: actual_end,
-        content: source,
+    // Build a synthetic "symbol" node so the renderer dispatches to line-range mode.
+    // We use a Symbol kind with "line_range" as the kind string.
+    let target = format!("{}:{}-{}", display_path, actual_start, actual_end);
+    let node = ViewNode {
+        name: target.clone(),
+        kind: ViewNodeKind::Symbol("line_range".to_string()),
+        path: display_path,
+        children: Vec::new(),
+        signature: None,
+        docstring: None,
+        line_range: Some((actual_start, actual_end)),
+        grammar: grammar.clone(),
+    };
+
+    Ok(ViewReport {
+        target,
+        node,
+        source: Some(source),
+        imports: Vec::new(),
+        exports: Vec::new(),
+        parent_signatures: Vec::new(),
+        line_range: Some((actual_start, actual_end)),
         grammar,
-    }))
+        warnings: Vec::new(),
+    })
 }
 
 /// Find line numbers that contain doc comments within a range.

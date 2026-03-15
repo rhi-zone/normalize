@@ -46,7 +46,7 @@ impl ViewConfig {
 /// Build a view result for the service layer.
 ///
 /// Routes to the appropriate sub-function based on the target and options,
-/// returning a typed ViewOutput instead of writing directly to stdout.
+/// returning a typed ViewReport instead of writing directly to stdout.
 #[allow(clippy::too_many_arguments)]
 pub async fn build_view_service(
     target: Option<&str>,
@@ -67,17 +67,32 @@ pub async fn build_view_service(
     exclude: &[String],
     only: &[String],
     case_insensitive: bool,
-) -> Result<report::ViewOutput, String> {
+) -> Result<report::ViewReport, String> {
     // Ensure daemon is running if configured
     daemon::maybe_start_daemon(root);
 
     // Build filter if exclude/only patterns are specified
     let filter = super::build_filter(root, exclude, only);
 
-    // If kind filter is specified without target (or with "."), list matching symbols
+    // If kind filter is specified, route to list service and error if multiple
     if let Some(kind) = kind_filter {
         let scope = target.unwrap_or(".");
-        return tree::build_view_filtered_service(root, scope, kind);
+        let results = tree::build_view_filtered_service(root, scope, kind)?;
+        return if results.len() == 1 {
+            // normalize-syntax-allow: rust/unwrap-in-impl - len == 1 guarantees Some
+            Ok(results.into_iter().next().unwrap())
+        } else if results.is_empty() {
+            Err(format!("No symbols found matching type: {}", kind))
+        } else {
+            let mut msg = format!(
+                "Multiple matches for kind '{}' - use 'normalize view list --kind {}' to list all:\n",
+                kind, kind
+            );
+            for r in &results {
+                msg.push_str(&format!("  {}\n", r.target));
+            }
+            Err(msg)
+        };
     }
 
     let target_str = target.unwrap_or(".");
@@ -177,9 +192,9 @@ pub async fn build_view_service(
             );
         }
         _ => {
-            // Multiple matches
+            // Multiple matches → error with hint
             let mut text = format!(
-                "Multiple matches for '{}' - be more specific:\n",
+                "Multiple matches for '{}' - be more specific, or use 'normalize view list':\n",
                 target_str
             );
             for m in &matches {
@@ -196,7 +211,6 @@ pub async fn build_view_service(
                     sym.file, sp, sym.kind, sym.start_line
                 ));
             }
-
             return Err(text);
         }
     };
@@ -209,19 +223,17 @@ pub async fn build_view_service(
             filter.as_ref(),
         )
     } else if full && unified.symbol_path.is_empty() {
-        // --full: emit the raw source of the entire file
-        let full_path = root.join(&unified.file_path);
-        let content = std::fs::read_to_string(&full_path)
-            .map_err(|e| format!("Error reading {}: {}", unified.file_path, e))?;
-        let grammar =
-            normalize_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
-        Ok(report::ViewOutput::FileContent(
-            report::ViewFileContentReport {
-                path: unified.file_path,
-                content,
-                grammar,
-            },
-        ))
+        // --full: emit the raw source of the entire file via file service with depth out-of-range
+        file::build_view_file_service(
+            &unified.file_path,
+            root,
+            -1, // triggers full-source path
+            _show_deps,
+            types_only,
+            show_tests,
+            docstring_mode,
+            context,
+        )
     } else if unified.symbol_path.is_empty() {
         file::build_view_file_service(
             &unified.file_path,
@@ -237,11 +249,22 @@ pub async fn build_view_service(
         // Check if symbol path contains glob patterns
         let symbol_pattern = unified.symbol_path.join("/");
         if path_resolve::is_glob_pattern(&symbol_pattern) {
-            return symbol::build_view_symbol_glob_service(
-                &unified.file_path,
-                &symbol_pattern,
-                root,
+            // Glob → multiple results; return error with suggestion
+            let results =
+                symbol::build_view_symbol_glob_service(&unified.file_path, &symbol_pattern, root)?;
+            if results.len() == 1 {
+                // normalize-syntax-allow: rust/unwrap-in-impl - len == 1 guarantees Some
+                return Ok(results.into_iter().next().unwrap());
+            }
+            let mut msg = format!(
+                "Pattern '{}' matched {} symbols - use 'normalize view list' to see all:\n",
+                symbol_pattern,
+                results.len()
             );
+            for r in &results {
+                msg.push_str(&format!("  {}\n", r.target));
+            }
+            return Err(msg);
         }
 
         symbol::build_view_symbol_service(
@@ -256,4 +279,139 @@ pub async fn build_view_service(
             case_insensitive,
         )
     }
+}
+
+/// Build a list of view results matching the given filters.
+#[allow(clippy::too_many_arguments)]
+pub async fn build_view_list_service(
+    target: Option<&str>,
+    root: &Path,
+    depth: i32,
+    kind_filter: Option<&tree::SymbolKindFilter>,
+    types_only: bool,
+    show_tests: bool,
+    raw: bool,
+    _show_deps: bool,
+    docstring_mode: DocstringDisplay,
+    context: bool,
+    show_parent: bool,
+    exclude: &[String],
+    only: &[String],
+    case_insensitive: bool,
+) -> Result<report::ViewListReport, String> {
+    daemon::maybe_start_daemon(root);
+
+    let filter = super::build_filter(root, exclude, only);
+
+    // Kind filter → list matching symbols
+    if let Some(kind) = kind_filter {
+        let scope = target.unwrap_or(".");
+        let results = tree::build_view_filtered_service(root, scope, kind)?;
+        return Ok(report::ViewListReport(results));
+    }
+
+    let target_str = target.unwrap_or(".");
+
+    // Directory → list children
+    if target_str == "." {
+        let dir_report = tree::build_view_directory_service(root, depth, raw, filter.as_ref())?;
+        // Return all direct children as separate ViewReports
+        let children: Vec<report::ViewReport> = dir_report
+            .node
+            .children
+            .into_iter()
+            .map(|child| {
+                let tgt = child.path.clone();
+                report::ViewReport {
+                    target: tgt,
+                    node: child,
+                    source: None,
+                    imports: Vec::new(),
+                    exports: Vec::new(),
+                    parent_signatures: Vec::new(),
+                    line_range: None,
+                    grammar: None,
+                    warnings: Vec::new(),
+                }
+            })
+            .collect();
+        return Ok(report::ViewListReport(children));
+    }
+
+    // Symbol glob pattern in file
+    let has_file_extension = target_str
+        .rsplit('/')
+        .next()
+        .map(|last| last.contains('.'))
+        .unwrap_or(false);
+
+    let matches = path_resolve::resolve_unified_all(target_str, root);
+    if !matches.is_empty() {
+        let unified = &matches[0];
+        if !unified.is_directory && !unified.symbol_path.is_empty() {
+            let symbol_pattern = unified.symbol_path.join("/");
+            if path_resolve::is_glob_pattern(&symbol_pattern) {
+                let results = symbol::build_view_symbol_glob_service(
+                    &unified.file_path,
+                    &symbol_pattern,
+                    root,
+                )?;
+                return Ok(report::ViewListReport(results));
+            }
+        }
+    }
+
+    // Symbol search → list all matches
+    let symbol_matches = search::search_symbols(target_str, root).await;
+    if !symbol_matches.is_empty() {
+        let mut results = Vec::new();
+        for sym in &symbol_matches {
+            if let Ok(r) = symbol::build_view_symbol_service(
+                &sym.file,
+                std::slice::from_ref(&sym.name),
+                root,
+                depth,
+                false,
+                docstring_mode,
+                show_parent,
+                context,
+                case_insensitive,
+            ) {
+                results.push(r);
+            }
+        }
+        return Ok(report::ViewListReport(results));
+    }
+
+    // Path matches
+    if !matches.is_empty() {
+        let mut results = Vec::new();
+        for m in matches {
+            if m.is_directory {
+                if let Ok(r) = tree::build_view_directory_service(
+                    &root.join(&m.file_path),
+                    depth,
+                    raw,
+                    filter.as_ref(),
+                ) {
+                    results.push(r);
+                }
+            } else if let Ok(r) = file::build_view_file_service(
+                &m.file_path,
+                root,
+                depth,
+                _show_deps,
+                types_only,
+                show_tests,
+                docstring_mode,
+                context,
+            ) {
+                results.push(r);
+            }
+        }
+        return Ok(report::ViewListReport(results));
+    }
+
+    let _ = has_file_extension;
+    Ok(report::ViewListReport(Vec::new()))
 }

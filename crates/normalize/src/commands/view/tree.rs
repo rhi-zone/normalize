@@ -1,6 +1,6 @@
 //! Directory tree viewing for view command.
 
-use super::report::{ViewKindFilterEntry, ViewKindFilterReport, ViewOutput};
+use super::report::ViewReport;
 use super::search::has_language_support;
 use crate::filter::Filter;
 use crate::tree::{ViewNode, ViewNodeKind};
@@ -62,7 +62,7 @@ pub fn build_view_directory_service(
     depth: i32,
     raw: bool,
     filter: Option<&Filter>,
-) -> Result<ViewOutput, String> {
+) -> Result<ViewReport, String> {
     let effective_depth = if depth < 0 {
         None
     } else {
@@ -87,7 +87,18 @@ pub fn build_view_directory_service(
         view_node
     };
 
-    Ok(ViewOutput::Directory { node: view_node })
+    let target = dir.to_string_lossy().to_string();
+    Ok(ViewReport {
+        target,
+        node: view_node,
+        source: None,
+        imports: Vec::new(),
+        exports: Vec::new(),
+        parent_signatures: Vec::new(),
+        line_range: None,
+        grammar: None,
+        warnings: Vec::new(),
+    })
 }
 
 /// Filter a ViewNode tree, removing nodes that don't pass the filter.
@@ -125,7 +136,7 @@ pub fn build_view_filtered_service(
     root: &Path,
     scope: &str,
     kind: &SymbolKindFilter,
-) -> Result<ViewOutput, String> {
+) -> Result<Vec<ViewReport>, String> {
     let files_to_search: Vec<std::path::PathBuf> = if scope == "." {
         path_resolve::all_files(root)
             .into_iter()
@@ -178,16 +189,33 @@ pub fn build_view_filtered_service(
 
     all_symbols.sort_by(|a, b| (&a.0, a.3).cmp(&(&b.0, b.3)));
 
-    Ok(ViewOutput::KindFilter(ViewKindFilterReport {
-        symbols: all_symbols
-            .iter()
-            .map(|(file, name, kind_s, line, parent)| ViewKindFilterEntry {
-                file: file.clone(),
+    let reports = all_symbols
+        .iter()
+        .map(|(file, name, kind_s, line, _parent)| {
+            let sym_path = format!("{}/{}", file, name);
+            let node = ViewNode {
                 name: name.clone(),
-                kind: kind_s.clone(),
-                line: *line,
-                parent: parent.clone(),
-            })
-            .collect(),
-    }))
+                kind: ViewNodeKind::Symbol(kind_s.clone()),
+                path: sym_path.clone(),
+                children: Vec::new(),
+                signature: None,
+                docstring: None,
+                line_range: Some((*line, *line)),
+                grammar: None,
+            };
+            ViewReport {
+                target: sym_path,
+                node,
+                source: None,
+                imports: Vec::new(),
+                exports: Vec::new(),
+                parent_signatures: Vec::new(),
+                line_range: Some((*line, *line)),
+                grammar: None,
+                warnings: Vec::new(),
+            }
+        })
+        .collect();
+
+    Ok(reports)
 }

@@ -110,9 +110,9 @@ Data model:
 - `grep` stays top-level — text match shape is fundamentally different from code entity view
 
 Implementation:
-- [ ] Replace `ViewOutput` enum with `ViewReport` (single `ViewNode` tree)
-- [ ] Add `view list` subcommand returning `Vec<ViewReport>`; `--kind`/`--only`/`--exclude` apply to both
-- [ ] Fold `ViewFileReport`, `ViewSymbolReport`, `ViewSymbolNodeReport`, `ViewLineRangeReport`, `ViewGlobReport`, `ViewKindFilterReport`, `ViewMultipleMatchesReport`, `ViewFileContentReport` into unified `ViewReport`
+- [x] Replace `ViewOutput` enum with `ViewReport` (single `ViewNode` tree)
+- [x] Add `view list` subcommand returning `Vec<ViewReport>`; `--kind`/`--only`/`--exclude` apply to both
+- [x] Fold `ViewFileReport`, `ViewSymbolReport`, `ViewSymbolNodeReport`, `ViewLineRangeReport`, `ViewGlobReport`, `ViewKindFilterReport`, `ViewMultipleMatchesReport`, `ViewFileContentReport` into unified `ViewReport`
 
 **Not yet decided:**
 - Where big-picture commands live (`architecture`, `summary`, `health`) — synthesized understanding, not ranking, not navigation. No trait identified yet. Leave in `analyze` until pattern is clear.
@@ -712,7 +712,7 @@ to depend on. The LSP is useful day-to-day.
 
 *CLI surface (from P1):*
 - [x] `view` refactor phase 1: graph navigation + history as subcommands — done 2026-03-16
-- [ ] `view` refactor phase 2: dissolve `ViewOutput` enum into `ViewReport` + `view list` (see design decisions above)
+- [x] `view` refactor phase 2: dissolve `ViewOutput` enum into `ViewReport` + `view list` — done 2026-03-16
 
 *Release mechanics:*
 - [ ] Verify `normalize update` works against a real GitHub release (cross-platform smoke test)
