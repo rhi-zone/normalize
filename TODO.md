@@ -97,13 +97,22 @@ Crate split is correct. All 38 published crates justified. No reusable logic tra
 - These are navigation, not ranking — belong in `view`, not `analyze` or `rank`
 - See ADR in `docs/architecture-decisions.md` for full rationale
 
-**Next steps for `view` refactor:**
-- [ ] Read `ViewOutput` enum in `crates/normalize/src/commands/view/report.rs` — understand all 9 variants
-- [ ] Convert flag-driven variants into proper subcommands: `history`, `callers`, `callees`, `dependents`, `provenance`, `trace`
-- [ ] Each subcommand gets one output shape — no more `ViewOutput` enum variants for different operations
-- [ ] `--kind` filter stays as a flag (narrows output, doesn't change shape)
-- [ ] Move `call_graph`, `trace`, `dependents`, `provenance` methods from `service/analyze.rs` to `service/mod.rs` (view service) — or a new `service/view.rs`
-- [ ] Delete from `analyze` after migration
+**`view` refactor — remaining work (design decisions 2026-03-16):**
+
+Data model:
+- `ViewOutput` enum dissolves entirely — no enum returns
+- `view` returns `ViewReport` (single `ViewNode` tree) — exactly one result or error, never empty
+- `view list` returns `Vec<ViewReport>` — can be empty; multiple results OK; at a non-glob specific path, only occurs when same name has different kinds (e.g. TypeScript `type T` + `const T`)
+- `ViewReport` is always a `ViewNode` tree — directory/file/symbol all same shape, no separate structs per kind
+- `--kind` is a target constraint applied consistently to both `view` and `view list`; not a rendering filter
+- Ambiguous `view` → `Err()` containing: reason why multiple matches exist + identifiers of all matches + hint to use `--kind` or `view list`
+- `GlobMatches`, `KindFilter` variants fold into `view list` (`Vec<ViewReport>`)
+- `grep` stays top-level — text match shape is fundamentally different from code entity view
+
+Implementation:
+- [ ] Replace `ViewOutput` enum with `ViewReport` (single `ViewNode` tree)
+- [ ] Add `view list` subcommand returning `Vec<ViewReport>`; `--kind`/`--only`/`--exclude` apply to both
+- [ ] Fold `ViewFileReport`, `ViewSymbolReport`, `ViewSymbolNodeReport`, `ViewLineRangeReport`, `ViewGlobReport`, `ViewKindFilterReport`, `ViewMultipleMatchesReport`, `ViewFileContentReport` into unified `ViewReport`
 
 **Not yet decided:**
 - Where big-picture commands live (`architecture`, `summary`, `health`) — synthesized understanding, not ranking, not navigation. No trait identified yet. Leave in `analyze` until pattern is clear.
@@ -702,7 +711,8 @@ to depend on. The LSP is useful day-to-day.
 - [ ] Integrate incremental Datalog from ascent-interpreter (steps 1-3 done: interning, flat tuples, incremental eval; JIT ongoing but not blocking integration)
 
 *CLI surface (from P1):*
-- [x] `view` refactor: graph navigation + history as subcommands (`normalize view callers|callees|history|dependents|trace|graph|provenance`), fix `ViewOutput` enum — done 2026-03-16
+- [x] `view` refactor phase 1: graph navigation + history as subcommands — done 2026-03-16
+- [ ] `view` refactor phase 2: dissolve `ViewOutput` enum into `ViewReport` + `view list` (see design decisions above)
 
 *Release mechanics:*
 - [ ] Verify `normalize update` works against a real GitHub release (cross-platform smoke test)

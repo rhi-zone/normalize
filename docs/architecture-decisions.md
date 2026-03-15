@@ -469,11 +469,21 @@ They belong in `view`, not `analyze`. The pattern is `path subcommand` (target f
 operation second): `normalize view src/foo.rs/Bar callers`, `normalize view src/foo.rs/Bar
 history`. This is consistent with `view`'s existing target-first convention.
 
-**4. `ViewOutput` enum is a symptom to fix.**
-A command with one coherent purpose has one output shape. `ViewOutput` having 9 variants is
-a sign that `view` accumulated operations that should be subcommands. Each subcommand on
-`view` gets one output shape. The fix is mechanical: convert flag-driven output variants
-into proper subcommands.
+**4. `ViewOutput` enum dissolves into `ViewReport` + `view list`.**
+`ViewOutput`'s 9 variants were a sign of accumulated operations. Graph/history ops are now
+proper subcommands (done). The remaining variants dissolve as follows:
+
+- `view` returns `ViewReport` (a single `ViewNode` tree) — exactly one result or error, never
+  empty. Directory/file/symbol are all the same shape; no per-kind structs.
+- `view list` returns `Vec<ViewReport>` — can be empty; multiple results OK. At a non-glob
+  specific path, multiple only occurs when the same name has different kinds (e.g. a TypeScript
+  `type T` and `const T` in the same file).
+- `--kind` is a target constraint applied identically to both `view` and `view list` — it is
+  not a rendering filter. On `view`, it disambiguates (e.g. `view file.ts/T --kind const`).
+- Ambiguous `view` resolution → `Err()` with: reason for ambiguity, identifiers of all
+  matches, hint to use `--kind` to disambiguate or `view list` to see all.
+- `grep` stays top-level — text match output (`GrepResult`) is fundamentally different from
+  code entity view; they should not share a shape or a service.
 
 **5. `analyze` dissolves.**
 What remains in `analyze` after extracting `rank` and moving graph/history ops to `view`:

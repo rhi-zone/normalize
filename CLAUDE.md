@@ -8,6 +8,15 @@ Behavioral rules for Claude Code in this repository.
 
 **Published on [crates.io](https://crates.io/crates/normalize)** as 38 crates (+ 2 `publish = false`: `normalize-grammars`, `xtask`). All at v0.1.0 (early, in active development).
 
+## API-first
+
+**normalize is an API that happens to have a CLI.** The service layer returns typed data; the CLI renders it. When designing a command, start with the data model — what shape does the result have? The CLI surface (subcommand name, flags, positional layout) follows from that. Never let CLI aesthetics drive data shape decisions.
+
+Practical consequences:
+- A command that returns a list of items returns `Vec<T>` or a wrapper, regardless of whether the input is a flag, a glob, or a subcommand name.
+- `--json` / `--jq` / `--jsonl` are first-class on every command because programmatic consumers (agents, scripts, LSP) are primary users.
+- Report struct design question: "what does a caller of this API want to do with the result?" not "what does the output look like in a terminal?"
+
 ## Architecture
 
 **Index-first:** Core data extraction (symbols, imports, calls) goes in the Rust index. When adding language support: first add extraction to the indexer, then expose via commands. Single-file commands (view, complexity, parsing) work without the index; cross-file features (import resolution, call graphs, dead code) require it and prompt the user to run `normalize structure rebuild`.

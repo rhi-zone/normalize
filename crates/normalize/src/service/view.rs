@@ -125,7 +125,7 @@ impl ViewService {
             short = 'd',
             help = "Depth of expansion (0=names only, 1=signatures, 2=with children, -1=all)"
         )]
-        depth: i32,
+        depth: Option<i32>,
         #[param(short = 'n', help = "Show line numbers")] line_numbers: bool,
         #[param(help = "Show dependencies (imports/exports)")] deps: bool,
         #[param(short = 'k', help = "Filter by symbol kind: class, function, method")] kind: Option<
@@ -182,7 +182,7 @@ impl ViewService {
         crate::commands::view::build_view_service(
             target.as_deref(),
             &root_path,
-            depth,
+            depth.unwrap_or_else(|| config.view.depth()),
             line_numbers,
             deps,
             kind.as_ref(),
