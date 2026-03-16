@@ -287,9 +287,8 @@ impl SessionsService {
     #[allow(clippy::too_many_arguments)]
     pub fn messages(
         &self,
-        #[param(help = "Filter by role: user (default), assistant, all")] role: Option<
-            crate::commands::sessions::messages::RoleFilter,
-        >,
+        #[param(help = "Filter by role: user (default), assistant, tool, system, all")]
+        role: Option<crate::commands::sessions::messages::RoleFilter>,
         #[param(help = "Filter messages by content pattern")] grep: Option<String>,
         #[param(help = "Filter sessions from the last N days")] days: Option<u32>,
         #[param(help = "Filter sessions since date (YYYY-MM-DD)")] since: Option<String>,
@@ -311,6 +310,8 @@ impl SessionsService {
             help = "Lines of context around each matching line (requires --grep)"
         )]
         context: Option<usize>,
+        #[param(help = "Show only the last N messages per session (useful with --role assistant)")]
+        last_per_session: Option<usize>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -343,6 +344,7 @@ impl SessionsService {
             show_usage,
             sort_by_tokens,
             context_lines,
+            last_per_session,
             is_pretty,
         )
     }
