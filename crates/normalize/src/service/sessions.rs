@@ -310,7 +310,7 @@ impl SessionsService {
             help = "Lines of context around each matching line (requires --grep)"
         )]
         context: Option<usize>,
-        #[param(help = "Show only the last N messages per session (useful with --role assistant)")]
+        #[param(help = "Show last N messages per session (default: 1, use 0 for all)")]
         last_per_session: Option<usize>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,

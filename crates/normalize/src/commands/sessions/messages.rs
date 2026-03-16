@@ -561,8 +561,9 @@ pub fn build_messages_report(
         });
     }
 
-    // Keep only the last N messages per session if requested
-    if let Some(n) = last_per_session {
+    // Keep only the last N messages per session (default: 1; 0 means unlimited)
+    let n = last_per_session.unwrap_or(1);
+    if n > 0 {
         // Count messages per session to find which to keep
         let mut session_counts: HashMap<String, usize> = HashMap::new();
         for msg in &messages {

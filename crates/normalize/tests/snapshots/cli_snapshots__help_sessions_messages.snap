@@ -50,7 +50,7 @@ Options:
   -C, --context <context>
           Lines of context around each matching line (requires --grep)
       --last-per-session <last-per-session>
-          Show only the last N messages per session (useful with --role assistant)
+          Show last N messages per session (default: 1, use 0 for all)
   -r, --root <root>
           Root directory (defaults to current directory)
       --pretty
