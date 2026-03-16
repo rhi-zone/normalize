@@ -193,6 +193,7 @@ impl OutputFormatter for MessagesReport {
         } else {
             // Normal mode: group consecutive messages by session_id
             let mut last_session: Option<String> = None;
+            let mut last_date: Option<String> = None;
             for msg in &self.messages {
                 let id_short = if msg.session_id.len() > 8 {
                     &msg.session_id[..8]
@@ -210,10 +211,18 @@ impl OutputFormatter for MessagesReport {
                     let project = msg.project.as_deref().unwrap_or("");
                     lines.push(format!("[{}] {}  {}", id_short, project, date));
                     last_session = Some(msg.session_id.clone());
+                    last_date = Some(date.to_owned());
                 }
 
                 let ts = msg.timestamp.as_deref().unwrap_or("?");
+                let date = ts_date(ts);
                 let time = ts_time(ts);
+                let ts_part = if last_date.as_deref() != Some(date) {
+                    last_date = Some(date.to_owned());
+                    format!("{} {}", date, time)
+                } else {
+                    time.to_owned()
+                };
                 let abbrev = role_abbrev(&msg.role);
                 let usage_suffix = if self.show_usage {
                     format_usage_text(msg.usage.as_ref())
@@ -222,7 +231,7 @@ impl OutputFormatter for MessagesReport {
                 };
                 lines.push(format!(
                     "  [{}] {}{}  {}",
-                    abbrev, time, usage_suffix, msg.text
+                    abbrev, ts_part, usage_suffix, msg.text
                 ));
             }
         }
@@ -323,6 +332,7 @@ impl OutputFormatter for MessagesReport {
         } else {
             // Normal mode: group consecutive messages by session_id
             let mut last_session: Option<String> = None;
+            let mut last_date: Option<String> = None;
             for msg in &self.messages {
                 let id_short = if msg.session_id.len() > 8 {
                     &msg.session_id[..8]
@@ -343,10 +353,18 @@ impl OutputFormatter for MessagesReport {
                         id_short, project, date
                     ));
                     last_session = Some(msg.session_id.clone());
+                    last_date = Some(date.to_owned());
                 }
 
                 let ts = msg.timestamp.as_deref().unwrap_or("?");
+                let date = ts_date(ts);
                 let time = ts_time(ts);
+                let ts_part = if last_date.as_deref() != Some(date) {
+                    last_date = Some(date.to_owned());
+                    format!("{} {}", date, time)
+                } else {
+                    time.to_owned()
+                };
                 let role_badge = match msg.role.as_str() {
                     "user" => "\x1b[34m[user]\x1b[0m",
                     "assistant" => "\x1b[32m[asst]\x1b[0m",
@@ -361,7 +379,7 @@ impl OutputFormatter for MessagesReport {
                 };
                 lines.push(format!(
                     "  {} \x1b[90m{}\x1b[0m{}  {}",
-                    role_badge, time, usage_tag, msg.text
+                    role_badge, ts_part, usage_tag, msg.text
                 ));
             }
         }
