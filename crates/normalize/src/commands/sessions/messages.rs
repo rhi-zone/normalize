@@ -413,6 +413,31 @@ impl OutputFormatter for MessagesReport {
     }
 }
 
+/// Format a tool use as a yaml-esque inline string: `ToolName  key: value  key2: value2`
+///
+/// String values are shown bare (no quotes). Numbers, bools, null, arrays,
+/// and nested objects fall back to compact JSON.
+fn format_tool_use(name: &str, input: &serde_json::Value) -> String {
+    let params = match input {
+        serde_json::Value::Object(map) if !map.is_empty() => {
+            let parts: Vec<String> = map
+                .iter()
+                .map(|(k, v)| {
+                    let val = match v {
+                        serde_json::Value::String(s) => s.clone(),
+                        other => other.to_string(),
+                    };
+                    format!("{}: {}", k, val)
+                })
+                .collect();
+            format!("  {}", parts.join("  "))
+        }
+        serde_json::Value::Object(_) => String::new(),
+        other => format!("  {}", other),
+    };
+    format!("{}{}", name, params)
+}
+
 /// Format usage as a compact text suffix: ` [in:1234 out:567]`
 fn format_usage_text(usage: Option<&TokenUsage>) -> String {
     let Some(u) = usage else {
@@ -594,7 +619,7 @@ pub fn build_messages_report(
                         ContentBlock::Text { text } => Some(text.clone()),
                         ContentBlock::ToolResult { content, .. } => Some(content.clone()),
                         ContentBlock::ToolUse { name, input, .. } => {
-                            Some(format!("{} {}", name, input))
+                            Some(format_tool_use(name, input))
                         }
                         ContentBlock::Thinking { text } => Some(text.clone()),
                     })
