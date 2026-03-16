@@ -194,10 +194,10 @@ impl Cli {
                 }
             }),
             sort_keys: self.sort_keys,
-            colors: if color {
-                jaq_json::write::Colors::ansi()
+            styles: if color {
+                jaq_json::write::Styles::ansi()
             } else {
-                jaq_json::write::Colors::default()
+                jaq_json::write::Styles::default()
             },
             sep_space: !self.compact_output,
         }

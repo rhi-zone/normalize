@@ -77,7 +77,7 @@ fn real_main(cli: &Cli) -> Result<ExitCode, String> {
     let raw = cli.raw_output || cli.raw_output0 || cli.join_output;
     let print = |out: &mut dyn Write, v: &Val| -> io::Result<()> {
         match v {
-            Val::Str(s, _) if raw => out.write_all(s.as_ref())?,
+            Val::BStr(s) | Val::TStr(s) if raw => out.write_all(s.as_ref())?,
             _ => jaq_json::write::write(out, &pp, 0, v)?,
         }
         if cli.raw_output0 {

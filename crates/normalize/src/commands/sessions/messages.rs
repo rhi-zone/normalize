@@ -591,9 +591,12 @@ pub fn build_messages_report(
                     .content
                     .iter()
                     .filter_map(|c| match c {
-                        ContentBlock::Text { text } => Some(text.as_str()),
-                        ContentBlock::ToolResult { content, .. } => Some(content.as_str()),
-                        _ => None,
+                        ContentBlock::Text { text } => Some(text.clone()),
+                        ContentBlock::ToolResult { content, .. } => Some(content.clone()),
+                        ContentBlock::ToolUse { name, input, .. } => {
+                            Some(format!("{} {}", name, input))
+                        }
+                        ContentBlock::Thinking { text } => Some(text.clone()),
                     })
                     .collect::<Vec<_>>()
                     .join("\n");
