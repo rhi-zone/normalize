@@ -7,58 +7,31 @@ Extract all messages across sessions into a flat, queryable form
 Usage: normalize sessions messages [OPTIONS]
 
 Options:
-      --jsonl
-          Output one JSON object per line (for arrays)
-      --role <role>
-          Filter by role: user (default), assistant, tool, system, all
-      --grep <grep>
-          Filter messages by content pattern
-      --json
-          Output machine-readable JSON
-      --days <days>
-          Filter sessions from the last N days
-      --jq <jq>
-          Filter output through jq expression
-      --input-schema
-          Print JSON Schema of the subcommand's input parameters and exit
-      --since <since>
-          Filter sessions since date (YYYY-MM-DD)
-      --output-schema
-          Print JSON Schema of the subcommand's return type and exit
-      --until <until>
-          Filter sessions until date (YYYY-MM-DD)
-      --params-json <params-json>
-          Provide all parameters as a JSON object instead of individual flags
-      --project <project>
-          Filter by specific project path
-      --all-projects
-          Show sessions from all projects
-      --session <session>
-          Filter to a specific session ID
-      --format <format>
-          Force specific format: claude, codex, gemini, normalize
-  -n, --limit <limit>
-          Maximum number of sessions
-      --max-chars <max-chars>
-          Truncate message text to N chars (default: 200)
-      --no-truncate
-          Don't truncate message text
-      --show-usage
-          Show per-turn token usage (input/output/cache)
-      --sort-by-tokens
-          Sort by descending token count (heaviest turns first)
-  -C, --context <context>
-          Lines of context around each matching line (requires --grep)
-      --last-per-session <last-per-session>
-          Show only the last N messages per session (useful with --role assistant)
-  -r, --root <root>
-          Root directory (defaults to current directory)
-      --pretty
-          Enable pretty
-      --compact
-          Enable compact
-  -h, --help
-          Print help
+      --jsonl                      Output one JSON object per line (for arrays)
+      --role <role>                Filter by role: user (default), assistant, all
+      --grep <grep>                Filter messages by content pattern
+      --json                       Output machine-readable JSON
+      --days <days>                Filter sessions from the last N days
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --since <since>              Filter sessions since date (YYYY-MM-DD)
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --until <until>              Filter sessions until date (YYYY-MM-DD)
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --project <project>          Filter by specific project path
+      --all-projects               Show sessions from all projects
+      --session <session>          Filter to a specific session ID
+      --format <format>            Force specific format: claude, codex, gemini, normalize
+  -n, --limit <limit>              Maximum number of sessions
+      --max-chars <max-chars>      Truncate message text to N chars (default: 200)
+      --no-truncate                Don't truncate message text
+      --show-usage                 Show per-turn token usage (input/output/cache)
+      --sort-by-tokens             Sort by descending token count (heaviest turns first)
+  -C, --context <context>          Lines of context around each matching line (requires --grep)
+  -r, --root <root>                Root directory (defaults to current directory)
+      --pretty                     Enable pretty
+      --compact                    Enable compact
+  -h, --help                       Print help
 
 Examples:
 normalize sessions messages                                # user messages from recent sessions

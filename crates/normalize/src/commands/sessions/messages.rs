@@ -20,10 +20,6 @@ pub enum RoleFilter {
     User,
     /// Show only assistant messages
     Assistant,
-    /// Show only tool messages
-    Tool,
-    /// Show only system messages
-    System,
     /// Show all messages
     All,
 }
@@ -35,11 +31,9 @@ impl FromStr for RoleFilter {
         match s.to_lowercase().as_str() {
             "user" => Ok(RoleFilter::User),
             "assistant" | "asst" => Ok(RoleFilter::Assistant),
-            "tool" => Ok(RoleFilter::Tool),
-            "system" => Ok(RoleFilter::System),
             "all" => Ok(RoleFilter::All),
             _ => Err(format!(
-                "invalid role '{}': expected 'user', 'assistant', 'tool', 'system', or 'all'",
+                "invalid role '{}': expected 'user', 'assistant', or 'all'",
                 s
             )),
         }
@@ -51,8 +45,6 @@ impl fmt::Display for RoleFilter {
         match self {
             RoleFilter::User => write!(f, "user"),
             RoleFilter::Assistant => write!(f, "assistant"),
-            RoleFilter::Tool => write!(f, "tool"),
-            RoleFilter::System => write!(f, "system"),
             RoleFilter::All => write!(f, "all"),
         }
     }
@@ -346,7 +338,6 @@ pub fn build_messages_report(
     show_usage: bool,
     sort_by_tokens: bool,
     context_lines: usize,
-    last_per_session: Option<usize>,
     pretty: bool,
 ) -> Result<MessagesReport, String> {
     let registry = FormatRegistry::new();
@@ -456,16 +447,6 @@ pub fn build_messages_report(
                             continue;
                         }
                     }
-                    RoleFilter::Tool => {
-                        if role_str != "tool" {
-                            continue;
-                        }
-                    }
-                    RoleFilter::System => {
-                        if role_str != "system" {
-                            continue;
-                        }
-                    }
                 }
 
                 // Extract text from content blocks
@@ -558,24 +539,6 @@ pub fn build_messages_report(
             let tok_a = a.usage.as_ref().map(|u| u.input + u.output).unwrap_or(0);
             let tok_b = b.usage.as_ref().map(|u| u.input + u.output).unwrap_or(0);
             tok_b.cmp(&tok_a)
-        });
-    }
-
-    // Keep only the last N messages per session if requested
-    if let Some(n) = last_per_session {
-        // Count messages per session to find which to keep
-        let mut session_counts: HashMap<String, usize> = HashMap::new();
-        for msg in &messages {
-            *session_counts.entry(msg.session_id.clone()).or_insert(0) += 1;
-        }
-        // For each session, track how many we've skipped to implement "last N"
-        let mut session_seen: HashMap<String, usize> = HashMap::new();
-        messages.retain(|msg| {
-            let total = *session_counts.get(&msg.session_id).unwrap_or(&0);
-            let seen = session_seen.entry(msg.session_id.clone()).or_insert(0);
-            let keep = *seen >= total.saturating_sub(n);
-            *seen += 1;
-            keep
         });
     }
 
