@@ -23,8 +23,6 @@ Options:
       --session <session>          Filter to a specific session ID
       --format <format>            Force specific format: claude, codex, gemini, normalize
   -n, --limit <limit>              Maximum number of sessions
-      --max-chars <max-chars>      Truncate message text to N chars (default: 200)
-      --no-truncate                Don't truncate message text
       --show-usage                 Show per-turn token usage (input/output/cache)
       --sort-by-tokens             Sort by descending token count (heaviest turns first)
   -C, --context <context>          Lines of context around each matching line (requires --grep)

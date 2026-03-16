@@ -413,29 +413,34 @@ impl OutputFormatter for MessagesReport {
     }
 }
 
-/// Format a tool use as a yaml-esque inline string: `ToolName  key: value  key2: value2`
+/// Format a tool use as a yaml-esque multi-line block:
+///
+/// ```text
+/// ToolName
+///   key: value
+///   key2: value2
+/// ```
 ///
 /// String values are shown bare (no quotes). Numbers, bools, null, arrays,
 /// and nested objects fall back to compact JSON.
 fn format_tool_use(name: &str, input: &serde_json::Value) -> String {
-    let params = match input {
+    match input {
         serde_json::Value::Object(map) if !map.is_empty() => {
-            let parts: Vec<String> = map
+            let params: String = map
                 .iter()
                 .map(|(k, v)| {
                     let val = match v {
                         serde_json::Value::String(s) => s.clone(),
                         other => other.to_string(),
                     };
-                    format!("{}: {}", k, val)
+                    format!("\n  {}: {}", k, val)
                 })
                 .collect();
-            format!("  {}", parts.join("  "))
+            format!("{}{}", name, params)
         }
-        serde_json::Value::Object(_) => String::new(),
-        other => format!("  {}", other),
-    };
-    format!("{}{}", name, params)
+        serde_json::Value::Object(_) => name.to_string(),
+        other => format!("{}\n  {}", name, other),
+    }
 }
 
 /// Format usage as a compact text suffix: ` [in:1234 out:567]`
@@ -485,8 +490,6 @@ pub fn build_messages_report(
     project_filter: Option<&Path>,
     all_projects: bool,
     session_filter: Option<&str>,
-    max_chars: Option<usize>,
-    no_truncate: bool,
     show_usage: bool,
     sort_by_tokens: bool,
     context_lines: usize,
@@ -555,12 +558,6 @@ pub fn build_messages_report(
         return Err("No sessions found".to_string());
     }
 
-    let max_text_len = if no_truncate {
-        usize::MAX
-    } else {
-        max_chars.unwrap_or(200)
-    };
-
     let mut messages = Vec::new();
     let mut session_count = 0;
 
@@ -615,13 +612,11 @@ pub fn build_messages_report(
                 let text: String = msg
                     .content
                     .iter()
-                    .filter_map(|c| match c {
-                        ContentBlock::Text { text } => Some(text.clone()),
-                        ContentBlock::ToolResult { content, .. } => Some(content.clone()),
-                        ContentBlock::ToolUse { name, input, .. } => {
-                            Some(format_tool_use(name, input))
-                        }
-                        ContentBlock::Thinking { text } => Some(text.clone()),
+                    .map(|c| match c {
+                        ContentBlock::Text { text } => text.clone(),
+                        ContentBlock::ToolResult { content, .. } => content.clone(),
+                        ContentBlock::ToolUse { name, input, .. } => format_tool_use(name, input),
+                        ContentBlock::Thinking { text } => text.clone(),
                     })
                     .collect::<Vec<_>>()
                     .join("\n");
@@ -680,7 +675,6 @@ pub fn build_messages_report(
                     }
                 } else {
                     // Normal mode: emit one record per message
-                    let display_text = truncate_text(&text, max_text_len);
                     messages.push(MessageRecord {
                         session_id: session_id.clone(),
                         project: project.clone(),
@@ -688,7 +682,7 @@ pub fn build_messages_report(
                         role: role_str,
                         timestamp: msg.timestamp.clone(),
                         char_count: text.len(),
-                        text: display_text,
+                        text: text.trim().to_string(),
                         usage,
                         line_num: None,
                         context_before: Vec::new(),
@@ -740,18 +734,4 @@ pub fn build_messages_report(
         show_usage,
         line_mode: context_lines > 0,
     })
-}
-
-/// Truncate text to max_len characters without collapsing whitespace.
-fn truncate_text(s: &str, max_len: usize) -> String {
-    let trimmed = s.trim();
-    if trimmed.len() <= max_len {
-        return trimmed.to_string();
-    }
-    let mut end = max_len;
-    // Don't cut in the middle of a multi-byte char
-    while !trimmed.is_char_boundary(end) && end > 0 {
-        end -= 1;
-    }
-    format!("{}...", &trimmed[..end])
 }
