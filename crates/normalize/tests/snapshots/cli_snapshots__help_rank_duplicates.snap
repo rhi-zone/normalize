@@ -8,9 +8,9 @@ Usage: normalize rank duplicates [OPTIONS]
 
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
-      --scope <scope>              Scope: functions (default) or blocks [possible values: functions, blocks]
+      --scope <scope>              Scope: functions (default) or blocks
       --json                       Output machine-readable JSON
-      --mode <mode>                Detection mode: exact (default), similar (fuzzy), or clusters [possible values: exact, similar, clusters]
+      --mode <mode>                Detection mode: exact (default), similar (fuzzy), or clusters
       --elide-identifiers          Elide identifier names when comparing
       --jq <jq>                    Filter output through jq expression
       --elide-literals             Elide literal values when comparing (default: true for blocks scope)

@@ -592,6 +592,7 @@ pub fn build_messages_report(
                     .iter()
                     .filter_map(|c| match c {
                         ContentBlock::Text { text } => Some(text.as_str()),
+                        ContentBlock::ToolResult { content, .. } => Some(content.as_str()),
                         _ => None,
                     })
                     .collect::<Vec<_>>()

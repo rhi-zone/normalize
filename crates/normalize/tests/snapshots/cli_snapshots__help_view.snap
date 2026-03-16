@@ -32,7 +32,7 @@ Options:
   -d, --depth <depth>              Depth of expansion (0=names only, 1=signatures, 2=with children, -1=all)
   -n, --line-numbers               Show line numbers
       --deps                       Show dependencies (imports/exports)
-  -k, --kind <kind>                Filter by symbol kind: class, function, method [possible values: class, function, method]
+  -k, --kind <kind>                Filter by symbol kind: class, function, method
       --types-only                 Show only type definitions
       --tests                      Include test functions and test modules
       --raw                        Disable smart display (no collapsing single-child dirs)
