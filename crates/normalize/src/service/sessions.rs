@@ -287,9 +287,8 @@ impl SessionsService {
     #[allow(clippy::too_many_arguments)]
     pub fn messages(
         &self,
-        #[param(help = "Filter by role: user (default), assistant, all")] role: Option<
-            crate::commands::sessions::messages::RoleFilter,
-        >,
+        #[param(help = "Filter by role: user (default), assistant, tool, system, all")]
+        role: Option<crate::commands::sessions::messages::RoleFilter>,
         #[param(help = "Filter messages by content pattern")] grep: Option<String>,
         #[param(help = "Filter sessions from the last N days")] days: Option<u32>,
         #[param(help = "Filter sessions since date (YYYY-MM-DD)")] since: Option<String>,

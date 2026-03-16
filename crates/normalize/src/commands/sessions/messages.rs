@@ -20,6 +20,10 @@ pub enum RoleFilter {
     User,
     /// Show only assistant messages
     Assistant,
+    /// Show only tool messages
+    Tool,
+    /// Show only system messages
+    System,
     /// Show all messages
     All,
 }
@@ -31,9 +35,11 @@ impl FromStr for RoleFilter {
         match s.to_lowercase().as_str() {
             "user" => Ok(RoleFilter::User),
             "assistant" | "asst" => Ok(RoleFilter::Assistant),
+            "tool" => Ok(RoleFilter::Tool),
+            "system" | "sys" => Ok(RoleFilter::System),
             "all" => Ok(RoleFilter::All),
             _ => Err(format!(
-                "invalid role '{}': expected 'user', 'assistant', or 'all'",
+                "invalid role '{}': expected 'user', 'assistant', 'tool', 'system', or 'all'",
                 s
             )),
         }
@@ -45,6 +51,8 @@ impl fmt::Display for RoleFilter {
         match self {
             RoleFilter::User => write!(f, "user"),
             RoleFilter::Assistant => write!(f, "assistant"),
+            RoleFilter::Tool => write!(f, "tool"),
+            RoleFilter::System => write!(f, "system"),
             RoleFilter::All => write!(f, "all"),
         }
     }
@@ -106,30 +114,61 @@ pub struct MessagesStats {
     pub total_output_tokens: Option<u64>,
 }
 
+/// Extract the time portion (HH:MM:SS) from a timestamp string like "2026-03-15T15:50:02..."
+/// or "2026-03-15 15:50:02".
+fn ts_time(ts: &str) -> &str {
+    // Timestamps are either ISO 8601 with T separator or space-separated.
+    // We want just HH:MM:SS (positions 11..19 after the date part).
+    let s = if ts.len() > 19 { &ts[..19] } else { ts };
+    // Find separator (T or space)
+    if let Some(sep_pos) = s.find(['T', ' ']) {
+        let after = &s[sep_pos + 1..];
+        // Take up to 8 chars (HH:MM:SS)
+        if after.len() >= 8 { &after[..8] } else { after }
+    } else {
+        s
+    }
+}
+
+/// Extract the date portion (YYYY-MM-DD) from a timestamp string.
+fn ts_date(ts: &str) -> &str {
+    if ts.len() > 10 { &ts[..10] } else { ts }
+}
+
+/// Role abbreviation for display in message lines.
+fn role_abbrev(role: &str) -> &str {
+    match role {
+        "user" => "user",
+        "assistant" => "asst",
+        "tool" => "tool",
+        "system" => "sys",
+        other => other,
+    }
+}
+
 impl OutputFormatter for MessagesReport {
     fn format_text(&self) -> String {
         let mut lines = Vec::new();
-        let mut last_header: Option<(String, usize)> = None;
 
-        for msg in &self.messages {
-            let id_short = if msg.session_id.len() > 8 {
-                &msg.session_id[..8]
-            } else {
-                &msg.session_id
-            };
-            let ts = msg.timestamp.as_deref().unwrap_or("?");
-            // Trim timestamp to just date+time (no timezone)
-            let ts_short = if ts.len() > 19 { &ts[..19] } else { ts };
-            let ts_display = ts_short.replace('T', " ");
+        if self.line_mode {
+            // Line mode: group by (session_id, turn) — unchanged behaviour
+            let mut last_header: Option<(String, usize)> = None;
+            for msg in &self.messages {
+                let id_short = if msg.session_id.len() > 8 {
+                    &msg.session_id[..8]
+                } else {
+                    &msg.session_id
+                };
+                let ts = msg.timestamp.as_deref().unwrap_or("?");
+                let ts_short = if ts.len() > 19 { &ts[..19] } else { ts };
+                let ts_display = ts_short.replace('T', " ");
 
-            let usage_suffix = if self.show_usage {
-                format_usage_text(msg.usage.as_ref())
-            } else {
-                String::new()
-            };
+                let usage_suffix = if self.show_usage {
+                    format_usage_text(msg.usage.as_ref())
+                } else {
+                    String::new()
+                };
 
-            if self.line_mode {
-                // In line mode, group matches under a shared header per turn
                 let key = (msg.session_id.clone(), msg.turn);
                 if last_header.as_ref() != Some(&key) {
                     if last_header.is_some() {
@@ -150,10 +189,40 @@ impl OutputFormatter for MessagesReport {
                 for (i, ctx) in msg.context_after.iter().enumerate() {
                     lines.push(format!("  {:>4}-  {}", line_num + 1 + i + 1, ctx));
                 }
-            } else {
+            }
+        } else {
+            // Normal mode: group consecutive messages by session_id
+            let mut last_session: Option<String> = None;
+            for msg in &self.messages {
+                let id_short = if msg.session_id.len() > 8 {
+                    &msg.session_id[..8]
+                } else {
+                    &msg.session_id
+                };
+
+                // Emit session header when session changes
+                if last_session.as_deref() != Some(&msg.session_id) {
+                    if last_session.is_some() {
+                        lines.push(String::new());
+                    }
+                    let ts = msg.timestamp.as_deref().unwrap_or("?");
+                    let date = ts_date(ts);
+                    let project = msg.project.as_deref().unwrap_or("");
+                    lines.push(format!("[{}] {}  {}", id_short, project, date));
+                    last_session = Some(msg.session_id.clone());
+                }
+
+                let ts = msg.timestamp.as_deref().unwrap_or("?");
+                let time = ts_time(ts);
+                let abbrev = role_abbrev(&msg.role);
+                let usage_suffix = if self.show_usage {
+                    format_usage_text(msg.usage.as_ref())
+                } else {
+                    String::new()
+                };
                 lines.push(format!(
-                    "[{}] turn {} ({}, {}){} {}",
-                    id_short, msg.turn, msg.role, ts_display, usage_suffix, msg.text
+                    "  [{}] {}{}  {}",
+                    abbrev, time, usage_suffix, msg.text
                 ));
             }
         }
@@ -188,39 +257,40 @@ impl OutputFormatter for MessagesReport {
 
     fn format_pretty(&self) -> String {
         let mut lines = Vec::new();
-        let mut last_header: Option<(String, usize)> = None;
 
-        for msg in &self.messages {
-            let id_short = if msg.session_id.len() > 8 {
-                &msg.session_id[..8]
-            } else {
-                &msg.session_id
-            };
-            let ts = msg.timestamp.as_deref().unwrap_or("?");
-            let ts_short = if ts.len() > 19 { &ts[..19] } else { ts };
-            let ts_display = ts_short.replace('T', " ");
+        if self.line_mode {
+            // Line mode: group by (session_id, turn) — unchanged behaviour
+            let mut last_header: Option<(String, usize)> = None;
+            for msg in &self.messages {
+                let id_short = if msg.session_id.len() > 8 {
+                    &msg.session_id[..8]
+                } else {
+                    &msg.session_id
+                };
+                let ts = msg.timestamp.as_deref().unwrap_or("?");
+                let ts_short = if ts.len() > 19 { &ts[..19] } else { ts };
+                let ts_display = ts_short.replace('T', " ");
 
-            let role_badge = match msg.role.as_str() {
-                "user" => "\x1b[34m[user]\x1b[0m",
-                "assistant" => "\x1b[32m[asst]\x1b[0m",
-                "system" => "\x1b[33m[sys]\x1b[0m",
-                "tool" => "\x1b[35m[tool]\x1b[0m",
-                _ => &msg.role,
-            };
+                let role_badge = match msg.role.as_str() {
+                    "user" => "\x1b[34m[user]\x1b[0m",
+                    "assistant" => "\x1b[32m[asst]\x1b[0m",
+                    "system" => "\x1b[33m[sys]\x1b[0m",
+                    "tool" => "\x1b[35m[tool]\x1b[0m",
+                    r => r,
+                };
 
-            let project_tag = msg
-                .project
-                .as_deref()
-                .map(|p| format!(" \x1b[36m{}\x1b[0m", p))
-                .unwrap_or_default();
+                let project_tag = msg
+                    .project
+                    .as_deref()
+                    .map(|p| format!(" \x1b[36m{}\x1b[0m", p))
+                    .unwrap_or_default();
 
-            let usage_tag = if self.show_usage {
-                format_usage_pretty(msg.usage.as_ref())
-            } else {
-                String::new()
-            };
+                let usage_tag = if self.show_usage {
+                    format_usage_pretty(msg.usage.as_ref())
+                } else {
+                    String::new()
+                };
 
-            if self.line_mode {
                 let key = (msg.session_id.clone(), msg.turn);
                 if last_header.as_ref() != Some(&key) {
                     if last_header.is_some() {
@@ -249,10 +319,49 @@ impl OutputFormatter for MessagesReport {
                         ctx
                     ));
                 }
-            } else {
+            }
+        } else {
+            // Normal mode: group consecutive messages by session_id
+            let mut last_session: Option<String> = None;
+            for msg in &self.messages {
+                let id_short = if msg.session_id.len() > 8 {
+                    &msg.session_id[..8]
+                } else {
+                    &msg.session_id
+                };
+
+                // Emit session header when session changes
+                if last_session.as_deref() != Some(&msg.session_id) {
+                    if last_session.is_some() {
+                        lines.push(String::new());
+                    }
+                    let ts = msg.timestamp.as_deref().unwrap_or("?");
+                    let date = ts_date(ts);
+                    let project = msg.project.as_deref().unwrap_or("");
+                    lines.push(format!(
+                        "\x1b[33m[{}]\x1b[0m \x1b[36m{}\x1b[0m  \x1b[90m{}\x1b[0m",
+                        id_short, project, date
+                    ));
+                    last_session = Some(msg.session_id.clone());
+                }
+
+                let ts = msg.timestamp.as_deref().unwrap_or("?");
+                let time = ts_time(ts);
+                let role_badge = match msg.role.as_str() {
+                    "user" => "\x1b[34m[user]\x1b[0m",
+                    "assistant" => "\x1b[32m[asst]\x1b[0m",
+                    "system" => "\x1b[33m[sys]\x1b[0m",
+                    "tool" => "\x1b[35m[tool]\x1b[0m",
+                    r => r,
+                };
+                let usage_tag = if self.show_usage {
+                    format_usage_pretty(msg.usage.as_ref())
+                } else {
+                    String::new()
+                };
                 lines.push(format!(
-                    "\x1b[33m{}\x1b[0m {} \x1b[90m{}\x1b[0m{}{} {}",
-                    id_short, role_badge, ts_display, project_tag, usage_tag, msg.text
+                    "  {} \x1b[90m{}\x1b[0m{}  {}",
+                    role_badge, time, usage_tag, msg.text
                 ));
             }
         }
@@ -444,6 +553,16 @@ pub fn build_messages_report(
                     }
                     RoleFilter::Assistant => {
                         if role_str != "assistant" {
+                            continue;
+                        }
+                    }
+                    RoleFilter::Tool => {
+                        if role_str != "tool" {
+                            continue;
+                        }
+                    }
+                    RoleFilter::System => {
+                        if role_str != "system" {
                             continue;
                         }
                     }
