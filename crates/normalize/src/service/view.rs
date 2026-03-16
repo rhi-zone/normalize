@@ -1,7 +1,7 @@
 //! View sub-service for server-less CLI.
 //!
 //! Hosts the default `view` command (directory/file/symbol navigation) and graph
-//! navigation subcommands: callers, callees, history, dependents, trace, graph, provenance.
+//! navigation subcommands: referenced-by, references, history, dependents, trace, graph, blame.
 
 use crate::commands::analyze::call_graph::CallEntry;
 use crate::commands::analyze::graph::{DependentsReport, GraphReport, GraphTarget};
@@ -110,8 +110,8 @@ impl ViewService {
     ///   normalize view src/main.rs --full        # full source code
     ///   normalize view src/main.rs --deps        # show imports/exports
     ///   normalize view src/main.rs --context     # skeleton + imports combined
-    ///   normalize view callers MyFn              # show callers of MyFn
-    ///   normalize view callees MyFn              # show callees of MyFn
+    ///   normalize view referenced-by MyFn        # show callers of MyFn
+    ///   normalize view references MyFn           # show what MyFn calls
     ///   normalize view history src/main.rs/MyFn  # git history for a symbol
     ///   normalize view dependents src/lib.rs     # show what depends on this file
     #[cli(default, display_with = "display_view")]
@@ -207,13 +207,13 @@ impl ViewService {
         .await
     }
 
-    /// Show callers of a symbol (requires facts index)
+    /// Show what references this symbol (callers in the call graph; requires facts index)
     ///
     /// Examples:
-    ///   normalize view callers MyFunction        # show all callers of MyFunction
-    ///   normalize view callers file.rs#MyFn      # callers of a specific method
+    ///   normalize view referenced-by MyFunction      # callers of a symbol
+    ///   normalize view referenced-by file.rs#MyFn    # callers of a specific method
     #[cli(display_with = "display_call_graph")]
-    pub async fn callers(
+    pub async fn referenced_by(
         &self,
         #[param(positional, help = "Symbol to look up (or file#symbol)")] target: String,
         #[param(short = 'i', help = "Case-insensitive matching")] case_insensitive: bool,
@@ -307,13 +307,13 @@ impl ViewService {
         .await
     }
 
-    /// Show callees of a symbol (requires facts index)
+    /// Show what this symbol references (callees in the call graph; requires facts index)
     ///
     /// Examples:
-    ///   normalize view callees MyFunction        # show all functions called by MyFunction
-    ///   normalize view callees file.rs#MyFn      # callees of a specific method
+    ///   normalize view references MyFunction     # functions called by MyFunction
+    ///   normalize view references file.rs#MyFn  # references from a specific method
     #[cli(display_with = "display_call_graph")]
-    pub async fn callees(
+    pub async fn references(
         &self,
         #[param(positional, help = "Symbol to look up (or file#symbol)")] target: String,
         #[param(short = 'i', help = "Case-insensitive matching")] case_insensitive: bool,
@@ -358,15 +358,15 @@ impl ViewService {
         )
     }
 
-    /// Reverse-dependency closure: who depends on this file/symbol? (requires facts index)
+    /// Reverse-dependency closure: who imports this file or module? (requires facts index)
     ///
     /// Examples:
-    ///   normalize view dependents src/lib.rs      # modules that depend on lib.rs
+    ///   normalize view dependents src/lib.rs           # modules that import lib.rs
     ///   normalize view dependents src/lib.rs --on symbols  # symbol-level dependents
     #[cli(display_with = "display_dependents")]
     pub async fn dependents(
         &self,
-        #[param(positional, help = "File or symbol to find dependents for")] target: String,
+        #[param(positional, help = "File or module to find dependents for")] target: String,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -443,15 +443,15 @@ impl ViewService {
             .map_err(|e| format!("Graph analysis failed: {}", e))
     }
 
-    /// Provenance graph: git blame → session mapping + code relations
+    /// Git blame with session attribution and code relations
     ///
     /// Examples:
-    ///   normalize view provenance                # provenance for current directory
-    ///   normalize view provenance src/           # provenance for a subdirectory
-    ///   normalize view provenance --calls        # include call graph edges
+    ///   normalize view blame                     # blame for current directory
+    ///   normalize view blame src/                # blame for a subdirectory
+    ///   normalize view blame --calls             # include call graph edges
     #[cli(display_with = "display_provenance")]
     #[allow(clippy::too_many_arguments)]
-    pub async fn provenance(
+    pub async fn blame(
         &self,
         #[param(positional, help = "Target file or directory scope")] target: Option<String>,
         #[param(help = "Include call graph edges (requires facts index)")] calls: bool,
