@@ -114,7 +114,7 @@ Use plan mode as a handoff mechanism when:
 
 **For mid-session planning** on a different topic: investigating inside plan mode is fine — context isn't being thrown away.
 
-**TODO.md is the lossless record. Memory files are lossy.** Flush any new items to TODO.md before the handoff. Memory files only need updating if there is genuinely new user/workflow/feedback information that isn't in TODO.md.
+**TODO.md is the lossless record.** Flush any new items to TODO.md before the handoff. Anything worth preserving belongs in CLAUDE.md or TODO.md — not in memory files.
 
 ## Context Management
 
@@ -141,6 +141,7 @@ Conventional commits: `type(scope): message`. Scope recommended for multi-crate 
 ## Negative Constraints
 
 Do not:
+- Use Claude Code's auto-memory system (`~/.claude/projects/.*./memory/`) — it is unversioned, invisible to the user, and can't be diffed or backed up. Write behavioral changes directly to CLAUDE.md instead
 - Hardcode file extensions — extension → language mapping belongs in the `Language` registry. Use `support_for_path(path)` or equivalent.
 - Ship mutating commands without `--dry-run`
 - Do half measures — when introducing a new abstraction, replace all existing ad-hoc code with it. "We'll clean it up later" means it never gets cleaned up.
