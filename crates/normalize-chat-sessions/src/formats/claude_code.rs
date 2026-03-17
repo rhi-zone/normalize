@@ -115,6 +115,23 @@ impl LogFormat for ClaudeCodeFormat {
 
             match entry_type {
                 "user" => {
+                    // Skip isMeta entries (caveat/context injections by Claude Code itself)
+                    if entry
+                        .get("isMeta")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false)
+                    {
+                        continue;
+                    }
+                    // Skip compaction summary injections
+                    let content_str = entry
+                        .get("message")
+                        .and_then(|m| m.get("content"))
+                        .and_then(|c| c.as_str());
+                    if content_str.is_some_and(|s| s.starts_with("This session is being continued"))
+                    {
+                        continue;
+                    }
                     let message = parse_message(&entry, Role::User);
                     // Tool result messages are structurally "user" in Claude Code's format
                     // but semantically they are tool responses, not human input.
