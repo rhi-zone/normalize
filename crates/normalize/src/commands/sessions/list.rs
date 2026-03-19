@@ -273,6 +273,7 @@ pub fn build_session_list(
     all_projects: bool,
     pretty: bool,
     mode: &super::SessionMode,
+    agent_type: Option<&str>,
 ) -> Result<SessionListReport, String> {
     use super::stats::{list_all_project_sessions_by_mode, parse_date};
     use std::time::{Duration, SystemTime};
@@ -322,6 +323,16 @@ pub fn build_session_list(
 
     if let Some(ref re) = grep_re {
         sessions.retain(|s| super::session_matches_grep(&s.path, re));
+    }
+
+    // Agent type filtering (case-insensitive match on subagent_type)
+    if let Some(at) = agent_type {
+        let at_lower = at.to_lowercase();
+        sessions.retain(|s| {
+            s.subagent_type
+                .as_deref()
+                .is_some_and(|t| t.to_lowercase() == at_lower)
+        });
     }
 
     sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));

@@ -28,6 +28,7 @@ Options:
   -C, --context <context>          Lines of context around each matching line (requires --grep)
   -r, --root <root>                Root directory (defaults to current directory)
       --mode <mode>                Session mode: interactive (default), subagent, or all
+      --agent-type <agent-type>    Filter by agent type (e.g. Explore, general-purpose, Plan)
       --pretty                     Enable pretty
       --compact                    Enable compact
   -h, --help                       Print help

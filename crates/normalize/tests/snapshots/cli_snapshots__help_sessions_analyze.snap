@@ -20,6 +20,7 @@ Options:
   -r, --root <root>                Root directory (defaults to current directory)
       --mode <mode>                Session mode: interactive (default), subagent, or all
       --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --agent-type <agent-type>    Filter by agent type (e.g. Explore, general-purpose, Plan)
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
       --pretty                     Enable pretty
       --compact                    Enable compact

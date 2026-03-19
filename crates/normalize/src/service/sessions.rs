@@ -101,6 +101,7 @@ impl SessionsService {
     ///   normalize sessions list --format codex        # only show Codex sessions
     ///   normalize sessions list --mode subagent       # list subagent sessions only
     ///   normalize sessions list --mode all            # list interactive + subagent sessions
+    ///   normalize sessions list --agent-type Explore  # only Explore agents
     #[allow(clippy::too_many_arguments)]
     pub fn list(
         &self,
@@ -120,6 +121,8 @@ impl SessionsService {
         #[param(help = "Session mode: interactive (default), subagent, or all")] mode: Option<
             SessionMode,
         >,
+        #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
+        agent_type: Option<String>,
         pretty: bool,
         compact: bool,
     ) -> Result<SessionListReport, String> {
@@ -141,6 +144,7 @@ impl SessionsService {
             all_projects,
             is_pretty,
             &mode,
+            agent_type.as_deref(),
         )
     }
 
@@ -204,10 +208,13 @@ impl SessionsService {
         #[param(help = "Session mode: interactive (default), subagent, or all")] mode: Option<
             SessionMode,
         >,
+        #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
+        agent_type: Option<String>,
         pretty: bool,
         compact: bool,
     ) -> Result<SessionAnalysis, String> {
         let _mode = mode; // session resolution already searches subagents
+        let _agent_type = agent_type; // session resolution already searches subagents
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
@@ -251,6 +258,8 @@ impl SessionsService {
         #[param(help = "Session mode: interactive (default), subagent, or all")] mode: Option<
             SessionMode,
         >,
+        #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
+        agent_type: Option<String>,
     ) -> Result<SessionAnalysis, String> {
         let limit = limit.unwrap_or(20);
         let root_path = root.as_deref().map(std::path::Path::new);
@@ -278,6 +287,7 @@ impl SessionsService {
                 all_projects,
                 &group_by_fields,
                 &mode,
+                agent_type.as_deref(),
             );
             std::process::exit(exit_code);
         }
@@ -293,6 +303,7 @@ impl SessionsService {
             project_path,
             all_projects,
             &mode,
+            agent_type.as_deref(),
         )
     }
 
@@ -334,6 +345,8 @@ impl SessionsService {
         #[param(help = "Session mode: interactive (default), subagent, or all")] mode: Option<
             SessionMode,
         >,
+        #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
+        agent_type: Option<String>,
         pretty: bool,
         compact: bool,
     ) -> Result<MessagesReport, String> {
@@ -364,6 +377,7 @@ impl SessionsService {
             context_lines,
             is_pretty,
             &mode,
+            agent_type.as_deref(),
         )
     }
 

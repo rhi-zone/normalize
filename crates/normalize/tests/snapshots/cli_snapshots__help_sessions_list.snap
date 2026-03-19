@@ -23,6 +23,7 @@ Options:
   -n, --limit <limit>              Maximum number of sessions
   -r, --root <root>                Root directory (defaults to current directory)
       --mode <mode>                Session mode: interactive (default), subagent, or all
+      --agent-type <agent-type>    Filter by agent type (e.g. Explore, general-purpose, Plan)
       --pretty                     Enable pretty
       --compact                    Enable compact
   -h, --help                       Print help
@@ -35,3 +36,4 @@ normalize sessions list --all-projects        # show sessions across all project
 normalize sessions list --format codex        # only show Codex sessions
 normalize sessions list --mode subagent       # list subagent sessions only
 normalize sessions list --mode all            # list interactive + subagent sessions
+normalize sessions list --agent-type Explore  # only Explore agents

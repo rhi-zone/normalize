@@ -31,6 +31,9 @@ normalize sessions list --days 7                 # Last 7 days
 normalize sessions list --since 2025-01-01       # Since date
 normalize sessions list -n 50                    # Limit results
 normalize sessions list --project /path/to/repo  # Specific project
+normalize sessions list --mode subagent          # Subagent sessions only
+normalize sessions list --agent-type Explore     # Only Explore agents
+normalize sessions list --mode subagent --agent-type general-purpose  # General-purpose subagents
 ```
 
 Options:
@@ -42,6 +45,8 @@ Options:
 - `--project <PATH>` — Filter by specific project path
 - `--all-projects` — Show sessions from all projects
 - `-n, --limit <N>` — Maximum number of sessions
+- `--mode <MODE>` — Session mode: `interactive` (default), `subagent`, or `all`
+- `--agent-type <TYPE>` — Filter by agent type (e.g. `Explore`, `general-purpose`, `Plan`)
 
 ### show
 
@@ -75,7 +80,7 @@ normalize sessions stats --days 30               # Last 30 days
 normalize sessions stats --format codex          # Codex sessions
 ```
 
-Options: same filtering as `list` (`--format`, `--grep`, `--days`, `--since`, `--until`, `--project`, `--all-projects`, `-n`).
+Options: same filtering as `list` (`--format`, `--grep`, `--days`, `--since`, `--until`, `--project`, `--all-projects`, `-n`, `--mode`, `--agent-type`).
 
 ### messages
 
@@ -96,7 +101,7 @@ Options:
 - `--grep <PATTERN>` — Filter messages by content pattern
 - `--max-chars <N>` — Truncate message text to N chars (default: 200)
 - `--no-truncate` — Don't truncate message text
-- Plus same filtering options as `list`
+- Plus same filtering options as `list` (`--mode`, `--agent-type`, etc.)
 
 ### plans
 

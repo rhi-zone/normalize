@@ -26,6 +26,7 @@ Options:
       --group-by <group-by>        Group results by comma-separated fields: project, day (e.g. project,day)
   -r, --root <root>                Root directory (defaults to current directory)
       --mode <mode>                Session mode: interactive (default), subagent, or all
+      --agent-type <agent-type>    Filter by agent type (e.g. Explore, general-purpose, Plan)
   -h, --help                       Print help
 
 Examples:

@@ -61,6 +61,7 @@ pub fn show_stats_grouped(
     all_projects: bool,
     group_by: &[String],
     mode: &super::SessionMode,
+    agent_type: Option<&str>,
 ) -> i32 {
     let json = false;
     let registry = FormatRegistry::new();
@@ -154,6 +155,16 @@ pub fn show_stats_grouped(
         sessions.retain(|s| session_matches_grep(&s.path, re));
     }
 
+    // Agent type filtering (case-insensitive match on subagent_type)
+    if let Some(at) = agent_type {
+        let at_lower = at.to_lowercase();
+        sessions.retain(|s| {
+            s.subagent_type
+                .as_deref()
+                .is_some_and(|t| t.to_lowercase() == at_lower)
+        });
+    }
+
     // Sort by time (newest first) and limit
     sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
     if limit > 0 {
@@ -223,6 +234,7 @@ pub fn build_stats_data(
     project_filter: Option<&Path>,
     all_projects: bool,
     mode: &super::SessionMode,
+    agent_type: Option<&str>,
 ) -> Result<crate::sessions::SessionAnalysis, String> {
     let registry = FormatRegistry::new();
     let format: &dyn LogFormat = match format_name {
@@ -270,6 +282,16 @@ pub fn build_stats_data(
     }
     if let Some(ref re) = grep_re {
         sessions.retain(|s| session_matches_grep(&s.path, re));
+    }
+
+    // Agent type filtering (case-insensitive match on subagent_type)
+    if let Some(at) = agent_type {
+        let at_lower = at.to_lowercase();
+        sessions.retain(|s| {
+            s.subagent_type
+                .as_deref()
+                .is_some_and(|t| t.to_lowercase() == at_lower)
+        });
     }
 
     sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
