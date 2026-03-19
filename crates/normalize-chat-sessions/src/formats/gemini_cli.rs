@@ -38,7 +38,7 @@ impl LogFormat for GeminiCliFormat {
                         mtime,
                         parent_id: None,
                         agent_id: None,
-                        subagent_type: None,
+                        subagent_type: Some("interactive".into()),
                     });
                 }
             }
@@ -81,6 +81,7 @@ impl LogFormat for GeminiCliFormat {
         let data: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
 
         let mut session = Session::new(path.to_path_buf(), self.name());
+        session.subagent_type = Some("interactive".into());
 
         // Extract metadata
         session.metadata.session_id = data

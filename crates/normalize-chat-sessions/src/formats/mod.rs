@@ -164,7 +164,7 @@ pub fn list_jsonl_sessions(dir: &Path) -> Vec<SessionFile> {
                     mtime,
                     parent_id: None,
                     agent_id: None,
-                    subagent_type: None,
+                    subagent_type: Some("interactive".into()),
                 });
             }
         }
@@ -212,16 +212,19 @@ pub fn list_subagent_sessions(dir: &Path) -> Vec<SessionFile> {
             let Ok(mtime) = meta.modified() else {
                 continue;
             };
-            // Read companion .meta.json for agent type
+            // Read companion .meta.json for agent type, default to "subagent"
             let meta_path = sub_path.with_extension("meta.json");
-            let subagent_type = std::fs::read_to_string(&meta_path)
-                .ok()
-                .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
-                .and_then(|v| {
-                    v.get("agentType")
-                        .and_then(|t| t.as_str())
-                        .map(String::from)
-                });
+            let subagent_type = Some(
+                std::fs::read_to_string(&meta_path)
+                    .ok()
+                    .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+                    .and_then(|v| {
+                        v.get("agentType")
+                            .and_then(|t| t.as_str())
+                            .map(String::from)
+                    })
+                    .unwrap_or_else(|| "subagent".into()),
+            );
             sessions.push(SessionFile {
                 path: sub_path,
                 mtime,

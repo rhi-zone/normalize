@@ -270,16 +270,21 @@ impl LogFormat for ClaudeCodeFormat {
             {
                 session.parent_id = Some(parent_name.to_string());
             }
-            // Read companion .meta.json for agent type
+            // Read companion .meta.json for agent type, default to "subagent"
             let meta_path = path.with_extension("meta.json");
-            if let Ok(meta_content) = std::fs::read_to_string(&meta_path)
-                && let Ok(meta_json) = serde_json::from_str::<Value>(&meta_content)
-            {
-                session.subagent_type = meta_json
-                    .get("agentType")
-                    .and_then(|t| t.as_str())
-                    .map(String::from);
-            }
+            session.subagent_type = Some(
+                std::fs::read_to_string(&meta_path)
+                    .ok()
+                    .and_then(|s| serde_json::from_str::<Value>(&s).ok())
+                    .and_then(|v| {
+                        v.get("agentType")
+                            .and_then(|t| t.as_str())
+                            .map(String::from)
+                    })
+                    .unwrap_or_else(|| "subagent".into()),
+            );
+        } else {
+            session.subagent_type = Some("interactive".into());
         }
 
         Ok(session)

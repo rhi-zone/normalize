@@ -201,6 +201,7 @@ impl LogFormat for NormalizeAgentFormat {
         let reader = BufReader::new(file);
 
         let mut session = Session::new(path.to_path_buf(), self.name());
+        session.subagent_type = Some("interactive".into());
         let mut current_turn = Turn::default();
         let mut current_turn_num = 0u32;
 

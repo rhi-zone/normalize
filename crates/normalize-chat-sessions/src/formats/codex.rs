@@ -57,7 +57,7 @@ impl LogFormat for CodexFormat {
                                                 mtime,
                                                 parent_id: None,
                                                 agent_id: None,
-                                                subagent_type: None,
+                                                subagent_type: Some("interactive".into()),
                                             });
                                         }
                                     }
@@ -105,6 +105,7 @@ impl LogFormat for CodexFormat {
         let reader = BufReader::new(file);
 
         let mut session = Session::new(path.to_path_buf(), self.name());
+        session.subagent_type = Some("interactive".into());
         let mut current_turn = Turn::default();
         let mut pending_tool_calls: HashMap<String, (String, Value)> = HashMap::new();
 
