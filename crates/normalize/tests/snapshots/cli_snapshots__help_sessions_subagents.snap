@@ -1,29 +1,28 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-expression: "snapshot_help(&[\"sessions\"])"
+expression: "snapshot_help(&[\"sessions\", \"subagents\"])"
 ---
-Analyze agent session logs (Claude Code, Codex, Gemini)
+List subagents for a given parent session
 
-Usage: normalize sessions [OPTIONS] [COMMAND]
+Usage: normalize sessions subagents [OPTIONS] [session]
 
-Commands:
-  list       List available sessions
-  show       Show a specific session (summary or full conversation)
-  analyze    Run deep behavioral analysis on a session (tool stats, errors, token costs, corrections)
-  stats      Show aggregate statistics across sessions
-  messages   Extract all messages across sessions into a flat, queryable form
-  subagents  List subagents for a given parent session
-  plans      List and view agent plans
-  help       Print this message or the help of the given subcommand(s)
+Arguments:
+  [session]  Parent session ID
 
 Options:
+      --format <format>            Force specific format: claude, codex, gemini, normalize
       --jsonl                      Output one JSON object per line (for arrays)
       --pretty                     Human-friendly output with colors and formatting
       --compact                    Compact output without colors (overrides TTY detection)
       --json                       Output machine-readable JSON
+      --project <project>          Filter by specific project path
       --jq <jq>                    Filter output through jq expression
+  -r, --root <root>                Root directory (defaults to current directory)
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
-  -V, --version                    Print version
+
+Examples:
+normalize sessions subagents abc123            # list subagents of session abc123
+normalize sessions subagents abc123 --json     # machine-readable output

@@ -60,6 +60,7 @@ pub fn show_stats_grouped(
     project_filter: Option<&Path>,
     all_projects: bool,
     group_by: &[String],
+    mode: &super::SessionMode,
 ) -> i32 {
     let json = false;
     let registry = FormatRegistry::new();
@@ -101,14 +102,14 @@ pub fn show_stats_grouped(
 
     // Get sessions from format
     let mut sessions: Vec<SessionFile> = if all_projects {
-        list_all_project_sessions(format)
+        list_all_project_sessions_by_mode(format, mode)
     } else {
         let project = if let Some(p) = project_filter {
             Some(p)
         } else {
             root
         };
-        format.list_sessions(project)
+        super::list_sessions_by_mode(format, project, mode)
     };
 
     // Calculate date filters
@@ -221,6 +222,7 @@ pub fn build_stats_data(
     until: Option<&str>,
     project_filter: Option<&Path>,
     all_projects: bool,
+    mode: &super::SessionMode,
 ) -> Result<crate::sessions::SessionAnalysis, String> {
     let registry = FormatRegistry::new();
     let format: &dyn LogFormat = match format_name {
@@ -237,10 +239,10 @@ pub fn build_stats_data(
         .transpose()?;
 
     let mut sessions: Vec<SessionFile> = if all_projects {
-        list_all_project_sessions(format)
+        list_all_project_sessions_by_mode(format, mode)
     } else {
         let project = project_filter.or(root);
-        format.list_sessions(project)
+        super::list_sessions_by_mode(format, project, mode)
     };
 
     let now = SystemTime::now();
@@ -284,43 +286,55 @@ pub fn build_stats_data(
         .ok_or_else(|| "No sessions could be analyzed".to_string())
 }
 
-/// List sessions from all projects in ~/.claude/projects/
-pub(crate) fn list_all_project_sessions(format: &dyn LogFormat) -> Vec<SessionFile> {
+/// List project directories under ~/.claude/projects/.
+pub(crate) fn list_all_project_dirs(format: &dyn LogFormat) -> Vec<PathBuf> {
+    let _ = format; // future: could use format to filter
     let home = match std::env::var("HOME") {
         Ok(h) => h,
         Err(_) => return Vec::new(),
     };
-
     let projects_dir = PathBuf::from(home).join(".claude/projects");
     if !projects_dir.exists() {
         return Vec::new();
     }
-
-    let mut all_sessions = Vec::new();
-
+    let mut dirs = Vec::new();
     if let Ok(entries) = std::fs::read_dir(&projects_dir) {
         for entry in entries.filter_map(|e| e.ok()) {
-            let proj_dir = entry.path();
-            if !proj_dir.is_dir() {
-                continue;
-            }
-
-            if let Ok(files) = std::fs::read_dir(&proj_dir) {
-                for file in files.filter_map(|f| f.ok()) {
-                    let path = file.path();
-                    if path.extension().and_then(|e| e.to_str()) == Some("jsonl")
-                        && let Ok(meta) = path.metadata()
-                        && let Ok(mtime) = meta.modified()
-                        && format.detect(&path) > 0.5
-                    {
-                        all_sessions.push(SessionFile { path, mtime });
-                    }
-                }
+            let path = entry.path();
+            if path.is_dir() {
+                dirs.push(path);
             }
         }
     }
+    dirs
+}
 
-    all_sessions
+/// List all project sessions (interactive + subagent) filtered by mode.
+pub(crate) fn list_all_project_sessions_by_mode(
+    format: &dyn LogFormat,
+    mode: &super::SessionMode,
+) -> Vec<SessionFile> {
+    use normalize_chat_sessions::{list_jsonl_sessions, list_subagent_sessions};
+    let mut all = Vec::new();
+    for dir in list_all_project_dirs(format) {
+        match mode {
+            super::SessionMode::Interactive => {
+                let mut sessions = list_jsonl_sessions(&dir);
+                sessions.retain(|s| format.detect(&s.path) > 0.5);
+                all.extend(sessions);
+            }
+            super::SessionMode::Subagent => {
+                all.extend(list_subagent_sessions(&dir));
+            }
+            super::SessionMode::All => {
+                let mut sessions = list_jsonl_sessions(&dir);
+                sessions.retain(|s| format.detect(&s.path) > 0.5);
+                all.extend(sessions);
+                all.extend(list_subagent_sessions(&dir));
+            }
+        }
+    }
+    all
 }
 
 /// Build a group key for a session based on active grouping dimensions.

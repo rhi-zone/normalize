@@ -70,3 +70,32 @@ and are unlikely to be precomputed in model weights:
 
 **Views not worth defining**: concepts trivially expressed in SQL that models handle
 in weights — `WHERE visibility = 'public'`, simple counts, etc.
+
+## Measuring Exploration Cost: Subagent Session Analysis
+
+To validate whether `structure query` (and views) actually reduce turn count, we need
+to measure how agents explore today. Claude Code stores subagent transcripts at
+`~/.claude/projects/<project>/<session>/subagents/agent-<id>.jsonl` — same JSONL
+format as main sessions. These contain every tool call, token count, and search
+pattern an Explore or general-purpose subagent used.
+
+### Data Model
+
+A subagent is a session with extra metadata:
+- `parent_id` — the session that spawned it
+- `agent_id` — the subagent's own ID (e.g. `agent-a5c5ccc9c2b61e757`)
+- `subagent_type` — `Explore`, `general-purpose`, `Plan`, etc.
+
+### CLI Surface
+
+**`--mode interactive|subagent|all`** filter on `list`, `stats`, `messages`, `analyze`.
+Default: `interactive` (current behavior). Flat listing with a `parent` column when
+subagents are included. Comma-delimited to combine modes.
+
+**`sessions show <session> subagents`** — summary table of a session's subagents
+(type, turns, tokens, duration, tool breakdown).
+
+**`sessions show <agent-id>`** — drilldown into a specific subagent as a full session.
+
+**Inline display**: when showing a parent session, subagent tool calls display the
+agent ID so the user can drill down directly.

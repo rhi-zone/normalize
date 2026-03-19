@@ -308,6 +308,16 @@ fn test_help_sessions_messages() {
 }
 
 #[test]
+fn test_help_sessions_subagents() {
+    insta::assert_snapshot!(snapshot_help(&["sessions", "subagents"]));
+}
+
+#[test]
+fn test_help_sessions_analyze() {
+    insta::assert_snapshot!(snapshot_help(&["sessions", "analyze"]));
+}
+
+#[test]
 fn test_help_sessions_plans() {
     insta::assert_snapshot!(snapshot_help(&["sessions", "plans"]));
 }

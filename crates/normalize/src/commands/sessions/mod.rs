@@ -17,13 +17,100 @@ pub use serve::serve_sessions;
 pub use show::{SessionShowReport, build_analyze_report, build_show_report};
 pub use stats::{build_stats_data, show_stats_grouped};
 
+pub mod subagents;
+
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
-use crate::sessions::{FormatRegistry, LogFormat};
+use crate::sessions::{FormatRegistry, LogFormat, SessionFile};
 use nucleo_matcher::pattern::{CaseMatching, Normalization, Pattern};
 use nucleo_matcher::{Config, Matcher};
+
+pub use subagents::{SubagentSummaryItem, SubagentsReport};
+
+/// Session filter mode: which kinds of sessions to include.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum SessionMode {
+    /// Only top-level interactive sessions (default).
+    #[default]
+    Interactive,
+    /// Only subagent sessions.
+    Subagent,
+    /// Both interactive and subagent sessions.
+    All,
+}
+
+impl std::str::FromStr for SessionMode {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Support comma-delimited: "interactive,subagent" => All
+        let parts: Vec<&str> = s.split(',').map(|p| p.trim()).collect();
+        let mut interactive = false;
+        let mut subagent = false;
+        for part in &parts {
+            match *part {
+                "interactive" => interactive = true,
+                "subagent" | "subagents" => subagent = true,
+                "all" => {
+                    interactive = true;
+                    subagent = true;
+                }
+                other => {
+                    return Err(format!(
+                        "Unknown mode: {} (expected interactive, subagent, or all)",
+                        other
+                    ));
+                }
+            }
+        }
+        if interactive && subagent {
+            Ok(Self::All)
+        } else if subagent {
+            Ok(Self::Subagent)
+        } else {
+            Ok(Self::Interactive)
+        }
+    }
+}
+
+impl std::fmt::Display for SessionMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Interactive => write!(f, "interactive"),
+            Self::Subagent => write!(f, "subagent"),
+            Self::All => write!(f, "all"),
+        }
+    }
+}
+
+/// List sessions filtered by mode.
+pub(crate) fn list_sessions_by_mode(
+    format: &dyn LogFormat,
+    project: Option<&Path>,
+    mode: &SessionMode,
+) -> Vec<SessionFile> {
+    match mode {
+        SessionMode::Interactive => format.list_sessions(project),
+        SessionMode::Subagent => format.list_subagent_sessions(project),
+        SessionMode::All => {
+            let mut all = format.list_sessions(project);
+            all.extend(format.list_subagent_sessions(project));
+            all
+        }
+    }
+}
 
 /// Format an age in seconds to a human-readable string.
 pub(crate) fn format_age(secs: u64) -> String {
@@ -40,6 +127,7 @@ pub(crate) fn format_age(secs: u64) -> String {
 
 /// Resolve a session identifier to one or more file paths.
 /// Tries literal (exact/prefix) matching first, then falls back to fuzzy matching.
+/// Also searches subagent directories for agent IDs (e.g. "agent-a5c5ccc9c2b61e757").
 pub(crate) fn resolve_session_paths(
     session_id: &str,
     project: Option<&Path>,
@@ -50,6 +138,11 @@ pub(crate) fn resolve_session_paths(
         return literal;
     }
 
+    // Try resolving as a subagent ID
+    if let Some(path) = resolve_subagent_path(session_id, project, format_name) {
+        return vec![path];
+    }
+
     // Fuzzy fallback
     if let Some((path, matched_stem)) = resolve_session_fuzzy(session_id, project, format_name) {
         eprintln!("fuzzy match: {}", matched_stem);
@@ -57,6 +150,36 @@ pub(crate) fn resolve_session_paths(
     }
 
     Vec::new()
+}
+
+/// Try to resolve a subagent ID to its JSONL path.
+/// Searches through all session subdirectories for matching agent files.
+fn resolve_subagent_path(
+    agent_id: &str,
+    project: Option<&Path>,
+    format_name: Option<&str>,
+) -> Option<PathBuf> {
+    let registry = FormatRegistry::new();
+    let format: &dyn LogFormat = match format_name {
+        Some(name) => registry.get(name)?,
+        None => registry.get("claude")?,
+    };
+
+    let subagent_sessions = format.list_subagent_sessions(project);
+    for s in &subagent_sessions {
+        if let Some(stem) = s.path.file_stem().and_then(|os| os.to_str())
+            && (stem == agent_id || stem.starts_with(agent_id))
+        {
+            return Some(s.path.clone());
+        }
+        // Also match by agent_id field
+        if let Some(ref aid) = s.agent_id
+            && (aid == agent_id || aid.starts_with(agent_id))
+        {
+            return Some(s.path.clone());
+        }
+    }
+    None
 }
 
 /// Resolve a session identifier using exact match or prefix only.

@@ -27,6 +27,7 @@ Options:
       --sort-by-tokens             Sort by descending token count (heaviest turns first)
   -C, --context <context>          Lines of context around each matching line (requires --grep)
   -r, --root <root>                Root directory (defaults to current directory)
+      --mode <mode>                Session mode: interactive (default), subagent, or all
       --pretty                     Enable pretty
       --compact                    Enable compact
   -h, --help                       Print help

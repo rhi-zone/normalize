@@ -1,6 +1,6 @@
 //! Claude Code JSONL format parser.
 
-use super::{LogFormat, SessionFile, list_jsonl_sessions, peek_lines};
+use super::{LogFormat, SessionFile, list_jsonl_sessions, list_subagent_sessions, peek_lines};
 use crate::{ContentBlock, Message, Role, Session, TokenUsage, Turn};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -62,6 +62,10 @@ impl LogFormat for ClaudeCodeFormat {
 
     fn list_sessions(&self, project: Option<&Path>) -> Vec<SessionFile> {
         list_jsonl_sessions(&self.sessions_dir(project))
+    }
+
+    fn list_subagent_sessions(&self, project: Option<&Path>) -> Vec<SessionFile> {
+        list_subagent_sessions(&self.sessions_dir(project))
     }
 
     fn detect(&self, path: &Path) -> f64 {
@@ -253,6 +257,30 @@ impl LogFormat for ClaudeCodeFormat {
 
         // Set provider
         session.metadata.provider = Some("anthropic".to_string());
+
+        // Detect subagent metadata from the file path and first entry's fields.
+        // Subagent files live at <session-uuid>/subagents/agent-<id>.jsonl
+        if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+            && stem.starts_with("agent-")
+        {
+            session.agent_id = Some(stem.to_string());
+            // Parent ID from the grandparent directory name (the session UUID)
+            if let Some(parent_dir) = path.parent().and_then(|p| p.parent())
+                && let Some(parent_name) = parent_dir.file_name().and_then(|n| n.to_str())
+            {
+                session.parent_id = Some(parent_name.to_string());
+            }
+            // Read companion .meta.json for agent type
+            let meta_path = path.with_extension("meta.json");
+            if let Ok(meta_content) = std::fs::read_to_string(&meta_path)
+                && let Ok(meta_json) = serde_json::from_str::<Value>(&meta_content)
+            {
+                session.subagent_type = meta_json
+                    .get("agentType")
+                    .and_then(|t| t.as_str())
+                    .map(String::from);
+            }
+        }
 
         Ok(session)
     }

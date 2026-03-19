@@ -61,6 +61,7 @@ mod tests {
             HistoryTreeReport,
         };
         use crate::commands::sessions::SessionShowReport;
+        use crate::commands::sessions::SubagentsReport;
         use crate::commands::sessions::list::SessionListReport;
         use crate::commands::sessions::messages::MessagesReport;
         use crate::commands::sessions::plans::PlansListReport;
@@ -119,6 +120,7 @@ mod tests {
         assert_output_formatter::<SessionAnalysis>();
         assert_output_formatter::<SessionListReport>();
         assert_output_formatter::<SessionShowReport>();
+        assert_output_formatter::<SubagentsReport>();
         assert_output_formatter::<SkeletonDiffReport>();
         assert_output_formatter::<SizeReport>();
         assert_output_formatter::<SummaryReport>();

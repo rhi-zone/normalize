@@ -36,6 +36,9 @@ impl LogFormat for GeminiCliFormat {
                     sessions.push(SessionFile {
                         path: logs_path,
                         mtime,
+                        parent_id: None,
+                        agent_id: None,
+                        subagent_type: None,
                     });
                 }
             }

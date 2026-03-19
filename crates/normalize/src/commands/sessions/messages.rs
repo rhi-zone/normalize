@@ -1,7 +1,7 @@
 //! Extract all messages across sessions into a flat, queryable form.
 
 use super::list::project_from_path;
-use super::stats::{list_all_project_sessions, parse_date};
+use super::stats::parse_date;
 use crate::output::OutputFormatter;
 use crate::sessions::{ContentBlock, FormatRegistry, LogFormat, SessionFile, TokenUsage};
 use serde::{Deserialize, Serialize};
@@ -494,7 +494,10 @@ pub fn build_messages_report(
     sort_by_tokens: bool,
     context_lines: usize,
     pretty: bool,
+    mode: &super::SessionMode,
 ) -> Result<MessagesReport, String> {
+    use super::stats::list_all_project_sessions_by_mode;
+
     let registry = FormatRegistry::new();
     let format: &dyn LogFormat = match format_name {
         Some(name) => registry
@@ -510,10 +513,10 @@ pub fn build_messages_report(
         .transpose()?;
 
     let mut sessions: Vec<SessionFile> = if all_projects {
-        list_all_project_sessions(format)
+        list_all_project_sessions_by_mode(format, mode)
     } else {
         let proj = project_filter.or(root);
-        format.list_sessions(proj)
+        super::list_sessions_by_mode(format, proj, mode)
     };
 
     // Session ID filtering

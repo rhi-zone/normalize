@@ -1,0 +1,32 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+expression: "snapshot_help(&[\"sessions\", \"analyze\"])"
+---
+Run deep behavioral analysis on a session (tool stats, errors, token costs, corrections)
+
+Usage: normalize sessions analyze [OPTIONS] [session]
+
+Arguments:
+  [session]  Session ID or pattern
+
+Options:
+      --exact                      Require exact/prefix match (disable fuzzy)
+      --jsonl                      Output one JSON object per line (for arrays)
+      --format <format>            Force specific format: claude, codex, gemini, normalize
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --project <project>          Filter by specific project path
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+  -r, --root <root>                Root directory (defaults to current directory)
+      --mode <mode>                Session mode: interactive (default), subagent, or all
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --pretty                     Enable pretty
+      --compact                    Enable compact
+  -h, --help                       Print help
+
+Examples:
+normalize sessions analyze abc123             # analyze a session by ID
+normalize sessions analyze abc123 --pretty    # colored terminal output
+normalize sessions analyze abc123 --json      # machine-readable analysis
+normalize sessions analyze agent-abc --mode subagent  # analyze a subagent

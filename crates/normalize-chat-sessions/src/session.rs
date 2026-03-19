@@ -19,6 +19,15 @@ pub struct Session {
     pub metadata: SessionMetadata,
     /// Conversation turns (request/response pairs).
     pub turns: Vec<Turn>,
+    /// Parent session ID (set when this session is a subagent).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+    /// Agent ID for subagent sessions (e.g. "agent-a5c5ccc9c2b61e757").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_id: Option<String>,
+    /// Subagent type (e.g. "general-purpose", "Explore", "Plan").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subagent_type: Option<String>,
 }
 
 /// Session metadata extracted from the log.
@@ -120,7 +129,15 @@ impl Session {
             format: format.into(),
             metadata: SessionMetadata::default(),
             turns: Vec::new(),
+            parent_id: None,
+            agent_id: None,
+            subagent_type: None,
         }
+    }
+
+    /// Whether this session is a subagent (has a parent session).
+    pub fn is_subagent(&self) -> bool {
+        self.parent_id.is_some()
     }
 
     /// Total number of messages across all turns.

@@ -52,7 +52,13 @@ impl LogFormat for CodexFormat {
                                             && let Ok(meta) = path.metadata()
                                             && let Ok(mtime) = meta.modified()
                                         {
-                                            sessions.push(SessionFile { path, mtime });
+                                            sessions.push(SessionFile {
+                                                path,
+                                                mtime,
+                                                parent_id: None,
+                                                agent_id: None,
+                                                subagent_type: None,
+                                            });
                                         }
                                     }
                                 }

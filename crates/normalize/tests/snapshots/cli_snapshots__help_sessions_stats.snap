@@ -25,6 +25,7 @@ Options:
   -n, --limit <limit>              Maximum number of sessions
       --group-by <group-by>        Group results by comma-separated fields: project, day (e.g. project,day)
   -r, --root <root>                Root directory (defaults to current directory)
+      --mode <mode>                Session mode: interactive (default), subagent, or all
   -h, --help                       Print help
 
 Examples:
@@ -32,3 +33,4 @@ normalize sessions stats                             # aggregate stats for recen
 normalize sessions stats --days 30                   # stats for the last 30 days
 normalize sessions stats --group-by project          # group results by project
 normalize sessions stats --group-by project,day      # group by project and day
+normalize sessions stats --mode subagent             # stats for subagent sessions only

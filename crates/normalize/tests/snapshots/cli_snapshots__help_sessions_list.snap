@@ -22,6 +22,7 @@ Options:
       --format <format>            Force specific format: claude, codex, gemini, normalize
   -n, --limit <limit>              Maximum number of sessions
   -r, --root <root>                Root directory (defaults to current directory)
+      --mode <mode>                Session mode: interactive (default), subagent, or all
       --pretty                     Enable pretty
       --compact                    Enable compact
   -h, --help                       Print help
@@ -32,3 +33,5 @@ normalize sessions list --days 7              # sessions from the last 7 days
 normalize sessions list --grep "refactor"     # filter sessions by content pattern
 normalize sessions list --all-projects        # show sessions across all projects
 normalize sessions list --format codex        # only show Codex sessions
+normalize sessions list --mode subagent       # list subagent sessions only
+normalize sessions list --mode all            # list interactive + subagent sessions

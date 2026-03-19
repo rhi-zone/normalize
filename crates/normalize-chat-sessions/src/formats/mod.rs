@@ -81,6 +81,12 @@ fn init_builtin() {
 pub struct SessionFile {
     pub path: PathBuf,
     pub mtime: std::time::SystemTime,
+    /// Parent session ID (set for subagent sessions).
+    pub parent_id: Option<String>,
+    /// Agent ID (set for subagent sessions, e.g. "agent-a5c5ccc9c2b61e757").
+    pub agent_id: Option<String>,
+    /// Subagent type from meta.json (e.g. "general-purpose", "Explore").
+    pub subagent_type: Option<String>,
 }
 
 /// Trait for session log format plugins.
@@ -94,6 +100,12 @@ pub trait LogFormat: Send + Sync {
 
     /// List all session files for this format.
     fn list_sessions(&self, project: Option<&Path>) -> Vec<SessionFile>;
+
+    /// List subagent session files for this format.
+    /// Default returns empty (only Claude Code supports subagents currently).
+    fn list_subagent_sessions(&self, _project: Option<&Path>) -> Vec<SessionFile> {
+        Vec::new()
+    }
 
     /// Check if this format can parse the given file.
     /// Returns a confidence score 0.0-1.0.
@@ -147,8 +159,76 @@ pub fn list_jsonl_sessions(dir: &Path) -> Vec<SessionFile> {
                 && let Ok(meta) = path.metadata()
                 && let Ok(mtime) = meta.modified()
             {
-                sessions.push(SessionFile { path, mtime });
+                sessions.push(SessionFile {
+                    path,
+                    mtime,
+                    parent_id: None,
+                    agent_id: None,
+                    subagent_type: None,
+                });
             }
+        }
+    }
+    sessions
+}
+
+/// List subagent sessions from `<session-uuid>/subagents/` directories.
+///
+/// Walks each subdirectory of `dir` looking for a `subagents/` folder containing
+/// `agent-<id>.jsonl` files. Also reads the companion `.meta.json` for agent type.
+pub fn list_subagent_sessions(dir: &Path) -> Vec<SessionFile> {
+    let mut sessions = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return sessions;
+    };
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let parent_id = path.file_name().and_then(|n| n.to_str()).map(String::from);
+        let subagents_dir = path.join("subagents");
+        if !subagents_dir.is_dir() {
+            continue;
+        }
+        let Ok(sub_entries) = std::fs::read_dir(&subagents_dir) else {
+            continue;
+        };
+        for sub_entry in sub_entries.filter_map(|e| e.ok()) {
+            let sub_path = sub_entry.path();
+            if sub_path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                continue;
+            }
+            let stem = match sub_path.file_stem().and_then(|s| s.to_str()) {
+                Some(s) => s.to_string(),
+                None => continue,
+            };
+            if !stem.starts_with("agent-") {
+                continue;
+            }
+            let Ok(meta) = sub_path.metadata() else {
+                continue;
+            };
+            let Ok(mtime) = meta.modified() else {
+                continue;
+            };
+            // Read companion .meta.json for agent type
+            let meta_path = sub_path.with_extension("meta.json");
+            let subagent_type = std::fs::read_to_string(&meta_path)
+                .ok()
+                .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+                .and_then(|v| {
+                    v.get("agentType")
+                        .and_then(|t| t.as_str())
+                        .map(String::from)
+                });
+            sessions.push(SessionFile {
+                path: sub_path,
+                mtime,
+                parent_id: parent_id.clone(),
+                agent_id: Some(stem.clone()),
+                subagent_type,
+            });
         }
     }
     sessions
@@ -219,6 +299,15 @@ impl FormatRegistry {
     /// List all available format names.
     pub fn list(&self) -> Vec<&'static str> {
         self.formats.iter().map(|f| f.name()).collect()
+    }
+
+    /// List subagent sessions across all registered formats.
+    pub fn list_subagent_sessions(&self, project: Option<&Path>) -> Vec<SessionFile> {
+        let mut all = Vec::new();
+        for fmt in &self.formats {
+            all.extend(fmt.list_subagent_sessions(project));
+        }
+        all
     }
 }
 

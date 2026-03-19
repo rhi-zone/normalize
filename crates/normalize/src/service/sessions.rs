@@ -2,7 +2,8 @@
 
 use super::resolve_pretty;
 use crate::commands::sessions::{
-    MessagesReport, PlanContent, PlansListReport, SessionListReport, SessionShowReport,
+    MessagesReport, PlanContent, PlansListReport, SessionListReport, SessionMode,
+    SessionShowReport, SubagentsReport,
 };
 use crate::output::OutputFormatter;
 use crate::sessions::SessionAnalysis;
@@ -98,6 +99,8 @@ impl SessionsService {
     ///   normalize sessions list --grep "refactor"     # filter sessions by content pattern
     ///   normalize sessions list --all-projects        # show sessions across all projects
     ///   normalize sessions list --format codex        # only show Codex sessions
+    ///   normalize sessions list --mode subagent       # list subagent sessions only
+    ///   normalize sessions list --mode all            # list interactive + subagent sessions
     #[allow(clippy::too_many_arguments)]
     pub fn list(
         &self,
@@ -114,6 +117,9 @@ impl SessionsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(help = "Session mode: interactive (default), subagent, or all")] mode: Option<
+            SessionMode,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<SessionListReport, String> {
@@ -122,6 +128,7 @@ impl SessionsService {
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
         let is_pretty = resolve_pretty(resolved_root, pretty, compact);
+        let mode = mode.unwrap_or_default();
         crate::commands::sessions::build_session_list(
             root_path,
             limit,
@@ -133,6 +140,7 @@ impl SessionsService {
             project_path,
             all_projects,
             is_pretty,
+            &mode,
         )
     }
 
@@ -179,6 +187,7 @@ impl SessionsService {
     ///   normalize sessions analyze abc123             # analyze a session by ID
     ///   normalize sessions analyze abc123 --pretty    # colored terminal output
     ///   normalize sessions analyze abc123 --json      # machine-readable analysis
+    ///   normalize sessions analyze agent-abc --mode subagent  # analyze a subagent
     #[cli(display_with = "display_analyze")]
     #[allow(clippy::too_many_arguments)]
     pub fn analyze(
@@ -192,9 +201,13 @@ impl SessionsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(help = "Session mode: interactive (default), subagent, or all")] mode: Option<
+            SessionMode,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<SessionAnalysis, String> {
+        let _mode = mode; // session resolution already searches subagents
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
@@ -216,6 +229,7 @@ impl SessionsService {
     ///   normalize sessions stats --days 30                   # stats for the last 30 days
     ///   normalize sessions stats --group-by project          # group results by project
     ///   normalize sessions stats --group-by project,day      # group by project and day
+    ///   normalize sessions stats --mode subagent             # stats for subagent sessions only
     #[allow(clippy::too_many_arguments)]
     pub fn stats(
         &self,
@@ -234,10 +248,14 @@ impl SessionsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(help = "Session mode: interactive (default), subagent, or all")] mode: Option<
+            SessionMode,
+        >,
     ) -> Result<SessionAnalysis, String> {
         let limit = limit.unwrap_or(20);
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
+        let mode = mode.unwrap_or_default();
 
         // When group_by is specified, delegate to the grouped command path which prints
         // per-group output directly. This uses process::exit to avoid double-printing
@@ -259,6 +277,7 @@ impl SessionsService {
                 project_path,
                 all_projects,
                 &group_by_fields,
+                &mode,
             );
             std::process::exit(exit_code);
         }
@@ -273,6 +292,7 @@ impl SessionsService {
             until.as_deref(),
             project_path,
             all_projects,
+            &mode,
         )
     }
 
@@ -311,6 +331,9 @@ impl SessionsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(help = "Session mode: interactive (default), subagent, or all")] mode: Option<
+            SessionMode,
+        >,
         pretty: bool,
         compact: bool,
     ) -> Result<MessagesReport, String> {
@@ -323,6 +346,7 @@ impl SessionsService {
         if context_lines > 0 && grep.is_none() {
             return Err("--context requires --grep".to_string());
         }
+        let mode = mode.unwrap_or_default();
         crate::commands::sessions::build_messages_report(
             root_path,
             limit,
@@ -339,6 +363,33 @@ impl SessionsService {
             sort_by_tokens,
             context_lines,
             is_pretty,
+            &mode,
+        )
+    }
+
+    /// List subagents for a given parent session
+    ///
+    /// Examples:
+    ///   normalize sessions subagents abc123            # list subagents of session abc123
+    ///   normalize sessions subagents abc123 --json     # machine-readable output
+    pub fn subagents(
+        &self,
+        #[param(positional, help = "Parent session ID")] session: String,
+        #[param(help = "Force specific format: claude, codex, gemini, normalize")] format: Option<
+            String,
+        >,
+        #[param(help = "Filter by specific project path")] project: Option<String>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+    ) -> Result<SubagentsReport, String> {
+        let root_path = root.as_deref().map(std::path::Path::new);
+        let project_path = project.as_deref().map(std::path::Path::new);
+        let effective_project = project_path.or(root_path);
+        crate::commands::sessions::subagents::build_subagents_report(
+            &session,
+            effective_project,
+            format.as_deref(),
         )
     }
 

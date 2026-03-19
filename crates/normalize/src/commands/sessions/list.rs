@@ -19,6 +19,15 @@ struct SessionListItem {
     user_messages: usize,
     tool_calls: usize,
     duration_seconds: Option<u64>,
+    /// Parent session ID (set when this is a subagent session).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    parent_id: Option<String>,
+    /// Agent ID (set for subagent sessions).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    agent_id: Option<String>,
+    /// Subagent type (e.g. "general-purpose", "Explore").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    subagent_type: Option<String>,
 }
 
 /// Session list report
@@ -29,6 +38,10 @@ pub struct SessionListReport {
     #[serde(skip)]
     #[schemars(skip)]
     pretty: bool,
+    /// Whether any subagent sessions are included (controls column display).
+    #[serde(skip)]
+    #[schemars(skip)]
+    has_subagents: bool,
 }
 
 impl SessionListReport {
@@ -54,7 +67,11 @@ impl OutputFormatter for SessionListReport {
         let mut lines = Vec::new();
 
         // Legend header
-        let legend = if multi {
+        let legend = if self.has_subagents && multi {
+            "# id  age  duration  turns  tools  project  parent  type  title".to_string()
+        } else if self.has_subagents {
+            "# id  age  duration  user  tools  parent  type  title".to_string()
+        } else if multi {
             "# id  age  duration  turns  tools  project  title".to_string()
         } else {
             "# id  age  duration  user  tools  title".to_string()
@@ -73,24 +90,23 @@ impl OutputFormatter for SessionListReport {
                 .as_deref()
                 .map(truncate_message)
                 .unwrap_or_default();
+
+            let mut parts = vec![item.id.clone(), age, duration, counts];
             if multi {
-                let project = item.project.as_deref().unwrap_or("?");
-                lines.push(format!(
-                    "{}  {}  {}  {}  {}  {}",
-                    item.id, age, duration, counts, project, title
-                ));
-            } else {
-                lines.push(format!(
-                    "{}  {}  {}  {}  {}",
-                    item.id, age, duration, counts, title
-                ));
+                parts.push(item.project.as_deref().unwrap_or("?").to_string());
             }
+            if self.has_subagents {
+                parts.push(item.parent_id.as_deref().unwrap_or("-").to_string());
+                parts.push(item.subagent_type.as_deref().unwrap_or("-").to_string());
+            }
+            parts.push(title);
+            lines.push(parts.join("  "));
         }
         lines.join("\n")
     }
 
     fn format_pretty(&self) -> String {
-        use nu_ansi_term::Color::{Cyan, DarkGray, Green, Yellow};
+        use nu_ansi_term::Color::{Cyan, DarkGray, Green, Magenta, Yellow};
         let multi = self.is_multi_project();
         let mut lines = Vec::new();
 
@@ -119,6 +135,12 @@ impl OutputFormatter for SessionListReport {
             if multi {
                 let proj = item.project.as_deref().unwrap_or("?");
                 parts.push(Cyan.bold().paint(proj).to_string());
+            }
+            if self.has_subagents {
+                let parent = item.parent_id.as_deref().unwrap_or("-");
+                parts.push(Magenta.paint(parent).to_string());
+                let agent_type = item.subagent_type.as_deref().unwrap_or("-");
+                parts.push(DarkGray.paint(agent_type).to_string());
             }
             parts.push(title);
 
@@ -250,8 +272,9 @@ pub fn build_session_list(
     project_filter: Option<&Path>,
     all_projects: bool,
     pretty: bool,
+    mode: &super::SessionMode,
 ) -> Result<SessionListReport, String> {
-    use super::stats::{list_all_project_sessions, parse_date};
+    use super::stats::{list_all_project_sessions_by_mode, parse_date};
     use std::time::{Duration, SystemTime};
 
     let registry = FormatRegistry::new();
@@ -269,10 +292,10 @@ pub fn build_session_list(
         .transpose()?;
 
     let mut sessions: Vec<SessionFile> = if all_projects {
-        list_all_project_sessions(format)
+        list_all_project_sessions_by_mode(format, mode)
     } else {
         let proj = project_filter.or(project);
-        format.list_sessions(proj)
+        super::list_sessions_by_mode(format, proj, mode)
     };
 
     // Date filtering
@@ -306,6 +329,8 @@ pub fn build_session_list(
         sessions.truncate(limit);
     }
 
+    let has_subagents = sessions.iter().any(|s| s.parent_id.is_some());
+
     let items: Vec<SessionListItem> = sessions
         .iter()
         .map(|s| {
@@ -327,6 +352,9 @@ pub fn build_session_list(
                 user_messages: stats.message_count,
                 tool_calls: stats.tool_use_count,
                 duration_seconds: stats.first_timestamp,
+                parent_id: s.parent_id.clone(),
+                agent_id: s.agent_id.clone(),
+                subagent_type: s.subagent_type.clone(),
             }
         })
         .collect();
@@ -334,5 +362,6 @@ pub fn build_session_list(
     Ok(SessionListReport {
         sessions: items,
         pretty,
+        has_subagents,
     })
 }
