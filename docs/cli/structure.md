@@ -10,6 +10,7 @@ Manage the structural index (symbols, imports, calls).
 | `stats` | Show index statistics |
 | `files` | List indexed files |
 | `packages` | Index external packages into global cache |
+| `query` | Run an arbitrary SQL query against the structural index |
 
 ## rebuild
 
@@ -67,6 +68,31 @@ normalize structure packages --clear
 Options:
 - `--only <ECOSYSTEM>` — Ecosystems to index: `python`, `go`, `js`, `deno`, `java`, `cpp`, `rust`. Defaults to all available.
 - `--clear` — Clear existing index before re-indexing
+
+## query
+
+Run an arbitrary read-only SQL query against the structural index (`.normalize/index.sqlite`).
+Results are returned as a table (text) or JSON array of objects (with `--json`).
+
+The index exposes these tables: `files`, `symbols`, `symbol_attributes`, `symbol_implements`,
+`calls`, `imports`, `type_methods`, `type_refs`. Three convenience views are also defined at
+index open time:
+
+| View | Description |
+|------|-------------|
+| `entry_points` | Public symbols with no callers |
+| `external_deps` | Imports where `resolved_file IS NULL` |
+| `external_surface` | Public symbols called from files that have unresolved imports |
+
+```bash
+normalize structure query "SELECT name, kind, file FROM symbols WHERE kind = 'function' LIMIT 10"
+normalize structure query "SELECT * FROM entry_points" --json
+normalize structure query "SELECT file, COUNT(*) AS n FROM imports GROUP BY file ORDER BY n DESC LIMIT 5"
+normalize structure query "SELECT DISTINCT module FROM external_deps ORDER BY module" --jsonl
+```
+
+Arguments:
+- `<SQL>` — SQL query to run against the structural index
 
 ## Global Options
 

@@ -418,6 +418,48 @@ impl FileIndex {
             .await?;
         }
 
+        // Create convenience views for agent queries.
+        // These are idempotent (CREATE VIEW IF NOT EXISTS) and safe to run on every open.
+        conn.execute(
+            "CREATE VIEW IF NOT EXISTS entry_points AS
+             SELECT s.file, s.name, s.kind, s.start_line, s.end_line
+             FROM symbols s
+             WHERE s.visibility = 'public'
+               AND NOT EXISTS (
+                   SELECT 1 FROM calls c WHERE c.callee_name = s.name
+               )",
+            (),
+        )
+        .await
+        .ok();
+
+        conn.execute(
+            "CREATE VIEW IF NOT EXISTS external_deps AS
+             SELECT file, module, name, alias, line
+             FROM imports
+             WHERE resolved_file IS NULL",
+            (),
+        )
+        .await
+        .ok();
+
+        conn.execute(
+            "CREATE VIEW IF NOT EXISTS external_surface AS
+             SELECT DISTINCT s.file, s.name, s.kind, s.start_line, s.end_line
+             FROM symbols s
+             WHERE s.visibility = 'public'
+               AND EXISTS (
+                   SELECT 1 FROM calls c
+                   WHERE c.callee_name = s.name
+                     AND EXISTS (
+                         SELECT 1 FROM external_deps ed WHERE ed.file = c.caller_file
+                     )
+               )",
+            (),
+        )
+        .await
+        .ok();
+
         Ok(Self {
             conn,
             db,
@@ -677,6 +719,37 @@ impl FileIndex {
     /// Execute a raw SQL statement (for maintenance operations).
     pub async fn execute(&self, sql: &str) -> Result<u64, libsql::Error> {
         self.conn.execute(sql, ()).await
+    }
+
+    /// Run an arbitrary read-only SQL query and return results as a list of row maps.
+    ///
+    /// Each row is a `serde_json::Map` from column name to value.
+    /// Useful for agent-driven exploration of the structural index.
+    pub async fn raw_query(
+        &self,
+        sql: &str,
+    ) -> Result<Vec<serde_json::Map<String, serde_json::Value>>, libsql::Error> {
+        let mut rows = self.conn.query(sql, ()).await?;
+        let mut result = Vec::new();
+        while let Some(row) = rows.next().await? {
+            let col_count = row.column_count();
+            let mut map = serde_json::Map::new();
+            for i in 0..col_count {
+                let col_name = row.column_name(i).unwrap_or("?").to_string();
+                let value = match row.get_value(i)? {
+                    libsql::Value::Null => serde_json::Value::Null,
+                    libsql::Value::Integer(n) => serde_json::Value::Number(n.into()),
+                    libsql::Value::Real(f) => serde_json::json!(f),
+                    libsql::Value::Text(s) => serde_json::Value::String(s),
+                    libsql::Value::Blob(b) => {
+                        serde_json::Value::String(format!("<blob {} bytes>", b.len()))
+                    }
+                };
+                map.insert(col_name, value);
+            }
+            result.push(map);
+        }
+        Ok(result)
     }
 
     /// Refresh the index by walking the filesystem

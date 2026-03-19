@@ -13,12 +13,12 @@ required-features = ["cli"]
 
 [features]
 default = []
-cli = ["dep:server-less", "dep:tokio", "dep:serde_json", "dep:schemars"]
+cli = ["dep:server-less", "dep:tokio", "dep:schemars"]
 
 [dependencies]
 server-less = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
+serde_json = { workspace = true }
 schemars = { version = "1", optional = true }
 # Core types
 normalize-facts-core = { path = "../normalize-facts-core", version = "0.1.0" }
@@ -49,4 +49,3 @@ serde.workspace = true
 normalize-manifest = { path = "../normalize-manifest", version = "0.1.0" }
 tempfile = "3"
 tokio = { workspace = true }
-serde_json = { workspace = true }

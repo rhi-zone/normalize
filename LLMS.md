@@ -135,4 +135,6 @@ normalize grep "TODO" --only "*.rs"
 - `normalize analyze` handles health, security, call graphs, docs, and trends; `normalize rank` handles all ranked-list metrics (complexity, hotspots, coupling, duplicates, etc.)
 - `normalize grep` for text search, `normalize view` for structural navigation
 - Use `--json` when you need to parse output programmatically
-- The structure DB (`.normalize/facts.db`) caches symbols for fast lookups
+- The structure DB (`.normalize/index.sqlite`) caches symbols for fast lookups
+- `normalize structure query "<sql>"` runs arbitrary SQL against the index — the fastest way to answer relational questions about the codebase (imports, callers, symbol counts, etc.)
+- Three convenience views are available in every index: `entry_points` (public symbols with no callers), `external_deps` (unresolved imports), `external_surface` (public symbols called by files with external deps)

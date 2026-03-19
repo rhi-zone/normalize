@@ -777,6 +777,45 @@ impl FactsService {
         let root_path = root.map(PathBuf::from);
         packages_data(&only, clear, root_path.as_deref()).await
     }
+
+    /// Run an arbitrary SQL query against the structural index
+    ///
+    /// Opens the index read-only and returns results as a JSON array of objects.
+    /// The index exposes these tables: files, symbols, symbol_attributes,
+    /// symbol_implements, calls, imports, type_methods, type_refs.
+    /// Three convenience views are also available:
+    ///   entry_points      — public symbols with no callers
+    ///   external_deps     — imports where resolved_file IS NULL
+    ///   external_surface  — public symbols called from files that have external deps
+    ///
+    /// Examples:
+    ///   normalize structure query "SELECT name, kind, file FROM symbols WHERE kind = 'function' LIMIT 10"
+    ///   normalize structure query "SELECT * FROM entry_points" --json
+    ///   normalize structure query "SELECT file, COUNT(*) as n FROM imports GROUP BY file ORDER BY n DESC LIMIT 5"
+    pub async fn query(
+        &self,
+        #[param(positional, help = "SQL query to run against the structural index")] sql: String,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+    ) -> Result<QueryResult, String> {
+        let root = root
+            .map(PathBuf::from)
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+
+        let idx = index::open(&root)
+            .await
+            .map_err(|e| format!("Failed to open index: {}", e))?;
+
+        let rows = idx
+            .raw_query(&sql)
+            .await
+            .map_err(|e| format!("Query error: {}", e))?;
+
+        Ok(QueryResult { rows })
+    }
 }
 
 /// Output for stats command (either regular stats or storage report).
@@ -793,5 +832,63 @@ impl std::fmt::Display for FactsStatsOutput {
             Self::Stats(s) => write!(f, "{}", s),
             Self::Storage(s) => write!(f, "{}", s),
         }
+    }
+}
+
+/// Result of a raw SQL query against the structural index.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct QueryResult {
+    pub rows: Vec<serde_json::Map<String, serde_json::Value>>,
+}
+
+impl std::fmt::Display for QueryResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.rows.is_empty() {
+            return write!(f, "(no rows)");
+        }
+        // Collect column names from the first row
+        let cols: Vec<&str> = self.rows[0].keys().map(|k| k.as_str()).collect();
+        // Compute column widths
+        let mut widths: Vec<usize> = cols.iter().map(|c| c.len()).collect();
+        for row in &self.rows {
+            for (i, col) in cols.iter().enumerate() {
+                let val = row.get(*col).map(value_to_str).unwrap_or_default();
+                if val.len() > widths[i] {
+                    widths[i] = val.len();
+                }
+            }
+        }
+        // Header
+        let header: Vec<String> = cols
+            .iter()
+            .zip(&widths)
+            .map(|(c, w)| format!("{:width$}", c, width = w))
+            .collect();
+        writeln!(f, "{}", header.join("  "))?;
+        let sep: Vec<String> = widths.iter().map(|w| "-".repeat(*w)).collect();
+        writeln!(f, "{}", sep.join("  "))?;
+        // Rows
+        for row in &self.rows {
+            let cells: Vec<String> = cols
+                .iter()
+                .zip(&widths)
+                .map(|(col, w)| {
+                    let val = row.get(*col).map(value_to_str).unwrap_or_default();
+                    format!("{:width$}", val, width = w)
+                })
+                .collect();
+            writeln!(f, "{}", cells.join("  "))?;
+        }
+        write!(f, "\n{} row(s)", self.rows.len())
+    }
+}
+
+fn value_to_str(v: &serde_json::Value) -> String {
+    match v {
+        serde_json::Value::Null => "NULL".to_string(),
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::String(s) => s.clone(),
+        other => other.to_string(),
     }
 }

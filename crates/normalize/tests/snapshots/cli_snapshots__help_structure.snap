@@ -11,6 +11,7 @@ Commands:
   stats     Show index statistics (DB size vs codebase size)
   files     List indexed files (with optional prefix filter)
   packages  Index external packages (stdlib, site-packages) into global cache
+  query     Run an arbitrary SQL query against the structural index
   help      Print this message or the help of the given subcommand(s)
 
 Options:

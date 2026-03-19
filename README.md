@@ -189,6 +189,7 @@ Manage the structural index (symbols, imports, calls):
 normalize structure stats            # Index stats
 normalize structure rebuild          # Rebuild the index
 normalize structure files            # List indexed files
+normalize structure query "SELECT name, kind FROM symbols WHERE kind = 'function' LIMIT 10"  # SQL query
 ```
 
 ### sessions - Session Analysis
