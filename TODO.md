@@ -51,6 +51,14 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ## P1 — Short-term Improvements (coherence / usability)
 
+### Agent UX: comprehensive compact output audit
+
+Baseline audit in `docs/agent-ux-audit.md` (2026-03-21) covers 12 commands across 3 models (Haiku, Sonnet, Opus). Quick wins fixed. Remaining work:
+
+- [ ] Run full audit pass over all ~30+ subcommands (not just the 12 sampled)
+- [ ] Fix deferred single-model issues once patterns emerge across more commands
+- [ ] Re-run multi-model audit after fixes to verify improvement
+
 ### ~~Main Crate Responsibility Boundaries~~ (audited 2026-03-15 — no action needed)
 
 Crate split is correct. All 38 published crates justified. No reusable logic trapped in `normalize`; no unjustified extractions. Single-consumer domain libraries (graph, scope, edit, deps, etc.) are correctly placed — the test is "CLI wiring vs. domain logic", not "has 2+ consumers". Revisit only if a concrete second consumer appears for a specific module.
