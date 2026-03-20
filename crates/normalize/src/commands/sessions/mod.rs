@@ -3,6 +3,7 @@
 pub mod analyze;
 pub mod list;
 pub mod messages;
+pub mod patterns;
 pub mod plans;
 #[cfg(feature = "sessions-web")]
 mod serve;
@@ -11,6 +12,7 @@ pub mod stats;
 
 pub use list::{SessionListReport, build_session_list};
 pub use messages::{MessagesReport, build_messages_report};
+pub use patterns::{PatternsReport, build_patterns_report};
 pub use plans::{PlanContent, PlansListReport, build_plan_content, build_plans_list};
 #[cfg(feature = "sessions-web")]
 pub use serve::serve_sessions;

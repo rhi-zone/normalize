@@ -121,6 +121,8 @@ mod tests {
         assert_output_formatter::<SessionListReport>();
         assert_output_formatter::<SessionShowReport>();
         assert_output_formatter::<SubagentsReport>();
+        use crate::commands::sessions::patterns::PatternsReport;
+        assert_output_formatter::<PatternsReport>();
         assert_output_formatter::<SkeletonDiffReport>();
         assert_output_formatter::<SizeReport>();
         assert_output_formatter::<SummaryReport>();

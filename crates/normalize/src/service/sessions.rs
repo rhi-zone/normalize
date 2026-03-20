@@ -2,7 +2,7 @@
 
 use super::resolve_pretty;
 use crate::commands::sessions::{
-    MessagesReport, PlanContent, PlansListReport, SessionListReport, SessionMode,
+    MessagesReport, PatternsReport, PlanContent, PlansListReport, SessionListReport, SessionMode,
     SessionShowReport, SubagentsReport,
 };
 use crate::output::OutputFormatter;
@@ -404,6 +404,59 @@ impl SessionsService {
             &session,
             effective_project,
             format.as_deref(),
+        )
+    }
+
+    /// Analyze tool call sequence patterns across sessions using Markov chain transition matrices
+    ///
+    /// Examples:
+    ///   normalize sessions patterns                         # analyze tool patterns for recent sessions
+    ///   normalize sessions patterns --days 30               # patterns for the last 30 days
+    ///   normalize sessions patterns --mode subagent         # patterns for subagent sessions only
+    ///   normalize sessions patterns --all-projects          # patterns across all projects
+    #[allow(clippy::too_many_arguments)]
+    pub fn patterns(
+        &self,
+        #[param(help = "Filter sessions by grep pattern")] grep: Option<String>,
+        #[param(help = "Filter sessions from the last N days")] days: Option<u32>,
+        #[param(help = "Filter sessions since date (YYYY-MM-DD)")] since: Option<String>,
+        #[param(help = "Filter sessions until date (YYYY-MM-DD)")] until: Option<String>,
+        #[param(help = "Filter by specific project path")] project: Option<String>,
+        #[param(help = "Show sessions from all projects")] all_projects: bool,
+        #[param(help = "Force specific format: claude, codex, gemini, normalize")] format: Option<
+            String,
+        >,
+        #[param(short = 'n', help = "Maximum number of sessions")] limit: Option<usize>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Session mode: interactive (default), subagent, or all")] mode: Option<
+            SessionMode,
+        >,
+        #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
+        agent_type: Option<String>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<PatternsReport, String> {
+        let limit = limit.unwrap_or(20);
+        let root_path = root.as_deref().map(std::path::Path::new);
+        let project_path = project.as_deref().map(std::path::Path::new);
+        let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
+        let is_pretty = resolve_pretty(resolved_root, pretty, compact);
+        let mode = mode.unwrap_or_default();
+        crate::commands::sessions::build_patterns_report(
+            root_path,
+            limit,
+            format.as_deref(),
+            grep.as_deref(),
+            days,
+            since.as_deref(),
+            until.as_deref(),
+            project_path,
+            all_projects,
+            &mode,
+            agent_type.as_deref(),
+            is_pretty,
         )
     }
 

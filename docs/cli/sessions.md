@@ -16,6 +16,7 @@ normalize sessions <SUBCOMMAND> [OPTIONS]
 | `show` | Show a specific session (summary or full conversation) |
 | `stats` | Show aggregate statistics across sessions |
 | `messages` | Extract all messages across sessions into a flat, queryable form |
+| `patterns` | Analyze tool call sequence patterns using Markov chain transition matrices |
 | `plans` | List and view agent plans |
 
 ### list
@@ -102,6 +103,25 @@ Options:
 - `--max-chars <N>` — Truncate message text to N chars (default: 200)
 - `--no-truncate` — Don't truncate message text
 - Plus same filtering options as `list` (`--mode`, `--agent-type`, etc.)
+
+### patterns
+
+Analyze tool call sequence patterns across sessions using Markov chain transition matrices:
+
+```bash
+normalize sessions patterns                         # Patterns for current project
+normalize sessions patterns --days 30               # Last 30 days
+normalize sessions patterns --mode subagent         # Subagent sessions only
+normalize sessions patterns --all-projects          # All projects
+normalize sessions patterns --json                  # Full data as JSON
+```
+
+Shows:
+- **Population transition matrix** — probability of transitioning from tool A to tool B, aggregated across all sessions
+- **Most common starting/ending tools** — which tools sessions begin and end with
+- **Outlier sessions** — sessions ranked by divergence from the population matrix (Frobenius norm)
+
+Options: same filtering as `list` (`--format`, `--grep`, `--days`, `--since`, `--until`, `--project`, `--all-projects`, `-n`, `--mode`, `--agent-type`).
 
 ### plans
 

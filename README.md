@@ -200,6 +200,7 @@ Analyze Claude Code and other agent session logs:
 normalize sessions list              # List recent sessions
 normalize sessions show <id>         # Show session details
 normalize sessions stats             # Aggregate statistics
+normalize sessions patterns          # Tool call sequence analysis (Markov chains)
 normalize sessions plans             # View agent plans
 ```
 
