@@ -211,7 +211,14 @@ impl OutputFormatter for ComplexityReport {
             }
         }
 
-        if !self.functions.is_empty() {
+        if self.functions.is_empty() && self.full_stats.is_none() {
+            lines.push(String::new());
+            lines.push(
+                "hint: no supported source files found — pass a file path or a directory \
+                 containing code"
+                    .to_string(),
+            );
+        } else if !self.functions.is_empty() {
             lines.push(String::new());
             if is_diff {
                 lines.push("## Most Changed Functions".to_string());
@@ -345,7 +352,17 @@ impl OutputFormatter for ComplexityReport {
             }
         }
 
-        if !self.functions.is_empty() {
+        if self.functions.is_empty() && self.full_stats.is_none() {
+            lines.push(String::new());
+            lines.push(
+                Color::Yellow
+                    .paint(
+                        "hint: no supported source files found — pass a file path or a \
+                         directory containing code",
+                    )
+                    .to_string(),
+            );
+        } else if !self.functions.is_empty() {
             lines.push(String::new());
             if is_diff {
                 lines.push(

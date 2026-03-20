@@ -71,13 +71,14 @@ impl OutputFormatter for SessionListReport {
 
         // Legend header
         let legend = if self.has_subagents && multi {
-            "# id  age  duration  turns  tools  project  parent  type  title".to_string()
+            "# id  age  duration  user_msgs  tools  project  parent  type  first_message"
+                .to_string()
         } else if self.has_subagents {
-            "# id  age  duration  user  tools  parent  type  title".to_string()
+            "# id  age  duration  user_msgs  tools  parent  type  first_message".to_string()
         } else if multi {
-            "# id  age  duration  turns  tools  project  title".to_string()
+            "# id  age  duration  user_msgs  tools  project  first_message".to_string()
         } else {
-            "# id  age  duration  user  tools  title".to_string()
+            "# id  age  duration  user_msgs  tools  first_message".to_string()
         };
         lines.push(legend);
 
@@ -87,14 +88,15 @@ impl OutputFormatter for SessionListReport {
                 .duration_seconds
                 .map(format_duration)
                 .unwrap_or_else(|| "-".to_string());
-            let counts = format!("{}u {}tc", item.user_messages, item.tool_calls);
-            let title = item
+            let user_msgs = item.user_messages.to_string();
+            let tool_calls = item.tool_calls.to_string();
+            let first_message = item
                 .first_message
                 .as_deref()
                 .map(truncate_message)
                 .unwrap_or_default();
 
-            let mut parts = vec![item.id.clone(), age, duration, counts];
+            let mut parts = vec![item.id.clone(), age, duration, user_msgs, tool_calls];
             if multi {
                 parts.push(item.project.as_deref().unwrap_or("?").to_string());
             }
@@ -102,7 +104,7 @@ impl OutputFormatter for SessionListReport {
                 parts.push(item.parent_id.as_deref().unwrap_or("-").to_string());
                 parts.push(item.subagent_type.as_deref().unwrap_or("-").to_string());
             }
-            parts.push(title);
+            parts.push(first_message);
             lines.push(parts.join("  "));
         }
         if let Some(ref t) = self.truncated {

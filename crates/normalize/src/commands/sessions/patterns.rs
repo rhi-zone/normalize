@@ -228,15 +228,20 @@ fn format_matrix_text(out: &mut String, matrix: &TransitionMatrix) {
         return;
     }
 
-    // Find max label width
+    // Find max label width; col_width must fit the full label plus a padding space
     let max_label = matrix.states.iter().map(|s| s.len()).max().unwrap_or(5);
-    let col_width = 7;
+    let col_width = matrix
+        .states
+        .iter()
+        .map(|s| s.len() + 1)
+        .max()
+        .unwrap_or(7)
+        .max(7);
 
     // Header row
     let _ = write!(out, "{:width$}", "", width = max_label + 2);
     for state in &matrix.states {
-        let label = if state.len() > 6 { &state[..6] } else { state };
-        let _ = write!(out, "{:>width$}", label, width = col_width);
+        let _ = write!(out, "{:>width$}", state, width = col_width);
     }
     let _ = writeln!(out);
 
@@ -270,13 +275,23 @@ fn format_matrix_pretty(out: &mut String, matrix: &TransitionMatrix) {
     }
 
     let max_label = matrix.states.iter().map(|s| s.len()).max().unwrap_or(5);
-    let col_width = 7;
+    let col_width = matrix
+        .states
+        .iter()
+        .map(|s| s.len() + 1)
+        .max()
+        .unwrap_or(7)
+        .max(7);
 
     // Header row
     let _ = write!(out, "{:width$}", "", width = max_label + 2);
     for state in &matrix.states {
-        let label = if state.len() > 6 { &state[..6] } else { state };
-        let _ = write!(out, "{:>width$}", Cyan.paint(label), width = col_width);
+        let _ = write!(
+            out,
+            "{:>width$}",
+            Cyan.paint(state.as_str()),
+            width = col_width
+        );
     }
     let _ = writeln!(out);
 

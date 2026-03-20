@@ -236,7 +236,10 @@ impl OutputFormatter for MessagesReport {
             }
         } else if self.sort_order == SortOrder::Timestamp {
             // Timestamp mode: no session grouping; show session ID inline per message
-            for msg in &self.messages {
+            for (i, msg) in self.messages.iter().enumerate() {
+                if i > 0 {
+                    lines.push("---".to_string());
+                }
                 let id_short = if msg.session_id.len() > 8 {
                     &msg.session_id[..8]
                 } else {
@@ -278,6 +281,9 @@ impl OutputFormatter for MessagesReport {
                     lines.push(format!("[{}] {}  {}", id_short, project, date));
                     last_session = Some(msg.session_id.clone());
                     last_date = Some(date.to_owned());
+                } else {
+                    // Separator between messages within the same session
+                    lines.push("---".to_string());
                 }
 
                 let ts = msg.timestamp.as_deref().unwrap_or("?");
