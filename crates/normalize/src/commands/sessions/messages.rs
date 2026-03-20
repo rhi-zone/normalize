@@ -58,6 +58,43 @@ impl fmt::Display for RoleFilter {
     }
 }
 
+/// Sort order for messages output.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum SortOrder {
+    /// Group messages by session, ordered within each session (default).
+    #[default]
+    Session,
+    /// Sort all messages chronologically across sessions by timestamp.
+    Timestamp,
+}
+
+impl FromStr for SortOrder {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "session" => Ok(SortOrder::Session),
+            "timestamp" | "time" => Ok(SortOrder::Timestamp),
+            _ => Err(format!(
+                "invalid sort '{}': expected 'session' or 'timestamp'",
+                s
+            )),
+        }
+    }
+}
+
+impl fmt::Display for SortOrder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SortOrder::Session => write!(f, "session"),
+            SortOrder::Timestamp => write!(f, "timestamp"),
+        }
+    }
+}
+
 /// A single message extracted from a session.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct MessageRecord {
@@ -100,6 +137,10 @@ pub struct MessagesReport {
     #[serde(skip)]
     #[schemars(skip)]
     pub(crate) line_mode: bool,
+    /// Sort order applied to this report.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) sort_order: SortOrder,
 }
 
 /// Aggregate stats for the messages report.
@@ -192,6 +233,28 @@ impl OutputFormatter for MessagesReport {
                 for (i, ctx) in msg.context_after.iter().enumerate() {
                     lines.push(format!("  {:>4}-  {}", line_num + 1 + i + 1, ctx));
                 }
+            }
+        } else if self.sort_order == SortOrder::Timestamp {
+            // Timestamp mode: no session grouping; show session ID inline per message
+            for msg in &self.messages {
+                let id_short = if msg.session_id.len() > 8 {
+                    &msg.session_id[..8]
+                } else {
+                    &msg.session_id
+                };
+                let ts = msg.timestamp.as_deref().unwrap_or("?");
+                let ts_short = if ts.len() > 19 { &ts[..19] } else { ts };
+                let ts_display = ts_short.replace('T', " ");
+                let abbrev = role_abbrev(&msg.role);
+                let usage_suffix = if self.show_usage {
+                    format_usage_text(msg.usage.as_ref())
+                } else {
+                    String::new()
+                };
+                lines.push(format!(
+                    "[{}] [{}] {}{}  {}",
+                    id_short, abbrev, ts_display, usage_suffix, msg.text
+                ));
             }
         } else {
             // Normal mode: group consecutive messages by session_id
@@ -334,6 +397,34 @@ impl OutputFormatter for MessagesReport {
                         ctx
                     ));
                 }
+            }
+        } else if self.sort_order == SortOrder::Timestamp {
+            // Timestamp mode: no session grouping; show session ID inline per message
+            for msg in &self.messages {
+                let id_short = if msg.session_id.len() > 8 {
+                    &msg.session_id[..8]
+                } else {
+                    &msg.session_id
+                };
+                let ts = msg.timestamp.as_deref().unwrap_or("?");
+                let ts_short = if ts.len() > 19 { &ts[..19] } else { ts };
+                let ts_display = ts_short.replace('T', " ");
+                let role_badge = match msg.role.as_str() {
+                    "user" => "\x1b[34m[user]\x1b[0m",
+                    "assistant" => "\x1b[32m[asst]\x1b[0m",
+                    "system" => "\x1b[33m[sys]\x1b[0m",
+                    "tool" => "\x1b[35m[tool]\x1b[0m",
+                    r => r,
+                };
+                let usage_tag = if self.show_usage {
+                    format_usage_pretty(msg.usage.as_ref())
+                } else {
+                    String::new()
+                };
+                lines.push(format!(
+                    "\x1b[33m{}\x1b[0m {} \x1b[90m{}\x1b[0m{}  {}",
+                    id_short, role_badge, ts_display, usage_tag, msg.text
+                ));
             }
         } else {
             // Normal mode: group consecutive messages by session_id
@@ -501,6 +592,7 @@ pub fn build_messages_report(
     session_filter: Option<&str>,
     show_usage: bool,
     sort_by_tokens: bool,
+    sort_order: SortOrder,
     context_lines: usize,
     pretty: bool,
     mode: &super::SessionMode,
@@ -729,6 +821,15 @@ pub fn build_messages_report(
         });
     }
 
+    // Sort chronologically across sessions when --sort timestamp is requested
+    if sort_order == SortOrder::Timestamp {
+        messages.sort_by(|a, b| {
+            let ts_a = a.timestamp.as_deref().unwrap_or("");
+            let ts_b = b.timestamp.as_deref().unwrap_or("");
+            ts_a.cmp(ts_b)
+        });
+    }
+
     // Build stats
     let mut by_role: HashMap<String, usize> = HashMap::new();
     let mut total_chars = 0;
@@ -761,5 +862,6 @@ pub fn build_messages_report(
         pretty,
         show_usage,
         line_mode: context_lines > 0,
+        sort_order,
     })
 }

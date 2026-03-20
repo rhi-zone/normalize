@@ -25,6 +25,7 @@ Options:
   -n, --limit <limit>              Maximum number of sessions
       --show-usage                 Show per-turn token usage (input/output/cache)
       --sort-by-tokens             Sort by descending token count (heaviest turns first)
+      --sort <sort>                Sort order: session (default, grouped by session) or timestamp (chronological across sessions)
   -C, --context <context>          Lines of context around each matching line (requires --grep)
   -r, --root <root>                Root directory (defaults to current directory)
       --mode <mode>                Session mode: interactive (default), subagent, or all

@@ -339,6 +339,10 @@ impl SessionsService {
         #[param(help = "Sort by descending token count (heaviest turns first)")]
         sort_by_tokens: bool,
         #[param(
+            help = "Sort order: session (default, grouped by session) or timestamp (chronological across sessions)"
+        )]
+        sort: Option<crate::commands::sessions::messages::SortOrder>,
+        #[param(
             short = 'C',
             help = "Lines of context around each matching line (requires --grep)"
         )]
@@ -364,6 +368,7 @@ impl SessionsService {
             return Err("--context requires --grep".to_string());
         }
         let mode = mode.unwrap_or_default();
+        let sort_order = sort.unwrap_or_default();
         crate::commands::sessions::build_messages_report(
             root_path,
             limit,
@@ -378,6 +383,7 @@ impl SessionsService {
             session.as_deref(),
             show_usage,
             sort_by_tokens,
+            sort_order,
             context_lines,
             is_pretty,
             &mode,
