@@ -87,6 +87,9 @@ pub struct MessageRecord {
 pub struct MessagesReport {
     pub messages: Vec<MessageRecord>,
     pub stats: MessagesStats,
+    /// Present when `--limit` truncated the session list.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truncated: Option<super::TruncationInfo>,
     #[serde(skip)]
     #[schemars(skip)]
     pub(crate) pretty: bool,
@@ -260,6 +263,9 @@ impl OutputFormatter for MessagesReport {
             role_summary.join(", "),
             token_summary,
         ));
+        if let Some(ref t) = self.truncated {
+            lines.push(t.notice());
+        }
 
         lines.join("\n")
     }
@@ -408,6 +414,9 @@ impl OutputFormatter for MessagesReport {
             role_summary.join(", "),
             token_summary,
         ));
+        if let Some(ref t) = self.truncated {
+            lines.push(format!("\x1b[90m{}\x1b[0m", t.notice()));
+        }
 
         lines.join("\n")
     }
@@ -564,9 +573,13 @@ pub fn build_messages_report(
     }
 
     sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
-    if session_filter.is_none() && limit > 0 {
+    let total_before_limit = sessions.len();
+    let truncated = if session_filter.is_none() && limit > 0 {
         sessions.truncate(limit);
-    }
+        super::TruncationInfo::if_truncated(total_before_limit, limit)
+    } else {
+        None
+    };
 
     if sessions.is_empty() {
         return Err("No sessions found".to_string());
@@ -744,6 +757,7 @@ pub fn build_messages_report(
     Ok(MessagesReport {
         messages,
         stats,
+        truncated,
         pretty,
         show_usage,
         line_mode: context_lines > 0,

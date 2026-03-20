@@ -63,6 +63,9 @@ pub struct PatternsReport {
     pub common_end_tools: Vec<(String, f64)>,
     /// Per-session transition data.
     pub per_session: Vec<SessionTransitions>,
+    /// Present when `--limit` truncated the session list.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truncated: Option<super::TruncationInfo>,
     /// Whether to use pretty formatting.
     #[serde(skip)]
     pub pretty: bool,
@@ -109,6 +112,11 @@ impl OutputFormatter for PatternsReport {
                 "  {:.4}  {}t  {}tc  {}  {}",
                 s.divergence, s.turn_count, s.tool_count, s.path, msg
             );
+        }
+
+        if let Some(ref t) = self.truncated {
+            let _ = writeln!(out);
+            let _ = writeln!(out, "{}", t.notice());
         }
 
         out
@@ -180,6 +188,12 @@ impl OutputFormatter for PatternsReport {
                 Yellow.paint(&s.path),
                 msg,
             );
+        }
+
+        if let Some(ref t) = self.truncated {
+            use nu_ansi_term::Color::DarkGray;
+            let _ = writeln!(out);
+            let _ = writeln!(out, "{}", DarkGray.paint(t.notice()));
         }
 
         out
@@ -506,9 +520,11 @@ pub fn build_patterns_report(
     }
 
     sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
+    let total_before_limit = sessions.len();
     if limit > 0 {
         sessions.truncate(limit);
     }
+    let truncated = super::TruncationInfo::if_truncated(total_before_limit, limit);
 
     if sessions.is_empty() {
         return Err("No sessions found".to_string());
@@ -619,6 +635,7 @@ pub fn build_patterns_report(
         common_start_tools,
         common_end_tools,
         per_session,
+        truncated,
         pretty,
     })
 }

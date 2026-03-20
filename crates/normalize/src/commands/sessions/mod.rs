@@ -31,6 +31,39 @@ use nucleo_matcher::{Config, Matcher};
 
 pub use subagents::{SubagentSummaryItem, SubagentsReport};
 
+/// Metadata about truncation applied by `--limit`.
+/// Included in reports so text/pretty output can show a notice and JSON output
+/// can carry structured truncation info.
+#[derive(Debug, Clone, serde::Serialize, schemars::JsonSchema)]
+pub struct TruncationInfo {
+    /// Number of items shown after truncation.
+    pub showing: usize,
+    /// Total number of items before truncation.
+    pub total: usize,
+}
+
+impl TruncationInfo {
+    /// Create a `TruncationInfo` only when truncation actually occurred.
+    pub fn if_truncated(total: usize, limit: usize) -> Option<Self> {
+        if limit > 0 && total > limit {
+            Some(Self {
+                showing: limit,
+                total,
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Format a human-readable notice for text/pretty output.
+    pub fn notice(&self) -> String {
+        format!(
+            "Showing {} of {} sessions (use --limit 0 for all)",
+            self.showing, self.total
+        )
+    }
+}
+
 /// Session filter mode: which kinds of sessions to include.
 #[derive(
     Debug,

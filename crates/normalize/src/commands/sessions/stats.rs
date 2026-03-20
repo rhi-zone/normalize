@@ -167,6 +167,7 @@ pub fn show_stats_grouped(
 
     // Sort by time (newest first) and limit
     sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
+    let total_before_limit = sessions.len();
     if limit > 0 {
         sessions.truncate(limit);
     }
@@ -209,6 +210,9 @@ pub fn show_stats_grouped(
             date_range,
             project_info
         );
+        if let Some(t) = super::TruncationInfo::if_truncated(total_before_limit, limit) {
+            eprintln!("{}\n", t.notice());
+        }
     }
 
     // Group and analyze
@@ -295,12 +299,17 @@ pub fn build_stats_data(
     }
 
     sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
+    let total_before_limit = sessions.len();
     if limit > 0 {
         sessions.truncate(limit);
     }
 
     if sessions.is_empty() {
         return Err("No sessions found".to_string());
+    }
+
+    if let Some(t) = super::TruncationInfo::if_truncated(total_before_limit, limit) {
+        eprintln!("{}", t.notice());
     }
 
     let paths: Vec<_> = sessions.iter().map(|s| s.path.clone()).collect();

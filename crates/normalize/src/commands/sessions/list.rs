@@ -34,6 +34,9 @@ struct SessionListItem {
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct SessionListReport {
     sessions: Vec<SessionListItem>,
+    /// Present when `--limit` truncated the results.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    truncated: Option<super::TruncationInfo>,
     /// Whether to use pretty output when rendered via Display (service layer).
     #[serde(skip)]
     #[schemars(skip)]
@@ -102,6 +105,9 @@ impl OutputFormatter for SessionListReport {
             parts.push(title);
             lines.push(parts.join("  "));
         }
+        if let Some(ref t) = self.truncated {
+            lines.push(t.notice());
+        }
         lines.join("\n")
     }
 
@@ -145,6 +151,10 @@ impl OutputFormatter for SessionListReport {
             parts.push(title);
 
             lines.push(parts.join("  "));
+        }
+        if let Some(ref t) = self.truncated {
+            use nu_ansi_term::Color::DarkGray;
+            lines.push(DarkGray.paint(t.notice()).to_string());
         }
         lines.join("\n")
     }
@@ -336,9 +346,11 @@ pub fn build_session_list(
     }
 
     sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
+    let total_before_limit = sessions.len();
     if limit > 0 {
         sessions.truncate(limit);
     }
+    let truncated = super::TruncationInfo::if_truncated(total_before_limit, limit);
 
     let has_subagents = sessions.iter().any(|s| s.parent_id.is_some());
 
@@ -372,6 +384,7 @@ pub fn build_session_list(
 
     Ok(SessionListReport {
         sessions: items,
+        truncated,
         pretty,
         has_subagents,
     })
