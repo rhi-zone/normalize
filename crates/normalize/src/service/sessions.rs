@@ -249,7 +249,11 @@ impl SessionsService {
         #[param(help = "Force specific format: claude, codex, gemini, normalize")] format: Option<
             String,
         >,
-        #[param(short = 'n', help = "Maximum number of sessions")] limit: Option<usize>,
+        #[param(
+            short = 'n',
+            help = "Maximum number of sessions (0 = all, default: all)"
+        )]
+        limit: Option<usize>,
         #[param(help = "Group results by comma-separated fields: project, day (e.g. project,day)")]
         group_by: Option<String>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -261,7 +265,7 @@ impl SessionsService {
         #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
         agent_type: Option<String>,
     ) -> Result<SessionAnalysis, String> {
-        let limit = limit.unwrap_or(20);
+        let limit = limit.unwrap_or(0);
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let mode = mode.unwrap_or_default();
@@ -426,7 +430,11 @@ impl SessionsService {
         #[param(help = "Force specific format: claude, codex, gemini, normalize")] format: Option<
             String,
         >,
-        #[param(short = 'n', help = "Maximum number of sessions")] limit: Option<usize>,
+        #[param(
+            short = 'n',
+            help = "Maximum number of sessions (0 = all, default: all)"
+        )]
+        limit: Option<usize>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -438,7 +446,7 @@ impl SessionsService {
         pretty: bool,
         compact: bool,
     ) -> Result<PatternsReport, String> {
-        let limit = limit.unwrap_or(20);
+        let limit = limit.unwrap_or(0);
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
