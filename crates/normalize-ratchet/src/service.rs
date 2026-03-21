@@ -178,10 +178,7 @@ impl OutputFormatter for RatchetShowReport {
 // Service
 // ---------------------------------------------------------------------------
 
-/// Factory type for building the set of metrics to use.
-/// Passed into [`RatchetService`] at construction time so the service layer
-/// can remain decoupled from the `normalize` main crate.
-pub type MetricFactory = fn() -> Vec<Box<dyn Metric>>;
+pub use crate::MetricFactory;
 
 /// Internal result type for measure_all to avoid overly complex type signature.
 type MeasureAllResult = (Vec<Box<dyn Metric>>, HashMap<String, Vec<(String, i64)>>);

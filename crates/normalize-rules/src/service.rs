@@ -91,7 +91,7 @@ pub struct RulesService {
     /// Issue display limit for text output (default 50).
     limit: Cell<usize>,
     /// Optional factory for ratchet metrics. When set, the ratchet native rule is enabled.
-    ratchet_factory: Option<normalize_ratchet::service::MetricFactory>,
+    ratchet_factory: Option<normalize_ratchet::MetricFactory>,
 }
 
 impl RulesService {
@@ -105,7 +105,7 @@ impl RulesService {
     }
 
     /// Attach a ratchet metric factory, enabling the ratchet native rules.
-    pub fn with_ratchet(mut self, factory: normalize_ratchet::service::MetricFactory) -> Self {
+    pub fn with_ratchet(mut self, factory: normalize_ratchet::MetricFactory) -> Self {
         self.ratchet_factory = Some(factory);
         self
     }

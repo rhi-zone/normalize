@@ -24,6 +24,10 @@ pub mod service;
 
 use std::path::Path;
 
+/// Factory function type for constructing the set of active metrics.
+/// Lives outside the `cli` feature so the rules engine can reference it without CLI deps.
+pub type MetricFactory = fn() -> Vec<Box<dyn Metric>>;
+
 /// A measurable metric that can be tracked in the ratchet baseline.
 pub trait Metric: Send + Sync {
     /// Short identifier for this metric (used as the key in `ratchet.json`).
