@@ -28,6 +28,7 @@ pub mod guide;
 pub mod history;
 pub mod package;
 pub mod rank;
+pub mod ratchet;
 // rules module moved to normalize-rules crate; re-exported for internal use
 pub mod serve;
 pub mod sessions;
@@ -59,6 +60,7 @@ pub struct NormalizeService {
     generate: generate::GenerateService,
     package: package::PackageService,
     rank: rank::RankService,
+    ratchet: normalize_ratchet::service::RatchetService,
     rules: normalize_rules::RulesService,
     serve: serve::ServeService,
     syntax: syntax::SyntaxService,
@@ -96,7 +98,9 @@ impl NormalizeService {
             generate: generate::GenerateService,
             package: package::PackageService::new(&pretty),
             rank: rank::RankService::new(&pretty),
-            rules: normalize_rules::RulesService::new(&pretty),
+            ratchet: ratchet::new_ratchet_service(),
+            rules: normalize_rules::RulesService::new(&pretty)
+                .with_ratchet(ratchet::default_metrics),
             serve: serve::ServeService,
             syntax: syntax::SyntaxService::new(),
             sessions: sessions::SessionsService::new(&pretty),
@@ -783,6 +787,11 @@ impl NormalizeService {
     /// Rank code by metrics (complexity, size, coupling, duplicates, and more)
     pub fn rank(&self) -> &rank::RankService {
         &self.rank
+    }
+
+    /// Track metric regressions with a stored baseline
+    pub fn ratchet(&self) -> &normalize_ratchet::service::RatchetService {
+        &self.ratchet
     }
 
     /// Manage and run syntax/fact rules

@@ -3759,6 +3759,7 @@ dependencies = [
  "normalize-openapi",
  "normalize-output",
  "normalize-path-resolve",
+ "normalize-ratchet",
  "normalize-rules",
  "normalize-scope",
  "normalize-session-analysis",
@@ -4141,6 +4142,7 @@ dependencies = [
  "normalize-facts",
  "normalize-languages",
  "normalize-output",
+ "normalize-ratchet",
  "regex",
  "schemars",
  "serde",
@@ -4195,6 +4197,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "normalize-ratchet"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "normalize-output",
+ "schemars",
+ "serde",
+ "serde_json",
+ "server-less",
+]
+
+[[package]]
 name = "normalize-rules"
 version = "0.1.0"
 dependencies = [
@@ -4210,6 +4224,7 @@ dependencies = [
  "normalize-languages",
  "normalize-native-rules",
  "normalize-output",
+ "normalize-ratchet",
  "normalize-rules-config",
  "normalize-syntax-rules",
  "nu-ansi-term",

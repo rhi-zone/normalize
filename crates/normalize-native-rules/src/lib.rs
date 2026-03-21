@@ -6,12 +6,14 @@
 
 pub mod check_examples;
 pub mod check_refs;
+pub mod ratchet;
 pub mod stale_docs;
 pub mod stale_summary;
 pub(crate) mod walk;
 
 pub use check_examples::build_check_examples_report;
 pub use check_refs::build_check_refs_report;
+pub use ratchet::build_ratchet_report;
 pub use stale_docs::build_stale_docs_report;
 pub use stale_summary::build_stale_summary_report;
 
@@ -54,5 +56,17 @@ pub const NATIVE_RULES: &[NativeRuleDescriptor] = &[
         default_severity: "warning",
         message: "Example referenced in docs doesn't appear in the source file",
         tags: &["documentation"],
+    },
+    NativeRuleDescriptor {
+        id: "ratchet/complexity-total",
+        default_severity: "error",
+        message: "Total codebase complexity regressed past the stored baseline",
+        tags: &["quality", "complexity"],
+    },
+    NativeRuleDescriptor {
+        id: "ratchet/complexity-per-function",
+        default_severity: "error",
+        message: "Per-function complexity regressed past the stored baseline",
+        tags: &["quality", "complexity"],
     },
 ];
