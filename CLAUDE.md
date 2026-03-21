@@ -23,9 +23,10 @@ Practical consequences:
 
 **CLI is generated from the service layer.** Subcommands come from `#[cli(...)]` proc-macro attributes on service methods, not `args.rs`. When adding a new subcommand:
 0. **Check if it already exists under a different service.** Run `normalize --help` and check each service's subcommands. Commands have been moved between services before (e.g. `analyze ast` → `syntax ast` → duplicate `analyze parse` created because no one checked `syntax`).
-1. Look at an existing command for the pattern: `normalize view crates/normalize/src/service/analyze.rs` and pick a similar method as template.
-2. Create the analysis module (`commands/analyze/<name>.rs`) with report struct + `OutputFormatter`
-3. Add `assert_output_formatter::<Report>()` in `output.rs` test
+1. **Decide where it lives.** If the subcommand belongs to an existing feature crate, add it there. If it's a new standalone feature, create a new crate with its own service. Only add to `commands/` in the main crate if it has no standalone value and no home elsewhere.
+2. Look at an existing command for the pattern: `normalize view crates/normalize/src/service/analyze.rs` and pick a similar method as template.
+3. Create the report struct + `OutputFormatter` in the owning crate (or `commands/<name>.rs` if staying in the main crate).
+4. Add `assert_output_formatter::<Report>()` in `output.rs` test
 
 **server-less is our own project** (dogfooding). Source at `/home/me/git/rhizone/server-less`. When the proc macro causes confusing behavior, investigate and fix it in server-less — don't document workarounds here. If a rule about server-less needs to exist in CLAUDE.md, that's a server-less UX bug.
 
@@ -33,7 +34,7 @@ Practical consequences:
 
 **A crate should only exist if:** (a) it has multiple actual dependents within the workspace, or (b) it is clearly useful standalone — meaning it could be published independently and people would use it without normalize (e.g. `normalize-graph`, `normalize-code-similarity`). "Could theoretically be reused someday" doesn't count. If neither condition is met, the code belongs in `commands/` or the single crate that uses it.
 
-The test for extraction: is this domain logic (algorithms, data models, extraction) or CLI wiring (formatting, dispatch, service layer)? Domain logic can be extracted when the above conditions are met. CLI wiring stays in `normalize`. If it's purely "compute something and format it for this one command", it stays in `commands/`.
+The test for extraction: is this domain logic (algorithms, data models, extraction) or CLI wiring (formatting, dispatch, service layer)? Domain logic can be extracted when the above conditions are met. CLI wiring for a feature lives in the crate that owns that feature — a crate that owns a subcommand includes its own `#[cli]` service, report structs, and `OutputFormatter` impls. The main `normalize` crate just mounts them. CLI support in a crate is always behind a `cli` feature flag so library consumers don't pull in CLI dependencies. Only cross-cutting wiring (command dispatch, global flags, output backend) lives in `normalize` itself. If it's purely "compute something and format it for this one command" with no standalone value, it stays in `commands/`.
 
 
 ## Core Rule
