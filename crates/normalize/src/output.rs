@@ -152,5 +152,17 @@ mod tests {
         assert_output_formatter::<ShowReport>();
         assert_output_formatter::<AddResult>();
         assert_output_formatter::<RemoveResult>();
+
+        use normalize_budget::service::{
+            AddResult as BudgetAddResult, CheckReport as BudgetCheckReport,
+            MeasureResult as BudgetMeasureResult, RemoveResult as BudgetRemoveResult,
+            ShowReport as BudgetShowReport, UpdateResult as BudgetUpdateResult,
+        };
+        assert_output_formatter::<BudgetMeasureResult>();
+        assert_output_formatter::<BudgetCheckReport>();
+        assert_output_formatter::<BudgetAddResult>();
+        assert_output_formatter::<BudgetUpdateResult>();
+        assert_output_formatter::<BudgetShowReport>();
+        assert_output_formatter::<BudgetRemoveResult>();
     }
 }

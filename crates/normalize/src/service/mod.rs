@@ -60,6 +60,7 @@ pub struct NormalizeService {
     generate: generate::GenerateService,
     package: package::PackageService,
     rank: rank::RankService,
+    budget: normalize_budget::service::BudgetService,
     ratchet: normalize_ratchet::service::RatchetService,
     rules: normalize_rules::RulesService,
     serve: serve::ServeService,
@@ -98,6 +99,7 @@ impl NormalizeService {
             generate: generate::GenerateService,
             package: package::PackageService::new(&pretty),
             rank: rank::RankService::new(&pretty),
+            budget: normalize_budget::service::BudgetService::new(&pretty),
             ratchet: normalize_ratchet::service::RatchetService::new(&pretty),
             rules: normalize_rules::RulesService::new(&pretty),
             serve: serve::ServeService,
@@ -786,6 +788,11 @@ impl NormalizeService {
     /// Rank code by metrics (complexity, size, coupling, duplicates, and more)
     pub fn rank(&self) -> &rank::RankService {
         &self.rank
+    }
+
+    /// Track diff-based budgets (limits on how much things can change)
+    pub fn budget(&self) -> &normalize_budget::service::BudgetService {
+        &self.budget
     }
 
     /// Track metric regressions with a ratchet baseline

@@ -329,7 +329,7 @@ impl RulesService {
         .await
         .map_err(|e| format!("Task error: {e}"))?;
 
-        // Native engine (stale-summary, check-refs, stale-docs, check-examples, ratchet)
+        // Native engine (stale-summary, check-refs, stale-docs, check-examples, ratchet, budget)
         // runs in async context; included in All and Native engine types.
         // All checks are independent — run them in parallel.
         if run_native {
@@ -337,7 +337,7 @@ impl RulesService {
             let native_config = load_rules_config(&native_root);
             let threshold = 10;
 
-            let (summary_res, stale_res, examples_res, refs_res, ratchet_res) = tokio::join!(
+            let (summary_res, stale_res, examples_res, refs_res, ratchet_res, budget_res) = tokio::join!(
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
                     move || normalize_native_rules::build_stale_summary_report(&root, threshold)
@@ -355,6 +355,10 @@ impl RulesService {
                     let root = native_root.clone();
                     move || normalize_native_rules::build_ratchet_report(&root)
                 }),
+                tokio::task::spawn_blocking({
+                    let root = native_root.clone();
+                    move || normalize_native_rules::build_budget_report(&root)
+                }),
             );
             if let Ok(r) = summary_res {
                 report.merge(r.into());
@@ -369,6 +373,9 @@ impl RulesService {
                 report.merge(r.into());
             }
             if let Ok(r) = ratchet_res {
+                report.merge(r);
+            }
+            if let Ok(r) = budget_res {
                 report.merge(r);
             }
 

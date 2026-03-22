@@ -1,0 +1,151 @@
+//! Functions added/removed diff metric.
+
+use super::DiffMetric;
+use normalize_facts::Extractor;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::path::Path;
+use std::process::Command;
+
+/// Functions/methods introduced or removed.
+///
+/// Compares function symbol lists at `base_ref` vs the working tree.
+/// Returns `(file/Parent/fn, 1.0, 0.0)` for added functions and `(file/Parent/fn, 0.0, 1.0)`
+/// for removed functions.
+pub struct FunctionsMetric;
+
+impl DiffMetric for FunctionsMetric {
+    fn name(&self) -> &'static str {
+        "functions"
+    }
+
+    fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<(String, f64, f64)>> {
+        symbol_diff(root, base_ref, &["function", "method"])
+    }
+}
+
+/// Create a temporary git worktree at the given ref. Returns the worktree path.
+pub(crate) fn create_worktree(root: &Path, base_ref: &str) -> anyhow::Result<std::path::PathBuf> {
+    let hash_output = Command::new("git")
+        .args(["rev-parse", "--verify", base_ref])
+        .current_dir(root)
+        .output()
+        .map_err(|e| anyhow::anyhow!("failed to run git: {e}"))?;
+
+    if !hash_output.status.success() {
+        return Err(anyhow::anyhow!(
+            "git ref '{base_ref}' not found: {}",
+            String::from_utf8_lossy(&hash_output.stderr).trim()
+        ));
+    }
+
+    let hash = String::from_utf8_lossy(&hash_output.stdout)
+        .trim()
+        .to_string();
+    let short = &hash[..7.min(hash.len())];
+    let worktree_name = format!("normalize-budget-wt-{short}");
+    let worktree_path = std::env::temp_dir().join(&worktree_name);
+    let worktree_str = worktree_path.to_string_lossy().to_string();
+
+    // Clean up any stale worktree
+    if worktree_path.exists() {
+        let _ = Command::new("git")
+            .args(["worktree", "remove", &worktree_str, "--force"])
+            .current_dir(root)
+            .output();
+    }
+
+    let add_output = Command::new("git")
+        .args(["worktree", "add", "--detach", &worktree_str, &hash])
+        .current_dir(root)
+        .output()
+        .map_err(|e| anyhow::anyhow!("failed to create worktree: {e}"))?;
+
+    if !add_output.status.success() {
+        return Err(anyhow::anyhow!(
+            "git worktree add failed: {}",
+            String::from_utf8_lossy(&add_output.stderr).trim()
+        ));
+    }
+
+    Ok(worktree_path)
+}
+
+/// Remove a temporary git worktree (best-effort).
+pub(crate) fn remove_worktree(root: &Path, worktree_path: &Path) {
+    let worktree_str = worktree_path.to_string_lossy().to_string();
+    let _ = Command::new("git")
+        .args(["worktree", "remove", &worktree_str, "--force"])
+        .current_dir(root)
+        .output();
+}
+
+fn collect_symbols_for_kinds(scan_root: &Path, kinds: &[&str]) -> HashMap<String, ()> {
+    let extractor = Extractor::new();
+    let all_files = normalize_path_resolve::all_files(scan_root, None);
+    let mut map = HashMap::new();
+
+    for entry in &all_files {
+        if entry.kind != "file" {
+            continue;
+        }
+        let abs_path = scan_root.join(&entry.path);
+        let Ok(content) = std::fs::read_to_string(&abs_path) else {
+            continue;
+        };
+
+        let result = extractor.extract(&abs_path, &content);
+        let rel = entry.path.replace('\\', "/");
+        collect_recursive(&result.symbols, &rel, None, kinds, &mut map);
+    }
+    map
+}
+
+fn collect_recursive(
+    symbols: &[normalize_facts::Symbol],
+    rel_path: &str,
+    parent_name: Option<&str>,
+    kinds: &[&str],
+    map: &mut HashMap<String, ()>,
+) {
+    for sym in symbols {
+        let kind_str = sym.kind.as_str();
+        if kinds.contains(&kind_str) {
+            let key = if let Some(parent) = parent_name {
+                format!("{rel_path}/{parent}/{}", sym.name)
+            } else {
+                format!("{rel_path}/{}", sym.name)
+            };
+            map.insert(key, ());
+        }
+        // Recurse into children (nested symbols like methods in classes)
+        if !sym.children.is_empty() {
+            collect_recursive(&sym.children, rel_path, Some(&sym.name), kinds, map);
+        }
+    }
+}
+
+/// Diff symbols of the given kinds between `base_ref` and the working tree.
+pub(crate) fn symbol_diff(
+    root: &Path,
+    base_ref: &str,
+    kinds: &[&str],
+) -> anyhow::Result<Vec<(String, f64, f64)>> {
+    let worktree_path = create_worktree(root, base_ref)?;
+    let base_map = collect_symbols_for_kinds(&worktree_path, kinds);
+    remove_worktree(root, &worktree_path);
+
+    let current_map = collect_symbols_for_kinds(root, kinds);
+
+    let base_set: HashSet<&String> = base_map.keys().collect();
+    let current_set: HashSet<&String> = current_map.keys().collect();
+
+    let mut results = Vec::new();
+    for key in current_set.difference(&base_set) {
+        results.push(((*key).clone(), 1.0, 0.0));
+    }
+    for key in base_set.difference(&current_set) {
+        results.push(((*key).clone(), 0.0, 1.0));
+    }
+    Ok(results)
+}

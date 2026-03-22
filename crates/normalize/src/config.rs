@@ -71,6 +71,7 @@ use crate::daemon::DaemonConfig;
 use crate::filter::AliasConfig;
 use crate::output::PrettyConfig;
 use crate::shadow::ShadowConfig;
+use normalize_budget::BudgetConfig;
 use normalize_ratchet::RatchetConfig;
 use normalize_rules::RulesConfig;
 use schemars::JsonSchema;
@@ -141,6 +142,9 @@ pub struct NormalizeConfig {
     /// Ratchet metric regression tracking (`[ratchet]` section).
     #[param(nested, serde)]
     pub ratchet: RatchetConfig,
+    /// Diff-based budget tracking (`[budget]` section).
+    #[param(nested, serde)]
+    pub budget: BudgetConfig,
 }
 
 impl NormalizeConfig {

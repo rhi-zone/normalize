@@ -1,9 +1,10 @@
 //! Native rule checks for normalize.
 //!
-//! Implements stale-summary, check-refs, stale-docs, check-examples, and ratchet as
+//! Implements stale-summary, check-refs, stale-docs, check-examples, ratchet, and budget as
 //! pure Rust checks (no tree-sitter AST parsing). These are the "native engine"
 //! checks invoked by `normalize rules run --engine native`.
 
+pub mod budget;
 pub mod check_examples;
 pub mod check_refs;
 pub mod ratchet;
@@ -11,6 +12,7 @@ pub mod stale_docs;
 pub mod stale_summary;
 pub(crate) mod walk;
 
+pub use budget::build_budget_report;
 pub use check_examples::build_check_examples_report;
 pub use check_refs::build_check_refs_report;
 pub use ratchet::build_ratchet_report;
@@ -92,5 +94,47 @@ pub const NATIVE_RULES: &[NativeRuleDescriptor] = &[
         default_severity: "error",
         message: "Comment line count has regressed past the ratchet baseline",
         tags: &["quality"],
+    },
+    NativeRuleDescriptor {
+        id: "budget/lines",
+        default_severity: "error",
+        message: "Line diff exceeds configured budget limit",
+        tags: &["quality", "budget"],
+    },
+    NativeRuleDescriptor {
+        id: "budget/functions",
+        default_severity: "error",
+        message: "Function diff exceeds configured budget limit",
+        tags: &["quality", "budget"],
+    },
+    NativeRuleDescriptor {
+        id: "budget/classes",
+        default_severity: "error",
+        message: "Class diff exceeds configured budget limit",
+        tags: &["quality", "budget"],
+    },
+    NativeRuleDescriptor {
+        id: "budget/modules",
+        default_severity: "error",
+        message: "Module diff exceeds configured budget limit",
+        tags: &["quality", "budget"],
+    },
+    NativeRuleDescriptor {
+        id: "budget/todos",
+        default_severity: "error",
+        message: "TODO/FIXME diff exceeds configured budget limit",
+        tags: &["quality", "budget"],
+    },
+    NativeRuleDescriptor {
+        id: "budget/complexity-delta",
+        default_severity: "error",
+        message: "Complexity delta exceeds configured budget limit",
+        tags: &["quality", "budget", "complexity"],
+    },
+    NativeRuleDescriptor {
+        id: "budget/dependencies",
+        default_severity: "error",
+        message: "Dependency diff exceeds configured budget limit",
+        tags: &["quality", "budget"],
     },
 ];
