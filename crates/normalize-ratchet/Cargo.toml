@@ -11,6 +11,7 @@ default = []
 cli = ["dep:server-less"]
 
 [dependencies]
+normalize-metrics = { path = "../normalize-metrics", version = "0.1.0" }
 normalize-output = { path = "../normalize-output", version = "0.1.0" }
 normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
 normalize-path-resolve = { path = "../normalize-path-resolve", version = "0.1.0" }

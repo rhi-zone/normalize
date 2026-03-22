@@ -3740,6 +3740,7 @@ dependencies = [
  "log",
  "normalize-analyze",
  "normalize-architecture",
+ "normalize-budget",
  "normalize-chat-sessions",
  "normalize-cli-parser",
  "normalize-code-similarity",
@@ -3814,6 +3815,26 @@ dependencies = [
  "normalize-languages",
  "schemars",
  "serde",
+]
+
+[[package]]
+name = "normalize-budget"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "normalize-facts",
+ "normalize-languages",
+ "normalize-metrics",
+ "normalize-output",
+ "normalize-path-resolve",
+ "rayon",
+ "schemars",
+ "serde",
+ "serde_json",
+ "server-less",
+ "streaming-iterator",
+ "toml",
+ "tree-sitter",
 ]
 
 [[package]]
@@ -4133,12 +4154,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "normalize-metrics"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "schemars",
+ "serde",
+]
+
+[[package]]
 name = "normalize-native-rules"
 version = "0.1.0"
 dependencies = [
  "dirs",
  "glob",
  "ignore",
+ "normalize-budget",
  "normalize-facts",
  "normalize-languages",
  "normalize-output",
@@ -4203,6 +4234,7 @@ dependencies = [
  "anyhow",
  "normalize-facts",
  "normalize-languages",
+ "normalize-metrics",
  "normalize-output",
  "normalize-path-resolve",
  "rayon",

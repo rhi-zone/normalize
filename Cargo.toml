@@ -38,6 +38,8 @@ members = [
     "crates/normalize-code-similarity",
     "crates/normalize-analyze",
     "crates/normalize-architecture",
+    "crates/normalize-metrics",
+    "crates/normalize-budget",
     "crates/normalize-native-rules",
     "crates/normalize-ratchet",
     "crates/normalize-rules",

@@ -1,0 +1,12 @@
+[package]
+name = "normalize-metrics"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Shared metric primitives for normalize ratchet and budget systems"
+
+[dependencies]
+serde = { workspace = true }
+schemars = "1"
+anyhow = "1"

@@ -11,11 +11,8 @@ pub mod metrics;
 pub mod service;
 
 pub use baseline::{Aggregate, BaselineEntry, BaselineFile, RatchetConfig, RatchetConfigMetric};
-pub use metrics::Metric;
-
-/// Factory function type: produce all metrics for a repo root.
-/// Lives outside the `cli` feature so `normalize-native-rules` can use it.
-pub type MetricFactory = fn(root: &std::path::Path) -> Vec<Box<dyn Metric>>;
+// Re-export Metric and MetricFactory from normalize-metrics for API consumers.
+pub use normalize_metrics::{Metric, MetricFactory};
 
 /// Create the default metric registry.
 pub fn default_metrics(_root: &std::path::Path) -> Vec<Box<dyn Metric>> {
