@@ -3759,6 +3759,7 @@ dependencies = [
  "normalize-openapi",
  "normalize-output",
  "normalize-path-resolve",
+ "normalize-ratchet",
  "normalize-rules",
  "normalize-scope",
  "normalize-session-analysis",
@@ -4141,6 +4142,7 @@ dependencies = [
  "normalize-facts",
  "normalize-languages",
  "normalize-output",
+ "normalize-ratchet",
  "regex",
  "schemars",
  "serde",
@@ -4192,6 +4194,25 @@ dependencies = [
  "ignore",
  "nucleo-matcher",
  "tempfile",
+]
+
+[[package]]
+name = "normalize-ratchet"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "normalize-facts",
+ "normalize-languages",
+ "normalize-output",
+ "normalize-path-resolve",
+ "rayon",
+ "schemars",
+ "serde",
+ "serde_json",
+ "server-less",
+ "streaming-iterator",
+ "toml",
+ "tree-sitter",
 ]
 
 [[package]]

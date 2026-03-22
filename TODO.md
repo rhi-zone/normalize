@@ -290,6 +290,20 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 
 - [x] Deterministic tag color hashing in `--pretty` output (FNV-1a hash, 10-color curated palette at OKLCH L≈0.65, red/yellow reserved for severity)
 
+### ~~normalize-ratchet: metric regression tracking~~ (done 2026-03-22)
+
+- [x] `normalize-ratchet` crate with 6 metrics: complexity, call-complexity, line-count, function-count, class-count, comment-line-count
+- [x] 6 CLI commands (behind `cli` feature): `measure`, `add`, `check`, `update`, `show`, `remove`
+- [x] Baseline stored in `.normalize/ratchet.json`; 6 aggregation strategies (mean/median/max/min/sum/count)
+- [x] `MetricFactory` type alias outside `cli` feature; `RatchetConfig` wired into `NormalizeConfig` via `#[param(nested, serde)]`
+- [x] Native rules integration: `normalize rules run` detects regressions via `ratchet/<metric>` rule IDs
+- [x] `--base <git-ref>` on `check` and `measure` for historical comparison via git worktrees
+
+**Follow-up ideas (not planned):**
+- `--base` worktree approach is correct but slow for large repos; could cache measurements per git-ref in `.normalize/ratchet-cache/`
+- Call-graph BFS is intra-project only (no cross-crate edges); future: integrate with `normalize-graph` if cross-crate call data exists
+- Trend charts (`normalize ratchet trend`) could visualize metric history over git log
+
 ---
 
 ## P2 — Structural Improvements / Larger Refactors

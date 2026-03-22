@@ -71,6 +71,7 @@ use crate::daemon::DaemonConfig;
 use crate::filter::AliasConfig;
 use crate::output::PrettyConfig;
 use crate::shadow::ShadowConfig;
+use normalize_ratchet::RatchetConfig;
 use normalize_rules::RulesConfig;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -137,6 +138,9 @@ pub struct NormalizeConfig {
     #[serde(default, rename = "rule-tags")]
     #[param(nested, serde, file_key = "rule-tags")]
     pub rule_tags: RuleTagsConfig,
+    /// Ratchet metric regression tracking (`[ratchet]` section).
+    #[param(nested, serde)]
+    pub ratchet: RatchetConfig,
 }
 
 impl NormalizeConfig {

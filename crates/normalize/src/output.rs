@@ -142,5 +142,15 @@ mod tests {
 
         use crate::commands::syntax::node_types::NodeTypesReport;
         assert_output_formatter::<NodeTypesReport>();
+
+        use normalize_ratchet::service::{
+            AddResult, CheckReport, MeasureResult, RemoveResult, ShowReport, UpdateReport,
+        };
+        assert_output_formatter::<MeasureResult>();
+        assert_output_formatter::<CheckReport>();
+        assert_output_formatter::<UpdateReport>();
+        assert_output_formatter::<ShowReport>();
+        assert_output_formatter::<AddResult>();
+        assert_output_formatter::<RemoveResult>();
     }
 }

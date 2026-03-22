@@ -1,0 +1,26 @@
+[package]
+name = "normalize-ratchet"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Metric regression-tracking (ratchet) system for normalize"
+
+[features]
+default = []
+cli = ["dep:server-less"]
+
+[dependencies]
+normalize-output = { path = "../normalize-output", version = "0.1.0" }
+normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
+normalize-path-resolve = { path = "../normalize-path-resolve", version = "0.1.0" }
+normalize-facts = { path = "../normalize-facts", version = "0.1.0" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+rayon = "1.10"
+anyhow = "1"
+tree-sitter = "0.26"
+streaming-iterator = "0.1"
+server-less = { version = "0.4.7", default-features = false, features = ["cli", "jsonschema", "config"], optional = true }
+schemars = "1"
