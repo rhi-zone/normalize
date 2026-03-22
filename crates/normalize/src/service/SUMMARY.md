@@ -4,7 +4,7 @@ Server-less `#[cli]` service layer — the primary CLI registration point. Each 
 
 Service methods call underlying domain functions directly (not `cmd_*` wrappers — those were eliminated). **`rules.rs` has been removed** — `RulesService` now lives in the `normalize-rules` crate (`normalize_rules::RulesService`) and is registered in `NormalizeService` via `normalize_rules::RulesService::new(&pretty)`. `RulesService::run()` uses `#[cli(display_with = "display_run")]` + returns `DiagnosticsReport` for unified output with colors and severity counts; errors exit 1 via `Err(...)`.
 
-`AnalyzeService::check` has been removed — documentation health checks (`check-refs`, `stale-docs`, `check-examples`, `stale-summary`) are now exposed exclusively via `normalize rules run --engine native`. Use `normalize rules run --rule <id>` to run a specific check.
+`AnalyzeService::check` has been removed — documentation health checks (`check-refs`, `stale-docs`, `check-examples`, `stale-summary`) are now exposed exclusively via `normalize rules run --type native`. Use `normalize rules run --rule <id>` to run a specific check.
 
 **`rank.rs`** — `RankService` was introduced in 2026-03 and hosts all ranked-list commands (complexity, size, ceremony, hotspots, coupling, ownership, test-ratio, budget, density, uniqueness, imports, surface, depth-map, layering, module-health, call-complexity, duplicates, fragments, contributors). These were previously in `AnalyzeService`. Command implementations stay in `commands/analyze/` — only the service layer wiring moved.
 

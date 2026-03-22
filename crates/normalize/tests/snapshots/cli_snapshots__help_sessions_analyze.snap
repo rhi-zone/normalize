@@ -11,19 +11,19 @@ Arguments:
 
 Options:
       --exact                      Require exact/prefix match (disable fuzzy)
-      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
       --format <format>            Force specific format: claude, codex, gemini, normalize
-      --json                       Output machine-readable JSON
-      --jq <jq>                    Filter output through jq expression
+      --jsonl                      Output one JSON object per line (for arrays)
       --project <project>          Filter by specific project path
-      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --json                       Output machine-readable JSON
   -r, --root <root>                Root directory (defaults to current directory)
+      --jq <jq>                    Filter output through jq expression
       --mode <mode>                Session mode: interactive (default), subagent, or all
-      --output-schema              Print JSON Schema of the subcommand's return type and exit
       --agent-type <agent-type>    Filter by agent type (e.g. Explore, general-purpose, Plan)
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
-      --pretty                     Enable pretty
-      --compact                    Enable compact
   -h, --help                       Print help
 
 Examples:

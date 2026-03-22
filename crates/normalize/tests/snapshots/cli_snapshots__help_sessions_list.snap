@@ -8,24 +8,24 @@ Usage: normalize sessions list [OPTIONS]
 
 Options:
       --grep <grep>                Filter sessions by grep pattern
-      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
       --days <days>                Filter sessions from the last N days
-      --json                       Output machine-readable JSON
-      --jq <jq>                    Filter output through jq expression
+      --jsonl                      Output one JSON object per line (for arrays)
       --since <since>              Filter sessions since date (YYYY-MM-DD)
-      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --json                       Output machine-readable JSON
       --until <until>              Filter sessions until date (YYYY-MM-DD)
-      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --jq <jq>                    Filter output through jq expression
       --project <project>          Filter by specific project path
       --all-projects               Show sessions from all projects
-      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --format <format>            Force specific format: claude, codex, gemini, normalize
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
   -n, --limit <limit>              Maximum number of sessions
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -r, --root <root>                Root directory (defaults to current directory)
       --mode <mode>                Session mode: interactive (default), subagent, or all
       --agent-type <agent-type>    Filter by agent type (e.g. Explore, general-purpose, Plan)
-      --pretty                     Enable pretty
-      --compact                    Enable compact
   -h, --help                       Print help
 
 Examples:

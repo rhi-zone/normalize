@@ -10,10 +10,10 @@ Arguments:
   [name]  Plan name to view (omit to list all)
 
 Options:
-      --jsonl                      Output one JSON object per line (for arrays)
   -n, --limit <limit>              Maximum number of plans
       --pretty                     Human-friendly output with colors and formatting
       --compact                    Compact output without colors (overrides TTY detection)
+      --jsonl                      Output one JSON object per line (for arrays)
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit

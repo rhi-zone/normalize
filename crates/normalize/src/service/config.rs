@@ -587,7 +587,11 @@ impl ConfigService {
 
 #[server_less::cli(
     name = "config",
-    description = "Inspect and validate config files using JSON Schema"
+    description = "Inspect and validate config files using JSON Schema",
+    global = [
+        pretty = "Human-friendly output with colors and formatting",
+        compact = "Compact output without colors (overrides TTY detection)",
+    ]
 )]
 impl ConfigService {
     /// Emit the JSON Schema for .normalize/config.toml (NormalizeConfig)
