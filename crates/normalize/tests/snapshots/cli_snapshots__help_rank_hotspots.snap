@@ -7,16 +7,16 @@ Churn × complexity hotspots: files ranked by change frequency and complexity
 Usage: normalize rank hotspots [OPTIONS]
 
 Options:
-      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Human-friendly output with colors and formatting
       --recency                    Weight recent changes higher (exponential decay)
-      --json                       Output machine-readable JSON
+      --compact                    Compact output without colors (overrides TTY detection)
   -r, --root <root>                Root directory (defaults to current directory)
-      --jq <jq>                    Filter output through jq expression
+      --jsonl                      Output one JSON object per line (for arrays)
       --repos-dir <repos-dir>      Run across all git repos under DIR
-      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --json                       Output machine-readable JSON
       --repos-depth <repos-depth>  Max depth to search for repos (default: 1)
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --output-schema              Print JSON Schema of the subcommand's return type and exit
-      --pretty                     Enable pretty
-      --compact                    Enable compact
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help

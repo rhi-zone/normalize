@@ -129,6 +129,15 @@ normalize grep "pattern"            # Full codebase search
 normalize grep "TODO" --only "*.rs"
 ```
 
+### ci - Run All Checks
+
+```bash
+normalize ci                       # run all engines, exit 1 on errors
+normalize ci --strict              # warnings also fail
+normalize ci --no-native           # skip ratchet/budget/stale-summary
+normalize ci --sarif               # SARIF output for GitHub Actions
+```
+
 ## Key Insights
 
 - `normalize view` is the primary navigation command - works on dirs, files, and symbols

@@ -7,25 +7,25 @@ Detect duplicate/similar code (functions or blocks)
 Usage: normalize rank duplicates [OPTIONS]
 
 Options:
-      --jsonl                      Output one JSON object per line (for arrays)
+      --pretty                     Human-friendly output with colors and formatting
       --scope <scope>              Scope: functions (default) or blocks
-      --json                       Output machine-readable JSON
+      --compact                    Compact output without colors (overrides TTY detection)
       --mode <mode>                Detection mode: exact (default), similar (fuzzy), or clusters
       --elide-identifiers          Elide identifier names when comparing
-      --jq <jq>                    Filter output through jq expression
+      --jsonl                      Output one JSON object per line (for arrays)
       --elide-literals             Elide literal values when comparing (default: true for blocks scope)
-      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
       --no-elide-literals          Keep literal values distinct when comparing (blocks scope: opt out of default elision)
-      --output-schema              Print JSON Schema of the subcommand's return type and exit
-      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --show-source                Show source code for matches
       --min-lines <min-lines>      Minimum lines to be considered
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
       --include-trait-impls        Include groups where all items share the same name
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -r, --root <root>                Root directory (defaults to current directory)
       --exclude <exclude>          Exclude paths matching pattern
       --only <only>                Include only paths matching pattern
-      --pretty                     Enable pretty
-      --compact                    Enable compact
       --similarity <similarity>    Minimum similarity threshold (0.0-1.0, similar/clusters mode)
       --skeleton                   Match on control-flow structure (similar/clusters mode)
       --repos-dir <repos-dir>      Scan across all git repos under DIR (functions scope only)

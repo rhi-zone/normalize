@@ -159,7 +159,11 @@ impl RulesService {
 
 #[cli(
     name = "rules",
-    description = "Manage and run analysis rules (syntax + fact + native)"
+    description = "Manage and run analysis rules (syntax + fact + native)",
+    global = [
+        pretty = "Human-friendly output with colors and formatting",
+        compact = "Compact output without colors (overrides TTY detection)",
+    ]
 )]
 impl RulesService {
     /// List all rules (syntax + fact, builtin + user)
@@ -223,7 +227,7 @@ impl RulesService {
     ///   normalize rules run src/               # run on specific directory
     ///   normalize rules run --rule rust/unwrap-in-impl   # single rule
     ///   normalize rules run --pretty           # colored output with details
-    ///   normalize rules run --engine syntax    # only syntax rules
+    ///   normalize rules run --type syntax      # only syntax rules
     #[cli(display_with = "display_run")]
     #[allow(clippy::too_many_arguments)]
     pub async fn run(

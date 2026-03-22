@@ -49,7 +49,7 @@ pub async fn analyze_test_gaps(
     let callee_to_callers: HashMap<String, Vec<(String, String)>> = if let Some(ref idx) = index {
         let stats = idx.call_graph_stats().await.unwrap_or_default();
         if stats.calls == 0 {
-            eprintln!("Warning: Call graph empty or not indexed. Run: normalize index reindex");
+            eprintln!("Warning: Call graph empty or not indexed. Run: normalize structure rebuild");
             eprintln!("Results will show 0 callers for all functions.");
             HashMap::new()
         } else {
@@ -70,7 +70,7 @@ pub async fn analyze_test_gaps(
             }
         }
     } else {
-        eprintln!("Warning: Index not available. Run: normalize index reindex");
+        eprintln!("Warning: Index not available. Run: normalize structure rebuild");
         eprintln!("Results will show 0 callers for all functions.");
         HashMap::new()
     };

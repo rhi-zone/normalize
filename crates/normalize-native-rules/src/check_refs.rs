@@ -86,7 +86,7 @@ pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, Str
     let all_symbols = idx.all_symbol_names().await.unwrap_or_default();
 
     if all_symbols.is_empty() {
-        return Err("No symbols indexed. Run: normalize index rebuild --call-graph".to_string());
+        return Err("No symbols indexed. Run: normalize structure rebuild".to_string());
     }
 
     // Find markdown files

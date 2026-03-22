@@ -94,7 +94,11 @@ impl ViewService {
 
 #[cli(
     name = "view",
-    description = "View a node in the codebase tree, or navigate symbol relationships"
+    description = "View a node in the codebase tree, or navigate symbol relationships",
+    global = [
+        pretty = "Human-friendly output with colors and formatting",
+        compact = "Compact output without colors (overrides TTY detection)",
+    ]
 )]
 impl ViewService {
     /// View a node in the codebase tree (directory, file, or symbol)

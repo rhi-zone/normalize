@@ -10,6 +10,8 @@ Arguments:
   [target]  Target file or directory
 
 Options:
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
       --jsonl                      Output one JSON object per line (for arrays)
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression
@@ -19,8 +21,6 @@ Options:
   -r, --root <root>                Root directory (defaults to current directory)
       --exclude <exclude>          Exclude paths matching pattern
       --only <only>                Include only paths matching pattern
-      --pretty                     Enable pretty
-      --compact                    Enable compact
   -h, --help                       Print help
   -V, --version                    Print version
 

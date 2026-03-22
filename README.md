@@ -204,6 +204,20 @@ normalize sessions patterns          # Tool call sequence analysis (Markov chain
 normalize sessions plans             # View agent plans
 ```
 
+## CI Integration
+
+Run all configured checks in a single command:
+
+```bash
+normalize ci                    # run all engines, exit 1 on errors
+normalize ci --strict           # treat warnings as errors
+normalize ci --no-native        # skip native checks (ratchet, budget, stale-summary)
+normalize ci --sarif            # SARIF output for GitHub Actions annotations
+```
+
+See [docs/ci.md](docs/ci.md) for full CI setup guides (GitHub Actions, GitLab CI, ratchet
+bootstrap workflow, and version pinning).
+
 ## Configuration
 
 Create `.normalize/config.toml`:

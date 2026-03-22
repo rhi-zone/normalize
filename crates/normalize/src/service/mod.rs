@@ -162,6 +162,11 @@ impl NormalizeService {
             value.code.clone()
         }
     }
+
+    /// Display bridge for CiReport.
+    fn display_ci(&self, value: &commands::ci::CiReport) -> String {
+        self.display_output(value)
+    }
 }
 
 /// Wrapper enum for context command's two output types.
@@ -813,6 +818,174 @@ impl NormalizeService {
     /// Start a normalize server (MCP, HTTP, LSP)
     pub fn serve(&self) -> &serve::ServeService {
         &self.serve
+    }
+
+    /// Run all configured checks (syntax, native, fact rules) and exit non-zero on errors
+    ///
+    /// Examples:
+    ///   normalize ci                           # run all engines, exit 1 on errors
+    ///   normalize ci --no-native               # skip native checks (stale-summary, ratchet, budget)
+    ///   normalize ci --strict                  # treat warnings as errors
+    ///   normalize ci --sarif                   # SARIF output for GitHub Actions annotations
+    ///   normalize ci --json                    # structured JSON output
+    #[cli(display_with = "display_ci")]
+    #[allow(clippy::too_many_arguments)]
+    pub async fn ci(
+        &self,
+        #[param(help = "Skip syntax rules engine")] no_syntax: bool,
+        #[param(help = "Skip native rules engine (stale-summary, ratchet, budget)")]
+        no_native: bool,
+        #[param(help = "Skip fact rules engine")] no_fact: bool,
+        #[param(help = "Treat warnings as errors (exit 1 on any warning)")] strict: bool,
+        #[param(help = "Output in SARIF format for GitHub Actions")] sarif: bool,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Maximum number of issues to show in detail (default: 50)")] _limit: Option<
+            usize,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<commands::ci::CiReport, String> {
+        use normalize_output::diagnostics::DiagnosticsReport;
+        use normalize_rules::{
+            RuleType, apply_native_rules_config, load_rules_config, run_rules_report,
+        };
+        use std::time::Instant;
+
+        let effective_root = root
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+        self.resolve_format(pretty, compact, &effective_root);
+
+        let start = Instant::now();
+        let mut merged = DiagnosticsReport::new();
+        let mut engines_run: Vec<String> = Vec::new();
+
+        // Syntax engine
+        if !no_syntax {
+            let root_clone = effective_root.clone();
+            let config = load_rules_config(&root_clone);
+            let report = tokio::task::spawn_blocking(move || {
+                run_rules_report(
+                    &root_clone,
+                    &root_clone,
+                    None,
+                    None,
+                    &RuleType::Syntax,
+                    &[],
+                    &config,
+                )
+            })
+            .await
+            .map_err(|e| format!("Task error (syntax): {e}"))?;
+            merged.merge(report);
+            engines_run.push("syntax".into());
+        }
+
+        // Native engine (stale-summary, check-refs, check-examples, ratchet, budget)
+        if !no_native {
+            let native_root = effective_root.clone();
+            let native_config = load_rules_config(&native_root);
+            let threshold = 10;
+
+            let (summary_res, stale_res, examples_res, refs_res, ratchet_res, budget_res) = tokio::join!(
+                tokio::task::spawn_blocking({
+                    let root = native_root.clone();
+                    move || normalize_native_rules::build_stale_summary_report(&root, threshold)
+                }),
+                tokio::task::spawn_blocking({
+                    let root = native_root.clone();
+                    move || normalize_native_rules::build_stale_docs_report(&root)
+                }),
+                tokio::task::spawn_blocking({
+                    let root = native_root.clone();
+                    move || normalize_native_rules::build_check_examples_report(&root)
+                }),
+                normalize_native_rules::build_check_refs_report(&native_root),
+                tokio::task::spawn_blocking({
+                    let root = native_root.clone();
+                    move || normalize_native_rules::build_ratchet_report(&root)
+                }),
+                tokio::task::spawn_blocking({
+                    let root = native_root.clone();
+                    move || normalize_native_rules::build_budget_report(&root)
+                }),
+            );
+            let mut native_report = DiagnosticsReport::new();
+            if let Ok(r) = summary_res {
+                native_report.merge(r.into());
+            }
+            if let Ok(r) = stale_res {
+                native_report.merge(r.into());
+            }
+            if let Ok(r) = examples_res {
+                native_report.merge(r.into());
+            }
+            if let Ok(r) = refs_res {
+                native_report.merge(r.into());
+            }
+            if let Ok(r) = ratchet_res {
+                native_report.merge(r);
+            }
+            if let Ok(r) = budget_res {
+                native_report.merge(r);
+            }
+            apply_native_rules_config(&mut native_report, &native_config.rules);
+            native_report.sources_run.push("native".into());
+            merged.merge(native_report);
+            engines_run.push("native".into());
+        }
+
+        // Fact engine
+        if !no_fact {
+            let fact_root = effective_root.clone();
+            let config = load_rules_config(&fact_root);
+            let report = tokio::task::spawn_blocking(move || {
+                run_rules_report(
+                    &fact_root,
+                    &fact_root,
+                    None,
+                    None,
+                    &RuleType::Fact,
+                    &[],
+                    &config,
+                )
+            })
+            .await
+            .map_err(|e| format!("Task error (fact): {e}"))?;
+            merged.merge(report);
+            engines_run.push("fact".into());
+        }
+
+        merged.sort();
+        let duration_ms = start.elapsed().as_millis() as u64;
+        let report = commands::ci::CiReport::new(merged, engines_run, duration_ms);
+
+        // Determine exit condition
+        let error_count = report.error_count;
+        let warning_count = report.warning_count;
+        let has_errors = error_count > 0;
+        let has_strict_failures = strict && warning_count > 0;
+
+        if has_errors || has_strict_failures {
+            let detail = if sarif {
+                report.diagnostics.format_sarif()
+            } else {
+                self.display_ci(&report)
+            };
+            let msg = if has_strict_failures && !has_errors {
+                format!("{detail}\n{warning_count} warning(s) found (--strict mode)")
+            } else {
+                format!("{detail}\n{error_count} error(s) found")
+            };
+            return Err(msg);
+        }
+
+        Ok(report)
     }
 }
 

@@ -30,6 +30,7 @@ pub fn build_filter(root: &Path, exclude: &[String], only: &[String]) -> Option<
 
 pub mod aliases;
 pub mod analyze;
+pub mod ci;
 pub mod context;
 pub mod daemon;
 pub mod edit;

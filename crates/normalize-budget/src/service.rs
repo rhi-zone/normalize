@@ -240,7 +240,10 @@ impl BudgetService {
     }
 }
 
-#[cli]
+#[cli(global = [
+    pretty = "Human-friendly output with colors and formatting",
+    compact = "Compact output without colors (overrides TTY detection)",
+])]
 impl BudgetService {
     /// Compute current diff stats for a path+metric. No side effects.
     #[cli(display_with = "display_measure")]

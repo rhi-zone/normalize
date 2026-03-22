@@ -30,7 +30,7 @@ pub async fn build_call_graph(
 
     let stats = idx.call_graph_stats().await.unwrap_or_default();
     if stats.calls == 0 {
-        return Err("Call graph not indexed. Run: normalize reindex --call-graph".to_string());
+        return Err("Call graph not indexed. Run: normalize structure rebuild".to_string());
     }
 
     let _ = case_insensitive; // Index methods already have case-insensitive fallbacks

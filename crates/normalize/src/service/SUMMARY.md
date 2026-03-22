@@ -15,3 +15,5 @@ Service methods call underlying domain functions directly (not `cmd_*` wrappers 
 `sessions.rs` — `SessionsService` extended with `--mode` flag (interactive/subagent/all) on `list`, `stats`, `messages`, `analyze` commands, plus new `subagents` subcommand for listing a parent session's subagent summary. Updated 2026-03-20.
 
 **`ratchet.rs`** — thin re-export of `normalize_ratchet::service::RatchetService`. The `normalize ratchet` subcommand provides metric regression tracking (`measure`, `add`, `check`, `update`, `show`, `remove`). Implementation lives in `normalize-ratchet` (behind `cli` feature). Updated 2026-03-22.
+
+**`normalize ci`** (method on `NormalizeService`) — unified CI entry point. Runs all three rule engines (syntax, native, fact) in sequence via `normalize_rules::run_rules_report`, merges results into a `CiReport` (`commands/ci.rs`), and exits non-zero on errors. Flags: `--no-syntax`, `--no-native`, `--no-fact` (opt-out per engine), `--strict` (warnings fail), `--sarif` (SARIF output). Updated 2026-03-22.

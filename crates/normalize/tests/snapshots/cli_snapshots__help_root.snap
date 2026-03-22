@@ -13,6 +13,7 @@ Commands:
   init       Initialize normalize in current directory
   update     Check for and install updates
   translate  Translate code between programming languages
+  ci         Run all configured checks (syntax, native, fact rules) and exit non-zero on errors
   view       View a node in the codebase tree, or navigate symbol relationships
   daemon     Manage the global normalize daemon
   grammars   Manage tree-sitter grammars for parsing

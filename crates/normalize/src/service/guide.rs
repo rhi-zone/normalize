@@ -181,7 +181,7 @@ Grammars are stored in ~/.config/normalize/grammars/.
 
 ## Build the facts index (for import/call analysis)
 
-  normalize structure build               # index symbols, imports, calls
+  normalize structure rebuild             # index symbols, imports, calls
   normalize structure stats               # check index status
 
 The index enables: import analysis, call graphs, dead code detection,

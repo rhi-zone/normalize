@@ -275,7 +275,10 @@ impl RatchetService {
     }
 }
 
-#[cli]
+#[cli(global = [
+    pretty = "Human-friendly output with colors and formatting",
+    compact = "Compact output without colors (overrides TTY detection)",
+])]
 impl RatchetService {
     /// Compute and display the current value for a path+metric. No side effects.
     #[cli(display_with = "display_measure")]
@@ -324,7 +327,11 @@ impl RatchetService {
     pub fn add(
         &self,
         #[param(positional, help = "Path to track")] path: String,
-        #[param(short = 'm', help = "Metric to track")] metric: String,
+        #[param(
+            short = 'm',
+            help = "Metric to track (complexity|call-complexity|line-count|function-count|class-count|comment-line-count)"
+        )]
+        metric: String,
         #[param(short = 'a', help = "Aggregation strategy")] aggregate: Option<String>,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
         pretty: bool,

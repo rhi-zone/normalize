@@ -195,7 +195,11 @@ impl AnalyzeService {
 
 #[cli(
     name = "analyze",
-    description = "Analyze codebase (health, complexity, security, duplicates, docs)"
+    description = "Analyze codebase (health, complexity, security, duplicates, docs)",
+    global = [
+        pretty = "Human-friendly output with colors and formatting",
+        compact = "Compact output without colors (overrides TTY detection)",
+    ]
 )]
 #[server(groups(
     code = "Code quality",

@@ -22,6 +22,8 @@ Arguments:
   [target]  Target: path, path/Symbol, Parent/method, file:line, or SymbolName
 
 Options:
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
       --jsonl                      Output one JSON object per line (for arrays)
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression
@@ -47,7 +49,5 @@ Options:
       --exclude <exclude>          Exclude paths matching pattern
       --only <only>                Include only paths matching pattern
   -i, --case-insensitive           Case-insensitive symbol matching
-      --pretty                     Enable pretty
-      --compact                    Enable compact
   -h, --help                       Print help
   -V, --version                    Print version

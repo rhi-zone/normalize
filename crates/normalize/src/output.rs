@@ -53,6 +53,7 @@ mod tests {
         use crate::commands::analyze::test_ratio::TestRatioReport;
         use crate::commands::analyze::trend::TrendReport;
         use crate::commands::analyze::uniqueness::UniquenessReport;
+        use crate::commands::ci::CiReport;
         use crate::commands::context::{ContextListReport, ContextReport};
         use crate::commands::find_references::ReferencesReport;
         use crate::commands::grammars::{GrammarListReport, GrammarPathsReport};
@@ -72,6 +73,7 @@ mod tests {
         use normalize_output::diagnostics::DiagnosticsReport;
 
         // Compile-time checks via trait bounds
+        assert_output_formatter::<CiReport>();
         assert_output_formatter::<ActivityReport>();
         assert_output_formatter::<CallComplexityReport>();
         assert_output_formatter::<DensityReport>();
