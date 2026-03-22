@@ -7,7 +7,7 @@ repository.workspace = true
 description = "Output formatting for normalize CLI commands"
 
 [dependencies]
-normalize-core = { path = "../normalize-core", version = "0.1.0" }
+normalize-core = { path = "../normalize-core", version = "0.2.0" }
 serde.workspace = true
 serde_json.workspace = true
 schemars = "1"

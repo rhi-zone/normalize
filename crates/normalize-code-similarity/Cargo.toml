@@ -9,4 +9,4 @@ description = "Code similarity algorithms: MinHash LSH, normalized AST hashing, 
 [dependencies]
 tree-sitter = "0.26"
 streaming-iterator = "0.1"
-normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
+normalize-languages = { path = "../normalize-languages", version = "0.2.0" }

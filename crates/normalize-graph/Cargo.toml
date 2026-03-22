@@ -9,4 +9,4 @@ description = "Pure graph algorithms for normalize: SCC, bridges, diamonds, chai
 [dependencies]
 serde = { workspace = true }
 schemars = "1"
-normalize-output = { path = "../normalize-output", version = "0.1.0" }
+normalize-output = { path = "../normalize-output", version = "0.2.0" }

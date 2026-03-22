@@ -26,4 +26,4 @@ lang-c = []
 lang-cpp = []
 
 [dependencies]
-normalize-manifest = { path = "../normalize-manifest", version = "0.1.0" }
+normalize-manifest = { path = "../normalize-manifest", version = "0.2.0" }

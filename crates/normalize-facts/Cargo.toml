@@ -21,9 +21,9 @@ tokio = { workspace = true, optional = true }
 serde_json = { workspace = true }
 schemars = { version = "1", optional = true }
 # Core types
-normalize-facts-core = { path = "../normalize-facts-core", version = "0.1.0" }
-normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
-normalize-local-deps = { path = "../normalize-local-deps", version = "0.1.0" }
+normalize-facts-core = { path = "../normalize-facts-core", version = "0.2.0" }
+normalize-languages = { path = "../normalize-languages", version = "0.2.0" }
+normalize-local-deps = { path = "../normalize-local-deps", version = "0.2.0" }
 
 # Parsing
 tree-sitter = "0.26"
@@ -46,6 +46,6 @@ indicatif.workspace = true
 serde.workspace = true
 
 [dev-dependencies]
-normalize-manifest = { path = "../normalize-manifest", version = "0.1.0" }
+normalize-manifest = { path = "../normalize-manifest", version = "0.2.0" }
 tempfile = "3"
 tokio = { workspace = true }

@@ -47,39 +47,39 @@ libsql.workspace = true
 tree-sitter = "0.26"
 streaming-iterator = "0.1"
 dirs = "5"
-normalize-core = { path = "../normalize-core", version = "0.1.0" }
-normalize-output = { path = "../normalize-output", version = "0.1.0" }
-normalize-facts = { path = "../normalize-facts", version = "0.1.0" }
-normalize-facts-core = { path = "../normalize-facts-core", version = "0.1.0" }
-normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.1.0" }
-normalize-facts-rules-interpret = { path = "../normalize-facts-rules-interpret", version = "0.1.0" }
+normalize-core = { path = "../normalize-core", version = "0.2.0" }
+normalize-output = { path = "../normalize-output", version = "0.2.0" }
+normalize-facts = { path = "../normalize-facts", version = "0.2.0" }
+normalize-facts-core = { path = "../normalize-facts-core", version = "0.2.0" }
+normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.2.0" }
+normalize-facts-rules-interpret = { path = "../normalize-facts-rules-interpret", version = "0.2.0" }
 abi_stable = "0.11"
-normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
-normalize-local-deps = { path = "../normalize-local-deps", version = "0.1.0" }
-normalize-typegen = { path = "../normalize-typegen", version = "0.1.0", features = ["input-typescript"] }
-normalize-syntax-rules = { path = "../normalize-syntax-rules", version = "0.1.0" }
-normalize-openapi = { path = "../normalize-openapi", version = "0.1.0" }
-normalize-ecosystems = { path = "../normalize-ecosystems", version = "0.1.0" }
-normalize-chat-sessions = { path = "../normalize-chat-sessions", version = "0.1.0", features = ["schema"] }
-normalize-session-analysis = { path = "../normalize-session-analysis", version = "0.1.0" }
-normalize-path-resolve = { path = "../normalize-path-resolve", version = "0.1.0" }
-normalize-shadow = { path = "../normalize-shadow", version = "0.1.0" }
-normalize-edit = { path = "../normalize-edit", version = "0.1.0" }
-normalize-deps = { path = "../normalize-deps", version = "0.1.0" }
-normalize-filter = { path = "../normalize-filter", version = "0.1.0", features = ["config"] }
-normalize-scope = { path = "../normalize-scope", version = "0.1.0" }
-normalize-graph = { path = "../normalize-graph", version = "0.1.0" }
-normalize-code-similarity = { path = "../normalize-code-similarity", version = "0.1.0" }
-normalize-tools = { path = "../normalize-tools", version = "0.1.0" }
-normalize-analyze = { path = "../normalize-analyze", version = "0.1.0" }
-normalize-architecture = { path = "../normalize-architecture", version = "0.1.0" }
-normalize-native-rules = { path = "../normalize-native-rules", version = "0.1.0" }
-normalize-budget = { path = "../normalize-budget", version = "0.1.0", features = ["cli"] }
-normalize-ratchet = { path = "../normalize-ratchet", version = "0.1.0", features = ["cli"] }
-normalize-rules = { path = "../normalize-rules", version = "0.1.0", features = ["cli"] }
+normalize-languages = { path = "../normalize-languages", version = "0.2.0" }
+normalize-local-deps = { path = "../normalize-local-deps", version = "0.2.0" }
+normalize-typegen = { path = "../normalize-typegen", version = "0.2.0", features = ["input-typescript"] }
+normalize-syntax-rules = { path = "../normalize-syntax-rules", version = "0.2.0" }
+normalize-openapi = { path = "../normalize-openapi", version = "0.2.0" }
+normalize-ecosystems = { path = "../normalize-ecosystems", version = "0.2.0" }
+normalize-chat-sessions = { path = "../normalize-chat-sessions", version = "0.2.0", features = ["schema"] }
+normalize-session-analysis = { path = "../normalize-session-analysis", version = "0.2.0" }
+normalize-path-resolve = { path = "../normalize-path-resolve", version = "0.2.0" }
+normalize-shadow = { path = "../normalize-shadow", version = "0.2.0" }
+normalize-edit = { path = "../normalize-edit", version = "0.2.0" }
+normalize-deps = { path = "../normalize-deps", version = "0.2.0" }
+normalize-filter = { path = "../normalize-filter", version = "0.2.0", features = ["config"] }
+normalize-scope = { path = "../normalize-scope", version = "0.2.0" }
+normalize-graph = { path = "../normalize-graph", version = "0.2.0" }
+normalize-code-similarity = { path = "../normalize-code-similarity", version = "0.2.0" }
+normalize-tools = { path = "../normalize-tools", version = "0.2.0" }
+normalize-analyze = { path = "../normalize-analyze", version = "0.2.0" }
+normalize-architecture = { path = "../normalize-architecture", version = "0.2.0" }
+normalize-native-rules = { path = "../normalize-native-rules", version = "0.2.0" }
+normalize-budget = { path = "../normalize-budget", version = "0.2.0", features = ["cli"] }
+normalize-ratchet = { path = "../normalize-ratchet", version = "0.2.0", features = ["cli"] }
+normalize-rules = { path = "../normalize-rules", version = "0.2.0", features = ["cli"] }
 server-less = { workspace = true }
-normalize-cli-parser = { path = "../normalize-cli-parser", version = "0.1.0" }
-normalize-surface-syntax = { path = "../normalize-surface-syntax", version = "0.1.0", features = ["read-typescript", "read-lua", "read-python", "write-typescript", "write-lua", "write-python"] }
+normalize-cli-parser = { path = "../normalize-cli-parser", version = "0.2.0" }
+normalize-surface-syntax = { path = "../normalize-surface-syntax", version = "0.2.0", features = ["read-typescript", "read-lua", "read-python", "write-typescript", "write-lua", "write-python"] }
 grep-matcher.workspace = true
 grep-regex.workspace = true
 grep-searcher.workspace = true

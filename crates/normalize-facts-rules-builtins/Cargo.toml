@@ -10,7 +10,7 @@ description = "Builtin rules for normalize (cycles, coupling, orphans)"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.1.0" }
+normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.2.0" }
 abi_stable = "0.11"
 ascent = "0.8"
 

@@ -7,8 +7,8 @@ repository.workspace = true
 description = "Architectural metrics: coupling, cycles, layering, hubs"
 
 [dependencies]
-normalize-facts = { path = "../normalize-facts", version = "0.1.0" }
-normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
+normalize-facts = { path = "../normalize-facts", version = "0.2.0" }
+normalize-languages = { path = "../normalize-languages", version = "0.2.0" }
 libsql.workspace = true
 serde.workspace = true
 schemars = "1"
