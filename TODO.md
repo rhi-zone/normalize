@@ -292,17 +292,61 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 
 ### ~~normalize-ratchet: metric regression tracking~~ (done 2026-03-22)
 
+- [x] `normalize-metrics` crate: shared `Metric` trait, `MetricFactory`, `Aggregate` enum + `aggregate()`, `filter_by_prefix()` — depended on by both ratchet and budget
 - [x] `normalize-ratchet` crate with 6 metrics: complexity, call-complexity, line-count, function-count, class-count, comment-line-count
 - [x] 6 CLI commands (behind `cli` feature): `measure`, `add`, `check`, `update`, `show`, `remove`
-- [x] Baseline stored in `.normalize/ratchet.json`; 6 aggregation strategies (mean/median/max/min/sum/count)
+- [x] Entries are `(path, metric, aggregation) → value`; path can be dir/file/symbol (`file/Parent/fn`); always aggregated — symbol path is degenerate case (n=1)
+- [x] Baseline stored in `.normalize/ratchet.json`; 6 aggregation strategies (mean/median/max/min/sum/count); defaults configurable via `[ratchet]` / `[ratchet.metrics.<name>]` in `.normalize/config.toml`
 - [x] `MetricFactory` type alias outside `cli` feature; `RatchetConfig` wired into `NormalizeConfig` via `#[param(nested, serde)]`
 - [x] Native rules integration: `normalize rules run` detects regressions via `ratchet/<metric>` rule IDs
 - [x] `--base <git-ref>` on `check` and `measure` for historical comparison via git worktrees
+- [x] `normalize-budget` crate: diff-based budget system; each entry has `(path, metric, aggregate, ref) → {max_added, max_removed, max_total, max_net}` (all optional); budget stored in `.normalize/budget.json`
+- [x] 7 diff metrics: lines, functions, classes, modules, todos, complexity-delta, dependencies
+- [x] Native rules integration: `budget/<metric>` rule IDs alongside ratchet rules
 
 **Follow-up ideas (not planned):**
 - `--base` worktree approach is correct but slow for large repos; could cache measurements per git-ref in `.normalize/ratchet-cache/`
 - Call-graph BFS is intra-project only (no cross-crate edges); future: integrate with `normalize-graph` if cross-crate call data exists
 - Trend charts (`normalize ratchet trend`) could visualize metric history over git log
+
+### CI readiness (release blocker for 0.2.0)
+
+Goal: a user should be able to add normalize to their CI pipeline in under 5 minutes with
+confidence it won't break randomly. The JIT work on ascent-interpreter is a release blocker
+for *performance* (fact rules can be slow on large repos), not for *functionality* — fact rules
+still run, they're just slower without JIT. Everything below can land before the JIT is done.
+
+- [ ] **`normalize ci` command** — single CI entry point. Runs all engines: syntax rules, native
+  rules (including ratchet + budget), and fact rules. Structured output + non-zero exit on any
+  failure. Flags to opt out of specific engines (`--no-fact`, `--no-ratchet`, etc.) for repos
+  that haven't configured them yet. Makes the CI config trivial: `run: normalize ci`. The repo's
+  `.normalize/config.toml` drives what actually runs (rule severities, enabled rules, thresholds).
+  Output should be CI-friendly: machine-parseable with `--json`, human-readable by default, SARIF
+  with `--sarif` for GitHub Actions native annotation support.
+
+- [ ] **Install script** — `curl -fsSL https://normalize.rs/install.sh | sh` (or equivalent).
+  Detects platform/arch, downloads the right binary from GitHub releases, installs to
+  `~/.local/bin` or `/usr/local/bin`. Also: a one-liner for CI that pins to a specific version
+  (`NORMALIZE_VERSION=0.2.0 curl ... | sh`). Currently `cargo install normalize` works but is
+  too slow for CI (full compile). Pre-built binaries exist in GitHub releases but there's no
+  ergonomic way to get them.
+
+- [ ] **CI documentation** — `docs/ci.md` (and a section in README). Covers: how to install in
+  CI (GitHub Actions, GitLab CI, CircleCI snippets), what `normalize ci` runs, how to configure
+  `.normalize/config.toml` for CI-only severity overrides, how to use ratchet + budget (bootstrap
+  workflow: `normalize ratchet add`, commit `.normalize/ratchet.json`, CI runs `normalize ci`),
+  how to pin the normalize version for reproducible CI.
+
+- [ ] **Version bump to 0.2.0** — all 38 published crates at v0.1.0. Bump to 0.2.0 before
+  release. The `xtask` or a script should handle the mechanical version update across all
+  `Cargo.toml` files. Check that `normalize update` (self-update) works against a real GitHub
+  release after tagging.
+
+- [ ] **Polish pass before release** — before tagging 0.2.0, audit `--help` text on all
+  commands for accuracy and completeness; verify all exit codes are correct (0 = clean,
+  1 = violations found, 2 = usage error); smoke-test on a real non-normalize repo; check that
+  error messages are actionable (not just "error: ...") for common failure modes (index not
+  built, no config file, unrecognized language).
 
 ---
 
@@ -730,11 +774,17 @@ to depend on. The LSP is useful day-to-day.
 **Remaining before 0.2.0:**
 
 *LSP / index (from P0):*
-- [ ] Integrate incremental Datalog from ascent-interpreter (steps 1-3 done: interning, flat tuples, incremental eval; JIT ongoing but not blocking integration)
+- [ ] Integrate incremental Datalog from ascent-interpreter (steps 1-3 done: interning, flat tuples, incremental eval; JIT is a **release blocker for performance** — fact rules work without it but are too slow on large repos for CI use)
 
 *CLI surface (from P1):*
 - [x] `view` refactor phase 1: graph navigation + history as subcommands — done 2026-03-16
 - [x] `view` refactor phase 2: dissolve `ViewOutput` enum into `ViewReport` + `view list` — done 2026-03-16
+
+*CI readiness (from P1 — see "CI readiness" section above):*
+- [ ] `normalize ci` command
+- [ ] Install script (curl | sh)
+- [ ] CI documentation (`docs/ci.md`)
+- [ ] Polish pass (--help, exit codes, error messages)
 
 *Release mechanics:*
 - [ ] Verify `normalize update` works against a real GitHub release (cross-platform smoke test)
