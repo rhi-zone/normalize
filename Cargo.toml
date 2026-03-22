@@ -41,7 +41,6 @@ members = [
     "crates/normalize-native-rules",
     "crates/normalize-rules",
     "crates/normalize-rules-config",
-    "crates/normalize-ratchet",
     "xtask",
 ]
 

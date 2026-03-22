@@ -142,12 +142,5 @@ mod tests {
 
         use crate::commands::syntax::node_types::NodeTypesReport;
         assert_output_formatter::<NodeTypesReport>();
-
-        use normalize_ratchet::service::{
-            RatchetCheckReport, RatchetShowReport, RatchetUpdateReport,
-        };
-        assert_output_formatter::<RatchetCheckReport>();
-        assert_output_formatter::<RatchetShowReport>();
-        assert_output_formatter::<RatchetUpdateReport>();
     }
 }

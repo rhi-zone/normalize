@@ -90,8 +90,6 @@ pub struct RulesService {
     sarif: Cell<bool>,
     /// Issue display limit for text output (default 50).
     limit: Cell<usize>,
-    /// Optional factory for ratchet metrics. When set, the ratchet native rule is enabled.
-    ratchet_factory: Option<normalize_ratchet::MetricFactory>,
 }
 
 impl RulesService {
@@ -100,14 +98,7 @@ impl RulesService {
             pretty: Cell::new(pretty.get()),
             sarif: Cell::new(false),
             limit: Cell::new(50),
-            ratchet_factory: None,
         }
-    }
-
-    /// Attach a ratchet metric factory, enabling the ratchet native rules.
-    pub fn with_ratchet(mut self, factory: normalize_ratchet::MetricFactory) -> Self {
-        self.ratchet_factory = Some(factory);
-        self
     }
 
     fn resolve_format(&self, pretty: bool, compact: bool) {
@@ -372,18 +363,6 @@ impl RulesService {
             }
             if let Ok(r) = refs_res {
                 report.merge(r.into());
-            }
-
-            // Ratchet check: run if a metric factory was injected
-            if let Some(factory) = self.ratchet_factory {
-                let ratchet_root = native_root.clone();
-                let ratchet_res = tokio::task::spawn_blocking(move || {
-                    normalize_native_rules::build_ratchet_report(&ratchet_root, factory)
-                })
-                .await;
-                if let Ok(r) = ratchet_res {
-                    report.merge(r);
-                }
             }
 
             apply_native_rules_config(&mut report, &native_config.rules);

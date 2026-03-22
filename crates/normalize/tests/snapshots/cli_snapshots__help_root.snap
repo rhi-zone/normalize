@@ -26,7 +26,6 @@ Commands:
   edit       Structural editing of code symbols
   analyze    Analyze codebase (health, complexity, security, duplicates, docs)
   rank       Rank code by metrics (complexity, size, coupling, duplicates, and more)
-  ratchet    Track metric regressions with a stored baseline
   rules      Manage and run syntax/fact rules
   config     Inspect and validate config files using JSON Schema
   serve      Start a normalize server (MCP, HTTP, LSP)

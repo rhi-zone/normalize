@@ -10,7 +10,6 @@ description = "Native rule checks for normalize (stale-summary, check-refs, stal
 normalize-output = { path = "../normalize-output", version = "0.1.0" }
 normalize-facts = { path = "../normalize-facts", version = "0.1.0" }
 normalize-languages = { path = "../normalize-languages", version = "0.1.0" }
-normalize-ratchet = { path = "../normalize-ratchet", version = "0.1.0" }
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
