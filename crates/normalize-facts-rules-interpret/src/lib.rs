@@ -39,14 +39,14 @@
 //!   file = "" for no location; line = 0 when the source has no line info.
 
 use abi_stable::std_types::ROption;
-use ascent_eval::{Engine, Value};
-use ascent_ir::Program;
-use ascent_syntax::AscentProgram;
+use ascent_interpreter::eval::intern::string_value;
+use ascent_interpreter::eval::{Engine, Value};
+use ascent_interpreter::ir::Program;
+use ascent_interpreter::syntax::AscentProgram;
 use glob::Pattern;
 use normalize_facts_rules_api::{Diagnostic, DiagnosticLevel, Relations};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 /// Preamble declaring the built-in input relations.
 /// Users don't need to declare these - they're always available.
@@ -586,14 +586,16 @@ pub fn run_rules_source(
     // Parse through ascent-syntax → IR
     let ast: AscentProgram =
         syn::parse_str(&full_source).map_err(|e| InterpretError::Parse(e.to_string()))?;
-    let program = Program::from_ast(ast);
+    let program = Program::from_ast(ast).map_err(InterpretError::Parse)?;
 
     // Create engine and populate facts
-    let mut engine = Engine::new(&program);
+    let mut engine = Engine::new(program);
     populate_facts(&mut engine, relations);
 
     // Run to fixpoint
-    engine.run(&program);
+    engine
+        .run()
+        .map_err(|e| InterpretError::Parse(e.to_string()))?;
 
     // Extract diagnostics from output relations
     Ok(extract_diagnostics(&engine))
@@ -602,91 +604,91 @@ pub fn run_rules_source(
 /// Populate the engine with facts from Relations
 fn populate_facts(engine: &mut Engine, relations: &Relations) {
     for sym in relations.symbols.iter() {
-        engine.insert(
+        let _ = engine.insert(
             "symbol",
             vec![
-                Value::String(Rc::new(sym.file.to_string())),
-                Value::String(Rc::new(sym.name.to_string())),
-                Value::String(Rc::new(sym.kind.to_string())),
+                string_value(&sym.file),
+                string_value(&sym.name),
+                string_value(&sym.kind),
                 Value::U32(sym.line),
             ],
         );
     }
 
     for imp in relations.imports.iter() {
-        engine.insert(
+        let _ = engine.insert(
             "import",
             vec![
-                Value::String(Rc::new(imp.from_file.to_string())),
-                Value::String(Rc::new(imp.to_module.to_string())),
-                Value::String(Rc::new(imp.name.to_string())),
+                string_value(&imp.from_file),
+                string_value(&imp.to_module),
+                string_value(&imp.name),
             ],
         );
     }
 
     for call in relations.calls.iter() {
-        engine.insert(
+        let _ = engine.insert(
             "call",
             vec![
-                Value::String(Rc::new(call.caller_file.to_string())),
-                Value::String(Rc::new(call.caller_name.to_string())),
-                Value::String(Rc::new(call.callee_name.to_string())),
+                string_value(&call.caller_file),
+                string_value(&call.caller_name),
+                string_value(&call.callee_name),
                 Value::U32(call.line),
             ],
         );
     }
 
     for vis in relations.visibilities.iter() {
-        engine.insert(
+        let _ = engine.insert(
             "visibility",
             vec![
-                Value::String(Rc::new(vis.file.to_string())),
-                Value::String(Rc::new(vis.name.to_string())),
-                Value::String(Rc::new(vis.visibility.to_string())),
+                string_value(&vis.file),
+                string_value(&vis.name),
+                string_value(&vis.visibility),
             ],
         );
     }
 
     for attr in relations.attributes.iter() {
-        engine.insert(
+        let _ = engine.insert(
             "attribute",
             vec![
-                Value::String(Rc::new(attr.file.to_string())),
-                Value::String(Rc::new(attr.name.to_string())),
-                Value::String(Rc::new(attr.attribute.to_string())),
+                string_value(&attr.file),
+                string_value(&attr.name),
+                string_value(&attr.attribute),
             ],
         );
     }
 
     for p in relations.parents.iter() {
-        engine.insert(
+        let _ = engine.insert(
             "parent",
             vec![
-                Value::String(Rc::new(p.file.to_string())),
-                Value::String(Rc::new(p.child_name.to_string())),
-                Value::String(Rc::new(p.parent_name.to_string())),
+                string_value(&p.file),
+                string_value(&p.child_name),
+                string_value(&p.parent_name),
             ],
         );
     }
 
     for q in relations.qualifiers.iter() {
-        engine.insert(
+        let _ = engine.insert(
             "qualifier",
             vec![
-                Value::String(Rc::new(q.caller_file.to_string())),
-                Value::String(Rc::new(q.caller_name.to_string())),
-                Value::String(Rc::new(q.callee_name.to_string())),
-                Value::String(Rc::new(q.qualifier.to_string())),
+                string_value(&q.caller_file),
+                string_value(&q.caller_name),
+                string_value(&q.callee_name),
+                string_value(&q.qualifier),
             ],
         );
     }
 
     for sr in relations.symbol_ranges.iter() {
-        engine.insert(
+        let _ = engine.insert(
             "symbol_range",
             vec![
-                Value::String(Rc::new(sr.file.to_string())),
-                Value::String(Rc::new(sr.name.to_string())),
+                string_value(&sr.file),
+                string_value(&sr.name),
                 Value::U32(sr.start_line),
                 Value::U32(sr.end_line),
             ],
@@ -694,33 +696,30 @@ fn populate_facts(engine: &mut Engine, relations: &Relations) {
     }
 
     for imp in relations.implements.iter() {
-        engine.insert(
+        let _ = engine.insert(
             "implements",
             vec![
-                Value::String(Rc::new(imp.file.to_string())),
-                Value::String(Rc::new(imp.name.to_string())),
-                Value::String(Rc::new(imp.interface.to_string())),
+                string_value(&imp.file),
+                string_value(&imp.name),
+                string_value(&imp.interface),
             ],
         );
     }
 
     for ii in relations.is_impls.iter() {
-        engine.insert(
+        let _ = engine.insert(
             "is_impl",
-            vec![
-                Value::String(Rc::new(ii.file.to_string())),
-                Value::String(Rc::new(ii.name.to_string())),
-            ],
+            vec![string_value(&ii.file), string_value(&ii.name)],
         );
     }
 
     for tm in relations.type_methods.iter() {
-        engine.insert(
+        let _ = engine.insert(
             "type_method",
             vec![
-                Value::String(Rc::new(tm.file.to_string())),
-                Value::String(Rc::new(tm.type_name.to_string())),
-                Value::String(Rc::new(tm.method_name.to_string())),
+                string_value(&tm.file),
+                string_value(&tm.type_name),
+                string_value(&tm.method_name),
             ],
         );
     }
@@ -737,15 +736,20 @@ fn extract_diagnostics(engine: &Engine) -> Vec<Diagnostic> {
 
     if let Some(diags) = engine.relation("diagnostic") {
         for tuple in diags.iter() {
-            if let [
-                Value::String(severity),
-                Value::String(rule_id),
-                Value::String(file),
-                Value::U32(line),
-                Value::String(message),
-            ] = tuple
-            {
-                let mut d = match severity.as_str() {
+            if let [sev_val, rule_val, file_val, Value::U32(line), msg_val] = tuple {
+                let Some(severity) = sev_val.as_str() else {
+                    continue;
+                };
+                let Some(rule_id) = rule_val.as_str() else {
+                    continue;
+                };
+                let Some(file) = file_val.as_str() else {
+                    continue;
+                };
+                let Some(message) = msg_val.as_str() else {
+                    continue;
+                };
+                let mut d = match severity {
                     "error" => Diagnostic::error(rule_id, message),
                     "info" | "hint" => Diagnostic::hint(rule_id, message),
                     _ => Diagnostic::warning(rule_id, message),

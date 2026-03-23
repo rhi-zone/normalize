@@ -1312,39 +1312,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "ascent-eval"
-version = "0.1.0"
-source = "git+https://github.com/pterror/ascent-interpreter#4b2e0abc3ad5feca00fffc2ccf9c0a670082d9e5"
-dependencies = [
- "ascent-ir",
- "ascent-syntax",
- "itertools 0.14.0",
- "petgraph",
- "rustc-hash 2.1.1",
- "syn 2.0.117",
-]
-
-[[package]]
-name = "ascent-ir"
-version = "0.1.0"
-source = "git+https://github.com/pterror/ascent-interpreter#4b2e0abc3ad5feca00fffc2ccf9c0a670082d9e5"
-dependencies = [
- "ascent-syntax",
- "itertools 0.14.0",
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
-name = "ascent-syntax"
-version = "0.1.0"
-source = "git+https://github.com/pterror/ascent-interpreter#4b2e0abc3ad5feca00fffc2ccf9c0a670082d9e5"
+name = "ascent-interpreter"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ac54b1b39ece770c86c7bb281df2bf8254342dbbc9c66dc8a5e9c68b2c85668"
 dependencies = [
  "derive-syn-parse",
+ "dynasmrt",
+ "hashbrown 0.16.1",
  "itertools 0.14.0",
+ "petgraph",
  "proc-macro2",
  "quote",
+ "rustc-hash 2.1.1",
  "syn 2.0.117",
 ]
 
@@ -2189,6 +2169,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
+name = "dynasm"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df4bf11ba8aecc00489b7ec4e8963cd3860651c3ea2a114394f8ba7e92a0e94a"
+dependencies = [
+ "bitflags 2.11.0",
+ "byteorder",
+ "lazy_static",
+ "proc-macro-error2",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "dynasmrt"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b38e5331d851567729d892ed28d898d22f49a96940b29e23b5c3e681bd30ffb3"
+dependencies = [
+ "byteorder",
+ "dynasm",
+ "fnv",
+ "memmap2",
+]
+
+[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2339,6 +2346,12 @@ name = "foldhash"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
+
+[[package]]
+name = "foldhash"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "form_urlencoded"
@@ -2666,7 +2679,7 @@ version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
 dependencies = [
- "foldhash",
+ "foldhash 0.1.5",
 ]
 
 [[package]]
@@ -2674,6 +2687,11 @@ name = "hashbrown"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
+dependencies = [
+ "allocator-api2",
+ "equivalent",
+ "foldhash 0.2.0",
+]
 
 [[package]]
 name = "hashlink"
@@ -3202,7 +3220,7 @@ checksum = "067d5f2cab4e711d34f59f71f994d350316c39e321a835b6399c4e7da8a3498a"
 dependencies = [
  "bstr",
  "bytes",
- "foldhash",
+ "foldhash 0.1.5",
  "hifijson",
  "indexmap 2.13.0",
  "jaq-core",
@@ -3969,9 +3987,7 @@ name = "normalize-facts-rules-interpret"
 version = "0.2.0"
 dependencies = [
  "abi_stable",
- "ascent-eval",
- "ascent-ir",
- "ascent-syntax",
+ "ascent-interpreter",
  "dirs",
  "glob",
  "normalize-core",
@@ -4769,6 +4785,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "479ca8adacdd7ce8f1fb39ce9ecccbfe93a3f1344b3d0d97f20bc0196208f62b"
 dependencies = [
  "proc-macro2",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "proc-macro-error-attr2"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96de42df36bb9bba5542fe9f1a054b8cc87e172759a1868aa05c1f3acc89dfc5"
+dependencies = [
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
+name = "proc-macro-error2"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11ec05c52be0a07b08061f7dd003e7d7092e0472bc731b4af7bb1ef876109802"
+dependencies = [
+ "proc-macro-error-attr2",
+ "proc-macro2",
+ "quote",
  "syn 2.0.117",
 ]
 

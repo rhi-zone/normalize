@@ -11,9 +11,7 @@ normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "
 abi_stable = "0.11"
 normalize-core = { path = "../normalize-core", version = "0.2.0" }
 normalize-rules-config = { path = "../normalize-rules-config", version = "0.2.0" }
-ascent-eval.workspace = true
-ascent-ir.workspace = true
-ascent-syntax.workspace = true
+ascent-interpreter.workspace = true
 syn = { version = "2.0", features = ["full"] }
 serde.workspace = true
 serde_json.workspace = true

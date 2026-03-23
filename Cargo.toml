@@ -77,9 +77,7 @@ dirs = "5"      # home directory lookup
 nucleo-matcher = "0.3"
 
 # Datalog interpreter
-ascent-eval = { git = "https://github.com/pterror/ascent-interpreter" }
-ascent-ir = { git = "https://github.com/pterror/ascent-interpreter" }
-ascent-syntax = { git = "https://github.com/pterror/ascent-interpreter" }
+ascent-interpreter = "0.1.1"
 
 # Parallelism
 rayon = "1.10"
