@@ -63,10 +63,12 @@ impl OutputFormatter for StaleDocsReport {
 
 /// Build a StaleDocsReport without printing (for service layer).
 pub fn build_stale_docs_report(root: &Path) -> StaleDocsReport {
-    use regex::Regex;
+    use std::sync::OnceLock;
 
+    static COVERS_RE: OnceLock<regex::Regex> = OnceLock::new();
     // normalize-syntax-allow: rust/unwrap-in-impl - compile-time constant regex pattern
-    let covers_re = Regex::new(r"<!--\s*covers:\s*(.+?)\s*-->").unwrap();
+    let covers_re =
+        COVERS_RE.get_or_init(|| regex::Regex::new(r"<!--\s*covers:\s*(.+?)\s*-->").unwrap());
 
     let md_files: Vec<_> = crate::walk::gitignore_walk(root)
         .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("md"))
@@ -222,10 +224,33 @@ impl From<StaleDocsReport> for DiagnosticsReport {
 
 /// Find files matching a cover pattern (glob or path prefix)
 fn find_covered_files(root: &Path, pattern: &str) -> Vec<String> {
+    // Reject patterns that could escape the project root via path traversal.
+    // Check both the pattern string and the resolved full path.
+    let pattern_path = std::path::Path::new(pattern);
+    if pattern_path
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return vec![];
+    }
+
     // Check if it's a glob pattern
     if pattern.contains('*') {
         // Use glob matching
         let full_pattern = root.join(pattern);
+        // Guard: ensure the constructed glob path still lives under root
+        // (after stripping glob wildcards, the prefix must be under root).
+        let non_glob_prefix: std::path::PathBuf = full_pattern
+            .components()
+            .take_while(|c| !c.as_os_str().to_string_lossy().contains('*'))
+            .collect();
+        if let (Ok(canon_prefix), Ok(canon_root)) =
+            (non_glob_prefix.canonicalize(), root.canonicalize())
+        {
+            if !canon_prefix.starts_with(&canon_root) {
+                return vec![];
+            }
+        }
         glob::glob(full_pattern.to_str().unwrap_or(""))
             .ok()
             .map(|paths| {

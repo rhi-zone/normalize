@@ -210,6 +210,7 @@ fn looks_like_file_path(s: &str) -> bool {
     let Some(dot) = s.rfind('.') else {
         return false;
     };
+    // SAFETY: '.' is ASCII (1 byte), so dot + 1 is always a valid char boundary
     let ext = &s[dot + 1..];
     !ext.is_empty() && ext.len() <= 5 && ext.chars().all(|c| c.is_ascii_lowercase())
 }

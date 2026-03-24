@@ -119,6 +119,7 @@ pub fn build_check_examples_report(root: &Path) -> CheckExamplesReport {
                 // normalize-syntax-allow: rust/unwrap-in-impl - cap.get(0) is always Some (the full match)
                 let match_start = cap.get(0).unwrap().start();
                 let match_end = cap.get(0).unwrap().end();
+                // SAFETY: regex byte offsets are always at UTF-8 char boundaries for valid UTF-8 input
                 let before = &line[..match_start];
                 let after = &line[match_end..];
 
