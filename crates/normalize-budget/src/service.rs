@@ -612,11 +612,11 @@ pub(crate) fn do_measure(
 
     let item_count = filtered.len();
 
-    let mut added_values: Vec<f64> = filtered.iter().map(|(a, _)| *a).collect();
-    let mut removed_values: Vec<f64> = filtered.iter().map(|(_, r)| *r).collect();
+    let added_values: Vec<f64> = filtered.iter().map(|(a, _)| *a).collect();
+    let removed_values: Vec<f64> = filtered.iter().map(|(_, r)| *r).collect();
 
-    let added = normalize_metrics::aggregate(&mut added_values, agg).unwrap_or(0.0);
-    let removed = normalize_metrics::aggregate(&mut removed_values, agg).unwrap_or(0.0);
+    let added = normalize_metrics::compute_aggregate(added_values, agg).unwrap_or(0.0);
+    let removed = normalize_metrics::compute_aggregate(removed_values, agg).unwrap_or(0.0);
     let total = added + removed;
     let net = added - removed;
 

@@ -622,7 +622,7 @@ pub fn do_measure(
 
     // Filter items whose address starts with the path prefix
     let path_prefix = path.trim_end_matches('/');
-    let mut values: Vec<f64> = all
+    let values: Vec<f64> = all
         .into_iter()
         .filter(|(addr, _)| {
             addr == path_prefix
@@ -634,7 +634,7 @@ pub fn do_measure(
 
     let item_count = values.len();
 
-    match crate::baseline::aggregate(&mut values, agg) {
+    match crate::baseline::compute_aggregate(values, agg) {
         Some(value) => Ok(MeasureResult {
             path: path.to_string(),
             metric: metric.to_string(),

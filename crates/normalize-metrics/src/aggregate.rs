@@ -9,11 +9,17 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "lowercase")]
 pub enum Aggregate {
     #[default]
+    /// Arithmetic mean of all values.
     Mean,
+    /// Middle value (interpolated for even-length inputs).
     Median,
+    /// Maximum value.
     Max,
+    /// Minimum value.
     Min,
+    /// Sum of all values.
     Sum,
+    /// Count of items (ignores values, counts occurrences).
     Count,
 }
 
@@ -49,7 +55,11 @@ impl std::fmt::Display for Aggregate {
 }
 
 /// Compute an aggregated value from a list of measurements.
-pub fn aggregate(values: &mut [f64], strategy: Aggregate) -> Option<f64> {
+///
+/// NaN and infinite values are filtered out before aggregation.
+/// Returns `None` if the input is empty or all values are non-finite.
+pub fn compute_aggregate(values: Vec<f64>, strategy: Aggregate) -> Option<f64> {
+    let mut values: Vec<f64> = values.into_iter().filter(|v| v.is_finite()).collect();
     if values.is_empty() {
         return None;
     }
@@ -77,37 +87,62 @@ mod tests {
 
     #[test]
     fn test_aggregate_mean() {
-        let mut v = vec![1.0, 2.0, 3.0];
-        assert_eq!(aggregate(&mut v, Aggregate::Mean), Some(2.0));
+        assert_eq!(
+            compute_aggregate(vec![1.0, 2.0, 3.0], Aggregate::Mean),
+            Some(2.0)
+        );
     }
 
     #[test]
     fn test_aggregate_median_odd() {
-        let mut v = vec![3.0, 1.0, 2.0];
-        assert_eq!(aggregate(&mut v, Aggregate::Median), Some(2.0));
+        assert_eq!(
+            compute_aggregate(vec![3.0, 1.0, 2.0], Aggregate::Median),
+            Some(2.0)
+        );
     }
 
     #[test]
     fn test_aggregate_median_even() {
-        let mut v = vec![1.0, 2.0, 3.0, 4.0];
-        assert_eq!(aggregate(&mut v, Aggregate::Median), Some(2.5));
+        assert_eq!(
+            compute_aggregate(vec![1.0, 2.0, 3.0, 4.0], Aggregate::Median),
+            Some(2.5)
+        );
     }
 
     #[test]
     fn test_aggregate_max() {
-        let mut v = vec![1.0, 5.0, 3.0];
-        assert_eq!(aggregate(&mut v, Aggregate::Max), Some(5.0));
+        assert_eq!(
+            compute_aggregate(vec![1.0, 5.0, 3.0], Aggregate::Max),
+            Some(5.0)
+        );
     }
 
     #[test]
     fn test_aggregate_count() {
-        let mut v = vec![1.0, 2.0, 3.0];
-        assert_eq!(aggregate(&mut v, Aggregate::Count), Some(3.0));
+        assert_eq!(
+            compute_aggregate(vec![1.0, 2.0, 3.0], Aggregate::Count),
+            Some(3.0)
+        );
     }
 
     #[test]
     fn test_aggregate_empty() {
-        let mut v: Vec<f64> = vec![];
-        assert_eq!(aggregate(&mut v, Aggregate::Mean), None);
+        assert_eq!(compute_aggregate(vec![], Aggregate::Mean), None);
+    }
+
+    #[test]
+    fn test_aggregate_nan_filtered() {
+        assert_eq!(
+            compute_aggregate(vec![1.0, f64::NAN, 3.0], Aggregate::Mean),
+            Some(2.0)
+        );
+    }
+
+    #[test]
+    fn test_aggregate_all_nan_returns_none() {
+        assert_eq!(
+            compute_aggregate(vec![f64::NAN, f64::INFINITY], Aggregate::Mean),
+            None
+        );
     }
 }

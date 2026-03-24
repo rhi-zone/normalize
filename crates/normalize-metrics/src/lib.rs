@@ -3,16 +3,16 @@
 //! This crate provides:
 //! - The [`Metric`] trait for snapshot metrics
 //! - [`MetricFactory`] type alias
-//! - [`Aggregate`] enum and [`aggregate`] function
-//! - Path filtering utilities for `(key, value)` pairs
+//! - [`Aggregate`] enum and [`compute_aggregate`] function
+//! - Path filtering utilities via [`filter_by_prefix`] returning [`MetricPoint`]
 
 use std::path::Path;
 
 mod aggregate;
 mod filter;
 
-pub use aggregate::{Aggregate, aggregate};
-pub use filter::filter_by_prefix;
+pub use aggregate::{Aggregate, compute_aggregate};
+pub use filter::{MetricPoint, filter_by_prefix};
 
 /// A measurable metric for the ratchet system.
 ///

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 // Re-export from normalize-metrics so callers don't need to depend on both.
-pub use normalize_metrics::{Aggregate, aggregate};
+pub use normalize_metrics::{Aggregate, compute_aggregate};
 
 /// A single baseline entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
