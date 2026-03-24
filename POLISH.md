@@ -1,9 +1,9 @@
 # Polish State
 
 Created: f89f7a3c5d17cb1d8b13137bacb8c830d54c808c
-Last run: 2026-03-25T03:00:00Z
+Last run: 2026-03-25T04:30:00Z
 Round 1 applied: 2026-03-24
-Round: 14
+Round: 15
 Project type: Rust CLI + library ecosystem (~40 crates)
 
 ## Lenses
@@ -848,3 +848,22 @@ adversarial: FIXPOINT
 - [DONE] `crates/normalize/src/service/config.rs:640` — `current_dir().unwrap_or_default()` → empty PathBuf on failure; changed to propagate error _(severity: high)_
 - [DONE] `crates/normalize/src/service/facts.rs:646,670-671` — three `eprintln!` in service helpers → `tracing::info!`/`tracing::warn!` _(severity: medium)_
 - [DONE] `crates/normalize/src/service/config.rs:289` — `unwrap()` without SAFETY comment → added comment _(severity: low)_
+
+---
+
+## Findings — Round 15
+
+Round 15 git hash: c4891ee4
+Scope: entire codebase — fixpoint verification
+
+### Result: FIXPOINT ✓
+
+api-clarity: FIXPOINT
+naming-consistency: FIXPOINT
+doc-coverage: FIXPOINT
+adversarial: FIXPOINT
+
+### error-surface (2 items — all fixed)
+
+- [DONE] `crates/normalize-scope/src/lib.rs:452,471,481` — `.is_none()` called on `Result<Language, GrammarLoadError>` (compile error in non-default workspace member not caught by `cargo test`); changed to `.is_err()` _(severity: high)_
+- [DONE] `crates/normalize-languages/tests/query_fixtures.rs` — 11 vacuous `assert!(x.len() >= 0, ...)` assertions (always true for `usize`, clippy warnings); removed and prefixed unused bindings with `_` _(severity: low)_
