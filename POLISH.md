@@ -545,3 +545,48 @@ None.
 - [DONE] `crates/normalize-tools/src/tools.rs:174-268` — `find_js_tool`/`find_python_tool` no path validation; document that root is trusted _(severity: medium)_
 - [DONE] `crates/normalize-rules/src/service.rs:262` — issue `limit` has no upper bound; cap at 10_000 _(severity: medium)_
 - [DONE] `crates/normalize-facts-rules-builtins/src/lib.rs:28-46` — `catch_unwind` swallows panics silently; log them _(severity: medium)_
+
+---
+
+## Findings — Round 7 (per-lens, new-crate focus)
+
+Round 7 git hash: ea256803
+Scope: entire codebase; extra focus on normalize-metrics, normalize-ratchet, normalize-budget, ci.rs, native-rules/ratchet.rs and budget.rs
+
+### Conflicts
+None.
+
+### api-clarity
+
+- [APPROVED] `crates/normalize-budget/src/service.rs:225` — `BudgetService::new()` and `::with_factory()` accept `_pretty: bool` but ignore it; `RatchetService` stores and uses it — remove param or implement _(severity: high)_
+- [APPROVED] `crates/normalize-budget/src/service.rs:57` — `CheckEntry.aggregate` is `String` while `RatchetService::CheckEntry.aggregate` is typed `Aggregate` enum — change to typed `Aggregate` _(severity: medium)_
+
+### naming-consistency
+
+_(0 new findings — fixpoint reached on this lens)_
+
+### doc-coverage
+
+- [APPROVED] `crates/normalize-ratchet/src/service.rs:690` — `pub fn do_measure()` missing doc comment _(severity: high)_
+- [APPROVED] `crates/normalize-ratchet/src/service.rs:1115` — `pub fn build_ratchet_report()` missing doc comment _(severity: high)_
+- [APPROVED] `crates/normalize-budget/src/service.rs:730` — `pub fn build_budget_report()` missing doc comment _(severity: high)_
+- [APPROVED] `crates/normalize-budget/src/service.rs:20` — `MeasureReport` fields (`path`, `metric`, `aggregate`, `base_ref`) undocumented _(severity: medium)_
+- [APPROVED] `crates/normalize-budget/src/service.rs:57` — `CheckEntry` fields undocumented _(severity: medium)_
+- [APPROVED] `crates/normalize-budget/src/service.rs:104,126,148,159` — `AddReport`, `UpdateReport`, `ShowEntry`, `ShowReport` fields undocumented _(severity: low)_
+- [APPROVED] `crates/normalize-ratchet/src/service.rs:238,207,212` — `AddReport`, `ShowReport`, `ShowEntry` fields undocumented _(severity: low)_
+
+### error-surface
+
+- [APPROVED] `crates/normalize-budget/src/service.rs:779` — `eprintln!` in public `build_budget_report()` — use `tracing::warn!` _(severity: medium)_
+- [APPROVED] `crates/normalize-ratchet/src/service.rs:1158` — `eprintln!` in public `build_ratchet_report()` — use `tracing::warn!` _(severity: medium)_
+- [APPROVED] `crates/normalize-budget/src/service.rs:403` — `eprintln!` in `check()` service method — use `tracing::warn!` _(severity: medium)_
+- [APPROVED] `crates/normalize-ratchet/src/service.rs:544` — `eprintln!` in `update()` service method — use `tracing::warn!` _(severity: medium)_
+
+### adversarial
+
+- [APPROVED] `crates/normalize-budget/src/service.rs:686` — `filter_entries` uses `e.path.starts_with(p)` string prefix matching; `"src"` matches `"srcother/"` — use path component boundary check (as ratchet does) _(severity: medium)_
+- [APPROVED] `crates/normalize-ratchet/src/metrics/call_complexity.rs:303` — unchecked `usize` addition in BFS can overflow on deep call graphs — use `saturating_add` _(severity: medium)_
+- [APPROVED] `crates/normalize-budget/src/metrics/complexity_delta.rs:226` — unchecked `usize` addition in complexity counting — use `saturating_add` _(severity: low)_
+- [APPROVED] `crates/normalize-ratchet/src/metrics/complexity.rs:195` — same unchecked addition — use `saturating_add` _(severity: low)_
+- [APPROVED] `crates/normalize-ratchet/src/service.rs:885` + `crates/normalize-budget/src/metrics/functions.rs:45` — `&hash[..7.min(hash.len())]` byte-slices git hash without char boundary check — add comment that git hashes are guaranteed ASCII _(severity: low)_
+- [APPROVED] `crates/normalize-budget/src/service.rs:717` — `net > max_net` when `max_net` may be negative; semantics surprising — add doc comment explaining the comparison _(severity: low)_
