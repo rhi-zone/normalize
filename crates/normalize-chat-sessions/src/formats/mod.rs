@@ -7,7 +7,7 @@
 //! Users can register custom formats via [`register()`]:
 //!
 //! ```ignore
-//! use normalize_chat_sessions::{LogFormat, SessionAnalysis, SessionFile, register};
+//! use normalize_chat_sessions::{LogFormat, SessionFile, register};
 //! use std::path::{Path, PathBuf};
 //!
 //! struct MyAgentFormat;
@@ -17,7 +17,6 @@
 //!     fn sessions_dir(&self, project: Option<&Path>) -> PathBuf { /* ... */ }
 //!     fn list_sessions(&self, project: Option<&Path>) -> Vec<SessionFile> { /* ... */ }
 //!     fn detect(&self, path: &Path) -> f64 { /* ... */ }
-//!     fn analyze(&self, path: &Path) -> Result<SessionAnalysis, String> { /* ... */ }
 //! }
 //!
 //! // Register before first use

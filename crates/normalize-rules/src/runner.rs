@@ -688,7 +688,10 @@ pub fn enable_disable(
 
     // Load or create the project config as a toml_edit document
     let content = std::fs::read_to_string(&config_path).unwrap_or_default();
-    let mut doc: toml_edit::DocumentMut = content.parse().unwrap_or_default();
+    let mut doc: toml_edit::DocumentMut = content.parse().unwrap_or_else(|e| {
+        tracing::warn!("failed to parse existing config, using defaults: {}", e);
+        toml_edit::DocumentMut::default()
+    });
 
     // Ensure [rules] exists as an explicit table section.
     // If the existing entry is an inline table (e.g. `rules = {}`), bail out with an
@@ -1131,8 +1134,10 @@ pub fn run_rules_report(
 
     // Fact rules
     if matches!(engine, RuleType::All | RuleType::Fact) {
-        // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
-        let rt = tokio::runtime::Runtime::new().unwrap();
+        let rt = tokio::runtime::Runtime::new().unwrap_or_else(|e| {
+            tracing::warn!("failed to create tokio runtime: {}", e);
+            panic!("failed to create tokio runtime: {}", e)
+        });
         let diagnostics = rt.block_on(collect_fact_diagnostics(
             project_root,
             &config.rules,
@@ -1203,7 +1208,7 @@ pub fn run_sarif_tools(
                 eprintln!("normalize: SARIF tool '{}' {}", tool.name, msg);
                 report
                     .tool_errors
-                    .push(normalize_output::diagnostics::ToolError {
+                    .push(normalize_output::diagnostics::ToolFailure {
                         tool: tool.name.clone(),
                         message: msg,
                     });
@@ -1218,7 +1223,7 @@ pub fn run_sarif_tools(
                 eprintln!("normalize: SARIF tool '{}' {}", tool.name, msg);
                 report
                     .tool_errors
-                    .push(normalize_output::diagnostics::ToolError {
+                    .push(normalize_output::diagnostics::ToolFailure {
                         tool: tool.name.clone(),
                         message: msg,
                     });
@@ -1233,7 +1238,7 @@ pub fn run_sarif_tools(
                 eprintln!("normalize: SARIF tool '{}' {}", tool.name, msg);
                 report
                     .tool_errors
-                    .push(normalize_output::diagnostics::ToolError {
+                    .push(normalize_output::diagnostics::ToolFailure {
                         tool: tool.name.clone(),
                         message: msg,
                     });
@@ -1316,7 +1321,7 @@ async fn ensure_relations(root: &Path) -> Result<normalize_facts_rules_api::Rela
     match build_relations_from_index(root).await {
         Ok(r) => Ok(r),
         Err(_) => {
-            eprintln!("Facts index not found. Building...");
+            tracing::info!("Facts index not found. Building...");
             let normalize_dir = get_normalize_dir(root);
             let db_path = normalize_dir.join("index.sqlite");
             let mut idx = normalize_facts::FileIndex::open(&db_path, root)
@@ -1326,14 +1331,16 @@ async fn ensure_relations(root: &Path) -> Result<normalize_facts_rules_api::Rela
                 .refresh()
                 .await
                 .map_err(|e| format!("Failed to index files: {}", e))?;
-            eprintln!("Indexed {} files.", count);
+            tracing::info!("Indexed {} files.", count);
             let stats = idx
                 .refresh_call_graph()
                 .await
                 .map_err(|e| format!("Failed to index call graph: {}", e))?;
-            eprintln!(
+            tracing::info!(
                 "Indexed {} symbols, {} calls, {} imports.",
-                stats.symbols, stats.calls, stats.imports
+                stats.symbols,
+                stats.calls,
+                stats.imports
             );
             build_relations_from_index(root).await
         }

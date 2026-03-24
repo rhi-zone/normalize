@@ -265,7 +265,13 @@ fn load_rules_from_dir(rules_dir: &Path) -> Vec<FactsRule> {
 
 /// Parse a rule file with TOML frontmatter.
 fn parse_rule_file(path: &Path) -> Option<FactsRule> {
-    let content = std::fs::read_to_string(path).ok()?;
+    let content = match std::fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!("failed to read rule file {:?}: {}", path, e);
+            return None;
+        }
+    };
     let default_id = path
         .file_stem()
         .and_then(|s| s.to_str())
@@ -339,7 +345,7 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         match toml::from_str(&frontmatter_str) {
             Ok(v) => v,
             Err(e) => {
-                eprintln!("Warning: invalid frontmatter: {}", e);
+                tracing::warn!("invalid frontmatter: {}", e);
                 return None;
             }
         }

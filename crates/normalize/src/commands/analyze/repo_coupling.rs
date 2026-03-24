@@ -28,7 +28,7 @@ pub struct TemporalCouplingPair {
 
 /// Per-repo activity context.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct RepoActivity {
+pub struct RepoCouplingContext {
     pub name: String,
     pub ecosystems: Vec<String>,
     pub published_names: Vec<String>,
@@ -42,7 +42,7 @@ pub struct RepoCouplingReport {
     pub dep_edges: Vec<DepEdge>,
     pub temporal_pairs: Vec<TemporalCouplingPair>,
     pub undeclared_pairs: Vec<TemporalCouplingPair>,
-    pub repos: Vec<RepoActivity>,
+    pub repos: Vec<RepoCouplingContext>,
     pub window_hours: usize,
 }
 
@@ -189,12 +189,12 @@ pub fn analyze_repo_coupling(
         .collect();
 
     // Build repo summaries
-    let repos_summary: Vec<RepoActivity> = repo_data
+    let repos_summary: Vec<RepoCouplingContext> = repo_data
         .iter()
         .map(|rd| {
             let window_secs = (window_hours as u64) * 3600;
             let windows = count_active_windows(&rd.commit_timestamps, window_secs);
-            RepoActivity {
+            RepoCouplingContext {
                 name: rd.name.clone(),
                 ecosystems: rd.ecosystem_names.clone(),
                 published_names: rd.published_names.clone(),

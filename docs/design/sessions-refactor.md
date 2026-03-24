@@ -9,10 +9,10 @@ normalize-chat-sessions previously conflated two concerns:
 1. **Parsing** - converting format-specific logs (Claude Code JSONL, Gemini CLI JSON, Codex, Normalize Agent) into structured data
 2. **Analysis** - computing statistics (tool call counts, token usage, error patterns, parallelization opportunities)
 
-The `LogFormat` trait's `analyze()` method does both, returning `SessionAnalysis` which contains pre-computed aggregations:
+The `LogFormat` trait's `analyze()` method did both, returning `SessionAnalysisReport` (then called `SessionAnalysis`) which contains pre-computed aggregations:
 
 ```rust
-pub struct SessionAnalysis {
+pub struct SessionAnalysisReport {
     pub message_counts: HashMap<String, usize>,
     pub tool_stats: HashMap<String, ToolStats>,
     pub token_stats: TokenStats,
@@ -138,5 +138,5 @@ Analysis moves out of normalize-chat-sessions entirely. The `normalize sessions`
 2. ~~Implement `parse()` for each format~~ Done (Claude Code, Gemini CLI, Codex, Normalize Agent)
 3. ~~Move analysis logic to normalize CLI~~ Done (`crates/normalize/src/sessions/analysis.rs`)
 4. ~~Remove `analyze()` from trait~~ Done
-5. ~~`SessionAnalysis` becomes internal to normalize CLI~~ Done
+5. ~~`SessionAnalysisReport` (previously `SessionAnalysis`) becomes internal to normalize CLI~~ Done
 
