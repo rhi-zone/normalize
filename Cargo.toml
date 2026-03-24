@@ -77,7 +77,7 @@ dirs = "5"      # home directory lookup
 nucleo-matcher = "0.3"
 
 # Datalog interpreter
-ascent-interpreter = "0.1.1"
+ascent-interpreter = { version = "0.1.1", features = ["jit-asm"] }
 
 # Parallelism
 rayon = "1.10"

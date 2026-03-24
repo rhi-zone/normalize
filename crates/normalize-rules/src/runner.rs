@@ -1069,15 +1069,14 @@ pub async fn collect_fact_diagnostics(
         }
     };
 
-    let mut all_diagnostics = Vec::new();
-    for rule in &all_rules {
-        match interpret::run_rule(rule, &relations) {
-            Ok(diagnostics) => all_diagnostics.extend(diagnostics),
-            Err(e) => {
-                eprintln!("Error running rule '{}': {}", rule.id, e);
-            }
+    let rule_refs: Vec<&interpret::FactsRule> = all_rules.iter().collect();
+    let mut all_diagnostics = match interpret::run_rules_batch(&rule_refs, &relations) {
+        Ok(diagnostics) => diagnostics,
+        Err(e) => {
+            eprintln!("Error running fact rules batch: {}", e);
+            Vec::new()
         }
-    }
+    };
 
     interpret::filter_inline_allowed(&mut all_diagnostics, root);
     all_diagnostics

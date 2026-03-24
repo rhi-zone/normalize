@@ -39,8 +39,7 @@
 //!   file = "" for no location; line = 0 when the source has no line info.
 
 use abi_stable::std_types::ROption;
-use ascent_interpreter::eval::intern::string_value;
-use ascent_interpreter::eval::{Engine, Value};
+use ascent_interpreter::eval::{Engine, SharedJitCompiler, Value};
 use ascent_interpreter::ir::Program;
 use ascent_interpreter::syntax::AscentProgram;
 use glob::Pattern;
@@ -588,141 +587,280 @@ pub fn run_rules_source(
         syn::parse_str(&full_source).map_err(|e| InterpretError::Parse(e.to_string()))?;
     let program = Program::from_ast(ast).map_err(InterpretError::Parse)?;
 
-    // Create engine and populate facts
+    // Create engine, populate facts, and run to fixpoint.
+    //
+    // NOTE: JIT is intentionally disabled here. ascent-interpreter 0.1.1 has a bug where
+    // the JIT compares interned String values by their intern IDs (u32) using packed integer
+    // comparison rather than lexicographic string content. This produces incorrect results for
+    // rules using `if a < b` with String columns (e.g. `cycle(a, b) <-- ..., if a < b`).
+    // Re-enable when ascent-interpreter fixes JIT string comparison.
     let mut engine = Engine::new(program);
-    populate_facts(&mut engine, relations);
-
-    // Run to fixpoint
+    populate_facts(&mut engine, relations)?;
     engine
         .run()
         .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    engine.materialize();
 
     // Extract diagnostics from output relations
     Ok(extract_diagnostics(&engine))
 }
 
-/// Populate the engine with facts from Relations
-fn populate_facts(engine: &mut Engine, relations: &Relations) {
+/// Run rules incrementally against an already-populated engine.
+///
+/// For the daemon/LSP path where facts change between runs. The engine must
+/// have been created and run at least once (via [`run_rules_source`] or
+/// [`run_rules_source_incremental`]). New/changed facts are inserted then
+/// `run_incremental` re-evaluates only strata affected by the changed relations.
+///
+/// `dirty_relations` names the input relations that have new facts inserted via
+/// `new_relations`. `retracted_relations` names any relations that had facts removed
+/// (triggering full clear-and-rederive for affected strata).
+///
+/// Returns diagnostics from the incremental re-evaluation.
+pub fn run_rules_source_incremental(
+    engine: &mut Engine,
+    new_relations: &Relations,
+    dirty_relations: &[&str],
+    retracted_relations: &[&str],
+) -> Result<Vec<Diagnostic>, InterpretError> {
+    populate_facts(engine, new_relations)?;
+    engine
+        .run_incremental(dirty_relations, retracted_relations)
+        .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    engine.materialize();
+    Ok(extract_diagnostics(engine))
+}
+
+/// Run multiple rules against the same relations, sharing a single JIT compiler.
+///
+/// For the batch path (running all rules against the same index snapshot), this
+/// compiles the first rule's program with JIT, then shares the compiled JIT state
+/// across all subsequent engine instances — avoiding repeated JIT compilation of
+/// identical rule bodies.
+///
+/// NOTE: JIT compiler sharing is structured but JIT is currently disabled pending an
+/// ascent-interpreter bug fix (see `run_rules_source` for details). The `shared_jit`
+/// infrastructure will become active once JIT is re-enabled.
+///
+/// Applies per-rule allow patterns and severity promotion, identical to `run_rule`.
+/// Returns all diagnostics from all rules combined.
+pub fn run_rules_batch(
+    rules: &[&FactsRule],
+    relations: &Relations,
+) -> Result<Vec<Diagnostic>, InterpretError> {
+    if rules.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut _shared_jit: Option<SharedJitCompiler> = None;
+    let mut all_diagnostics = Vec::new();
+
+    for rule in rules {
+        let full_source = format!("{}\n{}", PREAMBLE, &rule.source);
+        let ast: AscentProgram =
+            syn::parse_str(&full_source).map_err(|e| InterpretError::Parse(e.to_string()))?;
+        let program = Program::from_ast(ast).map_err(InterpretError::Parse)?;
+
+        let mut engine = Engine::new(program);
+
+        // JIT sharing: disabled until ascent-interpreter JIT string comparison is fixed.
+        // Uncomment to enable once the upstream bug is resolved:
+        //   match _shared_jit.take() {
+        //       Some(jit) => engine.set_jit_compiler(jit),
+        //       None => engine.enable_jit().map_err(|e| InterpretError::Parse(e.to_string()))?,
+        //   }
+
+        populate_facts(&mut engine, relations)?;
+        engine
+            .run()
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+        engine.materialize();
+
+        // Capture the shared JIT for when it's re-enabled.
+        _shared_jit = engine.share_jit_compiler();
+
+        let mut diagnostics = extract_diagnostics(&engine);
+
+        // Apply per-rule allow patterns.
+        if !rule.allow.is_empty() {
+            diagnostics.retain(|d| {
+                let match_str = match d.location.as_ref() {
+                    ROption::RSome(loc) => loc.file.as_str(),
+                    ROption::RNone => d.message.as_str(),
+                };
+                !rule.allow.iter().any(|p| p.matches(match_str))
+            });
+        }
+
+        // Apply per-rule severity.
+        match rule.severity {
+            Severity::Error => {
+                for d in &mut diagnostics {
+                    d.level = DiagnosticLevel::Error;
+                }
+            }
+            Severity::Info => {
+                for d in &mut diagnostics {
+                    if d.level == DiagnosticLevel::Warning {
+                        d.level = DiagnosticLevel::Hint;
+                    }
+                }
+            }
+            Severity::Warning => {}
+        }
+
+        all_diagnostics.extend(diagnostics);
+    }
+
+    Ok(all_diagnostics)
+}
+
+/// Populate the engine with facts from Relations.
+fn populate_facts(engine: &mut Engine, relations: &Relations) -> Result<(), InterpretError> {
     for sym in relations.symbols.iter() {
-        let _ = engine.insert(
-            "symbol",
-            vec![
-                string_value(&sym.file),
-                string_value(&sym.name),
-                string_value(&sym.kind),
-                Value::U32(sym.line),
-            ],
-        );
+        engine
+            .insert(
+                "symbol",
+                vec![
+                    Value::string(&sym.file),
+                    Value::string(&sym.name),
+                    Value::string(&sym.kind),
+                    Value::U32(sym.line),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
     }
 
     for imp in relations.imports.iter() {
-        let _ = engine.insert(
-            "import",
-            vec![
-                string_value(&imp.from_file),
-                string_value(&imp.to_module),
-                string_value(&imp.name),
-            ],
-        );
+        engine
+            .insert(
+                "import",
+                vec![
+                    Value::string(&imp.from_file),
+                    Value::string(&imp.to_module),
+                    Value::string(&imp.name),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
     }
 
     for call in relations.calls.iter() {
-        let _ = engine.insert(
-            "call",
-            vec![
-                string_value(&call.caller_file),
-                string_value(&call.caller_name),
-                string_value(&call.callee_name),
-                Value::U32(call.line),
-            ],
-        );
+        engine
+            .insert(
+                "call",
+                vec![
+                    Value::string(&call.caller_file),
+                    Value::string(&call.caller_name),
+                    Value::string(&call.callee_name),
+                    Value::U32(call.line),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
     }
 
     for vis in relations.visibilities.iter() {
-        let _ = engine.insert(
-            "visibility",
-            vec![
-                string_value(&vis.file),
-                string_value(&vis.name),
-                string_value(&vis.visibility),
-            ],
-        );
+        engine
+            .insert(
+                "visibility",
+                vec![
+                    Value::string(&vis.file),
+                    Value::string(&vis.name),
+                    Value::string(&vis.visibility),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
     }
 
     for attr in relations.attributes.iter() {
-        let _ = engine.insert(
-            "attribute",
-            vec![
-                string_value(&attr.file),
-                string_value(&attr.name),
-                string_value(&attr.attribute),
-            ],
-        );
+        engine
+            .insert(
+                "attribute",
+                vec![
+                    Value::string(&attr.file),
+                    Value::string(&attr.name),
+                    Value::string(&attr.attribute),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
     }
 
     for p in relations.parents.iter() {
-        let _ = engine.insert(
-            "parent",
-            vec![
-                string_value(&p.file),
-                string_value(&p.child_name),
-                string_value(&p.parent_name),
-            ],
-        );
+        engine
+            .insert(
+                "parent",
+                vec![
+                    Value::string(&p.file),
+                    Value::string(&p.child_name),
+                    Value::string(&p.parent_name),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
     }
 
     for q in relations.qualifiers.iter() {
-        let _ = engine.insert(
-            "qualifier",
-            vec![
-                string_value(&q.caller_file),
-                string_value(&q.caller_name),
-                string_value(&q.callee_name),
-                string_value(&q.qualifier),
-            ],
-        );
+        engine
+            .insert(
+                "qualifier",
+                vec![
+                    Value::string(&q.caller_file),
+                    Value::string(&q.caller_name),
+                    Value::string(&q.callee_name),
+                    Value::string(&q.qualifier),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
     }
 
     for sr in relations.symbol_ranges.iter() {
-        let _ = engine.insert(
-            "symbol_range",
-            vec![
-                string_value(&sr.file),
-                string_value(&sr.name),
-                Value::U32(sr.start_line),
-                Value::U32(sr.end_line),
-            ],
-        );
+        engine
+            .insert(
+                "symbol_range",
+                vec![
+                    Value::string(&sr.file),
+                    Value::string(&sr.name),
+                    Value::U32(sr.start_line),
+                    Value::U32(sr.end_line),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
     }
 
     for imp in relations.implements.iter() {
-        let _ = engine.insert(
-            "implements",
-            vec![
-                string_value(&imp.file),
-                string_value(&imp.name),
-                string_value(&imp.interface),
-            ],
-        );
+        engine
+            .insert(
+                "implements",
+                vec![
+                    Value::string(&imp.file),
+                    Value::string(&imp.name),
+                    Value::string(&imp.interface),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
     }
 
     for ii in relations.is_impls.iter() {
-        let _ = engine.insert(
-            "is_impl",
-            vec![string_value(&ii.file), string_value(&ii.name)],
-        );
+        engine
+            .insert(
+                "is_impl",
+                vec![Value::string(&ii.file), Value::string(&ii.name)],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
     }
 
     for tm in relations.type_methods.iter() {
-        let _ = engine.insert(
-            "type_method",
-            vec![
-                string_value(&tm.file),
-                string_value(&tm.type_name),
-                string_value(&tm.method_name),
-            ],
-        );
+        engine
+            .insert(
+                "type_method",
+                vec![
+                    Value::string(&tm.file),
+                    Value::string(&tm.type_name),
+                    Value::string(&tm.method_name),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
     }
+
+    Ok(())
 }
 
 /// Extract diagnostics from the `diagnostic` output relation.
@@ -736,17 +874,13 @@ fn extract_diagnostics(engine: &Engine) -> Vec<Diagnostic> {
 
     if let Some(diags) = engine.relation("diagnostic") {
         for tuple in diags.iter() {
-            if let [sev_val, rule_val, file_val, Value::U32(line), msg_val] = tuple {
-                let Some(severity) = sev_val.as_str() else {
-                    continue;
-                };
-                let Some(rule_id) = rule_val.as_str() else {
-                    continue;
-                };
-                let Some(file) = file_val.as_str() else {
-                    continue;
-                };
-                let Some(message) = msg_val.as_str() else {
+            if let [severity, rule_id, file, Value::U32(line), message] = tuple {
+                let (Some(severity), Some(rule_id), Some(file), Some(message)) = (
+                    severity.as_str(),
+                    rule_id.as_str(),
+                    file.as_str(),
+                    message.as_str(),
+                ) else {
                     continue;
                 };
                 let mut d = match severity {
