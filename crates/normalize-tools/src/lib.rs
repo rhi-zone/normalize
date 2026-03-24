@@ -9,6 +9,22 @@
 //! - **Formatters**: Check/fix code style (prettier, black, rustfmt, biome format)
 //! - **Type checkers**: Find type errors (tsc, mypy, pyright, cargo check)
 //!
+//! # Registry Entry Points
+//!
+//! Three ways to obtain a [`ToolRegistry`]:
+//!
+//! - [`default_registry()`] — preferred entry point for the CLI; returns a
+//!   registry populated with all built-in tool adapters. Use this when you
+//!   do not need project-specific custom tools.
+//! - [`registry_with_custom(root)`] — like `default_registry()` but also
+//!   loads any custom tools declared in `.normalize/tools.toml` under `root`.
+//!   Use this for CLI invocations that run inside a project.
+//! - [`ToolRegistry::with_builtins()`] — lower-level constructor; equivalent
+//!   to `default_registry()` but expressed as an associated function. Prefer
+//!   `default_registry()` at call sites for clarity; use `with_builtins()` in
+//!   code that works with `ToolRegistry` by value and wants the constructor
+//!   co-located with the type.
+//!
 //! # Custom Tools
 //!
 //! Tools can be configured in `.normalize/tools.toml`:

@@ -5,6 +5,9 @@ use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 use serde::Serialize;
 use std::path::Path;
 
+static MARKER_START_RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+static REF_RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+
 /// A missing example reference
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 struct MissingExample {
@@ -49,12 +52,11 @@ impl OutputFormatter for CheckExamplesReport {
 
 /// Build a CheckExamplesReport without printing (for service layer).
 pub fn build_check_examples_report(root: &Path) -> CheckExamplesReport {
-    use regex::Regex;
     use std::collections::HashSet;
 
-    // normalize-syntax-allow: rust/unwrap-in-impl - compile-time constant regex patterns
-    let marker_start_re = Regex::new(r"//\s*\[example:\s*([^\]]+)\]").unwrap();
-    let ref_re = Regex::new(r"\{\{example:\s*([^}]+)\}\}").unwrap();
+    let marker_start_re =
+        MARKER_START_RE.get_or_init(|| regex::Regex::new(r"//\s*\[example:\s*([^\]]+)\]").unwrap());
+    let ref_re = REF_RE.get_or_init(|| regex::Regex::new(r"\{\{example:\s*([^}]+)\}\}").unwrap());
 
     let mut defined_examples: HashSet<String> = HashSet::new();
 

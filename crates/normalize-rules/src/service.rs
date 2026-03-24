@@ -726,7 +726,14 @@ impl RulesService {
 pub fn load_rules_config(root: &Path) -> RulesRunConfig {
     // We parse a minimal subset of normalize.toml — just the rules-related sections.
     let project_path = root.join(".normalize").join("config.toml");
-    let content = std::fs::read_to_string(&project_path).unwrap_or_default();
+    let content = match std::fs::read_to_string(&project_path) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => {
+            tracing::warn!("failed to read config at {:?}: {}", project_path, e);
+            String::new()
+        }
+    };
 
     #[derive(serde::Deserialize, Default)]
     #[serde(default)]
@@ -739,11 +746,28 @@ pub fn load_rules_config(root: &Path) -> RulesRunConfig {
     // Load global config first
     let global_content = dirs::config_dir()
         .map(|d| d.join("normalize").join("config.toml"))
-        .and_then(|p| std::fs::read_to_string(p).ok())
+        .map(|p| match std::fs::read_to_string(&p) {
+            Ok(s) => s,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(e) => {
+                tracing::warn!("failed to read config at {:?}: {}", p, e);
+                String::new()
+            }
+        })
         .unwrap_or_default();
 
-    let global: RulesOnlyConfig = toml::from_str(&global_content).unwrap_or_default();
-    let project: RulesOnlyConfig = toml::from_str(&content).unwrap_or_default();
+    let global: RulesOnlyConfig = toml::from_str(&global_content).unwrap_or_else(|e| {
+        tracing::warn!("failed to parse global rules config: {}", e);
+        RulesOnlyConfig::default()
+    });
+    let project: RulesOnlyConfig = toml::from_str(&content).unwrap_or_else(|e| {
+        tracing::warn!(
+            "failed to parse project rules config at {:?}: {}",
+            project_path,
+            e
+        );
+        RulesOnlyConfig::default()
+    });
 
     let rule_tags = {
         let mut merged = global.rule_tags;

@@ -5,6 +5,8 @@ use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 use serde::Serialize;
 use std::path::Path;
 
+static CODE_REF_RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+
 /// A broken reference found in documentation
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 struct BrokenRef {
@@ -74,8 +76,6 @@ fn normalize_dir(root: &Path) -> std::path::PathBuf {
 
 /// Build a CheckRefsReport without printing (for service layer).
 pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, String> {
-    use regex::Regex;
-
     // Open index to get known symbols
     let db_path = normalize_dir(root).join("index.sqlite");
     let idx = normalize_facts::FileIndex::open(&db_path, root)
@@ -104,9 +104,9 @@ pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, Str
     }
 
     // Regex for code references: `identifier` or `Module::method` or `Module.method`
-    // normalize-syntax-allow: rust/unwrap-in-impl - compile-time constant regex pattern
-    let code_ref_re =
-        Regex::new(r"`([A-Z][a-zA-Z0-9_]*(?:[:\.][a-zA-Z_][a-zA-Z0-9_]*)*)`").unwrap();
+    let code_ref_re = CODE_REF_RE.get_or_init(|| {
+        regex::Regex::new(r"`([A-Z][a-zA-Z0-9_]*(?:[:\.][a-zA-Z_][a-zA-Z0-9_]*)*)`").unwrap()
+    });
 
     let mut broken_refs: Vec<BrokenRef> = Vec::new();
 

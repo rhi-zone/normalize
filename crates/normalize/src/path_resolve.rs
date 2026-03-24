@@ -45,7 +45,7 @@ impl IndexPathSource {
 }
 
 impl PathSource for IndexPathSource {
-    fn find_like(&mut self, query: &str) -> Option<Vec<normalize_path_resolve::PathEntry>> {
+    fn find_like(&self, query: &str) -> Option<Vec<normalize_path_resolve::PathEntry>> {
         let q = query.to_lowercase();
         Some(
             self.files
@@ -63,7 +63,7 @@ impl PathSource for IndexPathSource {
         )
     }
 
-    fn all_files(&mut self) -> Option<Vec<normalize_path_resolve::PathEntry>> {
+    fn all_files(&self) -> Option<Vec<normalize_path_resolve::PathEntry>> {
         Some(
             self.files
                 .iter()
@@ -97,8 +97,8 @@ pub fn resolve_unified(query: &str, root: &Path) -> Option<UnifiedPath> {
         root,
         &alias_lookup(root),
         IndexPathSource::open_sync(root)
-            .as_mut()
-            .map(|s| s as &mut dyn PathSource),
+            .as_ref()
+            .map(|s| s as &dyn PathSource),
     )
 }
 
@@ -109,8 +109,8 @@ pub fn resolve_unified_all(query: &str, root: &Path) -> Vec<UnifiedPath> {
         root,
         &alias_lookup(root),
         IndexPathSource::open_sync(root)
-            .as_mut()
-            .map(|s| s as &mut dyn PathSource),
+            .as_ref()
+            .map(|s| s as &dyn PathSource),
     )
 }
 
@@ -119,8 +119,8 @@ pub fn all_files(root: &Path) -> Vec<PathMatch> {
     normalize_path_resolve::all_files(
         root,
         IndexPathSource::open_sync(root)
-            .as_mut()
-            .map(|s| s as &mut dyn PathSource),
+            .as_ref()
+            .map(|s| s as &dyn PathSource),
     )
 }
 
@@ -130,8 +130,8 @@ pub fn resolve(query: &str, root: &Path) -> Vec<PathMatch> {
         query,
         root,
         IndexPathSource::open_sync(root)
-            .as_mut()
-            .map(|s| s as &mut dyn PathSource),
+            .as_ref()
+            .map(|s| s as &dyn PathSource),
     )
 }
 

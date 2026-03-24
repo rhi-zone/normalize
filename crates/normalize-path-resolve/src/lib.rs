@@ -39,11 +39,11 @@ pub struct SigilExpansion {
 pub trait PathSource {
     /// Return paths matching `query` using a fast prefix/substring filter.
     /// Returns `None` if the source cannot answer this query (caller falls back to `all_files`).
-    fn find_like(&mut self, query: &str) -> Option<Vec<PathEntry>>;
+    fn find_like(&self, query: &str) -> Option<Vec<PathEntry>>;
 
     /// Return all known file/directory entries.
     /// Returns `None` if the source is unavailable; caller falls back to a filesystem walk.
-    fn all_files(&mut self) -> Option<Vec<PathEntry>>;
+    fn all_files(&self) -> Option<Vec<PathEntry>>;
 }
 
 /// Expand an alias query like `@todo` or `@config/section`.
@@ -128,7 +128,7 @@ pub fn resolve_unified(
     query: &str,
     root: &Path,
     alias_lookup: &dyn Fn(&str) -> Option<Vec<String>>,
-    path_source: Option<&mut dyn PathSource>,
+    path_source: Option<&dyn PathSource>,
 ) -> Option<UnifiedPath> {
     resolve_unified_depth(query, root, alias_lookup, path_source, 0)
 }
@@ -137,7 +137,7 @@ fn resolve_unified_depth(
     query: &str,
     root: &Path,
     alias_lookup: &dyn Fn(&str) -> Option<Vec<String>>,
-    path_source: Option<&mut dyn PathSource>,
+    path_source: Option<&dyn PathSource>,
     depth: u8,
 ) -> Option<UnifiedPath> {
     // Handle sigil expansion (@todo, @config, etc.)
@@ -272,7 +272,7 @@ pub fn resolve_unified_all(
     query: &str,
     root: &Path,
     alias_lookup: &dyn Fn(&str) -> Option<Vec<String>>,
-    path_source: Option<&mut dyn PathSource>,
+    path_source: Option<&dyn PathSource>,
 ) -> Vec<UnifiedPath> {
     resolve_unified_all_depth(query, root, alias_lookup, path_source, 0)
 }
@@ -281,7 +281,7 @@ fn resolve_unified_all_depth(
     query: &str,
     root: &Path,
     alias_lookup: &dyn Fn(&str) -> Option<Vec<String>>,
-    path_source: Option<&mut dyn PathSource>,
+    path_source: Option<&dyn PathSource>,
     depth: u8,
 ) -> Vec<UnifiedPath> {
     // Handle sigil expansion (@todo, @config, etc.)
@@ -402,7 +402,7 @@ fn resolve_unified_all_depth(
 }
 
 /// Get all files in the repository (uses path source if available, else walks filesystem)
-pub fn all_files(root: &Path, path_source: Option<&mut dyn PathSource>) -> Vec<PathMatch> {
+pub fn all_files(root: &Path, path_source: Option<&dyn PathSource>) -> Vec<PathMatch> {
     get_paths_for_query(root, "", path_source)
         .into_iter()
         .map(|(path, is_dir)| PathMatch {
@@ -429,11 +429,7 @@ pub fn all_files(root: &Path, path_source: Option<&mut dyn PathSource>) -> Vec<P
 /// **Note:** colon-paths like `src/main.py:MyClass` are silently truncated — only the
 /// file component before `:` is resolved. Symbol resolution is left to the caller
 /// (use [`resolve_unified`] if you need both file and symbol).
-pub fn resolve(
-    query: &str,
-    root: &Path,
-    mut path_source: Option<&mut dyn PathSource>,
-) -> Vec<PathMatch> {
+pub fn resolve(query: &str, root: &Path, path_source: Option<&dyn PathSource>) -> Vec<PathMatch> {
     // Handle absolute paths first - check if file exists directly
     if query.starts_with('/') {
         let abs_path = std::path::Path::new(query);
@@ -463,7 +459,7 @@ pub fn resolve(
 
     // Handle extension patterns (e.g., ".rs", ".py") - return all matches directly
     if query.starts_with('.') && !query.contains('/') {
-        if let Some(ref mut src) = path_source
+        if let Some(ref src) = path_source
             && let Some(files) = src.find_like(query)
         {
             return files
@@ -511,7 +507,7 @@ pub fn resolve(
 fn get_paths_for_query(
     root: &Path,
     query: &str,
-    path_source: Option<&mut dyn PathSource>,
+    path_source: Option<&dyn PathSource>,
 ) -> Vec<(String, bool)> {
     if let Some(src) = path_source {
         // Try LIKE first for faster queries

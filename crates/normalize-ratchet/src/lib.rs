@@ -21,8 +21,9 @@ pub use normalize_metrics::{Metric, MetricFactory};
 ///
 /// The `root` argument is unused; it exists to satisfy the `MetricFactory` signature
 /// for future root-aware metric registration.
-#[allow(unused_variables)]
-pub fn default_metrics(root: &std::path::Path) -> Vec<Box<dyn Metric>> {
+pub fn default_metrics(
+    _root: &std::path::Path, // root is unused here; exists to match MetricFactory<T> = fn(&Path) -> Vec<T>
+) -> Vec<Box<dyn Metric>> {
     vec![
         Box::new(metrics::complexity::ComplexityMetric),
         Box::new(metrics::call_complexity::CallComplexityMetric),

@@ -60,7 +60,10 @@ impl InterfaceResolver for IndexedResolver<'_> {
 
         match tokio::runtime::Handle::try_current() {
             Ok(handle) => tokio::task::block_in_place(|| handle.block_on(task)),
-            Err(_) => tokio::runtime::Runtime::new().ok()?.block_on(task),
+            Err(_) => tokio::runtime::Runtime::new()
+                .map_err(|e| tracing::warn!("failed to create runtime: {}", e))
+                .ok()?
+                .block_on(task),
         }
     }
 }
