@@ -18,13 +18,13 @@ pub struct ToolListItem {
     pub website: String,
 }
 
-/// Result of lint list command
+/// Report for lint list command
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct LintListResult {
+pub struct LintListReport {
     pub tools: Vec<ToolListItem>,
 }
 
-impl OutputFormatter for LintListResult {
+impl OutputFormatter for LintListReport {
     fn format_text(&self) -> String {
         let mut out = String::from("Detected tools:\n\n");
         for tool in &self.tools {
@@ -105,7 +105,7 @@ fn run_tools(
 }
 
 /// Build lint list report (data only, no printing).
-pub fn build_lint_list(root: Option<&Path>) -> LintListResult {
+pub fn build_lint_list(root: Option<&Path>) -> LintListReport {
     let root = root.unwrap_or_else(|| Path::new("."));
     let registry = registry_with_custom(root);
 
@@ -126,7 +126,7 @@ pub fn build_lint_list(root: Option<&Path>) -> LintListResult {
         })
         .collect();
 
-    LintListResult { tools }
+    LintListReport { tools }
 }
 
 /// Per-repo lint result for multi-repo mode.
@@ -141,9 +141,9 @@ pub struct RepoLintResult {
     pub diagnostics: Vec<LintDiagnostic>,
 }
 
-/// Lint run result with structured diagnostics.
+/// Report for lint run command with structured diagnostics.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct LintRunResult {
+pub struct LintRunReport {
     pub error_count: usize,
     pub warning_count: usize,
     pub diagnostics: Vec<LintDiagnostic>,
@@ -166,7 +166,7 @@ pub struct LintDiagnostic {
     pub help_url: Option<String>,
 }
 
-impl OutputFormatter for LintRunResult {
+impl OutputFormatter for LintRunReport {
     fn format_text(&self) -> String {
         let mut out = String::new();
         if let Some(repos) = &self.repos {
@@ -228,7 +228,7 @@ impl OutputFormatter for LintRunResult {
     }
 }
 
-impl std::fmt::Display for LintRunResult {
+impl std::fmt::Display for LintRunReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.format_text())
     }
@@ -240,7 +240,7 @@ pub fn build_lint_run_multi(
     fix: bool,
     tools: Option<&str>,
     category: Option<&str>,
-) -> Result<LintRunResult, String> {
+) -> Result<LintRunReport, String> {
     let entries: Vec<RepoLintResult> = repos
         .par_iter()
         .map(|repo_path| {
@@ -273,7 +273,7 @@ pub fn build_lint_run_multi(
     let total_errors: usize = entries.iter().map(|r| r.error_count).sum();
     let total_warnings: usize = entries.iter().map(|r| r.warning_count).sum();
 
-    Ok(LintRunResult {
+    Ok(LintRunReport {
         error_count: total_errors,
         warning_count: total_warnings,
         diagnostics: vec![],
@@ -288,7 +288,7 @@ pub fn build_lint_run(
     fix: bool,
     tools: Option<&str>,
     category: Option<&str>,
-) -> Result<LintRunResult, String> {
+) -> Result<LintRunReport, String> {
     let root = root.unwrap_or_else(|| Path::new("."));
     let registry = registry_with_custom(root);
 
@@ -323,7 +323,7 @@ pub fn build_lint_run(
     };
 
     if tools_to_run.is_empty() {
-        return Ok(LintRunResult {
+        return Ok(LintRunReport {
             error_count: 0,
             warning_count: 0,
             diagnostics: vec![],
@@ -355,7 +355,7 @@ pub fn build_lint_run(
         }
     }
 
-    Ok(LintRunResult {
+    Ok(LintRunReport {
         error_count,
         warning_count,
         diagnostics,

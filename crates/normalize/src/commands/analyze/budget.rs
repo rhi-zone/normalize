@@ -451,7 +451,7 @@ pub fn analyze_budget(root: &Path, module_limit: usize) -> BudgetReport {
 
     let classifications: Vec<FileClassification> = all_files
         .par_iter()
-        .filter(|f| f.kind == "file")
+        .filter(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
         .filter_map(|f| {
             let abs_path = root.join(&f.path);
             let content = std::fs::read_to_string(&abs_path).ok()?;

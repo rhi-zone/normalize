@@ -41,7 +41,7 @@ use crate::commands::aliases::{AliasesReport, detect_project_languages};
 use crate::commands::context::{ContextListReport, ContextReport, collect_context_files};
 use crate::config::NormalizeConfig;
 use crate::output::OutputFormatter;
-use crate::text_search::{self, GrepResult};
+use crate::text_search::{self, GrepReport};
 use server_less::cli;
 use std::cell::Cell;
 use std::path::PathBuf;
@@ -116,7 +116,9 @@ impl NormalizeService {
     /// Called by server-less when a required parameter is not provided on the CLI.
     /// Loads config from the current directory and returns the config value as a string.
     fn config_defaults(&self, param: &str) -> Option<String> {
-        let config = NormalizeConfig::load(&std::env::current_dir().unwrap_or_default());
+        let config = NormalizeConfig::load(
+            &std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")),
+        );
         match param {
             "limit" => Some(config.text_search.limit().to_string()),
             "depth" => Some(config.view.depth().to_string()),
@@ -138,8 +140,8 @@ impl NormalizeService {
         }
     }
 
-    /// Display bridge for GrepResult.
-    fn display_grep(&self, value: &GrepResult) -> String {
+    /// Display bridge for GrepReport.
+    fn display_grep(&self, value: &GrepReport) -> String {
         self.display_output(value)
     }
 
@@ -151,8 +153,8 @@ impl NormalizeService {
         }
     }
 
-    /// Display bridge for TranslateResult.
-    fn display_translate(&self, value: &TranslateResult) -> String {
+    /// Display bridge for TranslateReport.
+    fn display_translate(&self, value: &TranslateReport) -> String {
         if let Some(ref path) = value.output_path {
             format!(
                 "Translated {} -> {} ({})",
@@ -171,24 +173,24 @@ impl NormalizeService {
 
 /// Wrapper enum for context command's two output types.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-#[serde(untagged)]
+#[serde(tag = "kind")]
 pub enum ContextOutput {
     List(ContextListReport),
     Full(ContextReport),
 }
 
-/// Init command result.
+/// Report for init command.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct InitResult {
+pub struct InitReport {
     pub success: bool,
     pub message: String,
     pub changes: Vec<String>,
     pub dry_run: bool,
 }
 
-/// Update check result.
+/// Report for update check.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct UpdateResult {
+pub struct UpdateReport {
     pub current_version: String,
     pub latest_version: String,
     pub update_available: bool,
@@ -196,7 +198,7 @@ pub struct UpdateResult {
     pub message: Option<String>,
 }
 
-impl std::fmt::Display for UpdateResult {
+impl std::fmt::Display for UpdateReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Current version: {}", self.current_version)?;
         writeln!(f, "Latest version:  {}", self.latest_version)?;
@@ -211,9 +213,9 @@ impl std::fmt::Display for UpdateResult {
     }
 }
 
-/// Translate command result.
+/// Report for translate command.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct TranslateResult {
+pub struct TranslateReport {
     pub code: String,
     pub source_language: String,
     pub target_language: String,
@@ -222,7 +224,7 @@ pub struct TranslateResult {
     pub output_path: Option<String>,
 }
 
-impl std::fmt::Display for TranslateResult {
+impl std::fmt::Display for TranslateReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.output_path.is_some() {
             // File was written, show nothing on stdout (message went to stderr)
@@ -269,7 +271,7 @@ impl NormalizeService {
         #[param(help = "Only include files matching patterns or aliases")] only: Vec<String>,
         pretty: bool,
         compact: bool,
-    ) -> Result<GrepResult, String> {
+    ) -> Result<GrepReport, String> {
         let root_path = root
             .map(PathBuf::from)
             .map(Ok)
@@ -384,7 +386,7 @@ impl NormalizeService {
         #[param(help = "Index the codebase after initialization")] index: bool,
         #[param(help = "Run interactive rule setup wizard after initialization")] setup: bool,
         #[param(help = "Preview changes without writing")] dry_run: bool,
-    ) -> Result<InitResult, String> {
+    ) -> Result<InitReport, String> {
         use std::fs;
 
         let root = std::env::current_dir()
@@ -496,7 +498,7 @@ impl NormalizeService {
             }
         }
 
-        Ok(InitResult {
+        Ok(InitReport {
             success: true,
             message: if changes.is_empty() {
                 "Already initialized.".to_string()
@@ -517,7 +519,7 @@ impl NormalizeService {
     pub fn update(
         &self,
         #[param(short = 'c', help = "Check for updates without installing")] check: bool,
-    ) -> Result<UpdateResult, String> {
+    ) -> Result<UpdateReport, String> {
         use std::io::Read;
 
         const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -551,7 +553,7 @@ impl NormalizeService {
             && commands::update::version_gt(&latest_version, CURRENT_VERSION);
 
         if check || !is_update_available {
-            return Ok(UpdateResult {
+            return Ok(UpdateReport {
                 current_version: CURRENT_VERSION.to_string(),
                 latest_version,
                 update_available: is_update_available,
@@ -629,7 +631,7 @@ impl NormalizeService {
         eprintln!("  Installing...");
         commands::update::self_replace(&binary_data)?;
 
-        Ok(UpdateResult {
+        Ok(UpdateReport {
             current_version: CURRENT_VERSION.to_string(),
             latest_version,
             update_available: true,
@@ -657,7 +659,7 @@ impl NormalizeService {
         #[param(short = 'o', help = "Output file (stdout if not specified)")] output: Option<
             String,
         >,
-    ) -> Result<TranslateResult, String> {
+    ) -> Result<TranslateReport, String> {
         use commands::translate::{SourceLanguage, TargetLanguage};
 
         let to_lang: TargetLanguage = to.parse().map_err(|e: String| e)?;
@@ -717,7 +719,7 @@ impl NormalizeService {
         if let Some(ref path) = output {
             std::fs::write(path, &code).map_err(|e| format!("Failed to write {}: {}", path, e))?;
             eprintln!("Translated {} -> {} ({})", input, path, target_lang);
-            Ok(TranslateResult {
+            Ok(TranslateReport {
                 code,
                 source_language: source_lang.to_string(),
                 target_language: target_lang.to_string(),
@@ -725,7 +727,7 @@ impl NormalizeService {
                 output_path: Some(path.clone()),
             })
         } else {
-            Ok(TranslateResult {
+            Ok(TranslateReport {
                 code,
                 source_language: source_lang.to_string(),
                 target_language: target_lang.to_string(),
@@ -990,8 +992,8 @@ impl NormalizeService {
 }
 
 /// Display impl bridges to OutputFormatter::format_text() for contexts outside
-/// server-less dispatch (e.g. direct use of GrepResult).
-impl std::fmt::Display for GrepResult {
+/// server-less dispatch (e.g. direct use of GrepReport).
+impl std::fmt::Display for GrepReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.format_text().trim_end())
     }
@@ -1012,7 +1014,7 @@ impl std::fmt::Display for ContextOutput {
     }
 }
 
-impl std::fmt::Display for InitResult {
+impl std::fmt::Display for InitReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.dry_run {
             writeln!(f, "[dry-run] Would initialize normalize:")?;

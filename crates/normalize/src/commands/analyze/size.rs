@@ -61,7 +61,7 @@ pub fn analyze_size(root: &Path, exclude: &[String]) -> SizeReport {
     // Collect (relative_path, line_count) for all recognized source files
     let file_sizes: Vec<(String, usize)> = all_files
         .par_iter()
-        .filter(|f| f.kind == "file")
+        .filter(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
         .filter(|f| !excludes.iter().any(|pat| pat.matches(&f.path)))
         .filter_map(|f| {
             let path = root.join(&f.path);

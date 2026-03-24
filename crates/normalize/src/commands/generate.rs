@@ -100,7 +100,7 @@ pub fn run_types_service(
     infer_types: bool,
     readonly: bool,
     package: String,
-) -> Result<crate::service::generate::GenerateResult, String> {
+) -> Result<crate::service::generate::GenerateReport, String> {
     let code = generate_types_code(
         input,
         format,
@@ -119,7 +119,7 @@ pub fn run_cli_snapshot_service(
     binary: PathBuf,
     output: Option<PathBuf>,
     name: Option<String>,
-) -> Result<crate::service::generate::GenerateResult, String> {
+) -> Result<crate::service::generate::GenerateReport, String> {
     let code = generate_cli_snapshot_code(&binary, name)?;
     write_generate_result(code, output)
 }
@@ -128,17 +128,17 @@ pub fn run_cli_snapshot_service(
 fn write_generate_result(
     code: String,
     output: Option<PathBuf>,
-) -> Result<crate::service::generate::GenerateResult, String> {
+) -> Result<crate::service::generate::GenerateReport, String> {
     if let Some(ref path) = output {
         std::fs::write(path, &code)
             .map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
         eprintln!("Generated {}", path.display());
-        Ok(crate::service::generate::GenerateResult {
+        Ok(crate::service::generate::GenerateReport {
             output: code,
             path: Some(path.display().to_string()),
         })
     } else {
-        Ok(crate::service::generate::GenerateResult {
+        Ok(crate::service::generate::GenerateReport {
             output: code,
             path: None,
         })

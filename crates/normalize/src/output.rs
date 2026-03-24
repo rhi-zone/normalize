@@ -66,10 +66,10 @@ mod tests {
         use crate::commands::sessions::list::SessionListReport;
         use crate::commands::sessions::messages::MessagesReport;
         use crate::commands::sessions::plans::PlansListReport;
-        use crate::commands::tools::lint::LintListResult;
+        use crate::commands::tools::lint::LintListReport;
         use crate::commands::view::report::{ViewHistoryReport, ViewListReport, ViewReport};
         use crate::sessions::SessionAnalysis;
-        use crate::text_search::GrepResult;
+        use crate::text_search::GrepReport;
         use normalize_output::diagnostics::DiagnosticsReport;
 
         // Compile-time checks via trait bounds
@@ -102,7 +102,7 @@ mod tests {
         assert_output_formatter::<GrammarPathsReport>();
         assert_output_formatter::<DependentsReport>();
         assert_output_formatter::<GraphReport>();
-        assert_output_formatter::<GrepResult>();
+        assert_output_formatter::<GrepReport>();
         assert_output_formatter::<HistoryDiffReport>();
         assert_output_formatter::<HistoryListReport>();
         assert_output_formatter::<HistoryPruneReport>();
@@ -112,7 +112,7 @@ mod tests {
         assert_output_formatter::<ImportCentralityReport>();
         assert_output_formatter::<LengthReport>();
         assert_output_formatter::<ModuleHealthReport>();
-        assert_output_formatter::<LintListResult>();
+        assert_output_formatter::<LintListReport>();
         assert_output_formatter::<OwnershipReport>();
         assert_output_formatter::<ProvenanceReport>();
         assert_output_formatter::<PlansListReport>();

@@ -185,7 +185,7 @@ pub fn analyze_ceremony(root: &Path, limit: usize) -> CeremonyReport {
     // Per-file ceremony extraction (parallel)
     let per_file: Vec<(String, String, usize, usize, usize, usize)> = all_files
         .par_iter()
-        .filter(|f| f.kind == "file")
+        .filter(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
         .filter_map(|file| {
             let path = root.join(&file.path);
             let lang = match normalize_languages::support_for_path(&path) {

@@ -42,15 +42,15 @@ impl std::fmt::Display for DaemonStatus {
     }
 }
 
-/// Result of a daemon action (start/stop).
+/// Report for a daemon action (start/stop).
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct DaemonActionResult {
+pub struct DaemonActionReport {
     pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 }
 
-impl std::fmt::Display for DaemonActionResult {
+impl std::fmt::Display for DaemonActionReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(ref msg) = self.message {
             write!(f, "{}", msg)
@@ -62,9 +62,9 @@ impl std::fmt::Display for DaemonActionResult {
     }
 }
 
-/// Result of add/remove root.
+/// Report for add/remove root.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct DaemonRootResult {
+pub struct DaemonRootReport {
     pub success: bool,
     pub path: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -72,7 +72,7 @@ pub struct DaemonRootResult {
     pub dry_run: bool,
 }
 
-impl std::fmt::Display for DaemonRootResult {
+impl std::fmt::Display for DaemonRootReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(ref msg) = self.message {
             write!(f, "{}", msg)
@@ -142,7 +142,7 @@ impl DaemonService {
     ///
     /// Examples:
     ///   normalize daemon stop                # gracefully stop the running daemon
-    pub fn stop(&self) -> Result<DaemonActionResult, String> {
+    pub fn stop(&self) -> Result<DaemonActionReport, String> {
         let client = DaemonClient::new();
 
         if !client.is_available() {
@@ -150,14 +150,14 @@ impl DaemonService {
         }
 
         match client.shutdown() {
-            Ok(()) => Ok(DaemonActionResult {
+            Ok(()) => Ok(DaemonActionReport {
                 success: true,
                 message: Some("Daemon stopped".to_string()),
             }),
             Err(e) => {
                 // Connection reset is expected when daemon shuts down
                 if e.contains("Connection reset") || e.contains("Broken pipe") {
-                    Ok(DaemonActionResult {
+                    Ok(DaemonActionReport {
                         success: true,
                         message: Some("Daemon stopped".to_string()),
                     })
@@ -172,7 +172,7 @@ impl DaemonService {
     ///
     /// Examples:
     ///   normalize daemon start               # start the daemon in the background
-    pub fn start(&self) -> Result<DaemonActionResult, String> {
+    pub fn start(&self) -> Result<DaemonActionReport, String> {
         let client = DaemonClient::new();
 
         if client.is_available() {
@@ -180,7 +180,7 @@ impl DaemonService {
         }
 
         if client.ensure_running() {
-            Ok(DaemonActionResult {
+            Ok(DaemonActionReport {
                 success: true,
                 message: Some("Daemon started".to_string()),
             })
@@ -215,14 +215,14 @@ impl DaemonService {
         &self,
         #[param(positional, help = "Path to the project root")] path: Option<String>,
         #[param(help = "Preview changes without applying")] dry_run: bool,
-    ) -> Result<DaemonRootResult, String> {
+    ) -> Result<DaemonRootReport, String> {
         let path = path
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("."));
         let root = std::fs::canonicalize(&path).unwrap_or(path);
 
         if dry_run {
-            return Ok(DaemonRootResult {
+            return Ok(DaemonRootReport {
                 success: true,
                 path: root.display().to_string(),
                 message: Some(format!("[dry-run] Would add: {}", root.display())),
@@ -255,7 +255,7 @@ impl DaemonService {
                         .unwrap_or("");
                     format!("Already watching: {}", reason)
                 };
-                Ok(DaemonRootResult {
+                Ok(DaemonRootReport {
                     success: true,
                     path: root.display().to_string(),
                     message: Some(message),
@@ -276,14 +276,14 @@ impl DaemonService {
         &self,
         #[param(positional, help = "Path to the project root")] path: Option<String>,
         #[param(help = "Preview changes without applying")] dry_run: bool,
-    ) -> Result<DaemonRootResult, String> {
+    ) -> Result<DaemonRootReport, String> {
         let path = path
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("."));
         let root = std::fs::canonicalize(&path).unwrap_or(path);
 
         if dry_run {
-            return Ok(DaemonRootResult {
+            return Ok(DaemonRootReport {
                 success: true,
                 path: root.display().to_string(),
                 message: Some(format!("[dry-run] Would remove: {}", root.display())),
@@ -310,7 +310,7 @@ impl DaemonService {
                 } else {
                     format!("Was not watching: {}", root.display())
                 };
-                Ok(DaemonRootResult {
+                Ok(DaemonRootReport {
                     success: true,
                     path: root.display().to_string(),
                     message: Some(message),

@@ -140,14 +140,20 @@ pub fn build_view_filtered_service(
     let files_to_search: Vec<std::path::PathBuf> = if scope == "." {
         path_resolve::all_files(root)
             .into_iter()
-            .filter(|m| m.kind == "file" && has_language_support(&m.path))
+            .filter(|m| {
+                m.kind == normalize_path_resolve::PathMatchKind::File
+                    && has_language_support(&m.path)
+            })
             .map(|m| root.join(&m.path))
             .collect()
     } else {
         let matches = path_resolve::resolve(scope, root);
         matches
             .into_iter()
-            .filter(|m| m.kind == "file" && has_language_support(&m.path))
+            .filter(|m| {
+                m.kind == normalize_path_resolve::PathMatchKind::File
+                    && has_language_support(&m.path)
+            })
             .map(|m| root.join(&m.path))
             .collect()
     };

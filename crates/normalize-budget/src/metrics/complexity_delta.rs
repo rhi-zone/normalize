@@ -71,7 +71,7 @@ fn collect_complexity(root: &Path, scan_root: &Path) -> HashMap<String, f64> {
     let mut map = HashMap::new();
 
     for entry in &all_files {
-        if entry.kind != "file" {
+        if entry.kind != normalize_path_resolve::PathMatchKind::File {
             continue;
         }
         let abs_path = scan_root.join(&entry.path);

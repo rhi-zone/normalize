@@ -6,7 +6,9 @@ use crate::skeleton::SkeletonExtractor;
 use normalize_languages::Symbol;
 
 // Re-export public types from the extracted crate
-pub use normalize_path_resolve::{PathMatch, PathSource, SigilExpansion, UnifiedPath};
+pub use normalize_path_resolve::{
+    PathEntry, PathMatch, PathMatchKind, PathSource, SigilExpansion, UnifiedPath,
+};
 
 /// Wraps pre-fetched index file data as a `PathSource`.
 ///
@@ -54,8 +56,16 @@ impl PathSource for IndexPathSource {
         )
     }
 
-    fn all_files(&mut self) -> Option<Vec<(String, bool)>> {
-        Some(self.files.clone())
+    fn all_files(&mut self) -> Option<Vec<normalize_path_resolve::PathEntry>> {
+        Some(
+            self.files
+                .iter()
+                .map(|(path, is_dir)| normalize_path_resolve::PathEntry {
+                    path: path.clone(),
+                    is_dir: *is_dir,
+                })
+                .collect(),
+        )
     }
 }
 

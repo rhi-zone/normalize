@@ -328,10 +328,7 @@ impl DiagnosticsReport {
         }
 
         if shown < actionable {
-            out.push_str(&format!(
-                "  ... {} more not shown (use --limit or --pretty to see all)\n",
-                actionable - shown
-            ));
+            out.push_str(&format!("  ... {} more not shown\n", actionable - shown));
         }
         if infos + hints > 0 {
             out.push_str(&format!(

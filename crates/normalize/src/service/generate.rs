@@ -7,15 +7,15 @@ use std::path::PathBuf;
 /// Code generation sub-service.
 pub struct GenerateService;
 
-/// Generation result (for methods that write to file or stdout).
+/// Report for code generation (methods that write to file or stdout).
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct GenerateResult {
+pub struct GenerateReport {
     pub output: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
 }
 
-impl std::fmt::Display for GenerateResult {
+impl std::fmt::Display for GenerateReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.path.is_some() {
             // File was written, show nothing on stdout (message went to stderr)
@@ -40,7 +40,7 @@ impl GenerateService {
         #[param(short = 'o', help = "Output file (stdout if not specified)")] output: Option<
             String,
         >,
-    ) -> Result<GenerateResult, String> {
+    ) -> Result<GenerateReport, String> {
         let spec_path = PathBuf::from(&spec);
         let generator = normalize_openapi::find_generator(&lang).ok_or_else(|| {
             let mut msg = format!("Unknown language: {}. Available:", lang);
@@ -60,12 +60,12 @@ impl GenerateService {
         if let Some(ref path) = output {
             std::fs::write(path, &code).map_err(|e| format!("Failed to write {}: {}", path, e))?;
             eprintln!("Generated {}", path);
-            Ok(GenerateResult {
+            Ok(GenerateReport {
                 output: code,
                 path: Some(path.clone()),
             })
         } else {
-            Ok(GenerateResult {
+            Ok(GenerateReport {
                 output: code,
                 path: None,
             })
@@ -99,7 +99,7 @@ impl GenerateService {
         #[param(help = "Generate type inference (for Zod/Valibot)")] infer_types: bool,
         #[param(help = "Make types readonly/frozen")] readonly: bool,
         #[param(help = "Package name (for Go)")] package: Option<String>,
-    ) -> Result<GenerateResult, String> {
+    ) -> Result<GenerateReport, String> {
         let input_format = format.unwrap_or(InputFormat::Auto);
         let export = export.unwrap_or(true);
         let package = package.unwrap_or_else(|| "types".to_string());
@@ -133,7 +133,7 @@ impl GenerateService {
         )]
         output: Option<String>,
         #[param(help = "Binary name to use in test (defaults to file stem)")] name: Option<String>,
-    ) -> Result<GenerateResult, String> {
+    ) -> Result<GenerateReport, String> {
         crate::commands::generate::run_cli_snapshot_service(
             PathBuf::from(&binary),
             output.map(PathBuf::from),

@@ -418,10 +418,17 @@ struct UnifiedRule {
     recommended: bool,
 }
 
+/// Filters applied when listing rules via [`build_list_report`].
 pub struct ListFilters<'a> {
+    /// Restrict to a specific rule engine type (syntax, fact, native, all, …).
     pub type_filter: &'a RuleType,
+    /// If `Some`, only include rules whose tags contain this value.
     pub tag: Option<&'a str>,
+    /// If `true`, only include rules that are currently enabled.
+    /// `enabled` and `disabled` are mutually exclusive — setting both returns no rules.
     pub enabled: bool,
+    /// If `true`, only include rules that are currently disabled.
+    /// `enabled` and `disabled` are mutually exclusive — setting both returns no rules.
     pub disabled: bool,
 }
 

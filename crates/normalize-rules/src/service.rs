@@ -108,15 +108,13 @@ impl RulesService {
 
 /// Generic result type for rule operations.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct RuleResult {
+pub struct RuleShowReport {
     pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<serde_json::Value>,
 }
 
-impl std::fmt::Display for RuleResult {
+impl std::fmt::Display for RuleShowReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(ref msg) = self.message {
             write!(f, "{}", msg)
@@ -412,7 +410,7 @@ impl RulesService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<RuleResult, String> {
+    ) -> Result<RuleShowReport, String> {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
@@ -421,11 +419,9 @@ impl RulesService {
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let config = load_rules_config(&effective_root);
         enable_disable(&effective_root, &id_or_tag, true, dry_run, &config).map(|msg| {
-            print!("{}", msg);
-            RuleResult {
+            RuleShowReport {
                 success: true,
-                message: None,
-                data: None,
+                message: Some(msg),
             }
         })
     }
@@ -441,7 +437,7 @@ impl RulesService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<RuleResult, String> {
+    ) -> Result<RuleShowReport, String> {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
@@ -450,11 +446,9 @@ impl RulesService {
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let config = load_rules_config(&effective_root);
         enable_disable(&effective_root, &id_or_tag, false, dry_run, &config).map(|msg| {
-            print!("{}", msg);
-            RuleResult {
+            RuleShowReport {
                 success: true,
-                message: None,
-                data: None,
+                message: Some(msg),
             }
         })
     }
@@ -471,7 +465,7 @@ impl RulesService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<RuleResult, String> {
+    ) -> Result<RuleShowReport, String> {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
@@ -480,13 +474,9 @@ impl RulesService {
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let use_colors = resolve_pretty(pretty, compact);
         let config = load_rules_config(&effective_root);
-        show_rule(&effective_root, &id, use_colors, &config).map(|msg| {
-            print!("{}", msg);
-            RuleResult {
-                success: true,
-                message: None,
-                data: None,
-            }
+        show_rule(&effective_root, &id, use_colors, &config).map(|msg| RuleShowReport {
+            success: true,
+            message: Some(msg),
         })
     }
 
@@ -503,7 +493,7 @@ impl RulesService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<RuleResult, String> {
+    ) -> Result<RuleShowReport, String> {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
@@ -519,13 +509,9 @@ impl RulesService {
             use_colors,
             &config,
         )
-        .map(|msg| {
-            print!("{}", msg);
-            RuleResult {
-                success: true,
-                message: None,
-                data: None,
-            }
+        .map(|msg| RuleShowReport {
+            success: true,
+            message: Some(msg),
         })
     }
 
@@ -537,11 +523,10 @@ impl RulesService {
         &self,
         #[param(positional, help = "URL to download the rule from")] url: String,
         #[param(help = "Install to global rules instead of project")] global: bool,
-    ) -> Result<RuleResult, String> {
-        add_rule(&url, global).map(|_| RuleResult {
+    ) -> Result<RuleShowReport, String> {
+        add_rule(&url, global).map(|_| RuleShowReport {
             success: true,
             message: None,
-            data: None,
         })
     }
 
@@ -553,11 +538,10 @@ impl RulesService {
             help = "Specific rule ID to update (updates all if omitted)"
         )]
         rule_id: Option<String>,
-    ) -> Result<RuleResult, String> {
-        update_rules(rule_id.as_deref()).map(|_| RuleResult {
+    ) -> Result<RuleShowReport, String> {
+        update_rules(rule_id.as_deref()).map(|_| RuleShowReport {
             success: true,
             message: None,
-            data: None,
         })
     }
 
@@ -565,11 +549,10 @@ impl RulesService {
     pub fn remove(
         &self,
         #[param(positional, help = "Rule ID to remove")] rule_id: String,
-    ) -> Result<RuleResult, String> {
-        remove_rule(&rule_id).map(|_| RuleResult {
+    ) -> Result<RuleShowReport, String> {
+        remove_rule(&rule_id).map(|_| RuleShowReport {
             success: true,
             message: None,
-            data: None,
         })
     }
 
@@ -582,7 +565,7 @@ impl RulesService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<RuleResult, String> {
+    ) -> Result<RuleShowReport, String> {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
@@ -591,10 +574,9 @@ impl RulesService {
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let exit_code = crate::setup::run_setup_wizard(&effective_root);
         if exit_code == 0 {
-            Ok(RuleResult {
+            Ok(RuleShowReport {
                 success: true,
                 message: None,
-                data: None,
             })
         } else {
             Err("Setup wizard failed".to_string())

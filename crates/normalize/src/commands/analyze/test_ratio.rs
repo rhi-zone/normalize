@@ -215,7 +215,7 @@ pub fn analyze_test_ratio(root: &Path, limit: usize) -> TestRatioReport {
     // Collect (relative_path, impl_lines, test_lines)
     let file_data: Vec<(String, usize, usize)> = all_files
         .par_iter()
-        .filter(|f| f.kind == "file")
+        .filter(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
         .filter_map(|f| {
             let abs_path = root.join(&f.path);
             normalize_languages::support_for_path(&abs_path)?;

@@ -20,10 +20,19 @@ pub use stale_docs::build_stale_docs_report;
 pub use stale_summary::build_stale_summary_report;
 
 /// Static descriptor for a native rule's default metadata.
+///
+/// `default_severity` is the baked-in severity from the rule author. At runtime
+/// the actual severity may differ: `normalize rules run` applies any
+/// `[rules."rule-id"]` overrides from the project's `normalize.toml` via
+/// [`crate::apply_native_rules_config`] before presenting findings to the user.
 pub struct NativeRuleDescriptor {
+    /// Unique rule identifier (e.g. `"stale-summary"`).
     pub id: &'static str,
+    /// Default severity before any project-level override (`"error"`, `"warning"`, or `"info"`).
     pub default_severity: &'static str,
+    /// Short human-readable description of what the rule checks.
     pub message: &'static str,
+    /// Tags used for grouping and filtering (e.g. `&["docs", "quality"]`).
     pub tags: &'static [&'static str],
 }
 

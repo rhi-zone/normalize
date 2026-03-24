@@ -61,7 +61,7 @@ impl std::fmt::Display for MessagesReport {
 
 /// Output type for plans (list or content).
 #[derive(serde::Serialize, schemars::JsonSchema)]
-#[serde(untagged)]
+#[serde(tag = "kind")]
 pub enum PlansOutput {
     List(PlansListReport),
     Content(PlanContent),

@@ -1,13 +1,28 @@
+//! Path resolution utilities: fuzzy matching, sigil expansion, and unified path parsing.
+
 use ignore::WalkBuilder;
 use nucleo_matcher::pattern::{CaseMatching, Normalization, Pattern};
 use nucleo_matcher::{Config, Matcher};
 use std::path::Path;
 
+/// Whether a resolved path points to a file or a directory.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PathMatchKind {
+    File,
+    Directory,
+}
+
 #[derive(Debug, Clone)]
 pub struct PathMatch {
     pub path: String,
-    pub kind: String,
+    pub kind: PathMatchKind,
     pub score: u32,
+}
+
+/// A single entry returned by [`PathSource::all_files`] or [`PathSource::find_like`].
+pub struct PathEntry {
+    pub path: String,
+    pub is_dir: bool,
 }
 
 /// Result of expanding a sigil like `@todo` or `@config`.
@@ -22,7 +37,7 @@ pub struct SigilExpansion {
 /// Source of indexed file paths (e.g., from a database index).
 pub trait PathSource {
     fn find_like(&mut self, query: &str) -> Option<Vec<(String, bool)>>;
-    fn all_files(&mut self) -> Option<Vec<(String, bool)>>;
+    fn all_files(&mut self) -> Option<Vec<PathEntry>>;
 }
 
 /// Expand an alias query like `@todo` or `@config/section`.
@@ -204,7 +219,7 @@ pub fn resolve_unified(
             let matches = resolve_from_paths(&file_query, &all_paths);
 
             if let Some(m) = matches.first() {
-                if m.kind == "file" {
+                if m.kind == PathMatchKind::File {
                     return Some(UnifiedPath {
                         file_path: m.path.clone(),
                         symbol_path: segments[split_point..]
@@ -213,7 +228,7 @@ pub fn resolve_unified(
                             .collect(),
                         is_directory: false,
                     });
-                } else if m.kind == "directory" && split_point == segments.len() {
+                } else if m.kind == PathMatchKind::Directory && split_point == segments.len() {
                     // Only return directory if it's the full query
                     return Some(UnifiedPath {
                         file_path: m.path.clone(),
@@ -319,7 +334,7 @@ pub fn resolve_unified_all(
             let filtered: Vec<_> = if dir_only {
                 matches
                     .into_iter()
-                    .filter(|m| m.kind == "directory")
+                    .filter(|m| m.kind == PathMatchKind::Directory)
                     .collect()
             } else {
                 matches
@@ -334,7 +349,7 @@ pub fn resolve_unified_all(
                             .iter()
                             .map(|s| s.to_string())
                             .collect(),
-                        is_directory: m.kind == "directory",
+                        is_directory: m.kind == PathMatchKind::Directory,
                     })
                     .collect();
             }
@@ -350,7 +365,11 @@ pub fn all_files(root: &Path, path_source: Option<&mut dyn PathSource>) -> Vec<P
         .into_iter()
         .map(|(path, is_dir)| PathMatch {
             path,
-            kind: if is_dir { "directory" } else { "file" }.to_string(),
+            kind: if is_dir {
+                PathMatchKind::Directory
+            } else {
+                PathMatchKind::File
+            },
             score: 0,
         })
         .collect()
@@ -375,13 +394,13 @@ pub fn resolve(
         if abs_path.is_file() {
             return vec![PathMatch {
                 path: query.to_string(),
-                kind: "file".to_string(),
+                kind: PathMatchKind::File,
                 score: u32::MAX,
             }];
         } else if abs_path.is_dir() {
             return vec![PathMatch {
                 path: query.to_string(),
-                kind: "directory".to_string(),
+                kind: PathMatchKind::Directory,
                 score: u32::MAX,
             }];
         }
@@ -405,7 +424,11 @@ pub fn resolve(
                 .into_iter()
                 .map(|(path, is_dir)| PathMatch {
                     path,
-                    kind: if is_dir { "directory" } else { "file" }.to_string(),
+                    kind: if is_dir {
+                        PathMatchKind::Directory
+                    } else {
+                        PathMatchKind::File
+                    },
                     score: u32::MAX,
                 })
                 .collect();
@@ -426,7 +449,7 @@ pub fn resolve(
                     {
                         return Some(PathMatch {
                             path: rel.to_string_lossy().to_string(),
-                            kind: "file".to_string(),
+                            kind: PathMatchKind::File,
                             score: u32::MAX,
                         });
                     }
@@ -458,7 +481,7 @@ fn get_paths_for_query(
         }
         // Fall back to all files for empty query or no LIKE matches
         if let Some(files) = src.all_files() {
-            return files;
+            return files.into_iter().map(|e| (e.path, e.is_dir)).collect();
         }
     }
     // Fall back to filesystem walk
@@ -524,7 +547,11 @@ fn resolve_from_paths(query: &str, all_paths: &[(String, bool)]) -> Vec<PathMatc
                 if pat.matches(path) || pat.matches(&path.replace('\\', "/")) {
                     glob_matches.push(PathMatch {
                         path: path.clone(),
-                        kind: if *is_dir { "directory" } else { "file" }.to_string(),
+                        kind: if *is_dir {
+                            PathMatchKind::Directory
+                        } else {
+                            PathMatchKind::File
+                        },
                         score: u32::MAX,
                     });
                 }
@@ -543,7 +570,11 @@ fn resolve_from_paths(query: &str, all_paths: &[(String, bool)]) -> Vec<PathMatc
         if eq_normalized(path, query) {
             return vec![PathMatch {
                 path: path.clone(),
-                kind: if *is_dir { "directory" } else { "file" }.to_string(),
+                kind: if *is_dir {
+                    PathMatchKind::Directory
+                } else {
+                    PathMatchKind::File
+                },
                 score: u32::MAX,
             }];
         }
@@ -570,7 +601,11 @@ fn resolve_from_paths(query: &str, all_paths: &[(String, bool)]) -> Vec<PathMatc
         {
             exact_matches.push(PathMatch {
                 path: path.clone(),
-                kind: if *is_dir { "directory" } else { "file" }.to_string(),
+                kind: if *is_dir {
+                    PathMatchKind::Directory
+                } else {
+                    PathMatchKind::File
+                },
                 score: u32::MAX - 1,
             });
         }
@@ -592,7 +627,11 @@ fn resolve_from_paths(query: &str, all_paths: &[(String, bool)]) -> Vec<PathMatc
             {
                 suffix_matches.push(PathMatch {
                     path: path.clone(),
-                    kind: if *is_dir { "directory" } else { "file" }.to_string(),
+                    kind: if *is_dir {
+                        PathMatchKind::Directory
+                    } else {
+                        PathMatchKind::File
+                    },
                     score: u32::MAX - 2,
                 });
             }
@@ -615,7 +654,11 @@ fn resolve_from_paths(query: &str, all_paths: &[(String, bool)]) -> Vec<PathMatc
         {
             fuzzy_matches.push(PathMatch {
                 path: path.clone(),
-                kind: if *is_dir { "directory" } else { "file" }.to_string(),
+                kind: if *is_dir {
+                    PathMatchKind::Directory
+                } else {
+                    PathMatchKind::File
+                },
                 score,
             });
         }

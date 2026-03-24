@@ -208,7 +208,8 @@ pub(super) fn collect_code_files<'a>(
     all_files
         .iter()
         .filter(|f| {
-            f.kind == "file" && normalize_languages::support_for_path(Path::new(&f.path)).is_some()
+            f.kind == normalize_path_resolve::PathMatchKind::File
+                && normalize_languages::support_for_path(Path::new(&f.path)).is_some()
         })
         .filter(|f| {
             filter

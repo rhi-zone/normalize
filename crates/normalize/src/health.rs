@@ -842,7 +842,7 @@ fn compute_complexity_stats(root: &Path, allowlist: &[String]) -> ComplexityStat
         let mut seen: HashSet<&'static str> = HashSet::new();
         all_files(root, None)
             .iter()
-            .filter(|f| f.kind == "file")
+            .filter(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
             .filter_map(|f| normalize_languages::support_for_path(std::path::Path::new(&f.path)))
             .filter(|lang| {
                 // Language has extractable functions when a tags.scm is available.

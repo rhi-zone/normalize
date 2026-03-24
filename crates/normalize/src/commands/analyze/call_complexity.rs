@@ -321,7 +321,7 @@ fn build_call_graph_from_files(root: &Path) -> CallGraphData {
     type FileResult = (Vec<(FnKey, usize)>, Vec<RawEdge>);
     let per_file: Vec<FileResult> = all_files
         .par_iter()
-        .filter(|f| f.kind == "file")
+        .filter(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
         .filter_map(|f| {
             let abs_path = root.join(&f.path);
             support_for_path(&abs_path)?;

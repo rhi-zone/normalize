@@ -89,7 +89,10 @@ impl OutputFormatter for FileLengthReport {
 /// Analyze file lengths
 pub fn analyze_files(root: &Path, limit: usize, exclude: &[String]) -> FileLengthReport {
     let all_files = path_resolve::all_files(root);
-    let files: Vec<_> = all_files.iter().filter(|f| f.kind == "file").collect();
+    let files: Vec<_> = all_files
+        .iter()
+        .filter(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
+        .collect();
 
     // Compile exclude patterns
     let excludes: Vec<Pattern> = exclude

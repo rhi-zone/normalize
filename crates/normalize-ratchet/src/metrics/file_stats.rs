@@ -28,7 +28,7 @@ impl Metric for LineCountMetric {
         let all_files = normalize_path_resolve::all_files(root, None);
         let results: Vec<(String, f64)> = all_files
             .par_iter()
-            .filter(|f| f.kind == "file")
+            .filter(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
             .filter_map(|f| {
                 let abs_path = root.join(&f.path);
                 // Only count code files
@@ -52,7 +52,7 @@ impl Metric for FunctionCountMetric {
         let loader = normalize_facts::grammar_loader();
         let results: Vec<(String, f64)> = all_files
             .par_iter()
-            .filter(|f| f.kind == "file")
+            .filter(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
             .filter_map(|f| {
                 let abs_path = root.join(&f.path);
                 let support = support_for_path(&abs_path)?;
@@ -98,7 +98,7 @@ impl Metric for ClassCountMetric {
         let loader = normalize_facts::grammar_loader();
         let results: Vec<(String, f64)> = all_files
             .par_iter()
-            .filter(|f| f.kind == "file")
+            .filter(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
             .filter_map(|f| {
                 let abs_path = root.join(&f.path);
                 let support = support_for_path(&abs_path)?;
@@ -143,7 +143,7 @@ impl Metric for CommentLineCountMetric {
         let all_files = normalize_path_resolve::all_files(root, None);
         let results: Vec<(String, f64)> = all_files
             .par_iter()
-            .filter(|f| f.kind == "file")
+            .filter(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
             .filter_map(|f| {
                 let abs_path = root.join(&f.path);
                 let support = support_for_path(&abs_path)?;

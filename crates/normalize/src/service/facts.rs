@@ -22,9 +22,9 @@ impl FactsService {
     }
 }
 
-/// Result of a rebuild operation.
+/// Report for a rebuild operation.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct RebuildResult {
+pub struct RebuildReport {
     pub files: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub symbols: Option<usize>,
@@ -34,7 +34,7 @@ pub struct RebuildResult {
     pub imports: Option<usize>,
 }
 
-impl std::fmt::Display for RebuildResult {
+impl std::fmt::Display for RebuildReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Indexed {} files", self.files)?;
         let mut parts = Vec::new();
@@ -172,9 +172,9 @@ impl std::fmt::Display for FileList {
     }
 }
 
-/// Package indexing result.
+/// Report for package indexing.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct PackagesResult {
+pub struct PackagesReport {
     pub ecosystems: Vec<EcosystemCounts>,
 }
 
@@ -186,7 +186,7 @@ pub struct EcosystemCounts {
     pub symbols: usize,
 }
 
-impl std::fmt::Display for PackagesResult {
+impl std::fmt::Display for PackagesReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Indexing complete:")?;
         for eco in &self.ecosystems {
@@ -200,9 +200,9 @@ impl std::fmt::Display for PackagesResult {
     }
 }
 
-/// Generic command result that wraps output from legacy functions.
+/// Report for generic commands that wrap output from legacy functions.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct CommandResult {
+pub struct CommandReport {
     pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
@@ -210,7 +210,7 @@ pub struct CommandResult {
     pub data: Option<serde_json::Value>,
 }
 
-impl std::fmt::Display for CommandResult {
+impl std::fmt::Display for CommandReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(ref msg) = self.message {
             write!(f, "{}", msg)
@@ -436,7 +436,7 @@ async fn index_language_packages(
 async fn rebuild_data(
     root: Option<&Path>,
     include: &[FactsContent],
-) -> Result<RebuildResult, String> {
+) -> Result<RebuildReport, String> {
     let root = root
         .map(|p| p.to_path_buf())
         .map(Ok)
@@ -454,7 +454,7 @@ async fn rebuild_data(
         .await
         .map_err(|e| format!("Error refreshing index: {}", e))?;
 
-    let mut result = RebuildResult {
+    let mut result = RebuildReport {
         files: file_count,
         symbols: None,
         calls: None,
@@ -602,7 +602,7 @@ async fn packages_data(
     only: &[String],
     clear: bool,
     root: Option<&Path>,
-) -> Result<PackagesResult, String> {
+) -> Result<PackagesReport, String> {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
@@ -660,7 +660,7 @@ async fn packages_data(
         results.insert(eco_key, counts);
     }
 
-    Ok(PackagesResult {
+    Ok(PackagesReport {
         ecosystems: results
             .into_iter()
             .map(|(name, counts)| EcosystemCounts {
@@ -695,7 +695,7 @@ impl FactsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<RebuildResult, String> {
+    ) -> Result<RebuildReport, String> {
         let include: Vec<FactsContent> = if include.is_empty() {
             vec![
                 FactsContent::Symbols,
@@ -773,7 +773,7 @@ impl FactsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<PackagesResult, String> {
+    ) -> Result<PackagesReport, String> {
         let root_path = root.map(PathBuf::from);
         packages_data(&only, clear, root_path.as_deref()).await
     }
@@ -798,7 +798,7 @@ impl FactsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<QueryResult, String> {
+    ) -> Result<QueryReport, String> {
         let root = root
             .map(PathBuf::from)
             .map(Ok)
@@ -814,13 +814,13 @@ impl FactsService {
             .await
             .map_err(|e| format!("Query error: {}", e))?;
 
-        Ok(QueryResult { rows })
+        Ok(QueryReport { rows })
     }
 }
 
 /// Output for stats command (either regular stats or storage report).
 #[derive(serde::Serialize, schemars::JsonSchema)]
-#[serde(untagged)]
+#[serde(tag = "kind")]
 pub enum FactsStatsOutput {
     Stats(FactsStats),
     Storage(StorageReport),
@@ -835,13 +835,13 @@ impl std::fmt::Display for FactsStatsOutput {
     }
 }
 
-/// Result of a raw SQL query against the structural index.
+/// Report for a raw SQL query against the structural index.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct QueryResult {
+pub struct QueryReport {
     pub rows: Vec<serde_json::Map<String, serde_json::Value>>,
 }
 
-impl std::fmt::Display for QueryResult {
+impl std::fmt::Display for QueryReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.rows.is_empty() {
             return write!(f, "(no rows)");

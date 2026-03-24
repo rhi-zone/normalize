@@ -36,9 +36,9 @@ pub struct GrepMatch {
     pub symbol_end: Option<usize>,
 }
 
-/// Result of a grep search
+/// Report for a grep search
 #[derive(Debug, serde::Serialize, schemars::JsonSchema)]
-pub struct GrepResult {
+pub struct GrepReport {
     pub matches: Vec<GrepMatch>,
     pub total_matches: usize,
     pub files_searched: usize,
@@ -51,7 +51,7 @@ pub fn grep(
     filter: Option<&Filter>,
     limit: usize,
     ignore_case: bool,
-) -> io::Result<GrepResult> {
+) -> io::Result<GrepReport> {
     // Build the regex matcher
     let pattern_str = if ignore_case {
         format!("(?i){}", pattern)
@@ -171,7 +171,7 @@ pub fn grep(
     // Enrich matches with containing symbol info
     add_symbol_context(&mut matches, root);
 
-    Ok(GrepResult {
+    Ok(GrepReport {
         matches,
         total_matches: total_matches.load(Ordering::Relaxed),
         files_searched: files_searched.load(Ordering::Relaxed),
@@ -253,7 +253,7 @@ fn format_symbol_info(m: &GrepMatch, colorize: bool) -> String {
     }
 }
 
-impl OutputFormatter for GrepResult {
+impl OutputFormatter for GrepReport {
     fn format_text(&self) -> String {
         use std::collections::BTreeMap;
 

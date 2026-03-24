@@ -35,9 +35,9 @@ impl GrammarService {
     }
 }
 
-/// Install result for grammar installation.
+/// Report for grammar installation.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct GrammarInstallResult {
+pub struct GrammarInstallReport {
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
@@ -46,7 +46,7 @@ pub struct GrammarInstallResult {
     pub dry_run: bool,
 }
 
-impl std::fmt::Display for GrammarInstallResult {
+impl std::fmt::Display for GrammarInstallReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.dry_run {
             write!(f, "[dry-run] Would install grammars to {}", self.path)?;
@@ -105,7 +105,7 @@ impl GrammarService {
         #[param(help = "Specific version to install (default: latest)")] version: Option<String>,
         #[param(help = "Force reinstall even if grammars exist")] force: bool,
         #[param(help = "Preview what would be installed without downloading")] dry_run: bool,
-    ) -> Result<GrammarInstallResult, String> {
+    ) -> Result<GrammarInstallReport, String> {
         use crate::commands::update::get_target_triple;
 
         const GITHUB_REPO: &str = "rhi-zone/normalize";
@@ -121,7 +121,7 @@ impl GrammarService {
         {
             let count = entries.filter(|e| e.is_ok()).count();
             if count > 0 {
-                return Ok(GrammarInstallResult {
+                return Ok(GrammarInstallReport {
                     status: "already_installed".to_string(),
                     version,
                     path: install_dir.display().to_string(),
@@ -132,7 +132,7 @@ impl GrammarService {
         }
 
         if dry_run {
-            return Ok(GrammarInstallResult {
+            return Ok(GrammarInstallReport {
                 status: "would_install".to_string(),
                 version: version.or_else(|| Some("latest".to_string())),
                 path: install_dir.display().to_string(),
@@ -224,7 +224,7 @@ impl GrammarService {
             }
         }
 
-        Ok(GrammarInstallResult {
+        Ok(GrammarInstallReport {
             status: "installed".to_string(),
             version: Some(version_str),
             path: install_dir.display().to_string(),

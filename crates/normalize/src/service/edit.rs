@@ -414,10 +414,12 @@ fn do_edit(
 ) -> Result<EditOutput, String> {
     use crate::commands::edit::Operation;
 
-    let root = root
-        .map(|p| p.to_path_buf())
-        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let root = match root {
+        Some(p) => p.to_path_buf(),
+        None => {
+            std::env::current_dir().map_err(|e| format!("cannot get current directory: {e}"))?
+        }
+    };
 
     let config = NormalizeConfig::load(&root);
     let shadow_enabled = config.shadow.enabled();
@@ -607,10 +609,12 @@ fn do_edit_each(
     message: Option<&str>,
     case_insensitive: bool,
 ) -> Result<EditResult, String> {
-    let root = root
-        .map(|p| p.to_path_buf())
-        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let root = match root {
+        Some(p) => p.to_path_buf(),
+        None => {
+            std::env::current_dir().map_err(|e| format!("cannot get current directory: {e}"))?
+        }
+    };
 
     let op_name = match &action {
         EditAction::Insert { .. } => "insert_each",
@@ -633,7 +637,7 @@ fn do_edit_each(
     // Collect files to edit first (so shadow gets all paths at once)
     let candidates: Vec<_> = all
         .iter()
-        .filter(|m| m.kind == "file")
+        .filter(|m| m.kind == normalize_path_resolve::PathMatchKind::File)
         .filter(|m| {
             filter
                 .as_ref()
@@ -762,10 +766,12 @@ fn do_undo_redo(
     dry_run: bool,
     force: bool,
 ) -> Result<UndoOutput, String> {
-    let root = root
-        .map(|p| p.to_path_buf())
-        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let root = match root {
+        Some(p) => p.to_path_buf(),
+        None => {
+            std::env::current_dir().map_err(|e| format!("cannot get current directory: {e}"))?
+        }
+    };
 
     let shadow = Shadow::new(&root);
 
@@ -852,10 +858,12 @@ fn do_batch_edit(
     dry_run: bool,
     message: Option<&str>,
 ) -> Result<BatchOutput, String> {
-    let root = root
-        .map(|p| p.to_path_buf())
-        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let root = match root {
+        Some(p) => p.to_path_buf(),
+        None => {
+            std::env::current_dir().map_err(|e| format!("cannot get current directory: {e}"))?
+        }
+    };
 
     let json_content = if batch_file == "-" {
         use std::io::Read;
@@ -1374,10 +1382,12 @@ async fn do_rename(
 ) -> Result<EditResult, String> {
     use std::collections::HashSet;
 
-    let root = root
-        .map(|p| p.to_path_buf())
-        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let root = match root {
+        Some(p) => p.to_path_buf(),
+        None => {
+            std::env::current_dir().map_err(|e| format!("cannot get current directory: {e}"))?
+        }
+    };
 
     let config = NormalizeConfig::load(&root);
     let shadow_enabled = config.shadow.enabled();

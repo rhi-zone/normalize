@@ -21,7 +21,7 @@ impl Metric for ComplexityMetric {
         let all_files = normalize_path_resolve::all_files(root, None);
         let results: Vec<Vec<(String, f64)>> = all_files
             .par_iter()
-            .filter(|f| f.kind == "file")
+            .filter(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
             .filter_map(|f| {
                 let abs_path = root.join(&f.path);
                 let support = support_for_path(&abs_path)?;

@@ -1,6 +1,6 @@
 //! Tools service for server-less CLI (lint + test).
 
-use crate::commands::tools::lint::{LintListResult, LintRunResult};
+use crate::commands::tools::lint::{LintListReport, LintRunReport};
 use crate::commands::tools::test::{TestListResult, TestRunResult};
 use crate::output::OutputFormatter;
 use server_less::cli;
@@ -33,7 +33,7 @@ pub struct LintService;
 /// Test sub-service.
 pub struct TestService;
 
-impl std::fmt::Display for LintListResult {
+impl std::fmt::Display for LintListReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.format_text())
     }
@@ -97,7 +97,7 @@ impl LintService {
         >,
         #[param(help = "Run across all git repos under DIR")] repos_dir: Option<String>,
         #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
-    ) -> Result<LintRunResult, String> {
+    ) -> Result<LintRunReport, String> {
         if let Some(dir) = repos_dir {
             let repo_paths = discover_repos(&dir, repos_depth.unwrap_or(1))?;
             crate::commands::tools::lint::build_lint_run_multi(
@@ -126,7 +126,7 @@ impl LintService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> LintListResult {
+    ) -> LintListReport {
         crate::commands::tools::lint::build_lint_list(root.as_deref().map(std::path::Path::new))
     }
 }

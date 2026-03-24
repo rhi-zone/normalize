@@ -15,19 +15,19 @@ use std::path::{Path, PathBuf};
 // Output types
 // =============================================================================
 
-/// Result of a rebuild operation.
+/// Report for a rebuild operation.
 #[derive(Serialize, JsonSchema)]
-pub struct RebuildResult {
+pub struct RebuildReport {
     pub files: usize,
 }
 
-impl OutputFormatter for RebuildResult {
+impl OutputFormatter for RebuildReport {
     fn format_text(&self) -> String {
         format!("Indexed {} files", self.files)
     }
 }
 
-impl std::fmt::Display for RebuildResult {
+impl std::fmt::Display for RebuildReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.format_text())
     }
@@ -139,14 +139,14 @@ impl FactsCliService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<RebuildResult, String> {
+    ) -> Result<RebuildReport, String> {
         let root_path = resolve_root(root)?;
         let mut idx = open_index(&root_path).await?;
         let files = idx
             .refresh()
             .await
             .map_err(|e| format!("Error refreshing index: {}", e))?;
-        Ok(RebuildResult { files })
+        Ok(RebuildReport { files })
     }
 
     /// Show index statistics

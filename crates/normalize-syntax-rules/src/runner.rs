@@ -10,20 +10,33 @@ use streaming_iterator::StreamingIterator;
 /// A finding from running a rule.
 #[derive(Debug)]
 pub struct Finding {
+    /// ID of the rule that produced this finding.
     pub rule_id: String,
+    /// Absolute path to the file where the finding was detected.
     pub file: PathBuf,
+    /// 1-based line number of the start of the match.
     pub start_line: usize,
+    /// 0-based column of the start of the match.
     pub start_col: usize,
+    /// 1-based line number of the end of the match.
     pub end_line: usize,
+    /// 0-based column of the end of the match.
     pub end_col: usize,
+    /// Byte offset of the start of the match in the source file.
     pub start_byte: usize,
+    /// Byte offset of the end of the match in the source file.
     pub end_byte: usize,
+    /// Human-readable description of the finding.
     pub message: String,
+    /// Severity level of the finding.
     pub severity: Severity,
+    /// The source text of the matched node.
     pub matched_text: String,
     /// Auto-fix template (None if no fix available).
     pub fix: Option<String>,
-    /// Capture values from the query match (for fix substitution).
+    /// Capture values from the query match keyed by capture name (without `@`).
+    /// Includes all named captures from the query; `@match` is NOT included —
+    /// use `matched_text` for the full matched node text instead.
     pub captures: HashMap<String, String>,
 }
 

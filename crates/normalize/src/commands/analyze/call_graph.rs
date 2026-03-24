@@ -40,7 +40,7 @@ pub async fn build_call_graph(
         let matches = path_resolve::resolve(f, root);
         matches
             .iter()
-            .find(|m| m.kind == "file")
+            .find(|m| m.kind == normalize_path_resolve::PathMatchKind::File)
             .map(|m| m.path.clone())
     } else {
         idx.find_symbol(&symbol)

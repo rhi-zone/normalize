@@ -75,8 +75,11 @@ pub struct Rule {
     /// Format: { "namespace.key" = "value" } or { "namespace.key" = ">=value" }
     pub requires: HashMap<String, String>,
     /// Auto-fix template using capture names from the query.
-    /// Use `$capture_name` to reference captures, `$match` for the full match.
-    /// Empty string means "delete the match".
+    ///
+    /// Substitution syntax: `$capture_name` is replaced by the text of the named capture
+    /// (e.g. `$fn_name`), and `$match` is replaced by the entire matched node's text.
+    /// An empty string means "delete the matched node entirely".
+    /// `None` means the rule has no auto-fix.
     pub fix: Option<String>,
     /// Tags for grouping and filtering rules by concept (e.g. "debug-print", "security").
     pub tags: Vec<String>,

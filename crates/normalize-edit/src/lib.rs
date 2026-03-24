@@ -1,3 +1,9 @@
+//! Symbol-aware file editing for normalize.
+//!
+//! Provides utilities to locate symbols within source files and apply targeted
+//! text replacements — used by `normalize edit` to rewrite functions, methods,
+//! and other named constructs without touching the rest of the file.
+
 use normalize_facts::{Extractor, Symbol};
 use normalize_languages::parsers::{grammar_loader, parse_with_grammar};
 use normalize_languages::{Language, support_for_path};

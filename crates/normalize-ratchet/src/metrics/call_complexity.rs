@@ -30,7 +30,7 @@ impl Metric for CallComplexityMetric {
 
         let per_file: Vec<FileResult> = all_files
             .par_iter()
-            .filter(|f| f.kind == "file")
+            .filter(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
             .filter_map(|f| {
                 let abs_path = root.join(&f.path);
                 let support = support_for_path(&abs_path)?;

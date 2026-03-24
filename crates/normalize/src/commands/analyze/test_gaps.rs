@@ -83,7 +83,10 @@ pub async fn analyze_test_gaps(
     let all_files = path_resolve::all_files(&analysis_root);
     let code_files: Vec<_> = all_files
         .iter()
-        .filter(|f| f.kind == "file" && support_for_path(Path::new(&f.path)).is_some())
+        .filter(|f| {
+            f.kind == normalize_path_resolve::PathMatchKind::File
+                && support_for_path(Path::new(&f.path)).is_some()
+        })
         .filter(|f| {
             filter
                 .map(|flt| flt.matches(Path::new(&f.path)))

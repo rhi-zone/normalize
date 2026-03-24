@@ -124,7 +124,7 @@ pub async fn analyze_docs(
     let all_files = path_resolve::all_files(root);
     let files: Vec<_> = all_files
         .iter()
-        .filter(|f| f.kind == "file")
+        .filter(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
         .filter(|f| !is_test_path(Path::new(&f.path)))
         .filter(|f| {
             if let Some(flt) = filter {

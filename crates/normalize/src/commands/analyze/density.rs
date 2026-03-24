@@ -312,7 +312,7 @@ pub fn analyze_density(root: &Path, module_limit: usize, worst_limit: usize) -> 
 
     let file_metrics: Vec<FileDensity> = all_files
         .par_iter()
-        .filter(|f| f.kind == "file")
+        .filter(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
         .filter_map(|f| {
             let abs_path = root.join(&f.path);
             support_for_path(&abs_path)?;

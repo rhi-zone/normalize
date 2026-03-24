@@ -617,7 +617,10 @@ pub fn analyze(
         } else {
             // Fallback to plain resolve for backwards compat
             let resolved = path_resolve::resolve(t, root);
-            let is_file = resolved.first().map(|f| f.kind == "file").unwrap_or(false);
+            let is_file = resolved
+                .first()
+                .map(|f| f.kind == normalize_path_resolve::PathMatchKind::File)
+                .unwrap_or(false);
             (resolved.first().map(|f| f.path.clone()), vec![], is_file)
         }
     } else {

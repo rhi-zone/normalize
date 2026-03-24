@@ -18,9 +18,9 @@ impl PackageService {
     }
 }
 
-/// Generic package command result.
+/// Report for package commands.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct PackageResult {
+pub struct PackageReport {
     pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
@@ -28,7 +28,7 @@ pub struct PackageResult {
     pub data: Option<serde_json::Value>,
 }
 
-impl std::fmt::Display for PackageResult {
+impl std::fmt::Display for PackageReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(ref msg) = self.message {
             write!(f, "{}", msg)
@@ -44,11 +44,11 @@ fn run_package(
     action: PackageAction,
     ecosystem: Option<&str>,
     root: Option<&str>,
-) -> Result<PackageResult, String> {
+) -> Result<PackageReport, String> {
     let root_path = root.map(Path::new);
     let exit_code = run_package_action(action, ecosystem, root_path);
     if exit_code == 0 {
-        Ok(PackageResult {
+        Ok(PackageReport {
             success: true,
             message: None,
             data: None,
@@ -83,7 +83,7 @@ impl PackageService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<PackageResult, String> {
+    ) -> Result<PackageReport, String> {
         let _ = (pretty, compact);
         run_package(
             PackageAction::Info { package },
@@ -106,7 +106,7 @@ impl PackageService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<PackageResult, String> {
+    ) -> Result<PackageReport, String> {
         let _ = (pretty, compact);
         run_package(PackageAction::List, ecosystem.as_deref(), root.as_deref())
     }
@@ -125,7 +125,7 @@ impl PackageService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<PackageResult, String> {
+    ) -> Result<PackageReport, String> {
         let _ = (pretty, compact);
         run_package(PackageAction::Tree, ecosystem.as_deref(), root.as_deref())
     }
@@ -144,7 +144,7 @@ impl PackageService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<PackageResult, String> {
+    ) -> Result<PackageReport, String> {
         let _ = (pretty, compact);
         run_package(
             PackageAction::Why { package },
@@ -167,7 +167,7 @@ impl PackageService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<PackageResult, String> {
+    ) -> Result<PackageReport, String> {
         let _ = (pretty, compact);
         run_package(
             PackageAction::Outdated,
@@ -190,7 +190,7 @@ impl PackageService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<PackageResult, String> {
+    ) -> Result<PackageReport, String> {
         let _ = (pretty, compact);
         run_package(PackageAction::Audit, ecosystem.as_deref(), root.as_deref())
     }

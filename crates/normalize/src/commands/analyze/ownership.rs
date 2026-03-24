@@ -157,6 +157,9 @@ fn blame_file(root: &Path, path: &str) -> Option<FileOwnership> {
     }
 
     let total_lines: usize = author_lines.values().sum();
+    if total_lines == 0 {
+        return None;
+    }
 
     // Sort authors by line count descending
     let mut sorted: Vec<(String, usize)> = author_lines.into_iter().collect();
