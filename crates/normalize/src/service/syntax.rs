@@ -76,8 +76,13 @@ impl SyntaxService {
             .as_ref()
             .map(PathBuf::from)
             .or_else(|| root.as_ref().map(PathBuf::from))
-            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+            .map_or_else(
+                || {
+                    std::env::current_dir()
+                        .map_err(|e| format!("failed to get working directory: {e}"))
+                },
+                Ok,
+            )?;
         crate::commands::analyze::query::run_query_service(
             &pattern,
             Some(&root_path),

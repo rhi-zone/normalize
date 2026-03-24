@@ -31,4 +31,4 @@ pub use loader::{
 };
 
 #[cfg(feature = "cli")]
-pub use service::{RuleShowReport, RulesService, load_rules_config};
+pub use service::{RuleShowReport, RulesService, RulesValidateReport, load_rules_config};

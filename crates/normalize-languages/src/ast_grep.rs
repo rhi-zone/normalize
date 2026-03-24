@@ -57,7 +57,7 @@ mod tests {
         use ast_grep_core::tree_sitter::LanguageExt;
 
         let loader = crate::parsers::grammar_loader();
-        let Some(ts_lang) = loader.get("rust").ok().flatten() else {
+        let Some(ts_lang) = loader.get("rust").ok() else {
             eprintln!("Skipping test: rust grammar not available");
             return;
         };

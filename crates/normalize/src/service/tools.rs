@@ -1,7 +1,7 @@
 //! Tools service for server-less CLI (lint + test).
 
 use crate::commands::tools::lint::{LintListReport, LintRunReport};
-use crate::commands::tools::test::{TestListResult, TestRunResult};
+use crate::commands::tools::test::{TestListReport, TestRunResult};
 use crate::output::OutputFormatter;
 use server_less::cli;
 use std::path::PathBuf;
@@ -106,6 +106,7 @@ impl LintService {
                 tools.as_deref(),
                 category.as_deref(),
             )
+            .map_err(|e| e.to_string())
         } else {
             crate::commands::tools::lint::build_lint_run(
                 target.as_deref(),
@@ -114,6 +115,7 @@ impl LintService {
                 tools.as_deref(),
                 category.as_deref(),
             )
+            .map_err(|e| e.to_string())
         }
     }
 
@@ -176,7 +178,7 @@ impl TestService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> TestListResult {
+    ) -> TestListReport {
         crate::commands::tools::test::build_test_list(root.as_deref().map(std::path::Path::new))
     }
 }

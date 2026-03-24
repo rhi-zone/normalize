@@ -169,9 +169,7 @@ pub fn build_ast_output(
     let loader = grammar_loader();
     let grammar = loader
         .get(lang.grammar_name())
-        .ok()
-        .flatten()
-        .ok_or_else(|| format!("Failed to load grammar for {}", lang.name()))?;
+        .map_err(|_| format!("Failed to load grammar for {}", lang.name()))?;
 
     let mut parser = tree_sitter::Parser::new();
     // normalize-syntax-allow: rust/unwrap-in-impl - set_language only fails if grammar/parser version mismatch (compile-time issue)

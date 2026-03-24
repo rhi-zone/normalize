@@ -34,10 +34,11 @@ impl AnalyzeService {
         }
     }
 
-    fn root_path(root: Option<String>) -> PathBuf {
-        root.map(PathBuf::from)
-            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-            .unwrap_or_else(|| std::env::current_dir().unwrap())
+    fn root_path(root: Option<String>) -> Result<PathBuf, String> {
+        root.map(PathBuf::from).map_or_else(
+            || std::env::current_dir().map_err(|e| format!("failed to get working directory: {e}")),
+            Ok,
+        )
     }
 
     fn resolve_format(&self, pretty: bool, compact: bool, root: &std::path::Path) {
@@ -221,7 +222,7 @@ impl AnalyzeService {
             String,
         >,
     ) -> Result<ArchitectureReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         let idx = crate::index::ensure_ready(&root_path).await?;
         crate::commands::analyze::architecture::analyze_architecture(&idx)
             .await
@@ -241,7 +242,7 @@ impl AnalyzeService {
         pretty: bool,
         compact: bool,
     ) -> Result<AnalyzeReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         // Validate target path exists (catches typos and unknown subcommands routed here via #[cli(default)])
         if let Some(ref t) = target {
             let candidate = root_path.join(t);
@@ -279,7 +280,7 @@ impl AnalyzeService {
         pretty: bool,
         compact: bool,
     ) -> Result<AnalyzeReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let filter =
@@ -307,7 +308,7 @@ impl AnalyzeService {
             String,
         >,
     ) -> Result<SecurityReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         Ok(crate::commands::analyze::security::analyze_security(
             &root_path,
         ))
@@ -326,7 +327,7 @@ impl AnalyzeService {
         pretty: bool,
         compact: bool,
     ) -> Result<ScalarTrendReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         crate::commands::analyze::trend::analyze_scalar_trend(
             &root_path,
@@ -366,7 +367,7 @@ impl AnalyzeService {
         pretty: bool,
         compact: bool,
     ) -> Result<LengthReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let filter =
@@ -436,7 +437,7 @@ impl AnalyzeService {
         pretty: bool,
         compact: bool,
     ) -> Result<ScalarTrendReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         crate::commands::analyze::trend::analyze_scalar_trend(
             &root_path,
@@ -469,7 +470,7 @@ impl AnalyzeService {
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
     ) -> Result<DocCoverageReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         let config = crate::config::NormalizeConfig::load(&root_path);
         let filter =
             Self::build_filter_with_config(&root_path, &config.analyze, "docs", &exclude, &only);
@@ -499,7 +500,7 @@ impl AnalyzeService {
         pretty: bool,
         compact: bool,
     ) -> Result<CouplingClustersReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let mut merged_exclude = config.analyze.excludes_for("coupling-clusters");
@@ -599,7 +600,7 @@ impl AnalyzeService {
         pretty: bool,
         compact: bool,
     ) -> Result<TestGapsReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let filter = Self::build_filter_with_config(
@@ -639,7 +640,7 @@ impl AnalyzeService {
         pretty: bool,
         compact: bool,
     ) -> Result<ScalarTrendReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         crate::commands::analyze::trend::analyze_scalar_trend(
             &root_path,
@@ -667,7 +668,7 @@ impl AnalyzeService {
         pretty: bool,
         compact: bool,
     ) -> Result<ScalarTrendReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         crate::commands::analyze::trend::analyze_scalar_trend(
             &root_path,
@@ -696,7 +697,7 @@ impl AnalyzeService {
         pretty: bool,
         compact: bool,
     ) -> Result<SummaryReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let effective_limit = match limit.unwrap_or(5) {
             0 => usize::MAX,
@@ -720,7 +721,7 @@ impl AnalyzeService {
         pretty: bool,
         compact: bool,
     ) -> Result<SkeletonDiffReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let mut merged_exclude = config.analyze.excludes_for("skeleton-diff");
@@ -746,7 +747,7 @@ impl AnalyzeService {
         pretty: bool,
         compact: bool,
     ) -> Result<TrendReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         crate::commands::analyze::trend::analyze_trend(&root_path, snapshots.unwrap_or(6))
     }
@@ -763,7 +764,7 @@ impl AnalyzeService {
         pretty: bool,
         compact: bool,
     ) -> Result<NodeTypesReport, String> {
-        let root_path = Self::root_path(None);
+        let root_path = Self::root_path(None)?;
         self.resolve_format(pretty, compact, &root_path);
         crate::commands::syntax::node_types::node_types_for_language(&language, search.as_deref())
     }

@@ -399,7 +399,7 @@ mod tests {
 
     fn parse_python(content: &str) -> ParseResult {
         let loader = GrammarLoader::new();
-        let language = loader.get("python").ok().flatten().unwrap();
+        let language = loader.get("python").ok().unwrap();
         let mut parser = Parser::new();
         parser.set_language(&language).unwrap();
         ParseResult {

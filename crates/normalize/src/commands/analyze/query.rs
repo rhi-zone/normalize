@@ -86,7 +86,7 @@ pub fn run_query_service(
     let mut all_results = Vec::new();
 
     for (grammar_name, files) in by_grammar {
-        let Some(grammar) = loader.get(&grammar_name).ok().flatten() else {
+        let Some(grammar) = loader.get(&grammar_name).ok() else {
             continue;
         };
 

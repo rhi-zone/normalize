@@ -83,7 +83,7 @@ impl DepsExtractor {
             Some(q) => q,
             None => return Vec::new(),
         };
-        let ts_lang = match loader.get(grammar_name).ok().flatten() {
+        let ts_lang = match loader.get(grammar_name).ok() {
             Some(l) => l,
             None => return Vec::new(),
         };
@@ -203,7 +203,7 @@ impl DepsExtractor {
         query_str: &str,
         loader: &normalize_languages::GrammarLoader,
     ) -> Option<Vec<Import>> {
-        let ts_lang = loader.get(grammar_name).ok().flatten()?;
+        let ts_lang = loader.get(grammar_name).ok()?;
         let query = tree_sitter::Query::new(&ts_lang, query_str).ok()?;
 
         let capture_names = query.capture_names().to_vec();

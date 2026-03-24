@@ -47,10 +47,11 @@ impl RankService {
         }
     }
 
-    fn root_path(root: Option<String>) -> PathBuf {
-        root.map(PathBuf::from)
-            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-            .unwrap_or_else(|| std::env::current_dir().unwrap())
+    fn root_path(root: Option<String>) -> Result<PathBuf, String> {
+        root.map(PathBuf::from).map_or_else(
+            || std::env::current_dir().map_err(|e| format!("failed to get working directory: {e}")),
+            Ok,
+        )
     }
 
     fn resolve_format(&self, pretty: bool, compact: bool, root: &std::path::Path) {
@@ -217,7 +218,7 @@ impl RankService {
         pretty: bool,
         compact: bool,
     ) -> Result<ComplexityReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let filter = Self::build_filter_with_config(
@@ -301,7 +302,7 @@ impl RankService {
             String,
         >,
     ) -> Result<FileLengthReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         let config = crate::config::NormalizeConfig::load(&root_path);
         let mut merged_exclude = config.analyze.excludes_for("files");
         merged_exclude.extend(exclude);
@@ -337,7 +338,7 @@ impl RankService {
         >,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
     ) -> Result<SizeReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         let config = crate::config::NormalizeConfig::load(&root_path);
         let mut merged_exclude = config.analyze.excludes_for("size");
         merged_exclude.extend(exclude);
@@ -362,7 +363,7 @@ impl RankService {
             String,
         >,
     ) -> Result<CeremonyReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         let mut report =
             crate::commands::analyze::ceremony::analyze_ceremony(&root_path, limit.unwrap_or(15));
         if let Some(ref diff_ref) = diff {
@@ -395,7 +396,7 @@ impl RankService {
         pretty: bool,
         compact: bool,
     ) -> Result<HotspotsReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         // Merge: global excludes + [analyze.hotspots] excludes + legacy hotspots_exclude + allow file
@@ -464,7 +465,7 @@ impl RankService {
         pretty: bool,
         compact: bool,
     ) -> Result<CouplingReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let mut merged_exclude = config.analyze.excludes_for("coupling");
@@ -513,7 +514,7 @@ impl RankService {
             String,
         >,
     ) -> Result<OwnershipReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         let config = crate::config::NormalizeConfig::load(&root_path);
         let mut merged_exclude = config.analyze.excludes_for("ownership");
         merged_exclude.extend(exclude);
@@ -590,7 +591,7 @@ impl RankService {
         pretty: bool,
         compact: bool,
     ) -> Result<TestRatioReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let effective_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
@@ -630,7 +631,7 @@ impl RankService {
         pretty: bool,
         compact: bool,
     ) -> Result<BudgetReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let effective_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
@@ -673,7 +674,7 @@ impl RankService {
         pretty: bool,
         compact: bool,
     ) -> Result<DensityReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let module_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
@@ -728,7 +729,7 @@ impl RankService {
         pretty: bool,
         compact: bool,
     ) -> Result<UniquenessReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let module_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
@@ -794,7 +795,7 @@ impl RankService {
         pretty: bool,
         compact: bool,
     ) -> Result<ImportCentralityReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let effective_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
@@ -844,7 +845,7 @@ impl RankService {
         pretty: bool,
         compact: bool,
     ) -> Result<SurfaceReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let effective_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
@@ -891,7 +892,7 @@ impl RankService {
         pretty: bool,
         compact: bool,
     ) -> Result<DepthMapReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let effective_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
@@ -939,7 +940,7 @@ impl RankService {
         pretty: bool,
         compact: bool,
     ) -> Result<LayeringReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let effective_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
@@ -986,7 +987,7 @@ impl RankService {
         pretty: bool,
         compact: bool,
     ) -> Result<ModuleHealthReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let effective_limit = match limit.unwrap_or(0) {
             0 => usize::MAX,
@@ -1016,7 +1017,7 @@ impl RankService {
         pretty: bool,
         compact: bool,
     ) -> Result<CallComplexityReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let effective_limit = limit.unwrap_or(20);
         let effective_module_limit = match module_limit.unwrap_or(30) {
@@ -1074,7 +1075,7 @@ impl RankService {
         )]
         limit: Option<usize>,
     ) -> Result<DuplicatesReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let scope = scope.unwrap_or(DuplicateScope::Functions);
         let mode = mode.unwrap_or(DuplicateMode::Exact);
@@ -1205,7 +1206,7 @@ impl RankService {
             String,
         >,
     ) -> Result<DuplicateTypesReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         let scan_root = target
             .map(PathBuf::from)
             .unwrap_or_else(|| root_path.clone());
@@ -1253,7 +1254,7 @@ impl RankService {
         pretty: bool,
         compact: bool,
     ) -> Result<FragmentsReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let scope_val: FragmentScope = scope
             .as_deref()

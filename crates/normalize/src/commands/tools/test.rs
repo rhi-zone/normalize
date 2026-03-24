@@ -15,15 +15,17 @@ pub struct TestRunnerItem {
     pub detected: bool,
 }
 
-/// Test list result.
+/// Test list report.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct TestListResult {
+pub struct TestListReport {
     pub runners: Vec<TestRunnerItem>,
 }
 
-impl std::fmt::Display for TestListResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Available test runners:\n")?;
+impl OutputFormatter for TestListReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let _ = writeln!(out, "Available test runners:\n");
         for runner in &self.runners {
             let status = if !runner.available {
                 "(not installed)"
@@ -32,19 +34,25 @@ impl std::fmt::Display for TestListResult {
             } else {
                 ""
             };
-            writeln!(
-                f,
+            let _ = writeln!(
+                out,
                 "  {:10} - {} {}",
                 runner.name, runner.description, status
-            )?;
+            );
         }
-        Ok(())
+        out
     }
 }
 
-/// Per-repo test result for multi-repo mode.
+impl std::fmt::Display for TestListReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.format_text())
+    }
+}
+
+/// Per-repo test entry for multi-repo mode.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct RepoTestResult {
+pub struct RepoTestEntry {
     pub name: String,
     pub path: PathBuf,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -62,7 +70,7 @@ pub struct TestRunResult {
     pub exit_code: i32,
     /// Populated in multi-repo mode (--repos-dir).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub repos: Option<Vec<RepoTestResult>>,
+    pub repos: Option<Vec<RepoTestEntry>>,
 }
 
 impl OutputFormatter for TestRunResult {
@@ -108,7 +116,7 @@ impl std::fmt::Display for TestRunResult {
 }
 
 /// Build test list (data only).
-pub fn build_test_list(root: Option<&Path>) -> TestListResult {
+pub fn build_test_list(root: Option<&Path>) -> TestListReport {
     let root = root.unwrap_or_else(|| Path::new("."));
     let runners: Vec<TestRunnerItem> = all_runners()
         .iter()
@@ -122,7 +130,7 @@ pub fn build_test_list(root: Option<&Path>) -> TestListResult {
             }
         })
         .collect();
-    TestListResult { runners }
+    TestListReport { runners }
 }
 
 /// Run tests across multiple repos and return aggregated results.
@@ -131,7 +139,7 @@ pub fn build_test_run_multi(
     runner: Option<&str>,
     args: &[String],
 ) -> Result<TestRunResult, String> {
-    let entries: Vec<RepoTestResult> = repos
+    let entries: Vec<RepoTestEntry> = repos
         .par_iter()
         .map(|repo_path| {
             let name = repo_path
@@ -140,7 +148,7 @@ pub fn build_test_run_multi(
                 .unwrap_or("unknown")
                 .to_string();
             match build_test_run(Some(repo_path), runner, args) {
-                Ok(r) => RepoTestResult {
+                Ok(r) => RepoTestEntry {
                     name,
                     path: repo_path.clone(),
                     error: None,
@@ -148,7 +156,7 @@ pub fn build_test_run_multi(
                     success: r.success,
                     exit_code: r.exit_code,
                 },
-                Err(e) => RepoTestResult {
+                Err(e) => RepoTestEntry {
                     name,
                     path: repo_path.clone(),
                     error: Some(e),

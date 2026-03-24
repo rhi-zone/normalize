@@ -145,11 +145,11 @@ impl NormalizeService {
         self.display_output(value)
     }
 
-    /// Display bridge for ContextOutput (dispatches to inner type).
-    fn display_context(&self, value: &ContextOutput) -> String {
+    /// Display bridge for ContextKindReport (dispatches to inner type).
+    fn display_context(&self, value: &ContextKindReport) -> String {
         match value {
-            ContextOutput::List(r) => r.format_text(),
-            ContextOutput::Full(r) => r.format_text(),
+            ContextKindReport::List(r) => r.format_text(),
+            ContextKindReport::Full(r) => r.format_text(),
         }
     }
 
@@ -174,9 +174,24 @@ impl NormalizeService {
 /// Wrapper enum for context command's two output types.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 #[serde(tag = "kind")]
-pub enum ContextOutput {
+pub enum ContextKindReport {
     List(ContextListReport),
     Full(ContextReport),
+}
+
+impl OutputFormatter for ContextKindReport {
+    fn format_text(&self) -> String {
+        match self {
+            Self::List(r) => r.format_text(),
+            Self::Full(r) => r.format_text(),
+        }
+    }
+}
+
+impl std::fmt::Display for ContextKindReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.format_text())
+    }
 }
 
 /// Report for init command.
@@ -198,18 +213,29 @@ pub struct UpdateReport {
     pub message: Option<String>,
 }
 
+impl OutputFormatter for UpdateReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let _ = writeln!(out, "Current version: {}", self.current_version);
+        let _ = writeln!(out, "Latest version:  {}", self.latest_version);
+        if let Some(ref msg) = self.message {
+            let _ = write!(out, "{}", msg);
+        } else if self.update_available {
+            let _ = write!(
+                out,
+                "\nUpdate available! Run 'normalize update' to install."
+            );
+        } else {
+            let _ = write!(out, "You are running the latest version.");
+        }
+        out
+    }
+}
+
 impl std::fmt::Display for UpdateReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Current version: {}", self.current_version)?;
-        writeln!(f, "Latest version:  {}", self.latest_version)?;
-        if let Some(ref msg) = self.message {
-            write!(f, "{}", msg)?;
-        } else if self.update_available {
-            write!(f, "\nUpdate available! Run 'normalize update' to install.")?;
-        } else {
-            write!(f, "You are running the latest version.")?;
-        }
-        Ok(())
+        write!(f, "{}", self.format_text())
     }
 }
 
@@ -224,14 +250,20 @@ pub struct TranslateReport {
     pub output_path: Option<String>,
 }
 
-impl std::fmt::Display for TranslateReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl OutputFormatter for TranslateReport {
+    fn format_text(&self) -> String {
         if self.output_path.is_some() {
             // File was written, show nothing on stdout (message went to stderr)
-            Ok(())
+            String::new()
         } else {
-            write!(f, "{}", self.code)
+            self.code.clone()
         }
+    }
+}
+
+impl std::fmt::Display for TranslateReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.format_text())
     }
 }
 
@@ -333,7 +365,7 @@ impl NormalizeService {
             String,
         >,
         #[param(help = "Show only file paths, not content")] list: bool,
-    ) -> Result<ContextOutput, String> {
+    ) -> Result<ContextKindReport, String> {
         let root_path = root
             .map(PathBuf::from)
             .map(Ok)
@@ -362,7 +394,7 @@ impl NormalizeService {
                 .iter()
                 .map(|f| f.to_str().unwrap_or("").to_string())
                 .collect();
-            Ok(ContextOutput::List(ContextListReport::new(paths)))
+            Ok(ContextKindReport::List(ContextListReport::new(paths)))
         } else {
             let entries = files
                 .iter()
@@ -372,7 +404,7 @@ impl NormalizeService {
                     (rel_path.display().to_string(), content)
                 })
                 .collect();
-            Ok(ContextOutput::Full(ContextReport::new(entries)))
+            Ok(ContextKindReport::Full(ContextReport::new(entries)))
         }
     }
 
@@ -1005,29 +1037,28 @@ impl std::fmt::Display for AliasesReport {
     }
 }
 
-impl std::fmt::Display for ContextOutput {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ContextOutput::List(r) => write!(f, "{}", r.format_text().trim_end()),
-            ContextOutput::Full(r) => write!(f, "{}", r.format_text().trim_end()),
+impl OutputFormatter for InitReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        if self.dry_run {
+            let _ = writeln!(out, "[dry-run] Would initialize normalize:");
+            if self.changes.is_empty() {
+                let _ = write!(out, "  (no changes needed)");
+            } else {
+                for change in &self.changes {
+                    let _ = writeln!(out, "  {}", change);
+                }
+            }
+        } else {
+            let _ = write!(out, "{}", self.message);
         }
+        out
     }
 }
 
 impl std::fmt::Display for InitReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.dry_run {
-            writeln!(f, "[dry-run] Would initialize normalize:")?;
-            if self.changes.is_empty() {
-                write!(f, "  (no changes needed)")?;
-            } else {
-                for change in &self.changes {
-                    writeln!(f, "  {}", change)?;
-                }
-            }
-            Ok(())
-        } else {
-            write!(f, "{}", self.message)
-        }
+        write!(f, "{}", self.format_text())
     }
 }

@@ -62,7 +62,11 @@ impl PathSource for IndexPathSource {
                 .iter()
                 .map(|(path, is_dir)| normalize_path_resolve::PathEntry {
                     path: path.clone(),
-                    is_dir: *is_dir,
+                    kind: if *is_dir {
+                        normalize_path_resolve::PathMatchKind::Directory
+                    } else {
+                        normalize_path_resolve::PathMatchKind::File
+                    },
                 })
                 .collect(),
         )

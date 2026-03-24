@@ -12,6 +12,7 @@ pub enum PathMatchKind {
     Directory,
 }
 
+/// A resolved path match with fuzzy-match score and kind.
 #[derive(Debug, Clone)]
 pub struct PathMatch {
     pub path: String,
@@ -22,7 +23,7 @@ pub struct PathMatch {
 /// A single entry returned by [`PathSource::all_files`] or [`PathSource::find_like`].
 pub struct PathEntry {
     pub path: String,
-    pub is_dir: bool,
+    pub kind: PathMatchKind,
 }
 
 /// Result of expanding a sigil like `@todo` or `@config`.
@@ -36,7 +37,13 @@ pub struct SigilExpansion {
 
 /// Source of indexed file paths (e.g., from a database index).
 pub trait PathSource {
+    /// Return paths matching `query` using a fast prefix/substring filter.
+    /// The bool in each tuple is `true` for directories, `false` for files.
+    /// Returns `None` if the source cannot answer this query (caller falls back to `all_files`).
     fn find_like(&mut self, query: &str) -> Option<Vec<(String, bool)>>;
+
+    /// Return all known file/directory entries.
+    /// Returns `None` if the source is unavailable; caller falls back to a filesystem walk.
     fn all_files(&mut self) -> Option<Vec<PathEntry>>;
 }
 
@@ -481,7 +488,10 @@ fn get_paths_for_query(
         }
         // Fall back to all files for empty query or no LIKE matches
         if let Some(files) = src.all_files() {
-            return files.into_iter().map(|e| (e.path, e.is_dir)).collect();
+            return files
+                .into_iter()
+                .map(|e| (e.path, e.kind == PathMatchKind::Directory))
+                .collect();
         }
     }
     // Fall back to filesystem walk

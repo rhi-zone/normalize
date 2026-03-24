@@ -1,6 +1,7 @@
 //! Code generation service for server-less CLI.
 
 use crate::commands::generate::{Backend, InputFormat};
+use crate::output::OutputFormatter;
 use server_less::cli;
 use std::path::PathBuf;
 
@@ -15,14 +16,20 @@ pub struct GenerateReport {
     pub path: Option<String>,
 }
 
-impl std::fmt::Display for GenerateReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl OutputFormatter for GenerateReport {
+    fn format_text(&self) -> String {
         if self.path.is_some() {
             // File was written, show nothing on stdout (message went to stderr)
-            Ok(())
+            String::new()
         } else {
-            write!(f, "{}", self.output)
+            self.output.clone()
         }
+    }
+}
+
+impl std::fmt::Display for GenerateReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.format_text())
     }
 }
 

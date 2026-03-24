@@ -23,7 +23,7 @@
 //!
 //! // Load grammars
 //! let loader = GrammarLoader::new();
-//! let python_grammar = loader.get("python").ok().flatten().expect("grammar not found");
+//! let python_grammar = loader.get("python").expect("grammar not found");
 //!
 //! // Static usage (compile-time known language):
 //! println!("Python name: {}", Python.name());

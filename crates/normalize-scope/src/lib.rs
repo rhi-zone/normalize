@@ -149,7 +149,7 @@ impl<'a> ScopeEngine<'a> {
     /// Analyze a source file: collect all scopes, definitions, and references,
     /// resolving each reference to its definition via scope walk.
     fn analyze(&self, lang: &str, source: &str) -> Option<FileAnalysis> {
-        let grammar = self.loader.get(lang).ok().flatten()?;
+        let grammar = self.loader.get(lang).ok()?;
         let locals_src = self.loader.get_locals(lang)?;
 
         let query = tree_sitter::Query::new(&grammar, &locals_src).ok()?;
@@ -401,7 +401,7 @@ mod tests {
     use super::*;
 
     fn print_tree(lang: &str, src: &str, loader: &GrammarLoader) {
-        let Some(grammar) = loader.get(lang).ok().flatten() else {
+        let Some(grammar) = loader.get(lang).ok() else {
             eprintln!("no grammar for {lang}");
             return;
         };

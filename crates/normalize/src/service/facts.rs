@@ -2,6 +2,7 @@
 
 use crate::commands::facts::FactsContent;
 use crate::index;
+use crate::output::OutputFormatter;
 use crate::paths::get_normalize_dir;
 use crate::skeleton;
 use normalize_languages::external_packages;
@@ -34,9 +35,9 @@ pub struct RebuildReport {
     pub imports: Option<usize>,
 }
 
-impl std::fmt::Display for RebuildReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Indexed {} files", self.files)?;
+impl OutputFormatter for RebuildReport {
+    fn format_text(&self) -> String {
+        let mut out = format!("Indexed {} files", self.files);
         let mut parts = Vec::new();
         if let Some(s) = self.symbols
             && s > 0
@@ -54,9 +55,15 @@ impl std::fmt::Display for RebuildReport {
             parts.push(format!("{} imports", i));
         }
         if !parts.is_empty() {
-            write!(f, "\nIndexed {}", parts.join(", "))?;
+            out.push_str(&format!("\nIndexed {}", parts.join(", ")));
         }
-        Ok(())
+        out
+    }
+}
+
+impl std::fmt::Display for RebuildReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.format_text())
     }
 }
 
@@ -81,37 +88,45 @@ pub struct ExtensionCount {
     pub count: usize,
 }
 
-impl std::fmt::Display for FactsStats {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Index Statistics")?;
-        writeln!(f, "================")?;
-        writeln!(f)?;
-        writeln!(
-            f,
+impl OutputFormatter for FactsStats {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let _ = writeln!(out, "Index Statistics");
+        let _ = writeln!(out, "================");
+        let _ = writeln!(out);
+        let _ = writeln!(
+            out,
             "Database:     {:.1} KB",
             self.db_size_bytes as f64 / 1024.0
-        )?;
-        writeln!(
-            f,
+        );
+        let _ = writeln!(
+            out,
             "Codebase:     {:.1} MB",
             self.codebase_size_bytes as f64 / 1024.0 / 1024.0
-        )?;
-        writeln!(f, "Ratio:        {:.2}%", self.ratio * 100.0)?;
-        writeln!(f)?;
-        writeln!(
-            f,
+        );
+        let _ = writeln!(out, "Ratio:        {:.2}%", self.ratio * 100.0);
+        let _ = writeln!(out);
+        let _ = writeln!(
+            out,
             "Files:        {} ({} dirs)",
             self.file_count, self.dir_count
-        )?;
-        writeln!(f, "Symbols:      {}", self.symbol_count)?;
-        writeln!(f, "Calls:        {}", self.call_count)?;
-        writeln!(f, "Imports:      {}", self.import_count)?;
-        writeln!(f)?;
-        writeln!(f, "Top extensions:")?;
+        );
+        let _ = writeln!(out, "Symbols:      {}", self.symbol_count);
+        let _ = writeln!(out, "Calls:        {}", self.call_count);
+        let _ = writeln!(out, "Imports:      {}", self.import_count);
+        let _ = writeln!(out);
+        let _ = writeln!(out, "Top extensions:");
         for ec in self.extensions.iter().take(15) {
-            writeln!(f, "  {:12} {:>6}", ec.ext, ec.count)?;
+            let _ = writeln!(out, "  {:12} {:>6}", ec.ext, ec.count);
         }
-        Ok(())
+        out
+    }
+}
+
+impl std::fmt::Display for FactsStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.format_text())
     }
 }
 
@@ -134,26 +149,38 @@ pub struct StorageEntry {
     pub human: String,
 }
 
-impl std::fmt::Display for StorageReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Storage Usage")?;
-        writeln!(f)?;
+impl OutputFormatter for StorageReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let _ = writeln!(out, "Storage Usage");
+        let _ = writeln!(out);
         if let Some(ref p) = self.index.path {
-            writeln!(f, "Project index:   {:>10}  {}", self.index.human, p)?;
+            let _ = writeln!(out, "Project index:   {:>10}  {}", self.index.human, p);
         }
         if let Some(ref p) = self.package_cache.path {
-            writeln!(
-                f,
+            let _ = writeln!(
+                out,
                 "Package cache:   {:>10}  {}",
                 self.package_cache.human, p
-            )?;
+            );
         }
         if let Some(ref p) = self.global_cache.path {
-            writeln!(f, "Global cache:    {:>10}  {}", self.global_cache.human, p)?;
+            let _ = writeln!(
+                out,
+                "Global cache:    {:>10}  {}",
+                self.global_cache.human, p
+            );
         }
-        writeln!(f)?;
-        write!(f, "Total:           {:>10}", self.total_human)?;
-        Ok(())
+        let _ = writeln!(out);
+        let _ = write!(out, "Total:           {:>10}", self.total_human);
+        out
+    }
+}
+
+impl std::fmt::Display for StorageReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.format_text())
     }
 }
 
@@ -163,12 +190,15 @@ pub struct FileList {
     pub files: Vec<String>,
 }
 
+impl OutputFormatter for FileList {
+    fn format_text(&self) -> String {
+        self.files.iter().map(|p| format!("{}\n", p)).collect()
+    }
+}
+
 impl std::fmt::Display for FileList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for path in &self.files {
-            writeln!(f, "{}", path)?;
-        }
-        Ok(())
+        write!(f, "{}", self.format_text())
     }
 }
 
@@ -186,17 +216,25 @@ pub struct EcosystemCounts {
     pub symbols: usize,
 }
 
-impl std::fmt::Display for PackagesReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Indexing complete:")?;
+impl OutputFormatter for PackagesReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let _ = writeln!(out, "Indexing complete:");
         for eco in &self.ecosystems {
-            writeln!(
-                f,
+            let _ = writeln!(
+                out,
                 "  {}: {} packages, {} symbols",
                 eco.name, eco.packages, eco.symbols
-            )?;
+            );
         }
-        Ok(())
+        out
+    }
+}
+
+impl std::fmt::Display for PackagesReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.format_text())
     }
 }
 
@@ -210,15 +248,21 @@ pub struct CommandReport {
     pub data: Option<serde_json::Value>,
 }
 
+impl OutputFormatter for CommandReport {
+    fn format_text(&self) -> String {
+        if let Some(ref msg) = self.message {
+            msg.clone()
+        } else if self.success {
+            "Done".to_string()
+        } else {
+            "Failed".to_string()
+        }
+    }
+}
+
 impl std::fmt::Display for CommandReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(ref msg) = self.message {
-            write!(f, "{}", msg)
-        } else if self.success {
-            write!(f, "Done")
-        } else {
-            write!(f, "Failed")
-        }
+        write!(f, "{}", self.format_text())
     }
 }
 
@@ -723,7 +767,7 @@ impl FactsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<FactsStatsOutput, String> {
+    ) -> Result<FactsStatsReport, String> {
         if storage {
             let effective_root = root
                 .as_deref()
@@ -731,14 +775,14 @@ impl FactsService {
                 .map(Ok)
                 .unwrap_or_else(std::env::current_dir)
                 .map_err(|e| format!("Failed to get current directory: {e}"))?;
-            return Ok(FactsStatsOutput::Storage(build_storage_report(
+            return Ok(FactsStatsReport::Storage(build_storage_report(
                 &effective_root,
             )));
         }
         let root_path = root.map(PathBuf::from);
         stats_data(root_path.as_deref())
             .await
-            .map(FactsStatsOutput::Stats)
+            .map(FactsStatsReport::Stats)
     }
 
     /// List indexed files (with optional prefix filter)
@@ -818,20 +862,26 @@ impl FactsService {
     }
 }
 
-/// Output for stats command (either regular stats or storage report).
+/// Report for stats command (either regular stats or storage report).
 #[derive(serde::Serialize, schemars::JsonSchema)]
 #[serde(tag = "kind")]
-pub enum FactsStatsOutput {
+pub enum FactsStatsReport {
     Stats(FactsStats),
     Storage(StorageReport),
 }
 
-impl std::fmt::Display for FactsStatsOutput {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl OutputFormatter for FactsStatsReport {
+    fn format_text(&self) -> String {
         match self {
-            Self::Stats(s) => write!(f, "{}", s),
-            Self::Storage(s) => write!(f, "{}", s),
+            Self::Stats(s) => s.format_text(),
+            Self::Storage(s) => s.format_text(),
         }
+    }
+}
+
+impl std::fmt::Display for FactsStatsReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.format_text())
     }
 }
 
@@ -841,11 +891,13 @@ pub struct QueryReport {
     pub rows: Vec<serde_json::Map<String, serde_json::Value>>,
 }
 
-impl std::fmt::Display for QueryReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl OutputFormatter for QueryReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
         if self.rows.is_empty() {
-            return write!(f, "(no rows)");
+            return "(no rows)".to_string();
         }
+        let mut out = String::new();
         // Collect column names from the first row
         let cols: Vec<&str> = self.rows[0].keys().map(|k| k.as_str()).collect();
         // Compute column widths
@@ -864,9 +916,9 @@ impl std::fmt::Display for QueryReport {
             .zip(&widths)
             .map(|(c, w)| format!("{:width$}", c, width = w))
             .collect();
-        writeln!(f, "{}", header.join("  "))?;
+        let _ = writeln!(out, "{}", header.join("  "));
         let sep: Vec<String> = widths.iter().map(|w| "-".repeat(*w)).collect();
-        writeln!(f, "{}", sep.join("  "))?;
+        let _ = writeln!(out, "{}", sep.join("  "));
         // Rows
         for row in &self.rows {
             let cells: Vec<String> = cols
@@ -877,9 +929,16 @@ impl std::fmt::Display for QueryReport {
                     format!("{:width$}", val, width = w)
                 })
                 .collect();
-            writeln!(f, "{}", cells.join("  "))?;
+            let _ = writeln!(out, "{}", cells.join("  "));
         }
-        write!(f, "\n{} row(s)", self.rows.len())
+        let _ = write!(out, "\n{} row(s)", self.rows.len());
+        out
+    }
+}
+
+impl std::fmt::Display for QueryReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.format_text())
     }
 }
 

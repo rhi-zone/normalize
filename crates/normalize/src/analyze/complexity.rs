@@ -492,7 +492,7 @@ impl ComplexityAnalyzer {
 
         loader
             .get_tags(grammar_name)
-            .zip(loader.get(grammar_name).ok().flatten())
+            .zip(loader.get(grammar_name).ok())
             .and_then(|(tags_scm, ts_lang)| tree_sitter::Query::new(&ts_lang, &tags_scm).ok())
             .map(|tags_query| {
                 self.collect_functions_from_tags(
@@ -526,7 +526,7 @@ impl ComplexityAnalyzer {
         let capture_names = tags_query.capture_names();
 
         let complexity_query = loader.get_complexity(grammar_name).and_then(|scm| {
-            let grammar = loader.get(grammar_name).ok().flatten()?;
+            let grammar = loader.get(grammar_name).ok()?;
             tree_sitter::Query::new(&grammar, &scm).ok()
         });
 

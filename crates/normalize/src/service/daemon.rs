@@ -1,6 +1,7 @@
 //! Daemon management service for server-less CLI.
 
 use crate::daemon::{self, DaemonClient, Event, global_socket_path};
+use crate::output::OutputFormatter;
 use server_less::cli;
 use std::path::PathBuf;
 
@@ -50,15 +51,21 @@ pub struct DaemonActionReport {
     pub message: Option<String>,
 }
 
+impl OutputFormatter for DaemonActionReport {
+    fn format_text(&self) -> String {
+        if let Some(ref msg) = self.message {
+            msg.clone()
+        } else if self.success {
+            "Done".to_string()
+        } else {
+            "Failed".to_string()
+        }
+    }
+}
+
 impl std::fmt::Display for DaemonActionReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(ref msg) = self.message {
-            write!(f, "{}", msg)
-        } else if self.success {
-            write!(f, "Done")
-        } else {
-            write!(f, "Failed")
-        }
+        write!(f, "{}", self.format_text())
     }
 }
 
@@ -72,13 +79,19 @@ pub struct DaemonRootReport {
     pub dry_run: bool,
 }
 
+impl OutputFormatter for DaemonRootReport {
+    fn format_text(&self) -> String {
+        if let Some(ref msg) = self.message {
+            msg.clone()
+        } else {
+            self.path.clone()
+        }
+    }
+}
+
 impl std::fmt::Display for DaemonRootReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(ref msg) = self.message {
-            write!(f, "{}", msg)
-        } else {
-            write!(f, "{}", self.path)
-        }
+        write!(f, "{}", self.format_text())
     }
 }
 
@@ -88,17 +101,25 @@ pub struct DaemonRootList {
     pub roots: Vec<String>,
 }
 
+impl OutputFormatter for DaemonRootList {
+    fn format_text(&self) -> String {
+        if self.roots.is_empty() {
+            "No roots being watched".to_string()
+        } else {
+            use std::fmt::Write as _;
+            let mut out = String::new();
+            let _ = writeln!(out, "Watched roots:");
+            for root in &self.roots {
+                let _ = writeln!(out, "  {}", root);
+            }
+            out
+        }
+    }
+}
+
 impl std::fmt::Display for DaemonRootList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.roots.is_empty() {
-            write!(f, "No roots being watched")
-        } else {
-            writeln!(f, "Watched roots:")?;
-            for root in &self.roots {
-                writeln!(f, "  {}", root)?;
-            }
-            Ok(())
-        }
+        write!(f, "{}", self.format_text())
     }
 }
 

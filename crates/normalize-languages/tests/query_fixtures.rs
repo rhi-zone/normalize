@@ -74,7 +74,7 @@ fn rust_tags_finds_functions_and_structs() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("rust").ok().flatten() else {
+    let Some(lang) = loader.get("rust").ok() else {
         eprintln!("Skipping rust_tags: rust grammar .so not found");
         return;
     };
@@ -101,7 +101,7 @@ fn rust_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("rust").ok().flatten() else {
+    let Some(lang) = loader.get("rust").ok() else {
         eprintln!("Skipping rust_calls: rust grammar .so not found");
         return;
     };
@@ -121,7 +121,7 @@ fn rust_imports_finds_use_statements() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("rust").ok().flatten() else {
+    let Some(lang) = loader.get("rust").ok() else {
         eprintln!("Skipping rust_imports: rust grammar .so not found");
         return;
     };
@@ -147,7 +147,7 @@ fn rust_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("rust").ok().flatten() else {
+    let Some(lang) = loader.get("rust").ok() else {
         eprintln!("Skipping rust_complexity: rust grammar .so not found");
         return;
     };
@@ -170,7 +170,7 @@ fn rust_types_finds_struct_definitions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("rust").ok().flatten() else {
+    let Some(lang) = loader.get("rust").ok() else {
         eprintln!("Skipping rust_types: rust grammar .so not found");
         return;
     };
@@ -195,7 +195,7 @@ fn python_tags_finds_class_and_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("python").ok().flatten() else {
+    let Some(lang) = loader.get("python").ok() else {
         eprintln!("Skipping python_tags: python grammar .so not found");
         return;
     };
@@ -224,7 +224,7 @@ fn python_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("python").ok().flatten() else {
+    let Some(lang) = loader.get("python").ok() else {
         eprintln!("Skipping python_calls: python grammar .so not found");
         return;
     };
@@ -245,7 +245,7 @@ fn python_imports_finds_import_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("python").ok().flatten() else {
+    let Some(lang) = loader.get("python").ok() else {
         eprintln!("Skipping python_imports: python grammar .so not found");
         return;
     };
@@ -270,7 +270,7 @@ fn python_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("python").ok().flatten() else {
+    let Some(lang) = loader.get("python").ok() else {
         eprintln!("Skipping python_complexity: python grammar .so not found");
         return;
     };
@@ -292,7 +292,7 @@ fn python_types_finds_class() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("python").ok().flatten() else {
+    let Some(lang) = loader.get("python").ok() else {
         eprintln!("Skipping python_types: python grammar .so not found");
         return;
     };
@@ -319,7 +319,7 @@ fn go_tags_finds_functions_and_types() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("go").ok().flatten() else {
+    let Some(lang) = loader.get("go").ok() else {
         eprintln!("Skipping go_tags: go grammar .so not found");
         return;
     };
@@ -346,7 +346,7 @@ fn go_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("go").ok().flatten() else {
+    let Some(lang) = loader.get("go").ok() else {
         eprintln!("Skipping go_calls: go grammar .so not found");
         return;
     };
@@ -365,7 +365,7 @@ fn go_imports_finds_import_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("go").ok().flatten() else {
+    let Some(lang) = loader.get("go").ok() else {
         eprintln!("Skipping go_imports: go grammar .so not found");
         return;
     };
@@ -388,7 +388,7 @@ fn go_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("go").ok().flatten() else {
+    let Some(lang) = loader.get("go").ok() else {
         eprintln!("Skipping go_complexity: go grammar .so not found");
         return;
     };
@@ -411,7 +411,7 @@ fn go_types_finds_struct_definitions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("go").ok().flatten() else {
+    let Some(lang) = loader.get("go").ok() else {
         eprintln!("Skipping go_types: go grammar .so not found");
         return;
     };
@@ -436,7 +436,7 @@ fn typescript_tags_finds_class_and_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("typescript").ok().flatten() else {
+    let Some(lang) = loader.get("typescript").ok() else {
         eprintln!("Skipping typescript_tags: typescript grammar .so not found");
         return;
     };
@@ -465,7 +465,7 @@ fn typescript_calls_finds_method_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("typescript").ok().flatten() else {
+    let Some(lang) = loader.get("typescript").ok() else {
         eprintln!("Skipping typescript_calls: typescript grammar .so not found");
         return;
     };
@@ -488,7 +488,7 @@ fn typescript_imports_finds_module_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("typescript").ok().flatten() else {
+    let Some(lang) = loader.get("typescript").ok() else {
         eprintln!("Skipping typescript_imports: typescript grammar .so not found");
         return;
     };
@@ -513,7 +513,7 @@ fn typescript_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("typescript").ok().flatten() else {
+    let Some(lang) = loader.get("typescript").ok() else {
         eprintln!("Skipping typescript_complexity: typescript grammar .so not found");
         return;
     };
@@ -536,7 +536,7 @@ fn typescript_types_finds_interface_and_class() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("typescript").ok().flatten() else {
+    let Some(lang) = loader.get("typescript").ok() else {
         eprintln!("Skipping typescript_types: typescript grammar .so not found");
         return;
     };
@@ -563,7 +563,7 @@ fn java_tags_finds_class_and_methods() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("java").ok().flatten() else {
+    let Some(lang) = loader.get("java").ok() else {
         eprintln!("Skipping java_tags: java grammar .so not found");
         return;
     };
@@ -590,7 +590,7 @@ fn java_calls_finds_method_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("java").ok().flatten() else {
+    let Some(lang) = loader.get("java").ok() else {
         eprintln!("Skipping java_calls: java grammar .so not found");
         return;
     };
@@ -609,7 +609,7 @@ fn java_imports_finds_import_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("java").ok().flatten() else {
+    let Some(lang) = loader.get("java").ok() else {
         eprintln!("Skipping java_imports: java grammar .so not found");
         return;
     };
@@ -630,7 +630,7 @@ fn java_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("java").ok().flatten() else {
+    let Some(lang) = loader.get("java").ok() else {
         eprintln!("Skipping java_complexity: java grammar .so not found");
         return;
     };
@@ -653,7 +653,7 @@ fn java_types_finds_class() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("java").ok().flatten() else {
+    let Some(lang) = loader.get("java").ok() else {
         eprintln!("Skipping java_types: java grammar .so not found");
         return;
     };
@@ -678,7 +678,7 @@ fn ruby_tags_finds_class_and_methods() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("ruby").ok().flatten() else {
+    let Some(lang) = loader.get("ruby").ok() else {
         eprintln!("Skipping ruby_tags: ruby grammar .so not found");
         return;
     };
@@ -705,7 +705,7 @@ fn ruby_calls_finds_method_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("ruby").ok().flatten() else {
+    let Some(lang) = loader.get("ruby").ok() else {
         eprintln!("Skipping ruby_calls: ruby grammar .so not found");
         return;
     };
@@ -724,7 +724,7 @@ fn ruby_imports_finds_require() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("ruby").ok().flatten() else {
+    let Some(lang) = loader.get("ruby").ok() else {
         eprintln!("Skipping ruby_imports: ruby grammar .so not found");
         return;
     };
@@ -745,7 +745,7 @@ fn ruby_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("ruby").ok().flatten() else {
+    let Some(lang) = loader.get("ruby").ok() else {
         eprintln!("Skipping ruby_complexity: ruby grammar .so not found");
         return;
     };
@@ -767,7 +767,7 @@ fn ruby_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("ruby").ok().flatten() else {
+    let Some(lang) = loader.get("ruby").ok() else {
         eprintln!("Skipping ruby_types: ruby grammar .so not found");
         return;
     };
@@ -792,7 +792,7 @@ fn kotlin_tags_finds_class_and_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("kotlin").ok().flatten() else {
+    let Some(lang) = loader.get("kotlin").ok() else {
         eprintln!("Skipping kotlin_tags: kotlin grammar .so not found");
         return;
     };
@@ -821,7 +821,7 @@ fn kotlin_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("kotlin").ok().flatten() else {
+    let Some(lang) = loader.get("kotlin").ok() else {
         eprintln!("Skipping kotlin_calls: kotlin grammar .so not found");
         return;
     };
@@ -842,7 +842,7 @@ fn kotlin_imports_finds_import_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("kotlin").ok().flatten() else {
+    let Some(lang) = loader.get("kotlin").ok() else {
         eprintln!("Skipping kotlin_imports: kotlin grammar .so not found");
         return;
     };
@@ -865,7 +865,7 @@ fn kotlin_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("kotlin").ok().flatten() else {
+    let Some(lang) = loader.get("kotlin").ok() else {
         eprintln!("Skipping kotlin_complexity: kotlin grammar .so not found");
         return;
     };
@@ -887,7 +887,7 @@ fn kotlin_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("kotlin").ok().flatten() else {
+    let Some(lang) = loader.get("kotlin").ok() else {
         eprintln!("Skipping kotlin_types: kotlin grammar .so not found");
         return;
     };
@@ -915,7 +915,7 @@ fn swift_tags_finds_class_and_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("swift").ok().flatten() else {
+    let Some(lang) = loader.get("swift").ok() else {
         eprintln!("Skipping swift_tags: swift grammar .so not found");
         return;
     };
@@ -942,7 +942,7 @@ fn swift_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("swift").ok().flatten() else {
+    let Some(lang) = loader.get("swift").ok() else {
         eprintln!("Skipping swift_calls: swift grammar .so not found");
         return;
     };
@@ -963,7 +963,7 @@ fn swift_imports_finds_module_imports() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("swift").ok().flatten() else {
+    let Some(lang) = loader.get("swift").ok() else {
         eprintln!("Skipping swift_imports: swift grammar .so not found");
         return;
     };
@@ -986,7 +986,7 @@ fn swift_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("swift").ok().flatten() else {
+    let Some(lang) = loader.get("swift").ok() else {
         eprintln!("Skipping swift_complexity: swift grammar .so not found");
         return;
     };
@@ -1008,7 +1008,7 @@ fn swift_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("swift").ok().flatten() else {
+    let Some(lang) = loader.get("swift").ok() else {
         eprintln!("Skipping swift_types: swift grammar .so not found");
         return;
     };
@@ -1036,7 +1036,7 @@ fn scala_tags_finds_class_and_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("scala").ok().flatten() else {
+    let Some(lang) = loader.get("scala").ok() else {
         eprintln!("Skipping scala_tags: scala grammar .so not found");
         return;
     };
@@ -1063,7 +1063,7 @@ fn scala_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("scala").ok().flatten() else {
+    let Some(lang) = loader.get("scala").ok() else {
         eprintln!("Skipping scala_calls: scala grammar .so not found");
         return;
     };
@@ -1084,7 +1084,7 @@ fn scala_imports_finds_import_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("scala").ok().flatten() else {
+    let Some(lang) = loader.get("scala").ok() else {
         eprintln!("Skipping scala_imports: scala grammar .so not found");
         return;
     };
@@ -1106,7 +1106,7 @@ fn scala_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("scala").ok().flatten() else {
+    let Some(lang) = loader.get("scala").ok() else {
         eprintln!("Skipping scala_complexity: scala grammar .so not found");
         return;
     };
@@ -1128,7 +1128,7 @@ fn scala_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("scala").ok().flatten() else {
+    let Some(lang) = loader.get("scala").ok() else {
         eprintln!("Skipping scala_types: scala grammar .so not found");
         return;
     };
@@ -1156,7 +1156,7 @@ fn php_tags_finds_class_and_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("php").ok().flatten() else {
+    let Some(lang) = loader.get("php").ok() else {
         eprintln!("Skipping php_tags: php grammar .so not found");
         return;
     };
@@ -1183,7 +1183,7 @@ fn php_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("php").ok().flatten() else {
+    let Some(lang) = loader.get("php").ok() else {
         eprintln!("Skipping php_calls: php grammar .so not found");
         return;
     };
@@ -1204,7 +1204,7 @@ fn php_imports_finds_use_declarations() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("php").ok().flatten() else {
+    let Some(lang) = loader.get("php").ok() else {
         eprintln!("Skipping php_imports: php grammar .so not found");
         return;
     };
@@ -1227,7 +1227,7 @@ fn php_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("php").ok().flatten() else {
+    let Some(lang) = loader.get("php").ok() else {
         eprintln!("Skipping php_complexity: php grammar .so not found");
         return;
     };
@@ -1249,7 +1249,7 @@ fn php_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("php").ok().flatten() else {
+    let Some(lang) = loader.get("php").ok() else {
         eprintln!("Skipping php_types: php grammar .so not found");
         return;
     };
@@ -1272,7 +1272,7 @@ fn dart_tags_finds_class_and_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("dart").ok().flatten() else {
+    let Some(lang) = loader.get("dart").ok() else {
         eprintln!("Skipping dart_tags: dart grammar .so not found");
         return;
     };
@@ -1299,7 +1299,7 @@ fn dart_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("dart").ok().flatten() else {
+    let Some(lang) = loader.get("dart").ok() else {
         eprintln!("Skipping dart_calls: dart grammar .so not found");
         return;
     };
@@ -1318,7 +1318,7 @@ fn dart_imports_finds_import_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("dart").ok().flatten() else {
+    let Some(lang) = loader.get("dart").ok() else {
         eprintln!("Skipping dart_imports: dart grammar .so not found");
         return;
     };
@@ -1341,7 +1341,7 @@ fn dart_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("dart").ok().flatten() else {
+    let Some(lang) = loader.get("dart").ok() else {
         eprintln!("Skipping dart_complexity: dart grammar .so not found");
         return;
     };
@@ -1363,7 +1363,7 @@ fn dart_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("dart").ok().flatten() else {
+    let Some(lang) = loader.get("dart").ok() else {
         eprintln!("Skipping dart_types: dart grammar .so not found");
         return;
     };
@@ -1389,7 +1389,7 @@ fn elixir_tags_finds_modules_and_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("elixir").ok().flatten() else {
+    let Some(lang) = loader.get("elixir").ok() else {
         eprintln!("Skipping elixir_tags: elixir grammar .so not found");
         return;
     };
@@ -1414,7 +1414,7 @@ fn elixir_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("elixir").ok().flatten() else {
+    let Some(lang) = loader.get("elixir").ok() else {
         eprintln!("Skipping elixir_calls: elixir grammar .so not found");
         return;
     };
@@ -1435,7 +1435,7 @@ fn elixir_imports_finds_alias_and_import() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("elixir").ok().flatten() else {
+    let Some(lang) = loader.get("elixir").ok() else {
         eprintln!("Skipping elixir_imports: elixir grammar .so not found");
         return;
     };
@@ -1456,7 +1456,7 @@ fn elixir_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("elixir").ok().flatten() else {
+    let Some(lang) = loader.get("elixir").ok() else {
         eprintln!("Skipping elixir_complexity: elixir grammar .so not found");
         return;
     };
@@ -1478,7 +1478,7 @@ fn elixir_types_finds_module_aliases() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("elixir").ok().flatten() else {
+    let Some(lang) = loader.get("elixir").ok() else {
         eprintln!("Skipping elixir_types: elixir grammar .so not found");
         return;
     };
@@ -1506,7 +1506,7 @@ fn c_tags_finds_functions_and_structs() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("c").ok().flatten() else {
+    let Some(lang) = loader.get("c").ok() else {
         eprintln!("Skipping c_tags: c grammar .so not found");
         return;
     };
@@ -1525,7 +1525,7 @@ fn c_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("c").ok().flatten() else {
+    let Some(lang) = loader.get("c").ok() else {
         eprintln!("Skipping c_calls: c grammar .so not found");
         return;
     };
@@ -1544,7 +1544,7 @@ fn c_imports_finds_include_directives() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("c").ok().flatten() else {
+    let Some(lang) = loader.get("c").ok() else {
         eprintln!("Skipping c_imports: c grammar .so not found");
         return;
     };
@@ -1565,7 +1565,7 @@ fn c_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("c").ok().flatten() else {
+    let Some(lang) = loader.get("c").ok() else {
         eprintln!("Skipping c_complexity: c grammar .so not found");
         return;
     };
@@ -1587,7 +1587,7 @@ fn c_types_finds_type_identifiers() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("c").ok().flatten() else {
+    let Some(lang) = loader.get("c").ok() else {
         eprintln!("Skipping c_types: c grammar .so not found");
         return;
     };
@@ -1612,7 +1612,7 @@ fn cpp_tags_finds_class_and_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("cpp").ok().flatten() else {
+    let Some(lang) = loader.get("cpp").ok() else {
         eprintln!("Skipping cpp_tags: cpp grammar .so not found");
         return;
     };
@@ -1635,7 +1635,7 @@ fn cpp_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("cpp").ok().flatten() else {
+    let Some(lang) = loader.get("cpp").ok() else {
         eprintln!("Skipping cpp_calls: cpp grammar .so not found");
         return;
     };
@@ -1656,7 +1656,7 @@ fn cpp_imports_finds_include_directives() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("cpp").ok().flatten() else {
+    let Some(lang) = loader.get("cpp").ok() else {
         eprintln!("Skipping cpp_imports: cpp grammar .so not found");
         return;
     };
@@ -1679,7 +1679,7 @@ fn cpp_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("cpp").ok().flatten() else {
+    let Some(lang) = loader.get("cpp").ok() else {
         eprintln!("Skipping cpp_complexity: cpp grammar .so not found");
         return;
     };
@@ -1701,7 +1701,7 @@ fn cpp_types_finds_type_identifiers() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("cpp").ok().flatten() else {
+    let Some(lang) = loader.get("cpp").ok() else {
         eprintln!("Skipping cpp_types: cpp grammar .so not found");
         return;
     };
@@ -1726,7 +1726,7 @@ fn csharp_tags_finds_class_and_methods() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("c-sharp").ok().flatten() else {
+    let Some(lang) = loader.get("c-sharp").ok() else {
         eprintln!("Skipping csharp_tags: c-sharp grammar .so not found");
         return;
     };
@@ -1755,7 +1755,7 @@ fn csharp_calls_finds_method_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("c-sharp").ok().flatten() else {
+    let Some(lang) = loader.get("c-sharp").ok() else {
         eprintln!("Skipping csharp_calls: c-sharp grammar .so not found");
         return;
     };
@@ -1778,7 +1778,7 @@ fn csharp_imports_finds_using_directives() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("c-sharp").ok().flatten() else {
+    let Some(lang) = loader.get("c-sharp").ok() else {
         eprintln!("Skipping csharp_imports: c-sharp grammar .so not found");
         return;
     };
@@ -1807,7 +1807,7 @@ fn csharp_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("c-sharp").ok().flatten() else {
+    let Some(lang) = loader.get("c-sharp").ok() else {
         eprintln!("Skipping csharp_complexity: c-sharp grammar .so not found");
         return;
     };
@@ -1829,7 +1829,7 @@ fn csharp_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("c-sharp").ok().flatten() else {
+    let Some(lang) = loader.get("c-sharp").ok() else {
         eprintln!("Skipping csharp_types: c-sharp grammar .so not found");
         return;
     };
@@ -1857,7 +1857,7 @@ fn clojure_tags_finds_functions_and_defrecord() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("clojure").ok().flatten() else {
+    let Some(lang) = loader.get("clojure").ok() else {
         eprintln!("Skipping clojure_tags: clojure grammar .so not found");
         return;
     };
@@ -1882,7 +1882,7 @@ fn clojure_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("clojure").ok().flatten() else {
+    let Some(lang) = loader.get("clojure").ok() else {
         eprintln!("Skipping clojure_calls: clojure grammar .so not found");
         return;
     };
@@ -1903,7 +1903,7 @@ fn clojure_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("clojure").ok().flatten() else {
+    let Some(lang) = loader.get("clojure").ok() else {
         eprintln!("Skipping clojure_complexity: clojure grammar .so not found");
         return;
     };
@@ -1925,7 +1925,7 @@ fn clojure_imports_finds_require_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("clojure").ok().flatten() else {
+    let Some(lang) = loader.get("clojure").ok() else {
         eprintln!("Skipping clojure_imports: clojure grammar .so not found");
         return;
     };
@@ -1947,7 +1947,7 @@ fn clojure_types_finds_no_captures() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("clojure").ok().flatten() else {
+    let Some(lang) = loader.get("clojure").ok() else {
         eprintln!("Skipping clojure_types: clojure grammar .so not found");
         return;
     };
@@ -1971,7 +1971,7 @@ fn scheme_tags_finds_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("scheme").ok().flatten() else {
+    let Some(lang) = loader.get("scheme").ok() else {
         eprintln!("Skipping scheme_tags: scheme grammar .so not found");
         return;
     };
@@ -1996,7 +1996,7 @@ fn scheme_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("scheme").ok().flatten() else {
+    let Some(lang) = loader.get("scheme").ok() else {
         eprintln!("Skipping scheme_calls: scheme grammar .so not found");
         return;
     };
@@ -2017,7 +2017,7 @@ fn scheme_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("scheme").ok().flatten() else {
+    let Some(lang) = loader.get("scheme").ok() else {
         eprintln!("Skipping scheme_complexity: scheme grammar .so not found");
         return;
     };
@@ -2039,7 +2039,7 @@ fn scheme_imports_finds_import_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("scheme").ok().flatten() else {
+    let Some(lang) = loader.get("scheme").ok() else {
         eprintln!("Skipping scheme_imports: scheme grammar .so not found");
         return;
     };
@@ -2061,7 +2061,7 @@ fn scheme_types_finds_no_captures() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("scheme").ok().flatten() else {
+    let Some(lang) = loader.get("scheme").ok() else {
         eprintln!("Skipping scheme_types: scheme grammar .so not found");
         return;
     };
@@ -2084,7 +2084,7 @@ fn d_tags_finds_functions_and_classes() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("d").ok().flatten() else {
+    let Some(lang) = loader.get("d").ok() else {
         eprintln!("Skipping d_tags: d grammar .so not found");
         return;
     };
@@ -2107,7 +2107,7 @@ fn d_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("d").ok().flatten() else {
+    let Some(lang) = loader.get("d").ok() else {
         eprintln!("Skipping d_calls: d grammar .so not found");
         return;
     };
@@ -2126,7 +2126,7 @@ fn d_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("d").ok().flatten() else {
+    let Some(lang) = loader.get("d").ok() else {
         eprintln!("Skipping d_complexity: d grammar .so not found");
         return;
     };
@@ -2148,7 +2148,7 @@ fn d_imports_finds_module_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("d").ok().flatten() else {
+    let Some(lang) = loader.get("d").ok() else {
         eprintln!("Skipping d_imports: d grammar .so not found");
         return;
     };
@@ -2167,7 +2167,7 @@ fn d_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("d").ok().flatten() else {
+    let Some(lang) = loader.get("d").ok() else {
         eprintln!("Skipping d_types: d grammar .so not found");
         return;
     };
@@ -2192,7 +2192,7 @@ fn vb_tags_finds_methods_and_classes() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vb").ok().flatten() else {
+    let Some(lang) = loader.get("vb").ok() else {
         eprintln!("Skipping vb_tags: vb grammar .so not found");
         return;
     };
@@ -2215,7 +2215,7 @@ fn vb_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vb").ok().flatten() else {
+    let Some(lang) = loader.get("vb").ok() else {
         eprintln!("Skipping vb_calls: vb grammar .so not found");
         return;
     };
@@ -2234,7 +2234,7 @@ fn vb_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vb").ok().flatten() else {
+    let Some(lang) = loader.get("vb").ok() else {
         eprintln!("Skipping vb_complexity: vb grammar .so not found");
         return;
     };
@@ -2256,7 +2256,7 @@ fn vb_imports_finds_namespace_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vb").ok().flatten() else {
+    let Some(lang) = loader.get("vb").ok() else {
         eprintln!("Skipping vb_imports: vb grammar .so not found");
         return;
     };
@@ -2275,7 +2275,7 @@ fn vb_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vb").ok().flatten() else {
+    let Some(lang) = loader.get("vb").ok() else {
         eprintln!("Skipping vb_types: vb grammar .so not found");
         return;
     };
@@ -2300,7 +2300,7 @@ fn objc_tags_finds_classes_and_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("objc").ok().flatten() else {
+    let Some(lang) = loader.get("objc").ok() else {
         eprintln!("Skipping objc_tags: objc grammar .so not found");
         return;
     };
@@ -2323,7 +2323,7 @@ fn objc_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("objc").ok().flatten() else {
+    let Some(lang) = loader.get("objc").ok() else {
         eprintln!("Skipping objc_calls: objc grammar .so not found");
         return;
     };
@@ -2342,7 +2342,7 @@ fn objc_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("objc").ok().flatten() else {
+    let Some(lang) = loader.get("objc").ok() else {
         eprintln!("Skipping objc_complexity: objc grammar .so not found");
         return;
     };
@@ -2364,7 +2364,7 @@ fn objc_imports_finds_import_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("objc").ok().flatten() else {
+    let Some(lang) = loader.get("objc").ok() else {
         eprintln!("Skipping objc_imports: objc grammar .so not found");
         return;
     };
@@ -2385,7 +2385,7 @@ fn objc_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("objc").ok().flatten() else {
+    let Some(lang) = loader.get("objc").ok() else {
         eprintln!("Skipping objc_types: objc grammar .so not found");
         return;
     };
@@ -2411,7 +2411,7 @@ fn idris_tags_finds_functions_and_types() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("idris").ok().flatten() else {
+    let Some(lang) = loader.get("idris").ok() else {
         eprintln!("Skipping idris_tags: idris grammar .so not found");
         return;
     };
@@ -2434,7 +2434,7 @@ fn idris_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("idris").ok().flatten() else {
+    let Some(lang) = loader.get("idris").ok() else {
         eprintln!("Skipping idris_calls: idris grammar .so not found");
         return;
     };
@@ -2455,7 +2455,7 @@ fn idris_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("idris").ok().flatten() else {
+    let Some(lang) = loader.get("idris").ok() else {
         eprintln!("Skipping idris_complexity: idris grammar .so not found");
         return;
     };
@@ -2477,7 +2477,7 @@ fn idris_imports_finds_module_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("idris").ok().flatten() else {
+    let Some(lang) = loader.get("idris").ok() else {
         eprintln!("Skipping idris_imports: idris grammar .so not found");
         return;
     };
@@ -2498,7 +2498,7 @@ fn idris_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("idris").ok().flatten() else {
+    let Some(lang) = loader.get("idris").ok() else {
         eprintln!("Skipping idris_types: idris grammar .so not found");
         return;
     };
@@ -2526,7 +2526,7 @@ fn lean_tags_finds_defs_and_structures() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("lean").ok().flatten() else {
+    let Some(lang) = loader.get("lean").ok() else {
         eprintln!("Skipping lean_tags: lean grammar .so not found");
         return;
     };
@@ -2549,7 +2549,7 @@ fn lean_calls_finds_function_applications() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("lean").ok().flatten() else {
+    let Some(lang) = loader.get("lean").ok() else {
         eprintln!("Skipping lean_calls: lean grammar .so not found");
         return;
     };
@@ -2570,7 +2570,7 @@ fn lean_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("lean").ok().flatten() else {
+    let Some(lang) = loader.get("lean").ok() else {
         eprintln!("Skipping lean_complexity: lean grammar .so not found");
         return;
     };
@@ -2592,7 +2592,7 @@ fn lean_imports_finds_import_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("lean").ok().flatten() else {
+    let Some(lang) = loader.get("lean").ok() else {
         eprintln!("Skipping lean_imports: lean grammar .so not found");
         return;
     };
@@ -2613,7 +2613,7 @@ fn lean_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("lean").ok().flatten() else {
+    let Some(lang) = loader.get("lean").ok() else {
         eprintln!("Skipping lean_types: lean grammar .so not found");
         return;
     };
@@ -2635,7 +2635,7 @@ fn rescript_tags_finds_let_bindings_and_types() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("rescript").ok().flatten() else {
+    let Some(lang) = loader.get("rescript").ok() else {
         eprintln!("Skipping rescript_tags: rescript grammar .so not found");
         return;
     };
@@ -2660,7 +2660,7 @@ fn rescript_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("rescript").ok().flatten() else {
+    let Some(lang) = loader.get("rescript").ok() else {
         eprintln!("Skipping rescript_calls: rescript grammar .so not found");
         return;
     };
@@ -2681,7 +2681,7 @@ fn rescript_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("rescript").ok().flatten() else {
+    let Some(lang) = loader.get("rescript").ok() else {
         eprintln!("Skipping rescript_complexity: rescript grammar .so not found");
         return;
     };
@@ -2703,7 +2703,7 @@ fn rescript_imports_finds_open_statements() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("rescript").ok().flatten() else {
+    let Some(lang) = loader.get("rescript").ok() else {
         eprintln!("Skipping rescript_imports: rescript grammar .so not found");
         return;
     };
@@ -2724,7 +2724,7 @@ fn rescript_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("rescript").ok().flatten() else {
+    let Some(lang) = loader.get("rescript").ok() else {
         eprintln!("Skipping rescript_types: rescript grammar .so not found");
         return;
     };
@@ -2752,7 +2752,7 @@ fn elm_tags_finds_functions_and_types() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("elm").ok().flatten() else {
+    let Some(lang) = loader.get("elm").ok() else {
         eprintln!("Skipping elm_tags: elm grammar .so not found");
         return;
     };
@@ -2775,7 +2775,7 @@ fn elm_calls_finds_function_applications() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("elm").ok().flatten() else {
+    let Some(lang) = loader.get("elm").ok() else {
         eprintln!("Skipping elm_calls: elm grammar .so not found");
         return;
     };
@@ -2796,7 +2796,7 @@ fn elm_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("elm").ok().flatten() else {
+    let Some(lang) = loader.get("elm").ok() else {
         eprintln!("Skipping elm_complexity: elm grammar .so not found");
         return;
     };
@@ -2818,7 +2818,7 @@ fn elm_imports_finds_module_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("elm").ok().flatten() else {
+    let Some(lang) = loader.get("elm").ok() else {
         eprintln!("Skipping elm_imports: elm grammar .so not found");
         return;
     };
@@ -2839,7 +2839,7 @@ fn elm_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("elm").ok().flatten() else {
+    let Some(lang) = loader.get("elm").ok() else {
         eprintln!("Skipping elm_types: elm grammar .so not found");
         return;
     };
@@ -2865,7 +2865,7 @@ fn zig_tags_finds_functions_and_structs() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("zig").ok().flatten() else {
+    let Some(lang) = loader.get("zig").ok() else {
         eprintln!("Skipping zig_tags: zig grammar .so not found");
         return;
     };
@@ -2888,7 +2888,7 @@ fn zig_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("zig").ok().flatten() else {
+    let Some(lang) = loader.get("zig").ok() else {
         eprintln!("Skipping zig_calls: zig grammar .so not found");
         return;
     };
@@ -2909,7 +2909,7 @@ fn zig_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("zig").ok().flatten() else {
+    let Some(lang) = loader.get("zig").ok() else {
         eprintln!("Skipping zig_complexity: zig grammar .so not found");
         return;
     };
@@ -2931,7 +2931,7 @@ fn zig_imports_finds_module_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("zig").ok().flatten() else {
+    let Some(lang) = loader.get("zig").ok() else {
         eprintln!("Skipping zig_imports: zig grammar .so not found");
         return;
     };
@@ -2952,7 +2952,7 @@ fn zig_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("zig").ok().flatten() else {
+    let Some(lang) = loader.get("zig").ok() else {
         eprintln!("Skipping zig_types: zig grammar .so not found");
         return;
     };
@@ -2977,7 +2977,7 @@ fn ada_tags_finds_subprograms_and_packages() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("ada").ok().flatten() else {
+    let Some(lang) = loader.get("ada").ok() else {
         eprintln!("Skipping ada_tags: ada grammar .so not found");
         return;
     };
@@ -2998,7 +2998,7 @@ fn ada_calls_finds_procedure_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("ada").ok().flatten() else {
+    let Some(lang) = loader.get("ada").ok() else {
         eprintln!("Skipping ada_calls: ada grammar .so not found");
         return;
     };
@@ -3019,7 +3019,7 @@ fn ada_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("ada").ok().flatten() else {
+    let Some(lang) = loader.get("ada").ok() else {
         eprintln!("Skipping ada_complexity: ada grammar .so not found");
         return;
     };
@@ -3041,7 +3041,7 @@ fn ada_imports_finds_with_clauses() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("ada").ok().flatten() else {
+    let Some(lang) = loader.get("ada").ok() else {
         eprintln!("Skipping ada_imports: ada grammar .so not found");
         return;
     };
@@ -3064,7 +3064,7 @@ fn ada_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("ada").ok().flatten() else {
+    let Some(lang) = loader.get("ada").ok() else {
         eprintln!("Skipping ada_types: ada grammar .so not found");
         return;
     };
@@ -3089,7 +3089,7 @@ fn perl_tags_finds_subroutines_and_packages() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("perl").ok().flatten() else {
+    let Some(lang) = loader.get("perl").ok() else {
         eprintln!("Skipping perl_tags: perl grammar .so not found");
         return;
     };
@@ -3110,7 +3110,7 @@ fn perl_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("perl").ok().flatten() else {
+    let Some(lang) = loader.get("perl").ok() else {
         eprintln!("Skipping perl_calls: perl grammar .so not found");
         return;
     };
@@ -3131,7 +3131,7 @@ fn perl_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("perl").ok().flatten() else {
+    let Some(lang) = loader.get("perl").ok() else {
         eprintln!("Skipping perl_complexity: perl grammar .so not found");
         return;
     };
@@ -3153,7 +3153,7 @@ fn perl_imports_finds_use_statements() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("perl").ok().flatten() else {
+    let Some(lang) = loader.get("perl").ok() else {
         eprintln!("Skipping perl_imports: perl grammar .so not found");
         return;
     };
@@ -3182,7 +3182,7 @@ fn bash_tags_finds_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("bash").ok().flatten() else {
+    let Some(lang) = loader.get("bash").ok() else {
         eprintln!("Skipping bash_tags: bash grammar .so not found");
         return;
     };
@@ -3203,7 +3203,7 @@ fn bash_calls_finds_command_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("bash").ok().flatten() else {
+    let Some(lang) = loader.get("bash").ok() else {
         eprintln!("Skipping bash_calls: bash grammar .so not found");
         return;
     };
@@ -3224,7 +3224,7 @@ fn bash_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("bash").ok().flatten() else {
+    let Some(lang) = loader.get("bash").ok() else {
         eprintln!("Skipping bash_complexity: bash grammar .so not found");
         return;
     };
@@ -3246,7 +3246,7 @@ fn bash_imports_finds_source_commands() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("bash").ok().flatten() else {
+    let Some(lang) = loader.get("bash").ok() else {
         eprintln!("Skipping bash_imports: bash grammar .so not found");
         return;
     };
@@ -3275,7 +3275,7 @@ fn powershell_tags_finds_functions_and_classes() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("powershell").ok().flatten() else {
+    let Some(lang) = loader.get("powershell").ok() else {
         eprintln!("Skipping powershell_tags: powershell grammar .so not found");
         return;
     };
@@ -3298,7 +3298,7 @@ fn powershell_calls_finds_command_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("powershell").ok().flatten() else {
+    let Some(lang) = loader.get("powershell").ok() else {
         eprintln!("Skipping powershell_calls: powershell grammar .so not found");
         return;
     };
@@ -3321,7 +3321,7 @@ fn powershell_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("powershell").ok().flatten() else {
+    let Some(lang) = loader.get("powershell").ok() else {
         eprintln!("Skipping powershell_complexity: powershell grammar .so not found");
         return;
     };
@@ -3343,7 +3343,7 @@ fn powershell_imports_finds_import_module() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("powershell").ok().flatten() else {
+    let Some(lang) = loader.get("powershell").ok() else {
         eprintln!("Skipping powershell_imports: powershell grammar .so not found");
         return;
     };
@@ -3366,7 +3366,7 @@ fn powershell_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("powershell").ok().flatten() else {
+    let Some(lang) = loader.get("powershell").ok() else {
         eprintln!("Skipping powershell_types: powershell grammar .so not found");
         return;
     };
@@ -3393,7 +3393,7 @@ fn fish_tags_finds_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("fish").ok().flatten() else {
+    let Some(lang) = loader.get("fish").ok() else {
         eprintln!("Skipping fish_tags: fish grammar .so not found");
         return;
     };
@@ -3414,7 +3414,7 @@ fn fish_calls_finds_command_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("fish").ok().flatten() else {
+    let Some(lang) = loader.get("fish").ok() else {
         eprintln!("Skipping fish_calls: fish grammar .so not found");
         return;
     };
@@ -3435,7 +3435,7 @@ fn fish_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("fish").ok().flatten() else {
+    let Some(lang) = loader.get("fish").ok() else {
         eprintln!("Skipping fish_complexity: fish grammar .so not found");
         return;
     };
@@ -3457,7 +3457,7 @@ fn fish_imports_finds_source_commands() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("fish").ok().flatten() else {
+    let Some(lang) = loader.get("fish").ok() else {
         eprintln!("Skipping fish_imports: fish grammar .so not found");
         return;
     };
@@ -3502,7 +3502,7 @@ fn zsh_tags_finds_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("zsh").ok().flatten() else {
+    let Some(lang) = loader.get("zsh").ok() else {
         eprintln!("Skipping zsh_tags: zsh grammar .so not found");
         return;
     };
@@ -3529,7 +3529,7 @@ fn zsh_calls_finds_command_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("zsh").ok().flatten() else {
+    let Some(lang) = loader.get("zsh").ok() else {
         eprintln!("Skipping zsh_calls: zsh grammar .so not found");
         return;
     };
@@ -3556,7 +3556,7 @@ fn zsh_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("zsh").ok().flatten() else {
+    let Some(lang) = loader.get("zsh").ok() else {
         eprintln!("Skipping zsh_complexity: zsh grammar .so not found");
         return;
     };
@@ -3584,7 +3584,7 @@ fn zsh_imports_finds_source_commands() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("zsh").ok().flatten() else {
+    let Some(lang) = loader.get("zsh").ok() else {
         eprintln!("Skipping zsh_imports: zsh grammar .so not found");
         return;
     };
@@ -3619,7 +3619,7 @@ fn awk_tags_finds_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("awk").ok().flatten() else {
+    let Some(lang) = loader.get("awk").ok() else {
         eprintln!("Skipping awk_tags: awk grammar .so not found");
         return;
     };
@@ -3640,7 +3640,7 @@ fn awk_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("awk").ok().flatten() else {
+    let Some(lang) = loader.get("awk").ok() else {
         eprintln!("Skipping awk_calls: awk grammar .so not found");
         return;
     };
@@ -3661,7 +3661,7 @@ fn awk_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("awk").ok().flatten() else {
+    let Some(lang) = loader.get("awk").ok() else {
         eprintln!("Skipping awk_complexity: awk grammar .so not found");
         return;
     };
@@ -3689,7 +3689,7 @@ fn javascript_tags_finds_functions_and_classes() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("javascript").ok().flatten() else {
+    let Some(lang) = loader.get("javascript").ok() else {
         eprintln!("Skipping javascript_tags: javascript grammar .so not found");
         return;
     };
@@ -3712,7 +3712,7 @@ fn javascript_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("javascript").ok().flatten() else {
+    let Some(lang) = loader.get("javascript").ok() else {
         eprintln!("Skipping javascript_calls: javascript grammar .so not found");
         return;
     };
@@ -3735,7 +3735,7 @@ fn javascript_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("javascript").ok().flatten() else {
+    let Some(lang) = loader.get("javascript").ok() else {
         eprintln!("Skipping javascript_complexity: javascript grammar .so not found");
         return;
     };
@@ -3757,7 +3757,7 @@ fn javascript_imports_finds_es_module_imports() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("javascript").ok().flatten() else {
+    let Some(lang) = loader.get("javascript").ok() else {
         eprintln!("Skipping javascript_imports: javascript grammar .so not found");
         return;
     };
@@ -3780,7 +3780,7 @@ fn javascript_types_finds_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("javascript").ok().flatten() else {
+    let Some(lang) = loader.get("javascript").ok() else {
         eprintln!("Skipping javascript_types: javascript grammar .so not found");
         return;
     };
@@ -3807,7 +3807,7 @@ fn tsx_tags_finds_components_and_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("tsx").ok().flatten() else {
+    let Some(lang) = loader.get("tsx").ok() else {
         eprintln!("Skipping tsx_tags: tsx grammar .so not found");
         return;
     };
@@ -3828,7 +3828,7 @@ fn tsx_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("tsx").ok().flatten() else {
+    let Some(lang) = loader.get("tsx").ok() else {
         eprintln!("Skipping tsx_calls: tsx grammar .so not found");
         return;
     };
@@ -3849,7 +3849,7 @@ fn tsx_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("tsx").ok().flatten() else {
+    let Some(lang) = loader.get("tsx").ok() else {
         eprintln!("Skipping tsx_complexity: tsx grammar .so not found");
         return;
     };
@@ -3871,7 +3871,7 @@ fn tsx_imports_finds_react_imports() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("tsx").ok().flatten() else {
+    let Some(lang) = loader.get("tsx").ok() else {
         eprintln!("Skipping tsx_imports: tsx grammar .so not found");
         return;
     };
@@ -3892,7 +3892,7 @@ fn tsx_types_finds_interface_and_type_references() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("tsx").ok().flatten() else {
+    let Some(lang) = loader.get("tsx").ok() else {
         eprintln!("Skipping tsx_types: tsx grammar .so not found");
         return;
     };
@@ -3917,7 +3917,7 @@ fn agda_tags_finds_functions_and_types() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("agda").ok().flatten() else {
+    let Some(lang) = loader.get("agda").ok() else {
         eprintln!("Skipping agda_tags: agda grammar .so not found");
         return;
     };
@@ -3942,7 +3942,7 @@ fn agda_calls_finds_applications() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("agda").ok().flatten() else {
+    let Some(lang) = loader.get("agda").ok() else {
         eprintln!("Skipping agda_calls: agda grammar .so not found");
         return;
     };
@@ -3961,7 +3961,7 @@ fn agda_complexity_finds_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("agda").ok().flatten() else {
+    let Some(lang) = loader.get("agda").ok() else {
         eprintln!("Skipping agda_complexity: agda grammar .so not found");
         return;
     };
@@ -3983,7 +3983,7 @@ fn agda_imports_finds_module_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("agda").ok().flatten() else {
+    let Some(lang) = loader.get("agda").ok() else {
         eprintln!("Skipping agda_imports: agda grammar .so not found");
         return;
     };
@@ -4010,7 +4010,7 @@ fn commonlisp_tags_finds_functions_and_structs() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("commonlisp").ok().flatten() else {
+    let Some(lang) = loader.get("commonlisp").ok() else {
         eprintln!("Skipping commonlisp_tags: commonlisp grammar .so not found");
         return;
     };
@@ -4035,7 +4035,7 @@ fn commonlisp_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("commonlisp").ok().flatten() else {
+    let Some(lang) = loader.get("commonlisp").ok() else {
         eprintln!("Skipping commonlisp_calls: commonlisp grammar .so not found");
         return;
     };
@@ -4058,7 +4058,7 @@ fn commonlisp_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("commonlisp").ok().flatten() else {
+    let Some(lang) = loader.get("commonlisp").ok() else {
         eprintln!("Skipping commonlisp_complexity: commonlisp grammar .so not found");
         return;
     };
@@ -4080,7 +4080,7 @@ fn commonlisp_imports_finds_require() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("commonlisp").ok().flatten() else {
+    let Some(lang) = loader.get("commonlisp").ok() else {
         eprintln!("Skipping commonlisp_imports: commonlisp grammar .so not found");
         return;
     };
@@ -4109,7 +4109,7 @@ fn elisp_tags_finds_functions_and_vars() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("elisp").ok().flatten() else {
+    let Some(lang) = loader.get("elisp").ok() else {
         eprintln!("Skipping elisp_tags: elisp grammar .so not found");
         return;
     };
@@ -4132,7 +4132,7 @@ fn elisp_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("elisp").ok().flatten() else {
+    let Some(lang) = loader.get("elisp").ok() else {
         eprintln!("Skipping elisp_calls: elisp grammar .so not found");
         return;
     };
@@ -4155,7 +4155,7 @@ fn elisp_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("elisp").ok().flatten() else {
+    let Some(lang) = loader.get("elisp").ok() else {
         eprintln!("Skipping elisp_complexity: elisp grammar .so not found");
         return;
     };
@@ -4177,7 +4177,7 @@ fn elisp_imports_finds_require() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("elisp").ok().flatten() else {
+    let Some(lang) = loader.get("elisp").ok() else {
         eprintln!("Skipping elisp_imports: elisp grammar .so not found");
         return;
     };
@@ -4206,7 +4206,7 @@ fn prolog_tags_finds_predicates() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("prolog").ok().flatten() else {
+    let Some(lang) = loader.get("prolog").ok() else {
         eprintln!("Skipping prolog_tags: prolog grammar .so not found");
         return;
     };
@@ -4229,7 +4229,7 @@ fn prolog_calls_finds_predicate_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("prolog").ok().flatten() else {
+    let Some(lang) = loader.get("prolog").ok() else {
         eprintln!("Skipping prolog_calls: prolog grammar .so not found");
         return;
     };
@@ -4252,7 +4252,7 @@ fn prolog_complexity_finds_clauses() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("prolog").ok().flatten() else {
+    let Some(lang) = loader.get("prolog").ok() else {
         eprintln!("Skipping prolog_complexity: prolog grammar .so not found");
         return;
     };
@@ -4274,7 +4274,7 @@ fn prolog_imports_finds_use_module() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("prolog").ok().flatten() else {
+    let Some(lang) = loader.get("prolog").ok() else {
         eprintln!("Skipping prolog_imports: prolog grammar .so not found");
         return;
     };
@@ -4303,7 +4303,7 @@ fn sql_tags_finds_tables_and_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("sql").ok().flatten() else {
+    let Some(lang) = loader.get("sql").ok() else {
         eprintln!("Skipping sql_tags: sql grammar .so not found");
         return;
     };
@@ -4330,7 +4330,7 @@ fn sql_types_finds_column_types() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("sql").ok().flatten() else {
+    let Some(lang) = loader.get("sql").ok() else {
         eprintln!("Skipping sql_types: sql grammar .so not found");
         return;
     };
@@ -4349,7 +4349,7 @@ fn sql_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("sql").ok().flatten() else {
+    let Some(lang) = loader.get("sql").ok() else {
         eprintln!("Skipping sql_complexity: sql grammar .so not found");
         return;
     };
@@ -4371,7 +4371,7 @@ fn sql_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("sql").ok().flatten() else {
+    let Some(lang) = loader.get("sql").ok() else {
         eprintln!("Skipping sql_calls: sql grammar .so not found");
         return;
     };
@@ -4398,7 +4398,7 @@ fn starlark_tags_finds_functions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("starlark").ok().flatten() else {
+    let Some(lang) = loader.get("starlark").ok() else {
         eprintln!("Skipping starlark_tags: starlark grammar .so not found");
         return;
     };
@@ -4425,7 +4425,7 @@ fn starlark_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("starlark").ok().flatten() else {
+    let Some(lang) = loader.get("starlark").ok() else {
         eprintln!("Skipping starlark_calls: starlark grammar .so not found");
         return;
     };
@@ -4448,7 +4448,7 @@ fn starlark_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("starlark").ok().flatten() else {
+    let Some(lang) = loader.get("starlark").ok() else {
         eprintln!("Skipping starlark_complexity: starlark grammar .so not found");
         return;
     };
@@ -4470,7 +4470,7 @@ fn starlark_imports_finds_load_statements() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("starlark").ok().flatten() else {
+    let Some(lang) = loader.get("starlark").ok() else {
         eprintln!("Skipping starlark_imports: starlark grammar .so not found");
         return;
     };
@@ -4499,7 +4499,7 @@ fn hcl_tags_finds_blocks() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("hcl").ok().flatten() else {
+    let Some(lang) = loader.get("hcl").ok() else {
         eprintln!("Skipping hcl_tags: hcl grammar .so not found");
         return;
     };
@@ -4520,7 +4520,7 @@ fn hcl_types_finds_type_constraints() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("hcl").ok().flatten() else {
+    let Some(lang) = loader.get("hcl").ok() else {
         eprintln!("Skipping hcl_types: hcl grammar .so not found");
         return;
     };
@@ -4539,7 +4539,7 @@ fn hcl_complexity_finds_conditionals() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("hcl").ok().flatten() else {
+    let Some(lang) = loader.get("hcl").ok() else {
         eprintln!("Skipping hcl_complexity: hcl grammar .so not found");
         return;
     };
@@ -4561,7 +4561,7 @@ fn hcl_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("hcl").ok().flatten() else {
+    let Some(lang) = loader.get("hcl").ok() else {
         eprintln!("Skipping hcl_calls: hcl grammar .so not found");
         return;
     };
@@ -4582,7 +4582,7 @@ fn hcl_imports_finds_module_sources() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("hcl").ok().flatten() else {
+    let Some(lang) = loader.get("hcl").ok() else {
         eprintln!("Skipping hcl_imports: hcl grammar .so not found");
         return;
     };
@@ -4611,7 +4611,7 @@ fn nix_tags_finds_bindings() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("nix").ok().flatten() else {
+    let Some(lang) = loader.get("nix").ok() else {
         eprintln!("Skipping nix_tags: nix grammar .so not found");
         return;
     };
@@ -4630,7 +4630,7 @@ fn nix_calls_finds_applications() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("nix").ok().flatten() else {
+    let Some(lang) = loader.get("nix").ok() else {
         eprintln!("Skipping nix_calls: nix grammar .so not found");
         return;
     };
@@ -4651,7 +4651,7 @@ fn nix_complexity_finds_if_expressions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("nix").ok().flatten() else {
+    let Some(lang) = loader.get("nix").ok() else {
         eprintln!("Skipping nix_complexity: nix grammar .so not found");
         return;
     };
@@ -4673,7 +4673,7 @@ fn nix_imports_finds_import_expressions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("nix").ok().flatten() else {
+    let Some(lang) = loader.get("nix").ok() else {
         eprintln!("Skipping nix_imports: nix grammar .so not found");
         return;
     };
@@ -4702,7 +4702,7 @@ fn matlab_tags_finds_functions_and_class() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("matlab").ok().flatten() else {
+    let Some(lang) = loader.get("matlab").ok() else {
         eprintln!("Skipping matlab_tags: matlab grammar .so not found");
         return;
     };
@@ -4727,7 +4727,7 @@ fn matlab_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("matlab").ok().flatten() else {
+    let Some(lang) = loader.get("matlab").ok() else {
         eprintln!("Skipping matlab_calls: matlab grammar .so not found");
         return;
     };
@@ -4750,7 +4750,7 @@ fn matlab_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("matlab").ok().flatten() else {
+    let Some(lang) = loader.get("matlab").ok() else {
         eprintln!("Skipping matlab_complexity: matlab grammar .so not found");
         return;
     };
@@ -4778,7 +4778,7 @@ fn tlaplus_tags_finds_module_and_operators() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("tlaplus").ok().flatten() else {
+    let Some(lang) = loader.get("tlaplus").ok() else {
         eprintln!("Skipping tlaplus_tags: tlaplus grammar .so not found");
         return;
     };
@@ -4805,7 +4805,7 @@ fn tlaplus_complexity_finds_conditionals() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("tlaplus").ok().flatten() else {
+    let Some(lang) = loader.get("tlaplus").ok() else {
         eprintln!("Skipping tlaplus_complexity: tlaplus grammar .so not found");
         return;
     };
@@ -4827,7 +4827,7 @@ fn tlaplus_imports_finds_extends() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("tlaplus").ok().flatten() else {
+    let Some(lang) = loader.get("tlaplus").ok() else {
         eprintln!("Skipping tlaplus_imports: tlaplus grammar .so not found");
         return;
     };
@@ -4856,7 +4856,7 @@ fn cmake_tags_finds_functions_and_macros() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("cmake").ok().flatten() else {
+    let Some(lang) = loader.get("cmake").ok() else {
         eprintln!("Skipping cmake_tags: cmake grammar .so not found");
         return;
     };
@@ -4881,7 +4881,7 @@ fn cmake_calls_finds_command_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("cmake").ok().flatten() else {
+    let Some(lang) = loader.get("cmake").ok() else {
         eprintln!("Skipping cmake_calls: cmake grammar .so not found");
         return;
     };
@@ -4904,7 +4904,7 @@ fn cmake_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("cmake").ok().flatten() else {
+    let Some(lang) = loader.get("cmake").ok() else {
         eprintln!("Skipping cmake_complexity: cmake grammar .so not found");
         return;
     };
@@ -4925,7 +4925,7 @@ fn cmake_imports_finds_includes_and_find_package() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("cmake").ok().flatten() else {
+    let Some(lang) = loader.get("cmake").ok() else {
         eprintln!("Skipping cmake_imports: cmake grammar .so not found");
         return;
     };
@@ -4954,7 +4954,7 @@ fn graphql_tags_finds_types_and_interfaces() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("graphql").ok().flatten() else {
+    let Some(lang) = loader.get("graphql").ok() else {
         eprintln!("Skipping graphql_tags: graphql grammar .so not found");
         return;
     };
@@ -4983,7 +4983,7 @@ fn graphql_calls_finds_field_selections() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("graphql").ok().flatten() else {
+    let Some(lang) = loader.get("graphql").ok() else {
         eprintln!("Skipping graphql_calls: graphql grammar .so not found");
         return;
     };
@@ -5005,7 +5005,7 @@ fn graphql_complexity_query_runs_cleanly() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("graphql").ok().flatten() else {
+    let Some(lang) = loader.get("graphql").ok() else {
         eprintln!("Skipping graphql_complexity: graphql grammar .so not found");
         return;
     };
@@ -5032,7 +5032,7 @@ fn glsl_tags_finds_functions_and_structs() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("glsl").ok().flatten() else {
+    let Some(lang) = loader.get("glsl").ok() else {
         eprintln!("Skipping glsl_tags: glsl grammar .so not found");
         return;
     };
@@ -5057,7 +5057,7 @@ fn glsl_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("glsl").ok().flatten() else {
+    let Some(lang) = loader.get("glsl").ok() else {
         eprintln!("Skipping glsl_calls: glsl grammar .so not found");
         return;
     };
@@ -5078,7 +5078,7 @@ fn glsl_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("glsl").ok().flatten() else {
+    let Some(lang) = loader.get("glsl").ok() else {
         eprintln!("Skipping glsl_complexity: glsl grammar .so not found");
         return;
     };
@@ -5099,7 +5099,7 @@ fn glsl_imports_finds_include_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("glsl").ok().flatten() else {
+    let Some(lang) = loader.get("glsl").ok() else {
         eprintln!("Skipping glsl_imports: glsl grammar .so not found");
         return;
     };
@@ -5128,7 +5128,7 @@ fn hlsl_tags_finds_functions_structs_and_cbuffers() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("hlsl").ok().flatten() else {
+    let Some(lang) = loader.get("hlsl").ok() else {
         eprintln!("Skipping hlsl_tags: hlsl grammar .so not found");
         return;
     };
@@ -5155,7 +5155,7 @@ fn hlsl_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("hlsl").ok().flatten() else {
+    let Some(lang) = loader.get("hlsl").ok() else {
         eprintln!("Skipping hlsl_calls: hlsl grammar .so not found");
         return;
     };
@@ -5176,7 +5176,7 @@ fn hlsl_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("hlsl").ok().flatten() else {
+    let Some(lang) = loader.get("hlsl").ok() else {
         eprintln!("Skipping hlsl_complexity: hlsl grammar .so not found");
         return;
     };
@@ -5197,7 +5197,7 @@ fn hlsl_imports_finds_include_directives() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("hlsl").ok().flatten() else {
+    let Some(lang) = loader.get("hlsl").ok() else {
         eprintln!("Skipping hlsl_imports: hlsl grammar .so not found");
         return;
     };
@@ -5226,7 +5226,7 @@ fn jq_tags_finds_function_definitions() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("jq").ok().flatten() else {
+    let Some(lang) = loader.get("jq").ok() else {
         eprintln!("Skipping jq_tags: jq grammar .so not found");
         return;
     };
@@ -5251,7 +5251,7 @@ fn jq_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("jq").ok().flatten() else {
+    let Some(lang) = loader.get("jq").ok() else {
         eprintln!("Skipping jq_calls: jq grammar .so not found");
         return;
     };
@@ -5272,7 +5272,7 @@ fn jq_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("jq").ok().flatten() else {
+    let Some(lang) = loader.get("jq").ok() else {
         eprintln!("Skipping jq_complexity: jq grammar .so not found");
         return;
     };
@@ -5293,7 +5293,7 @@ fn jq_imports_finds_import_statements() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("jq").ok().flatten() else {
+    let Some(lang) = loader.get("jq").ok() else {
         eprintln!("Skipping jq_imports: jq grammar .so not found");
         return;
     };
@@ -5318,7 +5318,7 @@ fn markdown_tags_finds_headings() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("markdown").ok().flatten() else {
+    let Some(lang) = loader.get("markdown").ok() else {
         eprintln!("Skipping markdown_tags: markdown grammar .so not found");
         return;
     };
@@ -5347,7 +5347,7 @@ fn meson_tags_finds_variable_assignments() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("meson").ok().flatten() else {
+    let Some(lang) = loader.get("meson").ok() else {
         eprintln!("Skipping meson_tags: meson grammar .so not found");
         return;
     };
@@ -5367,7 +5367,7 @@ fn meson_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("meson").ok().flatten() else {
+    let Some(lang) = loader.get("meson").ok() else {
         eprintln!("Skipping meson_calls: meson grammar .so not found");
         return;
     };
@@ -5390,7 +5390,7 @@ fn meson_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("meson").ok().flatten() else {
+    let Some(lang) = loader.get("meson").ok() else {
         eprintln!("Skipping meson_complexity: meson grammar .so not found");
         return;
     };
@@ -5411,7 +5411,7 @@ fn meson_imports_finds_subproject_and_dependency() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("meson").ok().flatten() else {
+    let Some(lang) = loader.get("meson").ok() else {
         eprintln!("Skipping meson_imports: meson grammar .so not found");
         return;
     };
@@ -5440,7 +5440,7 @@ fn nginx_tags_finds_block_directives() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("nginx").ok().flatten() else {
+    let Some(lang) = loader.get("nginx").ok() else {
         eprintln!("Skipping nginx_tags: nginx grammar .so not found");
         return;
     };
@@ -5461,7 +5461,7 @@ fn nginx_complexity_finds_block_directives() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("nginx").ok().flatten() else {
+    let Some(lang) = loader.get("nginx").ok() else {
         eprintln!("Skipping nginx_complexity: nginx grammar .so not found");
         return;
     };
@@ -5482,7 +5482,7 @@ fn nginx_imports_finds_include_directives() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("nginx").ok().flatten() else {
+    let Some(lang) = loader.get("nginx").ok() else {
         eprintln!("Skipping nginx_imports: nginx grammar .so not found");
         return;
     };
@@ -5511,7 +5511,7 @@ fn scss_tags_finds_mixins_functions_and_rules() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("scss").ok().flatten() else {
+    let Some(lang) = loader.get("scss").ok() else {
         eprintln!("Skipping scss_tags: scss grammar .so not found");
         return;
     };
@@ -5536,7 +5536,7 @@ fn scss_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("scss").ok().flatten() else {
+    let Some(lang) = loader.get("scss").ok() else {
         eprintln!("Skipping scss_calls: scss grammar .so not found");
         return;
     };
@@ -5557,7 +5557,7 @@ fn scss_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("scss").ok().flatten() else {
+    let Some(lang) = loader.get("scss").ok() else {
         eprintln!("Skipping scss_complexity: scss grammar .so not found");
         return;
     };
@@ -5578,7 +5578,7 @@ fn scss_imports_finds_use_and_import_statements() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("scss").ok().flatten() else {
+    let Some(lang) = loader.get("scss").ok() else {
         eprintln!("Skipping scss_imports: scss grammar .so not found");
         return;
     };
@@ -5607,7 +5607,7 @@ fn css_imports_finds_at_import_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("css").ok().flatten() else {
+    let Some(lang) = loader.get("css").ok() else {
         eprintln!("Skipping css_imports: css grammar .so not found");
         return;
     };
@@ -5642,7 +5642,7 @@ fn svelte_tags_finds_script_and_style_blocks() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("svelte").ok().flatten() else {
+    let Some(lang) = loader.get("svelte").ok() else {
         eprintln!("Skipping svelte_tags: svelte grammar .so not found");
         return;
     };
@@ -5663,7 +5663,7 @@ fn svelte_calls_query_runs_cleanly() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("svelte").ok().flatten() else {
+    let Some(lang) = loader.get("svelte").ok() else {
         eprintln!("Skipping svelte_calls: svelte grammar .so not found");
         return;
     };
@@ -5685,7 +5685,7 @@ fn svelte_complexity_query_runs_cleanly() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("svelte").ok().flatten() else {
+    let Some(lang) = loader.get("svelte").ok() else {
         eprintln!("Skipping svelte_complexity: svelte grammar .so not found");
         return;
     };
@@ -5712,7 +5712,7 @@ fn typst_tags_finds_let_bindings() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("typst").ok().flatten() else {
+    let Some(lang) = loader.get("typst").ok() else {
         eprintln!("Skipping typst_tags: typst grammar .so not found");
         return;
     };
@@ -5737,7 +5737,7 @@ fn typst_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("typst").ok().flatten() else {
+    let Some(lang) = loader.get("typst").ok() else {
         eprintln!("Skipping typst_calls: typst grammar .so not found");
         return;
     };
@@ -5760,7 +5760,7 @@ fn typst_complexity_query_runs_cleanly() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("typst").ok().flatten() else {
+    let Some(lang) = loader.get("typst").ok() else {
         eprintln!("Skipping typst_complexity: typst grammar .so not found");
         return;
     };
@@ -5781,7 +5781,7 @@ fn typst_imports_finds_import_statements() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("typst").ok().flatten() else {
+    let Some(lang) = loader.get("typst").ok() else {
         eprintln!("Skipping typst_imports: typst grammar .so not found");
         return;
     };
@@ -5810,7 +5810,7 @@ fn verilog_tags_finds_modules() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("verilog").ok().flatten() else {
+    let Some(lang) = loader.get("verilog").ok() else {
         eprintln!("Skipping verilog_tags: verilog grammar .so not found");
         return;
     };
@@ -5835,7 +5835,7 @@ fn verilog_calls_finds_task_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("verilog").ok().flatten() else {
+    let Some(lang) = loader.get("verilog").ok() else {
         eprintln!("Skipping verilog_calls: verilog grammar .so not found");
         return;
     };
@@ -5856,7 +5856,7 @@ fn verilog_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("verilog").ok().flatten() else {
+    let Some(lang) = loader.get("verilog").ok() else {
         eprintln!("Skipping verilog_complexity: verilog grammar .so not found");
         return;
     };
@@ -5877,7 +5877,7 @@ fn verilog_imports_query_runs_cleanly() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("verilog").ok().flatten() else {
+    let Some(lang) = loader.get("verilog").ok() else {
         eprintln!("Skipping verilog_imports: verilog grammar .so not found");
         return;
     };
@@ -5904,7 +5904,7 @@ fn vhdl_tags_finds_entity_and_architecture() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vhdl").ok().flatten() else {
+    let Some(lang) = loader.get("vhdl").ok() else {
         eprintln!("Skipping vhdl_tags: vhdl grammar .so not found");
         return;
     };
@@ -5927,7 +5927,7 @@ fn vhdl_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vhdl").ok().flatten() else {
+    let Some(lang) = loader.get("vhdl").ok() else {
         eprintln!("Skipping vhdl_calls: vhdl grammar .so not found");
         return;
     };
@@ -5948,7 +5948,7 @@ fn vhdl_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vhdl").ok().flatten() else {
+    let Some(lang) = loader.get("vhdl").ok() else {
         eprintln!("Skipping vhdl_complexity: vhdl grammar .so not found");
         return;
     };
@@ -5969,7 +5969,7 @@ fn vhdl_imports_finds_use_clauses() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vhdl").ok().flatten() else {
+    let Some(lang) = loader.get("vhdl").ok() else {
         eprintln!("Skipping vhdl_imports: vhdl grammar .so not found");
         return;
     };
@@ -5998,7 +5998,7 @@ fn vim_tags_finds_functions_and_augroups() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vim").ok().flatten() else {
+    let Some(lang) = loader.get("vim").ok() else {
         eprintln!("Skipping vim_tags: vim grammar .so not found");
         return;
     };
@@ -6025,7 +6025,7 @@ fn vim_calls_finds_function_calls() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vim").ok().flatten() else {
+    let Some(lang) = loader.get("vim").ok() else {
         eprintln!("Skipping vim_calls: vim grammar .so not found");
         return;
     };
@@ -6046,7 +6046,7 @@ fn vim_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vim").ok().flatten() else {
+    let Some(lang) = loader.get("vim").ok() else {
         eprintln!("Skipping vim_complexity: vim grammar .so not found");
         return;
     };
@@ -6067,7 +6067,7 @@ fn vim_imports_finds_source_statements() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vim").ok().flatten() else {
+    let Some(lang) = loader.get("vim").ok() else {
         eprintln!("Skipping vim_imports: vim grammar .so not found");
         return;
     };
@@ -6096,7 +6096,7 @@ fn vue_tags_finds_script_template_and_style_blocks() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vue").ok().flatten() else {
+    let Some(lang) = loader.get("vue").ok() else {
         eprintln!("Skipping vue_tags: vue grammar .so not found");
         return;
     };
@@ -6117,7 +6117,7 @@ fn vue_calls_query_runs_cleanly() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vue").ok().flatten() else {
+    let Some(lang) = loader.get("vue").ok() else {
         eprintln!("Skipping vue_calls: vue grammar .so not found");
         return;
     };
@@ -6137,7 +6137,7 @@ fn vue_complexity_query_runs_cleanly() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("vue").ok().flatten() else {
+    let Some(lang) = loader.get("vue").ok() else {
         eprintln!("Skipping vue_complexity: vue grammar .so not found");
         return;
     };
@@ -6164,7 +6164,7 @@ fn jinja2_tags_finds_macros() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("jinja2").ok().flatten() else {
+    let Some(lang) = loader.get("jinja2").ok() else {
         eprintln!("Skipping jinja2_tags: jinja2 grammar .so not found");
         return;
     };
@@ -6189,7 +6189,7 @@ fn jinja2_imports_finds_paths() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("jinja2").ok().flatten() else {
+    let Some(lang) = loader.get("jinja2").ok() else {
         eprintln!("Skipping jinja2_imports: jinja2 grammar .so not found");
         return;
     };
@@ -6214,7 +6214,7 @@ fn jinja2_complexity_finds_control_flow() {
         return;
     };
     let loader = GrammarLoader::with_paths(vec![gdir]);
-    let Some(lang) = loader.get("jinja2").ok().flatten() else {
+    let Some(lang) = loader.get("jinja2").ok() else {
         eprintln!("Skipping jinja2_complexity: jinja2 grammar .so not found");
         return;
     };
@@ -6236,7 +6236,7 @@ fn jinja2_complexity_finds_control_flow() {
 #[test]
 fn groovy_tags_live() {
     let loader = normalize_languages::GrammarLoader::new();
-    let Some(lang) = loader.get("groovy").ok().flatten() else {
+    let Some(lang) = loader.get("groovy").ok() else {
         eprintln!("Skipping groovy_tags_live: groovy grammar not found");
         return;
     };
@@ -6269,7 +6269,7 @@ fn groovy_tags_live() {
 #[test]
 fn elixir_tags_no_args_function() {
     let loader = normalize_languages::GrammarLoader::new();
-    let Some(lang) = loader.get("elixir").ok().flatten() else {
+    let Some(lang) = loader.get("elixir").ok() else {
         eprintln!("Skipping elixir_tags_no_args_function: elixir grammar not found");
         return;
     };
@@ -6302,7 +6302,7 @@ const HASKELL_SAMPLE: &str = include_str!("fixtures/haskell/sample.hs");
 #[test]
 fn haskell_tags_no_duplicate_signatures() {
     let loader = normalize_languages::GrammarLoader::new();
-    let Some(lang) = loader.get("haskell").ok().flatten() else {
+    let Some(lang) = loader.get("haskell").ok() else {
         eprintln!("Skipping haskell_tags_no_duplicate_signatures: haskell grammar not found");
         return;
     };
@@ -6341,7 +6341,7 @@ const GROOVY_SAMPLE: &str = include_str!("fixtures/groovy/sample.groovy");
 #[test]
 fn groovy_imports_live() {
     let loader = normalize_languages::GrammarLoader::new();
-    let Some(lang) = loader.get("groovy").ok().flatten() else {
+    let Some(lang) = loader.get("groovy").ok() else {
         eprintln!("Skipping groovy_imports_live: groovy grammar not found");
         return;
     };
@@ -6366,7 +6366,7 @@ fn groovy_imports_live() {
 #[test]
 fn kotlin_tags_live() {
     let loader = normalize_languages::GrammarLoader::new();
-    let Some(lang) = loader.get("kotlin").ok().flatten() else {
+    let Some(lang) = loader.get("kotlin").ok() else {
         eprintln!("Skipping kotlin_tags_live: kotlin grammar not found");
         return;
     };

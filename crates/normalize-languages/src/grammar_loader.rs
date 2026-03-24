@@ -31,7 +31,7 @@
 //! ```ignore
 //! fn parse(code: &str) -> Tree {
 //!     let loader = GrammarLoader::new();  // Created here
-//!     let lang = loader.get("python").ok().flatten().unwrap();
+//!     let lang = loader.get("python").ok().unwrap();
 //!     let mut parser = Parser::new();
 //!     parser.set_language(&lang).unwrap();
 //!     parser.parse(code, None).unwrap()   // Tree returned
@@ -59,15 +59,6 @@ pub enum GrammarLoadError {
         /// Grammar name (e.g. `"python"`).
         grammar: String,
         /// Underlying error message from libloading.
-        detail: String,
-    },
-    /// The grammar was loaded but its ABI version is incompatible with the
-    /// currently linked tree-sitter library.
-    #[error("grammar '{grammar}' ABI incompatible: {detail}")]
-    AbiIncompatible {
-        /// Grammar name.
-        grammar: String,
-        /// Detail from tree-sitter (version range info).
         detail: String,
     },
 }
@@ -172,16 +163,10 @@ impl GrammarLoader {
 
     /// Get a grammar by name.
     ///
-    /// Returns `Ok(Some(lang))` if found and loaded successfully,
-    /// `Ok(None)` is never returned (kept for API symmetry — the grammar is
-    /// either found or the specific failure is in the `Err` variant),
+    /// Returns `Ok(lang)` if found and loaded successfully,
     /// `Err(GrammarLoadError::NotFound)` if no `.so`/`.dylib` exists in any
     /// search path, and other `Err` variants for load or ABI failures.
-    ///
-    /// Most callers that previously ignored failures can migrate with
-    /// `.ok().flatten()` to restore the old `Option<Language>` behaviour while
-    /// errors are silently discarded.  Prefer logging the error instead.
-    pub fn get(&self, name: &str) -> Result<Option<Language>, GrammarLoadError> {
+    pub fn get(&self, name: &str) -> Result<Language, GrammarLoadError> {
         // Check cache first
         if let Some(loaded) = self
             .cache
@@ -189,7 +174,7 @@ impl GrammarLoader {
             .unwrap_or_else(|e| e.into_inner())
             .get(name)
         {
-            return Ok(Some(loaded.language.clone()));
+            return Ok(loaded.language.clone());
         }
 
         self.load_external(name)
@@ -459,7 +444,7 @@ impl GrammarLoader {
         }
 
         // Compile and cache
-        let grammar = self.get(grammar_name).ok().flatten()?;
+        let grammar = self.get(grammar_name).ok()?;
         let compiled = tree_sitter::Query::new(&grammar, query_str).ok()?;
         let arc = Arc::new(compiled);
 
@@ -472,13 +457,13 @@ impl GrammarLoader {
     }
 
     /// Load a grammar from external .so file.
-    fn load_external(&self, name: &str) -> Result<Option<Language>, GrammarLoadError> {
+    fn load_external(&self, name: &str) -> Result<Language, GrammarLoadError> {
         let lib_name = grammar_lib_name(name);
 
         for search_path in &self.search_paths {
             let lib_path = search_path.join(&lib_name);
             if lib_path.exists() {
-                return self.load_from_path(name, &lib_path).map(Some);
+                return self.load_from_path(name, &lib_path);
             }
         }
 
@@ -1477,7 +1462,7 @@ mod tests {
                 "{lang}: no tags query found (missing from bundled_tags_query)"
             );
             let tags_str = tags.unwrap();
-            let grammar = loader.get(lang).ok().flatten();
+            let grammar = loader.get(lang).ok();
             if grammar.is_none() {
                 eprintln!("{lang}: grammar .so not found, skipping compilation check");
                 continue;
@@ -1494,7 +1479,7 @@ mod tests {
     #[test]
     fn test_scheme_node_kinds() {
         let loader = GrammarLoader::new();
-        let grammar = loader.get("scheme").ok().flatten();
+        let grammar = loader.get("scheme").ok();
         if grammar.is_none() {
             eprintln!("scheme: grammar .so not found or load failed");
             return;
@@ -1589,7 +1574,7 @@ mod tests {
         // Should load python from .so
         let ext = grammar_extension();
         if grammar_path.join(format!("python{ext}")).exists() {
-            let lang = loader.get("python").ok().flatten();
+            let lang = loader.get("python").ok();
             assert!(lang.is_some(), "Failed to load python grammar");
         }
 

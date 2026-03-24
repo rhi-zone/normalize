@@ -27,10 +27,11 @@ impl ViewService {
         }
     }
 
-    fn root_path(root: Option<String>) -> PathBuf {
-        root.map(PathBuf::from)
-            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-            .unwrap_or_else(|| std::env::current_dir().unwrap())
+    fn root_path(root: Option<String>) -> Result<PathBuf, String> {
+        root.map(PathBuf::from).map_or_else(
+            || std::env::current_dir().map_err(|e| format!("failed to get working directory: {e}")),
+            Ok,
+        )
     }
 
     fn resolve_format(&self, pretty: bool, compact: bool, root: &std::path::Path) {
@@ -225,7 +226,7 @@ impl ViewService {
             String,
         >,
     ) -> Result<Vec<CallEntry>, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         crate::commands::analyze::call_graph::build_call_graph(
             &root_path,
             &target,
@@ -325,7 +326,7 @@ impl ViewService {
             String,
         >,
     ) -> Result<Vec<CallEntry>, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         crate::commands::analyze::call_graph::build_call_graph(
             &root_path,
             &target,
@@ -353,7 +354,7 @@ impl ViewService {
             String,
         >,
     ) -> Result<ViewHistoryReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         crate::commands::view::history::build_view_history_report(
             &target,
             &root_path,
@@ -380,7 +381,7 @@ impl ViewService {
         pretty: bool,
         compact: bool,
     ) -> Result<DependentsReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let graph_target = on.unwrap_or(GraphTarget::Modules);
         let idx = crate::index::ensure_ready(&root_path).await?;
@@ -406,7 +407,7 @@ impl ViewService {
             String,
         >,
     ) -> Result<String, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         crate::commands::analyze::trace::build_trace_text(
             &symbol,
             target.as_deref(),
@@ -434,7 +435,7 @@ impl ViewService {
         pretty: bool,
         compact: bool,
     ) -> Result<GraphReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let effective_limit = match limit.unwrap_or(10) {
             0 => usize::MAX,
@@ -468,7 +469,7 @@ impl ViewService {
         pretty: bool,
         compact: bool,
     ) -> Result<ProvenanceReport, String> {
-        let root_path = Self::root_path(root);
+        let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let effective_limit = match limit.unwrap_or(50) {
             0 => usize::MAX,

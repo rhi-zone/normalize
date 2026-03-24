@@ -48,33 +48,41 @@ pub struct GrammarInstallReport {
 
 impl std::fmt::Display for GrammarInstallReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.format_text())
+    }
+}
+
+impl OutputFormatter for GrammarInstallReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
         if self.dry_run {
-            write!(f, "[dry-run] Would install grammars to {}", self.path)?;
+            let _ = write!(out, "[dry-run] Would install grammars to {}", self.path);
             if let Some(ref v) = self.version {
-                write!(f, " (version {})", v)?;
+                let _ = write!(out, " (version {})", v);
             }
             if self.status == "already_installed" {
-                write!(
-                    f,
+                let _ = write!(
+                    out,
                     "\n  ({} files already present, use --force to reinstall)",
                     self.count
-                )?;
+                );
             }
-            Ok(())
         } else if self.status == "already_installed" {
-            write!(
-                f,
+            let _ = write!(
+                out,
                 "Grammars already installed at {} ({} files)\nUse --force to reinstall",
                 self.path, self.count
-            )
+            );
         } else {
-            write!(
-                f,
+            let _ = write!(
+                out,
                 "Installed {} grammars from {}",
                 self.count,
                 self.version.as_deref().unwrap_or("unknown")
-            )
+            );
         }
+        out
     }
 }
 

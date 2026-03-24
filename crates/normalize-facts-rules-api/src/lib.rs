@@ -20,7 +20,10 @@ mod relations;
 mod rule_pack;
 
 pub use diagnostic::{Diagnostic, DiagnosticLevel, Location};
-pub use relations::{CallFact, ImportFact, Relations, SymbolFact};
+pub use relations::{
+    AttributeFact, CallFact, ImplementsFact, ImportFact, IsImplFact, ParentFact, QualifierFact,
+    Relations, SymbolFact, SymbolRangeFact, TypeMethodFact, VisibilityFact,
+};
 pub use rule_pack::{RulePack, RulePackInfo, RulePackRef};
 
 // Re-export ascent for rule implementors

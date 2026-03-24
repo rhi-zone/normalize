@@ -473,7 +473,7 @@ pub fn highlight_source(source: &str, grammar: &str, use_colors: bool) -> String
     }
 
     let loader = grammar_loader();
-    let language = match loader.get(grammar).ok().flatten() {
+    let language = match loader.get(grammar).ok() {
         Some(lang) => lang,
         None => return source.to_string(),
     };
@@ -564,7 +564,7 @@ fn collect_injection_spans(
 
         if let (Some(lang), Some(node)) = (lang_name, content_node) {
             // Check if we can load this language
-            if loader.get(&lang).ok().flatten().is_some() {
+            if loader.get(&lang).ok().is_some() {
                 let content = &source[node.byte_range()];
                 let offset = node.start_byte();
 
@@ -581,7 +581,7 @@ fn collect_injection_spans(
 /// Collect spans for injected content, adjusting offsets.
 fn collect_inner_spans(content: &str, grammar: &str, offset: usize) -> Vec<HighlightSpan> {
     let loader = grammar_loader();
-    let language = match loader.get(grammar).ok().flatten() {
+    let language = match loader.get(grammar).ok() {
         Some(lang) => lang,
         None => return Vec::new(),
     };

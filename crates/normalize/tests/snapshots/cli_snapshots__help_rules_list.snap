@@ -8,19 +8,17 @@ Usage: normalize rules list [OPTIONS]
 
 Options:
       --pretty                     Human-friendly output with colors and formatting
-      --sources                    Show source URLs for imported rules
-      --compact                    Compact output without colors (overrides TTY detection)
   -t, --type <type>                Filter by rule type (all, syntax, fact)
-      --jsonl                      Output one JSON object per line (for arrays)
+      --compact                    Compact output without colors (overrides TTY detection)
       --tag <tag>                  Filter by tag
       --enabled                    Filter to enabled rules only
-      --json                       Output machine-readable JSON
+      --jsonl                      Output one JSON object per line (for arrays)
       --disabled                   Filter to disabled rules only
+      --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression
-      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
-      --no-desc                    Hide the description line
-      --output-schema              Print JSON Schema of the subcommand's return type and exit
   -r, --root <root>                Root directory (defaults to current directory)
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
 

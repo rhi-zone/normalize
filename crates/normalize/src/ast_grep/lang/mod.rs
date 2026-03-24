@@ -51,7 +51,7 @@ impl Lang {
             .into_iter()
             .filter_map(|lang| {
                 let grammar_name = lang.grammar_name();
-                let ts_lang = loader.get(grammar_name).ok().flatten()?;
+                let ts_lang = loader.get(grammar_name).ok()?;
                 Some(Lang::new(intern_name(grammar_name), DynLang::new(ts_lang)))
             })
             .collect()
@@ -62,7 +62,7 @@ impl Lang {
         let lang_support = normalize_languages::support_for_path(path)?;
         let grammar_name = lang_support.grammar_name();
         let loader = grammar_loader();
-        let ts_lang = loader.get(grammar_name).ok().flatten()?;
+        let ts_lang = loader.get(grammar_name).ok()?;
         Some(Lang::new(intern_name(grammar_name), DynLang::new(ts_lang)))
     }
 
@@ -196,13 +196,9 @@ impl FromStr for Lang {
         };
 
         let loader = grammar_loader();
-        let ts_lang = loader
-            .get(grammar_name)
-            .ok()
-            .flatten()
-            .ok_or_else(|| LangErr {
-                name: s.to_string(),
-            })?;
+        let ts_lang = loader.get(grammar_name).map_err(|_| LangErr {
+            name: s.to_string(),
+        })?;
         Ok(Lang::new(intern_name(grammar_name), DynLang::new(ts_lang)))
     }
 }

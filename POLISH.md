@@ -307,3 +307,73 @@ None.
 - [DONE] `crates/normalize-edit/src/lib.rs:1` — missing crate-level `//!` doc _(severity: low)_
 
 - [DONE] `crates/normalize-facts-rules-api/src/relations.rs` — various `Relations` fields undocumented _(severity: low)_
+
+---
+
+## Findings — Round 3
+
+Round 3 git hash: 001a3e55
+Scope: entire codebase — re-audit after Round 2 changes
+
+### Conflicts
+None.
+
+---
+
+### adversarial + error-surface
+
+- [APPROVED] `crates/normalize-ratchet/src/service.rs:880` — `check_against_ref` creates a git worktree and returns early on unknown metric name; worktree is never removed — add a RAII guard that calls `remove_worktree` on drop _(severity: high)_
+
+- [APPROVED] `crates/normalize-languages/src/grammar_loader.rs:176-192` — `get()` doc says `Ok(None)` is never returned but the return type is `Result<Option<Language>, _>`; 25+ callers use `.ok().flatten()` which silently discards `GrammarLoadError` — change return type to `Result<Language, GrammarLoadError>` _(severity: medium)_
+
+- [APPROVED] `crates/normalize/src/service/history.rs:71,99,123,158,186`, `syntax.rs:80`, `rank.rs:53`, `analyze.rs:40`, `view.rs:33` — nine `current_dir().unwrap()` calls not fixed in Round 2 (only `edit.rs` was fixed) — propagate error as done in `edit.rs` _(severity: medium)_
+
+- [APPROVED] `crates/normalize-ratchet/src/error.rs`, `crates/normalize-budget/src/error.rs` — `RatchetError` and `BudgetError` defined and exported but never used; all service methods return `Result<_, String>` — adopt as service return type or remove until needed _(severity: medium)_
+
+- [APPROVED] `crates/normalize/src/commands/tools/lint.rs:307,260` — `LintError` enum defined but never used; `build_lint_run`/`build_lint_run_multi` still return `Result<_, String>` — use `LintError` as the return type _(severity: medium)_
+
+- [APPROVED] `crates/normalize-budget/src/metrics/complexity_delta.rs:22-24`, `functions.rs:143-145` — worktree created then `collect_complexity` called; panic between create and remove leaves orphaned worktree — RAII guard _(severity: low)_
+
+- [APPROVED] `crates/normalize-facts/src/index.rs:1872,1966` — `ProgressStyle::with_template(...).unwrap()` in production `rebuild()` path — use `.unwrap_or_default()` _(severity: low)_
+
+- [APPROVED] `crates/normalize-ratchet/src/service.rs:962` — `check_against_ref` hardcodes `Aggregate::Mean` in `CheckEntry`; actual aggregate strategy not reflected in report — pass through from caller _(severity: low)_
+
+---
+
+### api-clarity + naming-consistency
+
+- [APPROVED] `crates/normalize-languages/src/grammar_loader.rs:49-73` — `GrammarLoadError::AbiIncompatible` variant defined but never constructed — remove or implement ABI checking _(severity: medium)_
+
+- [APPROVED] `crates/normalize-path-resolve/src/lib.rs:22-26` — `PathEntry::is_dir: bool` inconsistent with `PathMatch::kind: PathMatchKind`; callers must manually map between the two — align `PathEntry` to use `kind: PathMatchKind` _(severity: medium)_
+
+- [APPROVED] `crates/normalize/src/service/facts.rs:824`, `mod.rs:177`, `sessions.rs:65` — `FactsStatsOutput`, `ContextOutput`, `PlansOutput` use `Output` suffix not `Report` — rename to `FactsStatsReport`, `ContextReport` (or `ContextVariantsReport`), `PlansReport` _(severity: medium)_
+
+- [APPROVED] `crates/normalize/src/service/facts.rs:37,166,186,213` — `RebuildReport`, `FileList`, `PackagesReport`, `CommandReport`, `FactsStats`, `StorageReport` implement `Display` but not `OutputFormatter`; returned from `#[cli]` methods _(severity: medium)_
+
+- [APPROVED] `crates/normalize/src/service/mod.rs:182,191,216` — `InitReport`, `UpdateReport`, `TranslateReport` implement `Display` but not `OutputFormatter` _(severity: medium)_
+
+- [APPROVED] `crates/normalize/src/service/grammars.rs`, `generate.rs`, `daemon.rs` — `GrammarInstallReport`, `GenerateReport`, `DaemonActionReport`, `DaemonRootReport`, `DaemonRootList` implement `Display` but not `OutputFormatter` _(severity: medium)_
+
+- [APPROVED] `crates/normalize-rules/src/service.rs:109-115` — `RuleShowReport` implements `Display` but not `OutputFormatter`; returned from 8 `#[cli]` methods _(severity: medium)_
+
+- [APPROVED] `crates/normalize/src/commands/tools/test.rs:20` — `TestListResult` should be `TestListReport`; uses `Display` not `OutputFormatter` _(severity: low)_
+
+- [APPROVED] `crates/normalize/src/commands/tools/test.rs:45` — `RepoLintResult` and `RepoTestResult` should be `RepoLintEntry`/`RepoTestEntry` (suffix `Result` implies `std::result::Result`) _(severity: low)_
+
+- [APPROVED] `crates/normalize/src/output.rs` — missing `assert_output_formatter` for: `ScalarTrendReport`, `HealthReport`, `RulesListReport`, `RulesValidateReport`, `BudgetDiagnosticsReport`, `RatchetDiagnosticsReport`, `CheckExamplesReport`, `CheckRefsReport`, `StaleDocsReport`, `StaleSummaryReport` _(severity: low)_
+
+- [APPROVED] `crates/normalize-ratchet/src/error.rs:15`, `crates/normalize-budget/src/error.rs:19` — `RatchetError::MeasurementFailed.reason` vs `BudgetError::MeasurementFailed.message` — inconsistent field name for same semantic concept _(severity: low)_
+
+---
+
+### doc-coverage
+
+- [APPROVED] `crates/normalize-ratchet/src/service.rs:202` — `ShowEntry` struct missing doc comment _(severity: medium)_
+
+- [APPROVED] `crates/normalize-ratchet/src/service.rs:658,728` — `filter_entries` and `build_check_report` internal helpers missing doc comments _(severity: medium)_
+
+- [APPROVED] `crates/normalize/src/commands/tools/lint.rs:33,157,180` — `ToolListItem`, `RepoLintResult` (→`RepoLintEntry`), `LintDiagnostic` fields undocumented _(severity: medium)_
+
+- [APPROVED] `crates/normalize-path-resolve/src/lib.rs:15,38-40` — `PathMatch` missing doc comment; `PathSource::find_like` and `all_files` methods missing contract docs _(severity: medium)_
+
+- [APPROVED] `crates/normalize-facts-rules-api/src/lib.rs:23` — `VisibilityFact`, `AttributeFact`, `ParentFact` and 5 other public types not re-exported from `lib.rs` — extend `pub use relations::` or add comment explaining intent _(severity: medium)_

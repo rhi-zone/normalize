@@ -59,20 +59,26 @@ impl std::fmt::Display for MessagesReport {
     }
 }
 
-/// Output type for plans (list or content).
+/// Report type for plans (list or content).
 #[derive(serde::Serialize, schemars::JsonSchema)]
 #[serde(tag = "kind")]
-pub enum PlansOutput {
+pub enum PlansReport {
     List(PlansListReport),
     Content(PlanContent),
 }
 
-impl std::fmt::Display for PlansOutput {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl crate::output::OutputFormatter for PlansReport {
+    fn format_text(&self) -> String {
         match self {
-            Self::List(r) => write!(f, "{}", r.format_text()),
-            Self::Content(c) => write!(f, "{}", c),
+            Self::List(r) => r.format_text(),
+            Self::Content(c) => c.to_string(),
         }
+    }
+}
+
+impl std::fmt::Display for PlansReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", crate::output::OutputFormatter::format_text(self))
     }
 }
 
@@ -487,16 +493,16 @@ impl SessionsService {
         &self,
         #[param(positional, help = "Plan name to view (omit to list all)")] name: Option<String>,
         #[param(short = 'n', help = "Maximum number of plans")] limit: Option<usize>,
-    ) -> Result<PlansOutput, String> {
+    ) -> Result<PlansReport, String> {
         let limit = limit.unwrap_or(20);
         match name {
             Some(ref n) => {
                 let content = crate::commands::sessions::build_plan_content(n)?;
-                Ok(PlansOutput::Content(content))
+                Ok(PlansReport::Content(content))
             }
             None => {
                 let list = crate::commands::sessions::build_plans_list(limit)?;
-                Ok(PlansOutput::List(list))
+                Ok(PlansReport::List(list))
             }
         }
     }

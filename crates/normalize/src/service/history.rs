@@ -65,10 +65,10 @@ impl HistoryService {
         use std::path::PathBuf;
 
         let limit = limit.unwrap_or(20);
-        let root = root
-            .map(PathBuf::from)
-            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let root = root.map(PathBuf::from).map_or_else(
+            || std::env::current_dir().map_err(|e| format!("failed to get working directory: {e}")),
+            Ok,
+        )?;
         let shadow = Shadow::new(&root);
         if !shadow.exists() {
             return Ok(HistoryListReport::empty());
@@ -93,10 +93,10 @@ impl HistoryService {
         use crate::shadow::Shadow;
         use std::path::PathBuf;
 
-        let root = root
-            .map(PathBuf::from)
-            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let root = root.map(PathBuf::from).map_or_else(
+            || std::env::current_dir().map_err(|e| format!("failed to get working directory: {e}")),
+            Ok,
+        )?;
         let shadow = Shadow::new(&root);
         match shadow.diff(&commit_ref) {
             Some(diff) => Ok(HistoryDiffReport::new(commit_ref, diff)),
@@ -117,10 +117,10 @@ impl HistoryService {
         use crate::shadow::Shadow;
         use std::path::PathBuf;
 
-        let root = root
-            .map(PathBuf::from)
-            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let root = root.map(PathBuf::from).map_or_else(
+            || std::env::current_dir().map_err(|e| format!("failed to get working directory: {e}")),
+            Ok,
+        )?;
         let shadow = Shadow::new(&root);
         let entries = shadow.history(None, 100);
         let checkpoint = shadow.checkpoint();
@@ -152,10 +152,10 @@ impl HistoryService {
         use std::path::PathBuf;
 
         let limit = limit.unwrap_or(20);
-        let root = root
-            .map(PathBuf::from)
-            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let root = root.map(PathBuf::from).map_or_else(
+            || std::env::current_dir().map_err(|e| format!("failed to get working directory: {e}")),
+            Ok,
+        )?;
         let shadow = Shadow::new(&root);
         match shadow.tree(limit) {
             Some(tree_output) => {
@@ -180,10 +180,10 @@ impl HistoryService {
         use crate::shadow::Shadow;
         use std::path::PathBuf;
 
-        let root = root
-            .map(PathBuf::from)
-            // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
-            .unwrap_or_else(|| std::env::current_dir().unwrap());
+        let root = root.map(PathBuf::from).map_or_else(
+            || std::env::current_dir().map_err(|e| format!("failed to get working directory: {e}")),
+            Ok,
+        )?;
         let shadow = Shadow::new(&root);
         match shadow.prune(keep) {
             Ok(pruned_count) => Ok(HistoryPruneReport::new(pruned_count, keep)),

@@ -114,15 +114,21 @@ pub struct RuleShowReport {
     pub message: Option<String>,
 }
 
+impl OutputFormatter for RuleShowReport {
+    fn format_text(&self) -> String {
+        if let Some(ref msg) = self.message {
+            msg.clone()
+        } else if self.success {
+            "Done".to_string()
+        } else {
+            "Failed".to_string()
+        }
+    }
+}
+
 impl std::fmt::Display for RuleShowReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(ref msg) = self.message {
-            write!(f, "{}", msg)
-        } else if self.success {
-            write!(f, "Done")
-        } else {
-            write!(f, "Failed")
-        }
+        write!(f, "{}", self.format_text())
     }
 }
 

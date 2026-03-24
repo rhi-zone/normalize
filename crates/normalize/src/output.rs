@@ -166,5 +166,69 @@ mod tests {
         assert_output_formatter::<BudgetUpdateReport>();
         assert_output_formatter::<BudgetShowReport>();
         assert_output_formatter::<BudgetRemoveReport>();
+
+        // Task 4: missing entries
+        use crate::commands::analyze::trend::ScalarTrendReport;
+        assert_output_formatter::<ScalarTrendReport>();
+
+        use crate::health::HealthReport;
+        assert_output_formatter::<HealthReport>();
+
+        use normalize_rules::{RulesListReport, RulesValidateReport};
+        assert_output_formatter::<RulesListReport>();
+        assert_output_formatter::<RulesValidateReport>();
+
+        use normalize_native_rules::check_examples::CheckExamplesReport;
+        use normalize_native_rules::check_refs::CheckRefsReport;
+        use normalize_native_rules::stale_docs::StaleDocsReport;
+        use normalize_native_rules::stale_summary::StaleSummaryReport;
+        use normalize_native_rules::{BudgetDiagnosticsReport, RatchetDiagnosticsReport};
+        assert_output_formatter::<BudgetDiagnosticsReport>();
+        assert_output_formatter::<RatchetDiagnosticsReport>();
+        assert_output_formatter::<CheckExamplesReport>();
+        assert_output_formatter::<CheckRefsReport>();
+        assert_output_formatter::<StaleDocsReport>();
+        assert_output_formatter::<StaleSummaryReport>();
+
+        // Service report types now implementing OutputFormatter
+        use crate::service::facts::{
+            CommandReport, FactsStats, FactsStatsReport, FileList, PackagesReport, QueryReport,
+            RebuildReport, StorageReport,
+        };
+        assert_output_formatter::<RebuildReport>();
+        assert_output_formatter::<FactsStats>();
+        assert_output_formatter::<StorageReport>();
+        assert_output_formatter::<FileList>();
+        assert_output_formatter::<PackagesReport>();
+        assert_output_formatter::<CommandReport>();
+        assert_output_formatter::<FactsStatsReport>();
+        assert_output_formatter::<QueryReport>();
+
+        use crate::service::{ContextKindReport, InitReport, TranslateReport};
+        assert_output_formatter::<ContextKindReport>();
+        assert_output_formatter::<InitReport>();
+        assert_output_formatter::<TranslateReport>();
+        use crate::service::UpdateReport as ServiceUpdateReport;
+        assert_output_formatter::<ServiceUpdateReport>();
+
+        use crate::service::grammars::GrammarInstallReport;
+        assert_output_formatter::<GrammarInstallReport>();
+
+        use crate::service::generate::GenerateReport;
+        assert_output_formatter::<GenerateReport>();
+
+        use crate::service::daemon::{DaemonActionReport, DaemonRootList, DaemonRootReport};
+        assert_output_formatter::<DaemonActionReport>();
+        assert_output_formatter::<DaemonRootReport>();
+        assert_output_formatter::<DaemonRootList>();
+
+        use normalize_rules::RuleShowReport;
+        assert_output_formatter::<RuleShowReport>();
+
+        use crate::commands::tools::test::TestListReport;
+        assert_output_formatter::<TestListReport>();
+
+        use crate::service::sessions::PlansReport;
+        assert_output_formatter::<PlansReport>();
     }
 }

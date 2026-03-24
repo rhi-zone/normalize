@@ -33,11 +33,17 @@ pub enum LintError {
 /// Tool info for lint list output
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ToolListItem {
+    /// Tool name (e.g. "clippy", "eslint").
     pub name: String,
+    /// Tool category: one of "lint", "fmt", or "type".
     pub category: String,
+    /// Whether the tool binary was found on `PATH` and is executable.
     pub available: bool,
+    /// Version string reported by the tool, or `None` if not installed.
     pub version: Option<String>,
+    /// Comma-separated list of file extensions this tool handles (e.g. "rs" or "js, ts").
     pub extensions: String,
+    /// URL of the tool's documentation or home page.
     pub website: String,
 }
 
@@ -152,15 +158,22 @@ pub fn build_lint_list(root: Option<&Path>) -> LintListReport {
     LintListReport { tools }
 }
 
-/// Per-repo lint result for multi-repo mode.
+/// Per-repo lint entry for multi-repo mode.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct RepoLintResult {
+pub struct RepoLintEntry {
+    /// Repository directory name (last component of `path`).
     pub name: String,
+    /// Absolute path to the repository root.
     pub path: PathBuf,
+    /// Set when the entire repo could not be linted (e.g. no tools detected).
+    /// When `Some`, `diagnostics` will be empty and counts will be zero.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// Number of error-severity diagnostics produced for this repo.
     pub error_count: usize,
+    /// Number of warning-severity diagnostics produced for this repo.
     pub warning_count: usize,
+    /// Individual diagnostics from all tools run against this repo.
     pub diagnostics: Vec<LintDiagnostic>,
 }
 
@@ -172,19 +185,27 @@ pub struct LintRunReport {
     pub diagnostics: Vec<LintDiagnostic>,
     /// Populated in multi-repo mode (--repos-dir).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub repos: Option<Vec<RepoLintResult>>,
+    pub repos: Option<Vec<RepoLintEntry>>,
 }
 
 /// A lint diagnostic for service output.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct LintDiagnostic {
+    /// Name of the tool that produced this diagnostic (e.g. "clippy", "eslint").
     pub tool: String,
+    /// Free-form severity string as reported by the tool (e.g. "error", "warning", "note").
     pub severity: String,
+    /// Rule or check identifier. May be empty if the tool does not emit rule IDs.
     pub rule_id: String,
+    /// Human-readable description of the issue.
     pub message: String,
+    /// Path to the file containing the issue, relative to the repository root.
     pub file: String,
+    /// 1-based line number of the diagnostic location.
     pub line: usize,
+    /// 1-based column number of the diagnostic location.
     pub column: usize,
+    /// Optional URL linking to documentation for the rule or error.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub help_url: Option<String>,
 }
@@ -263,8 +284,8 @@ pub fn build_lint_run_multi(
     fix: bool,
     tools: Option<&str>,
     category: Option<&str>,
-) -> Result<LintRunReport, String> {
-    let entries: Vec<RepoLintResult> = repos
+) -> Result<LintRunReport, LintError> {
+    let entries: Vec<RepoLintEntry> = repos
         .par_iter()
         .map(|repo_path| {
             let name = repo_path
@@ -273,7 +294,7 @@ pub fn build_lint_run_multi(
                 .unwrap_or("unknown")
                 .to_string();
             match build_lint_run(None, Some(repo_path), fix, tools, category) {
-                Ok(r) => RepoLintResult {
+                Ok(r) => RepoLintEntry {
                     name,
                     path: repo_path.clone(),
                     error: None,
@@ -281,10 +302,10 @@ pub fn build_lint_run_multi(
                     warning_count: r.warning_count,
                     diagnostics: r.diagnostics,
                 },
-                Err(e) => RepoLintResult {
+                Err(e) => RepoLintEntry {
                     name,
                     path: repo_path.clone(),
-                    error: Some(e),
+                    error: Some(e.to_string()),
                     error_count: 0,
                     warning_count: 0,
                     diagnostics: vec![],
@@ -311,19 +332,35 @@ pub fn build_lint_run(
     fix: bool,
     tools: Option<&str>,
     category: Option<&str>,
-) -> Result<LintRunReport, String> {
+) -> Result<LintRunReport, LintError> {
     let root = root.unwrap_or_else(|| Path::new("."));
     let registry = registry_with_custom(root);
 
-    let category_filter: Option<ToolCategory> = category.and_then(|c| match c {
-        "lint" | "linter" => Some(ToolCategory::Linter),
-        "fmt" | "format" | "formatter" => Some(ToolCategory::Formatter),
-        "type" | "typecheck" | "type-checker" => Some(ToolCategory::TypeChecker),
-        _ => None,
-    });
+    let category_filter: Option<ToolCategory> = if let Some(c) = category {
+        match c {
+            "lint" | "linter" => Some(ToolCategory::Linter),
+            "fmt" | "format" | "formatter" => Some(ToolCategory::Formatter),
+            "type" | "typecheck" | "type-checker" => Some(ToolCategory::TypeChecker),
+            _ => {
+                return Err(LintError::UnknownCategory {
+                    category: c.to_string(),
+                });
+            }
+        }
+    } else {
+        None
+    };
 
     let tools_to_run: Vec<&dyn normalize_tools::Tool> = if let Some(tool_names) = tools {
         let names: Vec<&str> = tool_names.split(',').map(|s| s.trim()).collect();
+        if let Some(unknown) = names
+            .iter()
+            .find(|&&n| !registry.tools().iter().any(|t| t.info().name == n))
+        {
+            return Err(LintError::UnknownTool {
+                name: unknown.to_string(),
+            });
+        }
         registry
             .tools()
             .iter()
