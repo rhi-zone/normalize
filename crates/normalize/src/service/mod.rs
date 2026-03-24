@@ -186,10 +186,9 @@ impl OutputFormatter for ContextKindReport {
     }
 }
 
-/// Report for `normalize init`: records whether initialization succeeded and what changed.
+/// Report for `normalize init`: records what changed during initialization.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct InitReport {
-    pub success: bool,
     pub message: String,
     pub changes: Vec<String>,
     pub dry_run: bool,
@@ -521,7 +520,6 @@ impl NormalizeService {
         }
 
         Ok(InitReport {
-            success: true,
             message: if changes.is_empty() {
                 "Already initialized.".to_string()
             } else if dry_run {

@@ -230,28 +230,22 @@ impl OutputFormatter for PackagesReport {
     }
 }
 
-/// Generic command result for operations that return a success flag and optional message.
+/// Generic command result for operations that produce a status message and optional data.
 ///
 /// Used for commands that don't have a more specific report type. `data` carries
-/// arbitrary structured output when present.
+/// arbitrary structured output when present. Errors are signalled via `Err(...)` in the
+/// `Result` return type — this struct only carries successful outcomes.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct CommandReport {
-    pub success: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
+    /// Human-readable description of the outcome.
+    pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<serde_json::Value>,
 }
 
 impl OutputFormatter for CommandReport {
     fn format_text(&self) -> String {
-        if let Some(ref msg) = self.message {
-            msg.clone()
-        } else if self.success {
-            "Done".to_string()
-        } else {
-            "Failed".to_string()
-        }
+        self.message.clone()
     }
 }
 

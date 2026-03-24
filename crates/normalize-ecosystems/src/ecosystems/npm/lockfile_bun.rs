@@ -8,7 +8,7 @@
 //!
 //! Binary format ported from Bun (MIT License):
 //! Copyright (c) 2022 Oven-sh
-//! https://github.com/oven-sh/bun/blob/main/src/install/lockfile/
+//! <https://github.com/oven-sh/bun/blob/main/src/install/lockfile/>
 //!
 //! Key source files:
 //! - bun.lockb.zig: Main serializer, file format layout

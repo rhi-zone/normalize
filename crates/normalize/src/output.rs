@@ -137,7 +137,10 @@ mod tests {
         assert_output_formatter::<ViewReport>();
         assert_output_formatter::<ViewListReport>();
 
-        use crate::service::config::{ConfigSetReport, ConfigShowReport, ConfigValidateReport};
+        use crate::service::config::{
+            ConfigSchemaReport, ConfigSetReport, ConfigShowReport, ConfigValidateReport,
+        };
+        assert_output_formatter::<ConfigSchemaReport>();
         assert_output_formatter::<ConfigShowReport>();
         assert_output_formatter::<ConfigValidateReport>();
         assert_output_formatter::<ConfigSetReport>();
@@ -240,5 +243,16 @@ mod tests {
 
         use crate::service::sessions::PlansReport;
         assert_output_formatter::<PlansReport>();
+
+        use crate::service::package::{
+            PackageAuditReport, PackageInfoReport, PackageListReport, PackageOutdatedReport,
+            PackageTreeReport, PackageWhyReport,
+        };
+        assert_output_formatter::<PackageInfoReport>();
+        assert_output_formatter::<PackageListReport>();
+        assert_output_formatter::<PackageTreeReport>();
+        assert_output_formatter::<PackageWhyReport>();
+        assert_output_formatter::<PackageOutdatedReport>();
+        assert_output_formatter::<PackageAuditReport>();
     }
 }

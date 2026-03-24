@@ -278,7 +278,7 @@ impl FreeBsd {
             match result {
                 Ok(pkgs) => packages.extend(pkgs),
                 Err(e) => {
-                    eprintln!("Warning: failed to load FreeBSD repo: {}", e);
+                    tracing::warn!("failed to load FreeBSD repo: {}", e);
                 }
             }
         }

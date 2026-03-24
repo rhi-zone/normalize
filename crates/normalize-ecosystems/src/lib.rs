@@ -20,6 +20,7 @@ mod cache;
 pub mod ecosystems;
 mod http;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -30,7 +31,9 @@ use std::path::Path;
 /// Parsed package query (name with optional version).
 #[derive(Debug, Clone)]
 pub struct PackageQuery {
+    /// Package name to look up (e.g. "serde", "express").
     pub name: String,
+    /// Optional version constraint (e.g. "1.0", "^2.3"); `None` means latest.
     pub version: Option<String>,
 }
 
@@ -60,28 +63,39 @@ impl PackageQuery {
 }
 
 /// Information about a package from a registry.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PackageInfo {
+    /// The package name as registered (e.g. "serde", "express").
     pub name: String,
+    /// The resolved version string (e.g. "1.0.152").
     pub version: String,
+    /// Short human-readable description of the package, if available.
     pub description: Option<String>,
+    /// SPDX license identifier or expression, if available (e.g. "MIT", "Apache-2.0").
     pub license: Option<String>,
+    /// URL of the package homepage or documentation site.
     pub homepage: Option<String>,
+    /// URL of the source code repository.
     pub repository: Option<String>,
+    /// Optional feature flags (Rust features, Python extras, npm optional deps).
     pub features: Vec<Feature>,
+    /// Direct dependencies declared by this package.
     pub dependencies: Vec<Dependency>,
 }
 
 /// A package feature (Rust features, Python extras, npm optional deps).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Feature {
+    /// Feature name (e.g. "derive", "full", "async").
     pub name: String,
+    /// Optional description of what this feature enables.
     pub description: Option<String>,
+    /// Other features or packages this feature depends on.
     pub dependencies: Vec<String>,
 }
 
 /// Source of a dependency (registry, git, local path).
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum DepSource {
     #[default]
@@ -95,7 +109,7 @@ pub enum DepSource {
 }
 
 /// A package dependency.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Dependency {
     pub name: String,
     /// Actual package name if renamed (e.g. cargo `package = "..."`).
@@ -148,33 +162,44 @@ impl Dependency {
 }
 
 /// A node in the dependency tree.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct TreeNode {
+    /// Package name.
     pub name: String,
+    /// Resolved version string (may be empty if unknown).
     pub version: String,
+    /// Transitive dependencies of this node.
     pub dependencies: Vec<TreeNode>,
 }
 
-/// Full dependency tree.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Full dependency tree rooted at the direct dependencies of the project.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DependencyTree {
+    /// Top-level packages (direct dependencies of the project).
     pub roots: Vec<TreeNode>,
 }
 
 /// Security vulnerability found by audit.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Vulnerability {
+    /// The affected package name.
     pub package: String,
+    /// The affected version string.
     pub version: String,
+    /// Severity level of this vulnerability.
     pub severity: VulnerabilitySeverity,
+    /// Short human-readable description of the vulnerability.
     pub title: String,
+    /// URL to the advisory or vulnerability database entry.
     pub url: Option<String>,
+    /// CVE identifier (e.g. "CVE-2024-12345"), if assigned.
     pub cve: Option<String>,
+    /// Version in which the vulnerability was fixed, if known.
     pub fixed_in: Option<String>,
 }
 
 /// Severity level for vulnerabilities.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum VulnerabilitySeverity {
     Critical,
@@ -237,7 +262,9 @@ impl std::error::Error for PackageError {}
 
 /// A lockfile pattern and its associated package manager.
 pub struct LockfileManager {
+    /// Lockfile filename to match (e.g. "package-lock.json", "Cargo.lock").
     pub filename: &'static str,
+    /// Package manager that produced this lockfile (e.g. "npm", "cargo").
     pub manager: &'static str,
 }
 

@@ -135,11 +135,7 @@ impl Guix {
                     ),
                     Err(IndexError::NotImplemented(_)) => None, // Skip unsupported channels
                     Err(e) => {
-                        eprintln!(
-                            "Warning: failed to load Guix channel {}: {}",
-                            channel.name(),
-                            e
-                        );
+                        tracing::warn!("failed to load Guix channel {}: {}", channel.name(), e);
                         None
                     }
                 }

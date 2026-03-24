@@ -397,7 +397,7 @@ impl Ubuntu {
             match result {
                 Ok(pkgs) => packages.extend(pkgs),
                 Err(e) => {
-                    eprintln!("Warning: failed to load Ubuntu repo: {}", e);
+                    tracing::warn!("failed to load Ubuntu repo: {}", e);
                 }
             }
         }

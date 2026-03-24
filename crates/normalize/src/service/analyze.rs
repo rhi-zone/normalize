@@ -27,19 +27,20 @@ pub enum AnalyzeError {
     /// An I/O error occurred.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
-    /// Any other error (message forwarded as-is).
+    /// An error with a descriptive message (forwarded as-is).
     #[error("{0}")]
-    Other(String),
+    Message(String),
 }
 
 impl From<String> for AnalyzeError {
     fn from(s: String) -> Self {
-        AnalyzeError::Other(s)
+        AnalyzeError::Message(s)
     }
 }
 
 fn discover_repos(dir: &str, depth: usize) -> Result<Vec<PathBuf>, AnalyzeError> {
-    crate::multi_repo::discover_repos_depth(&PathBuf::from(dir), depth).map_err(AnalyzeError::Other)
+    crate::multi_repo::discover_repos_depth(&PathBuf::from(dir), depth)
+        .map_err(AnalyzeError::Message)
 }
 
 /// Analyze sub-service (health, complexity, security, duplicates, docs).
@@ -58,7 +59,7 @@ impl AnalyzeService {
         root.map(PathBuf::from).map_or_else(
             || {
                 std::env::current_dir().map_err(|e| {
-                    AnalyzeError::Other(format!("failed to get working directory: {e}"))
+                    AnalyzeError::Message(format!("failed to get working directory: {e}"))
                 })
             },
             Ok,
@@ -72,119 +73,8 @@ impl AnalyzeService {
         self.pretty.set(is_pretty);
     }
 
-    fn display_architecture(&self, r: &ArchitectureReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_report(&self, r: &AnalyzeReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_security(&self, r: &SecurityReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_scalar_trend(&self, r: &ScalarTrendReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_length(&self, r: &LengthReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_doc_coverage(&self, r: &DocCoverageReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_activity(&self, r: &ActivityReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_repo_coupling(&self, r: &RepoCouplingReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_cross_repo_health(&self, r: &CrossRepoHealthReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_summary(&self, r: &SummaryReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_skeleton_diff(&self, r: &SkeletonDiffReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_trend(&self, r: &TrendReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_test_gaps(&self, r: &TestGapsReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_coupling_clusters(&self, r: &CouplingClustersReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_node_types(&self, r: &NodeTypesReport) -> String {
+    /// Generic display bridge: routes to `format_pretty()` or `format_text()` based on pretty mode.
+    fn display_output<T: OutputFormatter>(&self, r: &T) -> String {
         if self.pretty.get() {
             r.format_pretty()
         } else {
@@ -242,7 +132,7 @@ impl AnalyzeService {
     /// Requires the facts index (`normalize structure rebuild`). Returns an `ArchitectureReport`
     /// with coupling pairs, cycle lists, and hub modules ranked by fan-in/fan-out.
     #[server(group = "graph")]
-    #[cli(display_with = "display_architecture")]
+    #[cli(display_with = "display_output")]
     pub async fn architecture(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -253,11 +143,11 @@ impl AnalyzeService {
         let idx = crate::index::ensure_ready(&root_path).await?;
         crate::commands::analyze::architecture::analyze_architecture(&idx)
             .await
-            .map_err(|e| AnalyzeError::Other(format!("Architecture analysis failed: {}", e)))
+            .map_err(|e| AnalyzeError::Message(format!("Architecture analysis failed: {}", e)))
     }
 
     /// Run health analysis (file counts, complexity stats, large file warnings)
-    #[cli(default, display_with = "display_report")]
+    #[cli(default, display_with = "display_output")]
     pub fn health(
         &self,
         #[param(positional, help = "Target file or directory")] target: Option<String>,
@@ -274,7 +164,7 @@ impl AnalyzeService {
         if let Some(ref t) = target {
             let candidate = root_path.join(t);
             if !candidate.exists() && !t.contains('*') && !t.contains('?') && !t.contains('[') {
-                return Err(AnalyzeError::Other(format!("path not found: {t}")));
+                return Err(AnalyzeError::Message(format!("path not found: {t}")));
             }
         }
         self.resolve_format(pretty, compact, &root_path);
@@ -295,7 +185,7 @@ impl AnalyzeService {
     }
 
     /// Run all analysis passes
-    #[cli(display_with = "display_report")]
+    #[cli(display_with = "display_output")]
     pub fn all(
         &self,
         #[param(positional, help = "Target file or directory")] target: Option<String>,
@@ -331,7 +221,7 @@ impl AnalyzeService {
     /// parameter filters findings to paths that contain the given substring. Returns a
     /// `SecurityReport` with ranked findings including file, line, and severity.
     #[server(group = "security")]
-    #[cli(display_with = "display_security")]
+    #[cli(display_with = "display_output")]
     pub fn security(
         &self,
         #[param(positional, help = "Target file or directory to filter results by")] target: Option<
@@ -355,7 +245,7 @@ impl AnalyzeService {
     /// complexity at each point. Returns a `ScalarTrendReport` suitable for plotting
     /// or diffing. Lower values indicate improvement.
     #[server(group = "code")]
-    #[cli(display_with = "display_scalar_trend")]
+    #[cli(display_with = "display_output")]
     pub fn complexity_trend(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -393,7 +283,7 @@ impl AnalyzeService {
     /// and a `diff` ref to compare against. Returns a `LengthReport` with per-function
     /// entries including file, line range, and optional delta from the diff ref.
     #[server(group = "code")]
-    #[cli(display_with = "display_length")]
+    #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn length(
         &self,
@@ -428,14 +318,14 @@ impl AnalyzeService {
         if analysis_root.is_file() {
             return crate::commands::analyze::length::analyze_file_length(&analysis_root)
                 .ok_or_else(|| {
-                    AnalyzeError::Other(format!(
+                    AnalyzeError::Message(format!(
                         "could not analyze '{}' — unsupported file type",
                         analysis_root.display()
                     ))
                 });
         }
         if !analysis_root.is_dir() {
-            return Err(AnalyzeError::Other(format!(
+            return Err(AnalyzeError::Message(format!(
                 "'{}' is not a file or directory",
                 analysis_root.display()
             )));
@@ -473,7 +363,7 @@ impl AnalyzeService {
     /// Walks `snapshots` evenly-spaced commits, computing average function line count at
     /// each point. Returns a `ScalarTrendReport`. Lower values indicate improvement.
     #[server(group = "code")]
-    #[cli(display_with = "display_scalar_trend")]
+    #[cli(display_with = "display_output")]
     pub fn length_trend(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -510,7 +400,7 @@ impl AnalyzeService {
     /// with per-file and overall coverage percentages. Respects the `exclude_interface_impls`
     /// config option to skip auto-generated trait implementations.
     #[server(group = "repo")]
-    #[cli(display_with = "display_doc_coverage")]
+    #[cli(display_with = "display_output")]
     pub async fn docs(
         &self,
         #[param(short = 'l', help = "Maximum number of files to show (0=no limit)")] limit: Option<
@@ -541,7 +431,7 @@ impl AnalyzeService {
     /// count. `min_commits` controls the edge threshold (auto-scaled by repo size if
     /// omitted). Returns a `CouplingClustersReport` with cluster membership and sizes.
     #[server(group = "git")]
-    #[cli(display_with = "display_coupling_clusters")]
+    #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn coupling_clusters(
         &self,
@@ -592,7 +482,7 @@ impl AnalyzeService {
     /// and returns an `ActivityReport` with per-repo commit counts across `windows` periods.
     /// Useful for identifying which repos are most actively developed.
     #[server(group = "git")]
-    #[cli(display_with = "display_activity")]
+    #[cli(display_with = "display_output")]
     pub fn activity(
         &self,
         #[param(help = "Directory containing git repos")] repos_dir: String,
@@ -617,7 +507,7 @@ impl AnalyzeService {
     /// appear together in at least `min_windows` co-change windows. Returns a
     /// `RepoCouplingReport` with ranked repo pairs and their co-change counts.
     #[server(group = "git")]
-    #[cli(display_with = "display_repo_coupling")]
+    #[cli(display_with = "display_output")]
     pub fn repo_coupling(
         &self,
         #[param(help = "Directory containing git repos")] repos_dir: String,
@@ -642,7 +532,7 @@ impl AnalyzeService {
     /// combining churn rate, average cyclomatic complexity, and temporal coupling density.
     /// Returns a `CrossRepoHealthReport` with repos ranked worst-first.
     #[server(group = "git")]
-    #[cli(display_with = "display_cross_repo_health")]
+    #[cli(display_with = "display_output")]
     pub fn cross_repo_health(
         &self,
         #[param(help = "Directory containing git repos")] repos_dir: String,
@@ -658,7 +548,7 @@ impl AnalyzeService {
     /// by a risk heuristic (complexity × call-site count). `min_risk` filters out low-risk
     /// entries. Returns a `TestGapsReport` with per-function risk scores and locations.
     #[server(group = "test")]
-    #[cli(display_with = "display_test_gaps")]
+    #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub async fn test_gaps(
         &self,
@@ -708,7 +598,7 @@ impl AnalyzeService {
     /// are test files at each point. Returns a `ScalarTrendReport`. Higher values indicate
     /// better test coverage over time.
     #[server(group = "test")]
-    #[cli(display_with = "display_scalar_trend")]
+    #[cli(display_with = "display_output")]
     pub fn test_ratio_trend(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -741,7 +631,7 @@ impl AnalyzeService {
     /// (compression ratio + token uniqueness) at each point. Returns a `ScalarTrendReport`.
     /// Higher values indicate denser, more information-rich code over time.
     #[server(group = "modules")]
-    #[cli(display_with = "display_scalar_trend")]
+    #[cli(display_with = "display_output")]
     pub fn density_trend(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -768,7 +658,7 @@ impl AnalyzeService {
     }
 
     /// Auto-generated single-page codebase overview
-    #[cli(display_with = "display_summary")]
+    #[cli(display_with = "display_output")]
     pub async fn summary(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -797,7 +687,7 @@ impl AnalyzeService {
     /// to show added, removed, and changed symbols without requiring a full source diff.
     /// Returns a `SkeletonDiffReport` grouped by file with before/after signatures.
     #[server(group = "diff")]
-    #[cli(display_with = "display_skeleton_diff")]
+    #[cli(display_with = "display_output")]
     pub fn skeleton_diff(
         &self,
         #[param(positional, help = "Base ref to diff against (branch, commit, HEAD~N)")]
@@ -830,7 +720,7 @@ impl AnalyzeService {
     /// set of metrics at each point. Returns a `TrendReport` with per-snapshot values for
     /// all tracked metrics, enabling holistic codebase trend analysis.
     #[server(group = "git")]
-    #[cli(display_with = "display_trend")]
+    #[cli(display_with = "display_output")]
     pub fn trend(
         &self,
         #[param(short = 'n', help = "Number of historical snapshots (default: 6)")]
@@ -853,7 +743,7 @@ impl AnalyzeService {
     /// in the grammar for `language`. The optional `search` parameter filters results to
     /// entries whose name contains the given substring (case-insensitive).
     #[server(group = "code")]
-    #[cli(display_with = "display_node_types")]
+    #[cli(display_with = "display_output")]
     pub fn node_types(
         &self,
         #[param(positional, help = "Language name (e.g. rust, python, go)")] language: String,

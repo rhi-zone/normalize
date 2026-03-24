@@ -202,7 +202,7 @@ impl EndeavourOs {
             match result {
                 Ok(pkgs) => packages.extend(pkgs),
                 Err(e) => {
-                    eprintln!("Warning: failed to load EndeavourOS repo: {}", e);
+                    tracing::warn!("failed to load EndeavourOS repo: {}", e);
                 }
             }
         }

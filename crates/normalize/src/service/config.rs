@@ -12,6 +12,19 @@ use std::path::{Path, PathBuf};
 
 // ── Report types ────────────────────────────────────────────────────────────
 
+/// Report containing the JSON Schema for the normalize configuration.
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ConfigSchemaReport {
+    /// The JSON Schema document describing NormalizeConfig.
+    pub schema: serde_json::Value,
+}
+
+impl OutputFormatter for ConfigSchemaReport {
+    fn format_text(&self) -> String {
+        serde_json::to_string_pretty(&self.schema).unwrap_or_default()
+    }
+}
+
 /// Report from `normalize config show`: current config values with schema annotations.
 ///
 /// `content` holds the parsed config file values; `schema` (skipped from JSON output)
@@ -563,6 +576,14 @@ impl ConfigService {
         }
     }
 
+    fn display_schema(&self, r: &ConfigSchemaReport) -> String {
+        if self.pretty.get() {
+            r.format_pretty()
+        } else {
+            r.format_text()
+        }
+    }
+
     fn display_show(&self, r: &ConfigShowReport) -> String {
         if self.pretty.get() {
             r.format_pretty()
@@ -614,11 +635,14 @@ impl ConfigService {
     /// Examples:
     ///   normalize config schema              # print the full JSON Schema
     ///   normalize config schema --json       # machine-readable JSON output
-    pub fn schema(&self, pretty: bool, compact: bool) -> Result<serde_json::Value, String> {
+    #[cli(display_with = "display_schema")]
+    pub fn schema(&self, pretty: bool, compact: bool) -> Result<ConfigSchemaReport, String> {
         let root = std::env::current_dir().unwrap_or_default();
         self.resolve_format(pretty, compact, &root);
         let schema = schemars::schema_for!(NormalizeConfig);
-        serde_json::to_value(schema).map_err(|e| format!("Schema serialization error: {e}"))
+        let value =
+            serde_json::to_value(schema).map_err(|e| format!("Schema serialization error: {e}"))?;
+        Ok(ConfigSchemaReport { schema: value })
     }
 
     /// Show a config file with schema annotations — all available options, with descriptions.

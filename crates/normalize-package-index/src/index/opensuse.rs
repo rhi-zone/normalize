@@ -622,7 +622,7 @@ impl OpenSuse {
                     all_packages.extend(packages);
                 }
                 Err(e) => {
-                    eprintln!("Warning: failed to load openSUSE repo {}: {}", repo.id(), e);
+                    tracing::warn!("failed to load openSUSE repo {}: {}", repo.id(), e);
                 }
             }
         }

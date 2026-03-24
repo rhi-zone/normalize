@@ -18,23 +18,7 @@ impl GrammarService {
         }
     }
 
-    fn display_list(&self, value: &GrammarListReport) -> String {
-        if self.pretty.get() {
-            value.format_pretty()
-        } else {
-            value.format_text()
-        }
-    }
-
-    fn display_paths(&self, value: &GrammarPathsReport) -> String {
-        if self.pretty.get() {
-            value.format_pretty()
-        } else {
-            value.format_text()
-        }
-    }
-
-    /// Generic display bridge that routes to `OutputFormatter::format_text()`.
+    /// Generic display bridge: routes to `format_pretty()` or `format_text()` based on pretty mode.
     fn display_output<T: crate::output::OutputFormatter>(&self, value: &T) -> String {
         if self.pretty.get() {
             value.format_pretty()
@@ -99,7 +83,7 @@ impl GrammarService {
     /// Examples:
     ///   normalize grammars list          # show all available tree-sitter grammars
     ///   normalize grammars list --json   # machine-readable grammar list
-    #[cli(display_with = "display_list")]
+    #[cli(display_with = "display_output")]
     pub fn list(&self) -> Result<GrammarListReport, String> {
         let grammars = crate::parsers::available_external_grammars();
         Ok(GrammarListReport::new(grammars))
@@ -249,7 +233,7 @@ impl GrammarService {
     ///
     /// Examples:
     ///   normalize grammars paths          # show directories searched for grammar .so files
-    #[cli(display_with = "display_paths")]
+    #[cli(display_with = "display_output")]
     pub fn paths(&self) -> Result<GrammarPathsReport, String> {
         Ok(crate::commands::grammars::build_paths_report())
     }

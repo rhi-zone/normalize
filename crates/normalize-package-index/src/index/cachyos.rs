@@ -223,7 +223,7 @@ impl CachyOs {
             match result {
                 Ok(pkgs) => packages.extend(pkgs),
                 Err(e) => {
-                    eprintln!("Warning: failed to load CachyOS repo: {}", e);
+                    tracing::warn!("failed to load CachyOS repo: {}", e);
                 }
             }
         }

@@ -57,22 +57,13 @@ impl OutputFormatter for DaemonStatus {
 /// management operations (add/remove watched directories).
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct DaemonActionReport {
-    /// Whether the action completed successfully.
-    pub success: bool,
-    /// Optional human-readable description of the outcome.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
+    /// Human-readable description of the outcome (e.g. "Daemon started").
+    pub message: String,
 }
 
 impl OutputFormatter for DaemonActionReport {
     fn format_text(&self) -> String {
-        if let Some(ref msg) = self.message {
-            msg.clone()
-        } else if self.success {
-            "Done".to_string()
-        } else {
-            "Failed".to_string()
-        }
+        self.message.clone()
     }
 }
 
@@ -82,24 +73,17 @@ impl OutputFormatter for DaemonActionReport {
 /// from `DaemonActionReport`, which covers daemon lifecycle (start/stop).
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct DaemonRootReport {
-    /// Whether the operation completed successfully.
-    pub success: bool,
     /// Canonical path that was added or removed.
     pub path: String,
-    /// Optional human-readable description of the outcome.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
+    /// Human-readable description of the outcome (e.g. "Added: /home/user/project").
+    pub message: String,
     /// True when the operation was simulated (--dry-run flag was passed).
     pub dry_run: bool,
 }
 
 impl OutputFormatter for DaemonRootReport {
     fn format_text(&self) -> String {
-        if let Some(ref msg) = self.message {
-            msg.clone()
-        } else {
-            self.path.clone()
-        }
+        self.message.clone()
     }
 }
 
@@ -201,15 +185,13 @@ impl DaemonService {
 
         match client.shutdown() {
             Ok(()) => Ok(DaemonActionReport {
-                success: true,
-                message: Some("Daemon stopped".to_string()),
+                message: "Daemon stopped".to_string(),
             }),
             Err(e) => {
                 // Connection reset is expected when daemon shuts down
                 if e.contains("Connection reset") || e.contains("Broken pipe") {
                     Ok(DaemonActionReport {
-                        success: true,
-                        message: Some("Daemon stopped".to_string()),
+                        message: "Daemon stopped".to_string(),
                     })
                 } else {
                     Err(format!("Failed to stop daemon: {}", e))
@@ -232,8 +214,7 @@ impl DaemonService {
 
         if client.ensure_running() {
             Ok(DaemonActionReport {
-                success: true,
-                message: Some("Daemon started".to_string()),
+                message: "Daemon started".to_string(),
             })
         } else {
             Err("Failed to start daemon".to_string())
@@ -278,9 +259,8 @@ impl DaemonService {
 
         if dry_run {
             return Ok(DaemonRootReport {
-                success: true,
                 path: root.display().to_string(),
-                message: Some(format!("[dry-run] Would add: {}", root.display())),
+                message: format!("[dry-run] Would add: {}", root.display()),
                 dry_run,
             });
         }
@@ -311,9 +291,8 @@ impl DaemonService {
                     format!("Already watching: {}", reason)
                 };
                 Ok(DaemonRootReport {
-                    success: true,
                     path: root.display().to_string(),
-                    message: Some(message),
+                    message,
                     dry_run,
                 })
             }
@@ -340,9 +319,8 @@ impl DaemonService {
 
         if dry_run {
             return Ok(DaemonRootReport {
-                success: true,
                 path: root.display().to_string(),
-                message: Some(format!("[dry-run] Would remove: {}", root.display())),
+                message: format!("[dry-run] Would remove: {}", root.display()),
                 dry_run,
             });
         }
@@ -367,9 +345,8 @@ impl DaemonService {
                     format!("Was not watching: {}", root.display())
                 };
                 Ok(DaemonRootReport {
-                    success: true,
                     path: root.display().to_string(),
-                    message: Some(message),
+                    message,
                     dry_run,
                 })
             }

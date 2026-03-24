@@ -146,22 +146,6 @@ impl RulesService {
             r.format_text_limited(Some(self.limit.get()))
         }
     }
-
-    fn display_list(&self, r: &RulesListReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
-
-    fn display_validate(&self, r: &RulesValidateReport) -> String {
-        if self.pretty.get() {
-            r.format_pretty()
-        } else {
-            r.format_text()
-        }
-    }
 }
 
 #[cli(
@@ -179,7 +163,7 @@ impl RulesService {
     ///   normalize rules list                   # all rules with status
     ///   normalize rules list --pretty          # with full descriptions
     ///   normalize rules list --json            # machine-readable output
-    #[cli(display_with = "display_list")]
+    #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn list(
         &self,
@@ -641,7 +625,7 @@ impl RulesService {
     ///
     /// Examples:
     ///   normalize rules validate               # check rule config for errors
-    #[cli(display_with = "display_validate")]
+    #[cli(display_with = "display_output")]
     pub fn validate(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<

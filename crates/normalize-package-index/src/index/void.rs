@@ -353,7 +353,7 @@ impl Void {
             match result {
                 Ok(pkgs) => packages.extend(pkgs),
                 Err(e) => {
-                    eprintln!("Warning: failed to load Void repo: {}", e);
+                    tracing::warn!("failed to load Void repo: {}", e);
                 }
             }
         }
