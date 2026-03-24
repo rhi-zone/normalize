@@ -18,10 +18,14 @@ use std::path::{Path, PathBuf};
 /// Result of `budget measure` — current diff stats for a path+metric.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct MeasureReport {
+    /// File or directory path being measured.
     pub path: String,
+    /// Name of the metric being measured.
     pub metric: String,
+    /// Aggregation function applied to the metric values (e.g. `sum`, `mean`).
     pub aggregate: String,
     #[serde(rename = "ref")]
+    /// Git ref used as the base for the diff.
     pub base_ref: String,
     /// Total items added (in the aggregated result).
     pub added: f64,
@@ -55,14 +59,22 @@ impl OutputFormatter for MeasureReport {
 /// A single entry in a `budget check` report.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct CheckEntry {
+    /// File or directory path being checked.
     pub path: String,
+    /// Name of the metric being checked.
     pub metric: String,
-    pub aggregate: String,
+    /// Aggregation function applied to metric values.
+    pub aggregate: Aggregate,
     #[serde(rename = "ref")]
+    /// Git ref used as the base for the diff.
     pub base_ref: String,
+    /// Total items added relative to the base ref.
     pub added: f64,
+    /// Total items removed relative to the base ref.
     pub removed: f64,
+    /// `added + removed` (total churn).
     pub total: f64,
+    /// `added − removed` (net growth; negative means net shrinkage).
     pub net: f64,
     /// Human-readable descriptions of each limit that was exceeded.
     pub violations: Vec<String>,
@@ -102,7 +114,9 @@ impl OutputFormatter for CheckReport {
 /// Result of `budget add`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct AddReport {
+    /// File or directory path for the new budget entry.
     pub path: String,
+    /// Name of the metric the entry tracks.
     pub metric: String,
     /// True if the entry was created; false if it already existed.
     pub added: bool,
@@ -124,7 +138,9 @@ impl OutputFormatter for AddReport {
 /// Result of `budget update`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct UpdateReport {
+    /// File or directory path of the budget entry being updated.
     pub path: String,
+    /// Name of the metric for the entry being updated.
     pub metric: String,
     /// True if the entry was found and modified.
     pub updated: bool,
@@ -146,17 +162,23 @@ impl OutputFormatter for UpdateReport {
 /// A single entry in `budget show`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct ShowEntry {
+    /// File or directory path the entry applies to.
     pub path: String,
+    /// Name of the metric the entry tracks.
     pub metric: String,
+    /// Aggregation function applied to metric values.
     pub aggregate: String,
     #[serde(rename = "ref")]
+    /// Git ref used as the base for the diff.
     pub base_ref: String,
+    /// Budget limits configured for this entry.
     pub limits: BudgetLimits,
 }
 
 /// Result of `budget show`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct ShowReport {
+    /// Budget entries matching the query.
     pub entries: Vec<ShowEntry>,
 }
 
@@ -217,21 +239,32 @@ impl OutputFormatter for RemoveReport {
 
 /// Budget sub-service: diff-based budget tracking.
 pub struct BudgetService {
+    pretty: std::cell::Cell<bool>,
     diff_factory: DiffMetricFactory,
 }
 
 impl BudgetService {
     /// Create a service using the default diff metric registry.
-    pub fn new(_pretty: bool) -> Self {
+    pub fn new(pretty: bool) -> Self {
         Self {
+            pretty: std::cell::Cell::new(pretty),
             diff_factory: default_diff_metrics,
         }
     }
 
     /// Create a service with a custom diff metric factory.
-    pub fn with_factory(_pretty: bool, factory: DiffMetricFactory) -> Self {
+    pub fn with_factory(pretty: bool, factory: DiffMetricFactory) -> Self {
         Self {
+            pretty: std::cell::Cell::new(pretty),
             diff_factory: factory,
+        }
+    }
+
+    fn resolve_format(&self, pretty: bool, compact: bool) {
+        if pretty {
+            self.pretty.set(true);
+        } else if compact {
+            self.pretty.set(false);
         }
     }
 
@@ -289,7 +322,7 @@ impl BudgetService {
         compact: bool,
     ) -> Result<MeasureReport, String> {
         let root = resolve_root(root)?;
-        let _ = (pretty, compact);
+        self.resolve_format(pretty, compact);
         let config = load_budget_config(&root);
         let base_ref = base_ref
             .as_deref()
@@ -317,7 +350,7 @@ impl BudgetService {
         compact: bool,
     ) -> Result<AddReport, String> {
         let root = resolve_root(root)?;
-        let _ = (pretty, compact);
+        self.resolve_format(pretty, compact);
         let config = load_budget_config(&root);
         let base_ref = base_ref
             .as_deref()
@@ -381,7 +414,7 @@ impl BudgetService {
         compact: bool,
     ) -> Result<CheckReport, String> {
         let root = resolve_root(root)?;
-        let _ = (pretty, compact);
+        self.resolve_format(pretty, compact);
         let budget = load_budget(&root).map_err(|e| e.to_string())?;
         let entries = filter_entries(&budget.entries, path.as_deref(), metric.as_deref());
 
@@ -418,7 +451,7 @@ impl BudgetService {
             check_entries.push(CheckEntry {
                 path: entry.path.clone(),
                 metric: entry.metric.clone(),
-                aggregate: entry.aggregate.to_string(),
+                aggregate: entry.aggregate,
                 base_ref: entry.base_ref.clone(),
                 added: result.added,
                 removed: result.removed,
@@ -461,7 +494,7 @@ impl BudgetService {
         compact: bool,
     ) -> Result<UpdateReport, String> {
         let root = resolve_root(root)?;
-        let _ = (pretty, compact);
+        self.resolve_format(pretty, compact);
         let mut budget = load_budget(&root).map_err(|e| e.to_string())?;
 
         let entry = budget
@@ -509,7 +542,7 @@ impl BudgetService {
         compact: bool,
     ) -> Result<ShowReport, String> {
         let root = resolve_root(root)?;
-        let _ = (pretty, compact);
+        self.resolve_format(pretty, compact);
         let budget = load_budget(&root).map_err(|e| e.to_string())?;
         let entries = filter_entries(&budget.entries, path.as_deref(), metric.as_deref());
 
@@ -540,7 +573,7 @@ impl BudgetService {
         compact: bool,
     ) -> Result<RemoveReport, String> {
         let root = resolve_root(root)?;
-        let _ = (pretty, compact);
+        self.resolve_format(pretty, compact);
         let mut budget = load_budget(&root).map_err(|e| e.to_string())?;
 
         let len_before = budget.entries.len();
@@ -676,6 +709,11 @@ pub(crate) fn do_measure(
     })
 }
 
+fn path_matches(addr: &str, prefix: &str) -> bool {
+    let canonical = prefix.trim_end_matches('/');
+    addr == canonical || addr.starts_with(&format!("{canonical}/"))
+}
+
 fn filter_entries<'a>(
     entries: &'a [BudgetEntry],
     path: Option<&str>,
@@ -683,7 +721,7 @@ fn filter_entries<'a>(
 ) -> Vec<&'a BudgetEntry> {
     entries
         .iter()
-        .filter(|e| path.is_none_or(|p| e.path.starts_with(p)))
+        .filter(|e| path.is_none_or(|p| path_matches(&e.path, p)))
         .filter(|e| metric.is_none_or(|m| e.metric == m))
         .collect()
 }

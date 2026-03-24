@@ -206,15 +206,20 @@ impl OutputFormatter for UpdateReport {
 /// Result of `ratchet show`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct ShowReport {
+    /// Baseline entries matching the query.
     pub entries: Vec<ShowEntry>,
 }
 
 /// A single entry in a [`ShowReport`].
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct ShowEntry {
+    /// File or directory path the baseline entry applies to.
     pub path: String,
+    /// Name of the metric the entry tracks.
     pub metric: String,
+    /// Aggregation function applied to metric values.
     pub aggregate: String,
+    /// Recorded baseline value for this path/metric/aggregate combination.
     pub value: f64,
 }
 
@@ -238,10 +243,15 @@ impl OutputFormatter for ShowReport {
 /// Result of `ratchet add`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct AddReport {
+    /// File or directory path the new baseline entry applies to.
     pub path: String,
+    /// Name of the metric the entry tracks.
     pub metric: String,
+    /// Aggregation function applied to metric values.
     pub aggregate: String,
+    /// Baseline value recorded for this entry.
     pub value: f64,
+    /// Number of individual measurement items that were aggregated.
     pub item_count: usize,
 }
 

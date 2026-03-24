@@ -416,7 +416,7 @@ impl From<StaleSummaryReport> for DiagnosticsReport {
                 source: "stale-summary".into(),
                 related: vec![],
                 suggestion: Some(format!(
-                    "update {}/SUMMARY.md to reflect recent changes",
+                    "rewrite {}/SUMMARY.md to describe what is currently in the directory (not a changelog — one unified current-state description)",
                     s.dir
                 )),
             }

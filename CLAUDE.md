@@ -75,6 +75,7 @@ Every directory with files should have a `SUMMARY.md` describing its purpose and
 - Update `SUMMARY.md` in the current directory if you add, remove, or significantly change files there.
 - Update ancestor `SUMMARY.md` files if the change affects a parent directory's description (e.g., adding a new crate, removing a module, changing a major interface).
 - Rule of thumb: if a reader of the parent SUMMARY.md would be surprised by your change, update it.
+- **Rewrite, don't append.** A SUMMARY.md update must produce a coherent current-state description — not a list of dated changelog entries tacked on at the end. Read the existing text, incorporate what's still accurate, and write one unified paragraph that describes what's there now. Never write "Updated 2026-MM-DD" timestamps.
 
 **For context before making changes:**
 - Read `SUMMARY.md` in the current working directory to understand the directory's purpose.
