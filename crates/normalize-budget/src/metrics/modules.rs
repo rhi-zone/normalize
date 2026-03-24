@@ -1,21 +1,21 @@
 //! Module/file added or removed metric.
 
-use super::DiffMetric;
+use super::{DiffMeasurement, DiffMetric};
 use std::path::Path;
 use std::process::Command;
 
 /// Modules (files) added or removed.
 ///
 /// Uses `git diff --name-status` to find files with status A (added) or D (deleted).
-/// Returns `(file_path, 1.0, 0.0)` for added files and `(file_path, 0.0, 1.0)` for removed.
-pub struct ModulesMetric;
+/// Returns a measurement with `added=1.0` for added files and `removed=1.0` for removed.
+pub struct ModuleDeltaMetric;
 
-impl DiffMetric for ModulesMetric {
+impl DiffMetric for ModuleDeltaMetric {
     fn name(&self) -> &'static str {
         "modules"
     }
 
-    fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<(String, f64, f64)>> {
+    fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<DiffMeasurement>> {
         let output = Command::new("git")
             .args(["diff", "--name-status", base_ref, "--"])
             .current_dir(root)
@@ -36,10 +36,18 @@ impl DiffMetric for ModulesMetric {
                 continue;
             }
             let status = parts[0].trim();
-            let file = parts[1].trim().to_string();
+            let key = parts[1].trim().to_string();
             match status {
-                "A" => results.push((file, 1.0, 0.0)),
-                "D" => results.push((file, 0.0, 1.0)),
+                "A" => results.push(DiffMeasurement {
+                    key,
+                    added: 1.0,
+                    removed: 0.0,
+                }),
+                "D" => results.push(DiffMeasurement {
+                    key,
+                    added: 0.0,
+                    removed: 1.0,
+                }),
                 _ => {}
             }
         }

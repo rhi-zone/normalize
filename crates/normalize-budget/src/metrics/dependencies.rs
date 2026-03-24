@@ -1,6 +1,6 @@
 //! Dependency diff metric: entries added/removed from manifests.
 
-use super::DiffMetric;
+use super::{DiffMeasurement, DiffMetric};
 use std::path::Path;
 use std::process::Command;
 
@@ -8,9 +8,9 @@ use std::process::Command;
 ///
 /// Watches `Cargo.toml`, `package.json`, `requirements.txt`, `pyproject.toml`,
 /// `go.mod`, `pom.xml`, `build.gradle`, `*.gemspec`, and similar manifest files.
-/// Returns `(manifest_file, deps_added, deps_removed)` by counting dependency-like
-/// lines added/removed in the diff.
-pub struct DependenciesMetric;
+/// Returns measurements with `(manifest_file, deps_added, deps_removed)` by counting
+/// dependency-like lines added/removed in the diff.
+pub struct DependencyDeltaMetric;
 
 /// Returns true if a file path looks like a dependency manifest.
 fn is_manifest(path: &str) -> bool {
@@ -53,12 +53,12 @@ fn looks_like_dep_line(line: &str) -> bool {
         && t != "dependencies" // go.mod
 }
 
-impl DiffMetric for DependenciesMetric {
+impl DiffMetric for DependencyDeltaMetric {
     fn name(&self) -> &'static str {
         "dependencies"
     }
 
-    fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<(String, f64, f64)>> {
+    fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<DiffMeasurement>> {
         let output = Command::new("git")
             .args(["diff", base_ref, "--"])
             .current_dir(root)
@@ -85,12 +85,12 @@ impl DiffMetric for DependenciesMetric {
             } else if in_manifest {
                 if line.starts_with('+')
                     && !line.starts_with("+++")
-                    && looks_like_dep_line(&line[1..])
+                    && looks_like_dep_line(line.get(1..).unwrap_or(""))
                 {
                     *file_added.entry(current_file.clone()).or_default() += 1.0;
                 } else if line.starts_with('-')
                     && !line.starts_with("---")
-                    && looks_like_dep_line(&line[1..])
+                    && looks_like_dep_line(line.get(1..).unwrap_or(""))
                 {
                     *file_removed.entry(current_file.clone()).or_default() += 1.0;
                 }
@@ -107,7 +107,11 @@ impl DiffMetric for DependenciesMetric {
             .map(|f| {
                 let added = file_added.get(&f).copied().unwrap_or(0.0);
                 let removed = file_removed.get(&f).copied().unwrap_or(0.0);
-                (f, added, removed)
+                DiffMeasurement {
+                    key: f,
+                    added,
+                    removed,
+                }
             })
             .collect();
 

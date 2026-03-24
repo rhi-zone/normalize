@@ -1,20 +1,20 @@
 //! Line-level diff metric using `git diff --numstat`.
 
-use super::DiffMetric;
+use super::{DiffMeasurement, DiffMetric};
 use std::path::Path;
 use std::process::Command;
 
 /// Line-level diff per file.
 ///
-/// Returns `(file_path, lines_added, lines_removed)` for every changed file.
-pub struct LinesMetric;
+/// Returns measurements with `(file_path, lines_added, lines_removed)` for every changed file.
+pub struct LineDeltaMetric;
 
-impl DiffMetric for LinesMetric {
+impl DiffMetric for LineDeltaMetric {
     fn name(&self) -> &'static str {
         "lines"
     }
 
-    fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<(String, f64, f64)>> {
+    fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<DiffMeasurement>> {
         let output = Command::new("git")
             .args(["diff", "--numstat", base_ref, "--"])
             .current_dir(root)
@@ -44,8 +44,12 @@ impl DiffMetric for LinesMetric {
                 Ok(v) => v,
                 Err(_) => continue,
             };
-            let file = parts[2].trim().to_string();
-            results.push((file, added, removed));
+            let key = parts[2].trim().to_string();
+            results.push(DiffMeasurement {
+                key,
+                added,
+                removed,
+            });
         }
 
         Ok(results)
