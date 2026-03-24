@@ -5,17 +5,24 @@
 //! to baselines, and reports regressions.
 
 pub mod baseline;
+pub mod error;
 pub mod metrics;
 
 #[cfg(feature = "cli")]
 pub mod service;
 
 pub use baseline::{Aggregate, BaselineEntry, BaselineFile, RatchetConfig, RatchetConfigMetric};
+pub use error::RatchetError;
 // Re-export Metric and MetricFactory from normalize-metrics for API consumers.
 pub use normalize_metrics::{Metric, MetricFactory};
 
-/// Create the default metric registry.
-pub fn default_metrics(_root: &std::path::Path) -> Vec<Box<dyn Metric>> {
+/// Returns the default metric registry: complexity, call-complexity, line-count,
+/// function-count, class-count, and comment-line-count.
+///
+/// The `root` argument is unused; it exists to satisfy the `MetricFactory` signature
+/// for future root-aware metric registration.
+#[allow(unused_variables)]
+pub fn default_metrics(root: &std::path::Path) -> Vec<Box<dyn Metric>> {
     vec![
         Box::new(metrics::complexity::ComplexityMetric),
         Box::new(metrics::call_complexity::CallComplexityMetric),

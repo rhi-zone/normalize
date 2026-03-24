@@ -111,8 +111,12 @@ fn analyze_file_complexity(
         let fn_start_row = ti.start_row;
         let fn_end_row = ti.end_row;
 
-        // Find the actual tree node by byte range
-        let fn_node = find_node_by_range(root_node, ti.start_byte, ti.end_byte)?;
+        // Find the actual tree node by byte range — skip this function if not found,
+        // do not abort the whole file with `?`.
+        let fn_node = match find_node_by_range(root_node, ti.start_byte, ti.end_byte) {
+            Some(n) => n,
+            None => continue,
+        };
 
         // Find innermost enclosing container
         let parent_name: Option<String> = tag_infos

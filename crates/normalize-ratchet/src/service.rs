@@ -2,12 +2,12 @@
 //!
 //! Implements `normalize ratchet` subcommands via the server-less `#[cli]` pattern.
 
-use crate::baseline::{Aggregate, BaselineEntry, RatchetConfig, load_baseline, save_baseline};
+use crate::baseline::{Aggregate, BaselineEntry, BaselineFile, RatchetConfig};
 use crate::{MetricFactory, default_metrics};
+use normalize_metrics::filter_by_prefix;
 use normalize_output::OutputFormatter;
 use serde::Serialize;
 use server_less::cli;
-use std::cell::Cell;
 use std::path::{Path, PathBuf};
 
 // ---------------------------------------------------------------------------
@@ -16,15 +16,20 @@ use std::path::{Path, PathBuf};
 
 /// Result of a single measurement.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
-pub struct MeasureResult {
+pub struct MeasureReport {
+    /// Relative path (or symbol address) that was measured.
     pub path: String,
+    /// Name of the metric.
     pub metric: String,
+    /// Aggregation strategy applied.
     pub aggregate: String,
+    /// Aggregated metric value.
     pub value: f64,
+    /// Number of individual items that contributed to the aggregate.
     pub item_count: usize,
 }
 
-impl OutputFormatter for MeasureResult {
+impl OutputFormatter for MeasureReport {
     fn format_text(&self) -> String {
         format!(
             "{}  metric={} aggregate={} value={:.4} ({} items)",
@@ -36,30 +41,46 @@ impl OutputFormatter for MeasureResult {
 /// Result of `ratchet check`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct CheckReport {
+    /// All checked entries with their current vs baseline values.
     pub entries: Vec<CheckEntry>,
+    /// Number of entries that regressed.
     pub regressions: usize,
+    /// Number of entries that improved.
     pub improvements: usize,
+    /// Number of entries that were unchanged.
     pub unchanged: usize,
 }
 
+/// A single entry in a [`CheckReport`].
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct CheckEntry {
+    /// Path (or symbol address) this entry tracks.
     pub path: String,
+    /// Metric name.
     pub metric: String,
-    pub aggregate: String,
+    /// Aggregation strategy.
+    pub aggregate: Aggregate,
+    /// Pinned baseline value.
     pub baseline: f64,
+    /// Current measured value.
     pub current: f64,
+    /// `current - baseline`.
     pub delta: f64,
+    /// Whether this entry regressed, improved, or stayed the same.
     pub status: CheckStatus,
 }
 
+/// Classification of a check result relative to the baseline.
 #[derive(
     Debug, Clone, Copy, Serialize, serde::Deserialize, schemars::JsonSchema, PartialEq, Eq,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum CheckStatus {
+    /// The metric got worse (higher when higher-is-worse, or lower when lower-is-worse).
     Regression,
+    /// The metric improved.
     Improvement,
+    /// The metric did not change meaningfully.
     Unchanged,
 }
 
@@ -109,17 +130,43 @@ impl OutputFormatter for CheckReport {
 /// Result of `ratchet update`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct UpdateReport {
+    /// Entries whose baseline was written.
     pub updated: Vec<UpdateEntry>,
+    /// Entries that were not updated (no improvement, or value unchanged).
     pub skipped: Vec<UpdateEntry>,
 }
 
+/// A single entry in an [`UpdateReport`].
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct UpdateEntry {
     pub path: String,
     pub metric: String,
     pub old_value: f64,
     pub new_value: f64,
-    pub reason: String,
+    /// Why this entry was updated or skipped.
+    pub reason: UpdateReason,
+}
+
+/// Reason an entry was updated or skipped during `ratchet update`.
+#[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum UpdateReason {
+    /// Updated because `--force` was passed.
+    Forced,
+    /// Updated because the metric improved.
+    Improved,
+    /// Skipped because the metric did not improve.
+    NoImprovement,
+}
+
+impl std::fmt::Display for UpdateReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UpdateReason::Forced => f.write_str("forced"),
+            UpdateReason::Improved => f.write_str("improved"),
+            UpdateReason::NoImprovement => f.write_str("no improvement"),
+        }
+    }
 }
 
 impl OutputFormatter for UpdateReport {
@@ -138,8 +185,8 @@ impl OutputFormatter for UpdateReport {
         }
         for e in &self.skipped {
             lines.push(format!(
-                "  skipped {} ({}/{}): {:.4} ({})",
-                e.path, e.metric, e.reason, e.old_value, e.reason
+                "  skipped {} ({}/{}): {:.4}",
+                e.path, e.metric, e.reason, e.old_value
             ));
         }
         lines.join("\n")
@@ -179,7 +226,7 @@ impl OutputFormatter for ShowReport {
 
 /// Result of `ratchet add`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
-pub struct AddResult {
+pub struct AddReport {
     pub path: String,
     pub metric: String,
     pub aggregate: String,
@@ -187,7 +234,7 @@ pub struct AddResult {
     pub item_count: usize,
 }
 
-impl OutputFormatter for AddResult {
+impl OutputFormatter for AddReport {
     fn format_text(&self) -> String {
         format!(
             "Added baseline: {} ({}/{}) = {:.4} ({} items)",
@@ -198,13 +245,14 @@ impl OutputFormatter for AddResult {
 
 /// Result of `ratchet remove`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
-pub struct RemoveResult {
+pub struct RemoveReport {
     pub path: String,
     pub metric: String,
+    /// Whether an entry was actually found and removed.
     pub removed: bool,
 }
 
-impl OutputFormatter for RemoveResult {
+impl OutputFormatter for RemoveReport {
     fn format_text(&self) -> String {
         if self.removed {
             format!("Removed baseline entry: {} ({})", self.path, self.metric)
@@ -223,21 +271,23 @@ impl OutputFormatter for RemoveResult {
 
 /// Ratchet sub-service: metric regression tracking.
 pub struct RatchetService {
-    pretty: Cell<bool>,
+    pretty: std::cell::Cell<bool>,
     metric_factory: MetricFactory,
 }
 
 impl RatchetService {
-    pub fn new(pretty: &Cell<bool>) -> Self {
+    /// Create a service using the default metric registry.
+    pub fn new(pretty: bool) -> Self {
         Self {
-            pretty: Cell::new(pretty.get()),
+            pretty: std::cell::Cell::new(pretty),
             metric_factory: default_metrics,
         }
     }
 
-    pub fn with_factory(pretty: &Cell<bool>, factory: MetricFactory) -> Self {
+    /// Create a service with a custom metric factory, for testing or alternative metric sets.
+    pub fn with_factory(pretty: bool, factory: MetricFactory) -> Self {
         Self {
-            pretty: Cell::new(pretty.get()),
+            pretty: std::cell::Cell::new(pretty),
             metric_factory: factory,
         }
     }
@@ -250,7 +300,7 @@ impl RatchetService {
         }
     }
 
-    fn display_measure(&self, r: &MeasureResult) -> String {
+    fn display_measure(&self, r: &MeasureReport) -> String {
         r.format_text()
     }
 
@@ -266,11 +316,11 @@ impl RatchetService {
         r.format_text()
     }
 
-    fn display_add(&self, r: &AddResult) -> String {
+    fn display_add(&self, r: &AddReport) -> String {
         r.format_text()
     }
 
-    fn display_remove(&self, r: &RemoveResult) -> String {
+    fn display_remove(&self, r: &RemoveReport) -> String {
         r.format_text()
     }
 }
@@ -295,18 +345,18 @@ impl RatchetService {
             short = 'a',
             help = "Aggregation strategy (mean|median|max|min|sum|count)"
         )]
-        aggregate: Option<String>,
+        aggregate: Option<Aggregate>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
         #[param(help = "Show delta vs this git ref")] base: Option<String>,
         pretty: bool,
         compact: bool,
-    ) -> Result<MeasureResult, String> {
-        let root_path = resolve_root(root);
+    ) -> Result<MeasureReport, String> {
+        let root_path = resolve_root(root)?;
         self.resolve_format(pretty, compact);
         let config = load_ratchet_config(&root_path);
-        let agg: Aggregate = parse_aggregate(aggregate, &config, &metric)?;
+        let agg: Aggregate = aggregate.unwrap_or_else(|| config.effective_aggregate(&metric));
 
         if let Some(ref base_ref) = base {
             return measure_at_ref(
@@ -332,17 +382,19 @@ impl RatchetService {
             help = "Metric to track (complexity|call-complexity|line-count|function-count|class-count|comment-line-count)"
         )]
         metric: String,
-        #[param(short = 'a', help = "Aggregation strategy")] aggregate: Option<String>,
+        #[param(short = 'a', help = "Aggregation strategy")] aggregate: Option<Aggregate>,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
         pretty: bool,
         compact: bool,
-    ) -> Result<AddResult, String> {
-        let root_path = resolve_root(root);
+    ) -> Result<AddReport, String> {
+        let root_path = resolve_root(root)?;
         self.resolve_format(pretty, compact);
         let config = load_ratchet_config(&root_path);
-        let agg: Aggregate = parse_aggregate(aggregate, &config, &metric)?;
+        let agg: Aggregate = aggregate.unwrap_or_else(|| config.effective_aggregate(&metric));
 
-        let mut baseline = load_baseline(&root_path).map_err(|e| e.to_string())?;
+        let mut baseline = BaselineFile::load(&root_path)
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
 
         // Check duplicate
         if baseline
@@ -363,9 +415,9 @@ impl RatchetService {
             aggregate: agg,
             value: result.value,
         });
-        save_baseline(&root_path, &baseline).map_err(|e| e.to_string())?;
+        baseline.save(&root_path).map_err(|e| e.to_string())?;
 
-        Ok(AddResult {
+        Ok(AddReport {
             path,
             metric,
             aggregate: agg.to_string(),
@@ -390,7 +442,7 @@ impl RatchetService {
         pretty: bool,
         compact: bool,
     ) -> Result<CheckReport, String> {
-        let root_path = resolve_root(root);
+        let root_path = resolve_root(root)?;
         self.resolve_format(pretty, compact);
 
         if let Some(ref base_ref) = base {
@@ -403,7 +455,9 @@ impl RatchetService {
             );
         }
 
-        let baseline = load_baseline(&root_path).map_err(|e| e.to_string())?;
+        let baseline = BaselineFile::load(&root_path)
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
         let entries = filter_entries(&baseline.entries, path.as_deref(), metric.as_deref());
 
         let report = build_check_report(&root_path, entries, &self.metric_factory)?;
@@ -433,16 +487,18 @@ impl RatchetService {
         pretty: bool,
         compact: bool,
     ) -> Result<UpdateReport, String> {
-        let root_path = resolve_root(root);
+        let root_path = resolve_root(root)?;
         self.resolve_format(pretty, compact);
 
-        let mut baseline = load_baseline(&root_path).map_err(|e| e.to_string())?;
+        let mut baseline = BaselineFile::load(&root_path)
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
         let matching_indices: Vec<usize> = baseline
             .entries
             .iter()
             .enumerate()
             .filter(|(_, e)| {
-                path.as_deref().is_none_or(|p| e.path.starts_with(p))
+                path.as_deref().is_none_or(|p| path_matches(&e.path, p))
                     && metric.as_deref().is_none_or(|m| e.metric == m)
             })
             .map(|(i, _)| i)
@@ -492,9 +548,9 @@ impl RatchetService {
                     old_value,
                     new_value,
                     reason: if force {
-                        "forced".to_string()
+                        UpdateReason::Forced
                     } else {
-                        "improved".to_string()
+                        UpdateReason::Improved
                     },
                 });
                 baseline.entries[idx].value = new_value;
@@ -504,13 +560,13 @@ impl RatchetService {
                     metric: entry.metric.clone(),
                     old_value,
                     new_value,
-                    reason: "no improvement".to_string(),
+                    reason: UpdateReason::NoImprovement,
                 });
             }
         }
 
         if !updated.is_empty() {
-            save_baseline(&root_path, &baseline).map_err(|e| e.to_string())?;
+            baseline.save(&root_path).map_err(|e| e.to_string())?;
         }
 
         Ok(UpdateReport { updated, skipped })
@@ -526,9 +582,11 @@ impl RatchetService {
         pretty: bool,
         compact: bool,
     ) -> Result<ShowReport, String> {
-        let root_path = resolve_root(root);
+        let root_path = resolve_root(root)?;
         self.resolve_format(pretty, compact);
-        let baseline = load_baseline(&root_path).map_err(|e| e.to_string())?;
+        let baseline = BaselineFile::load(&root_path)
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
         let entries: Vec<ShowEntry> =
             filter_entries(&baseline.entries, path.as_deref(), metric.as_deref())
                 .into_iter()
@@ -551,19 +609,21 @@ impl RatchetService {
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
         pretty: bool,
         compact: bool,
-    ) -> Result<RemoveResult, String> {
-        let root_path = resolve_root(root);
+    ) -> Result<RemoveReport, String> {
+        let root_path = resolve_root(root)?;
         self.resolve_format(pretty, compact);
-        let mut baseline = load_baseline(&root_path).map_err(|e| e.to_string())?;
+        let mut baseline = BaselineFile::load(&root_path)
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
         let before = baseline.entries.len();
         baseline
             .entries
             .retain(|e| !(e.path == path && e.metric == metric));
         let removed = baseline.entries.len() < before;
         if removed {
-            save_baseline(&root_path, &baseline).map_err(|e| e.to_string())?;
+            baseline.save(&root_path).map_err(|e| e.to_string())?;
         }
-        Ok(RemoveResult {
+        Ok(RemoveReport {
             path,
             metric,
             removed,
@@ -575,9 +635,11 @@ impl RatchetService {
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn resolve_root(root: Option<String>) -> PathBuf {
-    root.map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+fn resolve_root(root: Option<String>) -> Result<PathBuf, String> {
+    match root {
+        Some(r) => Ok(PathBuf::from(r)),
+        None => std::env::current_dir().map_err(|e| format!("failed to get cwd: {e}")),
+    }
 }
 
 fn load_ratchet_config(root: &Path) -> RatchetConfig {
@@ -593,49 +655,38 @@ fn load_ratchet_config(root: &Path) -> RatchetConfig {
     RatchetConfig::default()
 }
 
-fn parse_aggregate(
-    agg: Option<String>,
-    config: &RatchetConfig,
-    metric: &str,
-) -> Result<Aggregate, String> {
-    match agg {
-        Some(s) => s.parse::<Aggregate>(),
-        None => Ok(config.effective_aggregate(metric)),
-    }
+/// True if `addr` matches path prefix `prefix`, respecting path boundaries.
+fn path_matches(addr: &str, prefix: &str) -> bool {
+    let canonical = prefix.trim_end_matches('/');
+    addr == canonical
+        || addr.starts_with(&format!("{canonical}/"))
+        || (prefix.ends_with('/') && addr.starts_with(prefix))
 }
 
-/// Perform a measurement: collect all metric values, filter by path prefix, aggregate.
+/// Collect and aggregate all metric values for the given metric name, filter by path prefix.
 pub fn do_measure(
     root: &Path,
     path: &str,
     metric: &str,
     agg: Aggregate,
     factory: &MetricFactory,
-) -> Result<MeasureResult, String> {
+) -> Result<MeasureReport, String> {
     let metrics = factory(root);
     let m = metrics
         .iter()
         .find(|m| m.name() == metric)
         .ok_or_else(|| format!("unknown metric '{metric}'"))?;
 
-    let all = m.measure_all(root).map_err(|e| e.to_string())?;
+    let all = m
+        .measure_all(root)
+        .map_err(|e| format!("metric '{}' at '{}': {}", metric, root.display(), e))?;
 
-    // Filter items whose address starts with the path prefix
-    let path_prefix = path.trim_end_matches('/');
-    let values: Vec<f64> = all
-        .into_iter()
-        .filter(|(addr, _)| {
-            addr == path_prefix
-                || addr.starts_with(&format!("{path_prefix}/"))
-                || addr.starts_with(path_prefix) && path_prefix.ends_with('/')
-        })
-        .map(|(_, v)| v)
-        .collect();
+    let values: Vec<f64> = filter_by_prefix(&all, path).map(|p| p.value).collect();
 
     let item_count = values.len();
 
     match crate::baseline::compute_aggregate(values, agg) {
-        Some(value) => Ok(MeasureResult {
+        Some(value) => Ok(MeasureReport {
             path: path.to_string(),
             metric: metric.to_string(),
             aggregate: agg.to_string(),
@@ -648,6 +699,20 @@ pub fn do_measure(
     }
 }
 
+/// Collect and aggregate all metric values for the given metric name, filter by path prefix.
+///
+/// Alias for [`do_measure`] kept during the transition.
+#[inline]
+pub fn measure(
+    root: &Path,
+    path: &str,
+    metric: &str,
+    agg: Aggregate,
+    factory: &MetricFactory,
+) -> Result<MeasureReport, String> {
+    do_measure(root, path, metric, agg, factory)
+}
+
 fn filter_entries<'a>(
     entries: &'a [BaselineEntry],
     path: Option<&str>,
@@ -655,7 +720,7 @@ fn filter_entries<'a>(
 ) -> Vec<&'a BaselineEntry> {
     entries
         .iter()
-        .filter(|e| path.is_none_or(|p| e.path.starts_with(p)))
+        .filter(|e| path.is_none_or(|p| path_matches(&e.path, p)))
         .filter(|e| metric.is_none_or(|m| e.metric == m))
         .collect()
 }
@@ -686,6 +751,15 @@ fn build_check_report(
         let baseline = entry.value;
         let delta = current - baseline;
 
+        // Guard against NaN/infinity deltas — skip the entry rather than misclassifying.
+        if !delta.is_finite() {
+            eprintln!(
+                "warning: non-finite delta for {} ({}): {delta}",
+                entry.path, entry.metric
+            );
+            continue;
+        }
+
         let metrics = factory(root);
         let higher_is_worse = metrics
             .iter()
@@ -693,7 +767,7 @@ fn build_check_report(
             .map(|m| m.higher_is_worse())
             .unwrap_or(true);
 
-        let status = if (delta).abs() < 1e-10 {
+        let status = if delta.abs() < 1e-10 {
             CheckStatus::Unchanged
         } else if (higher_is_worse && delta > 0.0) || (!higher_is_worse && delta < 0.0) {
             CheckStatus::Regression
@@ -710,7 +784,7 @@ fn build_check_report(
         check_entries.push(CheckEntry {
             path: entry.path.clone(),
             metric: entry.metric.clone(),
-            aggregate: entry.aggregate.to_string(),
+            aggregate: entry.aggregate,
             baseline,
             current,
             delta,
@@ -752,16 +826,24 @@ fn check_against_ref(
         .trim()
         .to_string();
     let short = &hash[..7.min(hash.len())];
-    let worktree_name = format!("normalize-ratchet-wt-{short}");
+    // Include PID to avoid races when multiple processes check the same ref.
+    let worktree_name = format!("normalize-ratchet-wt-{short}-{}", std::process::id());
     let worktree_path = std::env::temp_dir().join(&worktree_name);
     let worktree_str = worktree_path.to_string_lossy().to_string();
 
     // Clean up any stale worktree
     if worktree_path.exists() {
-        let _ = Command::new("git")
+        let rm = Command::new("git")
             .args(["worktree", "remove", &worktree_str, "--force"])
             .current_dir(root)
-            .output();
+            .output()
+            .map_err(|e| format!("failed to remove stale worktree: {e}"))?;
+        if !rm.status.success() {
+            return Err(format!(
+                "failed to remove stale worktree: {}",
+                String::from_utf8_lossy(&rm.stderr).trim()
+            ));
+        }
     }
 
     // Create worktree
@@ -792,10 +874,13 @@ fn check_against_ref(
 
         let mut measurements: Vec<(String, String, f64)> = Vec::new(); // (path, metric, value)
         for metric_name in metric_names {
-            let m = metrics.iter().find(|x| x.name() == metric_name).unwrap();
+            let m = metrics
+                .iter()
+                .find(|x| x.name() == metric_name)
+                .ok_or_else(|| format!("metric '{}' not found", metric_name))?;
             if let Ok(all) = m.measure_all(&worktree_path) {
                 for (addr, val) in all {
-                    if path_filter.is_none_or(|p| addr.starts_with(p)) {
+                    if path_filter.is_none_or(|p| path_matches(&addr, p)) {
                         measurements.push((addr, metric_name.to_string(), val));
                     }
                 }
@@ -804,11 +889,18 @@ fn check_against_ref(
         measurements
     };
 
-    // Clean up worktree
-    let _ = Command::new("git")
+    // Clean up worktree — surface error if removal fails
+    let rm = Command::new("git")
         .args(["worktree", "remove", &worktree_str, "--force"])
         .current_dir(root)
-        .output();
+        .output()
+        .map_err(|e| format!("failed to remove worktree: {e}"))?;
+    if !rm.status.success() {
+        return Err(format!(
+            "failed to remove worktree: {}",
+            String::from_utf8_lossy(&rm.stderr).trim()
+        ));
+    }
 
     // Measure current
     let current_metrics = factory(root);
@@ -848,6 +940,9 @@ fn check_against_ref(
                 None => continue,
             };
             let delta = current_val - baseline_val;
+            if !delta.is_finite() {
+                continue;
+            }
             let higher_is_worse = m.higher_is_worse();
             let status = if delta.abs() < 1e-10 {
                 CheckStatus::Unchanged
@@ -864,7 +959,7 @@ fn check_against_ref(
             check_entries.push(CheckEntry {
                 path: addr.clone(),
                 metric: metric_name.clone(),
-                aggregate: "raw".to_string(),
+                aggregate: Aggregate::Mean, // per-item, no aggregation
                 baseline: *baseline_val,
                 current: current_val,
                 delta,
@@ -899,7 +994,7 @@ fn measure_at_ref(
     metric: &str,
     agg: Aggregate,
     factory: &MetricFactory,
-) -> Result<MeasureResult, String> {
+) -> Result<MeasureReport, String> {
     use std::process::Command;
 
     let hash_output = Command::new("git")
@@ -914,15 +1009,22 @@ fn measure_at_ref(
         .trim()
         .to_string();
     let short = &hash[..7.min(hash.len())];
-    let worktree_name = format!("normalize-ratchet-wt-{short}");
+    let worktree_name = format!("normalize-ratchet-wt-{short}-{}", std::process::id());
     let worktree_path = std::env::temp_dir().join(&worktree_name);
     let worktree_str = worktree_path.to_string_lossy().to_string();
 
     if worktree_path.exists() {
-        let _ = Command::new("git")
+        let rm = Command::new("git")
             .args(["worktree", "remove", &worktree_str, "--force"])
             .current_dir(root)
-            .output();
+            .output()
+            .map_err(|e| format!("failed to remove stale worktree: {e}"))?;
+        if !rm.status.success() {
+            return Err(format!(
+                "failed to remove stale worktree: {}",
+                String::from_utf8_lossy(&rm.stderr).trim()
+            ));
+        }
     }
 
     let add_output = Command::new("git")
@@ -939,10 +1041,17 @@ fn measure_at_ref(
 
     let result = do_measure(&worktree_path, path, metric, agg, factory);
 
-    let _ = Command::new("git")
+    let rm = Command::new("git")
         .args(["worktree", "remove", &worktree_str, "--force"])
         .current_dir(root)
-        .output();
+        .output()
+        .map_err(|e| format!("failed to remove worktree: {e}"))?;
+    if !rm.status.success() {
+        return Err(format!(
+            "failed to remove worktree: {}",
+            String::from_utf8_lossy(&rm.stderr).trim()
+        ));
+    }
 
     result
 }
@@ -963,17 +1072,38 @@ fn metric_higher_is_worse(metric_name: &str, factory: &MetricFactory) -> bool {
 // ---------------------------------------------------------------------------
 
 /// Build a DiagnosticsReport from ratchet check for use in `normalize rules run`.
-pub fn build_ratchet_diagnostics(
+pub fn build_ratchet_report(
     root: &Path,
     factory: &MetricFactory,
 ) -> normalize_output::diagnostics::DiagnosticsReport {
     use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 
-    let baseline = match load_baseline(root) {
-        Ok(b) => b,
-        Err(e) => {
-            eprintln!("ratchet: could not load baseline: {e}");
+    let baseline = match BaselineFile::load(root) {
+        Ok(Some(b)) => b,
+        Ok(None) => {
+            // Ratchet not initialised — return empty report silently.
             return DiagnosticsReport::new();
+        }
+        Err(e) => {
+            // Real IO/parse error — surface it as a diagnostic.
+            return DiagnosticsReport {
+                issues: vec![Issue {
+                    file: root.to_string_lossy().into_owned(),
+                    line: None,
+                    column: None,
+                    end_line: None,
+                    end_column: None,
+                    rule_id: "ratchet/load-error".into(),
+                    message: format!("ratchet: failed to load baseline: {e}"),
+                    severity: Severity::Error,
+                    source: "ratchet".into(),
+                    related: vec![],
+                    suggestion: None,
+                }],
+                files_checked: 0,
+                sources_run: vec!["ratchet".into()],
+                tool_errors: vec![],
+            };
         }
     };
 
@@ -1025,4 +1155,13 @@ pub fn build_ratchet_diagnostics(
         sources_run: vec!["ratchet".into()],
         tool_errors: vec![],
     }
+}
+
+/// Alias kept for compatibility with `normalize-native-rules`.
+#[inline]
+pub fn build_ratchet_diagnostics(
+    root: &Path,
+    factory: &MetricFactory,
+) -> normalize_output::diagnostics::DiagnosticsReport {
+    build_ratchet_report(root, factory)
 }

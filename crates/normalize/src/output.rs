@@ -146,14 +146,14 @@ mod tests {
         assert_output_formatter::<NodeTypesReport>();
 
         use normalize_ratchet::service::{
-            AddResult, CheckReport, MeasureResult, RemoveResult, ShowReport, UpdateReport,
+            AddReport, CheckReport, MeasureReport, RemoveReport, ShowReport, UpdateReport,
         };
-        assert_output_formatter::<MeasureResult>();
+        assert_output_formatter::<MeasureReport>();
         assert_output_formatter::<CheckReport>();
         assert_output_formatter::<UpdateReport>();
         assert_output_formatter::<ShowReport>();
-        assert_output_formatter::<AddResult>();
-        assert_output_formatter::<RemoveResult>();
+        assert_output_formatter::<AddReport>();
+        assert_output_formatter::<RemoveReport>();
 
         use normalize_budget::service::{
             AddResult as BudgetAddResult, CheckReport as BudgetCheckReport,

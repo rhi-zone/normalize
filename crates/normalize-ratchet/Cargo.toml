@@ -21,6 +21,7 @@ serde_json = { workspace = true }
 toml = { workspace = true }
 rayon = "1.10"
 anyhow = "1"
+thiserror = "2"
 tree-sitter = "0.26"
 streaming-iterator = "0.1"
 server-less = { version = "0.4.7", default-features = false, features = ["cli", "jsonschema", "config"], optional = true }

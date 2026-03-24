@@ -98,7 +98,16 @@ impl Metric for CallComplexityMetric {
                 });
                 tag_infos.dedup_by(|b, a| a.start_byte == b.start_byte && a.end_byte == b.end_byte);
 
+                // Build fn_entries and a parallel row-range list in lockstep so that
+                // fn_row_ranges[i] always corresponds to fn_entries[i].  We must only
+                // add to both when node_name() succeeds; a `continue` that skips only
+                // one of them would misalign subsequent indices.
+                struct FnRowRange {
+                    start_row: usize,
+                    end_row: usize,
+                }
                 let mut fn_entries: Vec<(FnKey, usize, Option<String>)> = Vec::new();
+                let mut fn_row_ranges_raw: Vec<FnRowRange> = Vec::new();
 
                 for i in 0..tag_infos.len() {
                     if tag_infos[i].is_container {
@@ -144,23 +153,18 @@ impl Metric for CallComplexityMetric {
 
                     let key = (f.path.clone(), name.clone());
                     fn_entries.push((key, local_cc, parent_name));
+                    fn_row_ranges_raw.push(FnRowRange {
+                        start_row: fn_start_row,
+                        end_row: fn_end_row,
+                    });
                 }
 
-                // Extract call edges using calls query.
-                // Build a list of (fn_start_row, fn_end_row, fn_key) for containment lookup.
-                let fn_row_ranges: Vec<(usize, usize, FnKey)> = {
-                    let non_container_tis: Vec<&TagInfo> =
-                        tag_infos.iter().filter(|ti| !ti.is_container).collect();
-                    fn_entries
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(fi, (key, _, _))| {
-                            non_container_tis
-                                .get(fi)
-                                .map(|ti| (ti.start_row, ti.end_row, key.clone()))
-                        })
-                        .collect()
-                };
+                // Build the row-range lookup used for call-edge containment.
+                let fn_row_ranges: Vec<(usize, usize, FnKey)> = fn_entries
+                    .iter()
+                    .zip(fn_row_ranges_raw.iter())
+                    .map(|((key, _, _), rr)| (rr.start_row, rr.end_row, key.clone()))
+                    .collect();
 
                 let mut call_edges: Vec<(FnKey, String)> = Vec::new();
                 if let Some(ref cq) = calls_query {
@@ -229,6 +233,11 @@ impl Metric for CallComplexityMetric {
                     call_graph.entry(caller_key).or_default().push(t);
                 }
             }
+        }
+        // Dedup adjacency lists to prevent inflated BFS sums from duplicate call sites.
+        for callees in call_graph.values_mut() {
+            callees.sort_unstable();
+            callees.dedup();
         }
 
         // BFS from each function to compute reachable CC sum

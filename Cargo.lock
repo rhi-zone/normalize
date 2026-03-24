@@ -4259,6 +4259,7 @@ dependencies = [
  "serde_json",
  "server-less",
  "streaming-iterator",
+ "thiserror 2.0.18",
  "toml",
  "tree-sitter",
 ]

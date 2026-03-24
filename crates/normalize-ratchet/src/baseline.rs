@@ -9,16 +9,22 @@ pub use normalize_metrics::{Aggregate, compute_aggregate};
 /// A single baseline entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BaselineEntry {
+    /// Relative path (or symbol address) this entry tracks.
     pub path: String,
+    /// Name of the metric (e.g. "complexity", "line-count").
     pub metric: String,
+    /// Aggregation strategy applied when multiple items match the path.
     pub aggregate: Aggregate,
+    /// The pinned baseline value.
     pub value: f64,
 }
 
-/// The full baseline file.
+/// The full baseline file (`.normalize/ratchet.json`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BaselineFile {
+    /// File format version (currently `1`).
     pub version: u32,
+    /// All tracked baseline entries.
     pub entries: Vec<BaselineEntry>,
 }
 
@@ -31,32 +37,55 @@ impl Default for BaselineFile {
     }
 }
 
-/// Path to the ratchet baseline file.
-pub fn baseline_path(root: &Path) -> PathBuf {
+impl BaselineFile {
+    /// Load the ratchet baseline file from `root/.normalize/ratchet.json`.
+    ///
+    /// Returns `Ok(None)` when the file does not exist (ratchet not initialised),
+    /// `Ok(Some(file))` on success, and `Err` on IO or parse errors.
+    pub fn load(root: &Path) -> anyhow::Result<Option<Self>> {
+        let path = ratchet_path(root);
+        if !path.exists() {
+            return Ok(None);
+        }
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
+        let file = serde_json::from_str(&content)
+            .map_err(|e| anyhow::anyhow!("failed to parse {}: {e}", path.display()))?;
+        Ok(Some(file))
+    }
+
+    /// Write this baseline file to `root/.normalize/ratchet.json`.
+    pub fn save(&self, root: &Path) -> anyhow::Result<()> {
+        let path = ratchet_path(root);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| anyhow::anyhow!("failed to create {}: {e}", parent.display()))?;
+        }
+        let json = serde_json::to_string_pretty(self)?;
+        std::fs::write(&path, json + "\n")
+            .map_err(|e| anyhow::anyhow!("failed to write {}: {e}", path.display()))
+    }
+}
+
+/// Path to the ratchet baseline file (`<root>/.normalize/ratchet.json`).
+pub fn ratchet_path(root: &Path) -> PathBuf {
     root.join(".normalize").join("ratchet.json")
 }
 
+// ---------------------------------------------------------------------------
+// Deprecated free-function aliases kept for a single transition step.
+// ---------------------------------------------------------------------------
+
 /// Load the baseline file, returning default if not found.
+#[deprecated(note = "use BaselineFile::load")]
 pub fn load_baseline(root: &Path) -> anyhow::Result<BaselineFile> {
-    let path = baseline_path(root);
-    if !path.exists() {
-        return Ok(BaselineFile::default());
-    }
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
-    serde_json::from_str(&content)
-        .map_err(|e| anyhow::anyhow!("failed to parse {}: {e}", path.display()))
+    Ok(BaselineFile::load(root)?.unwrap_or_default())
 }
 
 /// Save the baseline file.
+#[deprecated(note = "use file.save(root)")]
 pub fn save_baseline(root: &Path, file: &BaselineFile) -> anyhow::Result<()> {
-    let path = baseline_path(root);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    let json = serde_json::to_string_pretty(file)?;
-    std::fs::write(&path, json + "\n")
-        .map_err(|e| anyhow::anyhow!("failed to write {}: {e}", path.display()))
+    file.save(root)
 }
 
 // --- Config types ---
