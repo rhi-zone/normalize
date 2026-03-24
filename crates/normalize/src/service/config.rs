@@ -286,6 +286,7 @@ fn format_schema_annotated(
         }
 
         if is_set {
+            // SAFETY: `is_set` is true only when `current` was found to be `Some` above.
             let v = current.unwrap();
             // Render as TOML key = value
             let toml_str = json_to_toml_string(&serde_json::json!({ key: v }));
@@ -637,7 +638,8 @@ impl ConfigService {
     ///   normalize config schema --json       # machine-readable JSON output
     #[cli(display_with = "display_schema")]
     pub fn schema(&self, pretty: bool, compact: bool) -> Result<ConfigSchemaReport, String> {
-        let root = std::env::current_dir().unwrap_or_default();
+        let root =
+            std::env::current_dir().map_err(|e| format!("cannot access current directory: {e}"))?;
         self.resolve_format(pretty, compact, &root);
         let schema = schemars::schema_for!(NormalizeConfig);
         let value =

@@ -643,7 +643,7 @@ async fn packages_data(
             .clear()
             .await
             .map_err(|e| format!("Failed to clear index: {}", e))?;
-        eprintln!("Cleared existing index");
+        tracing::info!("Cleared existing index");
     }
 
     let mut results: std::collections::HashMap<&str, IndexedCounts> =
@@ -667,8 +667,8 @@ async fn packages_data(
 
     for eco in only {
         if !available.contains(&eco.as_str()) {
-            eprintln!(
-                "Error: unknown ecosystem '{}', valid options: {}",
+            tracing::warn!(
+                "unknown ecosystem '{}', valid options: {}",
                 eco,
                 available.join(", ")
             );
