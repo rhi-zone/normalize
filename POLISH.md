@@ -1,9 +1,9 @@
 # Polish State
 
 Created: f89f7a3c5d17cb1d8b13137bacb8c830d54c808c
-Last run: 2026-03-24T23:00:00Z
+Last run: 2026-03-25T00:00:00Z
 Round 1 applied: 2026-03-24
-Round: 10
+Round: 11
 Project type: Rust CLI + library ecosystem (~40 crates)
 
 ## Lenses
@@ -733,3 +733,41 @@ None.
 - [DONE] `crates/normalize-grammars/src/lib.rs` — added crate-level `//!` doc _(severity: medium)_
 - [DONE] `crates/normalize-syntax-rules/src/runner.rs` — `DebugFlags::timing` field documented _(severity: low)_
 - [DONE] `crates/normalize-filter/src/service.rs` — `MatchReport`, `AliasEntry`, `AliasesReport` fields documented _(severity: low)_
+
+---
+
+## Findings — Round 11
+
+Round 11 git hash: bd9632e0
+Scope: entire codebase — fixpoint verification
+
+### Conflicts
+None.
+
+### naming-consistency
+
+- [DONE] `crates/normalize/src/service/guide.rs:9` — `Guide` → `GuideReport` _(severity: high)_
+- [DONE] `crates/normalize/src/service/facts.rs:189` — `FileList` → `FileListReport` _(severity: high)_
+- [DONE] `crates/normalize-session-analysis/src/lib.rs:301` — `CorrectionType` → `CorrectionKind` _(severity: medium)_
+- [DONE] `crates/normalize-rules/src/runner.rs:13` — `RuleType` → `RuleKind` _(severity: medium)_
+
+### api-clarity
+
+- [DONE] `crates/normalize/src/service/daemon.rs` — `run()` returned `Result<String, String>` → introduced `DaemonRunReport` with `OutputFormatter` _(severity: high)_
+- [DONE] `crates/normalize/src/service/view.rs` — `trace()` returned `Result<String, String>` → introduced `TraceReport` with `OutputFormatter` _(severity: high)_
+- [DONE] `DaemonActionReport`/`DaemonRootReport` — added doc comments explaining distinct purposes _(severity: medium)_
+
+### error-surface
+
+- [DONE] `crates/normalize/src/main.rs:11` — `serde_json::to_string_pretty(...).unwrap()` in schema handler → error string fallback _(severity: high)_
+- [DONE] `crates/normalize-package-index/src/index/artix.rs:388` — `eprintln!` → `tracing::warn!` _(severity: medium)_
+- [DONE] `crates/normalize-package-index/src/index/conda.rs:187` — `eprintln!` → `tracing::warn!` _(severity: medium)_
+
+### doc-coverage
+
+- [DONE] 16 `AnalyzeService` `#[cli]` methods missing doc comments — added _(severity: high)_
+- [DONE] 21 `RankService` `#[cli]` methods missing doc comments — added _(severity: high)_
+- [DONE] `NormalizeService::new()`, `grep()`, `ci()`, sessions/tools/view/edit service methods — docs added _(severity: high)_
+- [DONE] Struct-level docs on `ConfigShowReport`, `ConfigValidateReport`, `DaemonStatus`, `DaemonActionReport`, `DaemonRootReport`, `DaemonRootsReport`, `RebuildReport`, `FactsStats`, `ExtensionCount`, `StorageReport`, `StorageEntry`, `FileListReport`, `PackagesReport`, `EcosystemCounts`, `CommandReport`, `InitReport`, `UpdateReport`, `TranslateReport` _(severity: medium)_
+- [DONE] Field docs on `DaemonStatus` (running/socket/pid/uptime_secs/roots_watched), `GenerateReport` (output/path) _(severity: medium)_
+- [NOTED] 300+ report types in `commands/` undocumented — deferred (low priority, large sweep)
