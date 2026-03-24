@@ -23,7 +23,7 @@ pub struct MeasureReport {
     /// Name of the metric being measured.
     pub metric: String,
     /// Aggregation function applied to the metric values (e.g. `sum`, `mean`).
-    pub aggregate: String,
+    pub aggregate: Aggregate,
     /// Git ref used as the base for the diff.
     #[serde(rename = "ref")]
     pub base_ref: String,

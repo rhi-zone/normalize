@@ -68,33 +68,52 @@ impl Default for BudgetFile {
     }
 }
 
+impl BudgetFile {
+    /// Load the budget file from `root/.normalize/budget.json`.
+    ///
+    /// Returns `Ok(None)` when the file does not exist (budget not initialised),
+    /// `Ok(Some(file))` on success, and `Err` on IO or parse errors.
+    pub fn load(root: &Path) -> anyhow::Result<Option<Self>> {
+        let path = budget_path(root);
+        if !path.exists() {
+            return Ok(None);
+        }
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
+        let file = serde_json::from_str(&content)
+            .map_err(|e| anyhow::anyhow!("failed to parse {}: {e}", path.display()))?;
+        Ok(Some(file))
+    }
+
+    /// Write this budget file to `root/.normalize/budget.json`.
+    pub fn save(&self, root: &Path) -> anyhow::Result<()> {
+        let path = budget_path(root);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                anyhow::anyhow!("failed to create directory {}: {e}", parent.display())
+            })?;
+        }
+        let json = serde_json::to_string_pretty(self)?;
+        std::fs::write(&path, json + "\n")
+            .map_err(|e| anyhow::anyhow!("failed to write {}: {e}", path.display()))
+    }
+}
+
 /// Path to the budget file.
 pub fn budget_path(root: &Path) -> PathBuf {
     root.join(".normalize").join("budget.json")
 }
 
-/// Load the budget file from `root/.normalize/budget.json`. Returns an empty `BudgetFile` if the file does not exist.
+/// Load the budget file, returning default if not found.
+#[deprecated(since = "0.2.0", note = "use BudgetFile::load")]
 pub fn load_budget(root: &Path) -> anyhow::Result<BudgetFile> {
-    let path = budget_path(root);
-    if !path.exists() {
-        return Ok(BudgetFile::default());
-    }
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
-    serde_json::from_str(&content)
-        .map_err(|e| anyhow::anyhow!("failed to parse {}: {e}", path.display()))
+    Ok(BudgetFile::load(root)?.unwrap_or_default())
 }
 
 /// Write the budget file to `root/.normalize/budget.json`.
+#[deprecated(since = "0.2.0", note = "use BudgetFile::save")]
 pub fn save_budget(root: &Path, file: &BudgetFile) -> anyhow::Result<()> {
-    let path = budget_path(root);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| anyhow::anyhow!("failed to create directory {}: {e}", parent.display()))?;
-    }
-    let json = serde_json::to_string_pretty(file)?;
-    std::fs::write(&path, json + "\n")
-        .map_err(|e| anyhow::anyhow!("failed to write {}: {e}", path.display()))
+    file.save(root)
 }
 
 // --- Config types ---

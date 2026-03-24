@@ -182,8 +182,8 @@ mod tests {
         use normalize_native_rules::check_refs::CheckRefsReport;
         use normalize_native_rules::stale_docs::StaleDocsReport;
         use normalize_native_rules::stale_summary::StaleSummaryReport;
-        use normalize_native_rules::{BudgetDiagnosticsReport, RatchetDiagnosticsReport};
-        assert_output_formatter::<BudgetDiagnosticsReport>();
+        use normalize_native_rules::{BudgetRulesReport, RatchetDiagnosticsReport};
+        assert_output_formatter::<BudgetRulesReport>();
         assert_output_formatter::<RatchetDiagnosticsReport>();
         assert_output_formatter::<CheckExamplesReport>();
         assert_output_formatter::<CheckRefsReport>();

@@ -27,7 +27,7 @@ pub struct MeasureReport {
     /// Name of the metric.
     pub metric: String,
     /// Aggregation strategy applied.
-    pub aggregate: String,
+    pub aggregate: Aggregate,
     /// Aggregated metric value.
     pub value: f64,
     /// Number of individual items that contributed to the aggregate.
@@ -222,7 +222,7 @@ pub struct ShowEntry {
     /// Name of the metric the entry tracks.
     pub metric: String,
     /// Aggregation function applied to metric values.
-    pub aggregate: String,
+    pub aggregate: Aggregate,
     /// Recorded baseline value for this path/metric/aggregate combination.
     pub value: f64,
 }
@@ -252,7 +252,7 @@ pub struct AddReport {
     /// Name of the metric the entry tracks.
     pub metric: String,
     /// Aggregation function applied to metric values.
-    pub aggregate: String,
+    pub aggregate: Aggregate,
     /// Baseline value recorded for this entry.
     pub value: f64,
     /// Number of individual measurement items that were aggregated.
@@ -396,7 +396,7 @@ impl RatchetService {
             );
         }
 
-        do_measure(&root_path, &path, &metric, agg, &self.metric_factory)
+        measure(&root_path, &path, &metric, agg, &self.metric_factory)
     }
 
     /// Measure and pin as a new baseline entry. Errors if entry already exists.
@@ -434,7 +434,7 @@ impl RatchetService {
             ));
         }
 
-        let result = do_measure(&root_path, &path, &metric, agg, &self.metric_factory)?;
+        let result = measure(&root_path, &path, &metric, agg, &self.metric_factory)?;
 
         baseline.entries.push(BaselineEntry {
             path: path.clone(),
@@ -447,7 +447,7 @@ impl RatchetService {
         Ok(AddReport {
             path,
             metric,
-            aggregate: agg.to_string(),
+            aggregate: agg,
             value: result.value,
             item_count: result.item_count,
         })
@@ -548,7 +548,7 @@ impl RatchetService {
 
         for idx in matching_indices {
             let entry = &baseline.entries[idx];
-            let result = match do_measure(
+            let result = match measure(
                 &root_path,
                 &entry.path,
                 &entry.metric,
@@ -629,7 +629,7 @@ impl RatchetService {
                 .map(|e| ShowEntry {
                     path: e.path.clone(),
                     metric: e.metric.clone(),
-                    aggregate: e.aggregate.to_string(),
+                    aggregate: e.aggregate,
                     value: e.value,
                 })
                 .collect();
@@ -700,7 +700,7 @@ fn path_matches(addr: &str, prefix: &str) -> bool {
 }
 
 /// Collect and aggregate all metric values for the given metric name, filter by path prefix.
-pub fn do_measure(
+pub fn measure(
     root: &Path,
     path: &str,
     metric: &str,
@@ -732,7 +732,7 @@ pub fn do_measure(
         Some(value) => Ok(MeasureReport {
             path: path.to_string(),
             metric: metric.to_string(),
-            aggregate: agg.to_string(),
+            aggregate: agg,
             value,
             item_count,
         }),
@@ -742,18 +742,17 @@ pub fn do_measure(
     }
 }
 
-/// Collect and aggregate all metric values for the given metric name, filter by path prefix.
-///
-/// Alias for [`do_measure`] kept during the transition.
+/// Deprecated alias for [`measure`].
+#[deprecated(since = "0.2.0", note = "use measure")]
 #[inline]
-pub fn measure(
+pub fn do_measure(
     root: &Path,
     path: &str,
     metric: &str,
     agg: Aggregate,
     factory: &MetricFactory,
 ) -> Result<MeasureReport, String> {
-    do_measure(root, path, metric, agg, factory)
+    measure(root, path, metric, agg, factory)
 }
 
 /// Filter baseline entries by optional path prefix and metric name.
@@ -788,7 +787,7 @@ fn build_check_report(
     let mut unchanged = 0usize;
 
     for entry in entries {
-        let result = match do_measure(root, &entry.path, &entry.metric, entry.aggregate, factory) {
+        let result = match measure(root, &entry.path, &entry.metric, entry.aggregate, factory) {
             Ok(r) => r,
             Err(e) => {
                 tracing::warn!("could not measure {} at {}: {e}", entry.metric, entry.path);
@@ -1122,7 +1121,7 @@ fn measure_at_ref(
         path: &worktree_path,
         root,
     };
-    do_measure(&worktree_path, path, metric, agg, factory)
+    measure(&worktree_path, path, metric, agg, factory)
 }
 
 fn metric_higher_is_worse(metric_name: &str, factory: &MetricFactory) -> bool {

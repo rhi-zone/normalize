@@ -1313,9 +1313,9 @@ dependencies = [
 
 [[package]]
 name = "ascent-interpreter"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ac54b1b39ece770c86c7bb281df2bf8254342dbbc9c66dc8a5e9c68b2c85668"
+checksum = "6767b873d310161266f2359386d4de67ba2963e190d59399e9175ca831baec1d"
 dependencies = [
  "derive-syn-parse",
  "dynasmrt",
@@ -3810,6 +3810,7 @@ dependencies = [
  "toml",
  "toml_edit",
  "tower-lsp",
+ "tracing",
  "tree-sitter",
  "ureq",
  "utoipa",
@@ -3855,6 +3856,7 @@ dependencies = [
  "streaming-iterator",
  "thiserror 2.0.18",
  "toml",
+ "tracing",
  "tree-sitter",
 ]
 
@@ -4002,6 +4004,7 @@ dependencies = [
  "serde_json",
  "syn 2.0.117",
  "toml",
+ "tracing",
 ]
 
 [[package]]
@@ -4269,6 +4272,7 @@ dependencies = [
  "streaming-iterator",
  "thiserror 2.0.18",
  "toml",
+ "tracing",
  "tree-sitter",
 ]
 
@@ -4298,6 +4302,7 @@ dependencies = [
  "tokio",
  "toml",
  "toml_edit",
+ "tracing",
  "ureq",
 ]
 
