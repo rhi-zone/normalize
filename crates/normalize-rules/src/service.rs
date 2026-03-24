@@ -176,14 +176,12 @@ impl RulesService {
     #[allow(clippy::too_many_arguments)]
     pub fn list(
         &self,
-        #[param(help = "Show source URLs for imported rules")] sources: bool,
         #[param(short = 't', help = "Filter by rule type (all, syntax, fact)")] r#type: Option<
             String,
         >,
         #[param(help = "Filter by tag")] tag: Option<String>,
         #[param(help = "Filter to enabled rules only")] enabled: bool,
         #[param(help = "Filter to disabled rules only")] disabled: bool,
-        #[param(help = "Hide the description line")] no_desc: bool,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -206,14 +204,10 @@ impl RulesService {
         let report = build_list_report(
             &effective_root,
             &ListFilters {
-                sources,
                 type_filter: &rule_type,
                 tag: tag.as_deref(),
                 enabled,
                 disabled,
-                no_desc,
-                json: false,
-                use_colors: false, // not used by build_list_report
             },
             &config,
         );
@@ -665,14 +659,10 @@ impl RulesService {
         let list_report = build_list_report(
             &effective_root,
             &ListFilters {
-                sources: false,
                 type_filter: &RuleType::All,
                 tag: None,
                 enabled: false,
                 disabled: false,
-                no_desc: true,
-                json: false,
-                use_colors: false,
             },
             &config,
         );
