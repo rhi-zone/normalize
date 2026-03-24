@@ -1,9 +1,9 @@
 # Polish State
 
 Created: f89f7a3c5d17cb1d8b13137bacb8c830d54c808c
-Last run: 2026-03-25T00:00:00Z
+Last run: 2026-03-25T01:00:00Z
 Round 1 applied: 2026-03-24
-Round: 11
+Round: 12
 Project type: Rust CLI + library ecosystem (~40 crates)
 
 ## Lenses
@@ -771,3 +771,32 @@ None.
 - [DONE] Struct-level docs on `ConfigShowReport`, `ConfigValidateReport`, `DaemonStatus`, `DaemonActionReport`, `DaemonRootReport`, `DaemonRootsReport`, `RebuildReport`, `FactsStats`, `ExtensionCount`, `StorageReport`, `StorageEntry`, `FileListReport`, `PackagesReport`, `EcosystemCounts`, `CommandReport`, `InitReport`, `UpdateReport`, `TranslateReport` _(severity: medium)_
 - [DONE] Field docs on `DaemonStatus` (running/socket/pid/uptime_secs/roots_watched), `GenerateReport` (output/path) _(severity: medium)_
 - [NOTED] 300+ report types in `commands/` undocumented — deferred (low priority, large sweep)
+
+---
+
+## Findings — Round 12
+
+Round 12 git hash: c17aa8ea
+Scope: entire codebase — fixpoint verification
+
+### Conflicts
+None. (Display-impl finding initially looked like "remove Display" but correct fix was add missing display_with first.)
+
+### api-clarity / naming-consistency
+
+- [DONE] All `#[cli]` service methods missing `display_with = "display_output"` — added across `mod.rs`, `facts.rs`, `guide.rs`, `generate.rs`, `daemon.rs`, `sessions.rs`, `grammars.rs`, `normalize-rules`, `normalize-filter`, `normalize-syntax-rules`, `normalize-facts` _(severity: high)_
+- [DONE] Orphaned `impl Display` blocks removed from report types now covered by explicit `display_with` _(severity: high)_
+- [DONE] Thin wrapper bridge methods (`display_grep`, `display_ci`) replaced with direct `display_output` references _(severity: low)_
+- [DONE] Dead `pretty` fields removed from `SessionListReport`, `SessionShowReport`, `MessagesReport`, `PatternsReport` (write-only, routing already via service's `self.pretty.get()`) _(severity: low)_
+
+### doc-coverage
+
+- [DONE] `crates/normalize-facts-core/src/file.rs` — `IndexedFile` fields documented _(severity: medium)_
+- [DONE] `crates/normalize-facts-core/src/import.rs` — `Import`/`Export` fields documented _(severity: medium)_
+- [DONE] `crates/normalize-facts-core/src/symbol.rs` — `Visibility` variants + `as_str()` methods documented _(severity: medium)_
+- [DONE] `crates/normalize-graph/src/lib.rs` — `GraphStats`, `Scc`, `Diamond`, `BridgeEdge`, `ImportChain`, `TransitiveEdge` fields documented _(severity: medium)_
+
+### error-surface
+
+- [DONE] `crates/normalize-chat-sessions/src/formats/mod.rs` — `LogFormat::parse()` trait `Result<Session, String>` → `Result<Session, ParseError>`; `ParseError` enum defined with `Io`/`Format`/`Other` variants _(severity: medium)_
+- [DONE] `crates/normalize-chat-sessions/src/formats/mod.rs:326,347` — `read_file`/`parse_session_with_format` helpers use typed `ParseError` _(severity: medium)_
