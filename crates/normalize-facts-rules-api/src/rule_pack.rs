@@ -50,6 +50,20 @@ impl RulePackInfo {
 /// The root module type that dylib plugins must export.
 ///
 /// Use `export_root_module!` macro to generate the necessary exports.
+///
+/// # ABI versioning
+///
+/// `RulePack` uses `abi_stable`'s prefix-type layout: fields are appended
+/// only at the end, and the first field is marked `#[sabi(last_prefix_field)]`
+/// to guarantee backwards compatibility.  The host verifies `RulePackRef` at
+/// load time; mismatched layouts cause a hard error before any field is accessed.
+///
+/// # No-panic contract
+///
+/// All `extern "C"` function pointers in this type **must not unwind or panic**.
+/// Rust panics across a C FFI boundary are undefined behaviour.  Implementations
+/// must catch all panics (e.g. with `std::panic::catch_unwind`) and return an
+/// empty `RVec` or a synthetic error `Diagnostic` instead.
 #[repr(C)]
 #[derive(StableAbi)]
 #[sabi(kind(Prefix(prefix_ref = RulePackRef)))]

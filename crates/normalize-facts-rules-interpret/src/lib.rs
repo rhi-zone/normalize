@@ -68,46 +68,16 @@ relation diagnostic(String, String, String, u32, String);
 // Configuration
 // =============================================================================
 
-/// Type alias for backward compatibility. Use `normalize_rules_config::RuleOverride` directly.
-pub use normalize_rules_config::RuleOverride as FactsRuleOverride;
-/// Type alias for backward compatibility. Use `normalize_rules_config::RulesConfig` directly.
-pub use normalize_rules_config::RulesConfig as FactsRulesConfig;
+pub use normalize_rules_config::RuleOverride;
+pub use normalize_rules_config::RulesConfig;
 
 // =============================================================================
 // Rule types and loading
 // =============================================================================
 
-/// Severity level for rule findings.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum Severity {
-    Error,
-    #[default]
-    Warning,
-    Info,
-}
-
-impl std::fmt::Display for Severity {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Severity::Error => write!(f, "error"),
-            Severity::Warning => write!(f, "warning"),
-            Severity::Info => write!(f, "info"),
-        }
-    }
-}
-
-impl std::str::FromStr for Severity {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "error" => Ok(Severity::Error),
-            "warning" | "warn" => Ok(Severity::Warning),
-            "info" | "note" => Ok(Severity::Info),
-            _ => Err(format!("unknown severity: {}", s)),
-        }
-    }
-}
+/// Severity level for rule findings. Defined in normalize-rules-config for sharing
+/// across all rule engines (syntax, fact).
+pub use normalize_rules_config::Severity;
 
 /// A Datalog fact rule definition.
 #[derive(Debug)]
@@ -217,7 +187,7 @@ const BUILTIN_RULES: &[BuiltinFactsRule] = &[
 /// Load all rules from all sources, merged by ID.
 /// Order: builtins → ~/.config/normalize/rules/ → .normalize/rules/
 /// Then applies config overrides (deny, enabled, allow).
-pub fn load_all_rules(project_root: &Path, config: &FactsRulesConfig) -> Vec<FactsRule> {
+pub fn load_all_rules(project_root: &Path, config: &RulesConfig) -> Vec<FactsRule> {
     let mut rules_by_id: HashMap<String, FactsRule> = HashMap::new();
 
     // 1. Load embedded builtins
@@ -455,8 +425,10 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
 pub enum InterpretError {
     /// Failed to read the rules file
     Io(std::io::Error),
-    /// Failed to parse the rules
+    /// Failed to parse the Datalog source (syntax / IR construction error)
     Parse(String),
+    /// Rule evaluation failed at runtime (engine execution error)
+    Eval(String),
 }
 
 impl std::fmt::Display for InterpretError {
@@ -464,6 +436,7 @@ impl std::fmt::Display for InterpretError {
         match self {
             InterpretError::Io(e) => write!(f, "Failed to read rules file: {}", e),
             InterpretError::Parse(e) => write!(f, "Failed to parse rules: {}", e),
+            InterpretError::Eval(e) => write!(f, "Rule evaluation failed: {}", e),
         }
     }
 }
@@ -510,6 +483,11 @@ pub fn run_rule(
             }
         }
         Severity::Info => {
+            // `DiagnosticLevel` has no `Info` variant; `Hint` is the closest
+            // available level (quieter than Warning). This is a lossy mapping:
+            // both "info" and "hint" from the Datalog `diagnostic` relation end
+            // up as `Hint` after severity promotion. A future `Info` variant in
+            // `DiagnosticLevel` would allow an exact mapping.
             for d in &mut diagnostics {
                 if d.level == DiagnosticLevel::Warning {
                     d.level = DiagnosticLevel::Hint;
@@ -598,7 +576,7 @@ pub fn run_rules_source(
     populate_facts(&mut engine, relations)?;
     engine
         .run()
-        .map_err(|e| InterpretError::Parse(e.to_string()))?;
+        .map_err(|e| InterpretError::Eval(e.to_string()))?;
     engine.materialize();
 
     // Extract diagnostics from output relations
@@ -626,7 +604,7 @@ pub fn run_rules_source_incremental(
     populate_facts(engine, new_relations)?;
     engine
         .run_incremental(dirty_relations, retracted_relations)
-        .map_err(|e| InterpretError::Parse(e.to_string()))?;
+        .map_err(|e| InterpretError::Eval(e.to_string()))?;
     engine.materialize();
     Ok(extract_diagnostics(engine))
 }
@@ -673,7 +651,7 @@ pub fn run_rules_batch(
         populate_facts(&mut engine, relations)?;
         engine
             .run()
-            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            .map_err(|e| InterpretError::Eval(e.to_string()))?;
         engine.materialize();
 
         // Capture the shared JIT for when it's re-enabled.
@@ -700,6 +678,8 @@ pub fn run_rules_batch(
                 }
             }
             Severity::Info => {
+                // `DiagnosticLevel` has no `Info` variant; `Hint` is the closest
+                // available level. See the same comment in `run_rule` for details.
                 for d in &mut diagnostics {
                     if d.level == DiagnosticLevel::Warning {
                         d.level = DiagnosticLevel::Hint;

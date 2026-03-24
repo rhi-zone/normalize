@@ -426,10 +426,13 @@ impl RulesService {
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let config = load_rules_config(&effective_root);
-        enable_disable(&effective_root, &id_or_tag, true, dry_run, &config).map(|_| RuleResult {
-            success: true,
-            message: None,
-            data: None,
+        enable_disable(&effective_root, &id_or_tag, true, dry_run, &config).map(|msg| {
+            print!("{}", msg);
+            RuleResult {
+                success: true,
+                message: None,
+                data: None,
+            }
         })
     }
 
@@ -452,10 +455,13 @@ impl RulesService {
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let config = load_rules_config(&effective_root);
-        enable_disable(&effective_root, &id_or_tag, false, dry_run, &config).map(|_| RuleResult {
-            success: true,
-            message: None,
-            data: None,
+        enable_disable(&effective_root, &id_or_tag, false, dry_run, &config).map(|msg| {
+            print!("{}", msg);
+            RuleResult {
+                success: true,
+                message: None,
+                data: None,
+            }
         })
     }
 
@@ -480,10 +486,13 @@ impl RulesService {
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
         let use_colors = resolve_pretty(pretty, compact);
         let config = load_rules_config(&effective_root);
-        show_rule(&effective_root, &id, false, use_colors, &config).map(|_| RuleResult {
-            success: true,
-            message: None,
-            data: None,
+        show_rule(&effective_root, &id, use_colors, &config).map(|msg| {
+            print!("{}", msg);
+            RuleResult {
+                success: true,
+                message: None,
+                data: None,
+            }
         })
     }
 
@@ -513,14 +522,16 @@ impl RulesService {
             &effective_root,
             show_rules,
             tag.as_deref(),
-            false,
             use_colors,
             &config,
         )
-        .map(|_| RuleResult {
-            success: true,
-            message: None,
-            data: None,
+        .map(|msg| {
+            print!("{}", msg);
+            RuleResult {
+                success: true,
+                message: None,
+                data: None,
+            }
         })
     }
 

@@ -47,13 +47,13 @@ impl Capabilities {
     }
 
     /// Data format (JSON, YAML, TOML, etc.) - has structure but no code semantics.
+    ///
+    /// Currently an alias for [`Self::none`] — data formats have no importable
+    /// modules, no callable symbols, and no meaningful cyclomatic complexity.
+    /// If a data format ever gains format-specific capability flags, add them
+    /// here without touching `none()`.
     pub const fn data_format() -> Self {
-        Self {
-            imports: false,
-            callable_symbols: false,
-            complexity: false,
-            executable: false,
-        }
+        Self::none()
     }
 
     /// Markup language (Markdown, AsciiDoc, HTML) - has structure, may have symbols.

@@ -46,8 +46,18 @@ pub fn run(relations: &Relations) -> Vec<Diagnostic> {
         let from_file = import.from_file.to_string();
         let to_module = import.to_module.to_string();
 
-        // Only consider local file imports (not external packages)
-        // Local imports typically don't start with common package prefixes
+        // Only consider local file imports (not external packages).
+        // This heuristic filters out well-known external-package prefixes.
+        //
+        // Known false negatives (cycles that may be missed):
+        //   - npm scoped packages (`@scope/pkg`) — not filtered here but lack a
+        //     physical local path in the index, so they produce no cycle anyway
+        //   - Go module paths that happen to start with a local directory name —
+        //     filtered correctly because they contain `/` after the module root
+        //   - Relative JS/TS imports (`./foo`, `../bar`) — correctly kept in; they
+        //     will match because the indexer resolves them to absolute paths
+        //   - Rust `use` paths containing `crate::` — filtered by `::` guard above;
+        //     cross-crate deps cannot cycle within a single workspace index anyway
         if !to_module.starts_with("std")
             && !to_module.starts_with("http")
             && !to_module.starts_with("node:")

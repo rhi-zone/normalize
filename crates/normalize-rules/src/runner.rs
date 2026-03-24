@@ -235,8 +235,6 @@ pub struct RulesListReport {
     pub fact_count: usize,
     pub native_count: usize,
     pub disabled_count: usize,
-    pub sources: bool,
-    pub no_desc: bool,
 }
 
 impl normalize_output::OutputFormatter for RulesListReport {
@@ -282,20 +280,11 @@ impl normalize_output::OutputFormatter for RulesListReport {
                         .join(" ")
                 )
             };
-            if self.sources {
-                out.push_str(&format!(
-                    "  {}  {:<30}  {}  {}  {:<7}{}\n",
-                    type_col, r.id, sev_col, state_col, r.source, tags_str
-                ));
-            } else {
-                out.push_str(&format!(
-                    "  {}  {:<30}  {}  {}{}\n",
-                    type_col, r.id, sev_col, state_col, tags_str
-                ));
-            }
-            if !self.no_desc {
-                out.push_str(&format!("            {}\n", r.message));
-            }
+            out.push_str(&format!(
+                "  {}  {:<30}  {}  {}  {:<7}{}\n",
+                type_col, r.id, sev_col, state_col, r.source, tags_str
+            ));
+            out.push_str(&format!("            {}\n", r.message));
         }
         out.push_str("\nConfigure: [rules.\"<id>\"] in .normalize/config.toml\n");
         out.push_str("  severity, enabled, allow — or: normalize rules enable/disable <id>\n");
@@ -342,23 +331,13 @@ impl normalize_output::OutputFormatter for RulesListReport {
 
         // Column headers
         let gray = Color::DarkGray;
-        if self.sources {
-            out.push_str(&format!(
-                "{}\n",
-                gray.paint(format!(
-                    "  {:<6}  {:<30}  {:<8}  ST  {:<7}  TAGS",
-                    "TYPE", "ID", "SEVERITY", "SOURCE"
-                ))
-            ));
-        } else {
-            out.push_str(&format!(
-                "{}\n",
-                gray.paint(format!(
-                    "  {:<6}  {:<30}  {:<8}  ST  TAGS",
-                    "TYPE", "ID", "SEVERITY"
-                ))
-            ));
-        }
+        out.push_str(&format!(
+            "{}\n",
+            gray.paint(format!(
+                "  {:<6}  {:<30}  {:<8}  ST  {:<7}  TAGS",
+                "TYPE", "ID", "SEVERITY", "SOURCE"
+            ))
+        ));
 
         for r in &self.rules {
             let type_col = paint_rule_type(&r.rule_type);
@@ -380,24 +359,16 @@ impl normalize_output::OutputFormatter for RulesListReport {
             } else {
                 Color::DarkGray.paint(id_padded).to_string()
             };
-            if self.sources {
-                out.push_str(&format!(
-                    "  {type_col}  {id_col}  {sev_col}  {state_col}  {:<7}{tags_str}\n",
-                    r.source
-                ));
+            out.push_str(&format!(
+                "  {type_col}  {id_col}  {sev_col}  {state_col}  {:<7}{tags_str}\n",
+                r.source
+            ));
+            let desc = if r.enabled {
+                Color::DarkGray.paint(&r.message).to_string()
             } else {
-                out.push_str(&format!(
-                    "  {type_col}  {id_col}  {sev_col}  {state_col}{tags_str}\n",
-                ));
-            }
-            if !self.no_desc {
-                let desc = if r.enabled {
-                    Color::DarkGray.paint(&r.message).to_string()
-                } else {
-                    Color::DarkGray.dimmed().paint(&r.message).to_string()
-                };
-                out.push_str(&format!("            {desc}\n"));
-            }
+                Color::DarkGray.dimmed().paint(&r.message).to_string()
+            };
+            out.push_str(&format!("            {desc}\n"));
         }
         let dim = Color::DarkGray;
         out.push('\n');
@@ -448,14 +419,10 @@ struct UnifiedRule {
 }
 
 pub struct ListFilters<'a> {
-    pub sources: bool,
     pub type_filter: &'a RuleType,
     pub tag: Option<&'a str>,
     pub enabled: bool,
     pub disabled: bool,
-    pub no_desc: bool,
-    pub json: bool,
-    pub use_colors: bool,
 }
 
 /// Build a `RulesListReport` from the index, applying the given filters.
@@ -575,8 +542,6 @@ pub fn build_list_report(
         fact_count,
         native_count,
         disabled_count,
-        sources: filters.sources,
-        no_desc: filters.no_desc,
     }
 }
 
@@ -619,7 +584,7 @@ pub fn enable_disable(
     enable: bool,
     dry_run: bool,
     config: &RulesRunConfig,
-) -> Result<(), String> {
+) -> Result<String, String> {
     // Resolve which rule IDs to affect
     let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
     let fact_rules = interpret::load_all_rules(root, &config.rules);
@@ -682,34 +647,36 @@ pub fn enable_disable(
         .map(|r| r.id.as_str())
         .collect();
 
+    let mut out = String::new();
+
     for id in &already_syntax {
-        println!("{}: already {}d (no change)", id, verb);
+        out.push_str(&format!("{}: already {}d (no change)\n", id, verb));
     }
     for id in &already_fact {
-        println!("{}: already {}d (no change)", id, verb);
+        out.push_str(&format!("{}: already {}d (no change)\n", id, verb));
     }
 
     if changes_syntax.is_empty() && changes_fact.is_empty() {
-        return Ok(());
+        return Ok(out);
     }
 
     for id in &changes_syntax {
         if dry_run {
-            println!("[dry-run] would {} {}", verb, id);
+            out.push_str(&format!("[dry-run] would {} {}\n", verb, id));
         } else {
-            println!("{}d {}", verb, id);
+            out.push_str(&format!("{}d {}\n", verb, id));
         }
     }
     for id in &changes_fact {
         if dry_run {
-            println!("[dry-run] would {} {}", verb, id);
+            out.push_str(&format!("[dry-run] would {} {}\n", verb, id));
         } else {
-            println!("{}d {}", verb, id);
+            out.push_str(&format!("{}d {}\n", verb, id));
         }
     }
 
     if dry_run {
-        return Ok(());
+        return Ok(out);
     }
 
     // Load or create the project config as a toml_edit document
@@ -754,7 +721,9 @@ pub fn enable_disable(
     }
 
     std::fs::write(&config_path, doc.to_string())
-        .map_err(|e| format!("Failed to write config: {e}"))
+        .map_err(|e| format!("Failed to write config: {e}"))?;
+
+    Ok(out)
 }
 
 // =============================================================================
@@ -764,10 +733,9 @@ pub fn enable_disable(
 pub fn show_rule(
     root: &Path,
     id: &str,
-    json: bool,
     use_colors: bool,
     config: &RulesRunConfig,
-) -> Result<(), String> {
+) -> Result<String, String> {
     // Search syntax rules first, then fact rules
     let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
     let fact_rules = interpret::load_all_rules(root, &config.rules);
@@ -776,137 +744,112 @@ pub fn show_rule(
     let found_syntax = syntax_rules.iter().find(|r| r.id == id);
     let found_fact = fact_rules.iter().find(|r| r.id == id);
 
-    if json {
-        match (found_syntax, found_fact) {
-            (Some(r), _) => {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&serde_json::json!({
-                        "id": r.id,
-                        "type": "syntax",
-                        "severity": r.severity.to_string(),
-                        "message": r.message,
-                        "tags": r.tags,
-                        "languages": r.languages,
-                        "allow": r.allow.iter().map(|p| p.as_str()).collect::<Vec<_>>(),
-                        "enabled": r.enabled,
-                        "builtin": r.builtin,
-                        "fix": r.fix,
-                        "doc": r.doc,
-                    }))
-                    .unwrap()
-                );
-            }
-            (_, Some(r)) => {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&serde_json::json!({
-                        "id": r.id,
-                        "type": "fact",
-                        "severity": r.severity.to_string(),
-                        "message": r.message,
-                        "tags": r.tags,
-                        "allow": r.allow.iter().map(|p| p.as_str()).collect::<Vec<_>>(),
-                        "enabled": r.enabled,
-                        "builtin": r.builtin,
-                        "doc": r.doc,
-                    }))
-                    .unwrap()
-                );
-            }
-            _ => return Err(format!("Rule not found: {}", id)),
-        }
-        return Ok(());
-    }
+    let mut out = String::new();
 
     match (found_syntax, found_fact) {
         (Some(r), _) => {
-            println!("{} [syntax]", r.id);
-            println!(
-                "  severity: {}",
+            out.push_str(&format!("{} [syntax]\n", r.id));
+            out.push_str(&format!(
+                "  severity: {}\n",
                 paint_severity(&r.severity.to_string(), use_colors)
-            );
-            println!("  enabled:  {}", r.enabled);
+            ));
+            out.push_str(&format!("  enabled:  {}\n", r.enabled));
             if !r.tags.is_empty() {
-                println!("  tags:     {}", paint_tags(&r.tags, use_colors));
+                out.push_str(&format!(
+                    "  tags:     {}\n",
+                    paint_tags(&r.tags, use_colors)
+                ));
             }
             if !r.languages.is_empty() {
-                println!("  langs:    {}", r.languages.join(", "));
+                out.push_str(&format!("  langs:    {}\n", r.languages.join(", ")));
             }
             if !r.allow.is_empty() {
-                println!(
-                    "  allow:    {}",
+                out.push_str(&format!(
+                    "  allow:    {}\n",
                     r.allow
                         .iter()
                         .map(|p| p.as_str())
                         .collect::<Vec<_>>()
                         .join("  ")
-                );
+                ));
             }
             if let Some(ref fix) = r.fix {
                 if fix.is_empty() {
-                    println!("  fix:      (delete match)");
+                    out.push_str("  fix:      (delete match)\n");
                 } else {
-                    println!("  fix:      {}", fix);
+                    out.push_str(&format!("  fix:      {}\n", fix));
                 }
             }
-            println!("  message:  {}", r.message);
+            out.push_str(&format!("  message:  {}\n", r.message));
             if let Some(ref doc) = r.doc {
-                println!();
-                println!("{}", doc);
+                out.push('\n');
+                out.push_str(doc);
+                out.push('\n');
             } else {
-                println!();
-                println!("(no documentation — add a markdown comment block after the frontmatter)");
+                out.push('\n');
+                out.push_str(
+                    "(no documentation — add a markdown comment block after the frontmatter)\n",
+                );
             }
-            println!();
-            print_config_snippet(&r.id, config.rules.rules.get(&r.id));
+            out.push('\n');
+            out.push_str(&format_config_snippet(&r.id, config.rules.rules.get(&r.id)));
         }
         (_, Some(r)) => {
-            println!("{} [fact]", r.id);
-            println!(
-                "  severity: {}",
+            out.push_str(&format!("{} [fact]\n", r.id));
+            out.push_str(&format!(
+                "  severity: {}\n",
                 paint_severity(&r.severity.to_string(), use_colors)
-            );
-            println!("  enabled:  {}", r.enabled);
+            ));
+            out.push_str(&format!("  enabled:  {}\n", r.enabled));
             if !r.tags.is_empty() {
-                println!("  tags:     {}", paint_tags(&r.tags, use_colors));
+                out.push_str(&format!(
+                    "  tags:     {}\n",
+                    paint_tags(&r.tags, use_colors)
+                ));
             }
             if !r.allow.is_empty() {
-                println!(
-                    "  allow:    {}",
+                out.push_str(&format!(
+                    "  allow:    {}\n",
                     r.allow
                         .iter()
                         .map(|p| p.as_str())
                         .collect::<Vec<_>>()
                         .join("  ")
+                ));
+            }
+            out.push_str(&format!("  message:  {}\n", r.message));
+            if let Some(ref doc) = r.doc {
+                out.push('\n');
+                out.push_str(doc);
+                out.push('\n');
+            } else {
+                out.push('\n');
+                out.push_str(
+                    "(no documentation — add a markdown comment block after the frontmatter)\n",
                 );
             }
-            println!("  message:  {}", r.message);
-            if let Some(ref doc) = r.doc {
-                println!();
-                println!("{}", doc);
-            } else {
-                println!();
-                println!("(no documentation — add a markdown comment block after the frontmatter)");
-            }
-            println!();
-            print_config_snippet(&r.id, config.rules.rules.get(&r.id));
+            out.push('\n');
+            out.push_str(&format_config_snippet(&r.id, config.rules.rules.get(&r.id)));
         }
         _ => return Err(format!("Rule not found: {}", id)),
     }
 
-    Ok(())
+    Ok(out)
 }
 
-fn print_config_snippet(id: &str, override_: Option<&normalize_rules_config::RuleOverride>) {
-    println!("Configuration (.normalize/config.toml):");
+fn format_config_snippet(
+    id: &str,
+    override_: Option<&normalize_rules_config::RuleOverride>,
+) -> String {
+    let mut out = String::new();
+    out.push_str("Configuration (.normalize/config.toml):\n");
     if let Some(o) = override_ {
-        println!("  [rules.\"{id}\"]");
+        out.push_str(&format!("  [rules.\"{id}\"]\n"));
         if let Some(ref sev) = o.severity {
-            println!("  severity = \"{sev}\"");
+            out.push_str(&format!("  severity = \"{sev}\"\n"));
         }
         if let Some(enabled) = o.enabled {
-            println!("  enabled = {enabled}");
+            out.push_str(&format!("  enabled = {enabled}\n"));
         }
         if !o.allow.is_empty() {
             let patterns = o
@@ -915,18 +858,19 @@ fn print_config_snippet(id: &str, override_: Option<&normalize_rules_config::Rul
                 .map(|p| format!("\"{p}\""))
                 .collect::<Vec<_>>()
                 .join(", ");
-            println!("  allow = [{patterns}]");
+            out.push_str(&format!("  allow = [{patterns}]\n"));
         }
     } else {
-        println!("  # No overrides set. Example:");
-        println!("  [rules.\"{id}\"]");
-        println!("  severity = \"error\"          # error | warning | info | hint");
-        println!("  enabled = false              # disable this rule");
-        println!("  allow = [\"**/tests/**\"]      # skip matching files");
+        out.push_str("  # No overrides set. Example:\n");
+        out.push_str(&format!("  [rules.\"{id}\"]\n"));
+        out.push_str("  severity = \"error\"          # error | warning | info | hint\n");
+        out.push_str("  enabled = false              # disable this rule\n");
+        out.push_str("  allow = [\"**/tests/**\"]      # skip matching files\n");
     }
-    println!();
-    println!("  # Or use: normalize rules enable {id}");
-    println!("  #         normalize rules disable {id}");
+    out.push('\n');
+    out.push_str(&format!("  # Or use: normalize rules enable {id}\n"));
+    out.push_str(&format!("  #         normalize rules disable {id}\n"));
+    out
 }
 
 // =============================================================================
@@ -937,10 +881,9 @@ pub fn list_tags(
     root: &Path,
     show_rules: bool,
     tag_filter: Option<&str>,
-    json: bool,
     use_colors: bool,
     config: &RulesRunConfig,
-) -> Result<(), String> {
+) -> Result<String, String> {
     // Collect all rules from both tiers
     let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
     let fact_rules = interpret::load_all_rules(root, &config.rules);
@@ -998,24 +941,11 @@ pub fn list_tags(
         tag_map.retain(|k, _| k == t);
     }
 
-    if json {
-        let out: Vec<_> = tag_map
-            .iter()
-            .map(|(tag, (origin, ids))| {
-                serde_json::json!({
-                    "tag": tag,
-                    "origin": origin,
-                    "rules": ids,
-                })
-            })
-            .collect();
-        println!("{}", serde_json::to_string_pretty(&out).unwrap());
-        return Ok(());
-    }
+    let mut out = String::new();
 
     if tag_map.is_empty() {
-        println!("No tags found.");
-        return Ok(());
+        out.push_str("No tags found.\n");
+        return Ok(out);
     }
 
     for (tag, (origin, ids)) in &tag_map {
@@ -1027,19 +957,24 @@ pub fn list_tags(
         };
         if show_rules {
             let ids_str: Vec<&str> = ids.iter().map(|s| s.as_str()).collect();
-            println!("{:20} [{}]  {}", tag_display, origin, ids_str.join("  "));
+            out.push_str(&format!(
+                "{:20} [{}]  {}\n",
+                tag_display,
+                origin,
+                ids_str.join("  ")
+            ));
         } else {
-            println!(
-                "{:20} [{}]  {} rule{}",
+            out.push_str(&format!(
+                "{:20} [{}]  {} rule{}\n",
                 tag_display,
                 origin,
                 count,
                 if count == 1 { "" } else { "s" }
-            );
+            ));
         }
     }
 
-    Ok(())
+    Ok(out)
 }
 
 /// Collect fact rule diagnostics without printing (returns raw diagnostics).

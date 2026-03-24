@@ -5,6 +5,43 @@
 
 use std::collections::HashMap;
 
+/// Severity level for rule findings.
+///
+/// Shared across all rule engines (syntax, fact). `DiagnosticLevel` in
+/// `normalize-facts-rules-api` is the ABI-stable counterpart and adds a
+/// `Hint` variant for the display layer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Severity {
+    Error,
+    #[default]
+    Warning,
+    Info,
+}
+
+impl std::fmt::Display for Severity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Severity::Error => write!(f, "error"),
+            Severity::Warning => write!(f, "warning"),
+            Severity::Info => write!(f, "info"),
+        }
+    }
+}
+
+impl std::str::FromStr for Severity {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "error" => Ok(Severity::Error),
+            "warning" | "warn" => Ok(Severity::Warning),
+            "info" | "note" => Ok(Severity::Info),
+            _ => Err(format!("unknown severity: {}", s)),
+        }
+    }
+}
+
 /// An external tool that emits SARIF 2.1.0 output (used with `--engine sarif`).
 ///
 /// Configured via `[[rules.sarif-tools]]` in `.normalize/config.toml`.
@@ -37,6 +74,13 @@ pub struct RuleOverride {
 }
 
 impl normalize_core::Merge for RuleOverride {
+    /// Merge two `RuleOverride` values, with `other` taking priority.
+    ///
+    /// - `Option` fields: `other`'s value wins if `Some`; falls back to `self`.
+    /// - Vec fields (`allow`, `tags`): if `other`'s field is non-empty it replaces
+    ///   `self`'s field entirely; an empty `other` field inherits from `self`.
+    ///   **This means you cannot reset a Vec to empty via merge** — an empty `other`
+    ///   vec is treated as "no override" rather than "clear the list".
     fn merge(self, other: Self) -> Self {
         Self {
             severity: other.severity.or(self.severity),
@@ -74,6 +118,14 @@ pub struct RulesConfig {
 }
 
 impl normalize_core::Merge for RulesConfig {
+    /// Merge two `RulesConfig` values, with `other` taking priority.
+    ///
+    /// - Vec fields (`global_allow`, `sarif_tools`): if `other`'s field is non-empty
+    ///   it replaces `self`'s field; an empty `other` field inherits from `self`.
+    ///   **This means you cannot reset a Vec to empty via merge** — an empty `other`
+    ///   vec is treated as "no override" rather than "clear the list".
+    /// - `rules` HashMap: merged using `extend`, so `other`'s keys override `self`'s
+    ///   keys. Keys present only in `self` are preserved.
     fn merge(self, other: Self) -> Self {
         let global_allow = if other.global_allow.is_empty() {
             self.global_allow

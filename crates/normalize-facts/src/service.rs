@@ -5,6 +5,7 @@
 //! that works without the full normalize binary.
 
 use crate::FileIndex;
+use normalize_output::OutputFormatter;
 use schemars::JsonSchema;
 use serde::Serialize;
 use server_less::cli;
@@ -20,15 +21,21 @@ pub struct RebuildResult {
     pub files: usize,
 }
 
+impl OutputFormatter for RebuildResult {
+    fn format_text(&self) -> String {
+        format!("Indexed {} files", self.files)
+    }
+}
+
 impl std::fmt::Display for RebuildResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Indexed {} files", self.files)
+        f.write_str(&self.format_text())
     }
 }
 
 /// Index statistics.
 #[derive(Serialize, JsonSchema)]
-pub struct StatsResult {
+pub struct StructureStatsReport {
     pub file_count: usize,
     pub dir_count: usize,
     pub symbol_count: usize,
@@ -37,28 +44,45 @@ pub struct StatsResult {
     pub db_size_bytes: u64,
 }
 
-impl std::fmt::Display for StatsResult {
+impl OutputFormatter for StructureStatsReport {
+    fn format_text(&self) -> String {
+        let mut out = String::new();
+        out.push_str(&format!(
+            "Files:    {} ({} dirs)\n",
+            self.file_count, self.dir_count
+        ));
+        out.push_str(&format!("Symbols:  {}\n", self.symbol_count));
+        out.push_str(&format!("Calls:    {}\n", self.call_count));
+        out.push_str(&format!("Imports:  {}\n", self.import_count));
+        out.push_str(&format!(
+            "DB size:  {:.1} KB",
+            self.db_size_bytes as f64 / 1024.0
+        ));
+        out
+    }
+}
+
+impl std::fmt::Display for StructureStatsReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Files:    {} ({} dirs)", self.file_count, self.dir_count)?;
-        writeln!(f, "Symbols:  {}", self.symbol_count)?;
-        writeln!(f, "Calls:    {}", self.call_count)?;
-        writeln!(f, "Imports:  {}", self.import_count)?;
-        write!(f, "DB size:  {:.1} KB", self.db_size_bytes as f64 / 1024.0)
+        f.write_str(&self.format_text())
     }
 }
 
 /// File list result.
 #[derive(Serialize, JsonSchema)]
-pub struct FileList {
+pub struct StructureFilesReport {
     pub files: Vec<String>,
 }
 
-impl std::fmt::Display for FileList {
+impl OutputFormatter for StructureFilesReport {
+    fn format_text(&self) -> String {
+        self.files.iter().map(|p| format!("{}\n", p)).collect()
+    }
+}
+
+impl std::fmt::Display for StructureFilesReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for path in &self.files {
-            writeln!(f, "{}", path)?;
-        }
-        Ok(())
+        f.write_str(&self.format_text())
     }
 }
 
@@ -131,7 +155,7 @@ impl FactsCliService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<StatsResult, String> {
+    ) -> Result<StructureStatsReport, String> {
         let root_path = resolve_root(root)?;
         let db_path = open_index_path(&root_path);
         let db_size = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
@@ -146,7 +170,7 @@ impl FactsCliService {
         let dir_count = files.iter().filter(|f| f.is_dir).count();
         let graph_stats = idx.call_graph_stats().await.unwrap_or_default();
 
-        Ok(StatsResult {
+        Ok(StructureStatsReport {
             file_count,
             dir_count,
             symbol_count: graph_stats.symbols,
@@ -164,7 +188,7 @@ impl FactsCliService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<FileList, String> {
+    ) -> Result<StructureFilesReport, String> {
         let root_path = resolve_root(root)?;
         let limit = limit.unwrap_or(100);
         let idx = open_index(&root_path).await?;
@@ -181,6 +205,6 @@ impl FactsCliService {
             .map(|f| f.path.clone())
             .collect();
 
-        Ok(FileList { files: filtered })
+        Ok(StructureFilesReport { files: filtered })
     }
 }

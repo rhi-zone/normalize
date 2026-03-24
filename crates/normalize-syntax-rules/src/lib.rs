@@ -42,41 +42,13 @@ pub use sources::{
     SourceContext, SourceRegistry, TypeScriptSource, builtin_registry,
 };
 
+/// Severity level for rule findings. Defined in normalize-rules-config for sharing
+/// across all rule engines (syntax, fact).
+pub use normalize_rules_config::Severity;
+
 use glob::Pattern;
 use std::collections::HashMap;
 use std::path::PathBuf;
-
-/// Severity level for rule findings.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum Severity {
-    Error,
-    #[default]
-    Warning,
-    Info,
-}
-
-impl std::fmt::Display for Severity {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Severity::Error => write!(f, "error"),
-            Severity::Warning => write!(f, "warning"),
-            Severity::Info => write!(f, "info"),
-        }
-    }
-}
-
-impl std::str::FromStr for Severity {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "error" => Ok(Severity::Error),
-            "warning" | "warn" => Ok(Severity::Warning),
-            "info" | "note" => Ok(Severity::Info),
-            _ => Err(format!("unknown severity: {}", s)),
-        }
-    }
-}
 
 /// A syntax rule definition.
 #[derive(Debug)]

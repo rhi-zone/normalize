@@ -359,10 +359,10 @@ fn test_config_override_deny() {
     assert_eq!(rule.severity, Severity::Warning);
 
     // Apply config override with severity=error
-    let mut config = FactsRulesConfig::default();
+    let mut config = RulesConfig::default();
     config.rules.insert(
         "self-import".to_string(),
-        FactsRuleOverride {
+        RuleOverride {
             severity: Some("error".to_string()),
             ..Default::default()
         },
@@ -399,16 +399,16 @@ fn test_config_override_allow() {
 #[test]
 fn test_config_override_enable() {
     // fan-out is disabled by default
-    let default_config = FactsRulesConfig::default();
+    let default_config = RulesConfig::default();
     let rules = load_all_rules(Path::new("/nonexistent"), &default_config);
     let fan_out = rules.iter().find(|r| r.id == "fan-out").unwrap();
     assert!(!fan_out.enabled);
 
     // Enable via config
-    let mut config = FactsRulesConfig::default();
+    let mut config = RulesConfig::default();
     config.rules.insert(
         "fan-out".to_string(),
-        FactsRuleOverride {
+        RuleOverride {
             enabled: Some(true),
             ..Default::default()
         },
