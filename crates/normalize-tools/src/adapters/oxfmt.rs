@@ -9,7 +9,7 @@ use crate::{
 use std::path::Path;
 use std::process::Command;
 
-fn oxfmt_command() -> Option<(String, Vec<String>)> {
+fn oxfmt_command() -> Option<crate::tools::ToolInvocation> {
     crate::tools::find_js_tool("oxfmt", None)
 }
 
@@ -46,9 +46,9 @@ impl Tool for Oxfmt {
     }
 
     fn version(&self) -> Option<String> {
-        let (cmd, base_args) = oxfmt_command()?;
-        let mut command = Command::new(cmd);
-        command.args(&base_args).arg("--version");
+        let inv = oxfmt_command()?;
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args).arg("--version");
         command
             .output()
             .ok()
@@ -79,7 +79,7 @@ impl Tool for Oxfmt {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) = oxfmt_command()
+        let inv = oxfmt_command()
             .ok_or_else(|| ToolError::NotAvailable("oxfmt not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -88,8 +88,8 @@ impl Tool for Oxfmt {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args);
         command.arg("--check");
 
         let output = command.args(&path_args).current_dir(root).output()?;
@@ -151,7 +151,7 @@ impl Tool for Oxfmt {
     }
 
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) = oxfmt_command()
+        let inv = oxfmt_command()
             .ok_or_else(|| ToolError::NotAvailable("oxfmt not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -160,8 +160,8 @@ impl Tool for Oxfmt {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args);
         command.arg("--write");
 
         let output = command.args(&path_args).current_dir(root).output()?;

@@ -73,8 +73,7 @@ pub fn build_view_file_service(
     };
 
     let deps_result = if show_deps || context {
-        let deps_extractor = deps::DepsExtractor::new();
-        Some(deps_extractor.extract(&full_path, &content))
+        Some(deps::extract_deps(&full_path, &content))
     } else {
         None
     };

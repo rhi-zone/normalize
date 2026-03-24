@@ -10,7 +10,7 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
-fn pyright_command() -> Option<(String, Vec<String>)> {
+fn pyright_command() -> Option<crate::tools::ToolInvocation> {
     // Pyright can be installed via npm or pip
     // Try Python first (more common in Python projects), then npm
     if let Some(cmd) = crate::tools::find_python_tool("pyright") {
@@ -81,9 +81,9 @@ impl Tool for Pyright {
     }
 
     fn version(&self) -> Option<String> {
-        let (cmd, base_args) = pyright_command()?;
-        let mut command = Command::new(cmd);
-        command.args(&base_args).arg("--version");
+        let inv = pyright_command()?;
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args).arg("--version");
         command
             .output()
             .ok()
@@ -109,7 +109,7 @@ impl Tool for Pyright {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) = pyright_command()
+        let inv = pyright_command()
             .ok_or_else(|| ToolError::NotAvailable("pyright not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -118,8 +118,8 @@ impl Tool for Pyright {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args);
         command.arg("--outputjson");
 
         let output = command.args(&path_args).current_dir(root).output()?;

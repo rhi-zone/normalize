@@ -152,6 +152,17 @@ pub fn has_config_file(root: &Path, names: &[&str]) -> bool {
     names.iter().any(|name| root.join(name).exists())
 }
 
+/// A resolved tool command with base arguments.
+///
+/// Returned by `find_js_tool` and `find_python_tool`.
+#[derive(Debug, Clone)]
+pub struct ToolInvocation {
+    /// The command to execute (e.g., `"node_modules/.bin/eslint"`).
+    pub command: String,
+    /// Base arguments to prepend before any tool-specific args.
+    pub args: Vec<String>,
+}
+
 /// Find a JS ecosystem tool (local installs only, no remote downloads).
 ///
 /// Tries in order:
@@ -160,13 +171,16 @@ pub fn has_config_file(root: &Path, names: &[&str]) -> bool {
 /// 3. global install
 ///
 /// Returns (command, base_args) or None if not found.
-pub fn find_js_tool(bin_name: &str, _pkg_name: Option<&str>) -> Option<(String, Vec<String>)> {
+pub fn find_js_tool(bin_name: &str, _pkg_name: Option<&str>) -> Option<ToolInvocation> {
     use std::process::Command;
 
     // Check node_modules/.bin/ first (no process spawn needed)
     let local_bin = std::path::Path::new("node_modules/.bin").join(bin_name);
     if local_bin.exists() {
-        return Some((local_bin.to_string_lossy().into_owned(), vec![]));
+        return Some(ToolInvocation {
+            command: local_bin.to_string_lossy().into_owned(),
+            args: vec![],
+        });
     }
 
     // pnpm exec (local install only, not remote)
@@ -176,7 +190,10 @@ pub fn find_js_tool(bin_name: &str, _pkg_name: Option<&str>) -> Option<(String, 
         .map(|o| o.status.success())
         .unwrap_or(false)
     {
-        return Some(("pnpm".into(), vec!["exec".into(), bin_name.into()]));
+        return Some(ToolInvocation {
+            command: "pnpm".into(),
+            args: vec!["exec".into(), bin_name.into()],
+        });
     }
 
     // Global install
@@ -186,7 +203,10 @@ pub fn find_js_tool(bin_name: &str, _pkg_name: Option<&str>) -> Option<(String, 
         .map(|o| o.status.success())
         .unwrap_or(false)
     {
-        return Some((bin_name.into(), vec![]));
+        return Some(ToolInvocation {
+            command: bin_name.into(),
+            args: vec![],
+        });
     }
 
     None
@@ -200,13 +220,16 @@ pub fn find_js_tool(bin_name: &str, _pkg_name: Option<&str>) -> Option<(String, 
 /// 3. global install
 ///
 /// Returns (command, base_args) or None if not found.
-pub fn find_python_tool(tool: &str) -> Option<(String, Vec<String>)> {
+pub fn find_python_tool(tool: &str) -> Option<ToolInvocation> {
     use std::process::Command;
 
     // Check .venv/bin/ first (no process spawn needed)
     let local_bin = std::path::Path::new(".venv/bin").join(tool);
     if local_bin.exists() {
-        return Some((local_bin.to_string_lossy().into_owned(), vec![]));
+        return Some(ToolInvocation {
+            command: local_bin.to_string_lossy().into_owned(),
+            args: vec![],
+        });
     }
 
     // uv run (uv project - uses local deps from pyproject.toml)
@@ -216,7 +239,10 @@ pub fn find_python_tool(tool: &str) -> Option<(String, Vec<String>)> {
         .map(|o| o.status.success())
         .unwrap_or(false)
     {
-        return Some(("uv".into(), vec!["run".into(), tool.into()]));
+        return Some(ToolInvocation {
+            command: "uv".into(),
+            args: vec!["run".into(), tool.into()],
+        });
     }
 
     // Global install
@@ -226,7 +252,10 @@ pub fn find_python_tool(tool: &str) -> Option<(String, Vec<String>)> {
         .map(|o| o.status.success())
         .unwrap_or(false)
     {
-        return Some((tool.into(), vec![]));
+        return Some(ToolInvocation {
+            command: tool.into(),
+            args: vec![],
+        });
     }
 
     None

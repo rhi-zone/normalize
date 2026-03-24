@@ -128,6 +128,30 @@ impl AliasConfig {
 }
 
 // ============================================================================
+// FilterError
+// ============================================================================
+
+/// Error returned by [`Filter::new`].
+#[derive(Debug, thiserror::Error)]
+pub enum FilterError {
+    /// The pattern is not a valid glob.
+    #[error("invalid filter pattern '{pattern}': {reason}")]
+    InvalidPattern { pattern: String, reason: String },
+    /// A bare word that looks like a language name was used instead of a glob or alias.
+    #[error("{0}")]
+    InvalidPatternHint(String),
+    /// An `@alias` name is not defined.
+    #[error("unknown alias @{0}")]
+    UnknownAlias(String),
+}
+
+impl From<FilterError> for String {
+    fn from(e: FilterError) -> String {
+        e.to_string()
+    }
+}
+
+// ============================================================================
 // Filter
 // ============================================================================
 
@@ -197,7 +221,7 @@ impl Filter {
         only: &[String],
         config: &AliasConfig,
         languages: &[&str],
-    ) -> Result<Self, String> {
+    ) -> Result<Self, FilterError> {
         let mut warnings = Vec::new();
 
         // Build exclude matcher
@@ -270,7 +294,7 @@ fn resolve_patterns(
     config: &AliasConfig,
     languages: &[&str],
     warnings: &mut Vec<String>,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<String>, FilterError> {
     let mut result = Vec::new();
 
     for pattern in patterns {
@@ -280,7 +304,7 @@ fn resolve_patterns(
                     result.extend(ps);
                 }
                 ResolveResult::UnknownAlias(name) => {
-                    return Err(format!("unknown alias @{}", name));
+                    return Err(FilterError::UnknownAlias(name));
                 }
                 ResolveResult::DisabledAlias(name) => {
                     warnings.push(format!("@{} is disabled (matches nothing)", name));
@@ -294,13 +318,13 @@ fn resolve_patterns(
                 .find(|l| l.eq_ignore_ascii_case(pattern))
                 .copied();
             if let Some(lang) = matched_lang {
-                return Err(format!(
+                return Err(FilterError::InvalidPatternHint(format!(
                     "'{pattern}' is not a valid pattern — use a glob like '*.ext' or an alias like '@tests' (run 'normalize aliases' to list available aliases; detected language: {lang})"
-                ));
+                )));
             } else {
-                return Err(format!(
+                return Err(FilterError::InvalidPatternHint(format!(
                     "'{pattern}' is not a valid pattern — use a glob like '*.rs' or an alias like '@tests' (run 'normalize aliases' to list available aliases)"
-                ));
+                )));
             }
         } else {
             result.push(pattern.clone());
@@ -340,18 +364,22 @@ fn resolve_alias(name: &str, config: &AliasConfig, languages: &[&str]) -> Resolv
 }
 
 /// Build a gitignore-style matcher from patterns.
-fn build_matcher(patterns: &[String]) -> Result<Gitignore, String> {
+fn build_matcher(patterns: &[String]) -> Result<Gitignore, FilterError> {
     let mut builder = GitignoreBuilder::new("");
 
     for pattern in patterns {
         builder
             .add_line(None, pattern)
-            .map_err(|e| format!("invalid glob pattern '{}': {}", pattern, e))?;
+            .map_err(|e| FilterError::InvalidPattern {
+                pattern: pattern.clone(),
+                reason: e.to_string(),
+            })?;
     }
 
-    builder
-        .build()
-        .map_err(|e| format!("failed to build filter: {}", e))
+    builder.build().map_err(|e| FilterError::InvalidPattern {
+        pattern: String::new(),
+        reason: e.to_string(),
+    })
 }
 
 /// Get all resolved aliases for display (normalize filter aliases).
@@ -450,7 +478,12 @@ mod tests {
 
         assert!(result.is_err());
         // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
-        assert!(result.unwrap_err().contains("unknown alias @unknown"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("unknown alias @unknown")
+        );
     }
 
     #[test]
@@ -499,7 +532,7 @@ mod tests {
         let result = Filter::new(&[], &["rust".to_string()], &config, &["Rust"]);
         assert!(result.is_err());
         // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
-        let err = result.unwrap_err();
+        let err = result.unwrap_err().to_string();
         assert!(err.contains("'rust' is not a valid pattern"), "got: {err}");
         assert!(
             err.contains("Rust"),
@@ -514,7 +547,7 @@ mod tests {
         let result = Filter::new(&[], &["python".to_string()], &config, &["Rust"]);
         assert!(result.is_err());
         // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
-        let err = result.unwrap_err();
+        let err = result.unwrap_err().to_string();
         assert!(
             err.contains("'python' is not a valid pattern"),
             "got: {err}"

@@ -409,7 +409,10 @@ impl Shadow {
             .args(args)
             .current_dir(&self.worktree)
             .output()
-            .map_err(|e| ShadowError::Validation(format!("Failed to run {}: {}", cmd, e)))?;
+            .map_err(|e| ShadowError::Validation {
+                message: format!("Failed to run {}: {}", cmd, e),
+                exit_code: -1,
+            })?;
 
         Ok(ValidationResult {
             success: output.status.success(),
@@ -432,12 +435,16 @@ impl Shadow {
             .args(["diff", "--name-only", "HEAD~1", "HEAD"])
             .current_dir(&self.worktree)
             .output()
-            .map_err(|e| ShadowError::Validation(format!("git diff failed: {}", e)))?;
+            .map_err(|e| ShadowError::Validation {
+                message: format!("git diff failed: {}", e),
+                exit_code: -1,
+            })?;
 
         if !output.status.success() {
-            return Err(ShadowError::Validation(
-                "Failed to get changed files".to_string(),
-            ));
+            return Err(ShadowError::Validation {
+                message: "Failed to get changed files".to_string(),
+                exit_code: -1,
+            });
         }
 
         let files: Vec<PathBuf> = String::from_utf8_lossy(&output.stdout)
@@ -451,11 +458,15 @@ impl Shadow {
             let shadow_file = self.worktree.join(rel);
             if shadow_file.exists() {
                 if let Some(parent) = file.parent() {
-                    std::fs::create_dir_all(parent)
-                        .map_err(|e| ShadowError::Validation(format!("mkdir failed: {}", e)))?;
+                    std::fs::create_dir_all(parent).map_err(|e| ShadowError::Validation {
+                        message: format!("mkdir failed: {}", e),
+                        exit_code: -1,
+                    })?;
                 }
-                std::fs::copy(&shadow_file, file)
-                    .map_err(|e| ShadowError::Validation(format!("copy failed: {}", e)))?;
+                std::fs::copy(&shadow_file, file).map_err(|e| ShadowError::Validation {
+                    message: format!("copy failed: {}", e),
+                    exit_code: -1,
+                })?;
             }
         }
 
@@ -1010,26 +1021,17 @@ pub struct UndoResult {
 }
 
 /// Shadow git errors.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum ShadowError {
+    #[error("failed to initialize shadow worktree: {0}")]
     Init(String),
+    #[error("failed to commit in shadow worktree: {0}")]
     Commit(String),
+    #[error("failed to undo shadow operation: {0}")]
     Undo(String),
-    Validation(String),
+    #[error("validation failed: {message} (exit code {exit_code})")]
+    Validation { message: String, exit_code: i32 },
 }
-
-impl std::fmt::Display for ShadowError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ShadowError::Init(msg) => write!(f, "Shadow init error: {}", msg),
-            ShadowError::Commit(msg) => write!(f, "Shadow commit error: {}", msg),
-            ShadowError::Undo(msg) => write!(f, "Shadow undo error: {}", msg),
-            ShadowError::Validation(msg) => write!(f, "Shadow validation error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for ShadowError {}
 
 #[cfg(test)]
 mod tests {

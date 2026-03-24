@@ -372,8 +372,7 @@ pub fn build_view_symbol_service(
     let grammar =
         normalize_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
 
-    let deps_extractor = crate::deps::DepsExtractor::new();
-    let deps_result = deps_extractor.extract(&full_path, &content);
+    let deps_result = crate::deps::extract_deps(&full_path, &content);
 
     // Try fast path for single-element paths
     let source_opt = if symbol_path.len() == 1 {
