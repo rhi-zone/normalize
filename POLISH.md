@@ -1,9 +1,9 @@
 # Polish State
 
 Created: f89f7a3c5d17cb1d8b13137bacb8c830d54c808c
-Last run: 2026-03-25T02:00:00Z
+Last run: 2026-03-25T03:00:00Z
 Round 1 applied: 2026-03-24
-Round: 13
+Round: 14
 Project type: Rust CLI + library ecosystem (~40 crates)
 
 ## Lenses
@@ -828,3 +828,23 @@ None.
 
 - [DONE] `crates/normalize-ecosystems/src/lib.rs` — `PackageQuery`, `PackageInfo`, `Feature`, `TreeNode`, `DependencyTree`, `Vulnerability`, `LockfileManager` fields documented _(severity: medium)_
 - [DONE] `crates/normalize-ecosystems/src/ecosystems/npm/lockfile_bun.rs:11` — bare URL wrapped in `<...>` _(severity: medium)_
+
+---
+
+## Findings — Round 14
+
+Round 14 git hash: 9b830aa1
+Scope: entire codebase — fixpoint verification
+
+### Result: NEAR-FIXPOINT ✓
+
+api-clarity: FIXPOINT
+naming-consistency: FIXPOINT
+doc-coverage: FIXPOINT
+adversarial: FIXPOINT
+
+### error-surface (4 remaining items — all fixed)
+
+- [DONE] `crates/normalize/src/service/config.rs:640` — `current_dir().unwrap_or_default()` → empty PathBuf on failure; changed to propagate error _(severity: high)_
+- [DONE] `crates/normalize/src/service/facts.rs:646,670-671` — three `eprintln!` in service helpers → `tracing::info!`/`tracing::warn!` _(severity: medium)_
+- [DONE] `crates/normalize/src/service/config.rs:289` — `unwrap()` without SAFETY comment → added comment _(severity: low)_
