@@ -1,9 +1,9 @@
 # Polish State
 
 Created: f89f7a3c5d17cb1d8b13137bacb8c830d54c808c
-Last run: 2026-03-24T14:50:00Z
+Last run: 2026-03-24T17:30:00Z
 Round 1 applied: 2026-03-24
-Round: 4 (fixpoint reached)
+Round: 6
 Project type: Rust CLI + library ecosystem (~40 crates)
 
 ## Lenses
@@ -489,3 +489,59 @@ None.
 - [DONE] `crates/normalize-rules-config/src/lib.rs:77-99` — `RuleOverride::merge` doc doesn't explain practical impact of "cannot reset Vec to empty" _(severity: low)_
 - [DONE] `crates/normalize-native-rules/src/lib.rs:22-37` — `id` naming convention not documented (slash-namespace vs hyphen) _(severity: low)_
 - [DONE] `crates/normalize-path-resolve/src/lib.rs:23` — `PathEntry` doc claims returned by `find_like` but `find_like` still returns `(String, bool)` tuples — fix after unification _(severity: low)_
+
+---
+
+## Findings — Round 6 (standard five lenses)
+
+Round 6 git hash: 266098e9
+Scope: entire codebase
+
+### Conflicts
+None.
+
+### api-clarity
+
+- [DONE] `crates/normalize-tools/src/tools.rs:144` — `Tool::fix` default impl silently calls `run()` — add doc comment explaining it's a deliberate default _(severity: medium)_
+- [DONE] `crates/normalize-tools/src/lib.rs:54,63` — three ways to create a registry with built-ins; no guidance on which to use — add module-level doc _(severity: medium)_
+- [DONE] `crates/normalize-graph/src/lib.rs:941` — `analyze_graph_data(limit=0)` magic value; `0` means "unlimited" but type system doesn't express it — add doc comment _(severity: medium)_
+- [DONE] `crates/normalize-path-resolve/src/lib.rs:42` — `PathSource::find_like` takes `&mut self` without justification — change to `&self` if no mutation needed _(severity: medium)_
+- [DONE] `crates/normalize-session-analysis/src/lib.rs:25` + `crates/normalize-ratchet/src/lib.rs:25` — `default_metrics(root)` has unused `root` that exists only to satisfy `MetricFactory` signature; document why _(severity: high)_
+
+### naming-consistency
+
+- [DONE] `crates/normalize/src/commands/analyze/activity.rs:83` + `repo_coupling.rs:31` — two `RepoActivity` structs with different fields — rename repo_coupling one to `RepoCouplingContext` _(severity: high)_
+- [DONE] `crates/normalize-tools/src/tools.rs:93` + `crates/normalize-output/src/diagnostics.rs:117` — `ToolError` as both enum and struct — rename struct to `ToolFailure` _(severity: high)_
+- [DONE] `crates/normalize-chat-sessions/src/formats/mod.rs:10,20` + `crates/normalize-session-analysis/SUMMARY.md:5` — stale `SessionAnalysis` references after Round 5 rename — update to `SessionAnalysisReport` _(severity: medium)_
+- [REJECTED] Path field naming (`path` vs `file_path` vs `file`) inconsistency across analyze report structs _(severity: medium)_ — **deferred: affects too many structs to fix atomically; track separately**
+- [REJECTED] File count fields (`file_count` vs `files_scanned` vs `files_analyzed` vs `files_checked`) _(severity: medium)_ — **deferred: same reason**
+- [REJECTED] Free-text fields (`message` vs `description` vs `text`) _(severity: medium)_ — **deferred**
+
+### doc-coverage
+
+- [DONE] `crates/normalize-architecture/src/lib.rs:488,523` — `find_longest_chains` and `longest_path_from` no doc comments _(severity: high)_
+- [DONE] `crates/normalize-output/src/diagnostics.rs:147` — `merge()` doc doesn't state `files_checked` is summed _(severity: high)_
+- [DONE] `crates/normalize-session-analysis/src/lib.rs:52-59` — `ModelPricing` fields undocumented (units unclear) _(severity: medium)_
+- [DONE] `crates/normalize-facts-rules-api/src/relations.rs:44-54` — `module_specifier` doc missing when/why empty _(severity: medium)_
+- [DONE] `crates/normalize-tools/src/tools.rs:166-228` — `find_js_tool`/`find_python_tool` don't explain root param usage _(severity: medium)_
+- [DONE] `crates/normalize-graph/src/lib.rs:848-884` — `find_longest_chains` doc missing; no dedup explanation _(severity: medium)_
+- [DONE] `crates/normalize-ratchet/src/service.rs:20-53` — `MeasureReport`/`CheckReport` overview docs missing _(severity: low)_
+- [DONE] `crates/normalize-budget/src/service.rs:268` — `measure()` doc doesn't explain default `base_ref` _(severity: low)_
+- [DONE] `crates/normalize-graph/src/lib.rs:21` — `MIN_CHAIN_NODE_COUNT` uses `//` not `///` _(severity: low)_
+
+### error-surface
+
+- [DONE] `crates/normalize-rules/src/runner.rs:1135` — `Runtime::new().unwrap()` panics on resource exhaustion _(severity: high)_
+- [DONE] `crates/normalize-rules/src/service.rs:724,740,743` — `load_rules_config` swallows file read + TOML parse errors silently _(severity: high)_
+- [DONE] `crates/normalize-rules/src/runner.rs:1319,1329,1334` — `eprintln!` in library code; should use tracing _(severity: medium)_
+- [DONE] `crates/normalize-rules/src/runner.rs:690,691` — TOML parse failures silently `unwrap_or_default` _(severity: medium)_
+- [DONE] `crates/normalize-facts-rules-interpret/src/lib.rs:268,342` — silent IO error + `eprintln!` in library _(severity: medium)_
+- [DONE] `crates/normalize/src/extract.rs:63` — `Runtime::new().ok()?` silently returns None _(severity: medium)_
+- [DONE] `crates/normalize-native-rules/src/check_examples.rs:57` + `check_refs.rs:109` — `Regex::new().unwrap()` on runtime; use lazy static _(severity: low)_
+
+### adversarial
+
+- [DONE] `crates/normalize/src/service/facts.rs:841-857` — `query()` passes user SQL to `raw_query()` without SELECT-only validation — SQL injection _(severity: high)_
+- [DONE] `crates/normalize-tools/src/tools.rs:174-268` — `find_js_tool`/`find_python_tool` no path validation; document that root is trusted _(severity: medium)_
+- [DONE] `crates/normalize-rules/src/service.rs:262` — issue `limit` has no upper bound; cap at 10_000 _(severity: medium)_
+- [DONE] `crates/normalize-facts-rules-builtins/src/lib.rs:28-46` — `catch_unwind` swallows panics silently; log them _(severity: medium)_
