@@ -108,7 +108,7 @@ pub trait OutputFormatter: Serialize + schemars::JsonSchema {
 /// Callers can wrap the result in ANSI color as needed.
 pub fn progress_bar(ratio: f64, width: usize) -> String {
     let ratio = ratio.clamp(0.0, 1.0);
-    let filled = (ratio * width as f64).round() as usize;
+    let filled = ((ratio * width as f64).round() as usize).min(width);
     format!("{}{}", "█".repeat(filled), "░".repeat(width - filled))
 }
 

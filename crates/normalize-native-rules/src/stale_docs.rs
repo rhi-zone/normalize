@@ -46,7 +46,7 @@ impl OutputFormatter for StaleDocsReport {
             for doc in &self.stale_docs {
                 lines.push(format!("  {}", doc.doc_path));
                 for cover in &doc.stale_covers {
-                    let days_stale = (cover.code_modified - doc.doc_modified) / 86400;
+                    let days_stale = cover.code_modified.saturating_sub(doc.doc_modified) / 86400;
                     lines.push(format!(
                         "    {} ({} files, ~{} days stale)",
                         cover.pattern,
@@ -173,7 +173,8 @@ impl From<StaleDocsReport> for DiagnosticsReport {
                 .into_iter()
                 .flat_map(|doc| {
                     doc.stale_covers.into_iter().map(move |cover| {
-                        let days_stale = (cover.code_modified - doc.doc_modified) / 86400;
+                        let days_stale =
+                            cover.code_modified.saturating_sub(doc.doc_modified) / 86400;
                         Issue {
                             file: doc.doc_path.clone(),
                             line: None,

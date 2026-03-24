@@ -4,6 +4,7 @@
 //! Report structs and OutputFormatter impls live in the `normalize` crate.
 
 use normalize_facts::FileIndex;
+pub use normalize_graph::{ImportChain, find_longest_chains};
 use normalize_languages::is_programming_language;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -68,16 +69,6 @@ pub struct HubModule {
     pub fan_out: usize,
     /// Product of fan_in * fan_out — higher = more central.
     pub hub_score: usize,
-}
-
-/// A deep import chain (longest dependency path).
-/// Long chains can indicate layering issues or overly deep hierarchies.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct ImportChain {
-    /// Modules in the chain from start to end.
-    pub modules: Vec<String>,
-    /// Length of the chain (number of edges, not nodes).
-    pub depth: usize,
 }
 
 /// Import flow between directory layers.
@@ -298,9 +289,14 @@ pub async fn find_orphan_modules(
             || file.contains("spec");
 
         if !is_imported && !is_likely_entry && symbol_count > 0 {
+            let symbols = if symbol_count < 0 {
+                0usize
+            } else {
+                symbol_count as usize
+            };
             orphans.push(OrphanModule {
                 path: file,
-                symbols: symbol_count as usize,
+                symbols,
             });
         }
     }
@@ -363,25 +359,44 @@ pub async fn find_symbol_hotspots(
         let name: String = row.get(0)?;
         let count: i64 = row.get(1)?;
         if !generic.contains(name.as_str()) {
-            symbol_callers.insert(name, count as usize);
+            let n = if count < 0 { 0usize } else { count as usize };
+            symbol_callers.insert(name, n);
         }
     }
 
+    // Filter to callers > 3 before the lookup query.
+    let candidates: Vec<(String, usize)> =
+        symbol_callers.into_iter().filter(|(_, c)| *c > 3).collect();
+
     let mut hotspots: Vec<SymbolMetrics> = Vec::new();
-    for (name, callers) in &symbol_callers {
-        let stmt = conn
-            .prepare("SELECT file, kind FROM symbols WHERE name = ? LIMIT 1")
-            .await?;
-        let mut rows = stmt.query([name.as_str()]).await?;
-        if let Some(row) = rows.next().await? {
-            let file: String = row.get(0)?;
-            let kind: String = row.get(1)?;
-            if *callers > 3 {
+    if !candidates.is_empty() {
+        let placeholders = candidates
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "SELECT name, file, kind FROM symbols WHERE name IN ({}) GROUP BY name",
+            placeholders
+        );
+        let stmt = conn.prepare(&sql).await?;
+        let params: Vec<libsql::Value> = candidates
+            .iter()
+            .map(|(n, _)| libsql::Value::Text(n.clone()))
+            .collect();
+        let mut rows = stmt.query(params).await?;
+        // Build a lookup from name → callers count.
+        let callers_map: HashMap<String, usize> = candidates.into_iter().collect();
+        while let Some(row) = rows.next().await? {
+            let name: String = row.get(0)?;
+            let file: String = row.get(1)?;
+            let kind: String = row.get(2)?;
+            if let Some(&callers) = callers_map.get(&name) {
                 hotspots.push(SymbolMetrics {
                     file,
-                    name: name.clone(),
+                    name,
                     kind,
-                    callers: *callers,
+                    callers,
                 });
             }
         }
@@ -459,77 +474,6 @@ fn find_cycles_dfs(
 
     path.pop();
     rec_stack.remove(node);
-}
-
-// ── Longest chain detection ───────────────────────────────────────────────────
-
-/// Find the longest import chains (dependency paths) in the graph.
-/// Uses DFS to find the longest path from each node, avoiding cycles.
-pub fn find_longest_chains(graph: &HashMap<String, HashSet<String>>) -> Vec<ImportChain> {
-    let mut longest_paths: Vec<ImportChain> = Vec::new();
-    let mut memo: HashMap<String, Vec<String>> = HashMap::new();
-
-    for start in graph.keys() {
-        let mut visited: HashSet<String> = HashSet::new();
-        let path = longest_path_from(start, graph, &mut visited, &mut memo);
-        if path.len() > 3 {
-            longest_paths.push(ImportChain {
-                depth: path.len() - 1,
-                modules: path,
-            });
-        }
-    }
-
-    longest_paths.sort_by(|a, b| b.depth.cmp(&a.depth));
-
-    let mut unique_chains: Vec<ImportChain> = Vec::new();
-    for chain in longest_paths {
-        let dominated = unique_chains.iter().any(|existing| {
-            existing.modules.len() > chain.modules.len()
-                && existing.modules.ends_with(&chain.modules)
-        });
-        if !dominated {
-            unique_chains.push(chain);
-        }
-        if unique_chains.len() >= 5 {
-            break;
-        }
-    }
-
-    unique_chains
-}
-
-/// Find the longest path from a node using DFS with memoization.
-fn longest_path_from(
-    node: &str,
-    graph: &HashMap<String, HashSet<String>>,
-    visited: &mut HashSet<String>,
-    memo: &mut HashMap<String, Vec<String>>,
-) -> Vec<String> {
-    if let Some(cached) = memo.get(node) {
-        return cached.clone();
-    }
-
-    visited.insert(node.to_string());
-
-    let mut longest: Vec<String> = vec![node.to_string()];
-
-    if let Some(neighbors) = graph.get(node) {
-        for neighbor in neighbors {
-            if !visited.contains(neighbor) {
-                let sub_path = longest_path_from(neighbor, graph, visited, memo);
-                if sub_path.len() + 1 > longest.len() {
-                    let mut new_path = vec![node.to_string()];
-                    new_path.extend(sub_path);
-                    longest = new_path;
-                }
-            }
-        }
-    }
-
-    visited.remove(node);
-    memo.insert(node.to_string(), longest.clone());
-    longest
 }
 
 // ── Layer extraction ──────────────────────────────────────────────────────────
