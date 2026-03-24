@@ -13,22 +13,21 @@ pub struct MetricPoint<'a> {
 /// Matching rules:
 /// - Exact match: `addr == prefix` (after stripping trailing slash from prefix)
 /// - Child match: `addr` starts with `prefix/`
-/// - Trailing-slash prefix: passing `"src/"` matches any addr starting with `"src/"`
+///
+/// Trailing slashes on `prefix` are stripped before comparison, so `"src/"` and `"src"` match
+/// identically.
 pub fn filter_by_prefix<'a>(
     items: &'a [(String, f64)],
     prefix: &str,
 ) -> impl Iterator<Item = MetricPoint<'a>> {
     // Normalise: strip any trailing slash to get the canonical prefix.
     let canonical = prefix.trim_end_matches('/').to_string();
-    // Whether the original prefix had a trailing slash — if so, prefix/ matches are correct.
-    let had_trailing_slash = prefix.ends_with('/');
 
     items
         .iter()
         .filter(move |(addr, _)| {
-            addr.as_str() == canonical.as_str()
-                || addr.starts_with(&format!("{canonical}/"))
-                || (had_trailing_slash && addr.starts_with(&format!("{canonical}/")))
+            // Exact match, or child path separated by '/'.
+            addr.as_str() == canonical.as_str() || addr.starts_with(&format!("{canonical}/"))
         })
         .map(|(addr, value)| MetricPoint {
             address: addr.as_str(),

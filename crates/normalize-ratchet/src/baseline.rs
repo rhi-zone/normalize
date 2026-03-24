@@ -77,13 +77,16 @@ pub fn ratchet_path(root: &Path) -> PathBuf {
 // ---------------------------------------------------------------------------
 
 /// Load the baseline file, returning default if not found.
-#[deprecated(note = "use BaselineFile::load")]
+#[deprecated(
+    since = "0.2.0",
+    note = "use BaselineFile::load — unlike this function, it returns None instead of default when the file is absent"
+)]
 pub fn load_baseline(root: &Path) -> anyhow::Result<BaselineFile> {
     Ok(BaselineFile::load(root)?.unwrap_or_default())
 }
 
 /// Save the baseline file.
-#[deprecated(note = "use file.save(root)")]
+#[deprecated(since = "0.2.0", note = "use file.save(root)")]
 pub fn save_baseline(root: &Path, file: &BaselineFile) -> anyhow::Result<()> {
     file.save(root)
 }

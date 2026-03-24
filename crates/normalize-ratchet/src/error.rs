@@ -16,7 +16,6 @@ pub enum RatchetError {
     #[error("failed to parse baseline: {0}")]
     BaselineParse(#[from] serde_json::Error),
     /// Running the metric against the repository or file failed.
-    /// Running the metric against the repository or file failed.
     #[error("measurement failed for metric '{metric}' at '{path}': {reason}")]
     MeasurementFailed {
         metric: String,
