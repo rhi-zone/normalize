@@ -408,23 +408,59 @@ pub async fn find_symbol_hotspots(
 
 // ── Cycle detection ───────────────────────────────────────────────────────────
 
-/// Find cycles in the import graph using DFS.
+/// Find cycles in the import graph using iterative DFS.
 pub fn find_cycles(graph: &HashMap<String, HashSet<String>>) -> Vec<Cycle> {
     let mut cycles = Vec::new();
     let mut visited: HashSet<String> = HashSet::new();
-    let mut rec_stack: HashSet<String> = HashSet::new();
-    let mut path: Vec<String> = Vec::new();
 
-    for node in graph.keys() {
-        if !visited.contains(node) {
-            find_cycles_dfs(
-                node,
-                graph,
-                &mut visited,
-                &mut rec_stack,
-                &mut path,
-                &mut cycles,
-            );
+    for start in graph.keys() {
+        if visited.contains(start) {
+            continue;
+        }
+        // Each stack frame: (node, iterator-index-into-neighbors, already-pushed-to-path)
+        // We use an explicit stack of (node, neighbor_index) pairs.
+        // rec_stack tracks the current DFS path as a set; path tracks it as an ordered Vec.
+        let mut rec_stack: HashSet<String> = HashSet::new();
+        let mut path: Vec<String> = Vec::new();
+        // Stack entries: (node_name, index_of_next_neighbor_to_visit)
+        let mut stack: Vec<(String, usize)> = Vec::new();
+
+        // Push the start node
+        visited.insert(start.clone());
+        rec_stack.insert(start.clone());
+        path.push(start.clone());
+        stack.push((start.clone(), 0));
+
+        while let Some((node, idx)) = stack.last_mut() {
+            let node = node.clone();
+            let neighbors: Vec<String> = graph
+                .get(&node)
+                .map(|s| s.iter().cloned().collect())
+                .unwrap_or_default();
+
+            if *idx < neighbors.len() {
+                let neighbor = neighbors[*idx].clone();
+                *idx += 1;
+
+                if !visited.contains(&neighbor) {
+                    visited.insert(neighbor.clone());
+                    rec_stack.insert(neighbor.clone());
+                    path.push(neighbor.clone());
+                    stack.push((neighbor, 0));
+                } else if rec_stack.contains(&neighbor)
+                    && let Some(pos) = path.iter().position(|x| x == &neighbor)
+                    && path[pos..].len() > 1
+                {
+                    cycles.push(Cycle {
+                        modules: path[pos..].to_vec(),
+                    });
+                }
+            } else {
+                // Done with this node — pop it
+                stack.pop();
+                path.pop();
+                rec_stack.remove(&node);
+            }
         }
     }
 
@@ -445,35 +481,75 @@ pub fn find_cycles(graph: &HashMap<String, HashSet<String>>) -> Vec<Cycle> {
     unique_cycles
 }
 
-fn find_cycles_dfs(
+// ── Longest chain detection ───────────────────────────────────────────────────
+
+/// Find the longest import chains (dependency paths) in the graph.
+/// Uses DFS to find the longest path from each node, avoiding cycles.
+pub fn find_longest_chains(graph: &HashMap<String, HashSet<String>>) -> Vec<ImportChain> {
+    let mut longest_paths: Vec<ImportChain> = Vec::new();
+    let mut memo: HashMap<String, Vec<String>> = HashMap::new();
+
+    for start in graph.keys() {
+        let mut visited: HashSet<String> = HashSet::new();
+        let path = longest_path_from(start, graph, &mut visited, &mut memo);
+        if path.len() > 3 {
+            longest_paths.push(ImportChain {
+                depth: path.len() - 1,
+                modules: path,
+            });
+        }
+    }
+
+    longest_paths.sort_by(|a, b| b.depth.cmp(&a.depth));
+
+    let mut unique_chains: Vec<ImportChain> = Vec::new();
+    for chain in longest_paths {
+        let dominated = unique_chains.iter().any(|existing| {
+            existing.modules.len() > chain.modules.len()
+                && existing.modules.ends_with(&chain.modules)
+        });
+        if !dominated {
+            unique_chains.push(chain);
+        }
+        if unique_chains.len() >= 5 {
+            break;
+        }
+    }
+
+    unique_chains
+}
+
+/// Find the longest path from a node using DFS with memoization.
+fn longest_path_from(
     node: &str,
     graph: &HashMap<String, HashSet<String>>,
     visited: &mut HashSet<String>,
-    rec_stack: &mut HashSet<String>,
-    path: &mut Vec<String>,
-    cycles: &mut Vec<Cycle>,
-) {
+    memo: &mut HashMap<String, Vec<String>>,
+) -> Vec<String> {
+    if let Some(cached) = memo.get(node) {
+        return cached.clone();
+    }
+
     visited.insert(node.to_string());
-    rec_stack.insert(node.to_string());
-    path.push(node.to_string());
+
+    let mut longest: Vec<String> = vec![node.to_string()];
 
     if let Some(neighbors) = graph.get(node) {
         for neighbor in neighbors {
             if !visited.contains(neighbor) {
-                find_cycles_dfs(neighbor, graph, visited, rec_stack, path, cycles);
-            } else if rec_stack.contains(neighbor)
-                && let Some(pos) = path.iter().position(|x| x == neighbor)
-                && path[pos..].len() > 1
-            {
-                cycles.push(Cycle {
-                    modules: path[pos..].to_vec(),
-                });
+                let sub_path = longest_path_from(neighbor, graph, visited, memo);
+                if sub_path.len() + 1 > longest.len() {
+                    let mut new_path = vec![node.to_string()];
+                    new_path.extend(sub_path);
+                    longest = new_path;
+                }
             }
         }
     }
 
-    path.pop();
-    rec_stack.remove(node);
+    visited.remove(node);
+    memo.insert(node.to_string(), longest.clone());
+    longest
 }
 
 // ── Layer extraction ──────────────────────────────────────────────────────────

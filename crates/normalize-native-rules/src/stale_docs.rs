@@ -109,8 +109,11 @@ pub fn build_stale_docs_report(root: &Path) -> StaleDocsReport {
 
         let doc_modified = std::fs::metadata(md_file)
             .and_then(|m| m.modified())
-            // normalize-syntax-allow: rust/unwrap-in-impl - UNIX_EPOCH is always earlier than any real file timestamp
-            .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
+            .map(|t| {
+                t.duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or(std::time::Duration::ZERO)
+                    .as_secs()
+            })
             .unwrap_or(0);
 
         let mut stale_covers: Vec<StaleCover> = Vec::new();
@@ -132,8 +135,11 @@ pub fn build_stale_docs_report(root: &Path) -> StaleDocsReport {
                     .filter_map(|f| {
                         std::fs::metadata(root.join(f))
                             .and_then(|m| m.modified())
-                            // normalize-syntax-allow: rust/unwrap-in-impl - UNIX_EPOCH is always earlier than any real file timestamp
-                            .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
+                            .map(|t| {
+                                t.duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or(std::time::Duration::ZERO)
+                                    .as_secs()
+                            })
                             .ok()
                     })
                     .max()

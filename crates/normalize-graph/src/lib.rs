@@ -12,6 +12,14 @@ use nu_ansi_term::Color;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 
+/// Minimum chain length (in nodes) to include in the longest-chains report.
+///
+/// A chain of 4 nodes has depth 3 (3 edges). Depth 2 chains are common in any
+/// project with a utilities layer and are not interesting signals. Starting at
+/// depth ≥ 3 surfaces only chains that likely indicate layering violations or
+/// overly deep call stacks worth reviewing.
+const MIN_CHAIN_NODE_COUNT: usize = 4;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -847,7 +855,7 @@ pub fn find_longest_chains(
     for start in graph.keys() {
         let mut visited: HashSet<String> = HashSet::new();
         let path = longest_path_from(start, graph, &mut visited, &mut memo);
-        if path.len() > 3 {
+        if path.len() >= MIN_CHAIN_NODE_COUNT {
             longest_paths.push(ImportChain {
                 depth: path.len() - 1,
                 modules: path,
@@ -876,6 +884,16 @@ pub fn find_longest_chains(
 }
 
 /// Find the longest path from a node using DFS with memoization.
+///
+/// # Memoization limitation
+///
+/// Results are cached keyed only by `node`. When the same node is reached from
+/// two different roots the first cached result is reused, even though the
+/// `visited` set differs between the two calls. This means the cached result
+/// may be shorter than what would be computed from a different root (because
+/// some successors were marked visited in the first traversal). The trade-off
+/// is acceptable: the memo avoids O(n²) worst-case work and the goal is
+/// finding representative longest paths, not an exhaustive enumeration.
 pub fn longest_path_from(
     node: &str,
     graph: &HashMap<String, HashSet<String>>,
@@ -915,13 +933,20 @@ pub fn longest_path_from(
 /// Analyze graph-theoretic properties of an abstract dependency graph.
 ///
 /// Takes an adjacency list (`HashMap<String, HashSet<String>>`) and a limit
-/// for the number of items to return in each section. Pass `usize::MAX` for
-/// no limit. The `target` parameter is recorded in the report for display.
+/// for the number of items to return in each section. Pass `0` or `usize::MAX`
+/// for no limit — `0` is treated as "unlimited" so callers do not accidentally
+/// truncate all results to empty Vecs while stats counts still reflect the
+/// full data (which would produce misleading reports). The `target` parameter
+/// is recorded in the report for display.
 pub fn analyze_graph_data(
     imports: &HashMap<String, HashSet<String>>,
     target: GraphTarget,
     limit: usize,
 ) -> GraphReport {
+    // Treat 0 as "no limit" — callers should pass usize::MAX explicitly when
+    // they want unlimited, but 0 is a common default and should not silently
+    // truncate every result Vec to empty.
+    let limit = if limit == 0 { usize::MAX } else { limit };
     let nodes = all_nodes(imports);
     let node_count = nodes.len();
     let edges = edge_count(imports);
@@ -1020,7 +1045,15 @@ fn truncate_path(path: &str, max_len: usize) -> String {
     if path.len() <= max_len {
         path.to_string()
     } else {
-        format!("...{}", &path[path.len() - (max_len - 3)..])
+        // Use char_indices to find a safe character boundary, avoiding a byte-index
+        // slice into a multi-byte UTF-8 sequence which would panic.
+        let suffix = path
+            .char_indices()
+            .rev()
+            .find(|(i, _)| path.len() - i <= max_len - 3)
+            .map(|(i, _)| &path[i..])
+            .unwrap_or(path);
+        format!("...{}", suffix)
     }
 }
 
