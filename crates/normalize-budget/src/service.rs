@@ -83,6 +83,7 @@ pub struct CheckEntry {
 /// Result of `budget check`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct CheckReport {
+    /// All checked entries with their current values and any violations.
     pub entries: Vec<CheckEntry>,
     /// Total number of limit violations across all entries.
     pub violations: usize,

@@ -149,9 +149,13 @@ pub struct UpdateReport {
 /// A single entry in an [`UpdateReport`].
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct UpdateEntry {
+    /// File or directory path the baseline entry applies to.
     pub path: String,
+    /// Name of the metric the entry tracks.
     pub metric: String,
+    /// Baseline value before this update.
     pub old_value: f64,
+    /// Baseline value after this update.
     pub new_value: f64,
     /// Why this entry was updated or skipped.
     pub reason: UpdateReason,
@@ -267,7 +271,9 @@ impl OutputFormatter for AddReport {
 /// Result of `ratchet remove`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct RemoveReport {
+    /// File or directory path the baseline entry applies to.
     pub path: String,
+    /// Name of the metric the entry tracks.
     pub metric: String,
     /// Whether an entry was actually found and removed.
     pub removed: bool,
