@@ -72,7 +72,24 @@ pub(crate) fn create_worktree(root: &Path, base_ref: &str) -> anyhow::Result<std
     Ok(worktree_path)
 }
 
+/// RAII guard that removes a git worktree on drop.
+pub(crate) struct WorktreeGuard {
+    pub(crate) path: std::path::PathBuf,
+    pub(crate) root: std::path::PathBuf,
+}
+
+impl Drop for WorktreeGuard {
+    fn drop(&mut self) {
+        let worktree_str = self.path.to_string_lossy().to_string();
+        let _ = Command::new("git")
+            .args(["worktree", "remove", &worktree_str, "--force"])
+            .current_dir(&self.root)
+            .output();
+    }
+}
+
 /// Remove a temporary git worktree. Propagates errors on failure.
+#[allow(dead_code)]
 pub(crate) fn remove_worktree(root: &Path, worktree_path: &Path) -> anyhow::Result<()> {
     let worktree_str = worktree_path.to_string_lossy().to_string();
     let output = Command::new("git")
@@ -141,8 +158,12 @@ pub(crate) fn symbol_diff(
     kinds: &[&str],
 ) -> anyhow::Result<Vec<DiffMeasurement>> {
     let worktree_path = create_worktree(root, base_ref)?;
+    let _guard = WorktreeGuard {
+        path: worktree_path.clone(),
+        root: root.to_path_buf(),
+    };
     let base_map = collect_symbols_for_kinds(&worktree_path, kinds);
-    remove_worktree(root, &worktree_path)?;
+    drop(_guard);
 
     let current_map = collect_symbols_for_kinds(root, kinds);
 

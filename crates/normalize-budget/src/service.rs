@@ -3,6 +3,7 @@
 //! Implements `normalize budget` subcommands via the server-less `#[cli]` pattern.
 
 use crate::budget::{BudgetConfig, BudgetEntry, BudgetLimits, load_budget, save_budget};
+use crate::error::BudgetError;
 use crate::{DiffMetricFactory, default_diff_metrics};
 use normalize_metrics::Aggregate;
 use normalize_output::OutputFormatter;
@@ -606,14 +607,21 @@ pub(crate) fn do_measure(
     factory: &DiffMetricFactory,
 ) -> Result<MeasureReport, String> {
     let metrics = factory();
-    let m = metrics
-        .iter()
-        .find(|m| m.name() == metric)
-        .ok_or_else(|| format!("unknown diff metric '{metric}'"))?;
+    let m = metrics.iter().find(|m| m.name() == metric).ok_or_else(|| {
+        BudgetError::MetricNotFound {
+            name: metric.to_string(),
+        }
+        .to_string()
+    })?;
 
-    let all = m
-        .measure_diff(root, base_ref)
-        .map_err(|e| format!("metric '{}' at '{}': {}", metric, root.display(), e))?;
+    let all = m.measure_diff(root, base_ref).map_err(|e| {
+        BudgetError::MeasurementFailed {
+            metric: metric.to_string(),
+            path: root.display().to_string(),
+            reason: e.to_string(),
+        }
+        .to_string()
+    })?;
 
     // Filter items whose key starts with path prefix
     let path_prefix = path.trim_end_matches('/');

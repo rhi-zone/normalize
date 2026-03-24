@@ -1,6 +1,6 @@
 //! Complexity delta diff metric.
 
-use super::functions::{create_worktree, remove_worktree};
+use super::functions::{WorktreeGuard, create_worktree};
 use super::{DiffMeasurement, DiffMetric};
 use normalize_languages::{Language, support_for_path};
 use std::collections::HashMap;
@@ -20,8 +20,12 @@ impl DiffMetric for ComplexityDeltaMetric {
 
     fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<DiffMeasurement>> {
         let worktree_path = create_worktree(root, base_ref)?;
+        let _guard = WorktreeGuard {
+            path: worktree_path.clone(),
+            root: root.to_path_buf(),
+        };
         let base_map = collect_complexity(root, &worktree_path);
-        remove_worktree(root, &worktree_path)?;
+        drop(_guard);
 
         let current_map = collect_complexity(root, root);
 
@@ -107,11 +111,11 @@ fn analyze_file_complexity(
     let tree = normalize_facts::parse_with_grammar(grammar_name, content)?;
 
     let tags_scm = loader.get_tags(grammar_name)?;
-    let ts_lang = loader.get(grammar_name).ok().flatten()?;
+    let ts_lang = loader.get(grammar_name).ok()?;
     let tags_query = tree_sitter::Query::new(&ts_lang, &tags_scm).ok()?;
 
     let complexity_query = loader.get_complexity(grammar_name).and_then(|scm| {
-        let grammar = loader.get(grammar_name).ok().flatten()?;
+        let grammar = loader.get(grammar_name).ok()?;
         tree_sitter::Query::new(&grammar, &scm).ok()
     });
 

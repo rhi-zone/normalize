@@ -20,7 +20,7 @@ pub fn grammar_loader() -> Arc<GrammarLoader> {
 ///
 /// The grammar name should match tree-sitter grammar names (e.g., "python", "rust", "typescript").
 pub fn parser_for(grammar: &str) -> Option<Parser> {
-    let language = grammar_loader().get(grammar).ok().flatten()?;
+    let language = grammar_loader().get(grammar).ok()?;
     let mut parser = Parser::new();
     parser.set_language(&language).ok()?;
     Some(parser)

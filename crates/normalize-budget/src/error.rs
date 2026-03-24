@@ -11,11 +11,11 @@ pub enum BudgetError {
     BudgetRead(#[from] std::io::Error),
     #[error("failed to parse budget file: {0}")]
     BudgetParse(#[from] serde_json::Error),
-    #[error("measurement failed for metric '{metric}' at '{path}': {message}")]
+    #[error("measurement failed for metric '{metric}' at '{path}': {reason}")]
     MeasurementFailed {
         metric: String,
         path: String,
-        message: String,
+        reason: String,
     },
     #[error("git operation failed: {0}")]
     GitFailed(String),

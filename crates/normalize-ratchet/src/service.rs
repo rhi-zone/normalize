@@ -3,6 +3,7 @@
 //! Implements `normalize ratchet` subcommands via the server-less `#[cli]` pattern.
 
 use crate::baseline::{Aggregate, BaselineEntry, BaselineFile, RatchetConfig};
+use crate::error::RatchetError;
 use crate::{MetricFactory, default_metrics};
 use normalize_metrics::filter_by_prefix;
 use normalize_output::OutputFormatter;
@@ -199,6 +200,7 @@ pub struct ShowReport {
     pub entries: Vec<ShowEntry>,
 }
 
+/// A single entry in a [`ShowReport`].
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct ShowEntry {
     pub path: String,
@@ -433,11 +435,15 @@ impl RatchetService {
     ///
     /// Exits non-zero if regressions found.
     #[cli(display_with = "display_check")]
+    #[allow(clippy::too_many_arguments)]
     pub fn check(
         &self,
         #[param(positional, help = "Filter by path prefix")] path: Option<String>,
         #[param(short = 'm', help = "Filter by metric name")] metric: Option<String>,
         #[param(help = "Compare to this git ref instead of stored baseline")] base: Option<String>,
+        #[param(short = 'a', help = "Aggregation strategy (used with --base)")] aggregate: Option<
+            Aggregate,
+        >,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
         pretty: bool,
         compact: bool,
@@ -446,11 +452,19 @@ impl RatchetService {
         self.resolve_format(pretty, compact);
 
         if let Some(ref base_ref) = base {
+            let config = load_ratchet_config(&root_path);
+            let agg = aggregate.unwrap_or_else(|| {
+                metric
+                    .as_deref()
+                    .map(|m| config.effective_aggregate(m))
+                    .unwrap_or(Aggregate::Mean)
+            });
             return check_against_ref(
                 &root_path,
                 base_ref,
                 path.as_deref(),
                 metric.as_deref(),
+                agg,
                 &self.metric_factory,
             );
         }
@@ -672,14 +686,21 @@ pub fn do_measure(
     factory: &MetricFactory,
 ) -> Result<MeasureReport, String> {
     let metrics = factory(root);
-    let m = metrics
-        .iter()
-        .find(|m| m.name() == metric)
-        .ok_or_else(|| format!("unknown metric '{metric}'"))?;
+    let m = metrics.iter().find(|m| m.name() == metric).ok_or_else(|| {
+        RatchetError::MetricNotFound {
+            name: metric.to_string(),
+        }
+        .to_string()
+    })?;
 
-    let all = m
-        .measure_all(root)
-        .map_err(|e| format!("metric '{}' at '{}': {}", metric, root.display(), e))?;
+    let all = m.measure_all(root).map_err(|e| {
+        RatchetError::MeasurementFailed {
+            metric: metric.to_string(),
+            path: root.display().to_string(),
+            reason: e.to_string(),
+        }
+        .to_string()
+    })?;
 
     let values: Vec<f64> = filter_by_prefix(&all, path).map(|p| p.value).collect();
 
@@ -713,6 +734,10 @@ pub fn measure(
     do_measure(root, path, metric, agg, factory)
 }
 
+/// Filter baseline entries by optional path prefix and metric name.
+///
+/// Both `path` and `metric` are optional; passing `None` means "no filter".
+/// Path matching respects path boundaries (e.g. `"src"` matches `"src/foo"` but not `"srcs/bar"`).
 fn filter_entries<'a>(
     entries: &'a [BaselineEntry],
     path: Option<&str>,
@@ -725,6 +750,11 @@ fn filter_entries<'a>(
         .collect()
 }
 
+/// Measure all `entries` against the current working tree and produce a [`CheckReport`].
+///
+/// Each entry is re-measured; entries whose metric cannot be measured are skipped with a warning.
+/// The report counts regressions, improvements, and unchanged entries, and classifies each
+/// [`CheckEntry`] according to whether higher-or-lower is worse for that metric.
 fn build_check_report(
     root: &Path,
     entries: Vec<&BaselineEntry>,
@@ -800,12 +830,30 @@ fn build_check_report(
     })
 }
 
+/// RAII guard that removes a git worktree on drop.
+struct WorktreeGuard<'a> {
+    path: &'a Path,
+    root: &'a Path,
+}
+
+impl Drop for WorktreeGuard<'_> {
+    fn drop(&mut self) {
+        use std::process::Command;
+        let worktree_str = self.path.to_string_lossy().to_string();
+        let _ = Command::new("git")
+            .args(["worktree", "remove", &worktree_str, "--force"])
+            .current_dir(self.root)
+            .output();
+    }
+}
+
 /// Check against a historical git ref.
 fn check_against_ref(
     root: &Path,
     base_ref: &str,
     path_filter: Option<&str>,
     metric_filter: Option<&str>,
+    aggregate: Aggregate,
     factory: &MetricFactory,
 ) -> Result<CheckReport, String> {
     use std::process::Command;
@@ -859,6 +907,12 @@ fn check_against_ref(
         ));
     }
 
+    // Guard ensures worktree is removed even if we return early via `?`.
+    let _guard = WorktreeGuard {
+        path: &worktree_path,
+        root,
+    };
+
     // Measure baseline at ref
     let baseline_measurements = {
         let metrics = factory(&worktree_path);
@@ -888,19 +942,6 @@ fn check_against_ref(
         }
         measurements
     };
-
-    // Clean up worktree — surface error if removal fails
-    let rm = Command::new("git")
-        .args(["worktree", "remove", &worktree_str, "--force"])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("failed to remove worktree: {e}"))?;
-    if !rm.status.success() {
-        return Err(format!(
-            "failed to remove worktree: {}",
-            String::from_utf8_lossy(&rm.stderr).trim()
-        ));
-    }
 
     // Measure current
     let current_metrics = factory(root);
@@ -959,7 +1000,7 @@ fn check_against_ref(
             check_entries.push(CheckEntry {
                 path: addr.clone(),
                 metric: metric_name.clone(),
-                aggregate: Aggregate::Mean, // per-item, no aggregation
+                aggregate,
                 baseline: *baseline_val,
                 current: current_val,
                 delta,
@@ -1039,21 +1080,11 @@ fn measure_at_ref(
         ));
     }
 
-    let result = do_measure(&worktree_path, path, metric, agg, factory);
-
-    let rm = Command::new("git")
-        .args(["worktree", "remove", &worktree_str, "--force"])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("failed to remove worktree: {e}"))?;
-    if !rm.status.success() {
-        return Err(format!(
-            "failed to remove worktree: {}",
-            String::from_utf8_lossy(&rm.stderr).trim()
-        ));
-    }
-
-    result
+    let _guard = WorktreeGuard {
+        path: &worktree_path,
+        root,
+    };
+    do_measure(&worktree_path, path, metric, agg, factory)
 }
 
 fn metric_higher_is_worse(metric_name: &str, factory: &MetricFactory) -> bool {

@@ -769,7 +769,8 @@ impl FileIndex {
         let pb = if self.progress && std::io::IsTerminal::is_terminal(&std::io::stderr()) {
             let pb = ProgressBar::new_spinner();
             pb.set_style(
-                ProgressStyle::with_template("{spinner:.cyan} {msg} [{elapsed_precise}]").unwrap(),
+                ProgressStyle::with_template("{spinner:.cyan} {msg} [{elapsed_precise}]")
+                    .unwrap_or_else(|_| ProgressStyle::default_spinner()),
             );
             pb.set_message("Scanning files...");
             pb
@@ -1871,7 +1872,7 @@ impl FileIndex {
                 ProgressStyle::with_template(
                     "{spinner:.cyan} Parsing symbols... [{bar:30.cyan/dim}] {pos}/{len} files [{elapsed_precise}]",
                 )
-                .unwrap()
+                .unwrap_or_else(|_| ProgressStyle::default_bar())
                 .progress_chars("##-"),
             );
             pb
@@ -1965,7 +1966,7 @@ impl FileIndex {
                 ProgressStyle::with_template(
                     "{spinner:.cyan} Storing index... [{bar:30.cyan/dim}] {pos}/{len} files [{elapsed_precise}]",
                 )
-                .unwrap()
+                .unwrap_or_else(|_| ProgressStyle::default_bar())
                 .progress_chars("##-"),
             );
             pb
