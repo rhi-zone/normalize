@@ -1,9 +1,9 @@
 # Polish State
 
 Created: f89f7a3c5d17cb1d8b13137bacb8c830d54c808c
-Last run: 2026-03-24T22:00:00Z
+Last run: 2026-03-24T23:00:00Z
 Round 1 applied: 2026-03-24
-Round: 9
+Round: 10
 Project type: Rust CLI + library ecosystem (~40 crates)
 
 ## Lenses
@@ -691,3 +691,45 @@ None.
 - [DONE] `crates/normalize-native-rules/src/stale_summary.rs:215` — `build_stale_summary_report` missing doc comment — added _(severity: medium)_
 - [DONE] `DiffMetricFactory` duplicated doc paragraph — deduplicated _(severity: low)_
 - [DONE] `build_ratchet_diagnostics` minimal doc — expanded _(severity: low)_
+
+---
+
+## Findings — Round 10
+
+Round 10 git hash: 73b532c9
+Scope: entire codebase — fixpoint verification
+
+### Conflicts
+None.
+
+### naming-consistency
+
+- [DONE] `crates/normalize-syntax-rules/src/service.rs:44` — `RunResult` (Display, not OutputFormatter) → renamed `RunRulesReport` with `OutputFormatter` impl _(severity: high)_
+- [DONE] `crates/normalize-syntax-rules/src/service.rs:110` — `RuleList` (Display, not OutputFormatter) → renamed `RulesListReport` _(severity: high)_
+- [DONE] `crates/normalize-filter/src/service.rs:19` — `MatchResult` (Display) → renamed `MatchReport` with `OutputFormatter` _(severity: high)_
+- [DONE] `crates/normalize-filter/src/service.rs:44` — `AliasesResult` (Display) → renamed `AliasesReport` _(severity: high)_
+- [DONE] `crates/normalize/src/service/daemon.rs` — `DaemonRootList` → `DaemonRootsReport` _(severity: low)_
+- [DONE] `crates/normalize-filter/src/lib.rs:194` — `ResolveResult` (internal) → `AliasResolution` _(severity: low)_
+
+### adversarial
+
+- [DONE] `crates/normalize-edit/src/lib.rs` — `line_to_byte` summed `line.len() + 1` producing non-UTF-8-aligned offsets; rewrote to count `\n` bytes directly _(severity: high)_
+- [DONE] `crates/normalize-facts/src/index.rs:1279` — redundant double `unwrap_or(0)` simplified _(severity: low)_
+- [DONE] `crates/normalize-budget/src/metrics/complexity_delta.rs` — `find_node_by_range` recursive walk without depth guard; added `MAX_DEPTH=512` _(severity: low)_
+
+### error-surface
+
+- [DONE] `crates/normalize/src/service/analyze.rs` — ~18 service methods returning `Result<T, String>`; defined `AnalyzeError` enum (`IndexNotFound`, `Io`, `Other`) and changed all return types _(severity: medium)_
+
+### api-clarity
+
+- [DONE] `crates/normalize-ratchet/src/service.rs` — `base` parameter renamed to `diff_ref`/`baseline_ref` so server-less derives correct `--diff-ref`/`--baseline-ref` flag names _(severity: medium)_
+
+### doc-coverage
+
+- [DONE] `crates/normalize/src/jq/mod.rs:15` + `service/config.rs:616` — `[0]` and `[rules]` escaped as `\[0\]` and `\[rules\]` _(severity: medium)_
+- [DONE] `crates/normalize/src/paths.rs:12,13,18` — `<relative>`/`<root>` wrapped in backticks _(severity: medium)_
+- [DONE] `crates/normalize/src/commands/analyze/report.rs:61-66` — `SecurityFinding` fields documented _(severity: medium)_
+- [DONE] `crates/normalize-grammars/src/lib.rs` — added crate-level `//!` doc _(severity: medium)_
+- [DONE] `crates/normalize-syntax-rules/src/runner.rs` — `DebugFlags::timing` field documented _(severity: low)_
+- [DONE] `crates/normalize-filter/src/service.rs` — `MatchReport`, `AliasEntry`, `AliasesReport` fields documented _(severity: low)_
