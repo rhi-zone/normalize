@@ -70,7 +70,10 @@ impl Metric for CallComplexityMetric {
                     let mut infos: Vec<TagInfo> = Vec::new();
                     while let Some(m) = matches.next() {
                         for capture in m.captures {
-                            let cn = capture_names[capture.index as usize];
+                            // tree-sitter guarantees capture.index is valid for well-formed grammars; use .get() for defense against adversarial grammar injection
+                            let Some(&cn) = capture_names.get(capture.index as usize) else {
+                                continue;
+                            };
                             let is_fn = matches!(cn, "definition.function" | "definition.method");
                             let is_container = matches!(
                                 cn,
@@ -173,8 +176,12 @@ impl Metric for CallComplexityMetric {
                     let mut call_matches = qcursor2.matches(cq, root_node, content.as_bytes());
                     while let Some(m) = call_matches.next() {
                         for cap in m.captures {
-                            let cn = cq_capture_names[cap.index as usize];
+                            // tree-sitter guarantees capture.index is valid for well-formed grammars; use .get() for defense against adversarial grammar injection
+                            let Some(&cn) = cq_capture_names.get(cap.index as usize) else {
+                                continue;
+                            };
                             if cn == "reference.call" {
+                                // SAFETY: tree-sitter byte ranges are guaranteed to be char-boundary-aligned for valid UTF-8 source; read_to_string pre-validates UTF-8
                                 let callee_name = content[cap.node.byte_range()].to_string();
                                 let call_row = cap.node.start_position().row;
                                 // Find innermost function enclosing this call by row
@@ -251,7 +258,10 @@ impl Metric for CallComplexityMetric {
                 } else {
                     format!("{}/{}", key.0, key.1)
                 };
-                (address.replace('\\', "/"), (local_cc + reachable) as f64)
+                (
+                    address.replace('\\', "/"),
+                    local_cc.saturating_add(reachable) as f64,
+                )
             })
             .collect();
 
@@ -315,7 +325,7 @@ fn count_with_query(node: &tree_sitter::Node, query: &tree_sitter::Query, conten
     let mut matches = qcursor.matches(query, *node, content.as_bytes());
     let mut count = 1usize;
     while let Some(m) = matches.next() {
-        count += m.captures.len();
+        count = count.saturating_add(m.captures.len());
     }
     count
 }

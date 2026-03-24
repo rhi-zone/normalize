@@ -71,7 +71,10 @@ fn analyze_file_complexity(
         let mut infos: Vec<TagInfo> = Vec::new();
         while let Some(m) = matches.next() {
             for capture in m.captures {
-                let cn = capture_names[capture.index as usize];
+                // tree-sitter guarantees capture.index is valid for well-formed grammars; use .get() for defense against adversarial grammar injection
+                let Some(&cn) = capture_names.get(capture.index as usize) else {
+                    continue;
+                };
                 let is_fn = matches!(cn, "definition.function" | "definition.method");
                 let is_container = matches!(
                     cn,

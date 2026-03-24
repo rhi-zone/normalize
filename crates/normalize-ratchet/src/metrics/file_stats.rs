@@ -72,7 +72,10 @@ impl Metric for FunctionCountMetric {
                 let mut seen: HashSet<(usize, usize)> = HashSet::new();
                 while let Some(m) = matches.next() {
                     for capture in m.captures {
-                        let cn = capture_names[capture.index as usize];
+                        // tree-sitter guarantees capture.index is valid for well-formed grammars; use .get() for defense against adversarial grammar injection
+                        let Some(&cn) = capture_names.get(capture.index as usize) else {
+                            continue;
+                        };
                         if matches!(cn, "definition.function" | "definition.method") {
                             let key = (capture.node.start_byte(), capture.node.end_byte());
                             if seen.insert(key) {
@@ -118,7 +121,10 @@ impl Metric for ClassCountMetric {
                 let mut seen: HashSet<(usize, usize)> = HashSet::new();
                 while let Some(m) = matches.next() {
                     for capture in m.captures {
-                        let cn = capture_names[capture.index as usize];
+                        // tree-sitter guarantees capture.index is valid for well-formed grammars; use .get() for defense against adversarial grammar injection
+                        let Some(&cn) = capture_names.get(capture.index as usize) else {
+                            continue;
+                        };
                         if matches!(cn, "definition.class" | "definition.interface") {
                             let key = (capture.node.start_byte(), capture.node.end_byte());
                             if seen.insert(key) {

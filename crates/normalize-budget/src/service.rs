@@ -2,7 +2,7 @@
 //!
 //! Implements `normalize budget` subcommands via the server-less `#[cli]` pattern.
 
-use crate::budget::{BudgetConfig, BudgetEntry, BudgetLimits, load_budget, save_budget};
+use crate::budget::{BudgetConfig, BudgetEntry, BudgetFile, BudgetLimits};
 use crate::error::BudgetError;
 use crate::{DiffMetricFactory, default_diff_metrics};
 use normalize_metrics::Aggregate;
@@ -168,7 +168,7 @@ pub struct ShowEntry {
     /// Name of the metric the entry tracks.
     pub metric: String,
     /// Aggregation function applied to metric values.
-    pub aggregate: String,
+    pub aggregate: Aggregate,
     /// Git ref used as the base for the diff.
     #[serde(rename = "ref")]
     pub base_ref: String,
@@ -375,7 +375,9 @@ impl BudgetService {
             );
         }
 
-        let mut budget = load_budget(&root).map_err(|e| e.to_string())?;
+        let mut budget = BudgetFile::load(&root)
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
 
         if budget
             .entries
@@ -397,7 +399,7 @@ impl BudgetService {
             limits,
         };
         budget.entries.push(entry);
-        save_budget(&root, &budget).map_err(|e| e.to_string())?;
+        budget.save(&root).map_err(|e| e.to_string())?;
 
         Ok(AddReport {
             path,
@@ -418,7 +420,9 @@ impl BudgetService {
     ) -> Result<CheckReport, String> {
         let root = resolve_root(root)?;
         self.resolve_format(pretty, compact);
-        let budget = load_budget(&root).map_err(|e| e.to_string())?;
+        let budget = BudgetFile::load(&root)
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
         let entries = filter_entries(&budget.entries, path.as_deref(), metric.as_deref());
 
         let mut check_entries = Vec::new();
@@ -495,7 +499,9 @@ impl BudgetService {
     ) -> Result<UpdateReport, String> {
         let root = resolve_root(root)?;
         self.resolve_format(pretty, compact);
-        let mut budget = load_budget(&root).map_err(|e| e.to_string())?;
+        let mut budget = BudgetFile::load(&root)
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
 
         let entry = budget
             .entries
@@ -521,7 +527,7 @@ impl BudgetService {
                 if max_net.is_some() {
                     e.limits.max_net = max_net;
                 }
-                save_budget(&root, &budget).map_err(|e| e.to_string())?;
+                budget.save(&root).map_err(|e| e.to_string())?;
                 Ok(UpdateReport {
                     path,
                     metric,
@@ -543,7 +549,9 @@ impl BudgetService {
     ) -> Result<ShowReport, String> {
         let root = resolve_root(root)?;
         self.resolve_format(pretty, compact);
-        let budget = load_budget(&root).map_err(|e| e.to_string())?;
+        let budget = BudgetFile::load(&root)
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
         let entries = filter_entries(&budget.entries, path.as_deref(), metric.as_deref());
 
         let show_entries = entries
@@ -551,7 +559,7 @@ impl BudgetService {
             .map(|e| ShowEntry {
                 path: e.path.clone(),
                 metric: e.metric.clone(),
-                aggregate: e.aggregate.to_string(),
+                aggregate: e.aggregate,
                 base_ref: e.base_ref.clone(),
                 limits: e.limits.clone(),
             })
@@ -574,7 +582,9 @@ impl BudgetService {
     ) -> Result<RemoveReport, String> {
         let root = resolve_root(root)?;
         self.resolve_format(pretty, compact);
-        let mut budget = load_budget(&root).map_err(|e| e.to_string())?;
+        let mut budget = BudgetFile::load(&root)
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
 
         let len_before = budget.entries.len();
         budget
@@ -583,7 +593,7 @@ impl BudgetService {
         let removed = budget.entries.len() < len_before;
 
         if removed {
-            save_budget(&root, &budget).map_err(|e| e.to_string())?;
+            budget.save(&root).map_err(|e| e.to_string())?;
         }
 
         Ok(RemoveReport {
@@ -663,11 +673,7 @@ pub(crate) fn do_measure(
     let path_prefix = path.trim_end_matches('/');
     let filtered: Vec<(f64, f64)> = all
         .into_iter()
-        .filter(|item| {
-            item.key == path_prefix
-                || item.key.starts_with(&format!("{path_prefix}/"))
-                || (path_prefix.ends_with('/') && item.key.starts_with(path_prefix))
-        })
+        .filter(|item| item.key == path_prefix || item.key.starts_with(&format!("{path_prefix}/")))
         .map(|item| (item.added, item.removed))
         .collect();
 
@@ -702,7 +708,7 @@ pub(crate) fn do_measure(
     Ok(MeasureReport {
         path: path.to_string(),
         metric: metric.to_string(),
-        aggregate: agg.to_string(),
+        aggregate: agg,
         base_ref: base_ref.to_string(),
         added,
         removed,
@@ -776,10 +782,10 @@ pub fn build_budget_report(
 ) -> normalize_output::diagnostics::DiagnosticsReport {
     use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 
-    let budget = match load_budget(root) {
-        Ok(b) => b,
+    let budget = match BudgetFile::load(root) {
+        Ok(Some(b)) => b,
+        Ok(None) => return DiagnosticsReport::new(),
         Err(e) => {
-            // File-not-found returns default; only real errors reach here.
             return DiagnosticsReport {
                 issues: vec![Issue {
                     file: root.to_string_lossy().to_string(),
@@ -857,6 +863,12 @@ pub fn build_budget_report(
     }
 }
 
-// Keep the old name as an alias for backward compat with normalize-native-rules.
+/// Deprecated alias for [`build_budget_report`].
+#[deprecated(since = "0.2.0", note = "use build_budget_report")]
 #[doc(hidden)]
-pub use build_budget_report as build_budget_diagnostics;
+pub fn build_budget_diagnostics(
+    root: &Path,
+    factory: &DiffMetricFactory,
+) -> normalize_output::diagnostics::DiagnosticsReport {
+    build_budget_report(root, factory)
+}

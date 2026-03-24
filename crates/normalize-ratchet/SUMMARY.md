@@ -14,9 +14,9 @@ Each baseline entry is a `(path, metric, aggregation) → value` triple stored i
 
 - `src/lib.rs` — public API: `Metric` trait, `MetricFactory` type alias, `default_metrics()` factory
 - `src/baseline.rs` — baseline file format (`.normalize/ratchet.json`), `Aggregate` enum, `RatchetConfig`, aggregation logic
-- `src/metrics/` — metric implementations (complexity, call-complexity, line-count, function-count, class-count, comment-line-count)
-- `src/error.rs` — `RatchetError` enum with thiserror for metric-not-found, baseline IO/parse, measurement failures
-- `src/service.rs` — CLI service (`normalize ratchet`) with `measure`, `add`, `check`, `update`, `show`, `remove` commands; report types renamed `*Report` (was `MeasureResult`, `AddResult`, `RemoveResult`); `build_ratchet_report()` for native rules integration
+- `src/metrics/` — metric implementations (complexity, call-complexity, line-count, function-count, class-count, comment-line-count, file-stats)
+- `src/error.rs` — `RatchetError` enum (MetricNotFound, BaselineNotFound, BaselineRead, BaselineParse, MeasurementFailed) with per-variant doc comments
+- `src/service.rs` — `RatchetService` CLI service (`normalize ratchet`) with `measure`, `add`, `check`, `update`, `show`, `remove` commands; `build_ratchet_report()` for native rules integration
 
 ## Metrics
 
