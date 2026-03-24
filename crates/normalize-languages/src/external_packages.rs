@@ -60,25 +60,18 @@ pub fn get_global_packages_db() -> Option<PathBuf> {
     Some(cache.join("packages.db"))
 }
 
-/// Compare version strings semver-style.
-pub fn version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
-    let a_parts: Vec<u32> = a.split('.').filter_map(|p| p.parse().ok()).collect();
-    let b_parts: Vec<u32> = b.split('.').filter_map(|p| p.parse().ok()).collect();
-
-    for (ap, bp) in a_parts.iter().zip(b_parts.iter()) {
-        match ap.cmp(bp) {
-            std::cmp::Ordering::Equal => continue,
-            other => return other,
-        }
-    }
-    a_parts.len().cmp(&b_parts.len())
-}
-
 // =============================================================================
 // Global Package Index Database
 // =============================================================================
 
 use libsql::{Connection, Database, params};
+
+/// Error type for PackageIndex open operations.
+#[derive(Debug, thiserror::Error)]
+pub enum PackageIndexError {
+    #[error("failed to open package index: {0}")]
+    Open(#[from] libsql::Error),
+}
 
 /// Parsed version as (major, minor).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -176,7 +169,7 @@ pub struct PackageIndex {
 }
 
 impl PackageIndex {
-    pub async fn open() -> Result<Self, libsql::Error> {
+    pub async fn open() -> Result<Self, PackageIndexError> {
         let db_path = get_global_packages_db().ok_or_else(|| {
             libsql::Error::SqliteFailure(1, "Cannot determine cache directory".into())
         })?;
@@ -188,7 +181,7 @@ impl PackageIndex {
         Ok(index)
     }
 
-    pub async fn open_in_memory() -> Result<Self, libsql::Error> {
+    pub async fn open_in_memory() -> Result<Self, PackageIndexError> {
         let db = libsql::Builder::new_local(":memory:").build().await?;
         let conn = db.connect()?;
         let index = PackageIndex { conn, db };

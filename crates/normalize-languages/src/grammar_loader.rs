@@ -149,7 +149,12 @@ impl GrammarLoader {
     /// Returns None if grammar not found in search paths.
     pub fn get(&self, name: &str) -> Option<Language> {
         // Check cache first
-        if let Some(loaded) = self.cache.read().ok()?.get(name) {
+        if let Some(loaded) = self
+            .cache
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+        {
             return Some(loaded.language.clone());
         }
 
@@ -162,7 +167,12 @@ impl GrammarLoader {
     /// Query files are {name}.highlights.scm in the grammar search paths.
     pub fn get_highlights(&self, name: &str) -> Option<Arc<String>> {
         // Check cache first
-        if let Some(query) = self.highlight_cache.read().ok()?.get(name) {
+        if let Some(query) = self
+            .highlight_cache
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+        {
             return Some(Arc::clone(query));
         }
 
@@ -175,7 +185,12 @@ impl GrammarLoader {
     /// Query files are {name}.injections.scm in the grammar search paths.
     pub fn get_injections(&self, name: &str) -> Option<Arc<String>> {
         // Check cache first
-        if let Some(query) = self.injection_cache.read().ok()?.get(name) {
+        if let Some(query) = self
+            .injection_cache
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+        {
             return Some(Arc::clone(query));
         }
 
@@ -188,7 +203,12 @@ impl GrammarLoader {
     /// Query files are {name}.locals.scm in the grammar search paths.
     pub fn get_locals(&self, name: &str) -> Option<Arc<String>> {
         // Check cache first
-        if let Some(query) = self.locals_cache.read().ok()?.get(name) {
+        if let Some(query) = self
+            .locals_cache
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+        {
             return Some(Arc::clone(query));
         }
 
@@ -203,7 +223,12 @@ impl GrammarLoader {
     /// and `@nesting` captures for nodes that increase nesting depth.
     pub fn get_complexity(&self, name: &str) -> Option<Arc<String>> {
         // Check cache first
-        if let Some(query) = self.complexity_cache.read().ok()?.get(name) {
+        if let Some(query) = self
+            .complexity_cache
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+        {
             return Some(Arc::clone(query));
         }
 
@@ -212,9 +237,10 @@ impl GrammarLoader {
             .or_else(|| {
                 let content = bundled_complexity_query(name)?;
                 let query = Arc::new(content.to_string());
-                if let Ok(mut c) = self.complexity_cache.write() {
-                    c.insert(name.to_string(), Arc::clone(&query));
-                }
+                self.complexity_cache
+                    .write()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .insert(name.to_string(), Arc::clone(&query));
                 Some(query)
             })
     }
@@ -227,7 +253,12 @@ impl GrammarLoader {
     /// method call receivers (e.g. `foo` in `foo.bar()`).
     pub fn get_calls(&self, name: &str) -> Option<Arc<String>> {
         // Check cache first
-        if let Some(query) = self.calls_cache.read().ok()?.get(name) {
+        if let Some(query) = self
+            .calls_cache
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+        {
             return Some(Arc::clone(query));
         }
 
@@ -236,9 +267,10 @@ impl GrammarLoader {
             .or_else(|| {
                 let content = bundled_calls_query(name)?;
                 let query = Arc::new(content.to_string());
-                if let Ok(mut c) = self.calls_cache.write() {
-                    c.insert(name.to_string(), Arc::clone(&query));
-                }
+                self.calls_cache
+                    .write()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .insert(name.to_string(), Arc::clone(&query));
                 Some(query)
             })
     }
@@ -249,7 +281,12 @@ impl GrammarLoader {
     /// exists at `{name}.types.scm` in the grammar search paths (external wins).
     pub fn get_types(&self, name: &str) -> Option<Arc<String>> {
         // Check cache first
-        if let Some(query) = self.types_cache.read().ok()?.get(name) {
+        if let Some(query) = self
+            .types_cache
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+        {
             return Some(Arc::clone(query));
         }
 
@@ -261,9 +298,10 @@ impl GrammarLoader {
         // Fall back to bundled query
         let bundled = bundled_types_query(name)?;
         let query = Arc::new(bundled.to_string());
-        if let Ok(mut c) = self.types_cache.write() {
-            c.insert(name.to_string(), Arc::clone(&query));
-        }
+        self.types_cache
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(name.to_string(), Arc::clone(&query));
         Some(query)
     }
 
@@ -277,7 +315,12 @@ impl GrammarLoader {
     /// exists at `{name}.tags.scm` in the grammar search paths (external wins).
     pub fn get_tags(&self, name: &str) -> Option<Arc<String>> {
         // Check cache first
-        if let Some(query) = self.tags_cache.read().ok()?.get(name) {
+        if let Some(query) = self
+            .tags_cache
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+        {
             return Some(Arc::clone(query));
         }
 
@@ -289,9 +332,10 @@ impl GrammarLoader {
         // Fall back to bundled query
         let bundled = bundled_tags_query(name)?;
         let query = Arc::new(bundled.to_string());
-        if let Ok(mut c) = self.tags_cache.write() {
-            c.insert(name.to_string(), Arc::clone(&query));
-        }
+        self.tags_cache
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(name.to_string(), Arc::clone(&query));
         Some(query)
     }
 
@@ -301,7 +345,12 @@ impl GrammarLoader {
     /// exists at `{name}.imports.scm` in the grammar search paths (external wins).
     pub fn get_imports(&self, name: &str) -> Option<Arc<String>> {
         // Check cache first
-        if let Some(query) = self.imports_cache.read().ok()?.get(name) {
+        if let Some(query) = self
+            .imports_cache
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+        {
             return Some(Arc::clone(query));
         }
 
@@ -313,9 +362,10 @@ impl GrammarLoader {
         // Fall back to bundled query
         let bundled = bundled_imports_query(name)?;
         let query = Arc::new(bundled.to_string());
-        if let Ok(mut c) = self.imports_cache.write() {
-            c.insert(name.to_string(), Arc::clone(&query));
-        }
+        self.imports_cache
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(name.to_string(), Arc::clone(&query));
         Some(query)
     }
 
@@ -336,9 +386,10 @@ impl GrammarLoader {
                 let query = Arc::new(content);
 
                 // Cache it
-                if let Ok(mut c) = cache.write() {
-                    c.insert(name.to_string(), Arc::clone(&query));
-                }
+                cache
+                    .write()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .insert(name.to_string(), Arc::clone(&query));
 
                 return Some(query);
             }
@@ -363,10 +414,14 @@ impl GrammarLoader {
         let key = format!("{grammar_name}:{query_type}");
 
         // Check cache
-        if let Ok(cache) = self.compiled_query_cache.read()
-            && let Some(q) = cache.get(&key)
         {
-            return Some(Arc::clone(q));
+            let cache = self
+                .compiled_query_cache
+                .read()
+                .unwrap_or_else(|e| e.into_inner());
+            if let Some(q) = cache.get(&key) {
+                return Some(Arc::clone(q));
+            }
         }
 
         // Compile and cache
@@ -374,9 +429,10 @@ impl GrammarLoader {
         let compiled = tree_sitter::Query::new(&grammar, query_str).ok()?;
         let arc = Arc::new(compiled);
 
-        if let Ok(mut cache) = self.compiled_query_cache.write() {
-            cache.insert(key, Arc::clone(&arc));
-        }
+        self.compiled_query_cache
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(key, Arc::clone(&arc));
 
         Some(arc)
     }
@@ -403,7 +459,14 @@ impl GrammarLoader {
         // 1. Grammars come from arborium (bundled) or user-configured search paths
         // 2. The alternative (no dynamic loading) would require compiling all grammars statically
         // 3. Tree-sitter grammars are widely used and well-tested
-        let library = unsafe { Library::new(path).ok()? };
+        let library = unsafe {
+            Library::new(path)
+                .map_err(|e| {
+                    log::debug!("Failed to load grammar at {}: {}", path.display(), e);
+                    e
+                })
+                .ok()?
+        };
 
         let symbol_name = grammar_symbol_name(name);
         // SAFETY: We call the tree-sitter grammar function which returns a Language pointer.
@@ -424,9 +487,10 @@ impl GrammarLoader {
             language: language.clone(),
         });
 
-        if let Ok(mut cache) = self.cache.write() {
-            cache.insert(name.to_string(), loaded);
-        }
+        self.cache
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(name.to_string(), loaded);
 
         Some(language)
     }

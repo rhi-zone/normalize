@@ -176,7 +176,9 @@ tree-sitter-language = "0.1"
 libloading.workspace = true
 dirs = "5"
 libsql = { workspace = true }
+log = "0.4"
 serde_json = { workspace = true }
+thiserror = "2"
 ast-grep-core = "0.40.5"
 normalize-facts-core = { path = "../normalize-facts-core" }
 normalize-language-meta = { path = "../normalize-language-meta" }
