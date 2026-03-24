@@ -1465,7 +1465,7 @@ fn elixir_complexity_finds_control_flow() {
         .expect("elixir complexity query missing");
     let complexity = collect_captures(&lang, ELIXIR_SAMPLE, &query_str, "complexity");
     assert!(
-        complexity.len() >= 1,
+        !complexity.is_empty(),
         "expected at least 1 complexity node in elixir sample, got {} ({complexity:?})",
         complexity.len()
     );
@@ -2464,7 +2464,7 @@ fn idris_complexity_finds_control_flow() {
         .expect("idris complexity query missing");
     let complexity = collect_captures(&lang, IDRIS_SAMPLE, &query_str, "complexity");
     assert!(
-        complexity.len() >= 1,
+        !complexity.is_empty(),
         "expected at least 1 complexity node in idris sample, got {} ({complexity:?})",
         complexity.len()
     );
@@ -2579,7 +2579,7 @@ fn lean_complexity_finds_control_flow() {
         .expect("lean complexity query missing");
     let complexity = collect_captures(&lang, LEAN_SAMPLE, &query_str, "complexity");
     assert!(
-        complexity.len() >= 1,
+        !complexity.is_empty(),
         "expected at least 1 complexity node in lean sample, got {} ({complexity:?})",
         complexity.len()
     );
@@ -4358,7 +4358,7 @@ fn sql_complexity_finds_control_flow() {
         .expect("sql complexity query missing");
     let complexity = collect_captures(&lang, SQL_SAMPLE, &query_str, "complexity");
     assert!(
-        complexity.len() >= 1,
+        !complexity.is_empty(),
         "expected at least 1 complexity node in sql sample, got {} ({complexity:?})",
         complexity.len()
     );
@@ -4548,7 +4548,7 @@ fn hcl_complexity_finds_conditionals() {
         .expect("hcl complexity query missing");
     let complexity = collect_captures(&lang, HCL_SAMPLE, &query_str, "complexity");
     assert!(
-        complexity.len() >= 1,
+        !complexity.is_empty(),
         "expected at least 1 complexity node in hcl sample, got {} ({complexity:?})",
         complexity.len()
     );
@@ -4660,7 +4660,7 @@ fn nix_complexity_finds_if_expressions() {
         .expect("nix complexity query missing");
     let complexity = collect_captures(&lang, NIX_SAMPLE, &query_str, "complexity");
     assert!(
-        complexity.len() >= 1,
+        !complexity.is_empty(),
         "expected at least 1 complexity node in nix sample, got {} ({complexity:?})",
         complexity.len()
     );
@@ -4814,7 +4814,7 @@ fn tlaplus_complexity_finds_conditionals() {
         .expect("tlaplus complexity query missing");
     let complexity = collect_captures(&lang, TLAPLUS_SAMPLE, &query_str, "complexity");
     assert!(
-        complexity.len() >= 1,
+        !complexity.is_empty(),
         "expected at least 1 complexity node in tlaplus sample, got {} ({complexity:?})",
         complexity.len()
     );
@@ -4913,7 +4913,7 @@ fn cmake_complexity_finds_control_flow() {
         .expect("cmake complexity query missing");
     let complexity = collect_captures(&lang, CMAKE_SAMPLE, &query_str, "complexity");
     assert!(
-        complexity.len() >= 1,
+        !complexity.is_empty(),
         "expected at least 1 complexity node in cmake sample, got: {complexity:?}"
     );
 }
@@ -4991,11 +4991,7 @@ fn graphql_calls_finds_field_selections() {
         .get_calls("graphql")
         .expect("graphql calls query missing");
     // GraphQL calls query captures field names; runs cleanly against schema definitions
-    let calls = collect_captures(&lang, GRAPHQL_SAMPLE, &query_str, "call");
-    assert!(
-        calls.len() >= 0,
-        "graphql calls query should run cleanly, got: {calls:?}"
-    );
+    let _calls = collect_captures(&lang, GRAPHQL_SAMPLE, &query_str, "call");
 }
 
 #[test]
@@ -5012,11 +5008,7 @@ fn graphql_complexity_query_runs_cleanly() {
     let query_str = loader
         .get_complexity("graphql")
         .expect("graphql complexity query missing");
-    let complexity = collect_captures(&lang, GRAPHQL_SAMPLE, &query_str, "complexity");
-    assert!(
-        complexity.len() >= 0,
-        "graphql complexity query should run cleanly, got: {complexity:?}"
-    );
+    let _complexity = collect_captures(&lang, GRAPHQL_SAMPLE, &query_str, "complexity");
 }
 
 // ---------------------------------------------------------------------------
@@ -5087,7 +5079,7 @@ fn glsl_complexity_finds_control_flow() {
         .expect("glsl complexity query missing");
     let complexity = collect_captures(&lang, GLSL_SAMPLE, &query_str, "complexity");
     assert!(
-        complexity.len() >= 1,
+        !complexity.is_empty(),
         "expected at least 1 complexity node in glsl sample, got: {complexity:?}"
     );
 }
@@ -5185,7 +5177,7 @@ fn hlsl_complexity_finds_control_flow() {
         .expect("hlsl complexity query missing");
     let complexity = collect_captures(&lang, HLSL_SAMPLE, &query_str, "complexity");
     assert!(
-        complexity.len() >= 1,
+        !complexity.is_empty(),
         "expected at least 1 complexity node in hlsl sample, got: {complexity:?}"
     );
 }
@@ -5279,11 +5271,7 @@ fn jq_complexity_finds_control_flow() {
     let query_str = loader
         .get_complexity("jq")
         .expect("jq complexity query missing");
-    let complexity = collect_captures(&lang, JQ_SAMPLE, &query_str, "complexity");
-    assert!(
-        complexity.len() >= 0,
-        "jq complexity query should run cleanly, got: {complexity:?}"
-    );
+    let _complexity = collect_captures(&lang, JQ_SAMPLE, &query_str, "complexity");
 }
 
 #[test]
@@ -5353,11 +5341,7 @@ fn meson_tags_finds_variable_assignments() {
     };
     let query_str = loader.get_tags("meson").expect("meson tags query missing");
     // Meson tags captures variable identifiers from var_unit assignments
-    let names = collect_captures(&lang, MESON_SAMPLE, &query_str, "name");
-    assert!(
-        names.len() >= 0,
-        "meson tags query should run cleanly, got: {names:?}"
-    );
+    let _names = collect_captures(&lang, MESON_SAMPLE, &query_str, "name");
 }
 
 #[test]
@@ -5399,7 +5383,7 @@ fn meson_complexity_finds_control_flow() {
         .expect("meson complexity query missing");
     let complexity = collect_captures(&lang, MESON_SAMPLE, &query_str, "complexity");
     assert!(
-        complexity.len() >= 1,
+        !complexity.is_empty(),
         "expected at least 1 complexity node (if block) in meson sample, got: {complexity:?}"
     );
 }
@@ -5566,7 +5550,7 @@ fn scss_complexity_finds_control_flow() {
         .expect("scss complexity query missing");
     let complexity = collect_captures(&lang, SCSS_SAMPLE, &query_str, "complexity");
     assert!(
-        complexity.len() >= 1,
+        !complexity.is_empty(),
         "expected at least 1 complexity node (@if/@each) in scss sample, got: {complexity:?}"
     );
 }
@@ -5671,11 +5655,7 @@ fn svelte_calls_query_runs_cleanly() {
         .get_calls("svelte")
         .expect("svelte calls query missing");
     // Svelte calls query is intentionally empty (JS in <script> is raw_text)
-    let calls = collect_captures(&lang, SVELTE_SAMPLE, &query_str, "call");
-    assert!(
-        calls.len() >= 0,
-        "svelte calls query should run cleanly, got: {calls:?}"
-    );
+    let _calls = collect_captures(&lang, SVELTE_SAMPLE, &query_str, "call");
 }
 
 #[test]
@@ -5692,11 +5672,7 @@ fn svelte_complexity_query_runs_cleanly() {
     let query_str = loader
         .get_complexity("svelte")
         .expect("svelte complexity query missing");
-    let complexity = collect_captures(&lang, SVELTE_SAMPLE, &query_str, "complexity");
-    assert!(
-        complexity.len() >= 0,
-        "svelte complexity query should run cleanly, got: {complexity:?}"
-    );
+    let _complexity = collect_captures(&lang, SVELTE_SAMPLE, &query_str, "complexity");
 }
 
 // ---------------------------------------------------------------------------
@@ -5767,11 +5743,7 @@ fn typst_complexity_query_runs_cleanly() {
     let query_str = loader
         .get_complexity("typst")
         .expect("typst complexity query missing");
-    let complexity = collect_captures(&lang, TYPST_SAMPLE, &query_str, "complexity");
-    assert!(
-        complexity.len() >= 0,
-        "typst complexity query should run cleanly, got: {complexity:?}"
-    );
+    let _complexity = collect_captures(&lang, TYPST_SAMPLE, &query_str, "complexity");
 }
 
 #[test]
@@ -5842,11 +5814,7 @@ fn verilog_calls_finds_task_function_calls() {
     let query_str = loader
         .get_calls("verilog")
         .expect("verilog calls query missing");
-    let calls = collect_captures(&lang, VERILOG_SAMPLE, &query_str, "call");
-    assert!(
-        calls.len() >= 0,
-        "verilog calls query should run cleanly, got: {calls:?}"
-    );
+    let _calls = collect_captures(&lang, VERILOG_SAMPLE, &query_str, "call");
 }
 
 #[test]
@@ -5865,7 +5833,7 @@ fn verilog_complexity_finds_control_flow() {
         .expect("verilog complexity query missing");
     let complexity = collect_captures(&lang, VERILOG_SAMPLE, &query_str, "complexity");
     assert!(
-        complexity.len() >= 1,
+        !complexity.is_empty(),
         "expected at least 1 complexity node (always/case/if) in verilog sample, got: {complexity:?}"
     );
 }
@@ -5884,11 +5852,7 @@ fn verilog_imports_query_runs_cleanly() {
     let query_str = loader
         .get_imports("verilog")
         .expect("verilog imports query missing");
-    let paths = collect_captures(&lang, VERILOG_SAMPLE, &query_str, "import.path");
-    assert!(
-        paths.len() >= 0,
-        "verilog imports query should run cleanly (no package imports in sample), got: {paths:?}"
-    );
+    let _paths = collect_captures(&lang, VERILOG_SAMPLE, &query_str, "import.path");
 }
 
 // ---------------------------------------------------------------------------
@@ -5957,7 +5921,7 @@ fn vhdl_complexity_finds_control_flow() {
         .expect("vhdl complexity query missing");
     let complexity = collect_captures(&lang, VHDL_SAMPLE, &query_str, "complexity");
     assert!(
-        complexity.len() >= 1,
+        !complexity.is_empty(),
         "expected at least 1 complexity node (if/process) in vhdl sample, got: {complexity:?}"
     );
 }
@@ -6055,7 +6019,7 @@ fn vim_complexity_finds_control_flow() {
         .expect("vim complexity query missing");
     let complexity = collect_captures(&lang, VIM_SAMPLE, &query_str, "complexity");
     assert!(
-        complexity.len() >= 1,
+        !complexity.is_empty(),
         "expected at least 1 complexity node (if block) in vim sample, got: {complexity:?}"
     );
 }
@@ -6123,11 +6087,7 @@ fn vue_calls_query_runs_cleanly() {
     };
     let query_str = loader.get_calls("vue").expect("vue calls query missing");
     // Vue calls query is intentionally empty (JS in <script> is raw_text)
-    let calls = collect_captures(&lang, VUE_SAMPLE, &query_str, "call");
-    assert!(
-        calls.len() >= 0,
-        "vue calls query should run cleanly, got: {calls:?}"
-    );
+    let _calls = collect_captures(&lang, VUE_SAMPLE, &query_str, "call");
 }
 
 #[test]
@@ -6144,11 +6104,7 @@ fn vue_complexity_query_runs_cleanly() {
     let query_str = loader
         .get_complexity("vue")
         .expect("vue complexity query missing");
-    let complexity = collect_captures(&lang, VUE_SAMPLE, &query_str, "complexity");
-    assert!(
-        complexity.len() >= 0,
-        "vue complexity query should run cleanly, got: {complexity:?}"
-    );
+    let _complexity = collect_captures(&lang, VUE_SAMPLE, &query_str, "complexity");
 }
 
 // ---------------------------------------------------------------------------
@@ -6322,7 +6278,7 @@ fn haskell_tags_no_duplicate_signatures() {
     // Deduplication to a single symbol happens in the extraction layer (normalize-facts).
     let insert_count = names.iter().filter(|n| *n == "insert").count();
     assert!(
-        insert_count <= 2 && insert_count >= 1,
+        (1..=2).contains(&insert_count),
         "expected 'insert' 1-2 times (multi-equation), got: {names:?}"
     );
     // Type names from data/newtype/type should also be present

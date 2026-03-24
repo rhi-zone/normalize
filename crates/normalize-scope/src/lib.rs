@@ -449,7 +449,7 @@ mod tests {
         let l = loader();
         let engine = ScopeEngine::new(&l);
         // If grammars aren't built, skip gracefully
-        if l.get("javascript").is_none() {
+        if l.get("javascript").is_err() {
             return;
         }
         // javascript has locals.scm in arborium
@@ -468,7 +468,7 @@ mod tests {
     }
 
     fn skip_if_no(l: &GrammarLoader, lang: &str) -> bool {
-        l.get(lang).is_none() || l.get_locals(lang).is_none()
+        l.get(lang).is_err() || l.get_locals(lang).is_none()
     }
 
     fn skip_if_no_rust(l: &GrammarLoader) -> bool {
@@ -478,7 +478,7 @@ mod tests {
     #[test]
     fn test_rust_has_locals() {
         let l = loader();
-        if l.get("rust").is_none() {
+        if l.get("rust").is_err() {
             return;
         }
         let engine = ScopeEngine::new(&l);
