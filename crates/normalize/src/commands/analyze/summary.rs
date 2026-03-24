@@ -1,7 +1,7 @@
 //! Codebase summary: single-page overview aggregating health, budget, module health, and architecture.
 
 use crate::commands::analyze::architecture::{ArchitectureReport, analyze_architecture};
-use crate::commands::analyze::budget::{BudgetReport, analyze_budget};
+use crate::commands::analyze::budget::{LineBudgetReport, analyze_budget};
 use crate::commands::analyze::module_health::{ModuleHealthReport, analyze_module_health};
 use crate::health::{HealthReport, analyze_health};
 use crate::output::OutputFormatter;
@@ -26,7 +26,7 @@ pub struct ArchStats {
 pub struct SummaryReport {
     pub project: String,
     pub health: HealthReport,
-    pub budget: BudgetReport,
+    pub budget: LineBudgetReport,
     pub module_health: ModuleHealthReport,
     pub arch: ArchStats,
     pub concerns: Vec<Concern>,

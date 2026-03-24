@@ -459,7 +459,7 @@ pub fn resolve(query: &str, root: &Path, path_source: Option<&dyn PathSource>) -
 
     // Handle extension patterns (e.g., ".rs", ".py") - return all matches directly
     if query.starts_with('.') && !query.contains('/') {
-        if let Some(ref src) = path_source
+        if let Some(src) = path_source.as_ref()
             && let Some(files) = src.find_like(query)
         {
             return files

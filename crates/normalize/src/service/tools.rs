@@ -61,6 +61,16 @@ impl ToolsService {
     }
 }
 
+impl LintService {
+    fn display_lint_run(&self, r: &LintRunReport) -> String {
+        r.format_text()
+    }
+
+    fn display_lint_list(&self, r: &LintListReport) -> String {
+        r.format_text()
+    }
+}
+
 #[cli(
     name = "lint",
     description = "Run linters, formatters, and type checkers"
@@ -76,6 +86,7 @@ impl LintService {
     ///   normalize tools lint run -t clippy,eslint         # run specific tools only
     ///   normalize tools lint run -c fmt                   # run only formatters
     ///   normalize tools lint run --repos-dir ~/projects   # lint across multiple repos
+    #[cli(display_with = "display_lint_run")]
     #[allow(clippy::too_many_arguments)]
     pub fn run(
         &self,
@@ -121,6 +132,7 @@ impl LintService {
     ///
     /// Examples:
     ///   normalize tools lint list            # show detected linters for this project
+    #[cli(display_with = "display_lint_list")]
     pub fn list(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<

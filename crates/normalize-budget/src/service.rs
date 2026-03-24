@@ -315,7 +315,9 @@ impl BudgetService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        #[param(help = "Git ref to diff against")] base_ref: Option<String>,
+        #[param(name = "diff-ref", help = "Compute diff against this git ref")] base_ref: Option<
+            String,
+        >,
         #[param(
             short = 'a',
             help = "Aggregation strategy (mean|median|max|min|sum|count)"
@@ -343,7 +345,9 @@ impl BudgetService {
         #[param(positional, help = "Path to track")] path: String,
         #[param(short = 'm', help = "Diff metric to track")] metric: String,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
-        #[param(help = "Git ref to diff against")] base_ref: Option<String>,
+        #[param(name = "diff-ref", help = "Compute diff against this git ref")] base_ref: Option<
+            String,
+        >,
         #[param(short = 'a', help = "Aggregation strategy")] aggregate: Option<Aggregate>,
         #[param(help = "Maximum items added")] max_added: Option<f64>,
         #[param(help = "Maximum items removed")] max_removed: Option<f64>,

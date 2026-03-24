@@ -43,6 +43,9 @@ rayon.workspace = true
 # Progress reporting
 indicatif.workspace = true
 
+# Observability
+tracing = "0.1"
+
 # Serialization
 serde.workspace = true
 

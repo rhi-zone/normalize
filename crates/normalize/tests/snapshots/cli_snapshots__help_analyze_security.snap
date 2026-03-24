@@ -7,7 +7,7 @@ Run security analysis
 Usage: normalize analyze security [OPTIONS] [target]
 
 Arguments:
-  [target]  Target file or directory
+  [target]  Target file or directory to filter results by
 
 Options:
       --pretty                     Human-friendly output with colors and formatting

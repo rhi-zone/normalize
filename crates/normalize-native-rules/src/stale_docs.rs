@@ -246,21 +246,25 @@ fn find_covered_files(root: &Path, pattern: &str) -> Vec<String> {
             .collect();
         if let (Ok(canon_prefix), Ok(canon_root)) =
             (non_glob_prefix.canonicalize(), root.canonicalize())
+            && !canon_prefix.starts_with(&canon_root)
         {
-            if !canon_prefix.starts_with(&canon_root) {
-                return vec![];
-            }
+            return vec![];
         }
-        glob::glob(full_pattern.to_str().unwrap_or(""))
-            .ok()
-            .map(|paths| {
-                paths
-                    .filter_map(|p| p.ok())
-                    .filter(|p| p.is_file())
-                    .filter_map(|p| p.strip_prefix(root).ok().map(|r| r.display().to_string()))
-                    .collect()
-            })
-            .unwrap_or_default()
+        match glob::glob(full_pattern.to_str().unwrap_or("")) {
+            Err(e) => {
+                tracing::warn!(
+                    "normalize-native-rules: invalid glob pattern {:?}: {}",
+                    full_pattern,
+                    e
+                );
+                vec![]
+            }
+            Ok(paths) => paths
+                .filter_map(|p| p.ok())
+                .filter(|p| p.is_file())
+                .filter_map(|p| p.strip_prefix(root).ok().map(|r| r.display().to_string()))
+                .collect(),
+        }
     } else {
         // Treat as exact path or prefix
         let target = root.join(pattern);

@@ -376,7 +376,11 @@ impl RatchetService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        #[param(help = "Show delta vs this git ref")] base: Option<String>,
+        #[param(
+            name = "diff-ref",
+            help = "Compute diff against this git ref (measure delta vs this ref)"
+        )]
+        base: Option<String>,
         pretty: bool,
         compact: bool,
     ) -> Result<MeasureReport, String> {
@@ -455,8 +459,8 @@ impl RatchetService {
 
     /// Compare current values to baseline entries.
     ///
-    /// Without --base: reads .normalize/ratchet.json.
-    /// With --base <ref>: measures baseline at that git ref, compares to current working tree.
+    /// Without --baseline-ref: reads .normalize/ratchet.json.
+    /// With --baseline-ref <ref>: measures baseline at that git ref, compares to current working tree.
     ///
     /// Exits non-zero if regressions found.
     #[cli(display_with = "display_check")]
@@ -465,10 +469,13 @@ impl RatchetService {
         &self,
         #[param(positional, help = "Filter by path prefix")] path: Option<String>,
         #[param(short = 'm', help = "Filter by metric name")] metric: Option<String>,
-        #[param(help = "Compare to this git ref instead of stored baseline")] base: Option<String>,
-        #[param(short = 'a', help = "Aggregation strategy (used with --base)")] aggregate: Option<
-            Aggregate,
-        >,
+        #[param(
+            name = "baseline-ref",
+            help = "Substitute this git ref as the baseline instead of the stored ratchet.json baseline"
+        )]
+        base: Option<String>,
+        #[param(short = 'a', help = "Aggregation strategy (used with --baseline-ref)")]
+        aggregate: Option<Aggregate>,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
         pretty: bool,
         compact: bool,
@@ -1225,7 +1232,10 @@ pub fn build_ratchet_report(
     }
 }
 
-/// Alias kept for compatibility with `normalize-native-rules`.
+/// Build a [`DiagnosticsReport`](normalize_output::diagnostics::DiagnosticsReport) from the
+/// ratchet baseline check. Delegates to [`build_ratchet_report`] and returns its inner
+/// `DiagnosticsReport` directly. Kept for compatibility with `normalize-native-rules`.
+#[deprecated(since = "0.2.0", note = "use build_ratchet_report")]
 #[inline]
 pub fn build_ratchet_diagnostics(
     root: &Path,

@@ -3,7 +3,7 @@
 //! Hosts all commands that produce an ordered list of items by some metric.
 
 use crate::analyze::complexity::ComplexityReport;
-use crate::commands::analyze::budget::BudgetReport;
+use crate::commands::analyze::budget::LineBudgetReport;
 use crate::commands::analyze::call_complexity::CallComplexityReport;
 use crate::commands::analyze::ceremony::CeremonyReport;
 use crate::commands::analyze::contributors::ContributorsReport;
@@ -101,7 +101,7 @@ impl RankService {
         self.display_output(r)
     }
 
-    fn display_budget(&self, r: &BudgetReport) -> String {
+    fn display_budget(&self, r: &LineBudgetReport) -> String {
         self.display_output(r)
     }
 
@@ -630,7 +630,7 @@ impl RankService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<BudgetReport, String> {
+    ) -> Result<LineBudgetReport, String> {
         let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let effective_limit = match limit.unwrap_or(30) {

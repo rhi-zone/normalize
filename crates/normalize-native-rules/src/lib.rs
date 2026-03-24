@@ -15,7 +15,7 @@ pub(crate) mod walk;
 pub use budget::{BudgetRulesReport, build_budget_report};
 pub use check_examples::build_check_examples_report;
 pub use check_refs::build_check_refs_report;
-pub use ratchet::{RatchetDiagnosticsReport, build_ratchet_report};
+pub use ratchet::{RatchetRulesReport, build_ratchet_report};
 pub use stale_docs::build_stale_docs_report;
 pub use stale_summary::build_stale_summary_report;
 
@@ -24,7 +24,7 @@ pub use stale_summary::build_stale_summary_report;
 /// `default_severity` is the baked-in severity from the rule author. At runtime
 /// the actual severity may differ: `normalize rules run` applies any
 /// `[rules."rule-id"]` overrides from the project's `normalize.toml` via
-/// [`crate::apply_native_rules_config`] before presenting findings to the user.
+/// `normalize_rules::apply_native_rules_config` before presenting findings to the user.
 pub struct NativeRuleDescriptor {
     /// Unique rule identifier (e.g. `"stale-summary"`).
     pub id: &'static str,

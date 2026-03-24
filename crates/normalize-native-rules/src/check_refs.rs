@@ -83,7 +83,16 @@ pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, Str
         .map_err(|e| format!("Failed to open index: {e}"))?;
 
     // Get all symbol names from index
-    let all_symbols = idx.all_symbol_names().await.unwrap_or_default();
+    let all_symbols = match idx.all_symbol_names().await {
+        Ok(syms) => syms,
+        Err(e) => {
+            tracing::warn!(
+                "normalize-native-rules: failed to query symbol names: {}",
+                e
+            );
+            std::collections::HashSet::new()
+        }
+    };
 
     if all_symbols.is_empty() {
         return Err("No symbols indexed. Run: normalize structure rebuild".to_string());

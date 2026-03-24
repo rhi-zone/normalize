@@ -129,7 +129,7 @@ impl DiffableRankEntry for ModuleBudget {
 
 /// Report returned by `analyze budget`.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct BudgetReport {
+pub struct LineBudgetReport {
     pub root: String,
     pub total_lines: usize,
     pub categories: Vec<CategoryEntry>,
@@ -139,7 +139,7 @@ pub struct BudgetReport {
     pub diff_ref: Option<String>,
 }
 
-impl OutputFormatter for BudgetReport {
+impl OutputFormatter for LineBudgetReport {
     fn format_text(&self) -> String {
         let total_k = self.total_lines as f64 / 1000.0;
         let mut out = format_ranked_table(
@@ -445,7 +445,7 @@ fn classify_file(rel_path: &str, content: &str) -> FileClassification {
 }
 
 /// Analyze line budget across the entire codebase.
-pub fn analyze_budget(root: &Path, module_limit: usize) -> BudgetReport {
+pub fn analyze_budget(root: &Path, module_limit: usize) -> LineBudgetReport {
     let module_dirs = discover_module_dirs(root);
     let all_files = crate::path_resolve::all_files(root);
 
@@ -550,7 +550,7 @@ pub fn analyze_budget(root: &Path, module_limit: usize) -> BudgetReport {
     modules.sort_by(|a, b| b.total_lines.cmp(&a.total_lines));
     modules.truncate(module_limit);
 
-    BudgetReport {
+    LineBudgetReport {
         root: root
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())

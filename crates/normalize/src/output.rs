@@ -23,7 +23,7 @@ mod tests {
         use crate::commands::aliases::AliasesReport;
         use crate::commands::analyze::activity::ActivityReport;
         use crate::commands::analyze::architecture::ArchitectureReport;
-        use crate::commands::analyze::budget::BudgetReport;
+        use crate::commands::analyze::budget::LineBudgetReport;
         use crate::commands::analyze::call_complexity::CallComplexityReport;
         use crate::commands::analyze::ceremony::CeremonyReport;
         use crate::commands::analyze::contributors::ContributorsReport;
@@ -82,7 +82,7 @@ mod tests {
         assert_output_formatter::<AnalyzeReport>();
         assert_output_formatter::<AliasesReport>();
         assert_output_formatter::<ArchitectureReport>();
-        assert_output_formatter::<BudgetReport>();
+        assert_output_formatter::<LineBudgetReport>();
         assert_output_formatter::<CeremonyReport>();
         assert_output_formatter::<DiagnosticsReport>();
         assert_output_formatter::<ComplexityReport>();
@@ -182,9 +182,9 @@ mod tests {
         use normalize_native_rules::check_refs::CheckRefsReport;
         use normalize_native_rules::stale_docs::StaleDocsReport;
         use normalize_native_rules::stale_summary::StaleSummaryReport;
-        use normalize_native_rules::{BudgetRulesReport, RatchetDiagnosticsReport};
+        use normalize_native_rules::{BudgetRulesReport, RatchetRulesReport};
         assert_output_formatter::<BudgetRulesReport>();
-        assert_output_formatter::<RatchetDiagnosticsReport>();
+        assert_output_formatter::<RatchetRulesReport>();
         assert_output_formatter::<CheckExamplesReport>();
         assert_output_formatter::<CheckRefsReport>();
         assert_output_formatter::<StaleDocsReport>();

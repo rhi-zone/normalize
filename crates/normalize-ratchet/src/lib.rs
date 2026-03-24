@@ -11,7 +11,9 @@ pub mod metrics;
 #[cfg(feature = "cli")]
 pub mod service;
 
-pub use baseline::{Aggregate, BaselineEntry, BaselineFile, RatchetConfig, RatchetConfigMetric};
+pub use baseline::{
+    Aggregate, BaselineEntry, BaselineFile, RatchetConfig, RatchetConfigMetric, ratchet_path,
+};
 pub use error::RatchetError;
 // Re-export Metric and MetricFactory from normalize-metrics for API consumers.
 pub use normalize_metrics::{Metric, MetricFactory};

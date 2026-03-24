@@ -136,10 +136,12 @@ fn analyze_file_complexity(
         let mut infos: Vec<TagInfo> = Vec::new();
         while let Some(m) = matches.next() {
             for capture in m.captures {
-                let cn = capture_names[capture.index as usize];
-                let is_fn = matches!(cn, "definition.function" | "definition.method");
+                let Some(cn) = capture_names.get(capture.index as usize) else {
+                    continue;
+                };
+                let is_fn = matches!(*cn, "definition.function" | "definition.method");
                 let is_container = matches!(
-                    cn,
+                    *cn,
                     "definition.class" | "definition.module" | "definition.interface"
                 );
                 if is_fn || is_container {

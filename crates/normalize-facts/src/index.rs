@@ -104,8 +104,14 @@ impl FileIndex {
     /// * `root` - Project root directory (used for file walking during refresh)
     pub async fn open(db_path: &Path, root: &Path) -> Result<Self, libsql::Error> {
         // Ensure parent directory exists
-        if let Some(parent) = db_path.parent() {
-            std::fs::create_dir_all(parent).ok();
+        if let Some(parent) = db_path.parent()
+            && let Err(e) = std::fs::create_dir_all(parent)
+        {
+            tracing::warn!(
+                "normalize-facts: failed to create index directory {:?}: {}",
+                parent,
+                e
+            );
         }
 
         // Try to open, with recovery on corruption
@@ -122,7 +128,7 @@ impl FileIndex {
                     || err_str.contains("integrity check failed");
 
                 if is_corruption {
-                    eprintln!("Index corrupted, rebuilding: {}", e);
+                    tracing::warn!("Index corrupted, rebuilding: {}", e);
                     // Delete corrupted database and retry
                     let _ = std::fs::remove_file(db_path);
                     // Also remove journal/wal files if they exist
@@ -1166,7 +1172,7 @@ impl FileIndex {
     ) -> Result<Vec<SymbolMatch>, libsql::Error> {
         let query_lower = query.to_lowercase();
         let prefix_pattern = format!("{}%", query_lower);
-        let limit_i64 = limit as i64;
+        let limit_i64 = i64::try_from(limit).unwrap_or(i64::MAX);
 
         let mut symbols = Vec::new();
 
@@ -1316,7 +1322,7 @@ impl FileIndex {
                 row.get(0)?,
                 module.unwrap_or_default(),
                 row.get(2)?,
-                row.get::<i64>(3)? as u32,
+                u32::try_from(row.get::<i64>(3)?).unwrap_or(0),
             ));
         }
         Ok(imports)
@@ -1411,7 +1417,7 @@ impl FileIndex {
                 row.get(0)?,
                 row.get(1)?,
                 row.get(2)?,
-                row.get::<i64>(3)? as u32,
+                u32::try_from(row.get::<i64>(3)?).unwrap_or(0),
             ));
         }
         Ok(calls)
@@ -1494,7 +1500,7 @@ impl FileIndex {
                 row.get(1)?,
                 row.get(2)?,
                 row.get(3).ok(),
-                row.get::<i64>(4)? as u32,
+                u32::try_from(row.get::<i64>(4)?).unwrap_or(0),
             ));
         }
         Ok(calls)
@@ -2081,12 +2087,12 @@ impl FileIndex {
         // Resolve import module specifiers to root-relative file paths now that all
         // files are indexed. Must run after COMMIT so module_to_files() can query them.
         self.resolve_all_imports().await.unwrap_or_else(|e| {
-            eprintln!("normalize-facts: resolve_all_imports error: {}", e);
+            tracing::warn!("normalize-facts: resolve_all_imports error: {}", e);
             0
         });
         // Resolve call targets using the now-populated import graph.
         self.resolve_all_calls().await.unwrap_or_else(|e| {
-            eprintln!("normalize-facts: resolve_all_calls error: {}", e);
+            tracing::warn!("normalize-facts: resolve_all_calls error: {}", e);
             0
         });
 
@@ -2245,12 +2251,12 @@ impl FileIndex {
 
         // Resolve any newly inserted imports to root-relative file paths.
         self.resolve_all_imports().await.unwrap_or_else(|e| {
-            eprintln!("normalize-facts: resolve_all_imports error: {}", e);
+            tracing::warn!("normalize-facts: resolve_all_imports error: {}", e);
             0
         });
         // Resolve call targets using the now-populated import graph.
         self.resolve_all_calls().await.unwrap_or_else(|e| {
-            eprintln!("normalize-facts: resolve_all_calls error: {}", e);
+            tracing::warn!("normalize-facts: resolve_all_calls error: {}", e);
             0
         });
 
@@ -2292,11 +2298,11 @@ impl FileIndex {
         self.conn.execute("COMMIT", ()).await?;
 
         self.resolve_all_imports().await.unwrap_or_else(|e| {
-            eprintln!("normalize-facts: resolve_all_imports error: {}", e);
+            tracing::warn!("normalize-facts: resolve_all_imports error: {}", e);
             0
         });
         self.resolve_all_calls().await.unwrap_or_else(|e| {
-            eprintln!("normalize-facts: resolve_all_calls error: {}", e);
+            tracing::warn!("normalize-facts: resolve_all_calls error: {}", e);
             0
         });
 

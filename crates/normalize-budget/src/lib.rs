@@ -19,10 +19,9 @@ pub use error::BudgetError;
 pub use metrics::DiffMetric;
 
 /// Factory function type: produce all diff metrics.
-/// Lives outside the `cli` feature so `normalize-native-rules` can use it.
 ///
-/// Factory function for producing diff metrics. Takes no root argument because the root
-/// is passed at measurement time via `measure_diff`.
+/// Lives outside the `cli` feature so `normalize-native-rules` can use it.
+/// Takes no root argument because the root is passed at measurement time via `measure_diff`.
 pub type DiffMetricFactory = fn() -> Vec<Box<dyn DiffMetric>>;
 
 /// Create the default diff metric registry.

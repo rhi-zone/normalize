@@ -13,9 +13,9 @@ use std::path::Path;
 /// can be formatted standalone (as text) or converted to a `DiagnosticsReport`
 /// for the rules engine.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct RatchetDiagnosticsReport(pub DiagnosticsReport);
+pub struct RatchetRulesReport(pub DiagnosticsReport);
 
-impl OutputFormatter for RatchetDiagnosticsReport {
+impl OutputFormatter for RatchetRulesReport {
     fn format_text(&self) -> String {
         self.0.format_text()
     }
@@ -25,19 +25,19 @@ impl OutputFormatter for RatchetDiagnosticsReport {
     }
 }
 
-impl From<RatchetDiagnosticsReport> for DiagnosticsReport {
-    fn from(report: RatchetDiagnosticsReport) -> Self {
+impl From<RatchetRulesReport> for DiagnosticsReport {
+    fn from(report: RatchetRulesReport) -> Self {
         report.0
     }
 }
 
-/// Build a RatchetDiagnosticsReport from the ratchet baseline check.
+/// Build a RatchetRulesReport from the ratchet baseline check.
 ///
 /// Called by the native rules engine. Returns an empty report if no baseline
 /// exists or the check succeeds.
-pub fn build_ratchet_report(root: &Path) -> RatchetDiagnosticsReport {
+pub fn build_ratchet_report(root: &Path) -> RatchetRulesReport {
     let factory: normalize_ratchet::MetricFactory = normalize_ratchet::default_metrics;
-    RatchetDiagnosticsReport(normalize_ratchet::service::build_ratchet_diagnostics(
+    RatchetRulesReport(normalize_ratchet::service::build_ratchet_report(
         root, &factory,
     ))
 }

@@ -102,8 +102,22 @@ fn cache_path(root: &Path) -> std::path::PathBuf {
 }
 
 fn load_cache(root: &Path) -> Option<SummaryCache> {
-    let content = std::fs::read_to_string(cache_path(root)).ok()?;
-    serde_json::from_str(&content).ok()
+    let path = cache_path(root);
+    let content = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(_) => return None, // missing cache file is normal
+    };
+    match serde_json::from_str(&content) {
+        Ok(c) => Some(c),
+        Err(e) => {
+            tracing::debug!(
+                "normalize-native-rules: corrupt summary cache at {:?}: {}",
+                path,
+                e
+            );
+            None
+        }
+    }
 }
 
 fn save_cache(root: &Path, cache: &SummaryCache) {
@@ -212,6 +226,12 @@ fn git_summary_has_uncommitted_changes(root: &Path, summary_path: &str) -> bool 
     !String::from_utf8_lossy(&out.stdout).trim().is_empty()
 }
 
+/// Build a [`StaleSummaryReport`] by walking the repository under `root` and checking
+/// each directory for a `SUMMARY.md` that is up-to-date.
+///
+/// A `SUMMARY.md` is considered stale when the number of commits since its last
+/// update (plus any uncommitted content changes in the directory) exceeds `threshold`.
+/// Directories without any `SUMMARY.md` are reported as missing.
 pub fn build_stale_summary_report(root: &Path, threshold: usize) -> StaleSummaryReport {
     let mut stale = Vec::new();
     let mut missing = Vec::new();
