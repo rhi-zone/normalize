@@ -433,10 +433,7 @@ impl BudgetService {
             ) {
                 Ok(r) => r,
                 Err(e) => {
-                    eprintln!(
-                        "warning: could not measure {} ({}): {e}",
-                        entry.path, entry.metric
-                    );
+                    tracing::warn!("could not measure {} ({}): {e}", entry.path, entry.metric);
                     continue;
                 }
             };
@@ -816,9 +813,10 @@ pub fn build_budget_report(
         ) {
             Ok(r) => r,
             Err(e) => {
-                eprintln!(
-                    "warning: budget measure failed for {} ({}): {e}",
-                    entry.path, entry.metric
+                tracing::warn!(
+                    "budget measure failed for {} ({}): {e}",
+                    entry.path,
+                    entry.metric
                 );
                 continue;
             }

@@ -551,10 +551,7 @@ impl RatchetService {
             ) {
                 Ok(r) => r,
                 Err(e) => {
-                    eprintln!(
-                        "warning: could not measure {} ({}): {e}",
-                        entry.path, entry.metric
-                    );
+                    tracing::warn!("could not measure {} ({}): {e}", entry.path, entry.metric);
                     continue;
                 }
             };
@@ -1167,7 +1164,7 @@ pub fn build_ratchet_report(
     let report = match build_check_report(root, entries, factory) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("ratchet: check failed: {e}");
+            tracing::warn!("ratchet: check failed: {e}");
             return DiagnosticsReport::new();
         }
     };
