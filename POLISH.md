@@ -1,9 +1,9 @@
 # Polish State
 
 Created: f89f7a3c5d17cb1d8b13137bacb8c830d54c808c
-Last run: 2026-03-24T01:00:00Z
+Last run: 2026-03-24T14:50:00Z
 Round 1 applied: 2026-03-24
-Round: 2
+Round: 4 (fixpoint reached)
 Project type: Rust CLI + library ecosystem (~40 crates)
 
 ## Lenses
@@ -377,3 +377,20 @@ None.
 - [DONE] `crates/normalize-path-resolve/src/lib.rs:15,38-40` — `PathMatch` missing doc comment; `PathSource::find_like` and `all_files` methods missing contract docs _(severity: medium)_
 
 - [DONE] `crates/normalize-facts-rules-api/src/lib.rs:23` — `VisibilityFact`, `AttributeFact`, `ParentFact` and 5 other public types not re-exported from `lib.rs` — extend `pub use relations::` or add comment explaining intent _(severity: medium)_
+
+---
+
+## Findings — Round 4
+
+Round 4 git hash: 7726201d
+Scope: entire codebase — final fixpoint verification
+
+### Result: FIXPOINT REACHED ✓
+
+Round 4 audit found 3 findings (all low/medium), applied immediately:
+
+- [DONE] `crates/normalize/src/commands/tools/test.rs:67` — `TestRunResult` missed in Round 3 rename sweep — renamed to `TestRunReport` _(severity: medium)_
+- [DONE] `crates/normalize/src/output.rs` — missing `assert_output_formatter::<TestRunReport>()` and `assert_output_formatter::<LintRunReport>()` _(severity: low)_
+- [DONE] `crates/normalize/src/commands/tools/lint.rs:67-70` — `writeln!().unwrap()` on infallible String writes — replaced with `let _ = writeln!(...)` _(severity: low)_
+
+All lenses return 0 new findings after Round 4 fixes. Polish pass complete.
