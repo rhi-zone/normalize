@@ -1,9 +1,9 @@
 # Polish State
 
 Created: f89f7a3c5d17cb1d8b13137bacb8c830d54c808c
-Last run: 2026-03-25T01:00:00Z
+Last run: 2026-03-25T02:00:00Z
 Round 1 applied: 2026-03-24
-Round: 12
+Round: 13
 Project type: Rust CLI + library ecosystem (~40 crates)
 
 ## Lenses
@@ -800,3 +800,31 @@ None. (Display-impl finding initially looked like "remove Display" but correct f
 
 - [DONE] `crates/normalize-chat-sessions/src/formats/mod.rs` — `LogFormat::parse()` trait `Result<Session, String>` → `Result<Session, ParseError>`; `ParseError` enum defined with `Io`/`Format`/`Other` variants _(severity: medium)_
 - [DONE] `crates/normalize-chat-sessions/src/formats/mod.rs:326,347` — `read_file`/`parse_session_with_format` helpers use typed `ParseError` _(severity: medium)_
+
+---
+
+## Findings — Round 13
+
+Round 13 git hash: d2a8b4e8
+Scope: entire codebase — fixpoint verification
+
+### Conflicts
+None.
+
+### api-clarity / naming-consistency
+
+- [DONE] `crates/normalize/src/service/package.rs` — `PackageReport { success: bool, data: Option<Value> }` replaced with 6 typed report structs (`PackageInfoReport`, `PackageListReport`, `PackageTreeReport`, `PackageWhyReport`, `PackageOutdatedReport`, `PackageAuditReport`); `commands/package.rs` rewritten as data-returning functions _(severity: high)_
+- [DONE] `crates/normalize/src/service/config.rs:617` — `schema()` returned `serde_json::Value` → `ConfigSchemaReport` _(severity: high)_
+- [DONE] `crates/normalize/src/service/analyze.rs:75-193` — 15 identical `display_*` bridge methods collapsed into generic `display_output<T: OutputFormatter>` _(severity: high)_
+- [DONE] `crates/normalize/src/service/grammars.rs` + `normalize-rules/src/service.rs` — `display_list`/`display_paths`/`display_validate` thin wrappers removed _(severity: medium)_
+- [DONE] `crates/normalize/src/service/analyze.rs` — `AnalyzeError::Other` → `AnalyzeError::Message` _(severity: medium)_
+- [DONE] `DaemonActionReport`, `DaemonRootReport`, `InitReport`, `CommandReport` — `success: bool` removed _(severity: medium)_
+
+### error-surface
+
+- [DONE] `crates/normalize-package-index/src/index/` (11 files: dnf, freebsd, guix, manjaro, opensuse, pacman, void, apt, ubuntu, apk, cachyos, endeavouros) — `eprintln!` → `tracing::warn!` _(severity: high)_
+
+### doc-coverage
+
+- [DONE] `crates/normalize-ecosystems/src/lib.rs` — `PackageQuery`, `PackageInfo`, `Feature`, `TreeNode`, `DependencyTree`, `Vulnerability`, `LockfileManager` fields documented _(severity: medium)_
+- [DONE] `crates/normalize-ecosystems/src/ecosystems/npm/lockfile_bun.rs:11` — bare URL wrapped in `<...>` _(severity: medium)_
