@@ -276,9 +276,19 @@ impl RulesService {
         if fix {
             let debug_flags = normalize_syntax_rules::DebugFlags::from_args(&debug);
             tokio::task::spawn_blocking(move || {
+                const MAX_FIX_ITERATIONS: usize = 100;
                 let mut total_fixed = 0usize;
                 let mut total_files = 0usize;
+                let mut iterations = 0usize;
                 loop {
+                    if iterations >= MAX_FIX_ITERATIONS {
+                        eprintln!(
+                            "Warning: --fix stopped after {MAX_FIX_ITERATIONS} iterations; \
+                             a rule fix may be generating output that still matches the same rule."
+                        );
+                        break;
+                    }
+                    iterations += 1;
                     let findings = run_syntax_rules(
                         &target_root,
                         &project_root,
@@ -362,6 +372,11 @@ impl RulesService {
                     move || normalize_native_rules::build_budget_report(&root)
                 }),
             );
+
+            // Track how many issues existed before adding native results so
+            // global_allow filtering only touches the newly added native issues.
+            let native_start = report.issues.len();
+
             if let Ok(r) = summary_res {
                 report.merge(r.into());
             }
@@ -381,6 +396,26 @@ impl RulesService {
                 report.merge(r.into());
             }
 
+            // Apply global_allow patterns to native-rule issues (syntax/fact rules
+            // apply global_allow during their own execution; native rules need it here).
+            let global_allow: Vec<glob::Pattern> = native_config
+                .rules
+                .global_allow
+                .iter()
+                .filter_map(|s| glob::Pattern::new(s).ok())
+                .collect();
+            if !global_allow.is_empty() {
+                let mut keep_idx = 0usize;
+                report.issues.retain(|issue| {
+                    let idx = keep_idx;
+                    keep_idx += 1;
+                    if idx < native_start {
+                        // pre-existing syntax/fact issue — already filtered, keep it
+                        return true;
+                    }
+                    !global_allow.iter().any(|p| p.matches(&issue.file))
+                });
+            }
             apply_native_rules_config(&mut report, &native_config.rules);
             report.sources_run.push("native".into());
         }
@@ -677,10 +712,6 @@ impl RulesService {
             global_allow_count,
         };
 
-        if !report.valid {
-            return Err(report.format_text());
-        }
-
         Ok(report)
     }
 }
@@ -718,11 +749,10 @@ pub fn load_rules_config(root: &Path) -> RulesRunConfig {
         merged
     };
 
-    // Project config wins for rules (same semantics as normalize's config merge)
-    let rules = if content.is_empty() {
-        global.rules
-    } else {
-        project.rules
-    };
+    // Merge: start with global, overlay project on top.  Using normalize_core::Merge
+    // ensures per-rule overrides from global config are preserved when the project
+    // config only overrides a subset of rules.
+    use normalize_core::Merge as _;
+    let rules = global.rules.merge(project.rules);
     RulesRunConfig { rule_tags, rules }
 }

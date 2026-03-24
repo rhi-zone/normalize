@@ -482,7 +482,7 @@ pub fn run_rule(
                 d.level = DiagnosticLevel::Error;
             }
         }
-        Severity::Info => {
+        Severity::Info | Severity::Hint => {
             // `DiagnosticLevel` has no `Info` variant; `Hint` is the closest
             // available level (quieter than Warning). This is a lossy mapping:
             // both "info" and "hint" from the Datalog `diagnostic` relation end
@@ -677,7 +677,7 @@ pub fn run_rules_batch(
                     d.level = DiagnosticLevel::Error;
                 }
             }
-            Severity::Info => {
+            Severity::Info | Severity::Hint => {
                 // `DiagnosticLevel` has no `Info` variant; `Hint` is the closest
                 // available level. See the same comment in `run_rule` for details.
                 for d in &mut diagnostics {

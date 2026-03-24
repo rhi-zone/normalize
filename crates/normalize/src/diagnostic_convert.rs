@@ -29,6 +29,7 @@ fn syntax_severity(s: normalize_syntax_rules::Severity) -> Severity {
         normalize_syntax_rules::Severity::Error => Severity::Error,
         normalize_syntax_rules::Severity::Warning => Severity::Warning,
         normalize_syntax_rules::Severity::Info => Severity::Info,
+        normalize_syntax_rules::Severity::Hint => Severity::Hint,
     }
 }
 

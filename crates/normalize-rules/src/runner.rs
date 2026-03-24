@@ -53,7 +53,7 @@ impl std::str::FromStr for RuleType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct RuleLockEntry {
     source: String,
-    sha256: String,
+    content_hash: String,
     added: String,
 }
 
@@ -690,17 +690,25 @@ pub fn enable_disable(
     let content = std::fs::read_to_string(&config_path).unwrap_or_default();
     let mut doc: toml_edit::DocumentMut = content.parse().unwrap_or_default();
 
-    // Ensure [rules] exists as an implicit table
+    // Ensure [rules] exists as an explicit table section.
+    // If the existing entry is an inline table (e.g. `rules = {}`), bail out with an
+    // actionable error — converting inline tables in-place is lossy and surprising.
     if !doc.contains_key("rules") {
         let mut t = toml_edit::Table::new();
         t.set_implicit(true);
         doc["rules"] = toml_edit::Item::Table(t);
+    } else if doc["rules"].is_inline_table() {
+        return Err("Cannot update rules config: the existing 'rules' entry in \
+             .normalize/config.toml is an inline table (e.g. `rules = {...}`). \
+             Convert it to a [rules] section first."
+            .to_string());
     }
 
     // Apply syntax rule changes → [rules."id"]
     if !changes_syntax.is_empty() {
-        // normalize-syntax-allow: rust/unwrap-in-impl - "rules" was just inserted as a Table above; guaranteed to be a table
-        let rules_table = doc["rules"].as_table_mut().unwrap();
+        let rules_table = doc["rules"]
+            .as_table_mut()
+            .ok_or_else(|| "'rules' is not a TOML table".to_string())?;
         for id in &changes_syntax {
             if !rules_table.contains_key(id) {
                 rules_table[id] = toml_edit::Item::Table(toml_edit::Table::new());
@@ -711,8 +719,9 @@ pub fn enable_disable(
 
     // Apply fact rule changes → [rules."id"] (same section as syntax rules)
     if !changes_fact.is_empty() {
-        // normalize-syntax-allow: rust/unwrap-in-impl - "rules" was just inserted as a Table above; guaranteed to be a table
-        let rules_table = doc["rules"].as_table_mut().unwrap();
+        let rules_table = doc["rules"]
+            .as_table_mut()
+            .ok_or_else(|| "'rules' is not a TOML table".to_string())?;
         for id in &changes_fact {
             if !rules_table.contains_key(id) {
                 rules_table[id] = toml_edit::Item::Table(toml_edit::Table::new());
@@ -1489,7 +1498,7 @@ pub fn add_rule(url: &str, global: bool) -> Result<(), String> {
         rule_id.clone(),
         RuleLockEntry {
             source: url.to_string(),
-            sha256: sha256_hex(&content),
+            content_hash: content_hash(&content),
             added: chrono::Utc::now().format("%Y-%m-%d").to_string(),
         },
     );
@@ -1635,7 +1644,7 @@ fn extract_rule_id(content: &str) -> Option<String> {
     table.get("id")?.as_str().map(|s| s.to_string())
 }
 
-fn sha256_hex(content: &str) -> String {
+fn content_hash(content: &str) -> String {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 
@@ -1685,6 +1694,7 @@ fn syntax_severity(s: normalize_syntax_rules::Severity) -> normalize_output::dia
         normalize_syntax_rules::Severity::Error => Severity::Error,
         normalize_syntax_rules::Severity::Warning => Severity::Warning,
         normalize_syntax_rules::Severity::Info => Severity::Info,
+        normalize_syntax_rules::Severity::Hint => Severity::Hint,
     }
 }
 

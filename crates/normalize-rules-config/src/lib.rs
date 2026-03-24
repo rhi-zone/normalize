@@ -7,9 +7,8 @@ use std::collections::HashMap;
 
 /// Severity level for rule findings.
 ///
-/// Shared across all rule engines (syntax, fact). `DiagnosticLevel` in
-/// `normalize-facts-rules-api` is the ABI-stable counterpart and adds a
-/// `Hint` variant for the display layer.
+/// Shared across all rule engines (syntax, fact, native). `DiagnosticLevel` in
+/// `normalize-facts-rules-api` is the ABI-stable counterpart.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
@@ -17,6 +16,7 @@ pub enum Severity {
     #[default]
     Warning,
     Info,
+    Hint,
 }
 
 impl std::fmt::Display for Severity {
@@ -25,6 +25,7 @@ impl std::fmt::Display for Severity {
             Severity::Error => write!(f, "error"),
             Severity::Warning => write!(f, "warning"),
             Severity::Info => write!(f, "info"),
+            Severity::Hint => write!(f, "hint"),
         }
     }
 }
@@ -37,6 +38,7 @@ impl std::str::FromStr for Severity {
             "error" => Ok(Severity::Error),
             "warning" | "warn" => Ok(Severity::Warning),
             "info" | "note" => Ok(Severity::Info),
+            "hint" => Ok(Severity::Hint),
             _ => Err(format!("unknown severity: {}", s)),
         }
     }
