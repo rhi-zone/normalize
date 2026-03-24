@@ -162,6 +162,13 @@ impl Default for SyntaxRulesService {
     }
 }
 
+impl SyntaxRulesService {
+    /// Generic display bridge that routes to `OutputFormatter::format_text()`.
+    fn display_output<T: OutputFormatter>(&self, value: &T) -> String {
+        value.format_text()
+    }
+}
+
 #[cli(
     name = "normalize-syntax-rules",
     version = "0.1.0",
@@ -169,6 +176,7 @@ impl Default for SyntaxRulesService {
 )]
 impl SyntaxRulesService {
     /// Run rules against files in a directory
+    #[cli(display_with = "display_output")]
     pub fn run(
         &self,
         #[param(
@@ -236,6 +244,7 @@ impl SyntaxRulesService {
     }
 
     /// List available rules
+    #[cli(display_with = "display_output")]
     pub fn list(
         &self,
         #[param(short = 'r', help = "Project root (defaults to current directory)")] root: Option<

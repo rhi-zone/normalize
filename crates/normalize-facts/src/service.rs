@@ -27,12 +27,6 @@ impl OutputFormatter for RebuildReport {
     }
 }
 
-impl std::fmt::Display for RebuildReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.format_text())
-    }
-}
-
 /// Index statistics.
 #[derive(Serialize, JsonSchema)]
 pub struct StructureStatsReport {
@@ -62,12 +56,6 @@ impl OutputFormatter for StructureStatsReport {
     }
 }
 
-impl std::fmt::Display for StructureStatsReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.format_text())
-    }
-}
-
 /// File list result.
 #[derive(Serialize, JsonSchema)]
 pub struct StructureFilesReport {
@@ -77,12 +65,6 @@ pub struct StructureFilesReport {
 impl OutputFormatter for StructureFilesReport {
     fn format_text(&self) -> String {
         self.files.iter().map(|p| format!("{}\n", p)).collect()
-    }
-}
-
-impl std::fmt::Display for StructureFilesReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.format_text())
     }
 }
 
@@ -127,6 +109,13 @@ impl Default for FactsCliService {
     }
 }
 
+impl FactsCliService {
+    /// Generic display bridge that routes to `OutputFormatter::format_text()`.
+    fn display_output<T: OutputFormatter>(&self, value: &T) -> String {
+        value.format_text()
+    }
+}
+
 #[cli(
     name = "normalize-facts",
     version = "0.1.0",
@@ -134,6 +123,7 @@ impl Default for FactsCliService {
 )]
 impl FactsCliService {
     /// Rebuild the file index (re-scan all files)
+    #[cli(display_with = "display_output")]
     pub async fn rebuild(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -150,6 +140,7 @@ impl FactsCliService {
     }
 
     /// Show index statistics
+    #[cli(display_with = "display_output")]
     pub async fn stats(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -181,6 +172,7 @@ impl FactsCliService {
     }
 
     /// List indexed files (with optional prefix filter)
+    #[cli(display_with = "display_output")]
     pub async fn files(
         &self,
         #[param(positional, help = "Filter files by prefix")] prefix: Option<String>,

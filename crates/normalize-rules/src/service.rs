@@ -126,13 +126,16 @@ impl OutputFormatter for RuleShowReport {
     }
 }
 
-impl std::fmt::Display for RuleShowReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
-    }
-}
-
 impl RulesService {
+    /// Generic display bridge that routes to `OutputFormatter::format_text()`.
+    fn display_output<T: OutputFormatter>(&self, value: &T) -> String {
+        if self.pretty.get() {
+            value.format_pretty()
+        } else {
+            value.format_text()
+        }
+    }
+
     fn display_run(&self, r: &DiagnosticsReport) -> String {
         if self.sarif.get() {
             return r.format_sarif();
@@ -446,6 +449,7 @@ impl RulesService {
     /// Examples:
     ///   normalize rules enable python/bare-except   # enable a specific rule
     ///   normalize rules enable --tag correctness    # enable all correctness rules
+    #[cli(display_with = "display_output")]
     pub fn enable(
         &self,
         #[param(positional, help = "Rule ID or tag name")] id_or_tag: String,
@@ -473,6 +477,7 @@ impl RulesService {
     ///
     /// Examples:
     ///   normalize rules disable no-todo-comment     # disable a specific rule
+    #[cli(display_with = "display_output")]
     pub fn disable(
         &self,
         #[param(positional, help = "Rule ID or tag name")] id_or_tag: String,
@@ -500,6 +505,7 @@ impl RulesService {
     ///
     /// Examples:
     ///   normalize rules show rust/unwrap-in-impl    # full docs for a rule
+    #[cli(display_with = "display_output")]
     pub fn show(
         &self,
         #[param(positional, help = "Rule ID to show")] id: String,
@@ -527,6 +533,7 @@ impl RulesService {
     ///
     /// Examples:
     ///   normalize rules tags                   # list all tags with rule counts
+    #[cli(display_with = "display_output")]
     pub fn tags(
         &self,
         #[param(help = "Expand each tag to show its member rules")] show_rules: bool,
@@ -562,6 +569,7 @@ impl RulesService {
     ///
     /// Examples:
     ///   normalize rules add https://example.com/rule.scm   # import a rule from URL
+    #[cli(display_with = "display_output")]
     pub fn add(
         &self,
         #[param(positional, help = "URL to download the rule from")] url: String,
@@ -574,6 +582,7 @@ impl RulesService {
     }
 
     /// Update imported rules from their sources
+    #[cli(display_with = "display_output")]
     pub fn update(
         &self,
         #[param(
@@ -589,6 +598,7 @@ impl RulesService {
     }
 
     /// Remove an imported rule
+    #[cli(display_with = "display_output")]
     pub fn remove(
         &self,
         #[param(positional, help = "Rule ID to remove")] rule_id: String,
@@ -603,6 +613,7 @@ impl RulesService {
     ///
     /// Examples:
     ///   normalize rules setup                    # interactive rule configuration
+    #[cli(display_with = "display_output")]
     pub fn setup(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<

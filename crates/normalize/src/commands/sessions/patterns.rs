@@ -66,9 +66,6 @@ pub struct PatternsReport {
     /// Present when `--limit` truncated the session list.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub truncated: Option<super::TruncationInfo>,
-    /// Whether to use pretty formatting.
-    #[serde(skip)]
-    pub pretty: bool,
 }
 
 impl OutputFormatter for PatternsReport {
@@ -197,16 +194,6 @@ impl OutputFormatter for PatternsReport {
         }
 
         out
-    }
-}
-
-impl std::fmt::Display for PatternsReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.pretty {
-            write!(f, "{}", self.format_pretty())
-        } else {
-            write!(f, "{}", self.format_text())
-        }
     }
 }
 
@@ -475,7 +462,6 @@ pub fn build_patterns_report(
     all_projects: bool,
     mode: &SessionMode,
     agent_type: Option<&str>,
-    pretty: bool,
 ) -> Result<PatternsReport, String> {
     let registry = FormatRegistry::new();
     let format: &dyn LogFormat = match format_name {
@@ -651,6 +637,5 @@ pub fn build_patterns_report(
         common_end_tools,
         per_session,
         truncated,
-        pretty,
     })
 }

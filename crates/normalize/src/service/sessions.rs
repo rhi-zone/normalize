@@ -23,42 +23,6 @@ impl SessionsService {
     }
 }
 
-impl std::fmt::Display for SessionListReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.use_pretty() {
-            write!(f, "{}", self.format_pretty())
-        } else {
-            write!(f, "{}", self.format_text())
-        }
-    }
-}
-
-impl std::fmt::Display for SessionShowReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.use_pretty() {
-            write!(f, "{}", self.format_pretty())
-        } else {
-            write!(f, "{}", self.format_text())
-        }
-    }
-}
-
-impl std::fmt::Display for PlansListReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
-    }
-}
-
-impl std::fmt::Display for MessagesReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.pretty {
-            write!(f, "{}", self.format_pretty())
-        } else {
-            write!(f, "{}", self.format_text())
-        }
-    }
-}
-
 /// Report type for plans (list or content).
 #[derive(serde::Serialize, schemars::JsonSchema)]
 #[serde(tag = "kind")]
@@ -76,18 +40,21 @@ impl crate::output::OutputFormatter for PlansReport {
     }
 }
 
-impl std::fmt::Display for PlansReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", crate::output::OutputFormatter::format_text(self))
-    }
-}
-
 impl SessionsService {
     fn display_analyze(&self, a: &SessionAnalysisReport) -> String {
         if self.pretty.get() {
             a.format_pretty()
         } else {
             a.format_text()
+        }
+    }
+
+    /// Generic display bridge: delegates to the report's own pretty flag.
+    fn display_output<T: OutputFormatter>(&self, value: &T) -> String {
+        if self.pretty.get() {
+            value.format_pretty()
+        } else {
+            value.format_text()
         }
     }
 }
@@ -112,6 +79,7 @@ impl SessionsService {
     ///   normalize sessions list --mode subagent       # list subagent sessions only
     ///   normalize sessions list --mode all            # list interactive + subagent sessions
     ///   normalize sessions list --agent-type Explore  # only Explore agents
+    #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn list(
         &self,
@@ -140,7 +108,8 @@ impl SessionsService {
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
-        let is_pretty = resolve_pretty(resolved_root, pretty, compact);
+        self.pretty
+            .set(resolve_pretty(resolved_root, pretty, compact));
         let mode = mode.unwrap_or_default();
         crate::commands::sessions::build_session_list(
             root_path,
@@ -152,7 +121,6 @@ impl SessionsService {
             until.as_deref(),
             project_path,
             all_projects,
-            is_pretty,
             &mode,
             agent_type.as_deref(),
         )
@@ -164,6 +132,7 @@ impl SessionsService {
     ///   normalize sessions show abc123               # show session summary (fuzzy match on ID)
     ///   normalize sessions show abc123 --full        # show full conversation log
     ///   normalize sessions show abc123 --exact       # require exact ID match
+    #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn show(
         &self,
@@ -183,16 +152,16 @@ impl SessionsService {
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
-        let is_pretty = super::resolve_pretty(resolved_root, pretty, compact);
+        self.pretty
+            .set(super::resolve_pretty(resolved_root, pretty, compact));
         let effective_project = project_path.or(root_path);
-        let report = crate::commands::sessions::build_show_report(
+        crate::commands::sessions::build_show_report(
             &session,
             effective_project,
             format.as_deref(),
             full,
             exact,
-        )?;
-        Ok(report.with_pretty(is_pretty))
+        )
     }
 
     /// Run deep behavioral analysis on a session (tool stats, errors, token costs, corrections)
@@ -247,6 +216,7 @@ impl SessionsService {
     ///   normalize sessions stats --group-by project          # group results by project
     ///   normalize sessions stats --group-by project,day      # group by project and day
     ///   normalize sessions stats --mode subagent             # stats for subagent sessions only
+    #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn stats(
         &self,
@@ -329,6 +299,7 @@ impl SessionsService {
     ///   normalize sessions messages --grep "error" --no-truncate   # search messages, full text
     ///   normalize sessions messages --grep "panic" --context 2     # matching lines with 2 lines of context
     ///   normalize sessions messages --show-usage --sort-by-tokens  # heaviest turns first
+    #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn messages(
         &self,
@@ -372,7 +343,8 @@ impl SessionsService {
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
-        let is_pretty = resolve_pretty(resolved_root, pretty, compact);
+        self.pretty
+            .set(resolve_pretty(resolved_root, pretty, compact));
         let context_lines = context.unwrap_or(0);
         if context_lines > 0 && grep.is_none() {
             return Err("--context requires --grep".to_string());
@@ -395,7 +367,6 @@ impl SessionsService {
             sort_by_tokens,
             sort_order,
             context_lines,
-            is_pretty,
             &mode,
             agent_type.as_deref(),
         )
@@ -406,6 +377,7 @@ impl SessionsService {
     /// Examples:
     ///   normalize sessions subagents abc123            # list subagents of session abc123
     ///   normalize sessions subagents abc123 --json     # machine-readable output
+    #[cli(display_with = "display_output")]
     pub fn subagents(
         &self,
         #[param(positional, help = "Parent session ID")] session: String,
@@ -434,6 +406,7 @@ impl SessionsService {
     ///   normalize sessions patterns --days 30               # patterns for the last 30 days
     ///   normalize sessions patterns --mode subagent         # patterns for subagent sessions only
     ///   normalize sessions patterns --all-projects          # patterns across all projects
+    #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn patterns(
         &self,
@@ -466,7 +439,8 @@ impl SessionsService {
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
-        let is_pretty = resolve_pretty(resolved_root, pretty, compact);
+        self.pretty
+            .set(resolve_pretty(resolved_root, pretty, compact));
         let mode = mode.unwrap_or_default();
         crate::commands::sessions::build_patterns_report(
             root_path,
@@ -480,7 +454,6 @@ impl SessionsService {
             all_projects,
             &mode,
             agent_type.as_deref(),
-            is_pretty,
         )
     }
 
@@ -489,6 +462,7 @@ impl SessionsService {
     /// Examples:
     ///   normalize sessions plans                     # list all saved plans
     ///   normalize sessions plans my-plan             # view a specific plan by name
+    #[cli(display_with = "display_output")]
     pub fn plans(
         &self,
         #[param(positional, help = "Plan name to view (omit to list all)")] name: Option<String>,

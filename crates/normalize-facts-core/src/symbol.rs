@@ -33,6 +33,7 @@ pub enum SymbolKind {
 }
 
 impl SymbolKind {
+    /// Returns the lowercase string representation of this symbol kind.
     pub fn as_str(&self) -> &'static str {
         match self {
             SymbolKind::Function => "function",
@@ -55,14 +56,19 @@ impl SymbolKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Visibility {
+    /// Exported / accessible everywhere (default).
     #[default]
     Public,
+    /// Accessible only within the defining scope or file.
     Private,
+    /// Accessible to the defining type and its subclasses.
     Protected,
+    /// Accessible within the same package or crate but not externally.
     Internal,
 }
 
 impl Visibility {
+    /// Returns the lowercase string representation of this visibility level.
     pub fn as_str(&self) -> &'static str {
         match self {
             Visibility::Public => "public",

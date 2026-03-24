@@ -2,6 +2,7 @@
 //!
 //! Each method is a guide topic. `normalize guide` lists all topics via `--help`.
 
+use crate::output::OutputFormatter;
 use server_less::cli;
 
 /// A guide page returned by the guide service.
@@ -11,18 +12,26 @@ pub struct GuideReport {
     pub content: String,
 }
 
-impl std::fmt::Display for GuideReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.content)
+impl OutputFormatter for GuideReport {
+    fn format_text(&self) -> String {
+        self.content.clone()
     }
 }
 
 /// Built-in guides for normalize workflows.
 pub struct GuideService;
 
+impl GuideService {
+    /// Generic display bridge that routes to `OutputFormatter::format_text()`.
+    fn display_output<T: OutputFormatter>(&self, value: &T) -> String {
+        value.format_text()
+    }
+}
+
 #[cli(name = "guide", description = "Workflow guides with examples")]
 impl GuideService {
     /// Writing and testing syntax rules
+    #[cli(display_with = "display_output")]
     pub fn rules(&self) -> Result<GuideReport, String> {
         Ok(GuideReport {
             topic: "rules".into(),
@@ -31,6 +40,7 @@ impl GuideService {
     }
 
     /// Exploring a codebase
+    #[cli(display_with = "display_output")]
     pub fn explore(&self) -> Result<GuideReport, String> {
         Ok(GuideReport {
             topic: "explore".into(),
@@ -39,6 +49,7 @@ impl GuideService {
     }
 
     /// Setting up normalize in a project
+    #[cli(display_with = "display_output")]
     pub fn setup(&self) -> Result<GuideReport, String> {
         Ok(GuideReport {
             topic: "setup".into(),
@@ -47,6 +58,7 @@ impl GuideService {
     }
 
     /// Running analysis on a codebase
+    #[cli(display_with = "display_output")]
     pub fn analyze(&self) -> Result<GuideReport, String> {
         Ok(GuideReport {
             topic: "analyze".into(),
@@ -55,6 +67,7 @@ impl GuideService {
     }
 
     /// Using tree-sitter introspection commands
+    #[cli(display_with = "display_output")]
     pub fn tree_sitter(&self) -> Result<GuideReport, String> {
         Ok(GuideReport {
             topic: "tree-sitter".into(),

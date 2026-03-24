@@ -1,6 +1,6 @@
 //! OpenAI Codex CLI JSONL format parser.
 
-use super::{LogFormat, SessionFile, peek_lines};
+use super::{LogFormat, ParseError, SessionFile, peek_lines};
 use crate::{ContentBlock, Message, Role, Session, TokenUsage, Turn};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -100,8 +100,11 @@ impl LogFormat for CodexFormat {
         0.0
     }
 
-    fn parse(&self, path: &Path) -> Result<Session, String> {
-        let file = File::open(path).map_err(|e| e.to_string())?;
+    fn parse(&self, path: &Path) -> Result<Session, ParseError> {
+        let file = File::open(path).map_err(|e| ParseError::Io {
+            path: path.to_path_buf(),
+            source: e,
+        })?;
         let reader = BufReader::new(file);
 
         let mut session = Session::new(path.to_path_buf(), self.name());
@@ -110,7 +113,10 @@ impl LogFormat for CodexFormat {
         let mut pending_tool_calls: HashMap<String, (String, Value)> = HashMap::new();
 
         for line in reader.lines() {
-            let line = line.map_err(|e| e.to_string())?;
+            let line = line.map_err(|e| ParseError::Io {
+                path: path.to_path_buf(),
+                source: e,
+            })?;
             if line.trim().is_empty() {
                 continue;
             }

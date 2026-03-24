@@ -129,9 +129,6 @@ pub struct MessagesReport {
     pub truncated: Option<super::TruncationInfo>,
     #[serde(skip)]
     #[schemars(skip)]
-    pub(crate) pretty: bool,
-    #[serde(skip)]
-    #[schemars(skip)]
     pub(crate) show_usage: bool,
     /// Whether records are line-granularity matches (--context was set).
     #[serde(skip)]
@@ -600,7 +597,6 @@ pub fn build_messages_report(
     sort_by_tokens: bool,
     sort_order: SortOrder,
     context_lines: usize,
-    pretty: bool,
     mode: &super::SessionMode,
     agent_type: Option<&str>,
 ) -> Result<MessagesReport, String> {
@@ -865,7 +861,6 @@ pub fn build_messages_report(
         messages,
         stats,
         truncated,
-        pretty,
         show_usage,
         line_mode: context_lines > 0,
         sort_order,

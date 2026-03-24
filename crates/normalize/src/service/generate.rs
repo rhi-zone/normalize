@@ -32,9 +32,10 @@ impl OutputFormatter for GenerateReport {
     }
 }
 
-impl std::fmt::Display for GenerateReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
+impl GenerateService {
+    /// Generic display bridge that routes to `OutputFormatter::format_text()`.
+    fn display_output<T: OutputFormatter>(&self, value: &T) -> String {
+        value.format_text()
     }
 }
 
@@ -45,6 +46,7 @@ impl GenerateService {
     /// Examples:
     ///   normalize generate client api.json -l typescript          # generate TypeScript client
     ///   normalize generate client api.json -l python -o client.py # generate Python client to file
+    #[cli(display_with = "display_output")]
     pub fn client(
         &self,
         #[param(positional, help = "OpenAPI spec JSON file")] spec: String,
@@ -90,6 +92,7 @@ impl GenerateService {
     ///   normalize generate types schema.json -b typescript        # generate TypeScript types
     ///   normalize generate types schema.json -b zod --infer-types # Zod schemas with type inference
     ///   normalize generate types schema.json -b go --package models -o models.go
+    #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn types(
         &self,
@@ -135,7 +138,7 @@ impl GenerateService {
     /// Examples:
     ///   normalize generate cli-snapshot ./target/debug/myapp              # generate snapshot tests
     ///   normalize generate cli-snapshot ./target/debug/myapp -o tests/cli.rs  # write to file
-    #[cli(name = "cli-snapshot")]
+    #[cli(name = "cli-snapshot", display_with = "display_output")]
     pub fn cli_snapshot(
         &self,
         #[param(positional, help = "Path to the CLI binary")] binary: String,

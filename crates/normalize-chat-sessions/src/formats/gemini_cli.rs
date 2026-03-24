@@ -1,6 +1,6 @@
 //! Gemini CLI JSON format parser.
 
-use super::{LogFormat, SessionFile, read_file};
+use super::{LogFormat, ParseError, SessionFile, read_file};
 use crate::{ContentBlock, Message, Role, Session, TokenUsage, Turn};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -76,9 +76,12 @@ impl LogFormat for GeminiCliFormat {
         0.0
     }
 
-    fn parse(&self, path: &Path) -> Result<Session, String> {
+    fn parse(&self, path: &Path) -> Result<Session, ParseError> {
         let content = read_file(path)?;
-        let data: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+        let data: Value = serde_json::from_str(&content).map_err(|e| ParseError::Format {
+            path: path.to_path_buf(),
+            message: e.to_string(),
+        })?;
 
         let mut session = Session::new(path.to_path_buf(), self.name());
         session.subagent_type = Some("interactive".into());

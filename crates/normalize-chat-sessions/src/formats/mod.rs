@@ -47,6 +47,24 @@ use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::sync::{OnceLock, RwLock};
 
+/// Error type for session log parsing operations.
+#[derive(Debug, thiserror::Error)]
+pub enum ParseError {
+    /// I/O error reading a session log file.
+    #[error("I/O error reading {path}: {source}")]
+    Io {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    /// Structural parse error in a session log file.
+    #[error("parse error in {path}: {message}")]
+    Format { path: PathBuf, message: String },
+    /// Other error (e.g. unknown format, registry failure).
+    #[error("{0}")]
+    Other(String),
+}
+
 /// Global registry of log format plugins.
 static FORMATS: RwLock<Vec<&'static dyn LogFormat>> = RwLock::new(Vec::new());
 static INITIALIZED: OnceLock<()> = OnceLock::new();
@@ -111,7 +129,7 @@ pub trait LogFormat: Send + Sync {
     fn detect(&self, path: &Path) -> f64;
 
     /// Parse the log file into a unified Session structure.
-    fn parse(&self, path: &Path) -> Result<Session, String>;
+    fn parse(&self, path: &Path) -> Result<Session, ParseError>;
 }
 
 /// Get a format by name from the global registry.
@@ -314,20 +332,20 @@ impl FormatRegistry {
 }
 
 /// Parse a session log with auto-format detection.
-pub fn parse_session(path: &Path) -> Result<Session, String> {
+pub fn parse_session(path: &Path) -> Result<Session, ParseError> {
     let registry = FormatRegistry::new();
     let format = registry
         .detect(path)
-        .ok_or_else(|| format!("Unknown log format: {}", path.display()))?;
+        .ok_or_else(|| ParseError::Other(format!("Unknown log format: {}", path.display())))?;
     format.parse(path)
 }
 
 /// Parse a session log with explicit format.
-pub fn parse_session_with_format(path: &Path, format_name: &str) -> Result<Session, String> {
+pub fn parse_session_with_format(path: &Path, format_name: &str) -> Result<Session, ParseError> {
     let registry = FormatRegistry::new();
     let format = registry
         .get(format_name)
-        .ok_or_else(|| format!("Unknown format: {}", format_name))?;
+        .ok_or_else(|| ParseError::Other(format!("Unknown format: {}", format_name)))?;
     format.parse(path)
 }
 
@@ -344,10 +362,16 @@ pub(crate) fn peek_lines(path: &Path, n: usize) -> Vec<String> {
 }
 
 /// Helper: read entire file as string.
-pub(crate) fn read_file(path: &Path) -> Result<String, String> {
-    let mut file = File::open(path).map_err(|e| e.to_string())?;
+pub(crate) fn read_file(path: &Path) -> Result<String, ParseError> {
+    let mut file = File::open(path).map_err(|e| ParseError::Io {
+        path: path.to_path_buf(),
+        source: e,
+    })?;
     let mut content = String::new();
     file.read_to_string(&mut content)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| ParseError::Io {
+            path: path.to_path_buf(),
+            source: e,
+        })?;
     Ok(content)
 }

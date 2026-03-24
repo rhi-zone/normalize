@@ -21,6 +21,11 @@ impl FactsService {
             _pretty: Cell::new(pretty.get()),
         }
     }
+
+    /// Generic display bridge that routes to `OutputFormatter::format_text()`.
+    fn display_output<T: crate::output::OutputFormatter>(&self, value: &T) -> String {
+        value.format_text()
+    }
 }
 
 /// Report for `normalize structure rebuild`: counts of indexed entities.
@@ -61,12 +66,6 @@ impl OutputFormatter for RebuildReport {
             out.push_str(&format!("\nIndexed {}", parts.join(", ")));
         }
         out
-    }
-}
-
-impl std::fmt::Display for RebuildReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
     }
 }
 
@@ -186,12 +185,6 @@ impl OutputFormatter for StorageReport {
     }
 }
 
-impl std::fmt::Display for StorageReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
-    }
-}
-
 /// List of indexed file paths returned by `normalize structure files`.
 ///
 /// Each entry is a path relative to the project root. The list can be filtered by prefix
@@ -204,12 +197,6 @@ pub struct FileListReport {
 impl OutputFormatter for FileListReport {
     fn format_text(&self) -> String {
         self.files.iter().map(|p| format!("{}\n", p)).collect()
-    }
-}
-
-impl std::fmt::Display for FileListReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
     }
 }
 
@@ -243,12 +230,6 @@ impl OutputFormatter for PackagesReport {
     }
 }
 
-impl std::fmt::Display for PackagesReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
-    }
-}
-
 /// Generic command result for operations that return a success flag and optional message.
 ///
 /// Used for commands that don't have a more specific report type. `data` carries
@@ -271,12 +252,6 @@ impl OutputFormatter for CommandReport {
         } else {
             "Failed".to_string()
         }
-    }
-}
-
-impl std::fmt::Display for CommandReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
     }
 }
 
@@ -745,6 +720,7 @@ impl FactsService {
     ///   normalize structure rebuild                          # rebuild with all content types
     ///   normalize structure rebuild --include symbols        # only extract symbols
     ///   normalize structure rebuild --include calls,imports  # extract calls and imports
+    #[cli(display_with = "display_output")]
     pub async fn rebuild(
         &self,
         #[param(help = "What to extract: symbols, calls, imports (comma-separated)")] include: Vec<
@@ -775,6 +751,7 @@ impl FactsService {
     /// Examples:
     ///   normalize structure stats              # show symbol/call/import counts and DB size
     ///   normalize structure stats --storage    # show storage usage for index and caches
+    #[cli(display_with = "display_output")]
     pub async fn stats(
         &self,
         #[param(help = "Show storage usage for index and caches")] storage: bool,
@@ -805,6 +782,7 @@ impl FactsService {
     ///   normalize structure files                    # list all indexed files
     ///   normalize structure files src/               # list files under src/
     ///   normalize structure files -l 10              # show only the first 10 files
+    #[cli(display_with = "display_output")]
     pub async fn files(
         &self,
         #[param(positional, help = "Filter files by prefix")] prefix: Option<String>,
@@ -824,6 +802,7 @@ impl FactsService {
     ///   normalize structure packages                  # index all detected ecosystems
     ///   normalize structure packages --only rust      # index only Rust stdlib
     ///   normalize structure packages --clear          # clear cache and re-index
+    #[cli(display_with = "display_output")]
     pub async fn packages(
         &self,
         #[param(help = "Ecosystems to index (comma-separated)")] only: Vec<String>,
@@ -850,6 +829,7 @@ impl FactsService {
     ///   normalize structure query "SELECT name, kind, file FROM symbols WHERE kind = 'function' LIMIT 10"
     ///   normalize structure query "SELECT * FROM entry_points" --json
     ///   normalize structure query "SELECT file, COUNT(*) as n FROM imports GROUP BY file ORDER BY n DESC LIMIT 5"
+    #[cli(display_with = "display_output")]
     pub async fn query(
         &self,
         #[param(positional, help = "SQL query to run against the structural index")] sql: String,
@@ -890,12 +870,6 @@ impl OutputFormatter for FactsStatsReport {
             Self::Stats(s) => s.format_text(),
             Self::Storage(s) => s.format_text(),
         }
-    }
-}
-
-impl std::fmt::Display for FactsStatsReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
     }
 }
 
@@ -947,12 +921,6 @@ impl OutputFormatter for QueryReport {
         }
         let _ = write!(out, "\n{} row(s)", self.rows.len());
         out
-    }
-}
-
-impl std::fmt::Display for QueryReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
     }
 }
 

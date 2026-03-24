@@ -145,11 +145,6 @@ impl NormalizeService {
         }
     }
 
-    /// Display bridge for GrepReport.
-    fn display_grep(&self, value: &GrepReport) -> String {
-        self.display_output(value)
-    }
-
     /// Display bridge for ContextKindReport (dispatches to inner type).
     fn display_context(&self, value: &ContextKindReport) -> String {
         match value {
@@ -168,11 +163,6 @@ impl NormalizeService {
         } else {
             value.code.clone()
         }
-    }
-
-    /// Display bridge for CiReport.
-    fn display_ci(&self, value: &commands::ci::CiReport) -> String {
-        self.display_output(value)
     }
 }
 
@@ -193,12 +183,6 @@ impl OutputFormatter for ContextKindReport {
             Self::List(r) => r.format_text(),
             Self::Full(r) => r.format_text(),
         }
-    }
-}
-
-impl std::fmt::Display for ContextKindReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
     }
 }
 
@@ -241,12 +225,6 @@ impl OutputFormatter for UpdateReport {
     }
 }
 
-impl std::fmt::Display for UpdateReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
-    }
-}
-
 /// Report for `normalize translate`: translated code and optional output path.
 ///
 /// When `output_path` is set, the translated code was written to disk and `format_text()`
@@ -270,12 +248,6 @@ impl OutputFormatter for TranslateReport {
         } else {
             self.code.clone()
         }
-    }
-}
-
-impl std::fmt::Display for TranslateReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
     }
 }
 
@@ -305,7 +277,7 @@ impl NormalizeService {
     ///   normalize grep "TODO" --only "*.rs"    # search Rust files for TODO
     ///   normalize grep "fn main" src/          # search in specific directory
     ///   normalize grep "class \w+" --only "*.py" --json   # JSON output
-    #[cli(display_with = "display_grep")]
+    #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn grep(
         &self,
@@ -349,6 +321,7 @@ impl NormalizeService {
     ///
     /// Examples:
     ///   normalize aliases                      # list all filter aliases
+    #[cli(display_with = "display_output")]
     pub fn aliases(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -429,6 +402,7 @@ impl NormalizeService {
     /// Examples:
     ///   normalize init                         # create .normalize/ config directory
     ///   normalize init --setup                 # interactive rule setup wizard
+    #[cli(display_with = "display_output")]
     pub async fn init(
         &self,
         #[param(help = "Index the codebase after initialization")] index: bool,
@@ -564,6 +538,7 @@ impl NormalizeService {
     ///
     /// Examples:
     ///   normalize update                       # check for and install updates
+    #[cli(display_with = "display_output")]
     pub fn update(
         &self,
         #[param(short = 'c', help = "Check for updates without installing")] check: bool,
@@ -882,7 +857,7 @@ impl NormalizeService {
     ///   normalize ci --strict                  # treat warnings as errors
     ///   normalize ci --sarif                   # SARIF output for GitHub Actions annotations
     ///   normalize ci --json                    # structured JSON output
-    #[cli(display_with = "display_ci")]
+    #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub async fn ci(
         &self,
@@ -1029,7 +1004,7 @@ impl NormalizeService {
             let detail = if sarif {
                 report.diagnostics.format_sarif()
             } else {
-                self.display_ci(&report)
+                self.display_output(&report)
             };
             let msg = if has_strict_failures && !has_errors {
                 format!("{detail}\n{warning_count} warning(s) found (--strict mode)")
@@ -1040,20 +1015,6 @@ impl NormalizeService {
         }
 
         Ok(report)
-    }
-}
-
-/// Display impl bridges to OutputFormatter::format_text() for contexts outside
-/// server-less dispatch (e.g. direct use of GrepReport).
-impl std::fmt::Display for GrepReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text().trim_end())
-    }
-}
-
-impl std::fmt::Display for AliasesReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text().trim_end())
     }
 }
 
@@ -1074,11 +1035,5 @@ impl OutputFormatter for InitReport {
             let _ = write!(out, "{}", self.message);
         }
         out
-    }
-}
-
-impl std::fmt::Display for InitReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
     }
 }

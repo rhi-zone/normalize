@@ -18,8 +18,6 @@ pub struct SessionShowReport {
     session: Session,
     #[serde(skip)]
     show_full: bool,
-    #[serde(skip)]
-    pretty: bool,
 }
 
 impl SessionShowReport {
@@ -27,22 +25,12 @@ impl SessionShowReport {
         Self {
             session,
             show_full: false,
-            pretty: false,
         }
     }
 
     pub fn full(mut self, full: bool) -> Self {
         self.show_full = full;
         self
-    }
-
-    pub fn with_pretty(mut self, pretty: bool) -> Self {
-        self.pretty = pretty;
-        self
-    }
-
-    pub(crate) fn use_pretty(&self) -> bool {
-        self.pretty
     }
 }
 
@@ -811,7 +799,7 @@ fn parse_session_for_show(path: &Path, format: Option<&str>) -> Result<Session, 
         })?,
     };
 
-    log_format.parse(path)
+    log_format.parse(path).map_err(|e| e.to_string())
 }
 
 /// Filter and display messages from a session.

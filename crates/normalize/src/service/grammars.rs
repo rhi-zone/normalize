@@ -33,6 +33,15 @@ impl GrammarService {
             value.format_text()
         }
     }
+
+    /// Generic display bridge that routes to `OutputFormatter::format_text()`.
+    fn display_output<T: crate::output::OutputFormatter>(&self, value: &T) -> String {
+        if self.pretty.get() {
+            value.format_pretty()
+        } else {
+            value.format_text()
+        }
+    }
 }
 
 /// Report for grammar installation.
@@ -44,12 +53,6 @@ pub struct GrammarInstallReport {
     pub path: String,
     pub count: usize,
     pub dry_run: bool,
-}
-
-impl std::fmt::Display for GrammarInstallReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
-    }
 }
 
 impl OutputFormatter for GrammarInstallReport {
@@ -108,6 +111,7 @@ impl GrammarService {
     ///   normalize grammars install                    # install latest grammars
     ///   normalize grammars install --version v0.1.0   # install a specific version
     ///   normalize grammars install --force             # reinstall even if grammars exist
+    #[cli(display_with = "display_output")]
     pub fn install(
         &self,
         #[param(help = "Specific version to install (default: latest)")] version: Option<String>,

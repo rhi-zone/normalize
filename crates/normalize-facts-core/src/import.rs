@@ -7,11 +7,17 @@ use crate::SymbolKind;
 /// An import statement
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Import {
+    /// The module specifier as written in source (e.g., `"./foo"` or `std::collections`).
     pub module: String,
+    /// Specific names imported from the module (e.g., `["HashMap", "HashSet"]`).
     pub names: Vec<String>,
+    /// Local alias for the import (e.g., `import numpy as np` → `"np"`).
     pub alias: Option<String>,
+    /// True for wildcard imports (`import *` / `use *`).
     pub is_wildcard: bool,
+    /// True for relative imports (e.g., `./foo`, `../bar`).
     pub is_relative: bool,
+    /// Source line number where this import appears.
     pub line: usize,
 }
 
@@ -33,8 +39,11 @@ impl Import {
 /// An export declaration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Export {
+    /// The exported name as it appears in source.
     pub name: String,
+    /// The symbol kind being exported (function, class, variable, etc.).
     pub kind: SymbolKind,
+    /// Source line number where this export appears.
     pub line: usize,
 }
 

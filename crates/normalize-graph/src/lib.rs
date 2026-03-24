@@ -68,26 +68,30 @@ impl std::fmt::Display for GraphTarget {
 pub struct GraphStats {
     pub nodes: usize,
     pub edges: usize,
-    /// Edge density: edges / (nodes × (nodes − 1))
+    /// Edge density: edges / (nodes × (nodes − 1)); 0.0 for graphs with fewer than 2 nodes.
     pub density: f64,
     pub weakly_connected_components: usize,
     pub largest_component_size: usize,
     pub scc_count: usize,
-    /// SCCs with more than one module (actual circular-dependency clusters)
+    /// Number of strongly connected components with more than one node (actual circular-dependency clusters).
     pub nontrivial_scc_count: usize,
     pub diamond_count: usize,
+    /// Number of bridge edges whose removal would disconnect the graph.
     pub bridge_count: usize,
+    /// Number of redundant transitive edges (A→C where A→B→C already exists).
     pub transitive_edge_count: usize,
+    /// Depth (edge count) of the longest import chain.
     pub max_chain_depth: usize,
+    /// Total number of import chains at or exceeding the depth threshold.
     pub chain_count: usize,
-    /// Nodes with no inbound edges (unreachable / potentially dead code)
+    /// Number of nodes with no inbound edges (unreachable or potentially dead code).
     pub dead_node_count: usize,
 }
 
 /// A strongly connected component (circular-dependency cluster).
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct Scc {
-    /// Modules in the SCC
+    /// Modules that are part of this strongly connected component.
     pub modules: Vec<String>,
     /// Number of edges within the SCC
     pub internal_edges: usize,
@@ -96,23 +100,29 @@ pub struct Scc {
 /// A diamond dependency: source imports left and right, both import target.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct Diamond {
+    /// The module that starts the diamond (imports both `left` and `right`).
     pub source: String,
+    /// The left intermediate module (imports `target`).
     pub left: String,
+    /// The right intermediate module (imports `target`).
     pub right: String,
+    /// The shared dependency that both intermediate modules import.
     pub target: String,
 }
 
 /// A bridge edge whose removal disconnects the graph.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct BridgeEdge {
+    /// The importing module.
     pub from: String,
+    /// The imported module.
     pub to: String,
 }
 
 /// A deep import chain (longest dependency path).
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ImportChain {
-    /// Modules in the chain from start to end
+    /// Modules in the chain from start to end, ordered by import depth.
     pub modules: Vec<String>,
     /// Length of the chain (number of edges, not nodes)
     pub depth: usize,
@@ -121,8 +131,11 @@ pub struct ImportChain {
 /// A transitive (redundant) import: A→C is redundant because A→B→C.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct TransitiveEdge {
+    /// The importing module.
     pub from: String,
+    /// The transitively reachable module (redundant direct dependency).
     pub to: String,
+    /// The intermediate module that already provides the transitive path.
     pub via: String,
 }
 

@@ -26,25 +26,27 @@ pub struct DaemonStatus {
     pub roots_watched: Option<u64>,
 }
 
-impl std::fmt::Display for DaemonStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl OutputFormatter for DaemonStatus {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
         if !self.running {
-            writeln!(f, "Daemon is not running")?;
-            write!(f, "Socket: {}", self.socket)?;
-            return Ok(());
+            let _ = writeln!(out, "Daemon is not running");
+            let _ = write!(out, "Socket: {}", self.socket);
+            return out;
         }
-        writeln!(f, "Daemon Status")?;
-        writeln!(f, "  Running: yes")?;
+        let _ = writeln!(out, "Daemon Status");
+        let _ = writeln!(out, "  Running: yes");
         if let Some(pid) = self.pid {
-            writeln!(f, "  PID: {}", pid)?;
+            let _ = writeln!(out, "  PID: {}", pid);
         }
         if let Some(uptime) = self.uptime_secs {
-            writeln!(f, "  Uptime: {} seconds", uptime)?;
+            let _ = writeln!(out, "  Uptime: {} seconds", uptime);
         }
         if let Some(roots) = self.roots_watched {
-            write!(f, "  Roots watched: {}", roots)?;
+            let _ = write!(out, "  Roots watched: {}", roots);
         }
-        Ok(())
+        out
     }
 }
 
@@ -71,12 +73,6 @@ impl OutputFormatter for DaemonActionReport {
         } else {
             "Failed".to_string()
         }
-    }
-}
-
-impl std::fmt::Display for DaemonActionReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
     }
 }
 
@@ -107,12 +103,6 @@ impl OutputFormatter for DaemonRootReport {
     }
 }
 
-impl std::fmt::Display for DaemonRootReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
-    }
-}
-
 /// Report for `normalize daemon run` (foreground daemon execution).
 ///
 /// Returned when the daemon is run in the foreground (for debugging). Contains the
@@ -127,12 +117,6 @@ pub struct DaemonRunReport {
 impl OutputFormatter for DaemonRunReport {
     fn format_text(&self) -> String {
         self.status.clone()
-    }
-}
-
-impl std::fmt::Display for DaemonRunReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.status)
     }
 }
 
@@ -159,9 +143,10 @@ impl OutputFormatter for DaemonRootsReport {
     }
 }
 
-impl std::fmt::Display for DaemonRootsReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
+impl DaemonService {
+    /// Generic display bridge that routes to `OutputFormatter::format_text()`.
+    fn display_output<T: OutputFormatter>(&self, value: &T) -> String {
+        value.format_text()
     }
 }
 
@@ -171,6 +156,7 @@ impl DaemonService {
     ///
     /// Examples:
     ///   normalize daemon status              # check if daemon is running, show PID and uptime
+    #[cli(display_with = "display_output")]
     pub fn status(&self) -> Result<DaemonStatus, String> {
         let client = DaemonClient::new();
         let socket = global_socket_path().display().to_string();
@@ -205,6 +191,7 @@ impl DaemonService {
     ///
     /// Examples:
     ///   normalize daemon stop                # gracefully stop the running daemon
+    #[cli(display_with = "display_output")]
     pub fn stop(&self) -> Result<DaemonActionReport, String> {
         let client = DaemonClient::new();
 
@@ -235,6 +222,7 @@ impl DaemonService {
     ///
     /// Examples:
     ///   normalize daemon start               # start the daemon in the background
+    #[cli(display_with = "display_output")]
     pub fn start(&self) -> Result<DaemonActionReport, String> {
         let client = DaemonClient::new();
 
@@ -256,6 +244,7 @@ impl DaemonService {
     ///
     /// Examples:
     ///   normalize daemon run                 # run daemon in foreground with log output
+    #[cli(display_with = "display_output")]
     pub fn run(&self) -> Result<DaemonRunReport, String> {
         match daemon::run_daemon() {
             Ok(code) => {
@@ -276,6 +265,7 @@ impl DaemonService {
     /// Examples:
     ///   normalize daemon add                 # watch the current directory
     ///   normalize daemon add ~/projects/app  # watch a specific project root
+    #[cli(display_with = "display_output")]
     pub fn add(
         &self,
         #[param(positional, help = "Path to the project root")] path: Option<String>,
@@ -337,6 +327,7 @@ impl DaemonService {
     /// Examples:
     ///   normalize daemon remove              # stop watching the current directory
     ///   normalize daemon remove ~/projects/app  # stop watching a specific root
+    #[cli(display_with = "display_output")]
     pub fn remove(
         &self,
         #[param(positional, help = "Path to the project root")] path: Option<String>,
@@ -456,6 +447,7 @@ impl DaemonService {
     ///
     /// Examples:
     ///   normalize daemon list                # show all project roots being watched
+    #[cli(display_with = "display_output")]
     pub fn list(&self) -> Result<DaemonRootsReport, String> {
         let client = DaemonClient::new();
 

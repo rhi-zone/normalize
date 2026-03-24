@@ -37,10 +37,6 @@ pub struct SessionListReport {
     /// Present when `--limit` truncated the results.
     #[serde(skip_serializing_if = "Option::is_none")]
     truncated: Option<super::TruncationInfo>,
-    /// Whether to use pretty output when rendered via Display (service layer).
-    #[serde(skip)]
-    #[schemars(skip)]
-    pretty: bool,
     /// Whether any subagent sessions are included (controls column display).
     #[serde(skip)]
     #[schemars(skip)]
@@ -50,10 +46,6 @@ pub struct SessionListReport {
 impl SessionListReport {
     pub fn is_empty(&self) -> bool {
         self.sessions.is_empty()
-    }
-
-    pub(crate) fn use_pretty(&self) -> bool {
-        self.pretty
     }
 
     /// Returns true if sessions span more than one project.
@@ -283,7 +275,6 @@ pub fn build_session_list(
     until: Option<&str>,
     project_filter: Option<&Path>,
     all_projects: bool,
-    pretty: bool,
     mode: &super::SessionMode,
     agent_type: Option<&str>,
 ) -> Result<SessionListReport, String> {
@@ -387,7 +378,6 @@ pub fn build_session_list(
     Ok(SessionListReport {
         sessions: items,
         truncated,
-        pretty,
         has_subagents,
     })
 }

@@ -1,6 +1,6 @@
 //! Normalize @agent JSONL format parser.
 
-use super::{LogFormat, SessionFile, list_jsonl_sessions, peek_lines};
+use super::{LogFormat, ParseError, SessionFile, list_jsonl_sessions, peek_lines};
 use crate::{ContentBlock, Message, Role, Session, Turn};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -196,8 +196,11 @@ impl LogFormat for NormalizeAgentFormat {
         0.0
     }
 
-    fn parse(&self, path: &Path) -> Result<Session, String> {
-        let file = File::open(path).map_err(|e| e.to_string())?;
+    fn parse(&self, path: &Path) -> Result<Session, ParseError> {
+        let file = File::open(path).map_err(|e| ParseError::Io {
+            path: path.to_path_buf(),
+            source: e,
+        })?;
         let reader = BufReader::new(file);
 
         let mut session = Session::new(path.to_path_buf(), self.name());
@@ -206,7 +209,10 @@ impl LogFormat for NormalizeAgentFormat {
         let mut current_turn_num = 0u32;
 
         for line in reader.lines() {
-            let line = line.map_err(|e| e.to_string())?;
+            let line = line.map_err(|e| ParseError::Io {
+                path: path.to_path_buf(),
+                source: e,
+            })?;
             if line.trim().is_empty() {
                 continue;
             }

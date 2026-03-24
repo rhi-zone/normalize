@@ -90,6 +90,13 @@ impl Default for FilterCliService {
     }
 }
 
+impl FilterCliService {
+    /// Generic display bridge that routes to `OutputFormatter::format_text()`.
+    fn display_output<T: OutputFormatter>(&self, value: &T) -> String {
+        value.format_text()
+    }
+}
+
 #[cli(
     name = "normalize-filter",
     version = "0.1.0",
@@ -97,6 +104,7 @@ impl Default for FilterCliService {
 )]
 impl FilterCliService {
     /// Check if a path is included by the given filters
+    #[cli(display_with = "display_output")]
     pub fn matches(
         &self,
         #[param(positional, help = "Path to check")] path: String,
@@ -110,6 +118,7 @@ impl FilterCliService {
     }
 
     /// List available filter aliases
+    #[cli(display_with = "display_output")]
     pub fn aliases(&self) -> Result<AliasesReport, String> {
         let config = AliasConfig::default();
         let resolved = list_aliases(&config, &[]);
