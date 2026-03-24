@@ -16,7 +16,7 @@ Each baseline entry is a `(path, metric, aggregation) → value` triple stored i
 - `src/baseline.rs` — baseline file format (`.normalize/ratchet.json`), `Aggregate` enum, `RatchetConfig`, aggregation logic
 - `src/metrics/` — metric implementations (complexity, call-complexity, line-count, function-count, class-count, comment-line-count, file-stats)
 - `src/error.rs` — `RatchetError` enum (MetricNotFound, BaselineNotFound, BaselineRead, BaselineParse, MeasurementFailed) with per-variant doc comments
-- `src/service.rs` — `RatchetService` CLI service (`normalize ratchet`) with `measure`, `add`, `check`, `update`, `show`, `remove` commands; `build_ratchet_report()` for native rules integration
+- `src/service.rs` — `RatchetService` CLI service (`normalize ratchet`) with `measure`, `add`, `check`, `update`, `show`, `remove` commands; `build_ratchet_report()` for native rules integration. `measure` accepts `--diff-ref` (git ref to compute delta against); `check` accepts `--baseline-ref` (substitute a git ref as the baseline instead of ratchet.json).
 
 ## Metrics
 

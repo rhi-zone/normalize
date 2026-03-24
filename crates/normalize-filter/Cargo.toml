@@ -21,6 +21,7 @@ cli = ["dep:server-less", "dep:schemars", "dep:serde_json", "dep:tokio"]
 [dependencies]
 ignore = "0.4"
 normalize-language-meta = { path = "../normalize-language-meta", version = "0.2.0" }
+normalize-output = { path = "../normalize-output", version = "0.2.0" }
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 

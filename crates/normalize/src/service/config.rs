@@ -613,7 +613,7 @@ impl ConfigService {
     /// Examples:
     ///   normalize config show                                  # show all options with descriptions
     ///   normalize config show --set-only                       # only show fields with values set
-    ///   normalize config show --section rules                  # show the [rules] section
+    ///   normalize config show --section rules                  # show the \[rules\] section
     ///   normalize config show --section rules."rust/unwrap-in-impl"  # show a specific rule config
     #[allow(clippy::too_many_arguments)]
     #[cli(display_with = "display_show")]

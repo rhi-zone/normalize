@@ -58,11 +58,17 @@ impl Severity {
 /// A security finding from analysis tools
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct SecurityFinding {
+    /// Path to the file containing the finding.
     pub file: String,
+    /// 1-based line number of the finding.
     pub line: usize,
+    /// Severity level of the finding.
     pub severity: Severity,
+    /// Rule identifier that produced the finding.
     pub rule_id: String,
+    /// Human-readable description of the finding.
     pub message: String,
+    /// Name of the analysis tool that produced the finding.
     pub tool: String,
 }
 

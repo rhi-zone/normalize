@@ -43,6 +43,7 @@ pub struct Finding {
 /// Debug output categories.
 #[derive(Default)]
 pub struct DebugFlags {
+    /// Whether to emit per-rule timing information to stderr.
     pub timing: bool,
 }
 

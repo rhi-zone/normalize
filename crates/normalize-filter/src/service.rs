@@ -5,6 +5,7 @@
 //! - `aliases` — list available filter aliases
 
 use crate::{AliasConfig, Filter, list_aliases};
+use normalize_output::OutputFormatter;
 use schemars::JsonSchema;
 use serde::Serialize;
 use server_less::cli;
@@ -16,17 +17,19 @@ use std::path::Path;
 
 /// Result of a path match check.
 #[derive(Serialize, JsonSchema)]
-pub struct MatchResult {
+pub struct MatchReport {
+    /// Path that was checked.
     pub path: String,
+    /// Whether the path passed the filter.
     pub matched: bool,
 }
 
-impl std::fmt::Display for MatchResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl OutputFormatter for MatchReport {
+    fn format_text(&self) -> String {
         if self.matched {
-            write!(f, "{}: included", self.path)
+            format!("{}: included", self.path)
         } else {
-            write!(f, "{}: excluded", self.path)
+            format!("{}: excluded", self.path)
         }
     }
 }
@@ -34,33 +37,37 @@ impl std::fmt::Display for MatchResult {
 /// A single alias entry for display.
 #[derive(Serialize, JsonSchema)]
 pub struct AliasEntry {
+    /// The alias name (without `@` prefix).
     pub name: String,
+    /// Whether the alias is enabled or disabled.
     pub status: String,
+    /// The glob patterns this alias resolves to.
     pub patterns: Vec<String>,
 }
 
 /// List of resolved aliases.
 #[derive(Serialize, JsonSchema)]
-pub struct AliasesResult {
+pub struct AliasesReport {
+    /// All known filter aliases with their resolved patterns.
     pub aliases: Vec<AliasEntry>,
 }
 
-impl std::fmt::Display for AliasesResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl OutputFormatter for AliasesReport {
+    fn format_text(&self) -> String {
+        let mut out = String::new();
         for alias in &self.aliases {
             if alias.patterns.is_empty() {
-                writeln!(f, "@{} [{}]", alias.name, alias.status)?;
+                out.push_str(&format!("@{} [{}]\n", alias.name, alias.status));
             } else {
-                writeln!(
-                    f,
-                    "@{} [{}]: {}",
+                out.push_str(&format!(
+                    "@{} [{}]: {}\n",
                     alias.name,
                     alias.status,
                     alias.patterns.join(", ")
-                )?;
+                ));
             }
         }
-        Ok(())
+        out
     }
 }
 
@@ -95,15 +102,15 @@ impl FilterCliService {
         #[param(positional, help = "Path to check")] path: String,
         #[param(help = "Exclude files matching pattern or alias")] exclude: Vec<String>,
         #[param(help = "Include only files matching pattern or alias")] only: Vec<String>,
-    ) -> Result<MatchResult, String> {
+    ) -> Result<MatchReport, String> {
         let config = AliasConfig::default();
         let filter = Filter::new(&exclude, &only, &config, &[])?;
         let matched = filter.matches(Path::new(&path));
-        Ok(MatchResult { path, matched })
+        Ok(MatchReport { path, matched })
     }
 
     /// List available filter aliases
-    pub fn aliases(&self) -> Result<AliasesResult, String> {
+    pub fn aliases(&self) -> Result<AliasesReport, String> {
         let config = AliasConfig::default();
         let resolved = list_aliases(&config, &[]);
         let aliases = resolved
@@ -114,6 +121,6 @@ impl FilterCliService {
                 patterns: a.patterns,
             })
             .collect();
-        Ok(AliasesResult { aliases })
+        Ok(AliasesReport { aliases })
     }
 }

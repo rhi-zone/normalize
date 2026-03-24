@@ -217,10 +217,10 @@ mod tests {
         use crate::service::generate::GenerateReport;
         assert_output_formatter::<GenerateReport>();
 
-        use crate::service::daemon::{DaemonActionReport, DaemonRootList, DaemonRootReport};
+        use crate::service::daemon::{DaemonActionReport, DaemonRootReport, DaemonRootsReport};
         assert_output_formatter::<DaemonActionReport>();
         assert_output_formatter::<DaemonRootReport>();
-        assert_output_formatter::<DaemonRootList>();
+        assert_output_formatter::<DaemonRootsReport>();
 
         use normalize_rules::RuleShowReport;
         assert_output_formatter::<RuleShowReport>();

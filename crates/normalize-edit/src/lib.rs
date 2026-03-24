@@ -27,13 +27,35 @@ pub struct SymbolLocation {
 
 /// Convert a 1-based line number to byte offset in content.
 /// Clamps to content length for safety (last line may not have trailing newline).
+///
+/// Uses `char_indices` to locate actual newline bytes, ensuring the returned
+/// offset always lands on a valid UTF-8 character boundary regardless of
+/// multi-byte characters or CRLF line endings.
 pub fn line_to_byte(content: &str, line: usize) -> usize {
-    let pos: usize = content
-        .lines()
-        .take(line.saturating_sub(1))
-        .map(|l| l.len() + 1)
-        .sum();
-    pos.min(content.len())
+    if line <= 1 {
+        return 0;
+    }
+    let target = line - 1; // number of newlines to skip
+    let mut newlines_seen = 0usize;
+    let mut i = 0usize;
+    while i < content.len() {
+        // SAFETY: we advance i only to char boundaries via char_indices
+        let b = content.as_bytes()[i];
+        if b == b'\n' {
+            newlines_seen += 1;
+            if newlines_seen == target {
+                return (i + 1).min(content.len());
+            }
+        }
+        // Advance by char width to stay on boundaries
+        let ch_len = content[i..]
+            .chars()
+            .next()
+            .map(|c| c.len_utf8())
+            .unwrap_or(1);
+        i += ch_len;
+    }
+    content.len()
 }
 
 /// Editor for structural code modifications

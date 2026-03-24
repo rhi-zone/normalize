@@ -18,8 +18,28 @@ use server_less::cli;
 use std::cell::Cell;
 use std::path::PathBuf;
 
-fn discover_repos(dir: &str, depth: usize) -> Result<Vec<PathBuf>, String> {
-    crate::multi_repo::discover_repos_depth(&PathBuf::from(dir), depth)
+/// Errors returned by the analyze service.
+#[derive(Debug, thiserror::Error)]
+pub enum AnalyzeError {
+    /// The index was not found; run `normalize structure rebuild` first.
+    #[error("no index found; run `normalize structure rebuild` first")]
+    IndexNotFound,
+    /// An I/O error occurred.
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
+    /// Any other error (message forwarded as-is).
+    #[error("{0}")]
+    Other(String),
+}
+
+impl From<String> for AnalyzeError {
+    fn from(s: String) -> Self {
+        AnalyzeError::Other(s)
+    }
+}
+
+fn discover_repos(dir: &str, depth: usize) -> Result<Vec<PathBuf>, AnalyzeError> {
+    crate::multi_repo::discover_repos_depth(&PathBuf::from(dir), depth).map_err(AnalyzeError::Other)
 }
 
 /// Analyze sub-service (health, complexity, security, duplicates, docs).
@@ -34,9 +54,13 @@ impl AnalyzeService {
         }
     }
 
-    fn root_path(root: Option<String>) -> Result<PathBuf, String> {
+    fn root_path(root: Option<String>) -> Result<PathBuf, AnalyzeError> {
         root.map(PathBuf::from).map_or_else(
-            || std::env::current_dir().map_err(|e| format!("failed to get working directory: {e}")),
+            || {
+                std::env::current_dir().map_err(|e| {
+                    AnalyzeError::Other(format!("failed to get working directory: {e}"))
+                })
+            },
             Ok,
         )
     }
@@ -221,12 +245,12 @@ impl AnalyzeService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<ArchitectureReport, String> {
+    ) -> Result<ArchitectureReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         let idx = crate::index::ensure_ready(&root_path).await?;
         crate::commands::analyze::architecture::analyze_architecture(&idx)
             .await
-            .map_err(|e| format!("Architecture analysis failed: {}", e))
+            .map_err(|e| AnalyzeError::Other(format!("Architecture analysis failed: {}", e)))
     }
 
     /// Run health analysis (file counts, complexity stats, large file warnings)
@@ -241,13 +265,13 @@ impl AnalyzeService {
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
         pretty: bool,
         compact: bool,
-    ) -> Result<AnalyzeReport, String> {
+    ) -> Result<AnalyzeReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         // Validate target path exists (catches typos and unknown subcommands routed here via #[cli(default)])
         if let Some(ref t) = target {
             let candidate = root_path.join(t);
             if !candidate.exists() && !t.contains('*') && !t.contains('?') && !t.contains('[') {
-                return Err(format!("path not found: {t}"));
+                return Err(AnalyzeError::Other(format!("path not found: {t}")));
             }
         }
         self.resolve_format(pretty, compact, &root_path);
@@ -279,7 +303,7 @@ impl AnalyzeService {
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
         pretty: bool,
         compact: bool,
-    ) -> Result<AnalyzeReport, String> {
+    ) -> Result<AnalyzeReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
@@ -309,7 +333,7 @@ impl AnalyzeService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<SecurityReport, String> {
+    ) -> Result<SecurityReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         let mut report = crate::commands::analyze::security::analyze_security(&root_path);
         if let Some(t) = target {
@@ -330,7 +354,7 @@ impl AnalyzeService {
         snapshots: Option<usize>,
         pretty: bool,
         compact: bool,
-    ) -> Result<ScalarTrendReport, String> {
+    ) -> Result<ScalarTrendReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         crate::commands::analyze::trend::analyze_scalar_trend(
@@ -349,6 +373,7 @@ impl AnalyzeService {
                 report.full_stats.map(|s| s.total_avg)
             },
         )
+        .map_err(AnalyzeError::from)
     }
 
     /// Run function length analysis
@@ -370,7 +395,7 @@ impl AnalyzeService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<LengthReport, String> {
+    ) -> Result<LengthReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
@@ -388,17 +413,17 @@ impl AnalyzeService {
         if analysis_root.is_file() {
             return crate::commands::analyze::length::analyze_file_length(&analysis_root)
                 .ok_or_else(|| {
-                    format!(
+                    AnalyzeError::Other(format!(
                         "could not analyze '{}' — unsupported file type",
                         analysis_root.display()
-                    )
+                    ))
                 });
         }
         if !analysis_root.is_dir() {
-            return Err(format!(
+            return Err(AnalyzeError::Other(format!(
                 "'{}' is not a file or directory",
                 analysis_root.display()
-            ));
+            )));
         }
         let mut report = crate::commands::analyze::length::analyze_codebase_length(
             &analysis_root,
@@ -440,7 +465,7 @@ impl AnalyzeService {
         snapshots: Option<usize>,
         pretty: bool,
         compact: bool,
-    ) -> Result<ScalarTrendReport, String> {
+    ) -> Result<ScalarTrendReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         crate::commands::analyze::trend::analyze_scalar_trend(
@@ -458,6 +483,7 @@ impl AnalyzeService {
                 report.full_stats.map(|s| s.total_avg)
             },
         )
+        .map_err(AnalyzeError::from)
     }
 
     /// Analyze documentation coverage
@@ -473,7 +499,7 @@ impl AnalyzeService {
         >,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-    ) -> Result<DocCoverageReport, String> {
+    ) -> Result<DocCoverageReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         let config = crate::config::NormalizeConfig::load(&root_path);
         let filter =
@@ -503,7 +529,7 @@ impl AnalyzeService {
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
         pretty: bool,
         compact: bool,
-    ) -> Result<CouplingClustersReport, String> {
+    ) -> Result<CouplingClustersReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
@@ -531,6 +557,7 @@ impl AnalyzeService {
             &merged_exclude,
             &only,
         )
+        .map_err(AnalyzeError::from)
     }
 
     /// Analyze cross-repo activity over time
@@ -544,13 +571,14 @@ impl AnalyzeService {
         >,
         #[param(help = "Number of windows to show")] windows: Option<usize>,
         #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
-    ) -> Result<ActivityReport, String> {
+    ) -> Result<ActivityReport, AnalyzeError> {
         let repos = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
         crate::commands::analyze::activity::analyze_activity(
             &repos,
             window.unwrap_or_default(),
             windows.unwrap_or(12),
         )
+        .map_err(AnalyzeError::from)
     }
 
     /// Analyze cross-repo coupling
@@ -564,13 +592,14 @@ impl AnalyzeService {
             usize,
         >,
         #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
-    ) -> Result<RepoCouplingReport, String> {
+    ) -> Result<RepoCouplingReport, AnalyzeError> {
         let repos = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
         crate::commands::analyze::repo_coupling::analyze_repo_coupling(
             &repos,
             window.unwrap_or(24),
             min_windows.unwrap_or(3),
         )
+        .map_err(AnalyzeError::from)
     }
 
     /// Rank repos by tech debt (churn + complexity + coupling)
@@ -580,7 +609,7 @@ impl AnalyzeService {
         &self,
         #[param(help = "Directory containing git repos")] repos_dir: String,
         #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
-    ) -> Result<CrossRepoHealthReport, String> {
+    ) -> Result<CrossRepoHealthReport, AnalyzeError> {
         let repos = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
         Ok(crate::commands::analyze::cross_repo_health::analyze_cross_repo_health(&repos))
     }
@@ -603,7 +632,7 @@ impl AnalyzeService {
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
         pretty: bool,
         compact: bool,
-    ) -> Result<TestGapsReport, String> {
+    ) -> Result<TestGapsReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
@@ -643,7 +672,7 @@ impl AnalyzeService {
         snapshots: Option<usize>,
         pretty: bool,
         compact: bool,
-    ) -> Result<ScalarTrendReport, String> {
+    ) -> Result<ScalarTrendReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         crate::commands::analyze::trend::analyze_scalar_trend(
@@ -657,6 +686,7 @@ impl AnalyzeService {
                 Some(report.overall_ratio)
             },
         )
+        .map_err(AnalyzeError::from)
     }
 
     /// Show information density trend over git history
@@ -671,7 +701,7 @@ impl AnalyzeService {
         snapshots: Option<usize>,
         pretty: bool,
         compact: bool,
-    ) -> Result<ScalarTrendReport, String> {
+    ) -> Result<ScalarTrendReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         crate::commands::analyze::trend::analyze_scalar_trend(
@@ -684,6 +714,7 @@ impl AnalyzeService {
                 Some((report.overall_compression_ratio + report.overall_token_uniqueness) / 2.0)
             },
         )
+        .map_err(AnalyzeError::from)
     }
 
     /// Auto-generated single-page codebase overview
@@ -700,7 +731,7 @@ impl AnalyzeService {
         limit: Option<usize>,
         pretty: bool,
         compact: bool,
-    ) -> Result<SummaryReport, String> {
+    ) -> Result<SummaryReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let effective_limit = match limit.unwrap_or(5) {
@@ -724,7 +755,7 @@ impl AnalyzeService {
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
         pretty: bool,
         compact: bool,
-    ) -> Result<SkeletonDiffReport, String> {
+    ) -> Result<SkeletonDiffReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
@@ -736,6 +767,7 @@ impl AnalyzeService {
             &merged_exclude,
             &only,
         )
+        .map_err(AnalyzeError::from)
     }
 
     /// Track health metrics over git history at regular intervals
@@ -750,10 +782,11 @@ impl AnalyzeService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<TrendReport, String> {
+    ) -> Result<TrendReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         crate::commands::analyze::trend::analyze_trend(&root_path, snapshots.unwrap_or(6))
+            .map_err(AnalyzeError::from)
     }
 
     /// List node kinds and field names for a tree-sitter grammar
@@ -767,9 +800,10 @@ impl AnalyzeService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<NodeTypesReport, String> {
+    ) -> Result<NodeTypesReport, AnalyzeError> {
         let root_path = Self::root_path(None)?;
         self.resolve_format(pretty, compact, &root_path);
         crate::commands::syntax::node_types::node_types_for_language(&language, search.as_deref())
+            .map_err(AnalyzeError::from)
     }
 }

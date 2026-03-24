@@ -97,11 +97,11 @@ impl std::fmt::Display for DaemonRootReport {
 
 /// List of watched roots.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct DaemonRootList {
+pub struct DaemonRootsReport {
     pub roots: Vec<String>,
 }
 
-impl OutputFormatter for DaemonRootList {
+impl OutputFormatter for DaemonRootsReport {
     fn format_text(&self) -> String {
         if self.roots.is_empty() {
             "No roots being watched".to_string()
@@ -117,7 +117,7 @@ impl OutputFormatter for DaemonRootList {
     }
 }
 
-impl std::fmt::Display for DaemonRootList {
+impl std::fmt::Display for DaemonRootsReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.format_text())
     }
@@ -412,7 +412,7 @@ impl DaemonService {
     ///
     /// Examples:
     ///   normalize daemon list                # show all project roots being watched
-    pub fn list(&self) -> Result<DaemonRootList, String> {
+    pub fn list(&self) -> Result<DaemonRootsReport, String> {
         let client = DaemonClient::new();
 
         if !client.is_available() {
@@ -431,7 +431,7 @@ impl DaemonService {
                             .collect()
                     })
                     .unwrap_or_default();
-                Ok(DaemonRootList { roots })
+                Ok(DaemonRootsReport { roots })
             }
             Ok(resp) => Err(resp.error.unwrap_or_default()),
             Err(e) => Err(format!("Failed: {}", e)),

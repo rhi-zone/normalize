@@ -230,11 +230,25 @@ fn count_complexity_with_query(
     count
 }
 
+const MAX_DEPTH: usize = 512;
+
 fn find_node_by_range(
     node: tree_sitter::Node,
     start_byte: usize,
     end_byte: usize,
 ) -> Option<tree_sitter::Node> {
+    find_node_by_range_inner(node, start_byte, end_byte, 0)
+}
+
+fn find_node_by_range_inner(
+    node: tree_sitter::Node,
+    start_byte: usize,
+    end_byte: usize,
+    depth: usize,
+) -> Option<tree_sitter::Node> {
+    if depth > MAX_DEPTH {
+        return None;
+    }
     if node.start_byte() == start_byte && node.end_byte() == end_byte {
         return Some(node);
     }
@@ -244,7 +258,9 @@ fn find_node_by_range(
     let mut cursor = node.walk();
     if cursor.goto_first_child() {
         loop {
-            if let Some(found) = find_node_by_range(cursor.node(), start_byte, end_byte) {
+            if let Some(found) =
+                find_node_by_range_inner(cursor.node(), start_byte, end_byte, depth + 1)
+            {
                 return Some(found);
             }
             if !cursor.goto_next_sibling() {

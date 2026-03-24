@@ -1276,7 +1276,7 @@ impl FileIndex {
         let imports = {
             let mut rows = self.conn.query("SELECT COUNT(*) FROM imports", ()).await?;
             if let Some(row) = rows.next().await? {
-                u64::try_from(row.get::<i64>(0).unwrap_or(0)).unwrap_or(0) as usize
+                u64::try_from(row.get::<i64>(0)?).unwrap_or(0) as usize
             } else {
                 0
             }

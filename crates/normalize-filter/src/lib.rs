@@ -191,7 +191,7 @@ pub struct ResolvedAlias {
 
 /// Result of resolving a filter value.
 #[derive(Debug)]
-pub enum ResolveResult {
+pub enum AliasResolution {
     /// Resolved to glob patterns
     Patterns(Vec<String>),
     /// Alias not found
@@ -300,13 +300,13 @@ fn resolve_patterns(
     for pattern in patterns {
         if let Some(alias_name) = pattern.strip_prefix('@') {
             match resolve_alias(alias_name, config, languages) {
-                ResolveResult::Patterns(ps) => {
+                AliasResolution::Patterns(ps) => {
                     result.extend(ps);
                 }
-                ResolveResult::UnknownAlias(name) => {
+                AliasResolution::UnknownAlias(name) => {
                     return Err(FilterError::UnknownAlias(name));
                 }
-                ResolveResult::DisabledAlias(name) => {
+                AliasResolution::DisabledAlias(name) => {
                     warnings.push(format!("@{} is disabled (matches nothing)", name));
                 }
             }
@@ -348,18 +348,18 @@ fn looks_like_language_name(pattern: &str) -> bool {
 }
 
 /// Resolve a single alias name to patterns.
-fn resolve_alias(name: &str, config: &AliasConfig, languages: &[&str]) -> ResolveResult {
+fn resolve_alias(name: &str, config: &AliasConfig, languages: &[&str]) -> AliasResolution {
     // Check if explicitly disabled
     if let Some(patterns) = config.entries.get(name)
         && patterns.is_empty()
     {
-        return ResolveResult::DisabledAlias(name.to_string());
+        return AliasResolution::DisabledAlias(name.to_string());
     }
 
     // Use unified alias lookup
     match config.get_with_languages(name, languages) {
-        Some(patterns) => ResolveResult::Patterns(patterns),
-        None => ResolveResult::UnknownAlias(name.to_string()),
+        Some(patterns) => AliasResolution::Patterns(patterns),
+        None => AliasResolution::UnknownAlias(name.to_string()),
     }
 }
 

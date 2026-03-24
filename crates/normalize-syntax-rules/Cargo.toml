@@ -45,6 +45,7 @@ schemars = "1"
 # Core traits
 normalize-core = { path = "../normalize-core", version = "0.2.0" }
 normalize-rules-config = { path = "../normalize-rules-config", version = "0.2.0" }
+normalize-output = { path = "../normalize-output", version = "0.2.0" }
 
 [dev-dependencies]
 tempfile = "3"

@@ -376,11 +376,8 @@ impl RatchetService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        #[param(
-            name = "diff-ref",
-            help = "Compute diff against this git ref (measure delta vs this ref)"
-        )]
-        base: Option<String>,
+        #[param(help = "Compute diff against this git ref (measure delta vs this ref)")]
+        diff_ref: Option<String>,
         pretty: bool,
         compact: bool,
     ) -> Result<MeasureReport, String> {
@@ -389,7 +386,7 @@ impl RatchetService {
         let config = load_ratchet_config(&root_path);
         let agg: Aggregate = aggregate.unwrap_or_else(|| config.effective_aggregate(&metric));
 
-        if let Some(ref base_ref) = base {
+        if let Some(ref base_ref) = diff_ref {
             return measure_at_ref(
                 &root_path,
                 base_ref,
@@ -470,10 +467,9 @@ impl RatchetService {
         #[param(positional, help = "Filter by path prefix")] path: Option<String>,
         #[param(short = 'm', help = "Filter by metric name")] metric: Option<String>,
         #[param(
-            name = "baseline-ref",
             help = "Substitute this git ref as the baseline instead of the stored ratchet.json baseline"
         )]
-        base: Option<String>,
+        baseline_ref: Option<String>,
         #[param(short = 'a', help = "Aggregation strategy (used with --baseline-ref)")]
         aggregate: Option<Aggregate>,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
@@ -483,7 +479,7 @@ impl RatchetService {
         let root_path = resolve_root(root)?;
         self.resolve_format(pretty, compact);
 
-        if let Some(ref base_ref) = base {
+        if let Some(ref base_ref) = baseline_ref {
             let config = load_ratchet_config(&root_path);
             let agg = aggregate.unwrap_or_else(|| {
                 metric

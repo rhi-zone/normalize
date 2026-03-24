@@ -12,7 +12,7 @@ use std::io::{self, IsTerminal, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
-/// Run jq with the given arguments (not including argv[0]).
+/// Run jq with the given arguments (not including argv\[0\]).
 ///
 /// Entry point for both `normalize jq [args...]` and `jq -> normalize` symlink.
 pub fn run_jq(args: impl Iterator<Item = OsString>) -> ExitCode {

@@ -6,6 +6,7 @@
 
 use crate::{DebugFlags, Finding, Rule, Severity, apply_fixes, load_all_rules, run_rules};
 use normalize_languages::parsers::grammar_loader;
+use normalize_output::OutputFormatter;
 use schemars::JsonSchema;
 use serde::Serialize;
 use server_less::cli;
@@ -41,7 +42,7 @@ impl From<&Finding> for FindingItem {
 
 /// Results from running rules.
 #[derive(Serialize, JsonSchema)]
-pub struct RunResult {
+pub struct RunRulesReport {
     pub findings: Vec<FindingItem>,
     pub total: usize,
     pub errors: usize,
@@ -49,33 +50,32 @@ pub struct RunResult {
     pub fixes_applied: usize,
 }
 
-impl std::fmt::Display for RunResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl OutputFormatter for RunRulesReport {
+    fn format_text(&self) -> String {
+        let mut out = String::new();
         for finding in &self.findings {
-            writeln!(
-                f,
-                "{}:{}:{}: [{}] {} ({})",
+            out.push_str(&format!(
+                "{}:{}:{}: [{}] {} ({})\n",
                 finding.file,
                 finding.line,
                 finding.col,
                 finding.severity,
                 finding.message,
                 finding.rule_id
-            )?;
+            ));
         }
         if self.total == 0 {
-            writeln!(f, "No findings.")?;
+            out.push_str("No findings.\n");
         } else {
-            writeln!(
-                f,
-                "\n{} finding(s): {} error(s), {} warning(s)",
+            out.push_str(&format!(
+                "\n{} finding(s): {} error(s), {} warning(s)\n",
                 self.total, self.errors, self.warnings
-            )?;
+            ));
         }
         if self.fixes_applied > 0 {
-            writeln!(f, "Applied {} fix(es).", self.fixes_applied)?;
+            out.push_str(&format!("Applied {} fix(es).\n", self.fixes_applied));
         }
-        Ok(())
+        out
     }
 }
 
@@ -107,13 +107,14 @@ impl From<&Rule> for RuleItem {
 
 /// List of available rules.
 #[derive(Serialize, JsonSchema)]
-pub struct RuleList {
+pub struct RulesListReport {
     pub rules: Vec<RuleItem>,
     pub total: usize,
 }
 
-impl std::fmt::Display for RuleList {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl OutputFormatter for RulesListReport {
+    fn format_text(&self) -> String {
+        let mut out = String::new();
         for rule in &self.rules {
             let status = if rule.enabled { "on" } else { "off" };
             let langs = if rule.languages.is_empty() {
@@ -121,13 +122,13 @@ impl std::fmt::Display for RuleList {
             } else {
                 rule.languages.join(",")
             };
-            writeln!(
-                f,
-                "{:40} [{:7}] [{:3}] [{}]  {}",
+            out.push_str(&format!(
+                "{:40} [{:7}] [{:3}] [{}]  {}\n",
                 rule.id, rule.severity, status, langs, rule.message
-            )?;
+            ));
         }
-        writeln!(f, "\n{} rule(s) total", self.total)
+        out.push_str(&format!("\n{} rule(s) total\n", self.total));
+        out
     }
 }
 
@@ -182,7 +183,7 @@ impl SyntaxRulesService {
         #[param(short = 't', help = "Only run rules with this tag")] tag: Option<String>,
         #[param(help = "Apply auto-fixes where available")] fix: bool,
         #[param(help = "Debug flags (comma-separated: timing, all)")] debug: Vec<String>,
-    ) -> Result<RunResult, String> {
+    ) -> Result<RunRulesReport, String> {
         let project_root = resolve_root(root)?;
         let target_root = target
             .as_deref()
@@ -225,7 +226,7 @@ impl SyntaxRulesService {
 
         let items: Vec<FindingItem> = findings.iter().map(FindingItem::from).collect();
 
-        Ok(RunResult {
+        Ok(RunRulesReport {
             findings: items,
             total,
             errors,
@@ -243,7 +244,7 @@ impl SyntaxRulesService {
         #[param(short = 't', help = "Filter by tag")] tag: Option<String>,
         #[param(help = "Show only enabled rules")] enabled: bool,
         #[param(help = "Show only disabled rules")] disabled: bool,
-    ) -> Result<RuleList, String> {
+    ) -> Result<RulesListReport, String> {
         let project_root = resolve_root(root)?;
         let config = crate::RulesConfig::default();
         let rules = load_all_rules(&project_root, &config);
@@ -268,7 +269,7 @@ impl SyntaxRulesService {
             .collect();
 
         let total = filtered.len();
-        Ok(RuleList {
+        Ok(RulesListReport {
             rules: filtered,
             total,
         })
