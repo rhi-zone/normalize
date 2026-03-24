@@ -1,0 +1,46 @@
+Usage: jq [OPTIONS] [FILTER] [FILES...]
+       normalize jq [OPTIONS] [FILTER] [FILES...]
+
+jq is a tool for processing JSON inputs, applying the given filter to
+its JSON text inputs and producing the filter's results as JSON on
+standard output.
+
+Embedded via jaq (https://github.com/01mf02/jaq).
+
+Input options:
+  -n, --null-input          Use null as input (do not read from stdin)
+  -R, --raw-input           Read input as raw strings, not JSON
+  -s, --slurp               Read entire input into an array
+
+Output options:
+  -c, --compact-output      Compact output (no pretty-printing)
+  -r, --raw-output          Output strings without quotes
+      --raw-output0         Like -r, but NUL-terminated instead of newline
+  -j, --join-output         Like -r, but without newlines
+  -i, --in-place            Edit files in place (jaq extension, not in jq)
+  -S, --sort-keys           Sort object keys
+  -C, --color-output        Force color output
+  -M, --monochrome-output   Disable color output
+      --tab                 Use tabs for indentation
+      --indent N            Use N spaces for indentation (default: 2)
+      --unbuffered          Flush output after each value
+
+Compilation options:
+  -f, --from-file FILE      Read filter from file
+  -L PATH                   Add directory to library search path
+
+Variable binding:
+      --arg NAME VALUE      Set variable $NAME to VALUE (string)
+      --argjson NAME JSON   Set variable $NAME to JSON value
+      --slurpfile NAME FILE Set variable $NAME to array of JSON values from FILE
+      --rawfile NAME FILE   Set variable $NAME to contents of FILE (string)
+
+Other options:
+  -e, --exit-status         Set exit status based on last output value
+  -V, --version             Print version and exit
+      --build-configuration Print build configuration and exit
+  -h, --help                Print this help and exit
+      --args                Treat remaining arguments as positional strings ($ARGS)
+      --jsonargs            Treat remaining arguments as positional JSON ($ARGS)
+
+Not supported (jaq limitation): -a/--ascii-output, --stream, --stream-errors, --seq

@@ -71,6 +71,8 @@ cache/
 *.txt
 # ...except fixture expected outputs
 !**/tests/fixtures/**/expected/*.txt
+# ...except embedded help text included via include_str!
+!**/src/**/help.txt
 
 *.cpuprofile
 
