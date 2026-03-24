@@ -31,7 +31,7 @@
 //! ```ignore
 //! fn parse(code: &str) -> Tree {
 //!     let loader = GrammarLoader::new();  // Created here
-//!     let lang = loader.get("python").unwrap();
+//!     let lang = loader.get("python").ok().flatten().unwrap();
 //!     let mut parser = Parser::new();
 //!     parser.set_language(&lang).unwrap();
 //!     parser.parse(code, None).unwrap()   // Tree returned
@@ -45,6 +45,32 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use tree_sitter::Language;
 use tree_sitter_language::LanguageFn;
+
+/// Error returned by [`GrammarLoader::get`].
+#[derive(Debug, thiserror::Error)]
+pub enum GrammarLoadError {
+    /// No `.so`/`.dylib` file for this grammar exists in any search path.
+    #[error("grammar '{0}' not found in search paths")]
+    NotFound(String),
+    /// The shared library was found but could not be loaded (e.g., missing
+    /// symbols, OS-level `dlopen` failure).
+    #[error("failed to load grammar '{grammar}': {detail}")]
+    LoadFailed {
+        /// Grammar name (e.g. `"python"`).
+        grammar: String,
+        /// Underlying error message from libloading.
+        detail: String,
+    },
+    /// The grammar was loaded but its ABI version is incompatible with the
+    /// currently linked tree-sitter library.
+    #[error("grammar '{grammar}' ABI incompatible: {detail}")]
+    AbiIncompatible {
+        /// Grammar name.
+        grammar: String,
+        /// Detail from tree-sitter (version range info).
+        detail: String,
+    },
+}
 
 /// Loaded grammar with its backing library.
 ///
@@ -146,8 +172,16 @@ impl GrammarLoader {
 
     /// Get a grammar by name.
     ///
-    /// Returns None if grammar not found in search paths.
-    pub fn get(&self, name: &str) -> Option<Language> {
+    /// Returns `Ok(Some(lang))` if found and loaded successfully,
+    /// `Ok(None)` is never returned (kept for API symmetry — the grammar is
+    /// either found or the specific failure is in the `Err` variant),
+    /// `Err(GrammarLoadError::NotFound)` if no `.so`/`.dylib` exists in any
+    /// search path, and other `Err` variants for load or ABI failures.
+    ///
+    /// Most callers that previously ignored failures can migrate with
+    /// `.ok().flatten()` to restore the old `Option<Language>` behaviour while
+    /// errors are silently discarded.  Prefer logging the error instead.
+    pub fn get(&self, name: &str) -> Result<Option<Language>, GrammarLoadError> {
         // Check cache first
         if let Some(loaded) = self
             .cache
@@ -155,7 +189,7 @@ impl GrammarLoader {
             .unwrap_or_else(|e| e.into_inner())
             .get(name)
         {
-            return Some(loaded.language.clone());
+            return Ok(Some(loaded.language.clone()));
         }
 
         self.load_external(name)
@@ -425,7 +459,7 @@ impl GrammarLoader {
         }
 
         // Compile and cache
-        let grammar = self.get(grammar_name)?;
+        let grammar = self.get(grammar_name).ok().flatten()?;
         let compiled = tree_sitter::Query::new(&grammar, query_str).ok()?;
         let arc = Arc::new(compiled);
 
@@ -438,34 +472,33 @@ impl GrammarLoader {
     }
 
     /// Load a grammar from external .so file.
-    fn load_external(&self, name: &str) -> Option<Language> {
+    fn load_external(&self, name: &str) -> Result<Option<Language>, GrammarLoadError> {
         let lib_name = grammar_lib_name(name);
 
         for search_path in &self.search_paths {
             let lib_path = search_path.join(&lib_name);
-            if lib_path.exists()
-                && let Some(lang) = self.load_from_path(name, &lib_path)
-            {
-                return Some(lang);
+            if lib_path.exists() {
+                return self.load_from_path(name, &lib_path).map(Some);
             }
         }
 
-        None
+        Err(GrammarLoadError::NotFound(name.to_string()))
     }
 
     /// Load grammar from a specific path.
-    fn load_from_path(&self, name: &str, path: &Path) -> Option<Language> {
+    fn load_from_path(&self, name: &str, path: &Path) -> Result<Language, GrammarLoadError> {
         // SAFETY: Loading shared libraries is inherently unsafe. We accept this risk because:
         // 1. Grammars come from arborium (bundled) or user-configured search paths
         // 2. The alternative (no dynamic loading) would require compiling all grammars statically
         // 3. Tree-sitter grammars are widely used and well-tested
         let library = unsafe {
-            Library::new(path)
-                .map_err(|e| {
-                    log::debug!("Failed to load grammar at {}: {}", path.display(), e);
-                    e
-                })
-                .ok()?
+            Library::new(path).map_err(|e| {
+                log::debug!("Failed to load grammar at {}: {}", path.display(), e);
+                GrammarLoadError::LoadFailed {
+                    grammar: name.to_string(),
+                    detail: e.to_string(),
+                }
+            })?
         };
 
         let symbol_name = grammar_symbol_name(name);
@@ -475,10 +508,27 @@ impl GrammarLoader {
         // 2. The function conforms to tree-sitter's expected signature
         // 3. The returned Language is valid for the lifetime of the library
         let language = unsafe {
-            let func: Symbol<unsafe extern "C" fn() -> *const ()> =
-                library.get(symbol_name.as_bytes()).ok()?;
-            let lang_fn = LanguageFn::from_raw(*func);
-            Language::new(lang_fn)
+            let func: Result<Symbol<unsafe extern "C" fn() -> *const ()>, _> =
+                library.get(symbol_name.as_bytes());
+            match func {
+                Ok(f) => {
+                    let lang_fn = LanguageFn::from_raw(*f);
+                    Language::new(lang_fn)
+                }
+                Err(e) => {
+                    log::debug!(
+                        "Grammar '{}' at {} missing symbol '{}': {}",
+                        name,
+                        path.display(),
+                        symbol_name,
+                        e
+                    );
+                    return Err(GrammarLoadError::LoadFailed {
+                        grammar: name.to_string(),
+                        detail: format!("symbol '{}' not found: {}", symbol_name, e),
+                    });
+                }
+            }
         };
 
         // Cache the loaded grammar
@@ -492,7 +542,7 @@ impl GrammarLoader {
             .unwrap_or_else(|e| e.into_inner())
             .insert(name.to_string(), loaded);
 
-        Some(language)
+        Ok(language)
     }
 
     /// List available grammars in search paths.
@@ -1427,7 +1477,7 @@ mod tests {
                 "{lang}: no tags query found (missing from bundled_tags_query)"
             );
             let tags_str = tags.unwrap();
-            let grammar = loader.get(lang);
+            let grammar = loader.get(lang).ok().flatten();
             if grammar.is_none() {
                 eprintln!("{lang}: grammar .so not found, skipping compilation check");
                 continue;
@@ -1444,7 +1494,7 @@ mod tests {
     #[test]
     fn test_scheme_node_kinds() {
         let loader = GrammarLoader::new();
-        let grammar = loader.get("scheme");
+        let grammar = loader.get("scheme").ok().flatten();
         if grammar.is_none() {
             eprintln!("scheme: grammar .so not found or load failed");
             return;
@@ -1539,7 +1589,7 @@ mod tests {
         // Should load python from .so
         let ext = grammar_extension();
         if grammar_path.join(format!("python{ext}")).exists() {
-            let lang = loader.get("python");
+            let lang = loader.get("python").ok().flatten();
             assert!(lang.is_some(), "Failed to load python grammar");
         }
 

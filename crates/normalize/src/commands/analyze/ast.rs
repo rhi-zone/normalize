@@ -169,6 +169,8 @@ pub fn build_ast_output(
     let loader = grammar_loader();
     let grammar = loader
         .get(lang.grammar_name())
+        .ok()
+        .flatten()
         .ok_or_else(|| format!("Failed to load grammar for {}", lang.name()))?;
 
     let mut parser = tree_sitter::Parser::new();

@@ -113,6 +113,8 @@ pub fn node_types_for_language(
     let loader = grammar_loader();
     let ts_lang = loader
         .get(language_name)
+        .ok()
+        .flatten()
         .ok_or_else(|| format!("grammar not loaded for language '{language_name}'"))?;
 
     let kind_count = ts_lang.node_kind_count();

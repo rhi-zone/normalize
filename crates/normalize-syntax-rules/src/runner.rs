@@ -420,7 +420,7 @@ pub fn run_rules(
 
     let mut combined_by_grammar: HashMap<String, CombinedQuery> = HashMap::new();
     for grammar_name in files_by_grammar.keys() {
-        let Some(grammar) = loader.get(grammar_name) else {
+        let Some(grammar) = loader.get(grammar_name).ok().flatten() else {
             continue;
         };
         if let Some(cq) =
@@ -443,7 +443,7 @@ pub fn run_rules(
         let Some(combined) = combined_by_grammar.get(grammar_name) else {
             continue;
         };
-        let Some(grammar) = loader.get(grammar_name) else {
+        let Some(grammar) = loader.get(grammar_name).ok().flatten() else {
             continue;
         };
         let mut parser = tree_sitter::Parser::new();
@@ -779,7 +779,7 @@ mod tests {
     #[test]
     fn test_combined_query_predicate_scoping() {
         let loader = loader();
-        let grammar = loader.get("rust").expect("rust grammar");
+        let grammar = loader.get("rust").ok().flatten().expect("rust grammar");
 
         // Two patterns with same capture name but different predicate values
         let combined_query = r#"
@@ -862,7 +862,7 @@ fn main() {
     #[test]
     fn test_combined_rules_single_traversal() {
         let loader = loader();
-        let grammar = loader.get("rust").expect("rust grammar");
+        let grammar = loader.get("rust").ok().flatten().expect("rust grammar");
 
         // Simulate combining multiple rule queries
         let rules_queries = [
@@ -937,7 +937,7 @@ fn main() {
         // Rust grammar doesn't have `comment` node type but has `line_comment`.
         // A multi-pattern query with both should compile with only valid patterns.
         let loader = loader();
-        let grammar = loader.get("rust").expect("rust grammar");
+        let grammar = loader.get("rust").ok().flatten().expect("rust grammar");
 
         let query_str = r#"((comment) @match (#match? @match "TODO"))
 ((line_comment) @match (#match? @match "TODO"))"#;

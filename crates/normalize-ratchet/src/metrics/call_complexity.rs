@@ -41,14 +41,14 @@ impl Metric for CallComplexityMetric {
                 let grammar_name = support.grammar_name();
                 let tree = normalize_facts::parse_with_grammar(grammar_name, &content)?;
                 let tags_scm = loader.get_tags(grammar_name)?;
-                let ts_lang = loader.get(grammar_name)?;
+                let ts_lang = loader.get(grammar_name).ok().flatten()?;
                 let tags_query = tree_sitter::Query::new(&ts_lang, &tags_scm).ok()?;
                 let complexity_query = loader.get_complexity(grammar_name).and_then(|scm| {
-                    let grammar = loader.get(grammar_name)?;
+                    let grammar = loader.get(grammar_name).ok().flatten()?;
                     tree_sitter::Query::new(&grammar, &scm).ok()
                 });
                 let calls_query = loader.get_calls(grammar_name).and_then(|scm| {
-                    let grammar = loader.get(grammar_name)?;
+                    let grammar = loader.get(grammar_name).ok().flatten()?;
                     tree_sitter::Query::new(&grammar, &scm).ok()
                 });
 

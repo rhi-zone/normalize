@@ -86,6 +86,7 @@ grep-searcher.workspace = true
 grep = "0.4"
 lexopt = "0.3"
 anyhow = "1"
+thiserror = "2"
 bstr = "1"
 termcolor = "1"
 textwrap = { version = "0.16", default-features = false }

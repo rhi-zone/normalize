@@ -7,6 +7,29 @@ use serde::Serialize;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
+/// Error type for lint run operations.
+#[derive(Debug, thiserror::Error)]
+pub enum LintError {
+    /// No tools were detected for the given root directory.
+    #[error("no lint tools detected in {root}")]
+    NoToolsDetected {
+        /// The root directory that was scanned.
+        root: String,
+    },
+    /// A tool filter name did not match any registered tool.
+    #[error("unknown tool '{name}'")]
+    UnknownTool {
+        /// The tool name that was not found.
+        name: String,
+    },
+    /// An unknown category filter was supplied.
+    #[error("unknown category '{category}'; expected one of: lint, fmt, type")]
+    UnknownCategory {
+        /// The category string that was not recognised.
+        category: String,
+    },
+}
+
 /// Tool info for lint list output
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ToolListItem {

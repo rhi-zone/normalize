@@ -355,6 +355,8 @@ pub fn validate_unused_kinds_audit(
     let loader = GrammarLoader::new();
     let ts_lang = loader
         .get(lang.grammar_name())
+        .ok()
+        .flatten()
         .ok_or_else(|| format!("Grammar '{}' not found", lang.grammar_name()))?;
 
     // Keywords that suggest a node kind might be useful (same as cross_check_node_kinds)
@@ -505,7 +507,11 @@ mod tests {
         // Change this to the grammar you want to inspect
         let grammar_name = std::env::var("DUMP_GRAMMAR").unwrap_or_else(|_| "python".to_string());
 
-        let ts_lang = loader.get(&grammar_name).expect("grammar not found");
+        let ts_lang = loader
+            .get(&grammar_name)
+            .ok()
+            .flatten()
+            .expect("grammar not found");
 
         println!("\n=== Valid node kinds for '{}' ===\n", grammar_name);
         let count = ts_lang.node_kind_count();
@@ -585,7 +591,7 @@ mod tests {
 
         for lang in supported_languages() {
             let grammar_name = lang.grammar_name();
-            let ts_lang = match loader.get(grammar_name) {
+            let ts_lang = match loader.get(grammar_name).ok().flatten() {
                 Some(l) => l,
                 None => continue,
             };

@@ -1,0 +1,309 @@
+# Polish State
+
+Created: f89f7a3c5d17cb1d8b13137bacb8c830d54c808c
+Last run: 2026-03-24T01:00:00Z
+Round 1 applied: 2026-03-24
+Round: 2
+Project type: Rust CLI + library ecosystem (~40 crates)
+
+## Lenses
+- api-clarity
+- naming-consistency
+- doc-coverage
+- error-surface
+- adversarial
+
+## Scope
+Primary: crates/normalize-metrics/, crates/normalize-ratchet/, crates/normalize-budget/,
+crates/normalize/src/commands/ci.rs, crates/normalize-native-rules/src/ratchet.rs,
+crates/normalize-native-rules/src/budget.rs
+
+Secondary: entire workspace (spot-checks for consistency)
+
+## Findings — Round 1
+
+### Conflicts
+None. Naming-consistency and api-clarity findings on `*Result` vs `*Report` and `BudgetLimits`
+field names are complementary, not contradictory.
+
+---
+
+### adversarial
+
+- [DONE] `crates/normalize-ratchet/src/metrics/call_complexity.rs:157-163` — index misalignment between `fn_entries` and `non_container_tis` when `node_name()` returns `None` (causes skip in fn_entries but not non_container_tis), producing wrong TagInfo for call-edge row-range lookup → wrong call graphs and complexity values — add a parallel index into non_container_tis that tracks separately, or filter non_container_tis in lockstep _(severity: high)_
+
+- [DONE] `crates/normalize-metrics/src/filter.rs:13-18` — dead trailing-slash branch: `prefix` is trimmed into a new local `String` but then `prefix.ends_with('/')` checks the original `&str` binding; the documented "trailing-slash matches addr.starts_with(prefix)" behaviour silently never fires — fix to check the trimmed local or restructure the branches _(severity: medium)_ [also flagged by api-clarity]
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:658` — `filter_entries` uses raw `e.path.starts_with(p)` string prefix match; `"src"` matches `"srcother/..."`. Should use `normalize_metrics::filter_by_prefix` _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:445` — `update` has the same raw `starts_with` bug as `filter_entries:658` _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:687-690` — delta `current - baseline` propagates NaN/infinity (e.g. from BFS sum); the `abs() < 1e-10` epsilon check evaluates to `false` for NaN, silently classifying NaN delta as Regression — guard with `is_finite()` before classification _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:754` + `crates/normalize-budget/src/metrics/functions.rs:45` — worktree name uses first 7 chars of hash; two concurrent runs for the same ref race on stale-cleanup + `git worktree add`, causing "already exists" failure — use a unique suffix (pid or tempdir) _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:760-765` + `crates/normalize-budget/src/metrics/functions.rs:51-56` — `git worktree remove --force` failure silently ignored; subsequent `git worktree add` then fails — check exit code and surface error _(severity: medium)_
+
+- [DONE] `crates/normalize-budget/src/service.rs:648-680` — `check_limits` uses plain `>` comparisons; `NaN > max` is `false`, so NaN metric values silently skip all violations — guard with `is_finite()` _(severity: medium)_
+
+- [DONE] `crates/normalize-budget/src/service.rs:618-619` — if path prefix matches nothing, `added`/`removed` are both `0.0` and all limit checks silently pass; a typo in a prefix is invisible — warn when a configured entry matches zero files _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/metrics/complexity.rs:115` — `?` aborts the entire file's measurements when one function's node can't be found by byte range — change to `continue` to skip just that function _(severity: medium)_
+
+- [DONE] `crates/normalize-budget/src/metrics/complexity_delta.rs:154` — same whole-file abort on first missed node _(severity: medium)_
+
+- [DONE] `crates/normalize-metrics/src/aggregate.rs:57-68` — NaN in inputs silently propagates through Mean, Max, Min; Median sorts NaN as Equal, returning NaN as result — filter or reject NaN inputs before aggregation _(severity: medium)_
+
+- [DONE] Cross-cutting (build_ratchet_diagnostics / build_budget_diagnostics) — git operations outside a git repo return errors that are swallowed with `eprintln!`, causing CI to see a clean pass with no diagnostics when the tool couldn't check anything — return a typed error or produce a diagnostic indicating the failure _(severity: medium)_ [also flagged by error-surface]
+
+- [DONE] `crates/normalize-budget/src/metrics/todos.rs:41` + `crates/normalize-budget/src/metrics/dependencies.rs:88` — `&line[1..]` byte-slices a `&str` at index 1 without verifying it's a char boundary; safe for ASCII diff output but panics on adversarial non-ASCII input — use `line[1..].to_string()` with a char-boundary check or use `chars().skip(1)` _(severity: low)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:580` + `crates/normalize-budget/src/service.rs:557` — `resolve_root` silently falls back to `"."` if cwd is unavailable (common in ephemeral CI containers) — surface the error rather than silently substituting _(severity: low)_
+
+- [DONE] `crates/normalize-ratchet/src/metrics/call_complexity.rs:289` — adjacency list in call graph may have duplicate callee entries (no dedup on push at line 229), inflating BFS reachable sum _(severity: low)_
+
+---
+
+### naming-consistency
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:19,182,201` + `crates/normalize-budget/src/service.rs:20,96,172` — `MeasureResult`, `AddResult`, `RemoveResult` should be `MeasureReport`, `AddReport`, `RemoveReport` — all 30+ other commands use `*Report`; the mutation operations in these two services are the only exception _(severity: high)_
+
+- [DONE] `crates/normalize-budget/src/service.rs:111` — `UpdateResult` vs ratchet's `UpdateReport` — same operation, two names within the same crate family — rename budget's `UpdateResult` → `UpdateReport` _(severity: high)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:608` + `crates/normalize-budget/src/service.rs:585` — `do_measure` uses a private-helper-convention `do_` prefix despite being `pub` (ratchet) or `pub(crate)` (budget) — rename to `measure` or `ratchet_measure`/`budget_measure` _(severity: medium)_ [also flagged by api-clarity]
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:966` vs `crates/normalize-native-rules/src/ratchet.rs:12` — `build_ratchet_diagnostics` (service layer) vs `build_ratchet_report` (native-rules wrapper) — same call chain, different suffix — align to `build_ratchet_report` at both layers _(severity: medium)_
+
+- [DONE] `crates/normalize-budget/src/service.rs:687` vs `crates/normalize-native-rules/src/budget.rs:12` — same `_diagnostics` vs `_report` mismatch _(severity: medium)_
+
+- [DONE] `crates/normalize-budget/src/metrics/` — metric struct names use plural nouns (`LinesMetric`, `FunctionsMetric`, `ClassesMetric`) vs ratchet's full descriptive names (`LineCountMetric`, `FunctionCountMetric`, `ClassCountMetric`) — consider `LineDeltaMetric`, `FunctionDeltaMetric` etc. to signal diff semantics _(severity: medium)_
+
+- [DONE] `crates/normalize-budget/src/budget.rs:11-17` — `BudgetLimits` fields `added`, `removed`, `total`, `net` vs CLI flags `--max-added`, `--max-removed`, `--max-total`, `--max-net` — struct fields should be `max_added` etc. to match CLI and convey "these are maximums" _(severity: medium)_ [also flagged by api-clarity]
+
+- [DONE] `crates/normalize-ratchet/src/baseline.rs:35` — `baseline_path()` uses `"baseline"` noun but the feature is named `ratchet`; callers would look for `ratchet_path()` — rename _(severity: low)_
+
+- [DONE] `crates/normalize-native-rules/src/ratchet.rs:12` + `budget.rs:12` — these return `DiagnosticsReport` directly while all other native rules return a domain `*Report` type with `OutputFormatter` + `From<> impl` — ratchet/budget skip the intermediate type, breaking the native-rules pattern _(severity: medium)_
+
+---
+
+### api-clarity
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:231` + `crates/normalize-budget/src/service.rs:196` — `::new(pretty: &Cell<bool>)` copies the value at construction time but the parameter type implies it observes future changes — change to `bool` _(severity: high)_
+
+- [DONE] `crates/normalize-metrics/src/aggregate.rs:52` — `aggregate()` function shares a root name with the `Aggregate` enum in scope; call sites read `aggregate(&mut v, Aggregate::Mean)` which is confusing — rename function to `compute_aggregate` or `reduce` _(severity: medium)_
+
+- [DONE] `crates/normalize-metrics/src/aggregate.rs:52` — `aggregate()` mutates input slice for `Median` (sorts in place) but all other strategies are pure; mutation is surprising and undocumented on the signature — take ownership (`Vec<f64>`) or document mutation clearly _(severity: medium)_
+
+- [DONE] `crates/normalize-budget/src/metrics/mod.rs:27` — `DiffMetric::measure_diff` returns `Vec<(String, f64, f64)>` anonymous 3-tuple; callers use `.1` / `.2` with no hint of which is `added` vs `removed` — introduce `DiffMeasurement { key: String, added: f64, removed: f64 }` _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:46` — `CheckEntry.aggregate` is `String` while `BaselineEntry.aggregate` is `Aggregate` — same field, different representation; consumers re-parsing the string back to enum — use `Aggregate` on `CheckEntry` _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:116-123` — `UpdateEntry.reason: String` with hardcoded values `"forced"`, `"improved"`, `"no improvement"` — downstream matchers are fragile string comparisons — introduce `UpdateReason` enum _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/baseline.rs:35-37` + `crates/normalize-budget/src/budget.rs:64` — `load_baseline`, `save_baseline`, `baseline_path` are free functions rather than `BaselineFile` methods; not discoverable via IDE autocomplete on the type — convert to `BaselineFile::load(root)` / `baseline.save(root)` etc. _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:278` + budget equivalent — `aggregate: Option<String>` parameter forces callers to pass unvalidated string; `Aggregate` has `FromStr` — accept `Option<Aggregate>` instead _(severity: medium)_
+
+- [DONE] `crates/normalize/src/commands/ci.rs:18-31` — `CiReport` stores `error_count`/`warning_count`/`info_count` as fields derivable from `diagnostics`; caller who modifies `diagnostics` after construction has stale counts — make them accessor methods _(severity: medium)_
+
+- [DONE] `crates/normalize-budget/src/service.rs:96-107` (AddResult/UpdateResult/RemoveResult) — `message: String` field duplicates information already in structured fields; `format_text()` can construct it — remove the field _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/lib.rs:18` — `default_metrics(root: &Path)` ignores `root`; parameter implies root-specific metrics but all returned metrics are stateless — remove the parameter or document that it is unused _(severity: medium)_
+
+- [DONE] `crates/normalize-metrics/src/filter.rs:9` — returns `impl Iterator<Item = &'a (String, f64)>` (tuple); no compile-time documentation of which is address vs value — introduce `MetricPoint { address: String, value: f64 }` _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/baseline.rs:40` — `load_baseline` returns `Ok(BaselineFile::default())` for missing file; callers can't distinguish "never initialised" from "no entries" — consider `Ok(None)` / `Result<Option<BaselineFile>>` _(severity: low)_
+
+---
+
+### error-surface
+
+- [DONE] `crates/normalize-metrics/src/lib.rs:32` + `crates/normalize-budget/src/metrics/mod.rs:27` — `Metric::measure_all` and `DiffMetric::measure_diff` return `anyhow::Result` in public library traits — consumers can't match on failure modes; replace with typed error enums _(severity: high)_
+
+- [DONE] Cross-cutting — no structured error types in any of the three new crates; all errors are `anyhow::Error` at trait boundary or `String` in service methods — library callers (CI tools) cannot programmatically distinguish "baseline not found" vs "JSON parse error" vs "metric unknown" — add `thiserror`-defined error enums _(severity: high)_
+
+- [DONE] `crates/normalize-budget/src/service.rs:567-574` — `load_budget_config` silently discards both read errors and TOML parse errors (`unwrap_or_default()`); malformed `[budget]` config section is invisible to the user — surface as warning or error _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:974-989` + `crates/normalize-budget/src/service.rs:693-695` — `load_baseline` / `load_budget` errors silently swallowed (eprintln + empty report); corrupt file is indistinguishable from absent file at the caller — return typed result or produce a diagnostic _(severity: medium)_ [also flagged by adversarial]
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:621` + `crates/normalize-budget/src/service.rs:599` — `do_measure` error converted with `.map_err(|e| e.to_string())`; root path and metric name absent from resulting string — include context in the error string _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/baseline.rs:54-55` + `crates/normalize-budget/src/budget.rs:79` — `fs::create_dir_all(parent)?` propagates bare `io::Error` with no path — wrap with `.with_context(|| format!("creating {}", parent.display()))` _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:795` — `.unwrap()` on `metrics.iter().find(...)` — safe in practice but would panic if MetricFactory returns a metric whose `name()` changes — guard with `.ok_or_else(...)` _(severity: medium)_
+
+---
+
+### doc-coverage
+
+- [DONE] `crates/normalize-ratchet/src/baseline.rs:11` — `BaselineEntry` fields (`path`, `metric`, `aggregate`, `value`) have no doc comments — add per-field docs explaining semantics _(severity: high)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:608` — `pub fn do_measure` has no doc comment despite being the core computation function called by CLI and rules engine _(severity: high)_
+
+- [DONE] `crates/normalize-budget/src/service.rs:19` — `MeasureResult` fields `total`, `net`, `item_count` have no docs; `total = added + removed`, `net = added - removed` are non-obvious _(severity: high)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:19-56` — `MeasureResult`, `CheckReport`, `CheckEntry`, `CheckStatus` fields all undocumented _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:116-123` — `UpdateEntry.reason` field undocumented; valid values are opaque _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:231` — `RatchetService::new()` and `::with_factory()` have no doc comments _(severity: medium)_
+
+- [DONE] `crates/normalize-budget/src/service.rs:51,66` — `CheckEntry.violations` and `CheckReport` fields undocumented _(severity: medium)_
+
+- [DONE] `crates/normalize-budget/src/service.rs:196` — `BudgetService::new()` and `::with_factory()` have no doc comments _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/metrics/call_complexity.rs:15` — `CallComplexityMetric` doc omits BFS cycle handling and cross-file resolution strategy _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/lib.rs:18` — `default_metrics()` has no doc comment explaining which metrics are included _(severity: medium)_
+
+- [DONE] `crates/normalize-metrics/src/aggregate.rs:10` — `Aggregate` enum variants have no doc comments _(severity: medium)_
+
+- [DONE] `crates/normalize-budget/src/budget.rs:43` — `BudgetFile` fields undocumented _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/baseline.rs:20` — `BaselineFile` fields undocumented _(severity: medium)_
+
+- [DONE] `crates/normalize-budget/src/service.rs:585` — `do_measure()` (pub(crate)) has no doc comment _(severity: medium)_
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:199` — `RemoveResult.removed: bool` has no doc comment _(severity: low)_
+
+- [DONE] `crates/normalize-budget/src/budget.rs:21` — `BudgetLimits::is_empty()` has no doc comment _(severity: low)_
+
+- [DONE] `crates/normalize-budget/src/budget.rs:99` — `BudgetConfig::effective_ref()` and `::effective_aggregate()` have no doc comments _(severity: low)_
+
+---
+
+## Findings — Round 2
+
+Round 2 git hash: 036706ad
+Scope: normalize-languages, normalize-surface-syntax, normalize-language-meta, normalize-grammars,
+normalize-facts/facts-core/facts-rules-*, normalize-rules/rules-config/syntax-rules/native-rules,
+normalize-core/graph/analyze/architecture/output/filter/scope/path-resolve/manifest/deps,
+normalize crate (main), normalize-edit/shadow/tools/ecosystems/typegen/openapi/code-similarity/
+session-analysis/chat-sessions/package-index/local-deps
+
+### Conflicts
+None.
+
+---
+
+### adversarial
+
+- [DONE] `crates/normalize-analyze/src/lib.rs:63` — `truncate_path` slices by raw byte offset; panics on non-ASCII input (char boundary) AND panics when `max_len < 4` (usize underflow) — guard `max_len >= 4`, use `char_indices` to find safe boundary _(severity: high)_
+
+- [DONE] `crates/normalize-architecture/src/lib.rs:303` — `symbol_count as usize` from `i64` DB column without negative check; `-1i64 as usize` = `usize::MAX` — guard with `if symbol_count < 0 { 0 } else { symbol_count as usize }` _(severity: high)_
+
+- [DONE] `crates/normalize-architecture/src/lib.rs:366` — same `count as usize` from `i64` in `find_symbol_hotspots` _(severity: high)_
+
+- [DONE] `crates/normalize-languages/src/grammar_loader.rs:406` — `Library::new(path).ok()?` silently discards library load errors; ABI mismatches are invisible — log at debug level before returning None _(severity: high)_ [linked to error-surface finding below]
+
+- [DONE] `crates/normalize-languages/src/grammar_loader.rs:152` — `RwLock::read().ok()?` silently returns None on lock poison; all subsequent queries appear as "grammar not found" — use `unwrap_or_else(|e| e.into_inner())` to recover from poisoned lock _(severity: medium)_
+
+- [DONE] `crates/normalize-languages/src/scss.rs:35`, `dart.rs:129`, `svelte.rs:38` — `rest.chars().nth(start)` where `start` is a byte offset from `str::find`; wrong for multi-byte UTF-8 before the quote char; panic on `unwrap()` — use `rest[start..].chars().next()` _(severity: medium)_
+
+- [DONE] `crates/normalize/src/commands/analyze/ownership.rs:166` — `sorted[0].1 as f64 / total_lines as f64` panics/produces NaN when `total_lines == 0`; map non-empty but all zero counts is a reachable edge case — guard with `if total_lines == 0 { return None; }` _(severity: medium)_
+
+- [DONE] `crates/normalize/src/service/edit.rs:420,613,768,858,1380` — `std::env::current_dir().unwrap()` panics if cwd is deleted (common in CI); propagate as error _(severity: low)_
+
+- [DONE] `crates/normalize/src/service/mod.rs:119` — `current_dir().unwrap_or_default()` falls back to empty PathBuf `""`, not `"."`, silently wrong — change to `unwrap_or_else(|_| PathBuf::from("."))` _(severity: low)_
+
+- [DONE] `crates/normalize-architecture/src/lib.rs:352-391` — `find_symbol_hotspots` issues N+1 SQL prepares inside a loop (one per symbol name) — rewrite with `WHERE name IN (...)` _(severity: medium)_
+
+- [DONE] `crates/normalize-graph/src/lib.rs:188,197,212,221` — raw ANSI escape codes (`\x1b[1;36m` etc.) hardcoded in `DependentsReport::format_text` while rest of codebase uses `nu_ansi_term` — replace with `nu_ansi_term` calls _(severity: medium)_
+
+- [DONE] `crates/normalize-output/src/lib.rs:112` — `"░".repeat(width - filled)` has no guard that `filled <= width`; floating-point rounding could produce `filled > width` — add `let filled = filled.min(width)` _(severity: low)_
+
+- [DONE] `crates/normalize-native-rules/src/stale_docs.rs:49` — `(cover.code_modified - doc.doc_modified) / 86400` unchecked subtraction on `u64`; filter guards it but use `.saturating_sub()` to be explicit _(severity: low)_
+
+---
+
+### error-surface
+
+- [DONE] `crates/normalize-languages/src/grammar_loader.rs:~406` — `get()` returns `Option<Language>` with no way to distinguish "not found" / "load failed" / "ABI incompatible"; change to `Result<Option<Language>, GrammarLoadError>` _(severity: high)_
+
+- [DONE] `crates/normalize-facts-rules-api/src/rule_pack.rs:53-69` — `RulePack::run` returns `RVec<Diagnostic>` with no error signal; a panicking dylib unwinds across the FFI boundary (UB); document no-panic contract or add `catch_unwind` in the loader _(severity: high)_
+
+- [DONE] `crates/normalize-facts-rules-interpret/src/lib.rs:601,629` — execution-time errors from `engine.run()` / `run_incremental()` are mapped to `InterpretError::Parse`; add `InterpretError::Eval(String)` variant _(severity: medium)_
+
+- [DONE] `crates/normalize-filter/src/lib.rs:196-200` — `Filter::new` returns `Result<Self, String>`; define `FilterError` enum _(severity: medium)_
+
+- [DONE] `crates/normalize-manifest/src/lib.rs:112-118` — `ManifestError(pub String)` implements `Display` but not `std::error::Error`; cannot be used with `?` in standard error chains _(severity: medium)_
+
+- [DONE] `crates/normalize-languages/src/external_packages.rs:179-197` — `PackageIndex::open/open_in_memory` return `Result<_, libsql::Error>` leaking storage impl; wrap in `PackageIndexError` _(severity: medium)_
+
+- [DONE] `crates/normalize/src/commands/tools/lint.rs:238,243` — `build_lint_run` / `build_lint_run_multi` return `Result<_, String>`; define `LintError` _(severity: medium)_
+
+- [DONE] `crates/normalize-shadow/src/lib.rs:1014` — `ShadowError` variants carry only `String`; use structured variants for Init/Commit/Undo/Validation errors _(severity: low)_
+
+---
+
+### naming-consistency
+
+- [DONE] Cross-cutting — `Severity` enum defined independently in `normalize-syntax-rules` and `normalize-facts-rules-interpret` (identical structure, no shared source); `DiagnosticLevel` in `normalize-facts-rules-api` is a third type with a `Hint` variant the others lack; the `Severity::Info → DiagnosticLevel::Hint` mapping at `normalize-facts-rules-interpret:514` is lossy and undocumented — extract shared `Severity` to `normalize-rules-config` _(severity: high)_
+
+- [DONE] `crates/normalize/src/` (multiple files) — 15+ `*Result` output structs should be `*Report`: `LintListResult`, `LintRunResult`, `GrepResult`, `RebuildResult` (facts), `PackagesResult`, `CommandResult`, `QueryResult`, `DaemonActionResult`, `DaemonRootResult`, `PackageResult`, `GenerateResult`, `GrammarInstallResult`, `InitResult`, `UpdateResult`, `TranslateResult` _(severity: medium)_
+
+- [DONE] `crates/normalize-facts/src/service.rs:19-63` — `RebuildResult`, `StatsResult`, `FileList` implement `Display` instead of `OutputFormatter`; inconsistent with every other output struct in workspace _(severity: medium)_
+
+- [DONE] `crates/normalize-syntax-rules/src/service.rs:19-50` — `FindingItem` and `RunResult` don't follow `*Report` convention _(severity: medium)_ [also: `RunResult` has no Output Formatter, uses Display]
+
+- [DONE] `crates/normalize-rules/src/service.rs:111` — `RuleResult` doesn't follow `*Report` convention; also has a dead `data: Option<serde_json::Value>` field with no consumer _(severity: low)_
+
+- [DONE] `crates/normalize-graph/src/lib.rs:105-110` + `crates/normalize-architecture/src/lib.rs:74-81` — `ImportChain` declared twice (identical struct); `find_longest_chains` also duplicated with hardcoded limit 5 in architecture — architecture crate should use normalize-graph's type _(severity: medium)_
+
+- [DONE] `crates/normalize-facts-rules-interpret/src/lib.rs:71-74` — `FactsRuleOverride` / `FactsRulesConfig` stale backward-compat type aliases; comment says they should be removed — remove them _(severity: medium)_
+
+- [DONE] `crates/normalize-language-meta/src/capabilities.rs:39-46` — `Capabilities::none()` and `Capabilities::data_format()` return identical structs (all fields `false`); callers can't tell if there's a semantic difference — either make them distinct or keep only one _(severity: medium)_
+
+---
+
+### api-clarity
+
+- [DONE] `crates/normalize-path-resolve/src/lib.rs:9` — `PathMatch::kind: String` with two hardcoded values `"file"`/`"directory"` compared by string equality in 5+ places — convert to enum `PathMatchKind` _(severity: medium)_
+
+- [DONE] `crates/normalize-path-resolve/src/lib.rs:24-25` — `PathSource::all_files` returns `Option<Vec<(String, bool)>>`; the `bool` means `is_directory` but is undocumented — introduce `PathEntry { path: String, is_dir: bool }` _(severity: medium)_
+
+- [DONE] `crates/normalize-output/src/diagnostics.rs:333` — `"... {} more not shown (use --limit or --pretty to see all)"` embeds CLI flag names in a library crate — the string should not know about CLI flags _(severity: medium)_
+
+- [DONE] `crates/normalize-rules/src/runner.rs` (`show_rule`, `list_tags`, `enable_disable`) — these `pub fn`s print directly to stdout via `println!()` and return `Result<(), String>`; untestable; every other command returns a report struct — return formatted string or structured report _(severity: medium)_
+
+- [DONE] `crates/normalize-rules/src/runner.rs:216-240` — `RulesListReport` embeds rendering flags `sources: bool`, `no_desc: bool` in the data struct; these are CLI output hints, not data — move to `OutputFormatter` call site _(severity: medium)_
+
+- [DONE] `crates/normalize-rules-config/src/lib.rs:39-56,76-96` — `RuleOverride::merge` and `RulesConfig::merge` have asymmetric semantics (Vec: non-empty wins; HashMap: union); impossible to reset a Vec to empty via merge; undocumented — document the semantics explicitly _(severity: medium)_
+
+- [DONE] `crates/normalize-languages/src/external_packages.rs:64-75` — `version_cmp` free function does the same thing as `Version::partial_cmp`; remove the free function _(severity: medium)_
+
+- [DONE] `crates/normalize/src/service/facts.rs:823`, `sessions.rs:64`, `mod.rs:174` — `#[serde(untagged)]` enums produce JSON that's opaque to programmatic consumers and loses variant info in JSON Schema — use `#[serde(tag = "kind")]` _(severity: medium)_
+
+- [DONE] `crates/normalize-facts-rules-builtins/src/circular_deps.rs:51-57` — local-vs-external import heuristic is hard-coded and undocumented; silently misclassifies npm scoped packages, Go module paths, `./relative` imports — document known gaps and add tests _(severity: medium)_
+
+- [DONE] `crates/normalize-facts-rules-api/src/rule_pack.rs:56` — `#[sabi(missing_field(panic))]` causes panics on ABI version mismatch with no documentation for dylib authors — add comment explaining ABI versioning contract _(severity: medium)_
+
+- [DONE] `crates/normalize-tools/src/tools.rs:163-193` — `find_js_tool`/`find_python_tool` return `Option<(String, Vec<String>)>` (anonymous tuple) — introduce `ToolInvocation { command: String, args: Vec<String> }` _(severity: low)_
+
+- [DONE] `crates/normalize-deps/src/lib.rs:96-107` — `DepsExtractor` is a zero-field struct with no doc and no state; replace with free function `pub fn extract(path, content)` _(severity: low)_
+
+---
+
+### doc-coverage
+
+- [DONE] `crates/normalize-facts-core/src/symbol.rs:66-96` — `Symbol` and `FlatSymbol` fields all undocumented; `attributes` format, `implements` vs `is_interface_impl` semantics are non-obvious _(severity: medium)_
+
+- [DONE] `crates/normalize-rules/src/runner.rs:450-458` — `ListFilters` struct and fields undocumented; interaction between `enabled`/`disabled` flags is non-obvious _(severity: low)_
+
+- [DONE] `crates/normalize-native-rules/src/lib.rs:22-27` — `NativeRuleDescriptor` struct undocumented; `default_severity` vs runtime-configured severity lifecycle unexplained _(severity: low)_
+
+- [DONE] `crates/normalize-syntax-rules/src/lib.rs:81-116` — `Rule` struct fields undocumented; `fix` substitution syntax (`$capture`) documented in crate doc but not on the field _(severity: low)_
+
+- [DONE] `crates/normalize-syntax-rules/src/runner.rs:11-28` — `Finding` fields undocumented; `captures` key semantics (whether `@match` is included) matter for fix substitution _(severity: low)_
+
+- [DONE] `crates/normalize-path-resolve/src/lib.rs:1` — missing crate-level `//!` doc _(severity: low)_
+
+- [DONE] `crates/normalize-facts-core/src/symbol.rs:6` — `SymbolKind` enum variants undocumented; `Heading` variant is non-obvious (Markdown) _(severity: low)_
+
+- [DONE] `crates/normalize-facts-core/src/symbol.rs:66-80` — `Symbol` fields undocumented _(severity: medium)_
+
+- [DONE] `crates/normalize-languages/src/grammar_loader.rs:62` — `GrammarLoader` struct has no doc comment _(severity: low)_
+
+- [DONE] `crates/normalize-edit/src/lib.rs:1` — missing crate-level `//!` doc _(severity: low)_
+
+- [DONE] `crates/normalize-facts-rules-api/src/relations.rs` — various `Relations` fields undocumented _(severity: low)_

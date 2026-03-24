@@ -423,7 +423,7 @@ impl LengthAnalyzer {
 
         loader
             .get_tags(grammar_name)
-            .zip(loader.get(grammar_name))
+            .zip(loader.get(grammar_name).ok().flatten())
             .and_then(|(tags_scm, ts_lang)| tree_sitter::Query::new(&ts_lang, &tags_scm).ok())
             .map(|tags_query| {
                 Self::collect_functions_from_tags(&tree, &tags_query, content, support)
