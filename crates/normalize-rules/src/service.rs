@@ -377,10 +377,10 @@ impl RulesService {
                 report.merge(r.into());
             }
             if let Ok(r) = ratchet_res {
-                report.merge(r);
+                report.merge(r.into());
             }
             if let Ok(r) = budget_res {
-                report.merge(r);
+                report.merge(r.into());
             }
 
             apply_native_rules_config(&mut report, &native_config.rules);

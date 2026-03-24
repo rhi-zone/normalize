@@ -12,10 +12,10 @@ pub mod stale_docs;
 pub mod stale_summary;
 pub(crate) mod walk;
 
-pub use budget::build_budget_report;
+pub use budget::{BudgetDiagnosticsReport, build_budget_report};
 pub use check_examples::build_check_examples_report;
 pub use check_refs::build_check_refs_report;
-pub use ratchet::build_ratchet_report;
+pub use ratchet::{RatchetDiagnosticsReport, build_ratchet_report};
 pub use stale_docs::build_stale_docs_report;
 pub use stale_summary::build_stale_summary_report;
 

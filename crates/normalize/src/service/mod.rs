@@ -929,10 +929,10 @@ impl NormalizeService {
                 native_report.merge(r.into());
             }
             if let Ok(r) = ratchet_res {
-                native_report.merge(r);
+                native_report.merge(r.into());
             }
             if let Ok(r) = budget_res {
-                native_report.merge(r);
+                native_report.merge(r.into());
             }
             apply_native_rules_config(&mut native_report, &native_config.rules);
             native_report.sources_run.push("native".into());
@@ -966,8 +966,8 @@ impl NormalizeService {
         let report = commands::ci::CiReport::new(merged, engines_run, duration_ms);
 
         // Determine exit condition
-        let error_count = report.error_count;
-        let warning_count = report.warning_count;
+        let error_count = report.error_count();
+        let warning_count = report.warning_count();
         let has_errors = error_count > 0;
         let has_strict_failures = strict && warning_count > 0;
 
