@@ -409,83 +409,83 @@ None.
 
 ### adversarial (high)
 
-- [APPROVED] `crates/normalize-path-resolve/src/lib.rs:128-145` — `resolve_unified` alias expansion can cycle (a→b→a) causing unbounded recursion/stack overflow — add `depth: u8` limit _(severity: high)_
-- [APPROVED] `crates/normalize-languages/src/rust.rs:160` — `extract_imports` uses `find('}')` which finds the **first** `}`, corrupting nested group imports like `use std::{io::{Read, Write}, fs}` — use brace-depth counter _(severity: high)_
-- [APPROVED] `crates/normalize-architecture/src/lib.rs:448-477` — `find_cycles_dfs` is recursive with no depth limit; large codebases with long import chains will stack-overflow — convert to iterative DFS as other graph algorithms do _(severity: high)_
-- [APPROVED] `crates/normalize-facts/src/index.rs:2299-2306` — `find_like` caps `parts` to 4 AFTER constructing SQL conditions for all parts; when len > 4 the WHERE clause references `?1..?N` but only 4 params are bound → libsql panic or mis-bind — cap `parts` before building `conditions` _(severity: high)_
-- [APPROVED] `crates/normalize-facts-rules-builtins/src/lib.rs:27-43` — `run()` and `run_rule()` are `#[sabi_extern_fn]` (FFI) but do not call `catch_unwind`; the `rule_pack.rs` doc explicitly requires this — wrap in `std::panic::catch_unwind` _(severity: high)_
-- [APPROVED] `crates/normalize-graph/src/lib.rs:~1023` — private `truncate_path` copy uses the old byte-slice version (`&path[path.len() - (max_len - 3)..]`) that panics on multi-byte UTF-8; the fixed version is in `normalize-analyze` — call `normalize_analyze::truncate_path` instead _(severity: high)_
+- [DONE] `crates/normalize-path-resolve/src/lib.rs:128-145` — `resolve_unified` alias expansion can cycle (a→b→a) causing unbounded recursion/stack overflow — add `depth: u8` limit _(severity: high)_
+- [DONE] `crates/normalize-languages/src/rust.rs:160` — `extract_imports` uses `find('}')` which finds the **first** `}`, corrupting nested group imports like `use std::{io::{Read, Write}, fs}` — use brace-depth counter _(severity: high)_
+- [DONE] `crates/normalize-architecture/src/lib.rs:448-477` — `find_cycles_dfs` is recursive with no depth limit; large codebases with long import chains will stack-overflow — convert to iterative DFS as other graph algorithms do _(severity: high)_
+- [DONE] `crates/normalize-facts/src/index.rs:2299-2306` — `find_like` caps `parts` to 4 AFTER constructing SQL conditions for all parts; when len > 4 the WHERE clause references `?1..?N` but only 4 params are bound → libsql panic or mis-bind — cap `parts` before building `conditions` _(severity: high)_
+- [DONE] `crates/normalize-facts-rules-builtins/src/lib.rs:27-43` — `run()` and `run_rule()` are `#[sabi_extern_fn]` (FFI) but do not call `catch_unwind`; the `rule_pack.rs` doc explicitly requires this — wrap in `std::panic::catch_unwind` _(severity: high)_
+- [DONE] `crates/normalize-graph/src/lib.rs:~1023` — private `truncate_path` copy uses the old byte-slice version (`&path[path.len() - (max_len - 3)..]`) that panics on multi-byte UTF-8; the fixed version is in `normalize-analyze` — call `normalize_analyze::truncate_path` instead _(severity: high)_
 
 ---
 
 ### adversarial (medium)
 
-- [APPROVED] `crates/normalize-rules/src/runner.rs:703,715` — `enable_disable` calls `.as_table_mut().unwrap()` on a newly inserted TOML value; panics when existing `rules` is an inline table, not a `[rules]` section — check for inline table, return `Err` _(severity: medium)_
-- [APPROVED] `crates/normalize-native-rules/src/stale_docs.rs:113,136` — `SystemTime::duration_since(UNIX_EPOCH).unwrap()` panics for pre-epoch mtimes (FAT, network FS, wrong VM clock) — use `.unwrap_or(0)` _(severity: medium)_
-- [APPROVED] `crates/normalize-rules/src/service.rs:279-307` — fix `--fix` loop has no iteration cap; a rule whose fix generates output that still matches the same rule runs forever — add max iteration limit (e.g. 100) _(severity: medium)_
-- [APPROVED] `crates/normalize-languages/src/registry.rs:22,234,249,320` — four `LANGUAGES.read/write().unwrap()` calls; a panicking writer poisons the lock and crashes all subsequent readers — use `unwrap_or_else(|e| e.into_inner())` _(severity: medium)_
+- [DONE] `crates/normalize-rules/src/runner.rs:703,715` — `enable_disable` calls `.as_table_mut().unwrap()` on a newly inserted TOML value; panics when existing `rules` is an inline table, not a `[rules]` section — check for inline table, return `Err` _(severity: medium)_
+- [DONE] `crates/normalize-native-rules/src/stale_docs.rs:113,136` — `SystemTime::duration_since(UNIX_EPOCH).unwrap()` panics for pre-epoch mtimes (FAT, network FS, wrong VM clock) — use `.unwrap_or(0)` _(severity: medium)_
+- [DONE] `crates/normalize-rules/src/service.rs:279-307` — fix `--fix` loop has no iteration cap; a rule whose fix generates output that still matches the same rule runs forever — add max iteration limit (e.g. 100) _(severity: medium)_
+- [DONE] `crates/normalize-languages/src/registry.rs:22,234,249,320` — four `LANGUAGES.read/write().unwrap()` calls; a panicking writer poisons the lock and crashes all subsequent readers — use `unwrap_or_else(|e| e.into_inner())` _(severity: medium)_
 
 ---
 
 ### adversarial (low)
 
-- [APPROVED] `crates/normalize-languages/src/svelte.rs:35-38`, `scss.rs:35`, `dart.rs:129` — `.chars().next().unwrap()` (already noted in R2, but three new sites in extract_imports) — use `if let Some(quote)` _(severity: low)_
-- [APPROVED] `crates/normalize-tools/src/custom.rs:111-154` — `Box::leak` in `CustomTool::new` called on every `registry_with_custom` invocation; repeated calls leak strings — cache the registry or use `Arc<str>` _(severity: low)_
+- [DONE] `crates/normalize-languages/src/svelte.rs:35-38`, `scss.rs:35`, `dart.rs:129` — `.chars().next().unwrap()` (already noted in R2, but three new sites in extract_imports) — use `if let Some(quote)` _(severity: low)_
+- [DONE] `crates/normalize-tools/src/custom.rs:111-154` — `Box::leak` in `CustomTool::new` called on every `registry_with_custom` invocation; repeated calls leak strings — cache the registry or use `Arc<str>` _(severity: low)_
 
 ---
 
 ### api-clarity + naming-consistency (high)
 
-- [APPROVED] `crates/normalize-rules/src/runner.rs:1638` — `sha256_hex` uses `DefaultHasher` (64-bit non-cryptographic), not SHA-256; the lock file field is named `sha256` — rename to `content_hash` to avoid the lie _(severity: high)_
-- [APPROVED] `crates/normalize-rules/src/runner.rs:1067-1161` — `global_allow` patterns applied to syntax/fact rules but NOT to native-rule issues; users who set `global_allow = ["**/vendor/**"]` expect it to suppress all engines — apply filtering in `apply_native_rules_config` _(severity: high)_
-- [APPROVED] `crates/normalize-rules/src/service.rs:688-728` — `load_rules_config` uses either global OR project `rules` map (not a merge); any non-empty project config silently drops all global per-rule overrides — use `global.merge(project)` _(severity: high)_
+- [DONE] `crates/normalize-rules/src/runner.rs:1638` — `sha256_hex` uses `DefaultHasher` (64-bit non-cryptographic), not SHA-256; the lock file field is named `sha256` — rename to `content_hash` to avoid the lie _(severity: high)_
+- [DONE] `crates/normalize-rules/src/runner.rs:1067-1161` — `global_allow` patterns applied to syntax/fact rules but NOT to native-rule issues; users who set `global_allow = ["**/vendor/**"]` expect it to suppress all engines — apply filtering in `apply_native_rules_config` _(severity: high)_
+- [DONE] `crates/normalize-rules/src/service.rs:688-728` — `load_rules_config` uses either global OR project `rules` map (not a merge); any non-empty project config silently drops all global per-rule overrides — use `global.merge(project)` _(severity: high)_
 
 ---
 
 ### api-clarity + naming-consistency (medium)
 
-- [APPROVED] `crates/normalize-rules/src/service.rs:681` — `validate()` returns `Err(report.format_text())` on invalid config, discarding structured `RulesValidateReport` — return `Ok(report)` and let callers check `report.valid` _(severity: medium)_
-- [APPROVED] `crates/normalize-rules/src/runner.rs:1154` — `RuleType::All` silently excludes SARIF tools from `run_rules_report`; CLI help implies `all` includes all engines — document or include SARIF in `All` _(severity: medium)_
-- [APPROVED] `crates/normalize-rules/src/runner.rs:1027-1065` — `Hint` severity accepted by native-rule config but silently dropped by `normalize_rules_config::Severity::from_str` for syntax/fact rules — add `Hint` to `Severity` enum or validate and error _(severity: medium)_
-- [APPROVED] `crates/normalize-graph/src/lib.rs:920` — `analyze_graph_data(limit=0)` truncates all result Vecs to empty while stats counts retain pre-truncation values; produces reports saying "42 diamonds" with empty `diamonds` list — document that `0` = no limit or treat it as `usize::MAX` _(severity: medium)_
-- [APPROVED] `crates/normalize-facts/src/index.rs:911-952` — `index_file_symbols` takes `calls: &[(String, String, usize)]` (no qualifier) while `reindex_files` uses the richer 4-tuple; qualifier data is silently dropped for calls indexed via public API — add qualifier to the public tuple _(severity: medium)_
-- [APPROVED] `crates/normalize-facts/src/index.rs:1279-1299` — `all_imports()` converts NULL module to `""` silently; callers cannot distinguish "empty module string" from "module was NULL" — return `Option<String>` _(severity: medium)_
-- [APPROVED] `crates/normalize-facts-rules-api/src/relations.rs:44-51` — `ImportFact.to_module` holds raw unresolved specifier in some languages and "" in others; ambiguous between logical name and file path — rename to `module_specifier`, document contract _(severity: medium)_
-- [APPROVED] `crates/normalize-session-analysis/src/lib.rs:111-132` — `ModelPricing::from_model_str` maps all `sonnet-*` to `SONNET_4_5` pricing; claude-sonnet-3-5 sessions get wrong price — add per-version constants _(severity: medium)_
-- [APPROVED] `crates/normalize-session-analysis/src/lib.rs:354-384` — `SessionAnalysis` is both data model and report; workspace convention is `*Report` for service return types — rename to `SessionAnalysisReport` _(severity: medium)_
-- [APPROVED] `crates/normalize-output/src/diagnostics.rs:107-108` — `DiagnosticsReport::merge()` uses `max(files_checked)` not sum; merging two 100-file reports claims 100 checked — use sum _(severity: medium)_
-- [APPROVED] `crates/normalize-tools/src/adapters/eslint.rs:184` — `fix()` swallows JSON parse failure with `.unwrap_or_default()` while `run()` returns `Err(ToolError::ParseError)` for same — return `Err` consistently _(severity: medium)_
-- [APPROVED] `crates/normalize-tools/src/adapters/eslint.rs:193` — `fix()` hardcodes remaining diagnostics to `Warning`; `run()` maps severity properly — apply same mapping _(severity: medium)_
-- [APPROVED] `crates/normalize-tools/src/adapters/ruff.rs:213` — same as eslint: `fix()` hardcodes `Warning` — apply same mapping as `run()` _(severity: medium)_
-- [APPROVED] `crates/normalize-tools/src/tools.rs:178,227` — `find_js_tool`/`find_python_tool` check `node_modules/.bin` and `.venv/bin` relative to CWD, not `root` — add `root: &Path` parameter _(severity: medium)_
-- [APPROVED] `crates/normalize-shadow/src/lib.rs:829-848,982-998,670-685` — `redo()`, `goto()`, `undo()` discard git add/commit errors with `let _ = ...`, returning success even when shadow history write fails — propagate as `ShadowError::Commit` _(severity: medium)_
-- [APPROVED] `crates/normalize-tools/src/diagnostic.rs:7-18` vs `crates/normalize-output/src/diagnostics.rs:15-20` — parallel `DiagnosticSeverity` and `Severity` enums with identical variants; forces conversion at boundaries — unify on one enum _(severity: medium)_
-- [APPROVED] `crates/normalize/src/service/tools.rs:86-120` — lint `--fix` rewrites files in-place with no `--dry-run` option; CLAUDE.md requires `--dry-run` for all mutating commands _(severity: medium)_
-- [APPROVED] `crates/normalize/src/service/analyze.rs:304-315` — `security` method takes `_target: Option<String>` but ignores it; users who pass a target get whole-project analysis silently — plumb or remove the param _(severity: medium)_
-- [APPROVED] `crates/normalize-languages/src/svelte.rs:73-80` — `get_visibility` uses text scan (`contains("export ")`) instead of child node inspection, unlike every other language; false positives on string literals — walk child nodes for export keyword _(severity: medium)_
-- [APPROVED] `crates/normalize-languages/src/dart.rs:149` — `show`/`hide` imports marked `is_wildcard = true`; these are named imports, not wildcards; semantically wrong — set `is_wildcard = false`, populate `names` from `show` clause _(severity: medium)_
-- [APPROVED] `crates/normalize-languages/src/ecmascript.rs:278,290-295` — namespace import (`import * as ns`) sets `is_wildcard: false` and pushes `"* as ns"` into `names`, producing invalid `{ * as ns }` in `format_import` — set `is_wildcard: true`, `alias = Some("ns")` _(severity: medium)_
-- [APPROVED] `crates/normalize/src/service/analyze.rs:219-771` — none of the 16 `pub` methods in `AnalyzeService` have `Examples:` doc sections; all other services do — add examples _(severity: medium)_
-- [APPROVED] `crates/normalize-facts/src/index.rs:2055-2057,2213-2215,2254-2255` — `resolve_all_imports/calls().await.ok()` silently discards resolution errors — log at warn level _(severity: medium)_
-- [APPROVED] `crates/normalize-languages/src/registry.rs:394-463` — `validate_unused_kinds_audit` creates `used_kinds: HashSet<&str>` but never populates it; the check is permanently a no-op — populate or remove _(severity: medium)_
-- [APPROVED] `crates/normalize-path-resolve/src/lib.rs:385-425` — `resolve()` silently strips the symbol component from colon-paths (`src/main.py:MyClass` → only file returned) without documenting this truncation _(severity: medium)_
-- [APPROVED] `crates/normalize-path-resolve/src/lib.rs:38-47` — `find_like` returns `Option<Vec<(String, bool)>>` while `all_files` returns `Option<Vec<PathEntry>>`; same concept, different shapes — unify to return `Vec<PathEntry>` _(severity: medium)_
-- [APPROVED] `crates/normalize-languages/src/external_packages.rs:84-94` — `Version::parse("1.2.3")` silently discards patch, returning `Version { major: 1, minor: 2 }` — document or reject 3-part versions _(severity: medium)_
-- [APPROVED] `crates/normalize-graph/src/lib.rs:879` — `longest_path_from` memo cache subtlety: results cached with one `visited` set may return shorter paths when reached from a different root — document the limitation _(severity: medium)_
+- [DONE] `crates/normalize-rules/src/service.rs:681` — `validate()` returns `Err(report.format_text())` on invalid config, discarding structured `RulesValidateReport` — return `Ok(report)` and let callers check `report.valid` _(severity: medium)_
+- [DONE] `crates/normalize-rules/src/runner.rs:1154` — `RuleType::All` silently excludes SARIF tools from `run_rules_report`; CLI help implies `all` includes all engines — document or include SARIF in `All` _(severity: medium)_
+- [DONE] `crates/normalize-rules/src/runner.rs:1027-1065` — `Hint` severity accepted by native-rule config but silently dropped by `normalize_rules_config::Severity::from_str` for syntax/fact rules — add `Hint` to `Severity` enum or validate and error _(severity: medium)_
+- [DONE] `crates/normalize-graph/src/lib.rs:920` — `analyze_graph_data(limit=0)` truncates all result Vecs to empty while stats counts retain pre-truncation values; produces reports saying "42 diamonds" with empty `diamonds` list — document that `0` = no limit or treat it as `usize::MAX` _(severity: medium)_
+- [DONE] `crates/normalize-facts/src/index.rs:911-952` — `index_file_symbols` takes `calls: &[(String, String, usize)]` (no qualifier) while `reindex_files` uses the richer 4-tuple; qualifier data is silently dropped for calls indexed via public API — add qualifier to the public tuple _(severity: medium)_
+- [DONE] `crates/normalize-facts/src/index.rs:1279-1299` — `all_imports()` converts NULL module to `""` silently; callers cannot distinguish "empty module string" from "module was NULL" — return `Option<String>` _(severity: medium)_
+- [DONE] `crates/normalize-facts-rules-api/src/relations.rs:44-51` — `ImportFact.to_module` holds raw unresolved specifier in some languages and "" in others; ambiguous between logical name and file path — rename to `module_specifier`, document contract _(severity: medium)_
+- [DONE] `crates/normalize-session-analysis/src/lib.rs:111-132` — `ModelPricing::from_model_str` maps all `sonnet-*` to `SONNET_4_5` pricing; claude-sonnet-3-5 sessions get wrong price — add per-version constants _(severity: medium)_
+- [DONE] `crates/normalize-session-analysis/src/lib.rs:354-384` — `SessionAnalysis` is both data model and report; workspace convention is `*Report` for service return types — rename to `SessionAnalysisReport` _(severity: medium)_
+- [DONE] `crates/normalize-output/src/diagnostics.rs:107-108` — `DiagnosticsReport::merge()` uses `max(files_checked)` not sum; merging two 100-file reports claims 100 checked — use sum _(severity: medium)_
+- [DONE] `crates/normalize-tools/src/adapters/eslint.rs:184` — `fix()` swallows JSON parse failure with `.unwrap_or_default()` while `run()` returns `Err(ToolError::ParseError)` for same — return `Err` consistently _(severity: medium)_
+- [DONE] `crates/normalize-tools/src/adapters/eslint.rs:193` — `fix()` hardcodes remaining diagnostics to `Warning`; `run()` maps severity properly — apply same mapping _(severity: medium)_
+- [DONE] `crates/normalize-tools/src/adapters/ruff.rs:213` — same as eslint: `fix()` hardcodes `Warning` — apply same mapping as `run()` _(severity: medium)_
+- [DONE] `crates/normalize-tools/src/tools.rs:178,227` — `find_js_tool`/`find_python_tool` check `node_modules/.bin` and `.venv/bin` relative to CWD, not `root` — add `root: &Path` parameter _(severity: medium)_
+- [DONE] `crates/normalize-shadow/src/lib.rs:829-848,982-998,670-685` — `redo()`, `goto()`, `undo()` discard git add/commit errors with `let _ = ...`, returning success even when shadow history write fails — propagate as `ShadowError::Commit` _(severity: medium)_
+- [DONE] `crates/normalize-tools/src/diagnostic.rs:7-18` vs `crates/normalize-output/src/diagnostics.rs:15-20` — parallel `DiagnosticSeverity` and `Severity` enums with identical variants; forces conversion at boundaries — unify on one enum _(severity: medium)_
+- [DONE] `crates/normalize/src/service/tools.rs:86-120` — lint `--fix` rewrites files in-place with no `--dry-run` option; CLAUDE.md requires `--dry-run` for all mutating commands _(severity: medium)_
+- [DONE] `crates/normalize/src/service/analyze.rs:304-315` — `security` method takes `_target: Option<String>` but ignores it; users who pass a target get whole-project analysis silently — plumb or remove the param _(severity: medium)_
+- [DONE] `crates/normalize-languages/src/svelte.rs:73-80` — `get_visibility` uses text scan (`contains("export ")`) instead of child node inspection, unlike every other language; false positives on string literals — walk child nodes for export keyword _(severity: medium)_
+- [DONE] `crates/normalize-languages/src/dart.rs:149` — `show`/`hide` imports marked `is_wildcard = true`; these are named imports, not wildcards; semantically wrong — set `is_wildcard = false`, populate `names` from `show` clause _(severity: medium)_
+- [DONE] `crates/normalize-languages/src/ecmascript.rs:278,290-295` — namespace import (`import * as ns`) sets `is_wildcard: false` and pushes `"* as ns"` into `names`, producing invalid `{ * as ns }` in `format_import` — set `is_wildcard: true`, `alias = Some("ns")` _(severity: medium)_
+- [DONE] `crates/normalize/src/service/analyze.rs:219-771` — none of the 16 `pub` methods in `AnalyzeService` have `Examples:` doc sections; all other services do — add examples _(severity: medium)_
+- [DONE] `crates/normalize-facts/src/index.rs:2055-2057,2213-2215,2254-2255` — `resolve_all_imports/calls().await.ok()` silently discards resolution errors — log at warn level _(severity: medium)_
+- [DONE] `crates/normalize-languages/src/registry.rs:394-463` — `validate_unused_kinds_audit` creates `used_kinds: HashSet<&str>` but never populates it; the check is permanently a no-op — populate or remove _(severity: medium)_
+- [DONE] `crates/normalize-path-resolve/src/lib.rs:385-425` — `resolve()` silently strips the symbol component from colon-paths (`src/main.py:MyClass` → only file returned) without documenting this truncation _(severity: medium)_
+- [DONE] `crates/normalize-path-resolve/src/lib.rs:38-47` — `find_like` returns `Option<Vec<(String, bool)>>` while `all_files` returns `Option<Vec<PathEntry>>`; same concept, different shapes — unify to return `Vec<PathEntry>` _(severity: medium)_
+- [DONE] `crates/normalize-languages/src/external_packages.rs:84-94` — `Version::parse("1.2.3")` silently discards patch, returning `Version { major: 1, minor: 2 }` — document or reject 3-part versions _(severity: medium)_
+- [DONE] `crates/normalize-graph/src/lib.rs:879` — `longest_path_from` memo cache subtlety: results cached with one `visited` set may return shorter paths when reached from a different root — document the limitation _(severity: medium)_
 
 ---
 
 ### error-surface (medium)
 
-- [APPROVED] `crates/normalize-facts/src/index.rs:851,873,895,905,1113-1114` etc. — i64→usize casts without bounds check; negative DB values silently wrap to `usize::MAX` — use `u64::try_from(n).unwrap_or(0)` pattern _(severity: medium)_
-- [APPROVED] `crates/normalize-facts/src/index.rs:394-413` — schema reset block uses `.ok()` on DELETE/ALTER TABLE; partial failure leaves DB in invalid state while version is written as valid — propagate errors _(severity: medium)_
+- [DONE] `crates/normalize-facts/src/index.rs:851,873,895,905,1113-1114` etc. — i64→usize casts without bounds check; negative DB values silently wrap to `usize::MAX` — use `u64::try_from(n).unwrap_or(0)` pattern _(severity: medium)_
+- [DONE] `crates/normalize-facts/src/index.rs:394-413` — schema reset block uses `.ok()` on DELETE/ALTER TABLE; partial failure leaves DB in invalid state while version is written as valid — propagate errors _(severity: medium)_
 
 ---
 
 ### doc-coverage (low)
 
-- [APPROVED] `crates/normalize-facts/src/index.rs:421-461` — SQL views `entry_points`, `external_deps`, `external_surface` created with no doc comments explaining their semantics _(severity: low)_
-- [APPROVED] `crates/normalize-graph/src/lib.rs:838` — `find_longest_chains` hardcodes minimum chain length 4; undocumented _(severity: low)_
-- [APPROVED] `crates/normalize-rules-config/src/lib.rs:77-99` — `RuleOverride::merge` doc doesn't explain practical impact of "cannot reset Vec to empty" _(severity: low)_
-- [APPROVED] `crates/normalize-native-rules/src/lib.rs:22-37` — `id` naming convention not documented (slash-namespace vs hyphen) _(severity: low)_
-- [APPROVED] `crates/normalize-path-resolve/src/lib.rs:23` — `PathEntry` doc claims returned by `find_like` but `find_like` still returns `(String, bool)` tuples — fix after unification _(severity: low)_
+- [DONE] `crates/normalize-facts/src/index.rs:421-461` — SQL views `entry_points`, `external_deps`, `external_surface` created with no doc comments explaining their semantics _(severity: low)_
+- [DONE] `crates/normalize-graph/src/lib.rs:838` — `find_longest_chains` hardcodes minimum chain length 4; undocumented _(severity: low)_
+- [DONE] `crates/normalize-rules-config/src/lib.rs:77-99` — `RuleOverride::merge` doc doesn't explain practical impact of "cannot reset Vec to empty" _(severity: low)_
+- [DONE] `crates/normalize-native-rules/src/lib.rs:22-37` — `id` naming convention not documented (slash-namespace vs hyphen) _(severity: low)_
+- [DONE] `crates/normalize-path-resolve/src/lib.rs:23` — `PathEntry` doc claims returned by `find_like` but `find_like` still returns `(String, bool)` tuples — fix after unification _(severity: low)_
