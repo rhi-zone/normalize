@@ -141,8 +141,14 @@ pub trait Tool: Send + Sync {
     }
 
     /// Run the tool in fix mode (if supported).
+    ///
+    /// The default implementation delegates to [`Tool::run`], so callers always
+    /// get a result even when the tool does not implement a dedicated fix mode.
+    /// This is intentional: a tool that reports but cannot auto-fix is still
+    /// useful in fix-mode invocations (diagnostics are returned unchanged).
+    /// Override this method — and return `true` from [`Tool::can_fix`] — to
+    /// enable actual auto-fixing.
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        // Default: just run without fixing
         self.run(paths, root)
     }
 }
@@ -165,12 +171,15 @@ pub struct ToolInvocation {
 
 /// Find a JS ecosystem tool (local installs only, no remote downloads).
 ///
+/// The `root` parameter is used as the base directory for local install
+/// detection (e.g., `root/node_modules/.bin/` for JS tools).
+///
 /// Tries in order:
-/// 1. node_modules/.bin/ under `root` (local install)
+/// 1. `root/node_modules/.bin/` (local install)
 /// 2. pnpm exec (local install via pnpm)
 /// 3. global install
 ///
-/// Returns (command, base_args) or None if not found.
+/// Returns a [`ToolInvocation`] or `None` if not found.
 pub fn find_js_tool(
     bin_name: &str,
     _pkg_name: Option<&str>,
@@ -219,12 +228,15 @@ pub fn find_js_tool(
 
 /// Find a Python ecosystem tool (local installs only, no remote downloads).
 ///
+/// The `root` parameter is used as the base directory for local install
+/// detection (e.g., `root/.venv/bin/` for Python tools).
+///
 /// Tries in order:
-/// 1. .venv/bin/ under `root` (local virtualenv)
+/// 1. `root/.venv/bin/` (local virtualenv)
 /// 2. uv run (if in a uv project with local deps)
 /// 3. global install
 ///
-/// Returns (command, base_args) or None if not found.
+/// Returns a [`ToolInvocation`] or `None` if not found.
 pub fn find_python_tool(tool: &str, root: &Path) -> Option<ToolInvocation> {
     use std::process::Command;
 

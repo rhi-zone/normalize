@@ -51,10 +51,15 @@ pub struct TokenStats {
 /// Model pricing information (per million tokens).
 #[derive(Debug, Clone, Copy)]
 pub struct ModelPricing {
+    /// Human-readable model name (e.g. `"Claude Sonnet 4.5"`).
     pub name: &'static str,
+    /// Cost in USD per million input tokens.
     pub input_per_mtok: f64,
+    /// Cost in USD per million output tokens.
     pub output_per_mtok: f64,
+    /// Cost in USD per million tokens written to the prompt cache.
     pub cache_write_per_mtok: f64,
+    /// Cost in USD per million tokens read from the prompt cache.
     pub cache_read_per_mtok: f64,
 }
 
@@ -132,7 +137,12 @@ impl ModelPricing {
         cache_read_per_mtok: 0.03,
     };
 
-    /// Look up pricing from a model identifier string (e.g. "claude-opus-4-6").
+    /// Look up pricing from a model identifier string (e.g. `"claude-opus-4-6"`).
+    ///
+    /// Matching is case-insensitive and uses substring search on the model
+    /// identifier. The family (`opus`, `sonnet`, `haiku`) is detected first,
+    /// then the version number within that family. Returns `None` for unknown
+    /// model identifiers.
     pub fn from_model_str(model: &str) -> Option<&'static ModelPricing> {
         let m = model.to_lowercase();
         if m.contains("opus") {

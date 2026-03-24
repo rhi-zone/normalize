@@ -259,7 +259,9 @@ impl RulesService {
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
         self.resolve_format(pretty, compact);
         self.sarif.set(sarif);
-        self.limit.set(limit.unwrap_or(50));
+        // Cap limit to prevent accidental OOM from huge values (e.g. usize::MAX).
+        let limit = limit.unwrap_or(50).min(10_000);
+        self.limit.set(limit);
         let config = load_rules_config(&effective_root);
         let rule_type: RuleType = r#type
             .as_deref()

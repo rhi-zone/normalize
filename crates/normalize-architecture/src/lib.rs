@@ -484,7 +484,15 @@ pub fn find_cycles(graph: &HashMap<String, HashSet<String>>) -> Vec<Cycle> {
 // ── Longest chain detection ───────────────────────────────────────────────────
 
 /// Find the longest import chains (dependency paths) in the graph.
-/// Uses DFS to find the longest path from each node, avoiding cycles.
+///
+/// Returns up to 5 chains (hard-coded limit), sorted by depth (longest first).
+/// Only chains with more than 3 nodes (depth > 3) are included.
+///
+/// Chains dominated by a suffix of a longer chain are removed: if chain B's
+/// modules are a suffix of chain A's modules, B is dropped. This keeps the
+/// result set non-redundant — each returned chain represents a unique root.
+///
+/// Uses DFS from each node with memoization to find the longest path, avoiding cycles.
 pub fn find_longest_chains(graph: &HashMap<String, HashSet<String>>) -> Vec<ImportChain> {
     let mut longest_paths: Vec<ImportChain> = Vec::new();
     let mut memo: HashMap<String, Vec<String>> = HashMap::new();
@@ -520,6 +528,16 @@ pub fn find_longest_chains(graph: &HashMap<String, HashSet<String>>) -> Vec<Impo
 }
 
 /// Find the longest path from a node using DFS with memoization.
+///
+/// # Memoization limitation
+///
+/// Results are cached keyed only by `node`. When the same node is reached from
+/// two different roots the first cached result is reused, even though the
+/// `visited` set differs between the two calls. This means the cached result
+/// may be shorter than what would be computed from a different root (because
+/// some successors were marked visited in the first traversal). The trade-off
+/// is acceptable: the memo avoids O(n²) worst-case work and the goal is
+/// finding representative longest paths, not an exhaustive enumeration.
 fn longest_path_from(
     node: &str,
     graph: &HashMap<String, HashSet<String>>,

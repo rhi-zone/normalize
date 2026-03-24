@@ -44,10 +44,19 @@ pub struct SymbolFact {
 pub struct ImportFact {
     /// File containing the import
     pub from_file: RString,
-    /// Raw module specifier as written in the source (e.g. `"../foo"`, `"std::collections"`).
-    /// This is NOT a resolved file path — some languages populate this with the literal
-    /// import string; others leave it empty (`""`) when no module path is present in the
-    /// import syntax. Resolved file paths are stored separately in the index.
+    /// Raw module specifier as written in the source.
+    ///
+    /// The value depends on the language and import style:
+    ///
+    /// - **Relative or absolute file path** — e.g. `"../foo"`, `"./utils"` (JS/TS, Python
+    ///   relative imports). The path is as written in source, not resolved to an absolute path.
+    /// - **Module name** — e.g. `"os"` (Python stdlib), `"std::collections"` (Rust), `"fmt"`
+    ///   (Go). These are not file paths and cannot be resolved without a module resolver.
+    /// - **Empty string `""`** — when the grammar does not expose a module path for the
+    ///   import, or for star imports that name no explicit module (e.g. some wildcard import
+    ///   syntaxes). Callers should treat `""` as "module not known".
+    ///
+    /// Resolved file paths (when available) are stored separately in the index, not here.
     pub module_specifier: RString,
     /// Name being imported (or "*" for wildcard)
     pub name: RString,

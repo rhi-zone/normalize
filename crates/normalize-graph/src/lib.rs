@@ -844,7 +844,16 @@ pub fn count_transitive_edges(imports: &HashMap<String, HashSet<String>>) -> usi
 }
 
 /// Find the longest import chains (dependency paths) in the graph.
-/// Uses DFS to find the longest path from each node, avoiding cycles.
+///
+/// Returns up to `limit` chains sorted by depth (longest first). When `limit`
+/// is `0` all qualifying chains are returned. Only chains whose node count meets
+/// [`MIN_CHAIN_NODE_COUNT`] are included.
+///
+/// Chains dominated by a suffix of a longer chain are removed: if chain B's
+/// modules are a suffix of chain A's modules, B is dropped. This keeps the
+/// result set non-redundant — each returned chain represents a unique root.
+///
+/// Uses DFS from each node with memoization to find the longest path, avoiding cycles.
 pub fn find_longest_chains(
     graph: &HashMap<String, HashSet<String>>,
     limit: usize,

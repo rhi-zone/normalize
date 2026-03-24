@@ -15,7 +15,11 @@ use std::path::{Path, PathBuf};
 // Report types
 // ---------------------------------------------------------------------------
 
-/// Result of a single measurement.
+/// Result of a single measurement run.
+///
+/// Holds the current measured value for one metric at one path. This is the
+/// output of `ratchet measure` and represents a snapshot of the current working
+/// tree — it does not compare against any baseline.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct MeasureReport {
     /// Relative path (or symbol address) that was measured.
@@ -40,6 +44,11 @@ impl OutputFormatter for MeasureReport {
 }
 
 /// Result of `ratchet check`.
+///
+/// Compares current measured values against a pinned baseline. Each entry
+/// records whether the metric regressed, improved, or stayed unchanged relative
+/// to the baseline. The summary counts (`regressions`, `improvements`,
+/// `unchanged`) reflect totals across all checked entries.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct CheckReport {
     /// All checked entries with their current vs baseline values.

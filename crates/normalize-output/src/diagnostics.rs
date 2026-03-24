@@ -112,9 +112,9 @@ impl Issue {
     }
 }
 
-/// An error from a SARIF tool that failed to run or produce valid output.
+/// A record of a tool that failed to run or produce valid output.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-pub struct ToolError {
+pub struct ToolFailure {
     /// Name of the tool that failed.
     pub tool: String,
     /// Human-readable error message.
@@ -130,7 +130,7 @@ pub struct DiagnosticsReport {
     pub sources_run: Vec<String>,
     /// Errors from tools that failed to run or produce valid output.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub tool_errors: Vec<ToolError>,
+    pub tool_errors: Vec<ToolFailure>,
 }
 
 impl DiagnosticsReport {
@@ -145,6 +145,10 @@ impl DiagnosticsReport {
     }
 
     /// Merge another report into this one.
+    ///
+    /// `files_checked` is summed (not maxed) across both reports. Issues from
+    /// `other` are appended to `self.issues`. Sources are union-merged (no
+    /// duplicates). Tool errors are appended.
     pub fn merge(&mut self, other: DiagnosticsReport) {
         self.files_checked += other.files_checked;
         self.issues.extend(other.issues);
@@ -702,11 +706,11 @@ mod tests {
             files_checked: 0,
             sources_run: vec!["sarif".into()],
             tool_errors: vec![
-                ToolError {
+                ToolFailure {
                     tool: "eslint".into(),
                     message: "failed to run: No such file or directory".into(),
                 },
-                ToolError {
+                ToolFailure {
                     tool: "clippy-sarif".into(),
                     message: "did not emit valid JSON: expected value at line 1".into(),
                 },
@@ -724,7 +728,7 @@ mod tests {
             issues: vec![],
             files_checked: 0,
             sources_run: vec![],
-            tool_errors: vec![ToolError {
+            tool_errors: vec![ToolFailure {
                 tool: "tool-a".into(),
                 message: "error a".into(),
             }],
@@ -733,7 +737,7 @@ mod tests {
             issues: vec![],
             files_checked: 0,
             sources_run: vec![],
-            tool_errors: vec![ToolError {
+            tool_errors: vec![ToolFailure {
                 tool: "tool-b".into(),
                 message: "error b".into(),
             }],
