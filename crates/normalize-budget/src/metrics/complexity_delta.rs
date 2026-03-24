@@ -1,7 +1,7 @@
 //! Complexity delta diff metric.
 
-use super::DiffMetric;
 use super::functions::{create_worktree, remove_worktree};
+use super::{DiffMeasurement, DiffMetric};
 use normalize_languages::{Language, support_for_path};
 use std::collections::HashMap;
 use std::path::Path;
@@ -9,7 +9,8 @@ use std::path::Path;
 /// Complexity increase/decrease per function.
 ///
 /// Compares complexity output at `base_ref` vs the working tree.
-/// Returns `(file/Parent/fn, increase, decrease)` for each function whose complexity changed.
+/// Returns measurements with `(file/Parent/fn, increase, decrease)` for each function
+/// whose complexity changed.
 pub struct ComplexityDeltaMetric;
 
 impl DiffMetric for ComplexityDeltaMetric {
@@ -17,10 +18,10 @@ impl DiffMetric for ComplexityDeltaMetric {
         "complexity-delta"
     }
 
-    fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<(String, f64, f64)>> {
+    fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<DiffMeasurement>> {
         let worktree_path = create_worktree(root, base_ref)?;
         let base_map = collect_complexity(root, &worktree_path);
-        remove_worktree(root, &worktree_path);
+        remove_worktree(root, &worktree_path)?;
 
         let current_map = collect_complexity(root, root);
 
@@ -29,19 +30,35 @@ impl DiffMetric for ComplexityDeltaMetric {
             if let Some(&base_val) = base_map.get(key) {
                 let delta = *current_val - base_val;
                 if delta > 0.0 {
-                    results.push((key.clone(), delta, 0.0));
+                    results.push(DiffMeasurement {
+                        key: key.clone(),
+                        added: delta,
+                        removed: 0.0,
+                    });
                 } else if delta < 0.0 {
-                    results.push((key.clone(), 0.0, -delta));
+                    results.push(DiffMeasurement {
+                        key: key.clone(),
+                        added: 0.0,
+                        removed: -delta,
+                    });
                 }
             } else {
                 // New function — count its full complexity as added
-                results.push((key.clone(), *current_val, 0.0));
+                results.push(DiffMeasurement {
+                    key: key.clone(),
+                    added: *current_val,
+                    removed: 0.0,
+                });
             }
         }
         // Functions removed from base
         for (key, base_val) in &base_map {
             if !current_map.contains_key(key) {
-                results.push((key.clone(), 0.0, *base_val));
+                results.push(DiffMeasurement {
+                    key: key.clone(),
+                    added: 0.0,
+                    removed: *base_val,
+                });
             }
         }
 
@@ -151,7 +168,11 @@ fn analyze_file_complexity(
         }
         let ti = &tag_infos[i];
 
-        let fn_node = find_node_by_range(root_node, ti.start_byte, ti.end_byte)?;
+        // Use `let Some` instead of `?` so a single missing node skips this function
+        // rather than aborting measurement for the entire file.
+        let Some(fn_node) = find_node_by_range(root_node, ti.start_byte, ti.end_byte) else {
+            continue;
+        };
 
         let parent_name: Option<String> = tag_infos
             .iter()

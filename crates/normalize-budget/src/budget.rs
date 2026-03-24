@@ -5,21 +5,32 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 /// Limits on change for a single budget entry.
+///
+/// All fields are optional; unset limits are not checked.
+/// Field names match the corresponding CLI flags (`--max-added`, etc.).
+///
+/// **Note:** The JSON field names changed in v2 (added→max_added, removed→max_removed,
+/// total→max_total, net→max_net). Old budget.json files using v1 field names must be
+/// migrated manually or regenerated with `normalize budget add`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct BudgetLimits {
-    /// Maximum number of items added.
-    pub added: Option<f64>,
-    /// Maximum number of items removed.
-    pub removed: Option<f64>,
-    /// Maximum total churn (added + removed).
-    pub total: Option<f64>,
-    /// Maximum net change (added − removed). Can be negative (requires shrinkage).
-    pub net: Option<f64>,
+    /// Maximum number of items added before a violation is raised.
+    pub max_added: Option<f64>,
+    /// Maximum number of items removed before a violation is raised.
+    pub max_removed: Option<f64>,
+    /// Maximum total churn (added + removed) before a violation is raised.
+    pub max_total: Option<f64>,
+    /// Maximum net change (added − removed). Can be negative to require shrinkage.
+    pub max_net: Option<f64>,
 }
 
 impl BudgetLimits {
+    /// Returns true if no limits are configured.
     pub fn is_empty(&self) -> bool {
-        self.added.is_none() && self.removed.is_none() && self.total.is_none() && self.net.is_none()
+        self.max_added.is_none()
+            && self.max_removed.is_none()
+            && self.max_total.is_none()
+            && self.max_net.is_none()
     }
 }
 
@@ -42,7 +53,9 @@ pub struct BudgetEntry {
 /// The full budget file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BudgetFile {
+    /// Schema version. Currently 1.
     pub version: u32,
+    /// All tracked budget entries.
     pub entries: Vec<BudgetEntry>,
 }
 
@@ -76,7 +89,8 @@ pub fn load_budget(root: &Path) -> anyhow::Result<BudgetFile> {
 pub fn save_budget(root: &Path, file: &BudgetFile) -> anyhow::Result<()> {
     let path = budget_path(root);
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| anyhow::anyhow!("failed to create directory {}: {e}", parent.display()))?;
     }
     let json = serde_json::to_string_pretty(file)?;
     std::fs::write(&path, json + "\n")
@@ -96,12 +110,12 @@ pub struct BudgetConfig {
 }
 
 impl BudgetConfig {
-    pub fn effective_ref(&self) -> String {
-        self.default_ref
-            .clone()
-            .unwrap_or_else(|| "HEAD".to_string())
+    /// Returns `default_ref` if set, otherwise `"HEAD"`.
+    pub fn effective_ref(&self) -> &str {
+        self.default_ref.as_deref().unwrap_or("HEAD")
     }
 
+    /// Returns `default_aggregate` if set, otherwise `Sum`.
     pub fn effective_aggregate(&self) -> Aggregate {
         self.default_aggregate.unwrap_or(Aggregate::Sum)
     }

@@ -8,7 +8,6 @@ use normalize_metrics::Aggregate;
 use normalize_output::OutputFormatter;
 use serde::Serialize;
 use server_less::cli;
-use std::cell::Cell;
 use std::path::{Path, PathBuf};
 
 // ---------------------------------------------------------------------------
@@ -17,20 +16,25 @@ use std::path::{Path, PathBuf};
 
 /// Result of `budget measure` — current diff stats for a path+metric.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
-pub struct MeasureResult {
+pub struct MeasureReport {
     pub path: String,
     pub metric: String,
     pub aggregate: String,
     #[serde(rename = "ref")]
     pub base_ref: String,
+    /// Total items added (in the aggregated result).
     pub added: f64,
+    /// Total items removed (in the aggregated result).
     pub removed: f64,
+    /// `added + removed` (total churn).
     pub total: f64,
+    /// `added − removed` (net growth; negative means net shrinkage).
     pub net: f64,
+    /// Number of diff items matched before aggregation.
     pub item_count: usize,
 }
 
-impl OutputFormatter for MeasureResult {
+impl OutputFormatter for MeasureReport {
     fn format_text(&self) -> String {
         format!(
             "{}  metric={} aggregate={} ref={}\n  added={:.0} removed={:.0} total={:.0} net={:.0} ({} items)",
@@ -59,6 +63,7 @@ pub struct CheckEntry {
     pub removed: f64,
     pub total: f64,
     pub net: f64,
+    /// Human-readable descriptions of each limit that was exceeded.
     pub violations: Vec<String>,
 }
 
@@ -66,7 +71,9 @@ pub struct CheckEntry {
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct CheckReport {
     pub entries: Vec<CheckEntry>,
+    /// Total number of limit violations across all entries.
     pub violations: usize,
+    /// Number of entries with no violations.
     pub ok: usize,
 }
 
@@ -93,31 +100,45 @@ impl OutputFormatter for CheckReport {
 
 /// Result of `budget add`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
-pub struct AddResult {
+pub struct AddReport {
     pub path: String,
     pub metric: String,
+    /// True if the entry was created; false if it already existed.
     pub added: bool,
-    pub message: String,
 }
 
-impl OutputFormatter for AddResult {
+impl OutputFormatter for AddReport {
     fn format_text(&self) -> String {
-        self.message.clone()
+        if self.added {
+            format!("added budget entry: {}  metric={}", self.path, self.metric)
+        } else {
+            format!(
+                "budget entry already exists for {}/{}; use `budget update` to modify",
+                self.path, self.metric
+            )
+        }
     }
 }
 
 /// Result of `budget update`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
-pub struct UpdateResult {
+pub struct UpdateReport {
     pub path: String,
     pub metric: String,
+    /// True if the entry was found and modified.
     pub updated: bool,
-    pub message: String,
 }
 
-impl OutputFormatter for UpdateResult {
+impl OutputFormatter for UpdateReport {
     fn format_text(&self) -> String {
-        self.message.clone()
+        if self.updated {
+            format!(
+                "updated budget entry: {}  metric={}",
+                self.path, self.metric
+            )
+        } else {
+            "entry not found".to_string()
+        }
     }
 }
 
@@ -150,16 +171,16 @@ impl OutputFormatter for ShowReport {
                 e.path, e.metric, e.aggregate, e.base_ref
             ));
             let l = &e.limits;
-            if let Some(v) = l.added {
+            if let Some(v) = l.max_added {
                 out.push_str(&format!("    max_added: {v}\n"));
             }
-            if let Some(v) = l.removed {
+            if let Some(v) = l.max_removed {
                 out.push_str(&format!("    max_removed: {v}\n"));
             }
-            if let Some(v) = l.total {
+            if let Some(v) = l.max_total {
                 out.push_str(&format!("    max_total: {v}\n"));
             }
-            if let Some(v) = l.net {
+            if let Some(v) = l.max_net {
                 out.push_str(&format!("    max_net: {v}\n"));
             }
         }
@@ -169,16 +190,23 @@ impl OutputFormatter for ShowReport {
 
 /// Result of `budget remove`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
-pub struct RemoveResult {
+pub struct RemoveReport {
     pub path: String,
     pub metric: String,
+    /// True if the entry was found and removed.
     pub removed: bool,
-    pub message: String,
 }
 
-impl OutputFormatter for RemoveResult {
+impl OutputFormatter for RemoveReport {
     fn format_text(&self) -> String {
-        self.message.clone()
+        if self.removed {
+            format!(
+                "removed budget entry: {}  metric={}",
+                self.path, self.metric
+            )
+        } else {
+            format!("no entry found for {}  metric={}", self.path, self.metric)
+        }
     }
 }
 
@@ -188,34 +216,25 @@ impl OutputFormatter for RemoveResult {
 
 /// Budget sub-service: diff-based budget tracking.
 pub struct BudgetService {
-    pretty: Cell<bool>,
     diff_factory: DiffMetricFactory,
 }
 
 impl BudgetService {
-    pub fn new(pretty: &Cell<bool>) -> Self {
+    /// Create a service using the default diff metric registry.
+    pub fn new(_pretty: bool) -> Self {
         Self {
-            pretty: Cell::new(pretty.get()),
             diff_factory: default_diff_metrics,
         }
     }
 
-    pub fn with_factory(pretty: &Cell<bool>, factory: DiffMetricFactory) -> Self {
+    /// Create a service with a custom diff metric factory.
+    pub fn with_factory(_pretty: bool, factory: DiffMetricFactory) -> Self {
         Self {
-            pretty: Cell::new(pretty.get()),
             diff_factory: factory,
         }
     }
 
-    fn resolve_format(&self, pretty: bool, compact: bool) {
-        if pretty {
-            self.pretty.set(true);
-        } else if compact {
-            self.pretty.set(false);
-        }
-    }
-
-    fn display_measure(&self, r: &MeasureResult) -> String {
+    fn display_measure(&self, r: &MeasureReport) -> String {
         r.format_text()
     }
 
@@ -223,11 +242,11 @@ impl BudgetService {
         r.format_text()
     }
 
-    fn display_add(&self, r: &AddResult) -> String {
+    fn display_add(&self, r: &AddReport) -> String {
         r.format_text()
     }
 
-    fn display_update(&self, r: &UpdateResult) -> String {
+    fn display_update(&self, r: &UpdateReport) -> String {
         r.format_text()
     }
 
@@ -235,7 +254,7 @@ impl BudgetService {
         r.format_text()
     }
 
-    fn display_remove(&self, r: &RemoveResult) -> String {
+    fn display_remove(&self, r: &RemoveReport) -> String {
         r.format_text()
     }
 }
@@ -264,15 +283,18 @@ impl BudgetService {
             short = 'a',
             help = "Aggregation strategy (mean|median|max|min|sum|count)"
         )]
-        aggregate: Option<String>,
+        aggregate: Option<Aggregate>,
         pretty: bool,
         compact: bool,
-    ) -> Result<MeasureResult, String> {
-        let root = resolve_root(root);
-        self.resolve_format(pretty, compact);
+    ) -> Result<MeasureReport, String> {
+        let root = resolve_root(root)?;
+        let _ = (pretty, compact);
         let config = load_budget_config(&root);
-        let base_ref = base_ref.unwrap_or_else(|| config.effective_ref());
-        let agg = parse_aggregate(aggregate, &config)?;
+        let base_ref = base_ref
+            .as_deref()
+            .unwrap_or_else(|| config.effective_ref())
+            .to_string();
+        let agg = aggregate.unwrap_or_else(|| config.effective_aggregate());
         do_measure(&root, &path, &metric, &base_ref, agg, &self.diff_factory)
     }
 
@@ -285,25 +307,28 @@ impl BudgetService {
         #[param(short = 'm', help = "Diff metric to track")] metric: String,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
         #[param(help = "Git ref to diff against")] base_ref: Option<String>,
-        #[param(short = 'a', help = "Aggregation strategy")] aggregate: Option<String>,
+        #[param(short = 'a', help = "Aggregation strategy")] aggregate: Option<Aggregate>,
         #[param(help = "Maximum items added")] max_added: Option<f64>,
         #[param(help = "Maximum items removed")] max_removed: Option<f64>,
         #[param(help = "Maximum total churn (added + removed)")] max_total: Option<f64>,
         #[param(help = "Maximum net change (added - removed)")] max_net: Option<f64>,
         pretty: bool,
         compact: bool,
-    ) -> Result<AddResult, String> {
-        let root = resolve_root(root);
-        self.resolve_format(pretty, compact);
+    ) -> Result<AddReport, String> {
+        let root = resolve_root(root)?;
+        let _ = (pretty, compact);
         let config = load_budget_config(&root);
-        let base_ref = base_ref.unwrap_or_else(|| config.effective_ref());
-        let agg = parse_aggregate(aggregate, &config)?;
+        let base_ref = base_ref
+            .as_deref()
+            .unwrap_or_else(|| config.effective_ref())
+            .to_string();
+        let agg = aggregate.unwrap_or_else(|| config.effective_aggregate());
 
         let limits = BudgetLimits {
-            added: max_added,
-            removed: max_removed,
-            total: max_total,
-            net: max_net,
+            max_added,
+            max_removed,
+            max_total,
+            max_net,
         };
 
         if limits.is_empty() {
@@ -320,13 +345,10 @@ impl BudgetService {
             .iter()
             .any(|e| e.path == path && e.metric == metric)
         {
-            return Ok(AddResult {
-                path: path.clone(),
-                metric: metric.clone(),
+            return Ok(AddReport {
+                path,
+                metric,
                 added: false,
-                message: format!(
-                    "budget entry already exists for {path}/{metric}; use `budget update` to modify"
-                ),
             });
         }
 
@@ -340,11 +362,10 @@ impl BudgetService {
         budget.entries.push(entry);
         save_budget(&root, &budget).map_err(|e| e.to_string())?;
 
-        Ok(AddResult {
-            path: path.clone(),
-            metric: metric.clone(),
+        Ok(AddReport {
+            path,
+            metric,
             added: true,
-            message: format!("added budget entry: {path}  metric={metric}  ref={base_ref}"),
         })
     }
 
@@ -358,8 +379,8 @@ impl BudgetService {
         pretty: bool,
         compact: bool,
     ) -> Result<CheckReport, String> {
-        let root = resolve_root(root);
-        self.resolve_format(pretty, compact);
+        let root = resolve_root(root)?;
+        let _ = (pretty, compact);
         let budget = load_budget(&root).map_err(|e| e.to_string())?;
         let entries = filter_entries(&budget.entries, path.as_deref(), metric.as_deref());
 
@@ -437,9 +458,9 @@ impl BudgetService {
         #[param(help = "New maximum net change")] max_net: Option<f64>,
         pretty: bool,
         compact: bool,
-    ) -> Result<UpdateResult, String> {
-        let root = resolve_root(root);
-        self.resolve_format(pretty, compact);
+    ) -> Result<UpdateReport, String> {
+        let root = resolve_root(root)?;
+        let _ = (pretty, compact);
         let mut budget = load_budget(&root).map_err(|e| e.to_string())?;
 
         let entry = budget
@@ -448,31 +469,29 @@ impl BudgetService {
             .find(|e| e.path == path && e.metric == metric);
 
         match entry {
-            None => Ok(UpdateResult {
+            None => Ok(UpdateReport {
                 path,
                 metric,
                 updated: false,
-                message: "entry not found".to_string(),
             }),
             Some(e) => {
                 if max_added.is_some() {
-                    e.limits.added = max_added;
+                    e.limits.max_added = max_added;
                 }
                 if max_removed.is_some() {
-                    e.limits.removed = max_removed;
+                    e.limits.max_removed = max_removed;
                 }
                 if max_total.is_some() {
-                    e.limits.total = max_total;
+                    e.limits.max_total = max_total;
                 }
                 if max_net.is_some() {
-                    e.limits.net = max_net;
+                    e.limits.max_net = max_net;
                 }
                 save_budget(&root, &budget).map_err(|e| e.to_string())?;
-                Ok(UpdateResult {
-                    path: path.clone(),
-                    metric: metric.clone(),
+                Ok(UpdateReport {
+                    path,
+                    metric,
                     updated: true,
-                    message: format!("updated budget entry: {path}  metric={metric}"),
                 })
             }
         }
@@ -488,8 +507,8 @@ impl BudgetService {
         pretty: bool,
         compact: bool,
     ) -> Result<ShowReport, String> {
-        let root = resolve_root(root);
-        self.resolve_format(pretty, compact);
+        let root = resolve_root(root)?;
+        let _ = (pretty, compact);
         let budget = load_budget(&root).map_err(|e| e.to_string())?;
         let entries = filter_entries(&budget.entries, path.as_deref(), metric.as_deref());
 
@@ -518,9 +537,9 @@ impl BudgetService {
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
         pretty: bool,
         compact: bool,
-    ) -> Result<RemoveResult, String> {
-        let root = resolve_root(root);
-        self.resolve_format(pretty, compact);
+    ) -> Result<RemoveReport, String> {
+        let root = resolve_root(root)?;
+        let _ = (pretty, compact);
         let mut budget = load_budget(&root).map_err(|e| e.to_string())?;
 
         let len_before = budget.entries.len();
@@ -533,17 +552,10 @@ impl BudgetService {
             save_budget(&root, &budget).map_err(|e| e.to_string())?;
         }
 
-        let message = if removed {
-            format!("removed budget entry: {path}  metric={metric}")
-        } else {
-            format!("no entry found for {path}  metric={metric}")
-        };
-
-        Ok(RemoveResult {
+        Ok(RemoveReport {
             path,
             metric,
             removed,
-            message,
         })
     }
 }
@@ -552,9 +564,13 @@ impl BudgetService {
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn resolve_root(root: Option<String>) -> PathBuf {
-    root.map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+fn resolve_root(root: Option<String>) -> Result<PathBuf, String> {
+    match root {
+        Some(r) => Ok(PathBuf::from(r)),
+        None => {
+            std::env::current_dir().map_err(|e| format!("failed to get current directory: {e}"))
+        }
+    }
 }
 
 fn load_budget_config(root: &Path) -> BudgetConfig {
@@ -571,17 +587,16 @@ fn load_budget_config(root: &Path) -> BudgetConfig {
         #[serde(default)]
         budget: BudgetConfig,
     }
-    let wrapper: Wrapper = toml::from_str(&content).unwrap_or_default();
-    wrapper.budget
-}
-
-fn parse_aggregate(agg: Option<String>, config: &BudgetConfig) -> Result<Aggregate, String> {
-    match agg {
-        Some(s) => s.parse::<Aggregate>(),
-        None => Ok(config.effective_aggregate()),
+    match toml::from_str::<Wrapper>(&content) {
+        Ok(w) => w.budget,
+        Err(e) => {
+            eprintln!("warning: failed to parse budget config: {e}");
+            BudgetConfig::default()
+        }
     }
 }
 
+/// Measure current diff stats for a path prefix and metric, filtered and aggregated.
 pub(crate) fn do_measure(
     root: &Path,
     path: &str,
@@ -589,26 +604,35 @@ pub(crate) fn do_measure(
     base_ref: &str,
     agg: Aggregate,
     factory: &DiffMetricFactory,
-) -> Result<MeasureResult, String> {
+) -> Result<MeasureReport, String> {
     let metrics = factory();
     let m = metrics
         .iter()
         .find(|m| m.name() == metric)
         .ok_or_else(|| format!("unknown diff metric '{metric}'"))?;
 
-    let all = m.measure_diff(root, base_ref).map_err(|e| e.to_string())?;
+    let all = m
+        .measure_diff(root, base_ref)
+        .map_err(|e| format!("metric '{}' at '{}': {}", metric, root.display(), e))?;
 
     // Filter items whose key starts with path prefix
     let path_prefix = path.trim_end_matches('/');
     let filtered: Vec<(f64, f64)> = all
         .into_iter()
-        .filter(|(addr, _, _)| {
-            addr == path_prefix
-                || addr.starts_with(&format!("{path_prefix}/"))
-                || (path_prefix.ends_with('/') && addr.starts_with(path_prefix))
+        .filter(|item| {
+            item.key == path_prefix
+                || item.key.starts_with(&format!("{path_prefix}/"))
+                || (path_prefix.ends_with('/') && item.key.starts_with(path_prefix))
         })
-        .map(|(_, added, removed)| (added, removed))
+        .map(|item| (item.added, item.removed))
         .collect();
+
+    // Warn if a configured path prefix matched nothing — this often indicates a typo.
+    if filtered.is_empty() {
+        eprintln!(
+            "info: budget path prefix '{path}' matched no diff items for metric '{metric}' (ref={base_ref})"
+        );
+    }
 
     let item_count = filtered.len();
 
@@ -617,10 +641,21 @@ pub(crate) fn do_measure(
 
     let added = normalize_metrics::compute_aggregate(added_values, agg).unwrap_or(0.0);
     let removed = normalize_metrics::compute_aggregate(removed_values, agg).unwrap_or(0.0);
+
+    // Guard against NaN propagating into limit comparisons.
+    if !added.is_finite() || !removed.is_finite() {
+        return Err(format!(
+            "metric '{}' at '{}': computed non-finite value (added={added}, removed={removed}); \
+             check for NaN-producing aggregation inputs",
+            metric,
+            root.display()
+        ));
+    }
+
     let total = added + removed;
     let net = added - removed;
 
-    Ok(MeasureResult {
+    Ok(MeasureReport {
         path: path.to_string(),
         metric: metric.to_string(),
         aggregate: agg.to_string(),
@@ -645,9 +680,9 @@ fn filter_entries<'a>(
         .collect()
 }
 
-fn check_limits(result: &MeasureResult, limits: &BudgetLimits) -> Vec<String> {
+fn check_limits(result: &MeasureReport, limits: &BudgetLimits) -> Vec<String> {
     let mut violations = Vec::new();
-    if let Some(max) = limits.added
+    if let Some(max) = limits.max_added
         && result.added > max
     {
         violations.push(format!(
@@ -655,7 +690,7 @@ fn check_limits(result: &MeasureResult, limits: &BudgetLimits) -> Vec<String> {
             result.added
         ));
     }
-    if let Some(max) = limits.removed
+    if let Some(max) = limits.max_removed
         && result.removed > max
     {
         violations.push(format!(
@@ -663,7 +698,7 @@ fn check_limits(result: &MeasureResult, limits: &BudgetLimits) -> Vec<String> {
             result.removed
         ));
     }
-    if let Some(max) = limits.total
+    if let Some(max) = limits.max_total
         && result.total > max
     {
         violations.push(format!(
@@ -671,7 +706,7 @@ fn check_limits(result: &MeasureResult, limits: &BudgetLimits) -> Vec<String> {
             result.total
         ));
     }
-    if let Some(max) = limits.net
+    if let Some(max) = limits.max_net
         && result.net > max
     {
         violations.push(format!("net={:.0} exceeds max_net={max:.0}", result.net));
@@ -684,7 +719,7 @@ fn check_limits(result: &MeasureResult, limits: &BudgetLimits) -> Vec<String> {
 // ---------------------------------------------------------------------------
 
 /// Build a DiagnosticsReport from budget check for use in `normalize rules run`.
-pub fn build_budget_diagnostics(
+pub fn build_budget_report(
     root: &Path,
     factory: &DiffMetricFactory,
 ) -> normalize_output::diagnostics::DiagnosticsReport {
@@ -692,7 +727,27 @@ pub fn build_budget_diagnostics(
 
     let budget = match load_budget(root) {
         Ok(b) => b,
-        Err(_) => return DiagnosticsReport::new(),
+        Err(e) => {
+            // File-not-found returns default; only real errors reach here.
+            return DiagnosticsReport {
+                issues: vec![Issue {
+                    file: root.to_string_lossy().to_string(),
+                    line: None,
+                    column: None,
+                    end_line: None,
+                    end_column: None,
+                    rule_id: "budget/load".to_string(),
+                    message: format!("budget: failed to load budget file: {e}"),
+                    severity: Severity::Error,
+                    source: "budget".into(),
+                    related: vec![],
+                    suggestion: None,
+                }],
+                files_checked: 0,
+                sources_run: vec!["budget".into()],
+                tool_errors: vec![],
+            };
+        }
     };
 
     if budget.entries.is_empty() {
@@ -749,3 +804,7 @@ pub fn build_budget_diagnostics(
         tool_errors: vec![],
     }
 }
+
+// Keep the old name as an alias for backward compat with normalize-native-rules.
+#[doc(hidden)]
+pub use build_budget_report as build_budget_diagnostics;

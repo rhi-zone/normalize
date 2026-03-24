@@ -1,21 +1,21 @@
 //! TODO/FIXME comment diff metric.
 
-use super::DiffMetric;
+use super::{DiffMeasurement, DiffMetric};
 use std::path::Path;
 use std::process::Command;
 
 /// TODO/FIXME comments added or removed.
 ///
-/// Returns `(file_path, todos_added, todos_removed)` triples by counting
+/// Returns measurements with `(file_path, todos_added, todos_removed)` by counting
 /// lines matching `TODO` or `FIXME` in the diff output.
-pub struct TodosMetric;
+pub struct TodoDeltaMetric;
 
-impl DiffMetric for TodosMetric {
+impl DiffMetric for TodoDeltaMetric {
     fn name(&self) -> &'static str {
         "todos"
     }
 
-    fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<(String, f64, f64)>> {
+    fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<DiffMeasurement>> {
         let output = Command::new("git")
             .args(["diff", base_ref, "--"])
             .current_dir(root)
@@ -38,12 +38,12 @@ impl DiffMetric for TodosMetric {
             } else if line.starts_with("--- ") || line.starts_with("diff --git") {
                 // skip
             } else if line.starts_with('+') && !line.starts_with("+++") {
-                let content = &line[1..];
+                let content = line.get(1..).unwrap_or("");
                 if content.contains("TODO") || content.contains("FIXME") {
                     *file_added.entry(current_file.clone()).or_default() += 1.0;
                 }
             } else if line.starts_with('-') && !line.starts_with("---") {
-                let content = &line[1..];
+                let content = line.get(1..).unwrap_or("");
                 if content.contains("TODO") || content.contains("FIXME") {
                     *file_removed.entry(current_file.clone()).or_default() += 1.0;
                 }
@@ -60,7 +60,11 @@ impl DiffMetric for TodosMetric {
             .map(|f| {
                 let added = file_added.get(&f).copied().unwrap_or(0.0);
                 let removed = file_removed.get(&f).copied().unwrap_or(0.0);
-                (f, added, removed)
+                DiffMeasurement {
+                    key: f,
+                    added,
+                    removed,
+                }
             })
             .collect();
 

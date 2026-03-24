@@ -1,6 +1,6 @@
 //! Functions added/removed diff metric.
 
-use super::DiffMetric;
+use super::{DiffMeasurement, DiffMetric};
 use normalize_facts::Extractor;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -10,16 +10,16 @@ use std::process::Command;
 /// Functions/methods introduced or removed.
 ///
 /// Compares function symbol lists at `base_ref` vs the working tree.
-/// Returns `(file/Parent/fn, 1.0, 0.0)` for added functions and `(file/Parent/fn, 0.0, 1.0)`
+/// Returns a measurement with `added=1.0` for added functions and `removed=1.0`
 /// for removed functions.
-pub struct FunctionsMetric;
+pub struct FunctionDeltaMetric;
 
-impl DiffMetric for FunctionsMetric {
+impl DiffMetric for FunctionDeltaMetric {
     fn name(&self) -> &'static str {
         "functions"
     }
 
-    fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<(String, f64, f64)>> {
+    fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<DiffMeasurement>> {
         symbol_diff(root, base_ref, &["function", "method"])
     }
 }
@@ -43,11 +43,12 @@ pub(crate) fn create_worktree(root: &Path, base_ref: &str) -> anyhow::Result<std
         .trim()
         .to_string();
     let short = &hash[..7.min(hash.len())];
-    let worktree_name = format!("normalize-budget-wt-{short}");
+    // Include PID to avoid race conditions when multiple normalize processes run concurrently.
+    let worktree_name = format!("normalize-budget-wt-{}-{}", short, std::process::id());
     let worktree_path = std::env::temp_dir().join(&worktree_name);
     let worktree_str = worktree_path.to_string_lossy().to_string();
 
-    // Clean up any stale worktree
+    // Clean up any stale worktree (same PID, same hash — should not normally exist)
     if worktree_path.exists() {
         let _ = Command::new("git")
             .args(["worktree", "remove", &worktree_str, "--force"])
@@ -71,13 +72,21 @@ pub(crate) fn create_worktree(root: &Path, base_ref: &str) -> anyhow::Result<std
     Ok(worktree_path)
 }
 
-/// Remove a temporary git worktree (best-effort).
-pub(crate) fn remove_worktree(root: &Path, worktree_path: &Path) {
+/// Remove a temporary git worktree. Propagates errors on failure.
+pub(crate) fn remove_worktree(root: &Path, worktree_path: &Path) -> anyhow::Result<()> {
     let worktree_str = worktree_path.to_string_lossy().to_string();
-    let _ = Command::new("git")
+    let output = Command::new("git")
         .args(["worktree", "remove", &worktree_str, "--force"])
         .current_dir(root)
-        .output();
+        .output()
+        .map_err(|e| anyhow::anyhow!("failed to run git worktree remove: {e}"))?;
+    if !output.status.success() {
+        return Err(anyhow::anyhow!(
+            "git worktree remove failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(())
 }
 
 fn collect_symbols_for_kinds(scan_root: &Path, kinds: &[&str]) -> HashMap<String, ()> {
@@ -130,10 +139,10 @@ pub(crate) fn symbol_diff(
     root: &Path,
     base_ref: &str,
     kinds: &[&str],
-) -> anyhow::Result<Vec<(String, f64, f64)>> {
+) -> anyhow::Result<Vec<DiffMeasurement>> {
     let worktree_path = create_worktree(root, base_ref)?;
     let base_map = collect_symbols_for_kinds(&worktree_path, kinds);
-    remove_worktree(root, &worktree_path);
+    remove_worktree(root, &worktree_path)?;
 
     let current_map = collect_symbols_for_kinds(root, kinds);
 
@@ -142,10 +151,18 @@ pub(crate) fn symbol_diff(
 
     let mut results = Vec::new();
     for key in current_set.difference(&base_set) {
-        results.push(((*key).clone(), 1.0, 0.0));
+        results.push(DiffMeasurement {
+            key: (*key).clone(),
+            added: 1.0,
+            removed: 0.0,
+        });
     }
     for key in base_set.difference(&current_set) {
-        results.push(((*key).clone(), 0.0, 1.0));
+        results.push(DiffMeasurement {
+            key: (*key).clone(),
+            added: 0.0,
+            removed: 1.0,
+        });
     }
     Ok(results)
 }

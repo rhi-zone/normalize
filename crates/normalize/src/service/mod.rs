@@ -99,7 +99,7 @@ impl NormalizeService {
             generate: generate::GenerateService,
             package: package::PackageService::new(&pretty),
             rank: rank::RankService::new(&pretty),
-            budget: normalize_budget::service::BudgetService::new(&pretty),
+            budget: normalize_budget::service::BudgetService::new(false),
             ratchet: normalize_ratchet::service::RatchetService::new(&pretty),
             rules: normalize_rules::RulesService::new(&pretty),
             serve: serve::ServeService,

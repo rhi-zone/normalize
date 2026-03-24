@@ -1,6 +1,6 @@
 //! Native rule integration for the budget system.
 //!
-//! Delegates to `normalize_budget::service::build_budget_diagnostics`.
+//! Delegates to `normalize_budget::service::build_budget_report`.
 
 use normalize_output::diagnostics::DiagnosticsReport;
 use std::path::Path;
@@ -11,5 +11,5 @@ use std::path::Path;
 /// exists or all limits are within bounds.
 pub fn build_budget_report(root: &Path) -> DiagnosticsReport {
     let factory: normalize_budget::DiffMetricFactory = normalize_budget::default_diff_metrics;
-    normalize_budget::service::build_budget_diagnostics(root, &factory)
+    normalize_budget::service::build_budget_report(root, &factory)
 }
