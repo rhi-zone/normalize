@@ -225,8 +225,12 @@ mod tests {
         use normalize_rules::RuleShowReport;
         assert_output_formatter::<RuleShowReport>();
 
-        use crate::commands::tools::test::TestListReport;
+        use crate::commands::tools::test::{TestListReport, TestRunReport};
         assert_output_formatter::<TestListReport>();
+        assert_output_formatter::<TestRunReport>();
+
+        use crate::commands::tools::lint::LintRunReport;
+        assert_output_formatter::<LintRunReport>();
 
         use crate::service::sessions::PlansReport;
         assert_output_formatter::<PlansReport>();

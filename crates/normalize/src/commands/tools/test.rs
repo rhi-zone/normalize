@@ -64,7 +64,7 @@ pub struct RepoTestEntry {
 
 /// Test run result.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct TestRunResult {
+pub struct TestRunReport {
     pub runner: String,
     pub success: bool,
     pub exit_code: i32,
@@ -73,7 +73,7 @@ pub struct TestRunResult {
     pub repos: Option<Vec<RepoTestEntry>>,
 }
 
-impl OutputFormatter for TestRunResult {
+impl OutputFormatter for TestRunReport {
     fn format_text(&self) -> String {
         if let Some(repos) = &self.repos {
             if repos.is_empty() {
@@ -109,7 +109,7 @@ impl OutputFormatter for TestRunResult {
     }
 }
 
-impl std::fmt::Display for TestRunResult {
+impl std::fmt::Display for TestRunReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.format_text())
     }
@@ -138,7 +138,7 @@ pub fn build_test_run_multi(
     repos: &[PathBuf],
     runner: Option<&str>,
     args: &[String],
-) -> Result<TestRunResult, String> {
+) -> Result<TestRunReport, String> {
     let entries: Vec<RepoTestEntry> = repos
         .par_iter()
         .map(|repo_path| {
@@ -177,7 +177,7 @@ pub fn build_test_run_multi(
         .unwrap_or("multi")
         .to_string();
 
-    Ok(TestRunResult {
+    Ok(TestRunReport {
         runner: runner_name,
         success: all_passed,
         exit_code: if all_passed { 0 } else { 1 },
@@ -190,7 +190,7 @@ pub fn build_test_run(
     root: Option<&Path>,
     runner: Option<&str>,
     args: &[String],
-) -> Result<TestRunResult, String> {
+) -> Result<TestRunReport, String> {
     let root = root.unwrap_or_else(|| Path::new("."));
 
     let test_runner = if let Some(name) = runner {
@@ -212,7 +212,7 @@ pub fn build_test_run(
     match test_runner.run(root, &args_refs) {
         Ok(result) => {
             let exit_code = result.status.code().unwrap_or(1);
-            Ok(TestRunResult {
+            Ok(TestRunReport {
                 runner: runner_name,
                 success: result.success(),
                 exit_code: if result.success() { 0 } else { exit_code },

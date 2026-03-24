@@ -65,9 +65,9 @@ impl OutputFormatter for LintListReport {
                 status, tool.name, tool.category, ver
             )
             .unwrap();
-            writeln!(out, "    Extensions: {}", tool.extensions).unwrap();
-            writeln!(out, "    Website: {}", tool.website).unwrap();
-            writeln!(out).unwrap();
+            let _ = writeln!(out, "    Extensions: {}", tool.extensions);
+            let _ = writeln!(out, "    Website: {}", tool.website);
+            let _ = writeln!(out);
         }
         out
     }
@@ -219,9 +219,9 @@ impl OutputFormatter for LintRunReport {
                 return "No repositories found".to_string();
             }
             for repo in repos {
-                writeln!(out, "=== {} ===", repo.name).unwrap();
+                let _ = writeln!(out, "=== {} ===", repo.name);
                 if let Some(err) = &repo.error {
-                    writeln!(out, "Error: {}", err).unwrap();
+                    let _ = writeln!(out, "Error: {}", err);
                 } else {
                     for diag in &repo.diagnostics {
                         writeln!(
@@ -237,7 +237,7 @@ impl OutputFormatter for LintRunReport {
                         .unwrap();
                     }
                     if repo.error_count > 0 || repo.warning_count > 0 {
-                        writeln!(out).unwrap();
+                        let _ = writeln!(out);
                         writeln!(
                             out,
                             "Found {} error(s) and {} warning(s)",
@@ -246,7 +246,7 @@ impl OutputFormatter for LintRunReport {
                         .unwrap();
                     }
                 }
-                writeln!(out).unwrap();
+                let _ = writeln!(out);
             }
         } else {
             // Single-repo mode
@@ -259,7 +259,7 @@ impl OutputFormatter for LintRunReport {
                 .unwrap();
             }
             if self.error_count > 0 || self.warning_count > 0 {
-                writeln!(out).unwrap();
+                let _ = writeln!(out);
                 write!(
                     out,
                     "Found {} error(s) and {} warning(s)",

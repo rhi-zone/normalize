@@ -1,7 +1,7 @@
 //! Tools service for server-less CLI (lint + test).
 
 use crate::commands::tools::lint::{LintListReport, LintRunReport};
-use crate::commands::tools::test::{TestListReport, TestRunResult};
+use crate::commands::tools::test::{TestListReport, TestRunReport};
 use crate::output::OutputFormatter;
 use server_less::cli;
 use std::path::PathBuf;
@@ -152,7 +152,7 @@ impl TestService {
         >,
         #[param(help = "Run across all git repos under DIR")] repos_dir: Option<String>,
         #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
-    ) -> Result<TestRunResult, String> {
+    ) -> Result<TestRunReport, String> {
         if let Some(dir) = repos_dir {
             let repo_paths = discover_repos(&dir, repos_depth.unwrap_or(1))?;
             crate::commands::tools::test::build_test_run_multi(
