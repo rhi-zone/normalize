@@ -1041,7 +1041,7 @@ pub fn build_analyze_report(
     project: Option<&Path>,
     format_name: Option<&str>,
     exact: bool,
-) -> Result<crate::sessions::SessionAnalysis, String> {
+) -> Result<crate::sessions::SessionAnalysisReport, String> {
     use crate::sessions::analyze_session;
 
     let paths = if exact {

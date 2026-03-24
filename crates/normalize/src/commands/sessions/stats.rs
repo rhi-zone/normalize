@@ -239,7 +239,7 @@ pub fn build_stats_data(
     all_projects: bool,
     mode: &super::SessionMode,
     agent_type: Option<&str>,
-) -> Result<crate::sessions::SessionAnalysis, String> {
+) -> Result<crate::sessions::SessionAnalysisReport, String> {
     let registry = FormatRegistry::new();
     let format: &dyn LogFormat = match format_name {
         Some(name) => registry

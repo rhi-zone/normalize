@@ -10,9 +10,9 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
-fn biome_command() -> Option<crate::tools::ToolInvocation> {
+fn biome_command(root: &std::path::Path) -> Option<crate::tools::ToolInvocation> {
     // biome binary comes from the "@biomejs/biome" package
-    crate::tools::find_js_tool("biome", Some("@biomejs/biome"))
+    crate::tools::find_js_tool("biome", Some("@biomejs/biome"), root)
 }
 
 /// Biome linter adapter.
@@ -123,11 +123,11 @@ fn detect_biome(root: &Path, _extensions: &[&str]) -> f32 {
 }
 
 fn is_biome_available() -> bool {
-    biome_command().is_some()
+    biome_command(std::path::Path::new(".")).is_some()
 }
 
 fn biome_version() -> Option<String> {
-    let inv = biome_command()?;
+    let inv = biome_command(std::path::Path::new("."))?;
     let mut command = Command::new(&inv.command);
     command.args(&inv.args).arg("--version");
     command
@@ -193,8 +193,8 @@ fn run_biome(
     paths: &[&Path],
     root: &Path,
 ) -> Result<ToolResult, ToolError> {
-    let inv =
-        biome_command().ok_or_else(|| ToolError::NotAvailable("biome not found".to_string()))?;
+    let inv = biome_command(root)
+        .ok_or_else(|| ToolError::NotAvailable("biome not found".to_string()))?;
 
     let path_args: Vec<&str> = if paths.is_empty() {
         vec!["."]

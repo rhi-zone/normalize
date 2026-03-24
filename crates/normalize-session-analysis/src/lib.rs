@@ -68,6 +68,30 @@ impl ModelPricing {
         cache_read_per_mtok: 0.30,
     };
 
+    pub const SONNET_3_7: ModelPricing = ModelPricing {
+        name: "Claude Sonnet 3.7",
+        input_per_mtok: 3.0,
+        output_per_mtok: 15.0,
+        cache_write_per_mtok: 3.75,
+        cache_read_per_mtok: 0.30,
+    };
+
+    pub const SONNET_3_5: ModelPricing = ModelPricing {
+        name: "Claude Sonnet 3.5",
+        input_per_mtok: 3.0,
+        output_per_mtok: 15.0,
+        cache_write_per_mtok: 3.75,
+        cache_read_per_mtok: 0.30,
+    };
+
+    pub const SONNET_3: ModelPricing = ModelPricing {
+        name: "Claude Sonnet 3",
+        input_per_mtok: 3.0,
+        output_per_mtok: 15.0,
+        cache_write_per_mtok: 3.75,
+        cache_read_per_mtok: 0.30,
+    };
+
     pub const OPUS_4_5: ModelPricing = ModelPricing {
         name: "Claude Opus 4.5/4.6",
         input_per_mtok: 5.0,
@@ -118,7 +142,18 @@ impl ModelPricing {
                 Some(&Self::OPUS_3)
             }
         } else if m.contains("sonnet") {
-            Some(&Self::SONNET_4_5)
+            if m.contains("4-5") || m.contains("4.5") || m.contains("4-6") || m.contains("4.6") {
+                Some(&Self::SONNET_4_5)
+            } else if m.contains("3-7") || m.contains("3.7") {
+                Some(&Self::SONNET_3_7)
+            } else if m.contains("3-5") || m.contains("3.5") {
+                Some(&Self::SONNET_3_5)
+            } else if m.contains("-3") || m.ends_with("3") {
+                Some(&Self::SONNET_3)
+            } else {
+                // Default to latest sonnet pricing for unrecognized variants
+                Some(&Self::SONNET_4_5)
+            }
         } else if m.contains("haiku") {
             if m.contains("4") {
                 Some(&Self::HAIKU_4_5)
@@ -351,7 +386,7 @@ pub struct DedupTokenStats {
 
 /// Complete analysis of a session.
 #[derive(Debug, Clone, Default, Serialize, schemars::JsonSchema, Deserialize)]
-pub struct SessionAnalysis {
+pub struct SessionAnalysisReport {
     pub session_path: PathBuf,
     pub format: String,
     pub message_counts: HashMap<String, usize>,
@@ -383,7 +418,7 @@ pub struct SessionAnalysis {
     pub dedup_tokens: Option<DedupTokenStats>,
 }
 
-impl SessionAnalysis {
+impl SessionAnalysisReport {
     pub fn new(session_path: PathBuf, format: impl Into<String>) -> Self {
         Self {
             session_path,
@@ -1237,19 +1272,19 @@ impl SessionAnalysis {
 }
 
 /// Implement OutputFormatter trait for consistent output handling.
-impl OutputFormatter for SessionAnalysis {
+impl OutputFormatter for SessionAnalysisReport {
     fn format_text(&self) -> String {
         // Call the inherent method (markdown format)
-        SessionAnalysis::format_text(self)
+        SessionAnalysisReport::format_text(self)
     }
 
     fn format_pretty(&self) -> String {
         // Call the inherent method (colored bar charts)
-        SessionAnalysis::format_pretty(self)
+        SessionAnalysisReport::format_pretty(self)
     }
 }
 
-impl std::fmt::Display for SessionAnalysis {
+impl std::fmt::Display for SessionAnalysisReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", OutputFormatter::format_text(self))
     }
@@ -1766,8 +1801,8 @@ pub fn extract_tool_patterns(chains: &[ToolChain]) -> Vec<ToolPattern> {
 }
 
 /// Analyze a parsed session and compute statistics.
-pub fn analyze_session(session: &Session) -> SessionAnalysis {
-    let mut analysis = SessionAnalysis::new(session.path.clone(), &session.format);
+pub fn analyze_session(session: &Session) -> SessionAnalysisReport {
+    let mut analysis = SessionAnalysisReport::new(session.path.clone(), &session.format);
 
     // Count message types by role. Role::User = human input, Role::Tool = tool results.
     for turn in &session.turns {

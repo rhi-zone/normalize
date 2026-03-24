@@ -8,9 +8,9 @@ use crate::{Diagnostic, Tool, ToolCategory, ToolError, ToolInfo, ToolResult};
 use std::path::Path;
 use std::process::Command;
 
-fn tsgo_command() -> Option<crate::tools::ToolInvocation> {
+fn tsgo_command(root: &std::path::Path) -> Option<crate::tools::ToolInvocation> {
     // @typescript/native-preview provides the tsgo binary
-    crate::tools::find_js_tool("tsgo", Some("@typescript/native-preview"))
+    crate::tools::find_js_tool("tsgo", Some("@typescript/native-preview"), root)
 }
 
 /// Tsgo native TypeScript type checker adapter.
@@ -42,11 +42,11 @@ impl Tool for Tsgo {
     }
 
     fn is_available(&self) -> bool {
-        tsgo_command().is_some()
+        tsgo_command(std::path::Path::new(".")).is_some()
     }
 
     fn version(&self) -> Option<String> {
-        let inv = tsgo_command()?;
+        let inv = tsgo_command(std::path::Path::new("."))?;
         let mut command = Command::new(&inv.command);
         command.args(&inv.args).arg("--version");
         command
@@ -67,8 +67,8 @@ impl Tool for Tsgo {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let inv =
-            tsgo_command().ok_or_else(|| ToolError::NotAvailable("tsgo not found".to_string()))?;
+        let inv = tsgo_command(root)
+            .ok_or_else(|| ToolError::NotAvailable("tsgo not found".to_string()))?;
 
         // tsgo uses similar flags to tsc
         let mut cmd = Command::new(&inv.command);

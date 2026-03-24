@@ -4384,6 +4384,7 @@ dependencies = [
 name = "normalize-tools"
 version = "0.2.0"
 dependencies = [
+ "normalize-output",
  "rayon",
  "serde",
  "serde_json",

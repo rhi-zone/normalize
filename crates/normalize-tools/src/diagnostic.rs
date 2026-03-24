@@ -4,48 +4,11 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Severity levels for diagnostics.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum DiagnosticSeverity {
-    /// Fatal error, must be fixed.
-    Error,
-    /// Potential problem, should be fixed.
-    Warning,
-    /// Informational message.
-    Info,
-    /// Suggestion or hint.
-    Hint,
-}
-
-impl DiagnosticSeverity {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Error => "error",
-            Self::Warning => "warning",
-            Self::Info => "info",
-            Self::Hint => "hint",
-        }
-    }
-
-    /// Convert to SARIF level string.
-    pub fn to_sarif_level(&self) -> &'static str {
-        match self {
-            Self::Error => "error",
-            Self::Warning => "warning",
-            Self::Info | Self::Hint => "note",
-        }
-    }
-
-    /// Parse from SARIF level string.
-    pub fn from_sarif_level(level: &str) -> Self {
-        match level.to_lowercase().as_str() {
-            "error" => Self::Error,
-            "warning" => Self::Warning,
-            "note" | "none" => Self::Info,
-            _ => Self::Warning,
-        }
-    }
-}
+///
+/// Re-exported from `normalize-output` to share a single definition across crates.
+/// Methods (`as_str`, `to_sarif_level`, `from_sarif_level`) are defined on `Severity`
+/// in `normalize-output` and available here through the re-export.
+pub use normalize_output::diagnostics::Severity as DiagnosticSeverity;
 
 /// Source location of a diagnostic.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

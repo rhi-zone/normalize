@@ -34,8 +34,8 @@ impl Default for Oxlint {
     }
 }
 
-fn oxlint_command() -> Option<crate::tools::ToolInvocation> {
-    crate::tools::find_js_tool("oxlint", None)
+fn oxlint_command(root: &std::path::Path) -> Option<crate::tools::ToolInvocation> {
+    crate::tools::find_js_tool("oxlint", None, root)
 }
 
 fn has_tsconfig(root: &Path) -> bool {
@@ -88,11 +88,11 @@ impl Tool for Oxlint {
     }
 
     fn is_available(&self) -> bool {
-        oxlint_command().is_some()
+        oxlint_command(std::path::Path::new(".")).is_some()
     }
 
     fn version(&self) -> Option<String> {
-        let inv = oxlint_command()?;
+        let inv = oxlint_command(std::path::Path::new("."))?;
         let mut command = Command::new(&inv.command);
         command.args(&inv.args).arg("--version");
         command
@@ -119,7 +119,7 @@ impl Tool for Oxlint {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let inv = oxlint_command()
+        let inv = oxlint_command(root)
             .ok_or_else(|| ToolError::NotAvailable("oxlint not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -198,7 +198,7 @@ impl Tool for Oxlint {
     }
 
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let inv = oxlint_command()
+        let inv = oxlint_command(root)
             .ok_or_else(|| ToolError::NotAvailable("oxlint not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {

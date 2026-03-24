@@ -10,8 +10,8 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
-fn mypy_command() -> Option<crate::tools::ToolInvocation> {
-    crate::tools::find_python_tool("mypy")
+fn mypy_command(root: &std::path::Path) -> Option<crate::tools::ToolInvocation> {
+    crate::tools::find_python_tool("mypy", root)
 }
 
 /// Mypy Python type checker adapter.
@@ -54,11 +54,11 @@ impl Tool for Mypy {
     }
 
     fn is_available(&self) -> bool {
-        mypy_command().is_some()
+        mypy_command(std::path::Path::new(".")).is_some()
     }
 
     fn version(&self) -> Option<String> {
-        let inv = mypy_command()?;
+        let inv = mypy_command(std::path::Path::new("."))?;
         let mut command = Command::new(&inv.command);
         command.args(&inv.args).arg("--version");
         command
@@ -88,8 +88,8 @@ impl Tool for Mypy {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let inv =
-            mypy_command().ok_or_else(|| ToolError::NotAvailable("mypy not found".to_string()))?;
+        let inv = mypy_command(root)
+            .ok_or_else(|| ToolError::NotAvailable("mypy not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
             vec!["."]

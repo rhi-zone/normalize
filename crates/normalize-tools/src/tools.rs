@@ -166,16 +166,20 @@ pub struct ToolInvocation {
 /// Find a JS ecosystem tool (local installs only, no remote downloads).
 ///
 /// Tries in order:
-/// 1. node_modules/.bin/ (local install)
+/// 1. node_modules/.bin/ under `root` (local install)
 /// 2. pnpm exec (local install via pnpm)
 /// 3. global install
 ///
 /// Returns (command, base_args) or None if not found.
-pub fn find_js_tool(bin_name: &str, _pkg_name: Option<&str>) -> Option<ToolInvocation> {
+pub fn find_js_tool(
+    bin_name: &str,
+    _pkg_name: Option<&str>,
+    root: &Path,
+) -> Option<ToolInvocation> {
     use std::process::Command;
 
-    // Check node_modules/.bin/ first (no process spawn needed)
-    let local_bin = std::path::Path::new("node_modules/.bin").join(bin_name);
+    // Check node_modules/.bin/ relative to root (no process spawn needed)
+    let local_bin = root.join("node_modules/.bin").join(bin_name);
     if local_bin.exists() {
         return Some(ToolInvocation {
             command: local_bin.to_string_lossy().into_owned(),
@@ -186,6 +190,7 @@ pub fn find_js_tool(bin_name: &str, _pkg_name: Option<&str>) -> Option<ToolInvoc
     // pnpm exec (local install only, not remote)
     if Command::new("pnpm")
         .args(["exec", bin_name, "--version"])
+        .current_dir(root)
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
@@ -215,16 +220,16 @@ pub fn find_js_tool(bin_name: &str, _pkg_name: Option<&str>) -> Option<ToolInvoc
 /// Find a Python ecosystem tool (local installs only, no remote downloads).
 ///
 /// Tries in order:
-/// 1. .venv/bin/ (local virtualenv)
+/// 1. .venv/bin/ under `root` (local virtualenv)
 /// 2. uv run (if in a uv project with local deps)
 /// 3. global install
 ///
 /// Returns (command, base_args) or None if not found.
-pub fn find_python_tool(tool: &str) -> Option<ToolInvocation> {
+pub fn find_python_tool(tool: &str, root: &Path) -> Option<ToolInvocation> {
     use std::process::Command;
 
-    // Check .venv/bin/ first (no process spawn needed)
-    let local_bin = std::path::Path::new(".venv/bin").join(tool);
+    // Check .venv/bin/ relative to root (no process spawn needed)
+    let local_bin = root.join(".venv/bin").join(tool);
     if local_bin.exists() {
         return Some(ToolInvocation {
             command: local_bin.to_string_lossy().into_owned(),
@@ -235,6 +240,7 @@ pub fn find_python_tool(tool: &str) -> Option<ToolInvocation> {
     // uv run (uv project - uses local deps from pyproject.toml)
     if Command::new("uv")
         .args(["run", tool, "--version"])
+        .current_dir(root)
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)

@@ -9,8 +9,8 @@ use crate::{
 use std::path::Path;
 use std::process::Command;
 
-fn oxfmt_command() -> Option<crate::tools::ToolInvocation> {
-    crate::tools::find_js_tool("oxfmt", None)
+fn oxfmt_command(root: &std::path::Path) -> Option<crate::tools::ToolInvocation> {
+    crate::tools::find_js_tool("oxfmt", None, root)
 }
 
 /// Oxfmt JavaScript/TypeScript formatter adapter.
@@ -42,11 +42,11 @@ impl Tool for Oxfmt {
     }
 
     fn is_available(&self) -> bool {
-        oxfmt_command().is_some()
+        oxfmt_command(std::path::Path::new(".")).is_some()
     }
 
     fn version(&self) -> Option<String> {
-        let inv = oxfmt_command()?;
+        let inv = oxfmt_command(std::path::Path::new("."))?;
         let mut command = Command::new(&inv.command);
         command.args(&inv.args).arg("--version");
         command
@@ -79,7 +79,7 @@ impl Tool for Oxfmt {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let inv = oxfmt_command()
+        let inv = oxfmt_command(root)
             .ok_or_else(|| ToolError::NotAvailable("oxfmt not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -151,7 +151,7 @@ impl Tool for Oxfmt {
     }
 
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let inv = oxfmt_command()
+        let inv = oxfmt_command(root)
             .ok_or_else(|| ToolError::NotAvailable("oxfmt not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {

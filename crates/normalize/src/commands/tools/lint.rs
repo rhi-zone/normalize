@@ -186,6 +186,9 @@ pub struct LintRunReport {
     /// Populated in multi-repo mode (--repos-dir).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repos: Option<Vec<RepoLintEntry>>,
+    /// True when --fix was requested but --dry-run prevented writes.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub dry_run: bool,
 }
 
 /// A lint diagnostic for service output.
@@ -213,6 +216,9 @@ pub struct LintDiagnostic {
 impl OutputFormatter for LintRunReport {
     fn format_text(&self) -> String {
         let mut out = String::new();
+        if self.dry_run {
+            let _ = writeln!(out, "(dry run — no files were modified)\n");
+        }
         if let Some(repos) = &self.repos {
             // Multi-repo mode
             if repos.is_empty() {
@@ -282,6 +288,7 @@ impl std::fmt::Display for LintRunReport {
 pub fn build_lint_run_multi(
     repos: &[PathBuf],
     fix: bool,
+    dry_run: bool,
     tools: Option<&str>,
     category: Option<&str>,
 ) -> Result<LintRunReport, LintError> {
@@ -293,7 +300,7 @@ pub fn build_lint_run_multi(
                 .and_then(|n| n.to_str())
                 .unwrap_or("unknown")
                 .to_string();
-            match build_lint_run(None, Some(repo_path), fix, tools, category) {
+            match build_lint_run(None, Some(repo_path), fix, dry_run, tools, category) {
                 Ok(r) => RepoLintEntry {
                     name,
                     path: repo_path.clone(),
@@ -322,6 +329,7 @@ pub fn build_lint_run_multi(
         warning_count: total_warnings,
         diagnostics: vec![],
         repos: Some(entries),
+        dry_run,
     })
 }
 
@@ -330,6 +338,7 @@ pub fn build_lint_run(
     target: Option<&str>,
     root: Option<&Path>,
     fix: bool,
+    dry_run: bool,
     tools: Option<&str>,
     category: Option<&str>,
 ) -> Result<LintRunReport, LintError> {
@@ -388,11 +397,14 @@ pub fn build_lint_run(
             warning_count: 0,
             diagnostics: vec![],
             repos: None,
+            dry_run,
         });
     }
 
+    // When dry_run is set, run in check mode only (no writes) regardless of fix flag.
     let paths: Vec<&Path> = target.map(|t| vec![Path::new(t)]).unwrap_or_default();
-    let all_results = run_tools(&tools_to_run, &paths, fix, false, root).all_results;
+    let effective_fix = fix && !dry_run;
+    let all_results = run_tools(&tools_to_run, &paths, effective_fix, false, root).all_results;
 
     let mut diagnostics = Vec::new();
     let mut error_count = 0;
@@ -420,5 +432,6 @@ pub fn build_lint_run(
         warning_count,
         diagnostics,
         repos: None,
+        dry_run,
     })
 }

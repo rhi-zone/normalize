@@ -9,8 +9,8 @@ use crate::{
 use std::path::Path;
 use std::process::Command;
 
-fn prettier_command() -> Option<crate::tools::ToolInvocation> {
-    crate::tools::find_js_tool("prettier", None)
+fn prettier_command(root: &std::path::Path) -> Option<crate::tools::ToolInvocation> {
+    crate::tools::find_js_tool("prettier", None, root)
 }
 
 /// Prettier formatter adapter.
@@ -45,11 +45,11 @@ impl Tool for Prettier {
     }
 
     fn is_available(&self) -> bool {
-        prettier_command().is_some()
+        prettier_command(std::path::Path::new(".")).is_some()
     }
 
     fn version(&self) -> Option<String> {
-        let inv = prettier_command()?;
+        let inv = prettier_command(std::path::Path::new("."))?;
         let mut command = Command::new(&inv.command);
         command.args(&inv.args).arg("--version");
         command
@@ -91,7 +91,7 @@ impl Tool for Prettier {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let inv = prettier_command()
+        let inv = prettier_command(root)
             .ok_or_else(|| ToolError::NotAvailable("prettier not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -164,7 +164,7 @@ impl Tool for Prettier {
     }
 
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let inv = prettier_command()
+        let inv = prettier_command(root)
             .ok_or_else(|| ToolError::NotAvailable("prettier not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {

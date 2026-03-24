@@ -10,8 +10,8 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
-fn ruff_command() -> Option<crate::tools::ToolInvocation> {
-    crate::tools::find_python_tool("ruff")
+fn ruff_command(root: &std::path::Path) -> Option<crate::tools::ToolInvocation> {
+    crate::tools::find_python_tool("ruff", root)
 }
 
 /// Ruff Python linter/formatter adapter.
@@ -69,11 +69,11 @@ impl Tool for Ruff {
     }
 
     fn is_available(&self) -> bool {
-        ruff_command().is_some()
+        ruff_command(std::path::Path::new(".")).is_some()
     }
 
     fn version(&self) -> Option<String> {
-        let inv = ruff_command()?;
+        let inv = ruff_command(std::path::Path::new("."))?;
         let mut command = Command::new(&inv.command);
         command.args(&inv.args).arg("--version");
         command
@@ -104,8 +104,8 @@ impl Tool for Ruff {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let inv =
-            ruff_command().ok_or_else(|| ToolError::NotAvailable("ruff not found".to_string()))?;
+        let inv = ruff_command(root)
+            .ok_or_else(|| ToolError::NotAvailable("ruff not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
             vec!["."]
@@ -177,8 +177,8 @@ impl Tool for Ruff {
     }
 
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let inv =
-            ruff_command().ok_or_else(|| ToolError::NotAvailable("ruff not found".to_string()))?;
+        let inv = ruff_command(root)
+            .ok_or_else(|| ToolError::NotAvailable("ruff not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
             vec!["."]
@@ -202,24 +202,34 @@ impl Tool for Ruff {
         }
 
         // Parse remaining unfixable issues
-        let ruff_diags: Vec<RuffDiagnostic> = serde_json::from_str(&stdout).unwrap_or_default();
+        let ruff_diags: Vec<RuffDiagnostic> = serde_json::from_str(&stdout)
+            .map_err(|e| ToolError::ParseError(format!("failed to parse ruff output: {}", e)))?;
 
         let diagnostics = ruff_diags
             .into_iter()
-            .map(|d| Diagnostic {
-                tool: "ruff".to_string(),
-                rule_id: d.code.unwrap_or_else(|| "unknown".to_string()),
-                message: d.message,
-                severity: DiagnosticSeverity::Warning,
-                location: Location {
-                    file: d.filename.into(),
-                    line: d.location.row,
-                    column: d.location.column,
-                    end_line: Some(d.end_location.row),
-                    end_column: Some(d.end_location.column),
-                },
-                fix: None,
-                help_url: d.url,
+            .map(|d| {
+                let severity = match d.code.as_deref() {
+                    Some(code) if code.starts_with('E') || code.starts_with('F') => {
+                        DiagnosticSeverity::Error
+                    }
+                    Some(code) if code.starts_with('W') => DiagnosticSeverity::Warning,
+                    _ => DiagnosticSeverity::Warning,
+                };
+                Diagnostic {
+                    tool: "ruff".to_string(),
+                    rule_id: d.code.unwrap_or_else(|| "unknown".to_string()),
+                    message: d.message,
+                    severity,
+                    location: Location {
+                        file: d.filename.into(),
+                        line: d.location.row,
+                        column: d.location.column,
+                        end_line: Some(d.end_location.row),
+                        end_column: Some(d.end_location.column),
+                    },
+                    fix: None,
+                    help_url: d.url,
+                }
             })
             .collect();
 

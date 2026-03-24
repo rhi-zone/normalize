@@ -4,7 +4,7 @@
 //! Report structs and OutputFormatter impls live in the `normalize` crate.
 
 use normalize_facts::FileIndex;
-pub use normalize_graph::{ImportChain, find_longest_chains};
+pub use normalize_graph::ImportChain;
 use normalize_languages::is_programming_language;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};

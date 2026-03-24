@@ -78,6 +78,7 @@ impl LintService {
     ///   normalize tools lint run                          # run all detected linters
     ///   normalize tools lint run src/                     # lint a specific path
     ///   normalize tools lint run -f                       # auto-fix issues
+    ///   normalize tools lint run -f --dry-run             # show what would be fixed
     ///   normalize tools lint run -t clippy,eslint         # run specific tools only
     ///   normalize tools lint run -c fmt                   # run only formatters
     ///   normalize tools lint run --repos-dir ~/projects   # lint across multiple repos
@@ -86,6 +87,7 @@ impl LintService {
         &self,
         #[param(positional, help = "Target path to check")] target: Option<String>,
         #[param(short = 'f', help = "Fix issues automatically")] fix: bool,
+        #[param(help = "Show what would be fixed without writing files")] dry_run: bool,
         #[param(short = 't', help = "Specific tools to run (comma-separated)")] tools: Option<
             String,
         >,
@@ -103,6 +105,7 @@ impl LintService {
             crate::commands::tools::lint::build_lint_run_multi(
                 &repo_paths,
                 fix,
+                dry_run,
                 tools.as_deref(),
                 category.as_deref(),
             )
@@ -112,6 +115,7 @@ impl LintService {
                 target.as_deref(),
                 root.as_deref().map(std::path::Path::new),
                 fix,
+                dry_run,
                 tools.as_deref(),
                 category.as_deref(),
             )

@@ -10,8 +10,8 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
-fn eslint_command() -> Option<crate::tools::ToolInvocation> {
-    crate::tools::find_js_tool("eslint", None)
+fn eslint_command(root: &std::path::Path) -> Option<crate::tools::ToolInvocation> {
+    crate::tools::find_js_tool("eslint", None, root)
 }
 
 /// ESLint JavaScript/TypeScript linter adapter.
@@ -63,11 +63,11 @@ impl Tool for Eslint {
     }
 
     fn is_available(&self) -> bool {
-        eslint_command().is_some()
+        eslint_command(std::path::Path::new(".")).is_some()
     }
 
     fn version(&self) -> Option<String> {
-        let inv = eslint_command()?;
+        let inv = eslint_command(std::path::Path::new("."))?;
         let mut command = Command::new(&inv.command);
         command.args(&inv.args).arg("--version");
         command
@@ -98,7 +98,7 @@ impl Tool for Eslint {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let inv = eslint_command()
+        let inv = eslint_command(root)
             .ok_or_else(|| ToolError::NotAvailable("eslint not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -159,7 +159,7 @@ impl Tool for Eslint {
     }
 
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let inv = eslint_command()
+        let inv = eslint_command(root)
             .ok_or_else(|| ToolError::NotAvailable("eslint not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -181,25 +181,33 @@ impl Tool for Eslint {
         }
 
         // Parse remaining unfixable issues
-        let eslint_files: Vec<EslintFile> = serde_json::from_str(&stdout).unwrap_or_default();
+        let eslint_files: Vec<EslintFile> = serde_json::from_str(&stdout)
+            .map_err(|e| ToolError::ParseError(format!("failed to parse eslint output: {}", e)))?;
 
         let diagnostics = eslint_files
             .into_iter()
             .flat_map(|file| {
-                file.messages.into_iter().map(move |msg| Diagnostic {
-                    tool: "eslint".to_string(),
-                    rule_id: msg.rule_id.unwrap_or_else(|| "parse-error".to_string()),
-                    message: msg.message,
-                    severity: DiagnosticSeverity::Warning,
-                    location: Location {
-                        file: file.file_path.clone().into(),
-                        line: msg.line,
-                        column: msg.column,
-                        end_line: msg.end_line,
-                        end_column: msg.end_column,
-                    },
-                    fix: None,
-                    help_url: None,
+                file.messages.into_iter().map(move |msg| {
+                    let severity = if msg.severity >= 2 {
+                        DiagnosticSeverity::Error
+                    } else {
+                        DiagnosticSeverity::Warning
+                    };
+                    Diagnostic {
+                        tool: "eslint".to_string(),
+                        rule_id: msg.rule_id.unwrap_or_else(|| "parse-error".to_string()),
+                        message: msg.message,
+                        severity,
+                        location: Location {
+                            file: file.file_path.clone().into(),
+                            line: msg.line,
+                            column: msg.column,
+                            end_line: msg.end_line,
+                            end_column: msg.end_column,
+                        },
+                        fix: None,
+                        help_url: None,
+                    }
                 })
             })
             .collect();

@@ -6,7 +6,7 @@ use crate::commands::sessions::{
     SessionShowReport, SubagentsReport,
 };
 use crate::output::OutputFormatter;
-use crate::sessions::SessionAnalysis;
+use crate::sessions::SessionAnalysisReport;
 use server_less::cli;
 use std::cell::Cell;
 
@@ -83,7 +83,7 @@ impl std::fmt::Display for PlansReport {
 }
 
 impl SessionsService {
-    fn display_analyze(&self, a: &SessionAnalysis) -> String {
+    fn display_analyze(&self, a: &SessionAnalysisReport) -> String {
         if self.pretty.get() {
             a.format_pretty()
         } else {
@@ -222,7 +222,7 @@ impl SessionsService {
         agent_type: Option<String>,
         pretty: bool,
         compact: bool,
-    ) -> Result<SessionAnalysis, String> {
+    ) -> Result<SessionAnalysisReport, String> {
         let _mode = mode; // session resolution already searches subagents
         let _agent_type = agent_type; // session resolution already searches subagents
         let root_path = root.as_deref().map(std::path::Path::new);
@@ -274,7 +274,7 @@ impl SessionsService {
         >,
         #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
         agent_type: Option<String>,
-    ) -> Result<SessionAnalysis, String> {
+    ) -> Result<SessionAnalysisReport, String> {
         let limit = limit.unwrap_or(0);
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);

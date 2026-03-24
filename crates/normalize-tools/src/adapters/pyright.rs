@@ -10,13 +10,13 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
-fn pyright_command() -> Option<crate::tools::ToolInvocation> {
+fn pyright_command(root: &std::path::Path) -> Option<crate::tools::ToolInvocation> {
     // Pyright can be installed via npm or pip
     // Try Python first (more common in Python projects), then npm
-    if let Some(cmd) = crate::tools::find_python_tool("pyright") {
+    if let Some(cmd) = crate::tools::find_python_tool("pyright", root) {
         return Some(cmd);
     }
-    crate::tools::find_js_tool("pyright", None)
+    crate::tools::find_js_tool("pyright", None, root)
 }
 
 /// Pyright Python type checker adapter.
@@ -77,11 +77,11 @@ impl Tool for Pyright {
     }
 
     fn is_available(&self) -> bool {
-        pyright_command().is_some()
+        pyright_command(std::path::Path::new(".")).is_some()
     }
 
     fn version(&self) -> Option<String> {
-        let inv = pyright_command()?;
+        let inv = pyright_command(std::path::Path::new("."))?;
         let mut command = Command::new(&inv.command);
         command.args(&inv.args).arg("--version");
         command
@@ -109,7 +109,7 @@ impl Tool for Pyright {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let inv = pyright_command()
+        let inv = pyright_command(root)
             .ok_or_else(|| ToolError::NotAvailable("pyright not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {

@@ -7,9 +7,9 @@ use crate::{Diagnostic, Tool, ToolCategory, ToolError, ToolInfo, ToolResult};
 use std::path::Path;
 use std::process::Command;
 
-fn tsc_command() -> Option<crate::tools::ToolInvocation> {
+fn tsc_command(root: &std::path::Path) -> Option<crate::tools::ToolInvocation> {
     // tsc binary comes from the "typescript" package
-    crate::tools::find_js_tool("tsc", Some("typescript"))
+    crate::tools::find_js_tool("tsc", Some("typescript"), root)
 }
 
 /// TypeScript compiler (tsc) type checker adapter.
@@ -41,11 +41,11 @@ impl Tool for Tsc {
     }
 
     fn is_available(&self) -> bool {
-        tsc_command().is_some()
+        tsc_command(std::path::Path::new(".")).is_some()
     }
 
     fn version(&self) -> Option<String> {
-        let inv = tsc_command()?;
+        let inv = tsc_command(std::path::Path::new("."))?;
         let mut command = Command::new(&inv.command);
         command.args(&inv.args).arg("--version");
         command
@@ -65,8 +65,8 @@ impl Tool for Tsc {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let inv =
-            tsc_command().ok_or_else(|| ToolError::NotAvailable("tsc not found".to_string()))?;
+        let inv = tsc_command(root)
+            .ok_or_else(|| ToolError::NotAvailable("tsc not found".to_string()))?;
 
         // tsc --noEmit for type checking only
         // Use --pretty false for machine-readable output

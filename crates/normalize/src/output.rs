@@ -68,7 +68,7 @@ mod tests {
         use crate::commands::sessions::plans::PlansListReport;
         use crate::commands::tools::lint::LintListReport;
         use crate::commands::view::report::{ViewHistoryReport, ViewListReport, ViewReport};
-        use crate::sessions::SessionAnalysis;
+        use crate::sessions::SessionAnalysisReport;
         use crate::text_search::GrepReport;
         use normalize_output::diagnostics::DiagnosticsReport;
 
@@ -119,7 +119,7 @@ mod tests {
         assert_output_formatter::<RepoCouplingReport>();
         assert_output_formatter::<SecurityReport>();
         assert_output_formatter::<MessagesReport>();
-        assert_output_formatter::<SessionAnalysis>();
+        assert_output_formatter::<SessionAnalysisReport>();
         assert_output_formatter::<SessionListReport>();
         assert_output_formatter::<SessionShowReport>();
         assert_output_formatter::<SubagentsReport>();

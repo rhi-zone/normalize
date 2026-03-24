@@ -78,9 +78,9 @@ mod tests {
     fn unused_node_kinds_audit() {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
-            // Matcher-related
-            "matcher_name", "matcher_path", "matcher_path_regexp", "matcher_token",
-            "matcher_definition", "standard_matcher", "uri_path_with_placeholders",
+            // Matcher-related (matcher_name, matcher_token, matcher_definition used in tags.scm)
+            "matcher_path", "matcher_path_regexp",
+            "standard_matcher", "uri_path_with_placeholders",
             // Directive-related
             "directive_import", "directive_request_body", "request_body_option_max_size",
             "fastcgi_option_try_files", "encode_format", "log_option_format",
@@ -88,7 +88,6 @@ mod tests {
             "global_options_block",
             // structural node, not extracted as symbols
             "directive_block",
-            "site_block",
         ];
         validate_unused_kinds_audit(&Caddy, documented_unused)
             .expect("Caddy unused node kinds audit failed");

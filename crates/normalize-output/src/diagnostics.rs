@@ -9,7 +9,17 @@ use serde::{Deserialize, Serialize};
 
 /// Severity level for a diagnostic issue.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
@@ -26,6 +36,37 @@ impl std::fmt::Display for Severity {
             Severity::Info => write!(f, "info"),
             Severity::Warning => write!(f, "warning"),
             Severity::Error => write!(f, "error"),
+        }
+    }
+}
+
+impl Severity {
+    /// Return the severity as a lowercase string.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Error => "error",
+            Self::Warning => "warning",
+            Self::Info => "info",
+            Self::Hint => "hint",
+        }
+    }
+
+    /// Convert to SARIF level string.
+    pub fn to_sarif_level(&self) -> &'static str {
+        match self {
+            Self::Error => "error",
+            Self::Warning => "warning",
+            Self::Info | Self::Hint => "note",
+        }
+    }
+
+    /// Parse from SARIF level string.
+    pub fn from_sarif_level(level: &str) -> Self {
+        match level.to_lowercase().as_str() {
+            "error" => Self::Error,
+            "warning" => Self::Warning,
+            "note" | "none" => Self::Info,
+            _ => Self::Warning,
         }
     }
 }
@@ -105,7 +146,7 @@ impl DiagnosticsReport {
 
     /// Merge another report into this one.
     pub fn merge(&mut self, other: DiagnosticsReport) {
-        self.files_checked = self.files_checked.max(other.files_checked);
+        self.files_checked += other.files_checked;
         self.issues.extend(other.issues);
         for source in other.sources_run {
             if !self.sources_run.contains(&source) {
@@ -603,7 +644,7 @@ mod tests {
         };
         a.merge(b);
         assert_eq!(a.issues.len(), 2);
-        assert_eq!(a.files_checked, 8);
+        assert_eq!(a.files_checked, 13);
         assert_eq!(a.sources_run, vec!["check-refs", "stale-docs"]);
     }
 

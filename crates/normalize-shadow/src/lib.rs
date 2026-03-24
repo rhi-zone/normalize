@@ -667,10 +667,16 @@ impl Shadow {
             self.restore_files_from_ref(&files_to_undo, &parent_ref)?;
 
             // Stage and commit the undo
-            let _ = Command::new("git")
+            let add_status = Command::new("git")
                 .args(["add", "-A"])
                 .current_dir(&self.worktree)
-                .status();
+                .status()
+                .map_err(|e| ShadowError::Commit(format!("Failed to stage undo: {}", e)))?;
+            if !add_status.success() {
+                return Err(ShadowError::Commit(
+                    "git add failed during undo".to_string(),
+                ));
+            }
 
             let undo_msg = format!(
                 "normalize edit: undo {}\n\nOperation: undo\nTarget: {}\nUndone-Commit: {}\nFiles: {}\nGit-HEAD: {}\n",
@@ -682,10 +688,16 @@ impl Shadow {
                     .unwrap_or_else(|| "none".to_string())
             );
 
-            let _ = Command::new("git")
+            let commit_status = Command::new("git")
                 .args(["commit", "-m", &undo_msg, "--allow-empty"])
                 .current_dir(&self.worktree)
-                .status();
+                .status()
+                .map_err(|e| ShadowError::Commit(format!("Failed to commit undo: {}", e)))?;
+            if !commit_status.success() {
+                return Err(ShadowError::Commit(
+                    "git commit failed during undo".to_string(),
+                ));
+            }
 
             results.push(UndoResult {
                 files: files_to_undo.iter().map(PathBuf::from).collect(),
@@ -827,10 +839,16 @@ impl Shadow {
         self.restore_files_from_ref(&files, undone_hash)?;
 
         // Stage and commit the redo
-        let _ = Command::new("git")
+        let add_status = Command::new("git")
             .args(["add", "-A"])
             .current_dir(&self.worktree)
-            .status();
+            .status()
+            .map_err(|e| ShadowError::Commit(format!("Failed to stage redo: {}", e)))?;
+        if !add_status.success() {
+            return Err(ShadowError::Commit(
+                "git add failed during redo".to_string(),
+            ));
+        }
 
         let redo_msg = format!(
             "normalize edit: redo {}\n\nOperation: redo\nTarget: {}\nRedone-Commit: {}\nFiles: {}\nGit-HEAD: {}\n",
@@ -842,10 +860,16 @@ impl Shadow {
                 .unwrap_or_else(|| "none".to_string())
         );
 
-        let _ = Command::new("git")
+        let commit_status = Command::new("git")
             .args(["commit", "-m", &redo_msg, "--allow-empty"])
             .current_dir(&self.worktree)
-            .status();
+            .status()
+            .map_err(|e| ShadowError::Commit(format!("Failed to commit redo: {}", e)))?;
+        if !commit_status.success() {
+            return Err(ShadowError::Commit(
+                "git commit failed during redo".to_string(),
+            ));
+        }
 
         Ok(UndoResult {
             files: files.iter().map(PathBuf::from).collect(),
@@ -979,10 +1003,16 @@ impl Shadow {
         }
 
         // Stage and commit the goto
-        let _ = Command::new("git")
+        let add_status = Command::new("git")
             .args(["add", "-A"])
             .current_dir(&self.worktree)
-            .status();
+            .status()
+            .map_err(|e| ShadowError::Commit(format!("Failed to stage goto: {}", e)))?;
+        if !add_status.success() {
+            return Err(ShadowError::Commit(
+                "git add failed during goto".to_string(),
+            ));
+        }
 
         let goto_msg = format!(
             "normalize edit: goto {}\n\nOperation: goto\nTarget: {}\nGoto-Commit: {}\nFiles: {}\nGit-HEAD: {}\n",
@@ -994,10 +1024,16 @@ impl Shadow {
                 .unwrap_or_else(|| "none".to_string())
         );
 
-        let _ = Command::new("git")
+        let commit_status = Command::new("git")
             .args(["commit", "-m", &goto_msg, "--allow-empty"])
             .current_dir(&self.worktree)
-            .status();
+            .status()
+            .map_err(|e| ShadowError::Commit(format!("Failed to commit goto: {}", e)))?;
+        if !commit_status.success() {
+            return Err(ShadowError::Commit(
+                "git commit failed during goto".to_string(),
+            ));
+        }
 
         Ok(UndoResult {
             files: files.iter().map(PathBuf::from).collect(),
