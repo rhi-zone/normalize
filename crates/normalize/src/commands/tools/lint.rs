@@ -278,12 +278,6 @@ impl OutputFormatter for LintRunReport {
     }
 }
 
-impl std::fmt::Display for LintRunReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
-    }
-}
-
 /// Run lints across multiple repos and return aggregated results.
 pub fn build_lint_run_multi(
     repos: &[PathBuf],

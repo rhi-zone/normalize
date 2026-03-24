@@ -33,12 +33,6 @@ pub struct LintService;
 /// Test sub-service.
 pub struct TestService;
 
-impl std::fmt::Display for LintListReport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format_text())
-    }
-}
-
 fn discover_repos(dir: &str, depth: usize) -> Result<Vec<PathBuf>, String> {
     crate::multi_repo::discover_repos_depth(&PathBuf::from(dir), depth)
 }

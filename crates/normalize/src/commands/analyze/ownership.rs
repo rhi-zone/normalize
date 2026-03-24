@@ -161,6 +161,10 @@ fn blame_file(root: &Path, path: &str) -> Option<FileOwnership> {
         return None;
     }
 
+    if total_lines == 0 {
+        return None;
+    }
+
     // Sort authors by line count descending
     let mut sorted: Vec<(String, usize)> = author_lines.into_iter().collect();
     sorted.sort_by(|a, b| b.1.cmp(&a.1));
