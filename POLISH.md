@@ -1,9 +1,9 @@
 # Polish State
 
 Created: f89f7a3c5d17cb1d8b13137bacb8c830d54c808c
-Last run: 2026-03-24T17:30:00Z
+Last run: 2026-03-24T19:00:00Z
 Round 1 applied: 2026-03-24
-Round: 6
+Round: 8
 Project type: Rust CLI + library ecosystem (~40 crates)
 
 ## Lenses
@@ -590,3 +590,56 @@ _(0 new findings — fixpoint reached on this lens)_
 - [DONE] `crates/normalize-ratchet/src/metrics/complexity.rs:195` — same unchecked addition — use `saturating_add` _(severity: low)_
 - [DONE] `crates/normalize-ratchet/src/service.rs:885` + `crates/normalize-budget/src/metrics/functions.rs:45` — `&hash[..7.min(hash.len())]` byte-slices git hash without char boundary check — add comment that git hashes are guaranteed ASCII _(severity: low)_
 - [DONE] `crates/normalize-budget/src/service.rs:717` — `net > max_net` when `max_net` may be negative; semantics surprising — add doc comment explaining the comparison _(severity: low)_
+
+## Findings — Round 8
+
+Round 8 git hash: f4ef3fa1
+Scope: entire codebase; extra focus on normalize-metrics, normalize-ratchet, normalize-budget, normalize-native-rules
+
+### Conflicts
+None.
+
+### api-clarity
+
+- [DONE] `crates/normalize-ratchet/src/service.rs:703,749` — [+naming] `do_measure` was the actual `pub` implementation; `measure` described as "transitional alias" — direction was backwards. Swapped: `measure` is now canonical, `do_measure` is `#[deprecated(since = "0.2.0")]` wrapper _(severity: high)_
+- [DONE] `crates/normalize-budget/src/budget.rs:77,89` — [+naming] `BudgetFile` had no `load(root)`/`save(root)` methods; only free functions inconsistent with `BaselineFile` — added `BudgetFile::load`/`save`, deprecated free functions _(severity: medium)_
+- [DONE] `crates/normalize-budget/src/service.rs:857` — [+naming] `build_budget_diagnostics` exported without `#[deprecated]` — added `#[deprecated(since = "0.2.0", note = "use build_budget_report")]` _(severity: medium)_
+- [DONE] `crates/normalize-ratchet/src/service.rs:219` + budget — `ShowEntry.aggregate`, `MeasureReport.aggregate` typed as `String` while `CheckEntry.aggregate` uses typed `Aggregate` — changed to `Aggregate` across all report structs _(severity: medium)_
+- [DONE] `crates/normalize-metrics/src/filter.rs:31` — [+adversarial] dead third OR clause (`path_prefix.ends_with('/')` always false after trim) — removed _(severity: low)_
+- [DONE] `crates/normalize-ratchet/src/baseline.rs:80,88` — deprecated free functions missing `since = "0.2.0"` annotation — added _(severity: low)_
+- [DONE] `crates/normalize-budget/src/service.rs:632` — `do_measure` pub(crate) in budget vs pub in ratchet — aligned _(severity: low)_
+
+### naming-consistency
+
+- [DONE] `crates/normalize-native-rules/src/budget.rs:16` — `BudgetDiagnosticsReport` doesn't follow `*Report` suffix — renamed to `BudgetRulesReport` _(severity: low)_
+- [DONE] See api-clarity: do_measure/measure direction, BudgetFile methods, build_budget_diagnostics deprecated _(deduplicated)_
+
+### doc-coverage
+
+- [DONE] `crates/normalize-budget/src/service.rs:28,69,173` — `base_ref` doc comments placed after `#[serde(rename)]` attr, attaching to preceding field in rustdoc — moved before attr _(severity: medium)_
+- [DONE] `crates/normalize-native-rules/src/stale_docs.rs:26`, `check_refs.rs:21`, `check_examples.rs:21`, `stale_summary.rs:27` — public report structs missing struct-level doc comments (existing comments misattributed to preceding private structs) — added _(severity: medium)_
+- [DONE] `crates/normalize-budget/src/service.rs:217` — `RemoveReport.path` and `.metric` undocumented — added _(severity: low)_
+- [DONE] `crates/normalize-budget/src/budget.rs:77,89` — `load_budget`/`save_budget` no doc comments — added _(severity: low)_
+- [DONE] `crates/normalize-ratchet/src/error.rs` + budget — error enum variants undocumented — added per-variant docs _(severity: low)_
+- [DONE] `crates/normalize-ratchet/src/service.rs:300` + budget — service struct no doc comment — added _(severity: low)_
+
+### error-surface
+
+- [DONE] `crates/normalize-budget/src/service.rs:625` — `load_budget_config` used `eprintln!` — changed to `tracing::warn!` _(severity: medium)_
+- [DONE] `crates/normalize-budget/src/service.rs:671` — `do_measure` used `eprintln!("info: …")` — changed to `tracing::info!` _(severity: medium)_
+- [DONE] `crates/normalize-ratchet/src/service.rs:794,808` — `build_check_report` used `eprintln!` for two warnings — changed to `tracing::warn!` _(severity: medium)_
+- [DONE] `crates/normalize-ratchet/src/service.rs:958,994` — `check_against_ref` silently discarded measurement errors — added `tracing::warn!` before `continue` _(severity: medium)_
+- [DONE] `crates/normalize-ratchet/src/service.rs:1070` — git ref not-found error dropped stderr — now includes `stderr` text _(severity: low)_
+- [DONE] `crates/normalize-budget/src/metrics/functions.rs:53` — stale worktree removal errors swallowed silently — added `tracing::warn!` on failure _(severity: low)_
+- [NOTED] `crates/normalize-ratchet/src/error.rs` — `RatchetError`/`BudgetError` typed enums never used at service boundary (all converted to `String`) — deferred; fixing would require changing service return types _(severity: low)_
+
+### adversarial
+
+- [DONE] `crates/normalize-native-rules/src/stale_docs.rs:229` — path traversal via HTML comment glob patterns — added `..` component rejection and canonicalized root escape check _(severity: high)_
+- [DONE] `crates/normalize-ratchet/src/metrics/call_complexity.rs:318` — `count += len` without saturation — changed to `saturating_add` _(severity: medium)_
+- [DONE] `crates/normalize-native-rules/src/check_examples.rs:122-123` — byte-index slice using regex offsets — added `// SAFETY:` comment _(severity: medium)_
+- [DONE] `crates/normalize-ratchet/src/metrics/call_complexity.rs:178` — tree-sitter byte-range slice — added `// SAFETY:` comment _(severity: medium)_
+- [DONE] Multiple `capture_names[capture.index as usize]` sites — changed to `.get()` with `continue` on `None` _(severity: medium)_
+- [DONE] `crates/normalize-native-rules/src/stale_docs.rs:69` — `Regex::new().unwrap()` not in `OnceLock` — moved to static `OnceLock` _(severity: low)_
+- [DONE] `crates/normalize-ratchet/src/metrics/call_complexity.rs:254` — `(local_cc + reachable) as f64` without saturation — changed to `saturating_add` _(severity: low)_
+- [DONE] `crates/normalize-native-rules/src/check_refs.rs:213` — `s[dot + 1..]` after `rfind('.')` — added `// SAFETY:` comment _(severity: low)_
