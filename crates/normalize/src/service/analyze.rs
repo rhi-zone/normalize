@@ -303,15 +303,19 @@ impl AnalyzeService {
     #[cli(display_with = "display_security")]
     pub fn security(
         &self,
-        #[param(positional, help = "Target file or directory")] _target: Option<String>,
+        #[param(positional, help = "Target file or directory to filter results by")] target: Option<
+            String,
+        >,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
     ) -> Result<SecurityReport, String> {
         let root_path = Self::root_path(root)?;
-        Ok(crate::commands::analyze::security::analyze_security(
-            &root_path,
-        ))
+        let mut report = crate::commands::analyze::security::analyze_security(&root_path);
+        if let Some(t) = target {
+            report.findings.retain(|f| f.file.contains(&t));
+        }
+        Ok(report)
     }
 
     /// Show complexity trend over git history

@@ -126,7 +126,9 @@ impl Language for Dart {
         // Extract the import URI
         if let Some(start) = text.find('\'').or_else(|| text.find('"')) {
             // start is a byte offset; slice at it (safe: ASCII quote is single-byte) then take first char
-            let quote = text[start..].chars().next().unwrap();
+            let Some(quote) = text[start..].chars().next() else {
+                return Vec::new();
+            };
             let rest = &text[start + 1..];
             if let Some(end) = rest.find(quote) {
                 let module = rest[..end].to_string();
@@ -142,11 +144,31 @@ impl Language for Dart {
                     None
                 };
 
+                // Extract names from 'show' clause; 'hide' imports are named but we
+                // don't suppress names so they remain empty (caller can query show node).
+                // Neither show nor hide is a wildcard import.
+                let (names, is_wildcard) = if text.contains(" show ") {
+                    let show_names: Vec<String> = text
+                        .split(" show ")
+                        .nth(1)
+                        .unwrap_or("")
+                        .split(';')
+                        .next()
+                        .unwrap_or("")
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    (show_names, false)
+                } else {
+                    (Vec::new(), false)
+                };
+
                 return vec![Import {
                     module,
-                    names: Vec::new(),
+                    names,
                     alias,
-                    is_wildcard: text.contains(" show ") || text.contains(" hide "),
+                    is_wildcard,
                     is_relative,
                     line,
                 }];

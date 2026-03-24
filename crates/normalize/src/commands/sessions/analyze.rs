@@ -1,7 +1,7 @@
 //! Session analysis functions.
 
 use crate::sessions::{
-    DedupTokenStats, SessionAnalysis, ToolStats, analyze_session, parse_session,
+    DedupTokenStats, SessionAnalysisReport, ToolStats, analyze_session, parse_session,
     parse_session_with_format,
 };
 use std::fs::File;
@@ -46,8 +46,11 @@ pub fn print_sessions_analysis(paths: &[PathBuf], format: Option<&str>) -> i32 {
 }
 
 /// Aggregate multiple sessions into a single analysis. Returns None if no sessions could be parsed.
-pub fn aggregate_sessions(paths: &[PathBuf], format: Option<&str>) -> Option<SessionAnalysis> {
-    let mut aggregate = SessionAnalysis::new(PathBuf::from("."), "aggregate");
+pub fn aggregate_sessions(
+    paths: &[PathBuf],
+    format: Option<&str>,
+) -> Option<SessionAnalysisReport> {
+    let mut aggregate = SessionAnalysisReport::new(PathBuf::from("."), "aggregate");
     let mut session_count = 0;
     let mut all_chains = Vec::new();
 

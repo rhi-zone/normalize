@@ -81,6 +81,11 @@ pub struct Version {
 }
 
 impl Version {
+    /// Parse a version string like `"1.2"` or `"1.2.3"` into a `Version`.
+    ///
+    /// **Note:** Only the major and minor components are stored; the patch
+    /// component (and any pre-release/build metadata) is silently discarded.
+    /// `Version::parse("1.2.3")` returns `Version { major: 1, minor: 2 }`.
     pub fn parse(s: &str) -> Option<Version> {
         let parts: Vec<&str> = s.split('.').collect();
         if parts.len() >= 2 {

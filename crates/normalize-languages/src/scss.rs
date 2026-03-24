@@ -32,7 +32,9 @@ impl Language for Scss {
                 // Extract quoted path
                 if let Some(start) = rest.find('"').or_else(|| rest.find('\'')) {
                     // start is a byte offset; slice at it (safe: ASCII quote is single-byte) then take first char
-                    let quote = rest[start..].chars().next().unwrap();
+                    let Some(quote) = rest[start..].chars().next() else {
+                        continue;
+                    };
                     let inner = &rest[start + 1..];
                     if let Some(end) = inner.find(quote) {
                         let module = inner[..end].to_string();

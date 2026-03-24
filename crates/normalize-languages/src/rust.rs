@@ -157,7 +157,27 @@ impl Language for Rust {
 
         if let Some(brace_start) = module.find('{') {
             let prefix = module[..brace_start].trim_end_matches("::");
-            if let Some(brace_end) = module.find('}') {
+            // Find matching closing brace using depth counter to handle nested groups
+            // like `use std::{io::{Read, Write}, fs}`.
+            let brace_end = {
+                let mut depth = 0u32;
+                let mut end = None;
+                for (i, c) in module[brace_start..].char_indices() {
+                    match c {
+                        '{' => depth += 1,
+                        '}' => {
+                            depth -= 1;
+                            if depth == 0 {
+                                end = Some(brace_start + i);
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                end
+            };
+            if let Some(brace_end) = brace_end {
                 let items = &module[brace_start + 1..brace_end];
                 for item in items.split(',') {
                     let trimmed = item.trim();

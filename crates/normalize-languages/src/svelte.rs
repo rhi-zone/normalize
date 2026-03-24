@@ -35,7 +35,9 @@ impl Language for Svelte {
             let rest = &text[from_idx + 6..];
             if let Some(start) = rest.find('"').or_else(|| rest.find('\'')) {
                 // start is a byte offset; slice at it (safe: ASCII quote is single-byte) then take first char
-                let quote = rest[start..].chars().next().unwrap();
+                let Some(quote) = rest[start..].chars().next() else {
+                    return Vec::new();
+                };
                 let inner = &rest[start + 1..];
                 if let Some(end) = inner.find(quote) {
                     let module = inner[..end].to_string();
@@ -70,13 +72,14 @@ impl Language for Svelte {
         }
     }
 
-    fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
-        let text = &content[node.byte_range()];
-        if text.contains("export ") {
-            Visibility::Public
-        } else {
-            Visibility::Private
+    fn get_visibility(&self, node: &Node, _content: &str) -> Visibility {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "export" {
+                return Visibility::Public;
+            }
         }
+        Visibility::Private
     }
 
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {

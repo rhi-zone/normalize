@@ -20,7 +20,7 @@ pub struct PathMatch {
     pub score: u32,
 }
 
-/// A single entry returned by [`PathSource::all_files`] or [`PathSource::find_like`].
+/// A single entry returned by [`PathSource::all_files`] and [`PathSource::find_like`].
 pub struct PathEntry {
     pub path: String,
     pub kind: PathMatchKind,
@@ -38,9 +38,8 @@ pub struct SigilExpansion {
 /// Source of indexed file paths (e.g., from a database index).
 pub trait PathSource {
     /// Return paths matching `query` using a fast prefix/substring filter.
-    /// The bool in each tuple is `true` for directories, `false` for files.
     /// Returns `None` if the source cannot answer this query (caller falls back to `all_files`).
-    fn find_like(&mut self, query: &str) -> Option<Vec<(String, bool)>>;
+    fn find_like(&mut self, query: &str) -> Option<Vec<PathEntry>>;
 
     /// Return all known file/directory entries.
     /// Returns `None` if the source is unavailable; caller falls back to a filesystem walk.
@@ -131,10 +130,24 @@ pub fn resolve_unified(
     alias_lookup: &dyn Fn(&str) -> Option<Vec<String>>,
     path_source: Option<&mut dyn PathSource>,
 ) -> Option<UnifiedPath> {
+    resolve_unified_depth(query, root, alias_lookup, path_source, 0)
+}
+
+fn resolve_unified_depth(
+    query: &str,
+    root: &Path,
+    alias_lookup: &dyn Fn(&str) -> Option<Vec<String>>,
+    path_source: Option<&mut dyn PathSource>,
+    depth: u8,
+) -> Option<UnifiedPath> {
     // Handle sigil expansion (@todo, @config, etc.)
     if query.starts_with('@')
         && let Some(expansion) = expand_sigil(query, alias_lookup)
     {
+        // Guard against alias cycles (a→@b→@a→...) by limiting recursion depth.
+        if depth >= 32 {
+            return None;
+        }
         // Try each target path until one exists
         for target in &expansion.paths {
             let full_query = if expansion.suffix.is_empty() {
@@ -142,7 +155,9 @@ pub fn resolve_unified(
             } else {
                 format!("{}/{}", target, expansion.suffix)
             };
-            if let Some(result) = resolve_unified(&full_query, root, alias_lookup, None) {
+            if let Some(result) =
+                resolve_unified_depth(&full_query, root, alias_lookup, None, depth + 1)
+            {
                 return Some(result);
             }
         }
@@ -259,10 +274,24 @@ pub fn resolve_unified_all(
     alias_lookup: &dyn Fn(&str) -> Option<Vec<String>>,
     path_source: Option<&mut dyn PathSource>,
 ) -> Vec<UnifiedPath> {
+    resolve_unified_all_depth(query, root, alias_lookup, path_source, 0)
+}
+
+fn resolve_unified_all_depth(
+    query: &str,
+    root: &Path,
+    alias_lookup: &dyn Fn(&str) -> Option<Vec<String>>,
+    path_source: Option<&mut dyn PathSource>,
+    depth: u8,
+) -> Vec<UnifiedPath> {
     // Handle sigil expansion (@todo, @config, etc.)
     if query.starts_with('@')
         && let Some(expansion) = expand_sigil(query, alias_lookup)
     {
+        // Guard against alias cycles by limiting recursion depth.
+        if depth >= 32 {
+            return vec![];
+        }
         let mut results = Vec::new();
         for target in &expansion.paths {
             let full_query = if expansion.suffix.is_empty() {
@@ -270,7 +299,13 @@ pub fn resolve_unified_all(
             } else {
                 format!("{}/{}", target, expansion.suffix)
             };
-            results.extend(resolve_unified_all(&full_query, root, alias_lookup, None));
+            results.extend(resolve_unified_all_depth(
+                &full_query,
+                root,
+                alias_lookup,
+                None,
+                depth + 1,
+            ));
         }
         return results;
     }
@@ -282,7 +317,7 @@ pub fn resolve_unified_all(
 
     // Absolute paths: single result or none
     if normalized.starts_with('/') {
-        return resolve_unified(query, root, alias_lookup, None)
+        return resolve_unified_depth(query, root, alias_lookup, None, depth)
             .into_iter()
             .collect();
     }
@@ -390,6 +425,10 @@ pub fn all_files(root: &Path, path_source: Option<&mut dyn PathSource>) -> Vec<P
 /// - Exact paths: src/myapp/dwim.py
 /// - Partial filenames: dwim.py, dwim
 /// - Directory names: myapp, src
+///
+/// **Note:** colon-paths like `src/main.py:MyClass` are silently truncated — only the
+/// file component before `:` is resolved. Symbol resolution is left to the caller
+/// (use [`resolve_unified`] if you need both file and symbol).
 pub fn resolve(
     query: &str,
     root: &Path,
@@ -429,13 +468,9 @@ pub fn resolve(
         {
             return files
                 .into_iter()
-                .map(|(path, is_dir)| PathMatch {
-                    path,
-                    kind: if is_dir {
-                        PathMatchKind::Directory
-                    } else {
-                        PathMatchKind::File
-                    },
+                .map(|e| PathMatch {
+                    path: e.path,
+                    kind: e.kind,
                     score: u32::MAX,
                 })
                 .collect();
@@ -484,7 +519,10 @@ fn get_paths_for_query(
             && let Some(files) = src.find_like(query)
             && !files.is_empty()
         {
-            return files;
+            return files
+                .into_iter()
+                .map(|e| (e.path, e.kind == PathMatchKind::Directory))
+                .collect();
         }
         // Fall back to all files for empty query or no LIKE matches
         if let Some(files) = src.all_files() {

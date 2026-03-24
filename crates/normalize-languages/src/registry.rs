@@ -18,8 +18,10 @@ static GRAMMAR_MAP: OnceLock<HashMap<&'static str, &'static dyn Language>> = Onc
 /// Register a language in the global registry.
 /// Called internally by language modules.
 pub fn register(lang: &'static dyn Language) {
-    // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
-    LANGUAGES.write().unwrap().push(lang);
+    LANGUAGES
+        .write()
+        .unwrap_or_else(|e| e.into_inner())
+        .push(lang);
 }
 
 /// Initialize built-in languages (called once).
@@ -230,8 +232,7 @@ fn extension_map() -> &'static HashMap<&'static str, &'static dyn Language> {
     init_builtin();
     EXTENSION_MAP.get_or_init(|| {
         let mut map = HashMap::new();
-        // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
-        let langs = LANGUAGES.read().unwrap();
+        let langs = LANGUAGES.read().unwrap_or_else(|e| e.into_inner());
         for lang in langs.iter() {
             for ext in lang.extensions() {
                 map.insert(*ext, *lang);
@@ -245,8 +246,7 @@ fn grammar_map() -> &'static HashMap<&'static str, &'static dyn Language> {
     init_builtin();
     GRAMMAR_MAP.get_or_init(|| {
         let mut map = HashMap::new();
-        // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
-        let langs = LANGUAGES.read().unwrap();
+        let langs = LANGUAGES.read().unwrap_or_else(|e| e.into_inner());
         for lang in langs.iter() {
             map.insert(lang.grammar_name(), *lang);
         }
@@ -316,8 +316,7 @@ pub fn test_file_globs_for_path(path: &Path) -> &'static [&'static str] {
 /// Get all supported languages.
 pub fn supported_languages() -> Vec<&'static dyn Language> {
     init_builtin();
-    // normalize-syntax-allow: rust/unwrap-in-impl - RwLock poison means programmer error; recovery is not meaningful
-    LANGUAGES.read().unwrap().clone()
+    LANGUAGES.read().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 /// Check if a path is a programming language (not a data/config format).
@@ -400,10 +399,7 @@ pub fn validate_unused_kinds_audit(
         "operator",
     ];
 
-    // Collect all kinds used by Language trait methods
-    let used_kinds: HashSet<&str> = HashSet::new();
-
-    // Also collect kinds referenced in tags.scm
+    // Collect kinds referenced in tags.scm
     let tags_kinds: HashSet<String> = {
         let mut kinds = HashSet::new();
         if let Some(tags_content) = loader.get_tags(lang.grammar_name()) {
@@ -454,10 +450,10 @@ pub fn validate_unused_kinds_audit(
                 kind
             ));
         }
-        // Also check it's not actually being used (in trait methods or tags.scm)
-        if used_kinds.contains(*kind) || tags_kinds.contains(*kind) {
+        // Also check it's not actually being used (in tags.scm)
+        if tags_kinds.contains(*kind) {
             errors.push(format!(
-                "Documented kind '{}' is actually used in trait methods or tags.scm",
+                "Documented kind '{}' is actually used in tags.scm",
                 kind
             ));
         }
@@ -468,11 +464,7 @@ pub fn validate_unused_kinds_audit(
         let lower = kind.to_lowercase();
         let is_interesting = interesting_patterns.iter().any(|p| lower.contains(p));
 
-        if is_interesting
-            && !used_kinds.contains(*kind)
-            && !tags_kinds.contains(*kind)
-            && !documented_set.contains(*kind)
-        {
+        if is_interesting && !tags_kinds.contains(*kind) && !documented_set.contains(*kind) {
             errors.push(format!(
                 "Potentially useful kind '{}' is neither used nor documented",
                 kind

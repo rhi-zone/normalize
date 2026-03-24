@@ -45,13 +45,20 @@ impl IndexPathSource {
 }
 
 impl PathSource for IndexPathSource {
-    fn find_like(&mut self, query: &str) -> Option<Vec<(String, bool)>> {
+    fn find_like(&mut self, query: &str) -> Option<Vec<normalize_path_resolve::PathEntry>> {
         let q = query.to_lowercase();
         Some(
             self.files
                 .iter()
                 .filter(|(p, _)| p.to_lowercase().contains(&q))
-                .cloned()
+                .map(|(path, is_dir)| normalize_path_resolve::PathEntry {
+                    path: path.clone(),
+                    kind: if *is_dir {
+                        normalize_path_resolve::PathMatchKind::Directory
+                    } else {
+                        normalize_path_resolve::PathMatchKind::File
+                    },
+                })
                 .collect(),
         )
     }

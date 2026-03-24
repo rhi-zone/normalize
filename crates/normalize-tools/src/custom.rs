@@ -24,6 +24,22 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
+use std::sync::Mutex;
+
+/// Global string intern cache to avoid repeated `Box::leak` calls for the same strings.
+static STRING_INTERN: Mutex<Option<HashMap<String, &'static str>>> = Mutex::new(None);
+
+/// Intern a string: if already leaked, reuse the existing `&'static str`; otherwise leak once.
+fn intern_str(s: &str) -> &'static str {
+    let mut guard = STRING_INTERN.lock().unwrap_or_else(|e| e.into_inner());
+    let cache = guard.get_or_insert_with(HashMap::new);
+    if let Some(&existing) = cache.get(s) {
+        return existing;
+    }
+    let leaked: &'static str = Box::leak(s.to_string().into_boxed_str());
+    cache.insert(s.to_string(), leaked);
+    leaked
+}
 
 /// Configuration for custom tools.
 #[derive(Debug, Clone, Deserialize)]
@@ -107,21 +123,19 @@ pub struct CustomTool {
 
 impl CustomTool {
     /// Create a custom tool from configuration.
+    ///
+    /// Uses a global intern cache to avoid leaking the same strings on repeated calls
+    /// (e.g. when `registry_with_custom` is called multiple times with the same config).
     pub fn new(name: String, config: CustomToolConfig) -> Self {
-        // We need to leak the strings to get &'static str for ToolInfo
-        // This is acceptable because custom tools are loaded once at startup
-        let name_static: &'static str = Box::leak(name.clone().into_boxed_str());
-        let website_static: &'static str = config
-            .website
-            .as_ref()
-            .map(|s| Box::leak(s.clone().into_boxed_str()) as &'static str)
-            .unwrap_or("");
+        // Intern strings to get &'static str for ToolInfo without leaking on every call
+        let name_static: &'static str = intern_str(&name);
+        let website_static: &'static str = config.website.as_deref().map(intern_str).unwrap_or("");
 
         let extensions: &'static [&'static str] = Box::leak(
             config
                 .extensions
                 .iter()
-                .map(|s| Box::leak(s.clone().into_boxed_str()) as &'static str)
+                .map(|s| intern_str(s))
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
         );
@@ -131,12 +145,12 @@ impl CustomTool {
             Box::leak(
                 check
                     .iter()
-                    .map(|s| Box::leak(s.clone().into_boxed_str()) as &'static str)
+                    .map(|s| intern_str(s))
                     .collect::<Vec<_>>()
                     .into_boxed_slice(),
             )
         } else if !config.command.is_empty() {
-            let cmd = Box::leak(config.command[0].clone().into_boxed_str()) as &'static str;
+            let cmd = intern_str(&config.command[0]);
             Box::leak(vec![cmd, "--version"].into_boxed_slice())
         } else {
             &[]

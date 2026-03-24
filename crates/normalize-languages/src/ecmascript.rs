@@ -271,6 +271,21 @@ pub fn extract_imports(node: &Node, content: &str) -> Vec<Import> {
         return Vec::new();
     }
 
+    // Check for namespace import sentinel set by collect_import_names.
+    // `import * as ns` → is_wildcard=true, alias=Some("ns"), names=[].
+    if names.len() == 1
+        && let Some(ns_alias) = names[0].strip_prefix("__namespace__:")
+    {
+        return vec![Import {
+            module: module.clone(),
+            names: Vec::new(),
+            alias: Some(ns_alias.to_string()),
+            is_wildcard: true,
+            is_relative: module.starts_with('.'),
+            line,
+        }];
+    }
+
     vec![Import {
         module: module.clone(),
         names,
@@ -322,9 +337,15 @@ fn collect_import_names(import_clause: &Node, content: &str, names: &mut Vec<Str
                 }
             }
             "namespace_import" => {
-                // import * as foo
+                // import * as foo — this is a wildcard import; the alias is the namespace name.
+                // We signal this by setting is_wildcard=true and alias on the Import, not by
+                // pushing to names. collect_import_names can only push names, so we push a
+                // sentinel "__namespace__:<alias>" that extract_imports rewrites after this loop.
                 if let Some(name_node) = child.child_by_field_name("name") {
-                    names.push(format!("* as {}", &content[name_node.byte_range()]));
+                    names.push(format!(
+                        "__namespace__:{}",
+                        &content[name_node.byte_range()]
+                    ));
                 }
             }
             _ => {}
