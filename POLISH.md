@@ -558,8 +558,8 @@ None.
 
 ### api-clarity
 
-- [APPROVED] `crates/normalize-budget/src/service.rs:225` — `BudgetService::new()` and `::with_factory()` accept `_pretty: bool` but ignore it; `RatchetService` stores and uses it — remove param or implement _(severity: high)_
-- [APPROVED] `crates/normalize-budget/src/service.rs:57` — `CheckEntry.aggregate` is `String` while `RatchetService::CheckEntry.aggregate` is typed `Aggregate` enum — change to typed `Aggregate` _(severity: medium)_
+- [DONE] `crates/normalize-budget/src/service.rs:225` — `BudgetService::new()` and `::with_factory()` accept `_pretty: bool` but ignore it; `RatchetService` stores and uses it — remove param or implement _(severity: high)_
+- [DONE] `crates/normalize-budget/src/service.rs:57` — `CheckEntry.aggregate` is `String` while `RatchetService::CheckEntry.aggregate` is typed `Aggregate` enum — change to typed `Aggregate` _(severity: medium)_
 
 ### naming-consistency
 
@@ -577,16 +577,16 @@ _(0 new findings — fixpoint reached on this lens)_
 
 ### error-surface
 
-- [APPROVED] `crates/normalize-budget/src/service.rs:779` — `eprintln!` in public `build_budget_report()` — use `tracing::warn!` _(severity: medium)_
-- [APPROVED] `crates/normalize-ratchet/src/service.rs:1158` — `eprintln!` in public `build_ratchet_report()` — use `tracing::warn!` _(severity: medium)_
-- [APPROVED] `crates/normalize-budget/src/service.rs:403` — `eprintln!` in `check()` service method — use `tracing::warn!` _(severity: medium)_
-- [APPROVED] `crates/normalize-ratchet/src/service.rs:544` — `eprintln!` in `update()` service method — use `tracing::warn!` _(severity: medium)_
+- [DONE] `crates/normalize-budget/src/service.rs:779` — `eprintln!` in public `build_budget_report()` — use `tracing::warn!` _(severity: medium)_
+- [DONE] `crates/normalize-ratchet/src/service.rs:1158` — `eprintln!` in public `build_ratchet_report()` — use `tracing::warn!` _(severity: medium)_
+- [DONE] `crates/normalize-budget/src/service.rs:403` — `eprintln!` in `check()` service method — use `tracing::warn!` _(severity: medium)_
+- [DONE] `crates/normalize-ratchet/src/service.rs:544` — `eprintln!` in `update()` service method — use `tracing::warn!` _(severity: medium)_
 
 ### adversarial
 
-- [APPROVED] `crates/normalize-budget/src/service.rs:686` — `filter_entries` uses `e.path.starts_with(p)` string prefix matching; `"src"` matches `"srcother/"` — use path component boundary check (as ratchet does) _(severity: medium)_
-- [APPROVED] `crates/normalize-ratchet/src/metrics/call_complexity.rs:303` — unchecked `usize` addition in BFS can overflow on deep call graphs — use `saturating_add` _(severity: medium)_
-- [APPROVED] `crates/normalize-budget/src/metrics/complexity_delta.rs:226` — unchecked `usize` addition in complexity counting — use `saturating_add` _(severity: low)_
-- [APPROVED] `crates/normalize-ratchet/src/metrics/complexity.rs:195` — same unchecked addition — use `saturating_add` _(severity: low)_
-- [APPROVED] `crates/normalize-ratchet/src/service.rs:885` + `crates/normalize-budget/src/metrics/functions.rs:45` — `&hash[..7.min(hash.len())]` byte-slices git hash without char boundary check — add comment that git hashes are guaranteed ASCII _(severity: low)_
-- [APPROVED] `crates/normalize-budget/src/service.rs:717` — `net > max_net` when `max_net` may be negative; semantics surprising — add doc comment explaining the comparison _(severity: low)_
+- [DONE] `crates/normalize-budget/src/service.rs:686` — `filter_entries` uses `e.path.starts_with(p)` string prefix matching; `"src"` matches `"srcother/"` — use path component boundary check (as ratchet does) _(severity: medium)_
+- [DONE] `crates/normalize-ratchet/src/metrics/call_complexity.rs:303` — unchecked `usize` addition in BFS can overflow on deep call graphs — use `saturating_add` _(severity: medium)_
+- [DONE] `crates/normalize-budget/src/metrics/complexity_delta.rs:226` — unchecked `usize` addition in complexity counting — use `saturating_add` _(severity: low)_
+- [DONE] `crates/normalize-ratchet/src/metrics/complexity.rs:195` — same unchecked addition — use `saturating_add` _(severity: low)_
+- [DONE] `crates/normalize-ratchet/src/service.rs:885` + `crates/normalize-budget/src/metrics/functions.rs:45` — `&hash[..7.min(hash.len())]` byte-slices git hash without char boundary check — add comment that git hashes are guaranteed ASCII _(severity: low)_
+- [DONE] `crates/normalize-budget/src/service.rs:717` — `net > max_net` when `max_net` may be negative; semantics surprising — add doc comment explaining the comparison _(severity: low)_
