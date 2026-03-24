@@ -4013,6 +4013,7 @@ dependencies = [
  "serde",
  "serde_json",
  "server-less",
+ "thiserror 2.0.18",
  "tokio",
 ]
 
@@ -4335,6 +4336,7 @@ dependencies = [
  "schemars",
  "serde",
  "tempfile",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

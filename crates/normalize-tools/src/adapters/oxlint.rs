@@ -34,7 +34,7 @@ impl Default for Oxlint {
     }
 }
 
-fn oxlint_command() -> Option<(String, Vec<String>)> {
+fn oxlint_command() -> Option<crate::tools::ToolInvocation> {
     crate::tools::find_js_tool("oxlint", None)
 }
 
@@ -92,9 +92,9 @@ impl Tool for Oxlint {
     }
 
     fn version(&self) -> Option<String> {
-        let (cmd, base_args) = oxlint_command()?;
-        let mut command = Command::new(cmd);
-        command.args(&base_args).arg("--version");
+        let inv = oxlint_command()?;
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args).arg("--version");
         command
             .output()
             .ok()
@@ -119,7 +119,7 @@ impl Tool for Oxlint {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) = oxlint_command()
+        let inv = oxlint_command()
             .ok_or_else(|| ToolError::NotAvailable("oxlint not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -128,8 +128,8 @@ impl Tool for Oxlint {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args);
         command.arg("--format=json");
 
         // Enable type-aware linting when tsconfig.json is present
@@ -198,7 +198,7 @@ impl Tool for Oxlint {
     }
 
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) = oxlint_command()
+        let inv = oxlint_command()
             .ok_or_else(|| ToolError::NotAvailable("oxlint not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -207,8 +207,8 @@ impl Tool for Oxlint {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args);
         command.arg("--fix").arg("--format=json");
 
         // Enable type-aware linting when tsconfig.json is present

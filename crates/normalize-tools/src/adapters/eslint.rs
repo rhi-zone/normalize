@@ -10,7 +10,7 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
-fn eslint_command() -> Option<(String, Vec<String>)> {
+fn eslint_command() -> Option<crate::tools::ToolInvocation> {
     crate::tools::find_js_tool("eslint", None)
 }
 
@@ -67,9 +67,9 @@ impl Tool for Eslint {
     }
 
     fn version(&self) -> Option<String> {
-        let (cmd, base_args) = eslint_command()?;
-        let mut command = Command::new(cmd);
-        command.args(&base_args).arg("--version");
+        let inv = eslint_command()?;
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args).arg("--version");
         command
             .output()
             .ok()
@@ -98,7 +98,7 @@ impl Tool for Eslint {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) = eslint_command()
+        let inv = eslint_command()
             .ok_or_else(|| ToolError::NotAvailable("eslint not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -107,8 +107,8 @@ impl Tool for Eslint {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args);
         command.arg("--format").arg("json");
 
         let output = command.args(&path_args).current_dir(root).output()?;
@@ -159,7 +159,7 @@ impl Tool for Eslint {
     }
 
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) = eslint_command()
+        let inv = eslint_command()
             .ok_or_else(|| ToolError::NotAvailable("eslint not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -168,8 +168,8 @@ impl Tool for Eslint {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args);
         command.arg("--fix").arg("--format").arg("json");
 
         let output = command.args(&path_args).current_dir(root).output()?;

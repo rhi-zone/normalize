@@ -10,7 +10,7 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
-fn ruff_command() -> Option<(String, Vec<String>)> {
+fn ruff_command() -> Option<crate::tools::ToolInvocation> {
     crate::tools::find_python_tool("ruff")
 }
 
@@ -73,9 +73,9 @@ impl Tool for Ruff {
     }
 
     fn version(&self) -> Option<String> {
-        let (cmd, base_args) = ruff_command()?;
-        let mut command = Command::new(cmd);
-        command.args(&base_args).arg("--version");
+        let inv = ruff_command()?;
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args).arg("--version");
         command
             .output()
             .ok()
@@ -104,7 +104,7 @@ impl Tool for Ruff {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) =
+        let inv =
             ruff_command().ok_or_else(|| ToolError::NotAvailable("ruff not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -113,8 +113,8 @@ impl Tool for Ruff {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args);
         command.arg("check").arg("--output-format=json");
 
         let output = command.args(&path_args).current_dir(root).output()?;
@@ -177,7 +177,7 @@ impl Tool for Ruff {
     }
 
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) =
+        let inv =
             ruff_command().ok_or_else(|| ToolError::NotAvailable("ruff not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -186,8 +186,8 @@ impl Tool for Ruff {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args);
         command
             .arg("check")
             .arg("--fix")

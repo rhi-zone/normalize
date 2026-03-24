@@ -10,7 +10,7 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
-fn biome_command() -> Option<(String, Vec<String>)> {
+fn biome_command() -> Option<crate::tools::ToolInvocation> {
     // biome binary comes from the "@biomejs/biome" package
     crate::tools::find_js_tool("biome", Some("@biomejs/biome"))
 }
@@ -127,9 +127,9 @@ fn is_biome_available() -> bool {
 }
 
 fn biome_version() -> Option<String> {
-    let (cmd, base_args) = biome_command()?;
-    let mut command = Command::new(cmd);
-    command.args(&base_args).arg("--version");
+    let inv = biome_command()?;
+    let mut command = Command::new(&inv.command);
+    command.args(&inv.args).arg("--version");
     command
         .output()
         .ok()
@@ -193,7 +193,7 @@ fn run_biome(
     paths: &[&Path],
     root: &Path,
 ) -> Result<ToolResult, ToolError> {
-    let (cmd, base_args) =
+    let inv =
         biome_command().ok_or_else(|| ToolError::NotAvailable("biome not found".to_string()))?;
 
     let path_args: Vec<&str> = if paths.is_empty() {
@@ -202,8 +202,8 @@ fn run_biome(
         paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
     };
 
-    let mut command = Command::new(cmd);
-    command.args(&base_args).arg(subcommand);
+    let mut command = Command::new(&inv.command);
+    command.args(&inv.args).arg(subcommand);
     for arg in extra_args {
         command.arg(arg);
     }

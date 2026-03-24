@@ -7,7 +7,7 @@ use crate::{Diagnostic, Tool, ToolCategory, ToolError, ToolInfo, ToolResult};
 use std::path::Path;
 use std::process::Command;
 
-fn tsc_command() -> Option<(String, Vec<String>)> {
+fn tsc_command() -> Option<crate::tools::ToolInvocation> {
     // tsc binary comes from the "typescript" package
     crate::tools::find_js_tool("tsc", Some("typescript"))
 }
@@ -45,9 +45,9 @@ impl Tool for Tsc {
     }
 
     fn version(&self) -> Option<String> {
-        let (cmd, base_args) = tsc_command()?;
-        let mut command = Command::new(cmd);
-        command.args(&base_args).arg("--version");
+        let inv = tsc_command()?;
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args).arg("--version");
         command
             .output()
             .ok()
@@ -65,13 +65,13 @@ impl Tool for Tsc {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd_name, base_args) =
+        let inv =
             tsc_command().ok_or_else(|| ToolError::NotAvailable("tsc not found".to_string()))?;
 
         // tsc --noEmit for type checking only
         // Use --pretty false for machine-readable output
-        let mut cmd = Command::new(cmd_name);
-        cmd.args(&base_args);
+        let mut cmd = Command::new(&inv.command);
+        cmd.args(&inv.args);
         cmd.arg("--noEmit").arg("--pretty").arg("false");
 
         // If specific paths provided, we can't easily pass them to tsc

@@ -117,6 +117,8 @@ impl std::fmt::Display for ManifestError {
     }
 }
 
+impl std::error::Error for ManifestError {}
+
 /// A parser for a specific manifest file format.
 pub trait ManifestParser: Send + Sync {
     /// The canonical filename this parser handles (e.g., `"Cargo.toml"`).

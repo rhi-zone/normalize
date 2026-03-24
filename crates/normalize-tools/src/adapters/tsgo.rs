@@ -8,7 +8,7 @@ use crate::{Diagnostic, Tool, ToolCategory, ToolError, ToolInfo, ToolResult};
 use std::path::Path;
 use std::process::Command;
 
-fn tsgo_command() -> Option<(String, Vec<String>)> {
+fn tsgo_command() -> Option<crate::tools::ToolInvocation> {
     // @typescript/native-preview provides the tsgo binary
     crate::tools::find_js_tool("tsgo", Some("@typescript/native-preview"))
 }
@@ -46,9 +46,9 @@ impl Tool for Tsgo {
     }
 
     fn version(&self) -> Option<String> {
-        let (cmd, base_args) = tsgo_command()?;
-        let mut command = Command::new(cmd);
-        command.args(&base_args).arg("--version");
+        let inv = tsgo_command()?;
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args).arg("--version");
         command
             .output()
             .ok()
@@ -67,12 +67,12 @@ impl Tool for Tsgo {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd_name, base_args) =
+        let inv =
             tsgo_command().ok_or_else(|| ToolError::NotAvailable("tsgo not found".to_string()))?;
 
         // tsgo uses similar flags to tsc
-        let mut cmd = Command::new(cmd_name);
-        cmd.args(&base_args);
+        let mut cmd = Command::new(&inv.command);
+        cmd.args(&inv.args);
         cmd.arg("--noEmit").arg("--pretty").arg("false");
 
         // If specific paths provided, pass them

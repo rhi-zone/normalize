@@ -10,7 +10,7 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
-fn mypy_command() -> Option<(String, Vec<String>)> {
+fn mypy_command() -> Option<crate::tools::ToolInvocation> {
     crate::tools::find_python_tool("mypy")
 }
 
@@ -58,9 +58,9 @@ impl Tool for Mypy {
     }
 
     fn version(&self) -> Option<String> {
-        let (cmd, base_args) = mypy_command()?;
-        let mut command = Command::new(cmd);
-        command.args(&base_args).arg("--version");
+        let inv = mypy_command()?;
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args).arg("--version");
         command
             .output()
             .ok()
@@ -88,7 +88,7 @@ impl Tool for Mypy {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) =
+        let inv =
             mypy_command().ok_or_else(|| ToolError::NotAvailable("mypy not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -97,8 +97,8 @@ impl Tool for Mypy {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args);
         command.arg("--output").arg("json");
 
         let output = command.args(&path_args).current_dir(root).output()?;

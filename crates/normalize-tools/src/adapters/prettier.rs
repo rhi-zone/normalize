@@ -9,7 +9,7 @@ use crate::{
 use std::path::Path;
 use std::process::Command;
 
-fn prettier_command() -> Option<(String, Vec<String>)> {
+fn prettier_command() -> Option<crate::tools::ToolInvocation> {
     crate::tools::find_js_tool("prettier", None)
 }
 
@@ -49,9 +49,9 @@ impl Tool for Prettier {
     }
 
     fn version(&self) -> Option<String> {
-        let (cmd, base_args) = prettier_command()?;
-        let mut command = Command::new(cmd);
-        command.args(&base_args).arg("--version");
+        let inv = prettier_command()?;
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args).arg("--version");
         command
             .output()
             .ok()
@@ -91,7 +91,7 @@ impl Tool for Prettier {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) = prettier_command()
+        let inv = prettier_command()
             .ok_or_else(|| ToolError::NotAvailable("prettier not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -100,8 +100,8 @@ impl Tool for Prettier {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args);
         command.arg("--check");
 
         let output = command.args(&path_args).current_dir(root).output()?;
@@ -164,7 +164,7 @@ impl Tool for Prettier {
     }
 
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) = prettier_command()
+        let inv = prettier_command()
             .ok_or_else(|| ToolError::NotAvailable("prettier not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
@@ -173,8 +173,8 @@ impl Tool for Prettier {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let mut command = Command::new(cmd);
-        command.args(&base_args);
+        let mut command = Command::new(&inv.command);
+        command.args(&inv.args);
         command.arg("--write");
 
         let output = command.args(&path_args).current_dir(root).output()?;

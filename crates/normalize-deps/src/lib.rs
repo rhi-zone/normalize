@@ -26,87 +26,24 @@ struct ExtractedDeps {
     reexports: Vec<ReExport>,
 }
 
-/// Dependency information for a file
-#[allow(dead_code)] // file_path provides context; format() is API method
+/// Dependency information for a file.
 pub struct DepsResult {
     pub imports: Vec<Import>,
     pub exports: Vec<Export>,
     pub reexports: Vec<ReExport>,
+    /// Source file path, for context in downstream consumers.
     pub file_path: String,
 }
 
-impl DepsResult {
-    /// Format as compact text
-    #[allow(dead_code)] // API method for CLI output
-    pub fn format(&self) -> String {
-        let mut lines = Vec::new();
-
-        if !self.imports.is_empty() {
-            lines.push("# Imports".to_string());
-            for imp in &self.imports {
-                let prefix = if imp.is_relative {
-                    format!(".{}", imp.module)
-                } else {
-                    imp.module.clone()
-                };
-
-                if imp.names.is_empty() {
-                    let alias = imp
-                        .alias
-                        .as_ref()
-                        .map(|a| format!(" as {}", a))
-                        .unwrap_or_default();
-                    lines.push(format!("import {}{}", prefix, alias));
-                } else {
-                    lines.push(format!("from {} import {}", prefix, imp.names.join(", ")));
-                }
-            }
-            lines.push(String::new());
-        }
-
-        if !self.exports.is_empty() {
-            lines.push("# Exports".to_string());
-            for exp in &self.exports {
-                if exp.kind != SymbolKind::Variable {
-                    lines.push(format!("{}: {}", exp.kind.as_str(), exp.name));
-                }
-            }
-            lines.push(String::new());
-        }
-
-        if !self.reexports.is_empty() {
-            lines.push("# Re-exports".to_string());
-            for reexp in &self.reexports {
-                if reexp.is_star {
-                    lines.push(format!("export * from '{}'", reexp.module));
-                } else {
-                    lines.push(format!(
-                        "export {{ {} }} from '{}'",
-                        reexp.names.join(", "),
-                        reexp.module
-                    ));
-                }
-            }
-        }
-
-        lines.join("\n").trim_end().to_string()
-    }
+/// Extract imports, exports, and re-exports from a source file.
+pub fn extract_deps(path: &Path, content: &str) -> DepsResult {
+    DepsExtractor.extract(path, content)
 }
 
-pub struct DepsExtractor {}
-
-impl Default for DepsExtractor {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+struct DepsExtractor;
 
 impl DepsExtractor {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    pub fn extract(&self, path: &Path, content: &str) -> DepsResult {
+    fn extract(&self, path: &Path, content: &str) -> DepsResult {
         let support = support_for_path(path);
 
         let extracted = match support {
@@ -880,7 +817,6 @@ mod tests {
 
     #[test]
     fn test_python_imports() {
-        let extractor = DepsExtractor::new();
         let content = r#"
 import os
 import json as j
@@ -893,7 +829,7 @@ def foo():
 class Bar:
     pass
 "#;
-        let result = extractor.extract(&PathBuf::from("test.py"), content);
+        let result = extract_deps(&PathBuf::from("test.py"), content);
 
         assert!(result.imports.len() >= 3);
         assert!(result.exports.iter().any(|e| e.name == "foo"));
@@ -902,7 +838,6 @@ class Bar:
 
     #[test]
     fn test_rust_imports() {
-        let extractor = DepsExtractor::new();
         let content = r#"
 use std::path::Path;
 use std::collections::{HashMap, HashSet};
@@ -911,7 +846,7 @@ pub fn foo() {}
 
 pub struct Bar {}
 "#;
-        let result = extractor.extract(&PathBuf::from("test.rs"), content);
+        let result = extract_deps(&PathBuf::from("test.rs"), content);
 
         assert!(result.imports.len() >= 2);
         assert!(result.exports.iter().any(|e| e.name == "foo"));
@@ -920,7 +855,6 @@ pub struct Bar {}
 
     #[test]
     fn test_typescript_imports() {
-        let extractor = DepsExtractor::new();
         let content = r#"
 import { foo, bar } from './utils';
 import React from 'react';
@@ -936,7 +870,7 @@ export class User {
 
 export const VERSION = "1.0.0";
 "#;
-        let result = extractor.extract(&PathBuf::from("test.ts"), content);
+        let result = extract_deps(&PathBuf::from("test.ts"), content);
 
         assert!(result.imports.len() >= 2);
         assert!(result.imports.iter().any(|i| i.module == "./utils"));
@@ -946,13 +880,12 @@ export const VERSION = "1.0.0";
 
     #[test]
     fn test_typescript_barrel_reexports() {
-        let extractor = DepsExtractor::new();
         let content = r#"
 export * from './utils';
 export * as helpers from './helpers';
 export { foo, bar } from './specific';
 "#;
-        let result = extractor.extract(&PathBuf::from("index.ts"), content);
+        let result = extract_deps(&PathBuf::from("index.ts"), content);
 
         assert_eq!(result.reexports.len(), 3);
 
@@ -989,7 +922,6 @@ export { foo, bar } from './specific';
 
     #[test]
     fn test_go_imports() {
-        let extractor = DepsExtractor::new();
         let content = r#"
 package main
 
@@ -1015,7 +947,7 @@ const PublicConst = 1
 
 var PublicVar = "hello"
 "#;
-        let result = extractor.extract(&PathBuf::from("main.go"), content);
+        let result = extract_deps(&PathBuf::from("main.go"), content);
 
         // Check imports
         assert!(result.imports.iter().any(|i| i.module == "fmt"));
@@ -1042,7 +974,6 @@ var PublicVar = "hello"
 
     #[test]
     fn test_vue_embedded_imports() {
-        let extractor = DepsExtractor::new();
         let content = r#"
 <template>
   <div>{{ message }}</div>
@@ -1059,7 +990,7 @@ export function greet(name: string): string {
 const message = ref('Hello World');
 </script>
 "#;
-        let result = extractor.extract(&PathBuf::from("App.vue"), content);
+        let result = extract_deps(&PathBuf::from("App.vue"), content);
 
         // Check imports from embedded script
         assert!(
@@ -1091,7 +1022,6 @@ const message = ref('Hello World');
 
     #[test]
     fn test_html_embedded_imports() {
-        let extractor = DepsExtractor::new();
         let content = r#"
 <!DOCTYPE html>
 <html>
@@ -1106,7 +1036,7 @@ const message = ref('Hello World');
 </body>
 </html>
 "#;
-        let result = extractor.extract(&PathBuf::from("index.html"), content);
+        let result = extract_deps(&PathBuf::from("index.html"), content);
 
         // Check imports from embedded script
         assert!(
@@ -1121,7 +1051,6 @@ const message = ref('Hello World');
 
     #[test]
     fn test_commonjs_require_imports() {
-        let extractor = DepsExtractor::new();
         let content = r#"
 const path = require('path');
 const { readFile, writeFile } = require('fs');
@@ -1131,7 +1060,7 @@ require('./side-effect');
 
 module.exports = { path, express };
 "#;
-        let result = extractor.extract(&PathBuf::from("test.js"), content);
+        let result = extract_deps(&PathBuf::from("test.js"), content);
 
         // Simple binding: const x = require(...)
         // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
@@ -1177,13 +1106,12 @@ module.exports = { path, express };
 
     #[test]
     fn test_commonjs_require_in_typescript() {
-        let extractor = DepsExtractor::new();
         let content = r#"
 const fs = require('fs');
 const { EventEmitter } = require('events');
 import { Something } from './es-module';
 "#;
-        let result = extractor.extract(&PathBuf::from("test.ts"), content);
+        let result = extract_deps(&PathBuf::from("test.ts"), content);
 
         assert!(
             result.imports.iter().any(|i| i.module == "fs"),
