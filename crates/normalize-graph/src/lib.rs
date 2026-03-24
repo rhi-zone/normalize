@@ -8,6 +8,7 @@
 //! transitive edge detection, longest chains, weakly connected components.
 
 use normalize_output::OutputFormatter;
+use nu_ansi_term::Color;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -185,7 +186,12 @@ impl DependentsReport {
         let total = self.direct.len() + self.transitive.len();
 
         if pretty {
-            lines.push(format!("\x1b[1;36m# Dependents of {}\x1b[0m", self.target));
+            lines.push(
+                Color::Cyan
+                    .bold()
+                    .paint(format!("# Dependents of {}", self.target))
+                    .to_string(),
+            );
         } else {
             lines.push(format!("# Dependents of {}", self.target));
         }
@@ -194,8 +200,12 @@ impl DependentsReport {
         if let Some(ref br) = self.blast_radius {
             if pretty {
                 lines.push(format!(
-                    "\x1b[1m{}\x1b[0m files affected · \x1b[32m{}\x1b[0m direct · \x1b[33m{}\x1b[0m transitive · \x1b[31m{}\x1b[0m untested · max depth {}",
-                    total, br.direct_count, br.transitive_count, br.untested_count, br.max_depth
+                    "{} files affected · {} direct · {} transitive · {} untested · max depth {}",
+                    Color::Default.bold().paint(total.to_string()),
+                    Color::Green.paint(br.direct_count.to_string()),
+                    Color::Yellow.paint(br.transitive_count.to_string()),
+                    Color::Red.paint(br.untested_count.to_string()),
+                    br.max_depth
                 ));
             } else {
                 lines.push(format!(
@@ -208,24 +218,26 @@ impl DependentsReport {
         if !self.direct.is_empty() {
             lines.push(String::new());
             if pretty {
-                lines.push(format!(
-                    "\x1b[1;32m## Direct ({})\x1b[0m",
-                    self.direct.len()
-                ));
+                lines.push(
+                    Color::Green
+                        .bold()
+                        .paint(format!("## Direct ({})", self.direct.len()))
+                        .to_string(),
+                );
             } else {
                 lines.push(format!("## Direct ({})", self.direct.len()));
             }
             for e in &self.direct {
                 let tested = if e.has_tests {
                     if pretty {
-                        "\x1b[32mtested\x1b[0m"
+                        Color::Green.paint("tested").to_string()
                     } else {
-                        "tested"
+                        "tested".to_string()
                     }
                 } else if pretty {
-                    "\x1b[1;31mUNTESTED\x1b[0m"
+                    Color::Red.bold().paint("UNTESTED").to_string()
                 } else {
-                    "UNTESTED"
+                    "UNTESTED".to_string()
                 };
                 lines.push(format!(
                     "  {:<40} depth {}  {}  fan-in {}",
@@ -237,24 +249,26 @@ impl DependentsReport {
         if !self.transitive.is_empty() {
             lines.push(String::new());
             if pretty {
-                lines.push(format!(
-                    "\x1b[1;33m## Transitive ({})\x1b[0m",
-                    self.transitive.len()
-                ));
+                lines.push(
+                    Color::Yellow
+                        .bold()
+                        .paint(format!("## Transitive ({})", self.transitive.len()))
+                        .to_string(),
+                );
             } else {
                 lines.push(format!("## Transitive ({})", self.transitive.len()));
             }
             for e in &self.transitive {
                 let tested = if e.has_tests {
                     if pretty {
-                        "\x1b[32mtested\x1b[0m"
+                        Color::Green.paint("tested").to_string()
                     } else {
-                        "tested"
+                        "tested".to_string()
                     }
                 } else if pretty {
-                    "\x1b[1;31mUNTESTED\x1b[0m"
+                    Color::Red.bold().paint("UNTESTED").to_string()
                 } else {
-                    "UNTESTED"
+                    "UNTESTED".to_string()
                 };
                 lines.push(format!(
                     "  {:<40} depth {}  {}  fan-in {}",
@@ -266,10 +280,15 @@ impl DependentsReport {
         if !self.untested_paths.is_empty() {
             lines.push(String::new());
             if pretty {
-                lines.push(format!(
-                    "\x1b[1;31m## Untested Impact Paths ({})\x1b[0m",
-                    self.untested_paths.len()
-                ));
+                lines.push(
+                    Color::Red
+                        .bold()
+                        .paint(format!(
+                            "## Untested Impact Paths ({})",
+                            self.untested_paths.len()
+                        ))
+                        .to_string(),
+                );
             } else {
                 lines.push(format!(
                     "## Untested Impact Paths ({})",
@@ -293,11 +312,17 @@ impl DependentsReport {
         let mut out = Vec::new();
         if pretty {
             out.push(format!(
-                "\x1b[1;36m# Dependents of\x1b[0m \x1b[1m{}\x1b[0m \x1b[2m({} {} depend on it)\x1b[0m",
-                self.target, self.dependents.len(), kind
+                "{} {} {}",
+                Color::Cyan.bold().paint("# Dependents of"),
+                Color::Default.bold().paint(&self.target),
+                Color::Default.dimmed().paint(format!(
+                    "({} {} depend on it)",
+                    self.dependents.len(),
+                    kind
+                )),
             ));
             for dep in &self.dependents {
-                out.push(format!("  \x1b[37m{}\x1b[0m", dep));
+                out.push(format!("  {}", Color::White.paint(dep.as_str())));
             }
         } else {
             out.push(format!(

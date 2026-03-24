@@ -3830,6 +3830,7 @@ version = "0.2.0"
 dependencies = [
  "libsql",
  "normalize-facts",
+ "normalize-graph",
  "normalize-languages",
  "schemars",
  "serde",
@@ -4124,6 +4125,7 @@ name = "normalize-graph"
 version = "0.2.0"
 dependencies = [
  "normalize-output",
+ "nu-ansi-term",
  "schemars",
  "serde",
 ]
