@@ -44,7 +44,7 @@ pub fn run(relations: &Relations) -> Vec<Diagnostic> {
 
     for import in relations.imports.iter() {
         let from_file = import.from_file.to_string();
-        let to_module = import.to_module.to_string();
+        let to_module = import.module_specifier.to_string();
 
         // Only consider local file imports (not external packages).
         // This heuristic filters out well-known external-package prefixes.

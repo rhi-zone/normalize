@@ -44,8 +44,11 @@ pub struct SymbolFact {
 pub struct ImportFact {
     /// File containing the import
     pub from_file: RString,
-    /// Module/file being imported from
-    pub to_module: RString,
+    /// Raw module specifier as written in the source (e.g. `"../foo"`, `"std::collections"`).
+    /// This is NOT a resolved file path — some languages populate this with the literal
+    /// import string; others leave it empty (`""`) when no module path is present in the
+    /// import syntax. Resolved file paths are stored separately in the index.
+    pub module_specifier: RString,
     /// Name being imported (or "*" for wildcard)
     pub name: RString,
 }
@@ -231,7 +234,7 @@ impl Relations {
     pub fn add_import(&mut self, from_file: &str, to_module: &str, name: &str) {
         self.imports.push(ImportFact {
             from_file: from_file.into(),
-            to_module: to_module.into(),
+            module_specifier: to_module.into(),
             name: name.into(),
         });
     }

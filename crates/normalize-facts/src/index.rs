@@ -391,10 +391,11 @@ impl FileIndex {
         if version != SCHEMA_VERSION {
             // Reset on schema change
             conn.execute("DELETE FROM files", ()).await?;
-            conn.execute("DELETE FROM calls", ()).await.ok();
-            conn.execute("DELETE FROM symbols", ()).await.ok();
-            conn.execute("DELETE FROM imports", ()).await.ok();
+            conn.execute("DELETE FROM calls", ()).await?;
+            conn.execute("DELETE FROM symbols", ()).await?;
+            conn.execute("DELETE FROM imports", ()).await?;
             // Add new columns that may not exist in older schema versions.
+            // Use .ok() to tolerate "duplicate column" errors on already-migrated DBs.
             conn.execute("ALTER TABLE imports ADD COLUMN resolved_file TEXT", ())
                 .await
                 .ok(); // ignore "duplicate column" error on fresh DBs
@@ -405,12 +406,11 @@ impl FileIndex {
                 "CREATE INDEX IF NOT EXISTS idx_calls_resolved ON calls(callee_resolved_file)",
                 (),
             )
-            .await
-            .ok();
-            conn.execute("DELETE FROM type_methods", ()).await.ok();
-            conn.execute("DELETE FROM type_refs", ()).await.ok();
-            conn.execute("DELETE FROM symbol_attributes", ()).await.ok();
-            conn.execute("DELETE FROM symbol_implements", ()).await.ok();
+            .await?;
+            conn.execute("DELETE FROM type_methods", ()).await?;
+            conn.execute("DELETE FROM type_refs", ()).await?;
+            conn.execute("DELETE FROM symbol_attributes", ()).await?;
+            conn.execute("DELETE FROM symbol_implements", ()).await?;
             conn.execute(
                 "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?1)",
                 params![SCHEMA_VERSION.to_string()],
@@ -420,6 +420,11 @@ impl FileIndex {
 
         // Create convenience views for agent queries.
         // These are idempotent (CREATE VIEW IF NOT EXISTS) and safe to run on every open.
+
+        // entry_points: public symbols that are never called internally.
+        // Identifies API surface that external callers enter through — functions/types
+        // that are exported but have no recorded callers within the indexed codebase.
+        // Useful for finding dead public API candidates and top-level entry symbols.
         conn.execute(
             "CREATE VIEW IF NOT EXISTS entry_points AS
              SELECT s.file, s.name, s.kind, s.start_line, s.end_line
@@ -433,6 +438,10 @@ impl FileIndex {
         .await
         .ok();
 
+        // external_deps: imports whose module specifier could not be resolved to a
+        // file within the indexed root (resolved_file IS NULL). These represent
+        // third-party packages, stdlib imports, or imports outside the project root.
+        // Used to distinguish in-project edges from external dependencies in analysis.
         conn.execute(
             "CREATE VIEW IF NOT EXISTS external_deps AS
              SELECT file, module, name, alias, line
@@ -443,6 +452,10 @@ impl FileIndex {
         .await
         .ok();
 
+        // external_surface: public symbols that are called by files whose own imports
+        // include at least one unresolved (external) dependency.
+        // Identifies the boundary between internal implementation and externally-facing
+        // API — the symbols that external-dependency-using files actually invoke.
         conn.execute(
             "CREATE VIEW IF NOT EXISTS external_surface AS
              SELECT DISTINCT s.file, s.name, s.kind, s.start_line, s.end_line
@@ -848,7 +861,7 @@ impl FileIndex {
                 path: row.get(0)?,
                 is_dir: row.get::<i64>(1)? != 0,
                 mtime: row.get(2)?,
-                lines: row.get::<i64>(3)? as usize,
+                lines: u64::try_from(row.get::<i64>(3)?).unwrap_or(0) as usize,
             });
         }
         Ok(files)
@@ -870,7 +883,7 @@ impl FileIndex {
                 path: row.get(0)?,
                 is_dir: row.get::<i64>(1)? != 0,
                 mtime: row.get(2)?,
-                lines: row.get::<i64>(3)? as usize,
+                lines: u64::try_from(row.get::<i64>(3)?).unwrap_or(0) as usize,
             });
         }
         Ok(files)
@@ -892,7 +905,7 @@ impl FileIndex {
                 path: row.get(0)?,
                 is_dir: row.get::<i64>(1)? != 0,
                 mtime: row.get(2)?,
-                lines: row.get::<i64>(3)? as usize,
+                lines: u64::try_from(row.get::<i64>(3)?).unwrap_or(0) as usize,
             });
         }
         Ok(files)
@@ -902,7 +915,7 @@ impl FileIndex {
     pub async fn count(&self) -> Result<usize, libsql::Error> {
         let mut rows = self.conn.query("SELECT COUNT(*) FROM files", ()).await?;
         if let Some(row) = rows.next().await? {
-            Ok(row.get::<i64>(0)? as usize)
+            Ok(u64::try_from(row.get::<i64>(0)?).unwrap_or(0) as usize)
         } else {
             Ok(0)
         }
@@ -988,7 +1001,11 @@ impl FileIndex {
                 .await?;
             let mut callers = Vec::new();
             while let Some(row) = rows.next().await? {
-                callers.push((row.get(0)?, row.get(1)?, row.get::<i64>(2)? as usize));
+                callers.push((
+                    row.get(0)?,
+                    row.get(1)?,
+                    u64::try_from(row.get::<i64>(2)?).unwrap_or(0) as usize,
+                ));
             }
 
             if !callers.is_empty() {
@@ -1033,7 +1050,11 @@ impl FileIndex {
         ).await?;
         let mut callers = Vec::new();
         while let Some(row) = rows.next().await? {
-            callers.push((row.get(0)?, row.get(1)?, row.get::<i64>(2)? as usize));
+            callers.push((
+                row.get(0)?,
+                row.get(1)?,
+                u64::try_from(row.get::<i64>(2)?).unwrap_or(0) as usize,
+            ));
         }
 
         Ok(callers)
@@ -1054,7 +1075,10 @@ impl FileIndex {
             .await?;
         let mut callees = Vec::new();
         while let Some(row) = rows.next().await? {
-            callees.push((row.get(0)?, row.get::<i64>(1)? as usize));
+            callees.push((
+                row.get(0)?,
+                u64::try_from(row.get::<i64>(1)?).unwrap_or(0) as usize,
+            ));
         }
         Ok(callees)
     }
@@ -1086,7 +1110,7 @@ impl FileIndex {
         while let Some(row) = rows.next().await? {
             callees.push((
                 row.get(0)?,
-                row.get::<i64>(1)? as usize,
+                u64::try_from(row.get::<i64>(1)?).unwrap_or(0) as usize,
                 row.get::<Option<String>>(2)?,
             ));
         }
@@ -1110,8 +1134,8 @@ impl FileIndex {
             symbols.push((
                 row.get(0)?,
                 row.get(1)?,
-                row.get::<i64>(2)? as usize,
-                row.get::<i64>(3)? as usize,
+                u64::try_from(row.get::<i64>(2)?).unwrap_or(0) as usize,
+                u64::try_from(row.get::<i64>(3)?).unwrap_or(0) as usize,
             ));
         }
         Ok(symbols)
@@ -1183,8 +1207,8 @@ impl FileIndex {
                     name: row.get(0)?,
                     kind: row.get(1)?,
                     file: row.get(2)?,
-                    start_line: row.get::<i64>(3)? as usize,
-                    end_line: row.get::<i64>(4)? as usize,
+                    start_line: u64::try_from(row.get::<i64>(3)?).unwrap_or(0) as usize,
+                    end_line: u64::try_from(row.get::<i64>(4)?).unwrap_or(0) as usize,
                     parent: row.get(5)?,
                 });
             }
@@ -1215,8 +1239,8 @@ impl FileIndex {
                     name: row.get(0)?,
                     kind: row.get(1)?,
                     file: row.get(2)?,
-                    start_line: row.get::<i64>(3)? as usize,
-                    end_line: row.get::<i64>(4)? as usize,
+                    start_line: u64::try_from(row.get::<i64>(3)?).unwrap_or(0) as usize,
+                    end_line: u64::try_from(row.get::<i64>(4)?).unwrap_or(0) as usize,
                     parent: row.get(5)?,
                 });
             }
@@ -1230,7 +1254,7 @@ impl FileIndex {
         let symbols = {
             let mut rows = self.conn.query("SELECT COUNT(*) FROM symbols", ()).await?;
             if let Some(row) = rows.next().await? {
-                row.get::<i64>(0)? as usize
+                u64::try_from(row.get::<i64>(0)?).unwrap_or(0) as usize
             } else {
                 0
             }
@@ -1238,7 +1262,7 @@ impl FileIndex {
         let calls = {
             let mut rows = self.conn.query("SELECT COUNT(*) FROM calls", ()).await?;
             if let Some(row) = rows.next().await? {
-                row.get::<i64>(0)? as usize
+                u64::try_from(row.get::<i64>(0)?).unwrap_or(0) as usize
             } else {
                 0
             }
@@ -1246,7 +1270,7 @@ impl FileIndex {
         let imports = {
             let mut rows = self.conn.query("SELECT COUNT(*) FROM imports", ()).await?;
             if let Some(row) = rows.next().await? {
-                row.get::<i64>(0).unwrap_or(0) as usize
+                u64::try_from(row.get::<i64>(0).unwrap_or(0)).unwrap_or(0) as usize
             } else {
                 0
             }
@@ -1424,8 +1448,8 @@ impl FileIndex {
                 row.get(0)?,
                 row.get(1)?,
                 row.get(2)?,
-                row.get::<i64>(3)? as usize,
-                row.get::<i64>(4)? as usize,
+                u64::try_from(row.get::<i64>(3)?).unwrap_or(0) as usize,
+                u64::try_from(row.get::<i64>(4)?).unwrap_or(0) as usize,
                 row.get(5).ok(),
                 row.get::<String>(6)
                     .unwrap_or_else(|_| "public".to_string()),
@@ -1754,7 +1778,11 @@ impl FileIndex {
             .await?;
         let mut importers = Vec::new();
         while let Some(row) = rows.next().await? {
-            importers.push((row.get(0)?, row.get(1)?, row.get::<i64>(2)? as usize));
+            importers.push((
+                row.get(0)?,
+                row.get(1)?,
+                u64::try_from(row.get::<i64>(2)?).unwrap_or(0) as usize,
+            ));
         }
         Ok(importers)
     }
@@ -1797,7 +1825,7 @@ impl FileIndex {
                 row.get(0)?,
                 row.get(1)?,
                 row.get(2)?,
-                row.get::<i64>(3)? as usize,
+                u64::try_from(row.get::<i64>(3)?).unwrap_or(0) as usize,
             ));
         }
         Ok(importers)
@@ -2052,9 +2080,15 @@ impl FileIndex {
 
         // Resolve import module specifiers to root-relative file paths now that all
         // files are indexed. Must run after COMMIT so module_to_files() can query them.
-        self.resolve_all_imports().await.ok();
+        self.resolve_all_imports().await.unwrap_or_else(|e| {
+            eprintln!("normalize-facts: resolve_all_imports error: {}", e);
+            0
+        });
         // Resolve call targets using the now-populated import graph.
-        self.resolve_all_calls().await.ok();
+        self.resolve_all_calls().await.unwrap_or_else(|e| {
+            eprintln!("normalize-facts: resolve_all_calls error: {}", e);
+            0
+        });
 
         Ok(CallGraphStats {
             symbols: symbol_count,
@@ -2210,9 +2244,15 @@ impl FileIndex {
         self.conn.execute("COMMIT", ()).await?;
 
         // Resolve any newly inserted imports to root-relative file paths.
-        self.resolve_all_imports().await.ok();
+        self.resolve_all_imports().await.unwrap_or_else(|e| {
+            eprintln!("normalize-facts: resolve_all_imports error: {}", e);
+            0
+        });
         // Resolve call targets using the now-populated import graph.
-        self.resolve_all_calls().await.ok();
+        self.resolve_all_calls().await.unwrap_or_else(|e| {
+            eprintln!("normalize-facts: resolve_all_calls error: {}", e);
+            0
+        });
 
         Ok(stats)
     }
@@ -2251,8 +2291,14 @@ impl FileIndex {
         };
         self.conn.execute("COMMIT", ()).await?;
 
-        self.resolve_all_imports().await.ok();
-        self.resolve_all_calls().await.ok();
+        self.resolve_all_imports().await.unwrap_or_else(|e| {
+            eprintln!("normalize-facts: resolve_all_imports error: {}", e);
+            0
+        });
+        self.resolve_all_calls().await.unwrap_or_else(|e| {
+            eprintln!("normalize-facts: resolve_all_calls error: {}", e);
+            0
+        });
 
         Ok(stats)
     }
@@ -2280,7 +2326,7 @@ impl FileIndex {
                     path: row.get(0)?,
                     is_dir: row.get::<i64>(1)? != 0,
                     mtime: row.get(2)?,
-                    lines: row.get::<i64>(3)? as usize,
+                    lines: u64::try_from(row.get::<i64>(3)?).unwrap_or(0) as usize,
                 });
             }
             return Ok(files);
@@ -2295,6 +2341,9 @@ impl FileIndex {
         if parts.is_empty() {
             return Ok(Vec::new());
         }
+
+        // Cap to 4 parts before building SQL so ?1..?N matches the bound params count.
+        let parts: Vec<&str> = parts.into_iter().take(4).collect();
 
         // Build WHERE clause: LOWER(path) LIKE '%part1%' AND LOWER(path) LIKE '%part2%' ...
         let conditions: Vec<String> = (0..parts.len())
@@ -2346,20 +2395,8 @@ impl FileIndex {
                     )
                     .await?
             }
-            _ => {
-                // For more than 4 parts, just use first 4
-                self.conn
-                    .query(
-                        &sql,
-                        params![
-                            patterns[0].clone(),
-                            patterns[1].clone(),
-                            patterns[2].clone(),
-                            patterns[3].clone()
-                        ],
-                    )
-                    .await?
-            }
+            // parts is capped to 4 above, so len > 4 is unreachable
+            _ => unreachable!("parts capped to 4"),
         };
 
         while let Some(row) = rows.next().await? {
@@ -2367,7 +2404,7 @@ impl FileIndex {
                 path: row.get(0)?,
                 is_dir: row.get::<i64>(1)? != 0,
                 mtime: row.get(2)?,
-                lines: row.get::<i64>(3)? as usize,
+                lines: u64::try_from(row.get::<i64>(3)?).unwrap_or(0) as usize,
             });
         }
         Ok(files)

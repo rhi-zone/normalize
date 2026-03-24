@@ -717,7 +717,7 @@ fn populate_facts(engine: &mut Engine, relations: &Relations) -> Result<(), Inte
                 "import",
                 vec![
                     Value::string(&imp.from_file),
-                    Value::string(&imp.to_module),
+                    Value::string(&imp.module_specifier),
                     Value::string(&imp.name),
                 ],
             )

@@ -25,21 +25,25 @@ fn info() -> RulePackInfo {
 /// Run all rules
 #[sabi_extern_fn]
 fn run(relations: &Relations) -> RVec<Diagnostic> {
-    let mut diagnostics = RVec::new();
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut diagnostics = RVec::new();
 
-    // Run circular dependency detection
-    diagnostics.extend(circular_deps::run(relations));
+        // Run circular dependency detection
+        diagnostics.extend(circular_deps::run(relations));
 
-    diagnostics
+        diagnostics
+    }))
+    .unwrap_or_else(|_| RVec::new())
 }
 
 /// Run a specific rule by ID
 #[sabi_extern_fn]
 fn run_rule(rule_id: RStr<'_>, relations: &Relations) -> RVec<Diagnostic> {
-    match rule_id.as_str() {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match rule_id.as_str() {
         "circular-deps" => circular_deps::run(relations).into_iter().collect(),
         _ => RVec::new(),
-    }
+    }))
+    .unwrap_or_else(|_| RVec::new())
 }
 
 /// The static rule pack instance with metadata for ABI stability
