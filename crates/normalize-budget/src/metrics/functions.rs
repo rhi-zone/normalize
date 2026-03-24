@@ -51,10 +51,20 @@ pub(crate) fn create_worktree(root: &Path, base_ref: &str) -> anyhow::Result<std
 
     // Clean up any stale worktree (same PID, same hash — should not normally exist)
     if worktree_path.exists() {
-        let _ = Command::new("git")
+        let rm_out = Command::new("git")
             .args(["worktree", "remove", &worktree_str, "--force"])
             .current_dir(root)
             .output();
+        match rm_out {
+            Ok(o) if !o.status.success() => {
+                tracing::warn!(
+                    "git worktree remove failed: {}",
+                    String::from_utf8_lossy(&o.stderr)
+                )
+            }
+            Err(e) => tracing::warn!("git worktree remove error: {e}"),
+            _ => {}
+        }
     }
 
     let add_output = Command::new("git")

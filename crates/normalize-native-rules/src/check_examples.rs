@@ -16,7 +16,7 @@ struct MissingExample {
     reference: String, // path#name
 }
 
-/// Example references check report
+/// Report produced by the missing-example native rule check.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct CheckExamplesReport {
     defined_examples: usize,

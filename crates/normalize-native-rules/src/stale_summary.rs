@@ -23,6 +23,7 @@ struct MissingSummary {
     has_uncommitted_changes: bool,
 }
 
+/// Report produced by the stale-summary native rule check.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct StaleSummaryReport {
     stale: Vec<StaleSummary>,

@@ -21,7 +21,7 @@ struct StaleCover {
     matching_files: Vec<String>,
 }
 
-/// Stale docs analysis report
+/// Report produced by the stale-doc native rule check.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct StaleDocsReport {
     stale_docs: Vec<StaleDoc>,

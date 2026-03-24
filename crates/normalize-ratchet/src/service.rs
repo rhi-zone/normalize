@@ -296,7 +296,7 @@ impl OutputFormatter for RemoveReport {
 // Service
 // ---------------------------------------------------------------------------
 
-/// Ratchet sub-service: metric regression tracking.
+/// CLI service implementing `normalize ratchet` subcommands.
 pub struct RatchetService {
     pretty: std::cell::Cell<bool>,
     metric_factory: MetricFactory,
@@ -791,10 +791,7 @@ fn build_check_report(
         let result = match do_measure(root, &entry.path, &entry.metric, entry.aggregate, factory) {
             Ok(r) => r,
             Err(e) => {
-                eprintln!(
-                    "warning: could not measure {} ({}): {e}",
-                    entry.path, entry.metric
-                );
+                tracing::warn!("could not measure {} at {}: {e}", entry.metric, entry.path);
                 continue;
             }
         };
@@ -805,9 +802,10 @@ fn build_check_report(
 
         // Guard against NaN/infinity deltas — skip the entry rather than misclassifying.
         if !delta.is_finite() {
-            eprintln!(
-                "warning: non-finite delta for {} ({}): {delta}",
-                entry.path, entry.metric
+            tracing::warn!(
+                "non-finite delta for {} at {}: {delta}",
+                entry.metric,
+                entry.path
             );
             continue;
         }
@@ -955,11 +953,21 @@ fn check_against_ref(
                 .iter()
                 .find(|x| x.name() == metric_name)
                 .ok_or_else(|| format!("metric '{}' not found", metric_name))?;
-            if let Ok(all) = m.measure_all(&worktree_path) {
-                for (addr, val) in all {
-                    if path_filter.is_none_or(|p| path_matches(&addr, p)) {
-                        measurements.push((addr, metric_name.to_string(), val));
-                    }
+            let all = match m.measure_all(&worktree_path) {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::warn!(
+                        "could not measure {} at base ref {}: {}",
+                        metric_name,
+                        base_ref,
+                        e
+                    );
+                    continue;
+                }
+            };
+            for (addr, val) in all {
+                if path_filter.is_none_or(|p| path_matches(&addr, p)) {
+                    measurements.push((addr, metric_name.to_string(), val));
                 }
             }
         }
@@ -993,7 +1001,10 @@ fn check_against_ref(
         };
         let current_all = match m.measure_all(root) {
             Ok(v) => v,
-            Err(_) => continue,
+            Err(e) => {
+                tracing::warn!("could not measure {} at current worktree: {e}", metric_name);
+                continue;
+            }
         };
         let current_map: std::collections::HashMap<&str, f64> =
             current_all.iter().map(|(k, v)| (k.as_str(), *v)).collect();
@@ -1067,7 +1078,10 @@ fn measure_at_ref(
         .output()
         .map_err(|e| format!("failed to run git: {e}"))?;
     if !hash_output.status.success() {
-        return Err(format!("git ref '{base_ref}' not found"));
+        return Err(format!(
+            "git ref '{base_ref}' not found: {}",
+            String::from_utf8_lossy(&hash_output.stderr).trim()
+        ));
     }
     let hash = String::from_utf8_lossy(&hash_output.stdout)
         .trim()

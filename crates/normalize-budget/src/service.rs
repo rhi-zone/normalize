@@ -24,8 +24,8 @@ pub struct MeasureReport {
     pub metric: String,
     /// Aggregation function applied to the metric values (e.g. `sum`, `mean`).
     pub aggregate: String,
-    #[serde(rename = "ref")]
     /// Git ref used as the base for the diff.
+    #[serde(rename = "ref")]
     pub base_ref: String,
     /// Total items added (in the aggregated result).
     pub added: f64,
@@ -65,8 +65,8 @@ pub struct CheckEntry {
     pub metric: String,
     /// Aggregation function applied to metric values.
     pub aggregate: Aggregate,
-    #[serde(rename = "ref")]
     /// Git ref used as the base for the diff.
+    #[serde(rename = "ref")]
     pub base_ref: String,
     /// Total items added relative to the base ref.
     pub added: f64,
@@ -169,8 +169,8 @@ pub struct ShowEntry {
     pub metric: String,
     /// Aggregation function applied to metric values.
     pub aggregate: String,
-    #[serde(rename = "ref")]
     /// Git ref used as the base for the diff.
+    #[serde(rename = "ref")]
     pub base_ref: String,
     /// Budget limits configured for this entry.
     pub limits: BudgetLimits,
@@ -215,7 +215,9 @@ impl OutputFormatter for ShowReport {
 /// Result of `budget remove`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct RemoveReport {
+    /// File or directory path the budget entry applies to.
     pub path: String,
+    /// Name of the metric the entry tracks.
     pub metric: String,
     /// True if the entry was found and removed.
     pub removed: bool,
@@ -238,7 +240,7 @@ impl OutputFormatter for RemoveReport {
 // Service
 // ---------------------------------------------------------------------------
 
-/// Budget sub-service: diff-based budget tracking.
+/// CLI service implementing `normalize budget` subcommands.
 pub struct BudgetService {
     pretty: std::cell::Cell<bool>,
     diff_factory: DiffMetricFactory,
@@ -612,7 +614,10 @@ fn load_budget_config(root: &Path) -> BudgetConfig {
     }
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,
-        Err(_) => return BudgetConfig::default(),
+        Err(e) => {
+            tracing::debug!("budget config not found, using defaults: {e}");
+            return BudgetConfig::default();
+        }
     };
     #[derive(serde::Deserialize, Default)]
     struct Wrapper {
@@ -622,7 +627,7 @@ fn load_budget_config(root: &Path) -> BudgetConfig {
     match toml::from_str::<Wrapper>(&content) {
         Ok(w) => w.budget,
         Err(e) => {
-            eprintln!("warning: failed to parse budget config: {e}");
+            tracing::warn!("failed to parse budget config: {e}");
             BudgetConfig::default()
         }
     }
@@ -668,8 +673,8 @@ pub(crate) fn do_measure(
 
     // Warn if a configured path prefix matched nothing — this often indicates a typo.
     if filtered.is_empty() {
-        eprintln!(
-            "info: budget path prefix '{path}' matched no diff items for metric '{metric}' (ref={base_ref})"
+        tracing::info!(
+            "budget path prefix '{path}' matched no diff items for metric '{metric}' (ref={base_ref})"
         );
     }
 

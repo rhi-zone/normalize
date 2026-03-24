@@ -73,7 +73,7 @@ pub fn budget_path(root: &Path) -> PathBuf {
     root.join(".normalize").join("budget.json")
 }
 
-/// Load the budget file, returning default if not found.
+/// Load the budget file from `root/.normalize/budget.json`. Returns an empty `BudgetFile` if the file does not exist.
 pub fn load_budget(root: &Path) -> anyhow::Result<BudgetFile> {
     let path = budget_path(root);
     if !path.exists() {
@@ -85,7 +85,7 @@ pub fn load_budget(root: &Path) -> anyhow::Result<BudgetFile> {
         .map_err(|e| anyhow::anyhow!("failed to parse {}: {e}", path.display()))
 }
 
-/// Save the budget file.
+/// Write the budget file to `root/.normalize/budget.json`.
 pub fn save_budget(root: &Path, file: &BudgetFile) -> anyhow::Result<()> {
     let path = budget_path(root);
     if let Some(parent) = path.parent() {

@@ -16,7 +16,7 @@ struct BrokenRef {
     context: String,
 }
 
-/// Documentation reference check report
+/// Report produced by the broken-ref native rule check.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct CheckRefsReport {
     broken_refs: Vec<BrokenRef>,
