@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"rank\", \"complexity\"])"
 ---
-Run complexity analysis
+Rank functions by cyclomatic complexity, worst first.
 
 Usage: normalize rank complexity [OPTIONS] [target]
 
@@ -25,3 +25,7 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Accepts an optional `target` path, a complexity `threshold`, and a `limit` on results.
+Use `diff` to compare against a git ref and show deltas. Returns a `ComplexityReport`
+with per-function complexity scores, file locations, and optional delta values.

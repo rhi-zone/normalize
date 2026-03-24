@@ -8,15 +8,20 @@ use std::path::PathBuf;
 /// Daemon management sub-service.
 pub struct DaemonService;
 
-/// Daemon status report.
+/// Daemon status report returned by `normalize daemon status`.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct DaemonStatus {
+    /// Whether the daemon process is currently running.
     pub running: bool,
+    /// Path to the Unix socket the daemon listens on.
     pub socket: String,
+    /// Process ID of the running daemon, if available.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pid: Option<u64>,
+    /// Number of seconds the daemon has been running, if available.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uptime_secs: Option<u64>,
+    /// Number of project roots currently being watched, if available.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub roots_watched: Option<u64>,
 }
@@ -43,10 +48,16 @@ impl std::fmt::Display for DaemonStatus {
     }
 }
 
-/// Report for a daemon action (start/stop).
+/// Report for a daemon lifecycle action (`start` or `stop`).
+///
+/// Used when the caller triggers a daemon state change (starting or stopping the
+/// background process). Distinct from `DaemonRootReport`, which covers root
+/// management operations (add/remove watched directories).
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct DaemonActionReport {
+    /// Whether the action completed successfully.
     pub success: bool,
+    /// Optional human-readable description of the outcome.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 }
@@ -69,13 +80,20 @@ impl std::fmt::Display for DaemonActionReport {
     }
 }
 
-/// Report for add/remove root.
+/// Report for a root management operation (`add` or `remove`).
+///
+/// Used when adding or removing a watched project root from the daemon. Distinct
+/// from `DaemonActionReport`, which covers daemon lifecycle (start/stop).
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct DaemonRootReport {
+    /// Whether the operation completed successfully.
     pub success: bool,
+    /// Canonical path that was added or removed.
     pub path: String,
+    /// Optional human-readable description of the outcome.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    /// True when the operation was simulated (--dry-run flag was passed).
     pub dry_run: bool,
 }
 
@@ -95,9 +113,33 @@ impl std::fmt::Display for DaemonRootReport {
     }
 }
 
-/// List of watched roots.
+/// Report for `normalize daemon run` (foreground daemon execution).
+///
+/// Returned when the daemon is run in the foreground (for debugging). Contains the
+/// exit status message. Unlike `DaemonActionReport` (which covers start/stop lifecycle
+/// commands) this type is specifically for the blocking foreground-run path.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct DaemonRunReport {
+    /// Human-readable status message (e.g. "Daemon exited" or an error description).
+    pub status: String,
+}
+
+impl OutputFormatter for DaemonRunReport {
+    fn format_text(&self) -> String {
+        self.status.clone()
+    }
+}
+
+impl std::fmt::Display for DaemonRunReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.status)
+    }
+}
+
+/// List of project roots currently watched by the daemon.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct DaemonRootsReport {
+    /// Canonical paths of all watched project roots.
     pub roots: Vec<String>,
 }
 
@@ -214,11 +256,13 @@ impl DaemonService {
     ///
     /// Examples:
     ///   normalize daemon run                 # run daemon in foreground with log output
-    pub fn run(&self) -> Result<String, String> {
+    pub fn run(&self) -> Result<DaemonRunReport, String> {
         match daemon::run_daemon() {
             Ok(code) => {
                 if code == 0 {
-                    Ok("Daemon exited".to_string())
+                    Ok(DaemonRunReport {
+                        status: "Daemon exited".to_string(),
+                    })
                 } else {
                     Err(format!("Daemon exited with code {}", code))
                 }

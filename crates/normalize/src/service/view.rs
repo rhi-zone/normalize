@@ -12,6 +12,25 @@ use server_less::cli;
 use std::cell::Cell;
 use std::path::PathBuf;
 
+/// Report for `normalize view trace` — value provenance trace for a symbol.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct TraceReport {
+    /// Human-readable trace output showing value provenance for the requested symbol.
+    pub trace: String,
+}
+
+impl OutputFormatter for TraceReport {
+    fn format_text(&self) -> String {
+        self.trace.clone()
+    }
+}
+
+impl std::fmt::Display for TraceReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.trace)
+    }
+}
+
 /// View sub-service: directory/file/symbol navigation and graph navigation.
 pub struct ViewService {
     pretty: Cell<bool>,
@@ -80,8 +99,8 @@ impl ViewService {
         self.display_output(r)
     }
 
-    fn display_trace(&self, text: &str) -> String {
-        text.to_string()
+    fn display_trace(&self, r: &TraceReport) -> String {
+        r.trace.clone()
     }
 
     fn display_graph(&self, r: &GraphReport) -> String {
@@ -406,9 +425,9 @@ impl ViewService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<String, String> {
+    ) -> Result<TraceReport, String> {
         let root_path = Self::root_path(root)?;
-        crate::commands::analyze::trace::build_trace_text(
+        let trace = crate::commands::analyze::trace::build_trace_text(
             &symbol,
             target.as_deref(),
             &root_path,
@@ -416,7 +435,8 @@ impl ViewService {
             recursive,
             case_insensitive,
         )
-        .await
+        .await?;
+        Ok(TraceReport { trace })
     }
 
     /// Graph-theoretic properties of the dependency graph (requires facts index)

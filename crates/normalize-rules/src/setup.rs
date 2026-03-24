@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::io::{self, BufRead, IsTerminal, Write};
 use std::path::Path;
 
-use crate::runner::{RuleType, RulesRunConfig, enable_disable, run_rules_report};
+use crate::runner::{RuleKind, RulesRunConfig, enable_disable, run_rules_report};
 use crate::service::load_rules_config;
 
 struct RuleMeta {
@@ -98,7 +98,7 @@ pub fn run_setup_wizard(root: &Path) -> i32 {
         rule_tags: config.rule_tags.clone(),
         rules: config.rules.clone(),
     };
-    let report = run_rules_report(root, root, None, None, &RuleType::All, &[], &rules_config);
+    let report = run_rules_report(root, root, None, None, &RuleKind::All, &[], &rules_config);
 
     // Group issues by rule_id
     let mut by_rule: HashMap<String, Vec<normalize_output::diagnostics::Issue>> = HashMap::new();

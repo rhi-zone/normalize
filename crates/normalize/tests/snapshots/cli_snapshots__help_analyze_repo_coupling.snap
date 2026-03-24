@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"repo-coupling\"])"
 ---
-Analyze cross-repo coupling
+Detect temporal coupling between repositories: pairs that receive commits together.
 
 Usage: normalize analyze repo-coupling [OPTIONS]
 
@@ -20,3 +20,7 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Groups commits within `window` hours as "co-changes" and reports repo pairs that
+appear together in at least `min_windows` co-change windows. Returns a
+`RepoCouplingReport` with ranked repo pairs and their co-change counts.

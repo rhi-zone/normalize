@@ -8,7 +8,11 @@ fn handle_schema_flag() -> bool {
             "format": "toml",
             "schema": schemars::schema_for!(normalize::config::NormalizeConfig)
         });
-        println!("{}", serde_json::to_string_pretty(&response).unwrap());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&response)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e))
+        );
         true
     } else {
         false

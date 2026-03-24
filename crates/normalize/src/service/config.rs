@@ -12,7 +12,11 @@ use std::path::{Path, PathBuf};
 
 // ── Report types ────────────────────────────────────────────────────────────
 
-/// Report from `normalize config show`.
+/// Report from `normalize config show`: current config values with schema annotations.
+///
+/// `content` holds the parsed config file values; `schema` (skipped from JSON output)
+/// is used to render human-readable annotations alongside each field. `set_only` limits
+/// output to fields explicitly set in the file (skipping defaults).
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ConfigShowReport {
     pub config_path: String,
@@ -328,7 +332,10 @@ fn format_schema_annotated(
     out
 }
 
-/// Report from `normalize config validate`.
+/// Report from `normalize config validate`: whether the config file is schema-compliant.
+///
+/// `valid` is true only when `errors` is empty. `schema_source` identifies which schema
+/// was used for validation (e.g. the crate's built-in schema or a custom path).
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ConfigValidateReport {
     pub valid: bool,
@@ -355,7 +362,10 @@ impl OutputFormatter for ConfigValidateReport {
     }
 }
 
-/// Report from `normalize config set`.
+/// Report from `normalize config set`: records the key, old value, and new value applied.
+///
+/// `dry_run` is true when the change was previewed but not written. `schema_warnings`
+/// lists any schema violations that were present but bypassed via `--force` or `--dry-run`.
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ConfigSetReport {
     pub key: String,
@@ -536,6 +546,11 @@ fn set_in_table(
 
 // ── Service ─────────────────────────────────────────────────────────────────
 
+/// Config inspection and mutation service for `normalize config` subcommands.
+///
+/// Wraps `show`, `validate`, `set`, `get`, and `edit` operations against
+/// `.normalize/config.toml`. Schema-driven: uses the `NormalizeConfig` JSON Schema
+/// to annotate output and validate writes.
 pub struct ConfigService {
     pub(crate) pretty: Cell<bool>,
 }

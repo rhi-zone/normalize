@@ -8,10 +8,15 @@ use std::path::PathBuf;
 /// Code generation sub-service.
 pub struct GenerateService;
 
-/// Report for code generation (methods that write to file or stdout).
+/// Report for `normalize generate` commands (methods that write to file or stdout).
+///
+/// `output` contains the generated code. `path` is the file it was written to when
+/// `--output` was specified; when absent, `output` is printed to stdout by the formatter.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct GenerateReport {
+    /// Generated code (API client, schema, etc.).
     pub output: String,
+    /// Output file path, if the result was written to disk rather than stdout.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
 }

@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"rank\", \"duplicates\"])"
 ---
-Detect duplicate/similar code (functions or blocks)
+Detect duplicate or similar code blocks and functions across the codebase.
 
 Usage: normalize rank duplicates [OPTIONS]
 
@@ -34,4 +34,6 @@ Options:
   -l, --limit <limit>              Maximum number of results to show (0=no limit, clusters mode)
   -h, --help                       Print help
 
-Modes: exact (default), similar (fuzzy MinHash), clusters (connected components).
+Modes: `exact` (default) finds byte-identical bodies; `similar` uses MinHash fuzzy
+matching; `clusters` groups near-duplicates into connected components. Returns a
+`DuplicatesReport` with grouped matches and similarity scores.

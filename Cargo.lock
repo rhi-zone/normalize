@@ -4241,6 +4241,7 @@ dependencies = [
  "serde_json",
  "serde_json_lenient",
  "tar",
+ "tracing",
  "ureq",
  "urlencoding",
  "xz2",

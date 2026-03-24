@@ -19,32 +19,32 @@ Options:
   -V, --version                    Print version
 
 Code quality:
-  complexity       Run complexity analysis
-  ceremony         Show ceremony ratio: fraction of callables that are trait/interface boilerplate
-  uniqueness       Measure what fraction of functions have no structural near-twin per module
-  call-complexity  Compute effective (reachable) cyclomatic complexity via call-graph BFS
-  duplicates       Detect duplicate/similar code (functions or blocks)
-  duplicate-types  Detect duplicate type definitions
-  fragments        Find repeated AST fragments across the codebase
+  complexity       Rank functions by cyclomatic complexity, worst first.
+  ceremony         Rank files by boilerplate ratio: fraction of callables that are trait/interface implementations.
+  uniqueness       Rank modules by code uniqueness: fraction of functions with no structural near-twin.
+  call-complexity  Rank functions by effective complexity: cyclomatic complexity summed over the full call graph.
+  duplicates       Detect duplicate or similar code blocks and functions across the codebase.
+  duplicate-types  Detect duplicate type definitions (structs, enums, classes) across the codebase.
+  fragments        Find repeated AST fragments (sub-expressions, statement patterns) across the codebase.
 
 Module structure:
-  size             Show hierarchical LOC breakdown (ncdu-style)
-  density          Measure information density (compression ratio + token uniqueness) per module
-  imports          Rank modules by import fan-in (requires facts index)
-  surface          Per-module public symbol count, public ratio, and constraint score
-  depth-map        Per-module dependency depth + ripple risk
-  layering         Per-module import layering compliance — are imports flowing downward?
-  module-health    Score each module across test ratio, uniqueness, and density (worst first)
+  size             Show hierarchical lines-of-code breakdown (ncdu-style tree view).
+  density          Rank modules by information density: compression ratio combined with token uniqueness.
+  imports          Rank modules by import fan-in: how many other modules import each module.
+  surface          Rank modules by API surface area: public symbol count, public ratio, and constraint score.
+  depth-map        Rank modules by dependency depth and ripple risk in the import graph.
+  layering         Rank modules by import layering compliance: do imports flow in one direction?
+  module-health    Score each module on a composite health metric: test ratio × uniqueness × density.
 
 Repository:
-  files            Show longest files in codebase
+  files            Rank source files by line count, longest first.
 
 Git history:
-  hotspots         Churn × complexity hotspots: files ranked by change frequency and complexity
-  coupling         Temporal coupling: file pairs that change together in git history
-  ownership        Show per-file ownership concentration from git blame
-  contributors     Analyze contributors across repos
+  hotspots         Rank files by churn × complexity: the highest-risk files for introducing bugs.
+  coupling         Rank file pairs by temporal coupling: pairs that appear in the same git commits.
+  ownership        Rank files by ownership concentration: how many authors contribute to each file.
+  contributors     Rank contributors by commit activity across one or more repositories.
 
 Testing:
-  test-ratio       Test/impl line ratio per module
-  budget           Line budget breakdown by purpose (business logic, tests, docs, config, etc.)
+  test-ratio       Rank modules by test-to-implementation line ratio.
+  budget           Break down line counts by purpose: business logic, tests, docs, config, and generated code.

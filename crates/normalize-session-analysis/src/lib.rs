@@ -298,20 +298,20 @@ impl ToolChain {
 /// Type of correction made by the assistant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum CorrectionType {
+pub enum CorrectionKind {
     Apology,
     Mistake,
     LetMeFix,
     Actually,
 }
 
-impl CorrectionType {
+impl CorrectionKind {
     pub fn as_str(&self) -> &'static str {
         match self {
-            CorrectionType::Apology => "Apology",
-            CorrectionType::Mistake => "Mistake",
-            CorrectionType::LetMeFix => "Let me fix",
-            CorrectionType::Actually => "Actually",
+            CorrectionKind::Apology => "Apology",
+            CorrectionKind::Mistake => "Mistake",
+            CorrectionKind::LetMeFix => "Let me fix",
+            CorrectionKind::Actually => "Actually",
         }
     }
 }
@@ -321,7 +321,7 @@ impl CorrectionType {
 pub struct Correction {
     pub turn: usize,
     pub text: String,
-    pub category: CorrectionType,
+    pub category: CorrectionKind,
 }
 
 /// File operation statistics.
@@ -1407,7 +1407,7 @@ fn extract_file_path(tool_name: &str, input: &serde_json::Value) -> Option<Strin
 
 /// Detect correction patterns in assistant text.
 /// Returns (category, excerpt) if a correction is found.
-pub fn detect_correction(text: &str) -> Option<(CorrectionType, String)> {
+pub fn detect_correction(text: &str) -> Option<(CorrectionKind, String)> {
     let lower = text.to_lowercase();
 
     // Look for apology patterns
@@ -1415,7 +1415,7 @@ pub fn detect_correction(text: &str) -> Option<(CorrectionType, String)> {
     for phrase in &apology_phrases {
         if let Some(pos) = lower.find(phrase) {
             let excerpt = text.chars().skip(pos).take(80).collect();
-            return Some((CorrectionType::Apology, excerpt));
+            return Some((CorrectionKind::Apology, excerpt));
         }
     }
 
@@ -1429,7 +1429,7 @@ pub fn detect_correction(text: &str) -> Option<(CorrectionType, String)> {
     for phrase in &mistake_phrases {
         if let Some(pos) = lower.find(phrase) {
             let excerpt = text.chars().skip(pos).take(80).collect();
-            return Some((CorrectionType::Mistake, excerpt));
+            return Some((CorrectionKind::Mistake, excerpt));
         }
     }
 
@@ -1438,7 +1438,7 @@ pub fn detect_correction(text: &str) -> Option<(CorrectionType, String)> {
     for phrase in &fix_phrases {
         if let Some(pos) = lower.find(phrase) {
             let excerpt = text.chars().skip(pos).take(80).collect();
-            return Some((CorrectionType::LetMeFix, excerpt));
+            return Some((CorrectionKind::LetMeFix, excerpt));
         }
     }
 
@@ -1447,7 +1447,7 @@ pub fn detect_correction(text: &str) -> Option<(CorrectionType, String)> {
     for phrase in &actually_phrases {
         if let Some(pos) = lower.find(phrase) {
             let excerpt = text.chars().skip(pos).take(80).collect();
-            return Some((CorrectionType::Actually, excerpt));
+            return Some((CorrectionKind::Actually, excerpt));
         }
     }
 

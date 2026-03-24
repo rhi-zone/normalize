@@ -10,7 +10,7 @@ use normalize_syntax_rules::apply_fixes;
 
 use crate::cmd_rules::run_syntax_rules;
 use crate::runner::{
-    ListFilters, RuleType, RulesListReport, RulesRunConfig, add_rule, apply_native_rules_config,
+    ListFilters, RuleKind, RulesListReport, RulesRunConfig, add_rule, apply_native_rules_config,
     build_list_report, enable_disable, list_tags, remove_rule, run_rules_report, show_rule,
     update_rules,
 };
@@ -200,7 +200,7 @@ impl RulesService {
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
         self.resolve_format(pretty, compact);
         let config = load_rules_config(&effective_root);
-        let rule_type: RuleType = r#type
+        let rule_type: RuleKind = r#type
             .as_deref()
             .unwrap_or("all")
             .parse()
@@ -263,7 +263,7 @@ impl RulesService {
         let limit = limit.unwrap_or(50).min(10_000);
         self.limit.set(limit);
         let config = load_rules_config(&effective_root);
-        let rule_type: RuleType = r#type
+        let rule_type: RuleKind = r#type
             .as_deref()
             .unwrap_or("all")
             .parse()
@@ -325,7 +325,7 @@ impl RulesService {
             return Ok(DiagnosticsReport::new());
         }
 
-        let run_native = matches!(rule_type, RuleType::All | RuleType::Native);
+        let run_native = matches!(rule_type, RuleKind::All | RuleKind::Native);
         let rule_filter = rule.clone();
 
         // Syntax + fact + SARIF engines via run_rules_report() (blocking)
@@ -684,7 +684,7 @@ impl RulesService {
         let list_report = build_list_report(
             &effective_root,
             &ListFilters {
-                type_filter: &RuleType::All,
+                type_filter: &RuleKind::All,
                 tag: None,
                 enabled: false,
                 disabled: false,

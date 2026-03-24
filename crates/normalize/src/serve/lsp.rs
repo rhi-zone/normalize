@@ -78,14 +78,14 @@ impl NormalizeBackend {
             run_and_publish_diagnostics(
                 &client,
                 &root,
-                &normalize_rules::RuleType::Syntax,
+                &normalize_rules::RuleKind::Syntax,
                 &syntax_diagnosed,
             )
             .await;
             run_and_publish_diagnostics(
                 &client,
                 &root,
-                &normalize_rules::RuleType::Fact,
+                &normalize_rules::RuleKind::Fact,
                 &fact_diagnosed,
             )
             .await;
@@ -119,7 +119,7 @@ impl NormalizeBackend {
                     &root_owned,
                     None,
                     None,
-                    &normalize_rules::RuleType::Syntax,
+                    &normalize_rules::RuleKind::Syntax,
                     &[],
                     &rules_config,
                 )
@@ -208,7 +208,7 @@ impl NormalizeBackend {
             run_and_publish_diagnostics(
                 &client,
                 &root,
-                &normalize_rules::RuleType::Fact,
+                &normalize_rules::RuleKind::Fact,
                 &fact_diagnosed,
             )
             .await;
@@ -976,7 +976,7 @@ fn issue_to_lsp_diagnostic(issue: &normalize_output::diagnostics::Issue) -> Diag
 async fn run_and_publish_diagnostics(
     client: &Client,
     root: &std::path::Path,
-    rule_type: &normalize_rules::RuleType,
+    rule_type: &normalize_rules::RuleKind,
     diagnosed_files: &Mutex<HashSet<Url>>,
 ) {
     let root_owned = root.to_path_buf();

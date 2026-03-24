@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"rank\", \"hotspots\"])"
 ---
-Churn × complexity hotspots: files ranked by change frequency and complexity
+Rank files by churn × complexity: the highest-risk files for introducing bugs.
 
 Usage: normalize rank hotspots [OPTIONS]
 
@@ -20,3 +20,7 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Combines git churn (commit frequency) with cyclomatic complexity to surface
+files that change often and are hard to reason about. Use `recency` to weight
+recent commits higher. Returns a `HotspotsReport` with per-file risk scores.

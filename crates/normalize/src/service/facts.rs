@@ -23,7 +23,10 @@ impl FactsService {
     }
 }
 
-/// Report for a rebuild operation.
+/// Report for `normalize structure rebuild`: counts of indexed entities.
+///
+/// `files` is always populated. `symbols`, `calls`, and `imports` are only set when the
+/// corresponding content type was included in the rebuild (controlled by `--include`).
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct RebuildReport {
     pub files: usize,
@@ -67,7 +70,10 @@ impl std::fmt::Display for RebuildReport {
     }
 }
 
-/// Index statistics.
+/// Index statistics returned by `normalize structure stats`.
+///
+/// Includes database size, codebase size, ratio, entity counts (files, symbols, calls,
+/// imports), and a ranked list of file extensions present in the index.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct FactsStats {
     pub db_size_bytes: u64,
@@ -81,7 +87,7 @@ pub struct FactsStats {
     pub extensions: Vec<ExtensionCount>,
 }
 
-/// Extension count entry.
+/// Count of indexed files with a given file extension.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct ExtensionCount {
     pub ext: String,
@@ -130,7 +136,9 @@ impl std::fmt::Display for FactsStats {
     }
 }
 
-/// Storage usage report.
+/// Storage usage report returned by `normalize structure stats --storage`.
+///
+/// Breaks down disk usage into the project index, language package cache, and global cache.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct StorageReport {
     pub index: StorageEntry,
@@ -140,7 +148,7 @@ pub struct StorageReport {
     pub total_human: String,
 }
 
-/// A single storage entry.
+/// A single storage location's disk usage, with optional path and human-readable size.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct StorageEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -184,31 +192,34 @@ impl std::fmt::Display for StorageReport {
     }
 }
 
-/// File list result.
+/// List of indexed file paths returned by `normalize structure files`.
+///
+/// Each entry is a path relative to the project root. The list can be filtered by prefix
+/// and capped via `--limit`.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct FileList {
+pub struct FileListReport {
     pub files: Vec<String>,
 }
 
-impl OutputFormatter for FileList {
+impl OutputFormatter for FileListReport {
     fn format_text(&self) -> String {
         self.files.iter().map(|p| format!("{}\n", p)).collect()
     }
 }
 
-impl std::fmt::Display for FileList {
+impl std::fmt::Display for FileListReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.format_text())
     }
 }
 
-/// Report for package indexing.
+/// Report for `normalize structure packages`: indexed package counts per ecosystem.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct PackagesReport {
     pub ecosystems: Vec<EcosystemCounts>,
 }
 
-/// Counts for a single ecosystem.
+/// Package and symbol counts for a single package ecosystem (e.g. "rust", "python").
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct EcosystemCounts {
     pub name: String,
@@ -238,7 +249,10 @@ impl std::fmt::Display for PackagesReport {
     }
 }
 
-/// Report for generic commands that wrap output from legacy functions.
+/// Generic command result for operations that return a success flag and optional message.
+///
+/// Used for commands that don't have a more specific report type. `data` carries
+/// arbitrary structured output when present.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct CommandReport {
     pub success: bool,
@@ -615,7 +629,7 @@ async fn list_files_data(
     prefix: Option<&str>,
     root: Option<&Path>,
     limit: usize,
-) -> Result<FileList, String> {
+) -> Result<FileListReport, String> {
     let root = root
         .map(|p| p.to_path_buf())
         .map(Ok)
@@ -639,7 +653,7 @@ async fn list_files_data(
         .map(|f| f.path.clone())
         .collect();
 
-    Ok(FileList { files: filtered })
+    Ok(FileListReport { files: filtered })
 }
 
 async fn packages_data(
@@ -798,7 +812,7 @@ impl FactsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<FileList, String> {
+    ) -> Result<FileListReport, String> {
         let limit = limit.unwrap_or(100);
         let root_path = root.map(PathBuf::from);
         list_files_data(prefix.as_deref(), root_path.as_deref(), limit).await

@@ -184,11 +184,7 @@ impl Conda {
             .filter_map(|&channel| match Self::fetch_repodata(channel) {
                 Ok(repodata) => Some(Self::extract_packages(&repodata, channel)),
                 Err(e) => {
-                    eprintln!(
-                        "Warning: failed to load Conda channel {}: {}",
-                        channel.name(),
-                        e
-                    );
+                    tracing::warn!("failed to load Conda channel {}: {}", channel.name(), e);
                     None
                 }
             })

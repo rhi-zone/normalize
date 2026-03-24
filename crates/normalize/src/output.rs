@@ -192,13 +192,13 @@ mod tests {
 
         // Service report types now implementing OutputFormatter
         use crate::service::facts::{
-            CommandReport, FactsStats, FactsStatsReport, FileList, PackagesReport, QueryReport,
-            RebuildReport, StorageReport,
+            CommandReport, FactsStats, FactsStatsReport, FileListReport, PackagesReport,
+            QueryReport, RebuildReport, StorageReport,
         };
         assert_output_formatter::<RebuildReport>();
         assert_output_formatter::<FactsStats>();
         assert_output_formatter::<StorageReport>();
-        assert_output_formatter::<FileList>();
+        assert_output_formatter::<FileListReport>();
         assert_output_formatter::<PackagesReport>();
         assert_output_formatter::<CommandReport>();
         assert_output_formatter::<FactsStatsReport>();
@@ -217,10 +217,16 @@ mod tests {
         use crate::service::generate::GenerateReport;
         assert_output_formatter::<GenerateReport>();
 
-        use crate::service::daemon::{DaemonActionReport, DaemonRootReport, DaemonRootsReport};
+        use crate::service::daemon::{
+            DaemonActionReport, DaemonRootReport, DaemonRootsReport, DaemonRunReport,
+        };
         assert_output_formatter::<DaemonActionReport>();
+        assert_output_formatter::<DaemonRunReport>();
         assert_output_formatter::<DaemonRootReport>();
         assert_output_formatter::<DaemonRootsReport>();
+
+        use crate::service::view::TraceReport;
+        assert_output_formatter::<TraceReport>();
 
         use normalize_rules::RuleShowReport;
         assert_output_formatter::<RuleShowReport>();

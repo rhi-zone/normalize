@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 /// Rule type filter for list/run commands.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
-pub enum RuleType {
+pub enum RuleKind {
     #[default]
     All,
     Syntax,
@@ -21,7 +21,7 @@ pub enum RuleType {
     Sarif,
 }
 
-impl std::fmt::Display for RuleType {
+impl std::fmt::Display for RuleKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::All => f.write_str("all"),
@@ -33,7 +33,7 @@ impl std::fmt::Display for RuleType {
     }
 }
 
-impl std::str::FromStr for RuleType {
+impl std::str::FromStr for RuleKind {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -421,7 +421,7 @@ struct UnifiedRule {
 /// Filters applied when listing rules via [`build_list_report`].
 pub struct ListFilters<'a> {
     /// Restrict to a specific rule engine type (syntax, fact, native, all, …).
-    pub type_filter: &'a RuleType,
+    pub type_filter: &'a RuleKind,
     /// If `Some`, only include rules whose tags contain this value.
     pub tag: Option<&'a str>,
     /// If `true`, only include rules that are currently enabled.
@@ -441,7 +441,7 @@ pub fn build_list_report(
     let mut all_rules: Vec<UnifiedRule> = Vec::new();
 
     // Load syntax rules
-    if matches!(filters.type_filter, RuleType::All | RuleType::Syntax) {
+    if matches!(filters.type_filter, RuleKind::All | RuleKind::Syntax) {
         let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
         for r in &syntax_rules {
             let source = if r.builtin { "builtin" } else { "project" };
@@ -459,7 +459,7 @@ pub fn build_list_report(
     }
 
     // Load fact rules
-    if matches!(filters.type_filter, RuleType::All | RuleType::Fact) {
+    if matches!(filters.type_filter, RuleKind::All | RuleKind::Fact) {
         let fact_rules = interpret::load_all_rules(root, &config.rules);
         for r in &fact_rules {
             let source = if r.builtin { "builtin" } else { "project" };
@@ -477,7 +477,7 @@ pub fn build_list_report(
     }
 
     // Load native rules (static descriptors with config overrides applied)
-    if matches!(filters.type_filter, RuleType::All | RuleType::Native) {
+    if matches!(filters.type_filter, RuleKind::All | RuleKind::Native) {
         for desc in normalize_native_rules::NATIVE_RULES {
             let override_ = config.rules.rules.get(desc.id);
             let severity = override_
@@ -1082,7 +1082,7 @@ pub fn run_rules_report(
     project_root: &Path,
     filter_rule: Option<&str>,
     filter_tag: Option<&str>,
-    engine: &RuleType,
+    engine: &RuleKind,
     debug: &[String],
     config: &RulesRunConfig,
 ) -> normalize_output::diagnostics::DiagnosticsReport {
@@ -1111,7 +1111,7 @@ pub fn run_rules_report(
     };
 
     // Syntax rules
-    if matches!(engine, RuleType::All | RuleType::Syntax) {
+    if matches!(engine, RuleKind::All | RuleKind::Syntax) {
         let debug_flags = DebugFlags::from_args(debug);
         let findings = crate::cmd_rules::run_syntax_rules(
             root,
@@ -1133,7 +1133,7 @@ pub fn run_rules_report(
     }
 
     // Fact rules
-    if matches!(engine, RuleType::All | RuleType::Fact) {
+    if matches!(engine, RuleKind::All | RuleKind::Fact) {
         let rt = tokio::runtime::Runtime::new().unwrap_or_else(|e| {
             tracing::warn!("failed to create tokio runtime: {}", e);
             panic!("failed to create tokio runtime: {}", e)
@@ -1165,7 +1165,7 @@ pub fn run_rules_report(
     }
 
     // SARIF passthrough: run external tools and merge their SARIF output
-    if matches!(engine, RuleType::Sarif) {
+    if matches!(engine, RuleKind::Sarif) {
         let sarif_report = run_sarif_tools(root, &config.rules.sarif_tools);
         report.merge(sarif_report);
     }

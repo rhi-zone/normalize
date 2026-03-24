@@ -4,14 +4,14 @@
 
 use server_less::cli;
 
-/// A guide page.
+/// A guide page returned by the guide service.
 #[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct Guide {
+pub struct GuideReport {
     pub topic: String,
     pub content: String,
 }
 
-impl std::fmt::Display for Guide {
+impl std::fmt::Display for GuideReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.content)
     }
@@ -23,40 +23,40 @@ pub struct GuideService;
 #[cli(name = "guide", description = "Workflow guides with examples")]
 impl GuideService {
     /// Writing and testing syntax rules
-    pub fn rules(&self) -> Result<Guide, String> {
-        Ok(Guide {
+    pub fn rules(&self) -> Result<GuideReport, String> {
+        Ok(GuideReport {
             topic: "rules".into(),
             content: GUIDE_RULES.into(),
         })
     }
 
     /// Exploring a codebase
-    pub fn explore(&self) -> Result<Guide, String> {
-        Ok(Guide {
+    pub fn explore(&self) -> Result<GuideReport, String> {
+        Ok(GuideReport {
             topic: "explore".into(),
             content: GUIDE_EXPLORE.into(),
         })
     }
 
     /// Setting up normalize in a project
-    pub fn setup(&self) -> Result<Guide, String> {
-        Ok(Guide {
+    pub fn setup(&self) -> Result<GuideReport, String> {
+        Ok(GuideReport {
             topic: "setup".into(),
             content: GUIDE_SETUP.into(),
         })
     }
 
     /// Running analysis on a codebase
-    pub fn analyze(&self) -> Result<Guide, String> {
-        Ok(Guide {
+    pub fn analyze(&self) -> Result<GuideReport, String> {
+        Ok(GuideReport {
             topic: "analyze".into(),
             content: GUIDE_ANALYZE.into(),
         })
     }
 
     /// Using tree-sitter introspection commands
-    pub fn tree_sitter(&self) -> Result<Guide, String> {
-        Ok(Guide {
+    pub fn tree_sitter(&self) -> Result<GuideReport, String> {
+        Ok(GuideReport {
             topic: "tree-sitter".into(),
             content: GUIDE_TREE_SITTER.into(),
         })

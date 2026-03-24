@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"grep\"])"
 ---
-Search for text patterns in files (fast ripgrep-based search)
+Search for text patterns across the codebase using ripgrep regex syntax.
 
 Usage: normalize grep [OPTIONS] [pattern]
 
@@ -24,6 +24,10 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Accepts a regex `pattern`, optional `root`, `only` (include glob), `exclude` (exclude
+glob), and `limit` flags. Returns a `GrepReport` with file paths, line numbers, and
+matched text. Uses ripgrep regex: `|` for alternation, not BRE/ERE.
 
 Examples:
 normalize grep "TODO" --only "*.rs"    # search Rust files for TODO

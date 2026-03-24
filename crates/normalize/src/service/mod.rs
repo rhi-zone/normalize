@@ -84,6 +84,11 @@ pub(crate) fn resolve_pretty(root: &std::path::Path, pretty: bool, compact: bool
 }
 
 impl NormalizeService {
+    /// Construct a new `NormalizeService` with all sub-services initialized.
+    ///
+    /// Creates each sub-service (analyze, rank, view, facts, rules, etc.) sharing a single
+    /// `pretty` cell that is updated per-command from global `--pretty`/`--compact` flags.
+    /// Called once at startup by the CLI entry point.
     pub fn new() -> Self {
         let pretty = Cell::new(false);
         Self {
@@ -171,7 +176,10 @@ impl NormalizeService {
     }
 }
 
-/// Wrapper enum for context command's two output types.
+/// Output type for `normalize context`: either a list of context files or full merged content.
+///
+/// The `list` subcommand returns `List`; the default (no subcommand) returns `Full` with the
+/// merged `.context.md` content for the requested path.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 #[serde(tag = "kind")]
 pub enum ContextKindReport {
@@ -194,7 +202,7 @@ impl std::fmt::Display for ContextKindReport {
     }
 }
 
-/// Report for init command.
+/// Report for `normalize init`: records whether initialization succeeded and what changed.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct InitReport {
     pub success: bool,
@@ -203,7 +211,7 @@ pub struct InitReport {
     pub dry_run: bool,
 }
 
-/// Report for update check.
+/// Report for `normalize update`: current and latest version with an update-available flag.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct UpdateReport {
     pub current_version: String,
@@ -239,7 +247,11 @@ impl std::fmt::Display for UpdateReport {
     }
 }
 
-/// Report for translate command.
+/// Report for `normalize translate`: translated code and optional output path.
+///
+/// When `output_path` is set, the translated code was written to disk and `format_text()`
+/// returns an empty string (the write message was sent to stderr). When absent, the
+/// translated code is printed to stdout via `code`.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct TranslateReport {
     pub code: String,
@@ -283,7 +295,11 @@ impl NormalizeService {
         &self.view
     }
 
-    /// Search for text patterns in files (fast ripgrep-based search)
+    /// Search for text patterns across the codebase using ripgrep regex syntax.
+    ///
+    /// Accepts a regex `pattern`, optional `root`, `only` (include glob), `exclude` (exclude
+    /// glob), and `limit` flags. Returns a `GrepReport` with file paths, line numbers, and
+    /// matched text. Uses ripgrep regex: `|` for alternation, not BRE/ERE.
     ///
     /// Examples:
     ///   normalize grep "TODO" --only "*.rs"    # search Rust files for TODO
@@ -854,7 +870,11 @@ impl NormalizeService {
         &self.serve
     }
 
-    /// Run all configured checks (syntax, native, fact rules) and exit non-zero on errors
+    /// Run all configured quality checks and exit non-zero if any errors are found.
+    ///
+    /// Runs the syntax rules engine (tree-sitter queries), native rules engine (stale-summary,
+    /// ratchet, budget), and fact rules engine in sequence. Returns a `CiReport` with grouped
+    /// findings. Use `--strict` to treat warnings as errors; `--sarif` for GitHub Actions output.
     ///
     /// Examples:
     ///   normalize ci                           # run all engines, exit 1 on errors
@@ -883,7 +903,7 @@ impl NormalizeService {
     ) -> Result<commands::ci::CiReport, String> {
         use normalize_output::diagnostics::DiagnosticsReport;
         use normalize_rules::{
-            RuleType, apply_native_rules_config, load_rules_config, run_rules_report,
+            RuleKind, apply_native_rules_config, load_rules_config, run_rules_report,
         };
         use std::time::Instant;
 
@@ -909,7 +929,7 @@ impl NormalizeService {
                     &root_clone,
                     None,
                     None,
-                    &RuleType::Syntax,
+                    &RuleKind::Syntax,
                     &[],
                     &config,
                 )
@@ -984,7 +1004,7 @@ impl NormalizeService {
                     &fact_root,
                     None,
                     None,
-                    &RuleType::Fact,
+                    &RuleKind::Fact,
                     &[],
                     &config,
                 )

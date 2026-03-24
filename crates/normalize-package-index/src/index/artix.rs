@@ -385,7 +385,7 @@ impl Artix {
             match result {
                 Ok(pkgs) => packages.extend(pkgs),
                 Err(e) => {
-                    eprintln!("Warning: failed to load Artix repo: {}", e);
+                    tracing::warn!("failed to load Artix repo: {}", e);
                 }
             }
         }

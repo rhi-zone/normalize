@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"rank\", \"files\"])"
 ---
-Show longest files in codebase
+Rank source files by line count, longest first.
 
 Usage: normalize rank files [OPTIONS]
 
@@ -20,3 +20,6 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Returns a `FileLengthReport` with file paths and line counts. Supports `exclude`
+globs and an optional `diff` ref to show how file lengths have changed.

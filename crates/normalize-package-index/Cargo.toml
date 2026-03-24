@@ -23,6 +23,7 @@ tar = "0.4"
 zstd = "0.13"
 rayon = { workspace = true }
 quick-xml = { version = "0.37", features = ["serialize"] }
+tracing = "0.1"
 
 [dev-dependencies]
 base64 = "0.22"

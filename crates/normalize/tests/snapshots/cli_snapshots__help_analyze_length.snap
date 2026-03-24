@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"length\"])"
 ---
-Run function length analysis
+Find the longest functions in the codebase, ranked by line count.
 
 Usage: normalize analyze length [OPTIONS] [target]
 
@@ -24,3 +24,7 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Accepts an optional `target` path, a `limit` on results, an `exclude` glob list,
+and a `diff` ref to compare against. Returns a `LengthReport` with per-function
+entries including file, line range, and optional delta from the diff ref.

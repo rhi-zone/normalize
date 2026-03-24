@@ -7,13 +7,13 @@ Fast code intelligence CLI
 Usage: normalize [OPTIONS] [COMMAND]
 
 Commands:
-  grep       Search for text patterns in files (fast ripgrep-based search)
+  grep       Search for text patterns across the codebase using ripgrep regex syntax.
   aliases    List filter aliases (used by --exclude/--only)
   context    Show directory context (hierarchical .context.md files)
   init       Initialize normalize in current directory
   update     Check for and install updates
   translate  Translate code between programming languages
-  ci         Run all configured checks (syntax, native, fact rules) and exit non-zero on errors
+  ci         Run all configured quality checks and exit non-zero if any errors are found.
   view       View a node in the codebase tree, or navigate symbol relationships
   daemon     Manage the global normalize daemon
   grammars   Manage tree-sitter grammars for parsing

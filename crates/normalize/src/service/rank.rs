@@ -195,7 +195,11 @@ impl RankService {
     test = "Testing",
 ))]
 impl RankService {
-    /// Run complexity analysis
+    /// Rank functions by cyclomatic complexity, worst first.
+    ///
+    /// Accepts an optional `target` path, a complexity `threshold`, and a `limit` on results.
+    /// Use `diff` to compare against a git ref and show deltas. Returns a `ComplexityReport`
+    /// with per-function complexity scores, file locations, and optional delta values.
     #[server(group = "code")]
     #[cli(display_with = "display_complexity")]
     #[allow(clippy::too_many_arguments)]
@@ -286,7 +290,10 @@ impl RankService {
         Ok(report)
     }
 
-    /// Show longest files in codebase
+    /// Rank source files by line count, longest first.
+    ///
+    /// Returns a `FileLengthReport` with file paths and line counts. Supports `exclude`
+    /// globs and an optional `diff` ref to show how file lengths have changed.
     #[server(group = "repo")]
     #[cli(display_with = "display_file_length")]
     pub fn files(
@@ -328,7 +335,11 @@ impl RankService {
         Ok(report)
     }
 
-    /// Show hierarchical LOC breakdown (ncdu-style)
+    /// Show hierarchical lines-of-code breakdown (ncdu-style tree view).
+    ///
+    /// Recursively aggregates line counts by directory, returning a `SizeReport` with
+    /// nested entries. The largest directories appear first at each level, mirroring
+    /// how ncdu presents disk usage.
     #[server(group = "modules")]
     #[cli(display_with = "display_size")]
     pub fn size(
@@ -348,7 +359,11 @@ impl RankService {
         ))
     }
 
-    /// Show ceremony ratio: fraction of callables that are trait/interface boilerplate
+    /// Rank files by boilerplate ratio: fraction of callables that are trait/interface implementations.
+    ///
+    /// High ceremony scores indicate files dominated by mechanical delegation rather than
+    /// business logic. Returns a `CeremonyReport` with per-file ratios and an optional
+    /// delta when `diff` is provided.
     #[server(group = "code")]
     #[cli(display_with = "display_ceremony")]
     pub fn ceremony(
@@ -382,7 +397,11 @@ impl RankService {
         Ok(report)
     }
 
-    /// Churn × complexity hotspots: files ranked by change frequency and complexity
+    /// Rank files by churn × complexity: the highest-risk files for introducing bugs.
+    ///
+    /// Combines git churn (commit frequency) with cyclomatic complexity to surface
+    /// files that change often and are hard to reason about. Use `recency` to weight
+    /// recent commits higher. Returns a `HotspotsReport` with per-file risk scores.
     #[server(group = "git")]
     #[cli(display_with = "display_hotspots")]
     pub fn hotspots(
@@ -446,7 +465,11 @@ impl RankService {
         crate::commands::analyze::hotspots::analyze_hotspots(&root_path, &excludes, recency)
     }
 
-    /// Temporal coupling: file pairs that change together in git history
+    /// Rank file pairs by temporal coupling: pairs that appear in the same git commits.
+    ///
+    /// High coupling scores indicate implicit dependencies that aren't visible in the
+    /// import graph. `min_commits` sets the minimum shared-commit threshold. Returns
+    /// a `CouplingReport` with ranked pairs and their shared-commit counts.
     #[server(group = "git")]
     #[cli(display_with = "display_coupling")]
     #[allow(clippy::too_many_arguments)]
@@ -496,7 +519,11 @@ impl RankService {
         Ok(report)
     }
 
-    /// Show per-file ownership concentration from git blame
+    /// Rank files by ownership concentration: how many authors contribute to each file.
+    ///
+    /// Uses git blame to compute the fraction of lines owned by the top contributor.
+    /// High concentration (single-author files) indicates bus-factor risk. Returns an
+    /// `OwnershipReport` with per-file scores and optional cross-repo aggregation.
     #[server(group = "git")]
     #[cli(display_with = "display_ownership")]
     pub fn ownership(
@@ -575,7 +602,11 @@ impl RankService {
         Ok(report)
     }
 
-    /// Test/impl line ratio per module
+    /// Rank modules by test-to-implementation line ratio.
+    ///
+    /// Classifies files as test or implementation by naming convention and groups them
+    /// by module. Returns a `TestRatioReport` with per-module ratios and an overall score.
+    /// Modules with the lowest ratio appear first.
     #[server(group = "test")]
     #[cli(display_with = "display_test_ratio")]
     pub fn test_ratio(
@@ -615,7 +646,11 @@ impl RankService {
         Ok(report)
     }
 
-    /// Line budget breakdown by purpose (business logic, tests, docs, config, etc.)
+    /// Break down line counts by purpose: business logic, tests, docs, config, and generated code.
+    ///
+    /// Classifies every line in the codebase into a budget category and ranks files by the
+    /// categories you care about most. Returns a `LineBudgetReport` with per-file breakdowns
+    /// and totals across the whole project.
     #[server(group = "test")]
     #[cli(display_with = "display_budget")]
     pub fn budget(
@@ -655,7 +690,11 @@ impl RankService {
         Ok(report)
     }
 
-    /// Measure information density (compression ratio + token uniqueness) per module
+    /// Rank modules by information density: compression ratio combined with token uniqueness.
+    ///
+    /// Modules with high density pack more distinct concepts per line. Low-density modules
+    /// may have excessive boilerplate or copy-paste. Returns a `DensityReport` with per-module
+    /// scores and the overall compression ratio and token uniqueness.
     #[server(group = "modules")]
     #[cli(display_with = "display_density")]
     pub fn density(
@@ -702,7 +741,11 @@ impl RankService {
         Ok(report)
     }
 
-    /// Measure what fraction of functions have no structural near-twin per module
+    /// Rank modules by code uniqueness: fraction of functions with no structural near-twin.
+    ///
+    /// Uses MinHash similarity to find near-duplicate function bodies. Modules with low
+    /// uniqueness scores have many similar functions that are candidates for extraction or
+    /// consolidation. Returns a `UniquenessReport` with per-module scores.
     #[server(group = "code")]
     #[cli(display_with = "display_uniqueness")]
     #[allow(clippy::too_many_arguments)]
@@ -778,7 +821,11 @@ impl RankService {
         Ok(report)
     }
 
-    /// Rank modules by import fan-in (requires facts index)
+    /// Rank modules by import fan-in: how many other modules import each module.
+    ///
+    /// Requires the facts index (`normalize structure rebuild`). High fan-in modules are
+    /// architectural hubs — changes to them ripple widely. Returns an `ImportCentralityReport`
+    /// with per-module fan-in counts and the most-imported symbols.
     #[server(group = "modules")]
     #[cli(display_with = "display_imports")]
     pub async fn imports(
@@ -829,7 +876,11 @@ impl RankService {
         Ok(report)
     }
 
-    /// Per-module public symbol count, public ratio, and constraint score
+    /// Rank modules by API surface area: public symbol count, public ratio, and constraint score.
+    ///
+    /// Modules with large surfaces are harder to evolve without breaking callers. The
+    /// constraint score combines symbol count with type complexity. Returns a `SurfaceReport`
+    /// with per-module rankings.
     #[server(group = "modules")]
     #[cli(display_with = "display_surface")]
     pub async fn surface(
@@ -876,7 +927,11 @@ impl RankService {
         Ok(report)
     }
 
-    /// Per-module dependency depth + ripple risk
+    /// Rank modules by dependency depth and ripple risk in the import graph.
+    ///
+    /// Computes the longest import chain reaching each module (depth) and estimates how
+    /// many modules would be affected by a change (ripple). Returns a `DepthMapReport`
+    /// sorted by combined risk score.
     #[server(group = "modules")]
     #[cli(display_with = "display_depth_map")]
     pub async fn depth_map(
@@ -924,7 +979,11 @@ impl RankService {
         Ok(report)
     }
 
-    /// Per-module import layering compliance — are imports flowing downward?
+    /// Rank modules by import layering compliance: do imports flow in one direction?
+    ///
+    /// Detects circular and upward imports that violate a clean layered architecture.
+    /// Returns a `LayeringReport` with per-module violation counts and the full list
+    /// of problematic import edges.
     #[server(group = "modules")]
     #[cli(display_with = "display_layering")]
     pub async fn layering(
@@ -972,7 +1031,11 @@ impl RankService {
         Ok(report)
     }
 
-    /// Score each module across test ratio, uniqueness, and density (worst first)
+    /// Score each module on a composite health metric: test ratio × uniqueness × density.
+    ///
+    /// Combines three orthogonal quality signals into a single score per module. Modules
+    /// with the lowest composite score appear first and are the highest-priority candidates
+    /// for improvement. Returns a `ModuleHealthReport`.
     #[server(group = "modules")]
     #[cli(display_with = "display_module_health")]
     pub fn module_health(
@@ -1002,7 +1065,11 @@ impl RankService {
         )
     }
 
-    /// Compute effective (reachable) cyclomatic complexity via call-graph BFS
+    /// Rank functions by effective complexity: cyclomatic complexity summed over the full call graph.
+    ///
+    /// Uses BFS on the call graph (requires facts index) to compute the total complexity
+    /// reachable from each entry point. High scores indicate functions that are simple
+    /// locally but call many complex sub-functions. Returns a `CallComplexityReport`.
     #[server(group = "code")]
     #[cli(display_with = "display_call_complexity")]
     pub fn call_complexity(
@@ -1033,9 +1100,11 @@ impl RankService {
         )
     }
 
-    /// Detect duplicate/similar code (functions or blocks)
+    /// Detect duplicate or similar code blocks and functions across the codebase.
     ///
-    /// Modes: exact (default), similar (fuzzy MinHash), clusters (connected components).
+    /// Modes: `exact` (default) finds byte-identical bodies; `similar` uses MinHash fuzzy
+    /// matching; `clusters` groups near-duplicates into connected components. Returns a
+    /// `DuplicatesReport` with grouped matches and similarity scores.
     #[server(group = "code")]
     #[cli(display_with = "display_duplicates")]
     #[allow(clippy::too_many_arguments)]
@@ -1195,7 +1264,10 @@ impl RankService {
         }
     }
 
-    /// Detect duplicate type definitions
+    /// Detect duplicate type definitions (structs, enums, classes) across the codebase.
+    ///
+    /// Finds types with identical or near-identical field layouts that have been defined
+    /// more than once. Returns a `DuplicateTypesReport` with grouped matches.
     #[server(group = "code")]
     #[cli(display_with = "display_dup_types")]
     pub fn duplicate_types(
@@ -1219,7 +1291,11 @@ impl RankService {
         )
     }
 
-    /// Find repeated AST fragments across the codebase
+    /// Find repeated AST fragments (sub-expressions, statement patterns) across the codebase.
+    ///
+    /// Operates at a finer granularity than `duplicates`: finds repeated structural patterns
+    /// within function bodies rather than entire functions. The `scope` parameter controls
+    /// whether to search within functions or across blocks. Returns a `FragmentsReport`.
     #[server(group = "code")]
     #[cli(display_with = "display_fragments")]
     #[allow(clippy::too_many_arguments)]
@@ -1279,7 +1355,11 @@ impl RankService {
         )
     }
 
-    /// Analyze contributors across repos
+    /// Rank contributors by commit activity across one or more repositories.
+    ///
+    /// Aggregates git log data per author, computing commit counts, lines added/removed,
+    /// and active periods. When `repos_dir` is provided, results span all discovered repos.
+    /// Returns a `ContributorsReport` with per-author statistics.
     #[server(group = "git")]
     #[cli(display_with = "display_contributors")]
     pub fn contributors(

@@ -237,7 +237,10 @@ impl AnalyzeService {
     diff = "Diff",
 ))]
 impl AnalyzeService {
-    /// Show architecture analysis (coupling, cycles, hubs)
+    /// Analyze architectural structure: coupling, dependency cycles, and hub modules.
+    ///
+    /// Requires the facts index (`normalize structure rebuild`). Returns an `ArchitectureReport`
+    /// with coupling pairs, cycle lists, and hub modules ranked by fan-in/fan-out.
     #[server(group = "graph")]
     #[cli(display_with = "display_architecture")]
     pub async fn architecture(
@@ -322,7 +325,11 @@ impl AnalyzeService {
         ))
     }
 
-    /// Run security analysis
+    /// Scan the codebase for security issues (hardcoded secrets, unsafe patterns).
+    ///
+    /// Runs heuristic pattern matching across all indexed files. The optional `target`
+    /// parameter filters findings to paths that contain the given substring. Returns a
+    /// `SecurityReport` with ranked findings including file, line, and severity.
     #[server(group = "security")]
     #[cli(display_with = "display_security")]
     pub fn security(
@@ -342,7 +349,11 @@ impl AnalyzeService {
         Ok(report)
     }
 
-    /// Show complexity trend over git history
+    /// Show how average cyclomatic complexity has changed over git history.
+    ///
+    /// Walks `snapshots` evenly-spaced commits on the current branch, computing average
+    /// complexity at each point. Returns a `ScalarTrendReport` suitable for plotting
+    /// or diffing. Lower values indicate improvement.
     #[server(group = "code")]
     #[cli(display_with = "display_scalar_trend")]
     pub fn complexity_trend(
@@ -376,7 +387,11 @@ impl AnalyzeService {
         .map_err(AnalyzeError::from)
     }
 
-    /// Run function length analysis
+    /// Find the longest functions in the codebase, ranked by line count.
+    ///
+    /// Accepts an optional `target` path, a `limit` on results, an `exclude` glob list,
+    /// and a `diff` ref to compare against. Returns a `LengthReport` with per-function
+    /// entries including file, line range, and optional delta from the diff ref.
     #[server(group = "code")]
     #[cli(display_with = "display_length")]
     #[allow(clippy::too_many_arguments)]
@@ -453,7 +468,10 @@ impl AnalyzeService {
         Ok(report)
     }
 
-    /// Show function length trend over git history
+    /// Show how average function length has changed over git history.
+    ///
+    /// Walks `snapshots` evenly-spaced commits, computing average function line count at
+    /// each point. Returns a `ScalarTrendReport`. Lower values indicate improvement.
     #[server(group = "code")]
     #[cli(display_with = "display_scalar_trend")]
     pub fn length_trend(
@@ -486,7 +504,11 @@ impl AnalyzeService {
         .map_err(AnalyzeError::from)
     }
 
-    /// Analyze documentation coverage
+    /// Measure documentation coverage: which public symbols lack doc comments.
+    ///
+    /// Returns a `DocCoverageReport` listing files ranked by undocumented public symbols,
+    /// with per-file and overall coverage percentages. Respects the `exclude_interface_impls`
+    /// config option to skip auto-generated trait implementations.
     #[server(group = "repo")]
     #[cli(display_with = "display_doc_coverage")]
     pub async fn docs(
@@ -513,7 +535,11 @@ impl AnalyzeService {
         .await)
     }
 
-    /// Change-clusters: connected components of temporally coupled files
+    /// Find clusters of files that change together in git history (connected components).
+    ///
+    /// Groups files into clusters using temporal coupling edges weighted by shared commit
+    /// count. `min_commits` controls the edge threshold (auto-scaled by repo size if
+    /// omitted). Returns a `CouplingClustersReport` with cluster membership and sizes.
     #[server(group = "git")]
     #[cli(display_with = "display_coupling_clusters")]
     #[allow(clippy::too_many_arguments)]
@@ -560,7 +586,11 @@ impl AnalyzeService {
         .map_err(AnalyzeError::from)
     }
 
-    /// Analyze cross-repo activity over time
+    /// Show commit activity across multiple repositories over time windows.
+    ///
+    /// Discovers git repos under `repos_dir`, groups commits by `window` (month or week),
+    /// and returns an `ActivityReport` with per-repo commit counts across `windows` periods.
+    /// Useful for identifying which repos are most actively developed.
     #[server(group = "git")]
     #[cli(display_with = "display_activity")]
     pub fn activity(
@@ -581,7 +611,11 @@ impl AnalyzeService {
         .map_err(AnalyzeError::from)
     }
 
-    /// Analyze cross-repo coupling
+    /// Detect temporal coupling between repositories: pairs that receive commits together.
+    ///
+    /// Groups commits within `window` hours as "co-changes" and reports repo pairs that
+    /// appear together in at least `min_windows` co-change windows. Returns a
+    /// `RepoCouplingReport` with ranked repo pairs and their co-change counts.
     #[server(group = "git")]
     #[cli(display_with = "display_repo_coupling")]
     pub fn repo_coupling(
@@ -602,7 +636,11 @@ impl AnalyzeService {
         .map_err(AnalyzeError::from)
     }
 
-    /// Rank repos by tech debt (churn + complexity + coupling)
+    /// Rank repositories by composite tech-debt score (churn × complexity × coupling).
+    ///
+    /// Discovers git repos under `repos_dir` and computes a health score for each by
+    /// combining churn rate, average cyclomatic complexity, and temporal coupling density.
+    /// Returns a `CrossRepoHealthReport` with repos ranked worst-first.
     #[server(group = "git")]
     #[cli(display_with = "display_cross_repo_health")]
     pub fn cross_repo_health(
@@ -614,7 +652,11 @@ impl AnalyzeService {
         Ok(crate::commands::analyze::cross_repo_health::analyze_cross_repo_health(&repos))
     }
 
-    /// Find untested public functions ranked by risk
+    /// Identify public functions that lack test coverage, ranked by risk score.
+    ///
+    /// Uses the facts index to find callables with no test references, then ranks them
+    /// by a risk heuristic (complexity × call-site count). `min_risk` filters out low-risk
+    /// entries. Returns a `TestGapsReport` with per-function risk scores and locations.
     #[server(group = "test")]
     #[cli(display_with = "display_test_gaps")]
     #[allow(clippy::too_many_arguments)]
@@ -660,7 +702,11 @@ impl AnalyzeService {
         .await)
     }
 
-    /// Show test ratio trend over git history
+    /// Show how the test-to-code ratio has changed over git history.
+    ///
+    /// Walks `snapshots` evenly-spaced commits and computes the fraction of files that
+    /// are test files at each point. Returns a `ScalarTrendReport`. Higher values indicate
+    /// better test coverage over time.
     #[server(group = "test")]
     #[cli(display_with = "display_scalar_trend")]
     pub fn test_ratio_trend(
@@ -689,7 +735,11 @@ impl AnalyzeService {
         .map_err(AnalyzeError::from)
     }
 
-    /// Show information density trend over git history
+    /// Show how information density has changed over git history.
+    ///
+    /// Walks `snapshots` evenly-spaced commits and computes a composite density score
+    /// (compression ratio + token uniqueness) at each point. Returns a `ScalarTrendReport`.
+    /// Higher values indicate denser, more information-rich code over time.
     #[server(group = "modules")]
     #[cli(display_with = "display_scalar_trend")]
     pub fn density_trend(
@@ -741,7 +791,11 @@ impl AnalyzeService {
         Ok(crate::commands::analyze::summary::analyze_summary(&root_path, effective_limit).await)
     }
 
-    /// Show structural changes between a base ref and HEAD
+    /// Show structural (skeleton) changes between a base ref and HEAD.
+    ///
+    /// Computes the skeleton (symbol signatures) at `base` and at HEAD, then diffs them
+    /// to show added, removed, and changed symbols without requiring a full source diff.
+    /// Returns a `SkeletonDiffReport` grouped by file with before/after signatures.
     #[server(group = "diff")]
     #[cli(display_with = "display_skeleton_diff")]
     pub fn skeleton_diff(
@@ -770,7 +824,11 @@ impl AnalyzeService {
         .map_err(AnalyzeError::from)
     }
 
-    /// Track health metrics over git history at regular intervals
+    /// Track multiple health metrics (complexity, length, test ratio, density) over git history.
+    ///
+    /// Walks `snapshots` evenly-spaced commits on the current branch and collects a composite
+    /// set of metrics at each point. Returns a `TrendReport` with per-snapshot values for
+    /// all tracked metrics, enabling holistic codebase trend analysis.
     #[server(group = "git")]
     #[cli(display_with = "display_trend")]
     pub fn trend(
@@ -789,7 +847,11 @@ impl AnalyzeService {
             .map_err(AnalyzeError::from)
     }
 
-    /// List node kinds and field names for a tree-sitter grammar
+    /// List all node types and field names for a tree-sitter grammar.
+    ///
+    /// Returns the full set of named node types, anonymous tokens, and field names defined
+    /// in the grammar for `language`. The optional `search` parameter filters results to
+    /// entries whose name contains the given substring (case-insensitive).
     #[server(group = "code")]
     #[cli(display_with = "display_node_types")]
     pub fn node_types(
