@@ -26,7 +26,8 @@ impl LogFormat for ClaudeCodeFormat {
 
         // Claude encodes project paths - check which encoding variant exists
         let path_to_claude_dir = |path: &Path| -> PathBuf {
-            let path_str = path.to_string_lossy().replace('/', "-");
+            let raw = path.to_string_lossy();
+            let path_str = raw.trim_end_matches('/').replace('/', "-");
             // Try with leading dash first (Claude's format)
             let proj_dir = claude_dir.join(format!("-{}", path_str.trim_start_matches('-')));
             if proj_dir.exists() {

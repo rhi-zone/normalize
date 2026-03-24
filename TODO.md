@@ -798,6 +798,16 @@ to depend on. The LSP is useful day-to-day.
 
 ---
 
+## Post-polish review
+
+After the fixpoint polish loop reaches 0 findings, do a retrospective pass:
+review all the changes made during the polish loop and evaluate whether they
+were actually helpful. Some fixes may have been mechanical (rename, doc comment)
+with clear value; others may have introduced complexity or changed semantics in
+ways worth questioning. Candidates to review: catch_unwind in FFI (does it hide
+real bugs?), load_rules_config merge (was the old behavior intentional?),
+find_cycles_dfs iterative conversion (was stack depth ever actually a problem?).
+
 ## Deferred
 
 - `normalize jq` multi-format support (YAML/CBOR/TOML/XML via `jaq-all` with `formats` feature): currently using `jaq-core/std/json` directly to avoid `jaq-fmts` bloat. Low priority — vanilla jq is JSON-only anyway.
