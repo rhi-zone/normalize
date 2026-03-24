@@ -567,13 +567,13 @@ _(0 new findings — fixpoint reached on this lens)_
 
 ### doc-coverage
 
-- [APPROVED] `crates/normalize-ratchet/src/service.rs:690` — `pub fn do_measure()` missing doc comment _(severity: high)_
-- [APPROVED] `crates/normalize-ratchet/src/service.rs:1115` — `pub fn build_ratchet_report()` missing doc comment _(severity: high)_
-- [APPROVED] `crates/normalize-budget/src/service.rs:730` — `pub fn build_budget_report()` missing doc comment _(severity: high)_
-- [APPROVED] `crates/normalize-budget/src/service.rs:20` — `MeasureReport` fields (`path`, `metric`, `aggregate`, `base_ref`) undocumented _(severity: medium)_
-- [APPROVED] `crates/normalize-budget/src/service.rs:57` — `CheckEntry` fields undocumented _(severity: medium)_
-- [APPROVED] `crates/normalize-budget/src/service.rs:104,126,148,159` — `AddReport`, `UpdateReport`, `ShowEntry`, `ShowReport` fields undocumented _(severity: low)_
-- [APPROVED] `crates/normalize-ratchet/src/service.rs:238,207,212` — `AddReport`, `ShowReport`, `ShowEntry` fields undocumented _(severity: low)_
+- [DONE] `crates/normalize-ratchet/src/service.rs:690` — `pub fn do_measure()` missing doc comment _(severity: high)_
+- [DONE] `crates/normalize-ratchet/src/service.rs:1115` — `pub fn build_ratchet_report()` missing doc comment _(severity: high)_
+- [DONE] `crates/normalize-budget/src/service.rs:730` — `pub fn build_budget_report()` missing doc comment _(severity: high)_
+- [DONE] `crates/normalize-budget/src/service.rs:20` — `MeasureReport` fields (`path`, `metric`, `aggregate`, `base_ref`) undocumented _(severity: medium)_
+- [DONE] `crates/normalize-budget/src/service.rs:57` — `CheckEntry` fields undocumented _(severity: medium)_
+- [DONE] `crates/normalize-budget/src/service.rs:104,126,148,159` — `AddReport`, `UpdateReport`, `ShowEntry`, `ShowReport` fields undocumented _(severity: low)_
+- [DONE] `crates/normalize-ratchet/src/service.rs:238,207,212` — `AddReport`, `ShowReport`, `ShowEntry` fields undocumented _(severity: low)_
 
 ### error-surface
 
