@@ -1,9 +1,9 @@
 # Polish State
 
 Created: f89f7a3c5d17cb1d8b13137bacb8c830d54c808c
-Last run: 2026-03-24T19:00:00Z
+Last run: 2026-03-24T22:00:00Z
 Round 1 applied: 2026-03-24
-Round: 8
+Round: 9
 Project type: Rust CLI + library ecosystem (~40 crates)
 
 ## Lenses
@@ -643,3 +643,51 @@ None.
 - [DONE] `crates/normalize-native-rules/src/stale_docs.rs:69` — `Regex::new().unwrap()` not in `OnceLock` — moved to static `OnceLock` _(severity: low)_
 - [DONE] `crates/normalize-ratchet/src/metrics/call_complexity.rs:254` — `(local_cc + reachable) as f64` without saturation — changed to `saturating_add` _(severity: low)_
 - [DONE] `crates/normalize-native-rules/src/check_refs.rs:213` — `s[dot + 1..]` after `rfind('.')` — added `// SAFETY:` comment _(severity: low)_
+
+---
+
+## Findings — Round 9
+
+Round 9 git hash: 7b1c049c
+Scope: entire codebase — fixpoint verification
+
+### Conflicts
+None.
+
+### error-surface
+
+- [DONE] `crates/normalize-facts/src/index.rs:125` — `"Index corrupted, rebuilding"` uses `eprintln!` in library code — changed to `tracing::warn!` _(severity: high)_
+- [DONE] `crates/normalize-facts/src/index.rs:2083,2247,2294` — `resolve_all_imports`/`resolve_all_calls` errors used `eprintln!` in library code — changed to `tracing::warn!` _(severity: high)_
+- [DONE] `crates/normalize-facts/src/index.rs:108` — `create_dir_all(...).ok()` silently swallowed failure — added `tracing::warn!` _(severity: medium)_
+- [DONE] `crates/normalize-native-rules/src/check_refs.rs:86` — `all_symbol_names().unwrap_or_default()` turned DB failure into misleading "run rebuild" message — added `tracing::warn!` before fallback _(severity: medium)_
+- [DONE] `crates/normalize-facts/src/index.rs` — column read errors in symbol extraction missing debug log — added `tracing::debug!` _(severity: low)_
+- [DONE] `crates/normalize-native-rules/src/stale_summary.rs` — `load_cache` didn't distinguish missing vs corrupt — added `tracing::debug!` on parse failure _(severity: low)_
+- [DONE] `crates/normalize-native-rules/src/stale_docs.rs` — `glob::glob()` parse error silently returned empty — added `tracing::warn!` _(severity: low)_
+- [DONE] `crates/normalize-facts/src/index.rs` — `gitignore_walk` errors silently dropped — logged _(severity: low)_
+
+### adversarial
+
+- [DONE] `crates/normalize-facts/src/index.rs:1169` — `limit as i64` unchecked; huge value → negative LIMIT — changed to `i64::try_from(limit).unwrap_or(i64::MAX)` _(severity: medium)_
+- [DONE] `crates/normalize-facts/src/index.rs:1319,1414,1497` — `row.get::<i64>(N)? as u32` wraps on negative — changed to `u32::try_from(...).unwrap_or(0)` _(severity: medium)_
+- [DONE] `crates/normalize-budget/src/metrics/complexity_delta.rs:139` — `capture_names[capture.index as usize]` direct index — changed to `.get()` + `continue` _(severity: medium)_
+- [DONE] Misc low: `.await? as usize` checked conversions; `dirs::home_dir()` fallback logging _(severity: low)_
+
+### naming-consistency
+
+- [DONE] `crates/normalize-native-rules/src/ratchet.rs:16` — `RatchetDiagnosticsReport` renamed to `RatchetRulesReport`; updated all callers _(severity: medium)_
+- [DONE] `crates/normalize-ratchet/src/service.rs` — `build_ratchet_diagnostics` missing `#[deprecated(since = "0.2.0")]` — added _(severity: medium)_
+
+### api-clarity
+
+- [DONE] `crates/normalize/src/commands/analyze/budget.rs` — `BudgetReport` collided with `normalize-budget::BudgetReport` — renamed to `LineBudgetReport` _(severity: medium)_
+- [DONE] `--base` flag — inconsistent semantics between `measure` and `check` — renamed to `--diff-ref` on `measure`, `--baseline-ref` on `check` _(severity: medium)_
+- [DONE] `build_ratchet_diagnostics` doc — expanded beyond "alias" to explain semantics _(severity: low)_
+- [DONE] `crates/normalize-ratchet/src/lib.rs` — `ratchet_path` added to re-exports for symmetry with `budget_path` _(severity: low)_
+- [DONE] `#[non_exhaustive]` added to native-rules public `*Report` structs _(severity: low)_
+
+### doc-coverage
+
+- [DONE] `crates/normalize-native-rules/src/lib.rs:27` — broken intra-doc link to `crate::apply_native_rules_config` — fixed to plain text reference _(severity: medium)_
+- [DONE] `crates/normalize-native-rules/src/stale_summary.rs:215` — `build_stale_summary_report` missing doc comment — added _(severity: medium)_
+- [DONE] `DiffMetricFactory` duplicated doc paragraph — deduplicated _(severity: low)_
+- [DONE] `build_ratchet_diagnostics` minimal doc — expanded _(severity: low)_
