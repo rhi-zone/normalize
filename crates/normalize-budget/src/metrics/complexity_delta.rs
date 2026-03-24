@@ -223,7 +223,7 @@ fn count_complexity_with_query(
     let mut matches = qcursor.matches(query, *node, content.as_bytes());
     let mut count = 1usize;
     while let Some(m) = matches.next() {
-        count += m.captures.len();
+        count = count.saturating_add(m.captures.len());
     }
     count
 }

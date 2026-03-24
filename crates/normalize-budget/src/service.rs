@@ -752,6 +752,8 @@ fn check_limits(result: &MeasureReport, limits: &BudgetLimits) -> Vec<String> {
             result.total
         ));
     }
+    // max_net is an absolute cap: even if net is negative (code shrank), it must not exceed
+    // max_net. This prevents a "net shrank so anything goes" loophole in budget enforcement.
     if let Some(max) = limits.max_net
         && result.net > max
     {

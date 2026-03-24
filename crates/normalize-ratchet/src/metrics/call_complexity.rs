@@ -300,7 +300,7 @@ fn bfs_reachable(
         if let Some(callees) = call_graph.get(current) {
             for callee in callees {
                 if visited.insert(callee) {
-                    total += cc_map.get(callee).copied().unwrap_or(1);
+                    total = total.saturating_add(cc_map.get(callee).copied().unwrap_or(1));
                     queue.push_back(callee);
                 }
             }

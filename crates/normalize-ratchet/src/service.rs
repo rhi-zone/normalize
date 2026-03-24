@@ -892,6 +892,7 @@ fn check_against_ref(
     let hash = String::from_utf8_lossy(&hash_output.stdout)
         .trim()
         .to_string();
+    // SAFETY: git hashes are always ASCII hex digits, so byte indexing is char-boundary-safe.
     let short = &hash[..7.min(hash.len())];
     // Include PID to avoid races when multiple processes check the same ref.
     let worktree_name = format!("normalize-ratchet-wt-{short}-{}", std::process::id());
@@ -1068,6 +1069,7 @@ fn measure_at_ref(
     let hash = String::from_utf8_lossy(&hash_output.stdout)
         .trim()
         .to_string();
+    // SAFETY: git hashes are always ASCII hex digits, so byte indexing is char-boundary-safe.
     let short = &hash[..7.min(hash.len())];
     let worktree_name = format!("normalize-ratchet-wt-{short}-{}", std::process::id());
     let worktree_path = std::env::temp_dir().join(&worktree_name);

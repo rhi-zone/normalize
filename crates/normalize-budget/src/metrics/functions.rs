@@ -42,6 +42,7 @@ pub(crate) fn create_worktree(root: &Path, base_ref: &str) -> anyhow::Result<std
     let hash = String::from_utf8_lossy(&hash_output.stdout)
         .trim()
         .to_string();
+    // SAFETY: git hashes are always ASCII hex digits, so byte indexing is char-boundary-safe.
     let short = &hash[..7.min(hash.len())];
     // Include PID to avoid race conditions when multiple normalize processes run concurrently.
     let worktree_name = format!("normalize-budget-wt-{}-{}", short, std::process::id());
