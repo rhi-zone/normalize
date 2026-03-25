@@ -8,9 +8,9 @@ description = "Interpreted Datalog rule evaluation for normalize code facts"
 
 [features]
 # Enable JIT compilation in ascent-interpreter (x86_64-only).
-# When enabled, passes the "jit" feature through to ascent-interpreter.
-# Disabled by default so aarch64 and Windows builds are not broken by
-# dynasmrt x86 assembly code.
+# ascent-interpreter 0.1.4 properly guards the JIT asm module with
+# #[cfg(target_arch = "x86_64")] so enabling this on all platforms is safe;
+# the JIT call sites in lib.rs are also gated on cfg(target_arch = "x86_64").
 jit = ["ascent-interpreter/jit"]
 
 [dependencies]

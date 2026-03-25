@@ -1313,9 +1313,9 @@ dependencies = [
 
 [[package]]
 name = "ascent-interpreter"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "105f0add306b58c8a1e591c0460877db814fc3b99b2960c7dfb25e5d3ece197c"
+checksum = "ce3554cf233f08b2104998e1d7fcc7a5774d8df0e0d5c367254791254bbc558a"
 dependencies = [
  "derive-syn-parse",
  "hashbrown 0.16.1",
