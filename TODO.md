@@ -916,10 +916,41 @@ incremental evaluation so they're fast enough for pre-commit use:
   references a function that no longer exists).
 - JIT fix and incremental eval wiring moved to 0.2.0 blockers.
 
+**Rules engine architecture — drop abi_stable, external process + rkyv for custom rules**
+
+The current dylib rule pack system (`libloading` + `abi_stable` + `RString`/`RVec` in
+`Relations`) has a heap corruption bug (glibc "corrupted double-linked list" on
+`normalize rules run --type fact`) caused by allocator boundary mismatch between the
+main binary and loaded `.so` files. This is not a patch-sized fix — the design is wrong.
+
+Target architecture:
+
+| Rule kind | Boundary | Serialization |
+|---|---|---|
+| Built-in native (stale-summary, broken-ref, …) | None — compiled in | — |
+| Datalog (builtin + user `.dl` files) | None — JIT in-process | — |
+| Custom native Rust rules | External process | rkyv |
+| Heavy external tools | External process | JSON / SARIF |
+
+rkyv for custom native rules: the external process receives `Relations` as a zero-copy
+rkyv archive (mmap or pipe), does its computation, writes diagnostics back. This gives
+external-process safety (no allocator boundary, no ABI concerns) without paying full JSON
+serialization cost — cheap enough for pre-commit. SARIF stays for heavy tools where JSON
+overhead is acceptable.
+
+- [ ] Drop `libloading`, `abi_stable`, `loader.rs` and the dylib search-path machinery.
+- [ ] Replace `RString`/`RVec` in `Relations` (and all `normalize-facts-rules-api` types)
+  with plain `String`/`Vec`. This fixes the heap corruption as a side effect.
+- [ ] Add `rkyv` derive to `Relations` + fact types for the external-process boundary.
+- [ ] Define the external native rule protocol: receive rkyv Relations on stdin, write
+  NDJSON diagnostics on stdout. Document in `docs/rules.md`.
+- [ ] Update the old "dylib implementation plan" entries in this file — they're superseded.
+
 **Dependencies / preconditions:**
 - `normalize refs` ships first — it's the foundation for rename, move, and dead-parameter rule.
 - Incremental Datalog wiring can happen independently of new rules.
 - JIT fix is upstream; don't block anything on it.
+- abi_stable removal can land independently of JIT — unblock it first.
 
 **Pillar 6 — Discoverability (every context type expressible in one call)**
 
