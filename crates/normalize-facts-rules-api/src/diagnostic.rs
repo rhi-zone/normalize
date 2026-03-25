@@ -3,34 +3,28 @@
 //! Rules produce diagnostics when they detect issues in the code.
 //! These are displayed to users and can be used for CI enforcement.
 
-use abi_stable::{
-    StableAbi,
-    std_types::{ROption, RString, RVec},
-};
 use serde::{Deserialize, Serialize};
 
 /// Severity level for a diagnostic.
-#[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, StableAbi, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DiagnosticLevel {
     /// Informational hint
-    Hint = 0,
+    Hint,
     /// Warning (may indicate a problem)
-    Warning = 1,
+    Warning,
     /// Error (definite problem)
-    Error = 2,
+    Error,
 }
 
 /// A source code location.
-#[repr(C)]
-#[derive(Clone, Debug, StableAbi, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Location {
     /// File path relative to project root
-    pub file: RString,
+    pub file: String,
     /// Line number (1-indexed)
     pub line: u32,
     /// Column number (1-indexed, optional)
-    pub column: ROption<u32>,
+    pub column: Option<u32>,
 }
 
 impl Location {
@@ -39,7 +33,7 @@ impl Location {
         Self {
             file: file.into(),
             line,
-            column: ROption::RNone,
+            column: None,
         }
     }
 
@@ -48,27 +42,26 @@ impl Location {
         Self {
             file: file.into(),
             line,
-            column: ROption::RSome(column),
+            column: Some(column),
         }
     }
 }
 
 /// A diagnostic produced by a rule.
-#[repr(C)]
-#[derive(Clone, Debug, StableAbi, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Diagnostic {
     /// Rule ID that produced this diagnostic (e.g., "circular-dependency")
-    pub rule_id: RString,
+    pub rule_id: String,
     /// Severity level
     pub level: DiagnosticLevel,
     /// Human-readable message
-    pub message: RString,
+    pub message: String,
     /// Primary location (where the issue was detected)
-    pub location: ROption<Location>,
+    pub location: Option<Location>,
     /// Related locations (e.g., other files in a cycle)
-    pub related: RVec<Location>,
+    pub related: Vec<Location>,
     /// Optional fix suggestion
-    pub suggestion: ROption<RString>,
+    pub suggestion: Option<String>,
 }
 
 impl Diagnostic {
@@ -78,9 +71,9 @@ impl Diagnostic {
             rule_id: rule_id.into(),
             level,
             message: message.into(),
-            location: ROption::RNone,
-            related: RVec::new(),
-            suggestion: ROption::RNone,
+            location: None,
+            related: Vec::new(),
+            suggestion: None,
         }
     }
 
@@ -101,7 +94,7 @@ impl Diagnostic {
 
     /// Set the primary location
     pub fn at(mut self, file: &str, line: u32) -> Self {
-        self.location = ROption::RSome(Location::new(file, line));
+        self.location = Some(Location::new(file, line));
         self
     }
 
@@ -113,7 +106,7 @@ impl Diagnostic {
 
     /// Add a fix suggestion
     pub fn with_suggestion(mut self, suggestion: &str) -> Self {
-        self.suggestion = ROption::RSome(suggestion.into());
+        self.suggestion = Some(suggestion.into());
         self
     }
 }

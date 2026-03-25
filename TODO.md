@@ -397,9 +397,9 @@ See `docs/lint-architecture.md` for full design discussion.
 - Safe Datalog: guaranteed termination, right level of expressiveness
 
 **Implementation plan:**
-- [ ] All rules (builtin + user) compile to dylibs via Ascent + `abi_stable`
-- [ ] Same infrastructure for both - builtins ship pre-compiled, users compile theirs
-- [ ] Same syntax for both (rules can graduate from user to builtin)
+- [x] ~~All rules (builtin + user) compile to dylibs via Ascent + `abi_stable`~~ — abandoned: dylib approach caused heap corruption (`corrupted double-linked list`) from `RString/RVec` allocator mismatch across dylib boundary. Replaced with interpreted `.dl` files via `normalize-facts-rules-interpret` (no dylib loading at all).
+- [ ] Same infrastructure for both - builtins ship pre-compiled, users compile theirs (done via `.dl` files)
+- [x] Same syntax for both (rules can graduate from user to builtin) — done: `.dl` files for all rules
 - See "Facts & Rules Architecture" section below for full plan
 
 **Rule tiers:**
@@ -423,7 +423,7 @@ Rules (custom enforcement, future):
 
 **Facts & Rules Architecture:**
 - [ ] `normalize rules compile <rules.dl>` command to build custom packs (sandboxed codegen)
-- [ ] Self-install builtin dylib: `normalize rules run --engine fact` should auto-install compiled builtins to `~/.local/share/normalize/rules/` on first run (or at build/install time). Currently requires manual copy.
+- [x] ~~Self-install builtin dylib~~ — no longer applicable; builtins are embedded `.dl` files in `normalize-facts-rules-interpret/src/builtin_dl/`, no dylib or copy step needed.
 
 ### normalize-manifest: eval-backed parsing (`eval` feature gate)
 

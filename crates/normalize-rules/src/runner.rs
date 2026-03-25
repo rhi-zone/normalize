@@ -1125,11 +1125,10 @@ pub async fn collect_fact_diagnostics_incremental(
 
             // Apply per-rule allow patterns and severity (mirrors run_rules_batch logic).
             if !rule.allow.is_empty() {
-                use abi_stable::std_types::ROption;
                 diagnostics.retain(|d| {
                     let match_str = match d.location.as_ref() {
-                        ROption::RSome(loc) => loc.file.as_str(),
-                        ROption::RNone => d.message.as_str(),
+                        Some(loc) => loc.file.as_str(),
+                        None => d.message.as_str(),
                     };
                     !rule.allow.iter().any(|p| p.matches(match_str))
                 });
@@ -1289,8 +1288,8 @@ pub fn run_rules_report(
             .collect();
         for d in &diagnostics {
             let file = match &d.location {
-                abi_stable::std_types::ROption::RSome(loc) => loc.file.as_str(),
-                abi_stable::std_types::ROption::RNone => d.message.as_str(),
+                Some(loc) => loc.file.as_str(),
+                None => d.message.as_str(),
             };
             if global_allow.is_empty() || !global_allow.iter().any(|p| p.matches(file)) {
                 report.issues.push(abi_diagnostic_to_issue(d));
@@ -1844,19 +1843,15 @@ fn syntax_severity(s: normalize_syntax_rules::Severity) -> normalize_output::dia
 pub fn abi_diagnostic_to_issue(
     d: &normalize_facts_rules_api::Diagnostic,
 ) -> normalize_output::diagnostics::Issue {
-    use abi_stable::std_types::ROption;
     use normalize_output::diagnostics::{Issue, RelatedLocation};
 
     let (file, line, column) = match &d.location {
-        ROption::RSome(loc) => (
+        Some(loc) => (
             loc.file.to_string(),
             Some(loc.line as usize),
-            match &loc.column {
-                ROption::RSome(c) => Some(*c as usize),
-                ROption::RNone => None,
-            },
+            loc.column.map(|c| c as usize),
         ),
-        ROption::RNone => (String::new(), None, None),
+        None => (String::new(), None, None),
     };
 
     let related = d
@@ -1869,10 +1864,7 @@ pub fn abi_diagnostic_to_issue(
         })
         .collect();
 
-    let suggestion = match &d.suggestion {
-        ROption::RSome(s) => Some(s.to_string()),
-        ROption::RNone => None,
-    };
+    let suggestion = d.suggestion.clone();
 
     Issue {
         file,

@@ -38,7 +38,6 @@
 //! - `diagnostic(severity, rule_id, file, line, message)` — severity = "warning"/"error"/"info"/"hint";
 //!   file = "" for no location; line = 0 when the source has no line info.
 
-use abi_stable::std_types::ROption;
 #[cfg(all(feature = "jit", target_arch = "x86_64"))]
 use ascent_interpreter::eval::SharedJitCompiler;
 use ascent_interpreter::eval::{Engine, SourceId, Value};
@@ -477,8 +476,8 @@ pub fn run_rule(
     if !rule.allow.is_empty() {
         diagnostics.retain(|d| {
             let match_str = match d.location.as_ref() {
-                ROption::RSome(loc) => loc.file.as_str(),
-                ROption::RNone => d.message.as_str(),
+                Some(loc) => loc.file.as_str(),
+                None => d.message.as_str(),
             };
             !rule.allow.iter().any(|p| p.matches(match_str))
         });
@@ -520,8 +519,8 @@ pub fn filter_inline_allowed(diagnostics: &mut Vec<Diagnostic>, root: &Path) {
         // For file-located diagnostics, check the location file directly.
         // For unlocated diagnostics, try interpreting the message as a file path.
         let file_str = match d.location.as_ref() {
-            ROption::RSome(loc) => loc.file.as_str(),
-            ROption::RNone => d.message.as_str(),
+            Some(loc) => loc.file.as_str(),
+            None => d.message.as_str(),
         };
         let path = root.join(file_str);
         if path.is_file() {
@@ -1029,8 +1028,8 @@ pub fn run_rules_batch(
         if !rule.allow.is_empty() {
             diagnostics.retain(|d| {
                 let match_str = match d.location.as_ref() {
-                    ROption::RSome(loc) => loc.file.as_str(),
-                    ROption::RNone => d.message.as_str(),
+                    Some(loc) => loc.file.as_str(),
+                    None => d.message.as_str(),
                 };
                 !rule.allow.iter().any(|p| p.matches(match_str))
             });

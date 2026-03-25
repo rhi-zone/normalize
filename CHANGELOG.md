@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`normalize rules run --type fact` no longer crashes** with `corrupted double-linked list` (heap corruption). The `abi_stable`/dylib rule pack loader has been removed; fact rules now run purely as interpreted `.dl` files with no dynamic library loading.
+
 ## [0.2.0] — 2026-03-25
 
 ### Added

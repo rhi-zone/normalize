@@ -777,11 +777,7 @@ fn test_unused_import_fires() {
     assert_eq!(result[0].message.as_str(), "helper");
     // warning_file provides file location
     assert_eq!(
-        result[0]
-            .location
-            .as_ref()
-            .map(|l| l.file.as_str())
-            .into_option(),
+        result[0].location.as_ref().map(|l| l.file.as_str()),
         Some("a.py")
     );
 }

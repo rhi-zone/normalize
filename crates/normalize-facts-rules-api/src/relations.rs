@@ -15,23 +15,17 @@
 //! - `is_impl(file, name)` - symbol is a trait/interface implementation
 //! - `type_method(file, type_name, method_name)` - method signatures on types
 
-use abi_stable::{
-    StableAbi,
-    std_types::{RString, RVec},
-};
-
 /// A symbol fact: a named entity defined in a file.
 ///
 /// Maps to Datalog: `symbol(file, name, kind, line)`
-#[repr(C)]
-#[derive(Clone, Debug, StableAbi)]
+#[derive(Clone, Debug)]
 pub struct SymbolFact {
     /// File path relative to project root
-    pub file: RString,
+    pub file: String,
     /// Symbol name
-    pub name: RString,
+    pub name: String,
     /// Symbol kind (function, class, method, etc.)
-    pub kind: RString,
+    pub kind: String,
     /// Line number where symbol is defined
     pub line: u32,
 }
@@ -39,11 +33,10 @@ pub struct SymbolFact {
 /// An import fact: a dependency from one file to another module.
 ///
 /// Maps to Datalog: `import(from_file, to_module, name)`
-#[repr(C)]
-#[derive(Clone, Debug, StableAbi)]
+#[derive(Clone, Debug)]
 pub struct ImportFact {
     /// File containing the import
-    pub from_file: RString,
+    pub from_file: String,
     /// Raw module specifier as written in the source.
     ///
     /// The value depends on the language and import style:
@@ -57,23 +50,22 @@ pub struct ImportFact {
     ///   syntaxes). Callers should treat `""` as "module not known".
     ///
     /// Resolved file paths (when available) are stored separately in the index, not here.
-    pub module_specifier: RString,
+    pub module_specifier: String,
     /// Name being imported (or "*" for wildcard)
-    pub name: RString,
+    pub name: String,
 }
 
 /// A call fact: a function call from one symbol to another.
 ///
 /// Maps to Datalog: `call(caller_file, caller_name, callee_name, line)`
-#[repr(C)]
-#[derive(Clone, Debug, StableAbi)]
+#[derive(Clone, Debug)]
 pub struct CallFact {
     /// File containing the call
-    pub caller_file: RString,
+    pub caller_file: String,
     /// Name of the calling function/method
-    pub caller_name: RString,
+    pub caller_name: String,
     /// Name of the called function/method
-    pub callee_name: RString,
+    pub callee_name: String,
     /// Line number of the call
     pub line: u32,
 }
@@ -81,71 +73,66 @@ pub struct CallFact {
 /// A visibility fact: the visibility of a symbol.
 ///
 /// Maps to Datalog: `visibility(file, name, vis)`
-#[repr(C)]
-#[derive(Clone, Debug, StableAbi)]
+#[derive(Clone, Debug)]
 pub struct VisibilityFact {
     /// File path relative to project root
-    pub file: RString,
+    pub file: String,
     /// Symbol name
-    pub name: RString,
+    pub name: String,
     /// Visibility: "public", "private", "protected", "internal"
-    pub visibility: RString,
+    pub visibility: String,
 }
 
 /// An attribute fact: one attribute annotation on a symbol.
 ///
 /// Maps to Datalog: `attribute(file, name, attr)`
-#[repr(C)]
-#[derive(Clone, Debug, StableAbi)]
+#[derive(Clone, Debug)]
 pub struct AttributeFact {
     /// File path relative to project root
-    pub file: RString,
+    pub file: String,
     /// Symbol name
-    pub name: RString,
+    pub name: String,
     /// Attribute string (e.g. "#[derive(Debug)]", "@Override")
-    pub attribute: RString,
+    pub attribute: String,
 }
 
 /// A parent fact: symbol nesting hierarchy.
 ///
 /// Maps to Datalog: `parent(file, child_name, parent_name)`
-#[repr(C)]
-#[derive(Clone, Debug, StableAbi)]
+#[derive(Clone, Debug)]
 pub struct ParentFact {
     /// File path relative to project root
-    pub file: RString,
+    pub file: String,
     /// Child symbol name
-    pub child_name: RString,
+    pub child_name: String,
     /// Parent symbol name
-    pub parent_name: RString,
+    pub parent_name: String,
 }
 
 /// A qualifier fact: call qualifier (receiver/module).
 ///
 /// Maps to Datalog: `qualifier(caller_file, caller_name, callee_name, qual)`
-#[repr(C)]
-#[derive(Clone, Debug, StableAbi)]
+#[derive(Clone, Debug)]
 pub struct QualifierFact {
     /// File containing the call
-    pub caller_file: RString,
+    pub caller_file: String,
     /// Name of the calling function/method
-    pub caller_name: RString,
+    pub caller_name: String,
     /// Name of the called function/method
-    pub callee_name: RString,
+    pub callee_name: String,
     /// Qualifier ("self", module name, etc.)
-    pub qualifier: RString,
+    pub qualifier: String,
 }
 
 /// A symbol range fact: start and end lines of a symbol.
 ///
 /// Maps to Datalog: `symbol_range(file, name, start_line, end_line)`
-#[repr(C)]
-#[derive(Clone, Debug, StableAbi)]
+#[derive(Clone, Debug)]
 pub struct SymbolRangeFact {
     /// File path relative to project root
-    pub file: RString,
+    pub file: String,
     /// Symbol name
-    pub name: RString,
+    pub name: String,
     /// Start line number
     pub start_line: u32,
     /// End line number
@@ -155,72 +142,68 @@ pub struct SymbolRangeFact {
 /// An implements fact: a symbol implements an interface/trait.
 ///
 /// Maps to Datalog: `implements(file, name, interface)`
-#[repr(C)]
-#[derive(Clone, Debug, StableAbi)]
+#[derive(Clone, Debug)]
 pub struct ImplementsFact {
     /// File path relative to project root
-    pub file: RString,
+    pub file: String,
     /// Symbol name
-    pub name: RString,
+    pub name: String,
     /// Interface/trait name
-    pub interface: RString,
+    pub interface: String,
 }
 
 /// An is_impl fact: symbol is a trait/interface implementation.
 ///
 /// Maps to Datalog: `is_impl(file, name)`
-#[repr(C)]
-#[derive(Clone, Debug, StableAbi)]
+#[derive(Clone, Debug)]
 pub struct IsImplFact {
     /// File path relative to project root
-    pub file: RString,
+    pub file: String,
     /// Symbol name
-    pub name: RString,
+    pub name: String,
 }
 
 /// A type method fact: a method signature on a type.
 ///
 /// Maps to Datalog: `type_method(file, type_name, method_name)`
-#[repr(C)]
-#[derive(Clone, Debug, StableAbi)]
+#[derive(Clone, Debug)]
 pub struct TypeMethodFact {
     /// File path relative to project root
-    pub file: RString,
+    pub file: String,
     /// Type (interface/class) name
-    pub type_name: RString,
+    pub type_name: String,
     /// Method name
-    pub method_name: RString,
+    pub method_name: String,
 }
 
 /// All relations (facts) available to rules.
 ///
 /// This is the complete set of facts extracted from a codebase.
 /// Rule packs receive this and apply Datalog rules over it.
-#[repr(C)]
-#[derive(Clone, Debug, Default, StableAbi)]
+#[derive(Clone, Debug, Default)]
 pub struct Relations {
     /// All symbols defined in the codebase
-    pub symbols: RVec<SymbolFact>,
+    pub symbols: Vec<SymbolFact>,
     /// All imports in the codebase
-    pub imports: RVec<ImportFact>,
+    pub imports: Vec<ImportFact>,
     /// All function calls in the codebase
-    pub calls: RVec<CallFact>,
+    pub calls: Vec<CallFact>,
     /// Symbol visibility facts
-    pub visibilities: RVec<VisibilityFact>,
+    pub visibilities: Vec<VisibilityFact>,
     /// Symbol attribute facts (one per attribute per symbol)
-    pub attributes: RVec<AttributeFact>,
+    pub attributes: Vec<AttributeFact>,
     /// Symbol parent-child hierarchy
-    pub parents: RVec<ParentFact>,
+    pub parents: Vec<ParentFact>,
     /// Call qualifier facts (receiver/module on calls)
-    pub qualifiers: RVec<QualifierFact>,
+    pub qualifiers: Vec<QualifierFact>,
     /// Symbol range facts (start and end lines)
-    pub symbol_ranges: RVec<SymbolRangeFact>,
+    pub symbol_ranges: Vec<SymbolRangeFact>,
     /// Implements facts (symbol implements interface/trait)
-    pub implements: RVec<ImplementsFact>,
+    pub implements: Vec<ImplementsFact>,
     /// Is-impl facts (symbol is a trait/interface implementation)
-    pub is_impls: RVec<IsImplFact>,
+    pub is_impls: Vec<IsImplFact>,
     /// Type method facts (method signatures on types)
-    pub type_methods: RVec<TypeMethodFact>,
+    pub type_methods: Vec<TypeMethodFact>,
 }
 
 impl Relations {

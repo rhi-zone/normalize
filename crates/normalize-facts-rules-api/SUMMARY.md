@@ -1,5 +1,5 @@
 # normalize-facts-rules-api
 
-Stable ABI for normalize rule plugins — the interface contract between the engine and Datalog rule packs loaded as dylibs at runtime.
+Data types for normalize fact rule evaluation — the shared interface between the Datalog engine and the rest of the system.
 
-Defines `RulePack` (the dylib export interface with `info`, `run`, `run_rule` function pointers), `RulePackInfo`, `RulePackRef`, `Relations` (the input fact tables: `SymbolFact`, `ImportFact`, `CallFact`), and `Diagnostic`/`DiagnosticLevel`/`Location` (rule output). Uses `abi_stable` for cross-version dylib safety and re-exports `ascent` for rule implementors. Rule packs implement this interface and are compiled to cdylib; the engine loads them via `RulePackRef`.
+Defines `Relations` (the input fact tables: `SymbolFact`, `ImportFact`, `CallFact`, `VisibilityFact`, etc.) and `Diagnostic`/`DiagnosticLevel`/`Location` (rule output). All types use plain Rust `String`, `Vec`, and `Option` — no FFI types. Re-exports `ascent` for rule implementors. The former `abi_stable`/dylib interface (`RulePack`, `RulePackRef`) has been removed; rules now run as interpreted `.dl` files via `normalize-facts-rules-interpret`.

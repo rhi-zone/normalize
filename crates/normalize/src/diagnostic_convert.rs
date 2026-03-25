@@ -35,18 +35,13 @@ fn syntax_severity(s: normalize_syntax_rules::Severity) -> Severity {
 
 /// Convert a facts-rules-api `Diagnostic` into a unified `Issue`.
 pub fn abi_diagnostic_to_issue(d: &normalize_facts_rules_api::Diagnostic) -> Issue {
-    use abi_stable::std_types::ROption;
-
     let (file, line, column) = match &d.location {
-        ROption::RSome(loc) => (
+        Some(loc) => (
             loc.file.to_string(),
             Some(loc.line as usize),
-            match &loc.column {
-                ROption::RSome(c) => Some(*c as usize),
-                ROption::RNone => None,
-            },
+            loc.column.map(|c| c as usize),
         ),
-        ROption::RNone => (String::new(), None, None),
+        None => (String::new(), None, None),
     };
 
     let related = d
@@ -59,10 +54,7 @@ pub fn abi_diagnostic_to_issue(d: &normalize_facts_rules_api::Diagnostic) -> Iss
         })
         .collect();
 
-    let suggestion = match &d.suggestion {
-        ROption::RSome(s) => Some(s.to_string()),
-        ROption::RNone => None,
-    };
+    let suggestion = d.suggestion.clone();
 
     Issue {
         file,

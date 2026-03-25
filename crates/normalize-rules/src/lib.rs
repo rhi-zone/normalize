@@ -3,7 +3,7 @@
 //! This crate owns all rule management logic extracted from the main `normalize` crate:
 //! - `runner` — unified run, list, show, tags, enable/disable, add/update/remove
 //! - `cmd_rules` — syntax rule runner (tree-sitter based)
-//! - `loader` — dylib rule pack discovery, loading, and execution
+//! - `loader` — diagnostic formatting helpers for fact rules
 //! - `service` — `RulesService` with `#[cli]` registration (feature-gated)
 //!
 //! The `RulesRunConfig` struct allows callers to pass rule config without depending on
@@ -26,10 +26,7 @@ pub use runner::{
     show_rule, update_rules,
 };
 
-pub use loader::{
-    LoadedRulePack, RulePackError, discover, format_diagnostic, load_all, load_from_path,
-    search_paths,
-};
+pub use loader::format_diagnostic;
 
 #[cfg(feature = "cli")]
 pub use service::{RuleShowReport, RulesService, RulesValidateReport, load_rules_config};

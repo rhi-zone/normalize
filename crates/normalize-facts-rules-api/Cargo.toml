@@ -4,14 +4,11 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Stable ABI for normalize rule plugins (Datalog over code facts)"
+description = "Data types for normalize fact rules (Relations input, Diagnostic output)"
 
 [dependencies]
 # Datalog engine
 ascent = "0.8"
-
-# Stable ABI for dylib plugins
-abi_stable = "0.11"
 
 # Serialization for diagnostics
 serde = { workspace = true, features = ["derive"] }
