@@ -157,7 +157,15 @@ pub async fn build_view_service(
 
     let unified = match (matches.len(), symbol_matches.len()) {
         (0, 0) => {
-            let mut msg = format!("No matches for: {}", target_str);
+            let mut msg = if has_file_extension || dir_only {
+                // Looks like a path — give a more actionable message
+                format!(
+                    "Path not found: {} (check that the path exists and is not ignored)",
+                    target_str
+                )
+            } else {
+                format!("No matches for: {}", target_str)
+            };
             let suggestions = search::suggest_symbols_trigram(target_str, root, 0.5, 5);
             if !suggestions.is_empty() {
                 msg.push_str("\nDid you mean?");

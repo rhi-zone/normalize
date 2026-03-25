@@ -708,7 +708,11 @@ async fn packages_data(
     description = "Manage the structural index (symbols, imports, calls)"
 )]
 impl FactsService {
-    /// Rebuild the file index
+    /// Rebuild the structural index (symbols, calls, imports, and file tree)
+    ///
+    /// Walks the project directory, parses source files, and populates the SQLite index
+    /// at `.normalize/index.sqlite`. Required before running fact rules or cross-file
+    /// navigation commands (referenced-by, dependents, depth-map, etc.).
     ///
     /// Examples:
     ///   normalize structure rebuild                          # rebuild with all content types

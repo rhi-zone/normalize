@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"structure\", \"rebuild\"])"
 ---
-Rebuild the file index
+Rebuild the structural index (symbols, calls, imports, and file tree)
 
 Usage: normalize structure rebuild [OPTIONS]
 
@@ -18,6 +18,10 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Walks the project directory, parses source files, and populates the SQLite index
+at `.normalize/index.sqlite`. Required before running fact rules or cross-file
+navigation commands (referenced-by, dependents, depth-map, etc.).
 
 Examples:
 normalize structure rebuild                          # rebuild with all content types

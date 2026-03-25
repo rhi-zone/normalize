@@ -10,7 +10,7 @@ Options:
       --no-syntax                  Skip syntax rules engine
       --pretty                     Human-friendly output with colors and formatting
       --compact                    Compact output without colors (overrides TTY detection)
-      --no-native                  Skip native rules engine (stale-summary, ratchet, budget)
+      --no-native                  Skip native rules engine (stale-summary, stale-docs, check-examples, check-refs, ratchet, budget)
       --jsonl                      Output one JSON object per line (for arrays)
       --no-fact                    Skip fact rules engine
       --json                       Output machine-readable JSON

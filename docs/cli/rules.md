@@ -1,6 +1,6 @@
 # normalize rules
 
-Manage and run analysis rules (syntax + fact). This is the unified entry point for all rule types — tree-sitter syntax rules (`.scm`) and Datalog fact rules (`.dl`).
+Manage and run analysis rules (syntax + fact + native). This is the unified entry point for all rule engines — tree-sitter syntax rules (`.scm`), Datalog fact rules (`.dl`), and native checks (stale-summary, check-refs, ratchet, budget).
 
 **Command path:** `normalize rules <subcommand>`
 
@@ -26,28 +26,27 @@ List installed rules:
 
 ```bash
 normalize rules list                # All rules
-normalize rules list --engine syntax  # Syntax rules only
-normalize rules list --engine fact    # Fact rules only
-normalize rules list --sources      # Show source URLs
+normalize rules list --type syntax  # Syntax rules only
+normalize rules list --type fact    # Fact rules only
 normalize rules list --json
 ```
 
 Options:
-- `--engine <ENGINE>` — Filter by rule engine: `all`, `syntax`, `fact` (default: `all`)
-- `--sources` — Show source URLs for imported rules
+- `-t, --type <TYPE>` — Filter by rule type: `all`, `syntax`, `fact` (default: `all`)
 
 ### run
 
 Run rules against the codebase:
 
 ```bash
-normalize rules run                         # Run all rules
-normalize rules run --engine syntax           # Syntax rules only
-normalize rules run --engine fact             # Fact rules only
-normalize rules run --rule rust/unwrap-in-impl  # Specific rule
-normalize rules run --fix                   # Apply auto-fixes (syntax only)
-normalize rules run --sarif                 # SARIF output
-normalize rules run src/                    # Target specific path
+normalize rules run                              # Run all rules
+normalize rules run --type syntax                # Syntax rules only
+normalize rules run --type fact                  # Fact rules only
+normalize rules run --type native                # Native checks only (stale-summary, ratchet, budget)
+normalize rules run --rule rust/unwrap-in-impl   # Specific rule
+normalize rules run --fix                        # Apply auto-fixes (syntax only)
+normalize rules run --sarif                      # SARIF output
+normalize rules run src/                         # Target specific path
 ```
 
 Arguments:
@@ -55,9 +54,10 @@ Arguments:
 
 Options:
 - `--rule <RULE>` — Specific rule ID to run
-- `--engine <ENGINE>` — Filter by rule engine: `all`, `syntax`, `fact` (default: `all`)
+- `-t, --type <TYPE>` — Filter by rule type: `all`, `syntax`, `fact`, `native`, `sarif` (default: `all`)
 - `--fix` — Apply auto-fixes (syntax rules only)
 - `--sarif` — Output in SARIF 2.1.0 format (for IDE/CI integration)
+- `--no-fail` — Exit 0 even when error-severity issues are found
 - `--pretty` — Colored terminal output
 - `--compact` — Plain text output (default)
 - `--json` — JSON output (automatic from `DiagnosticsReport`)

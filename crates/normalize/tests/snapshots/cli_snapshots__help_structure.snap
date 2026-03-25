@@ -7,7 +7,7 @@ Manage the structural index (symbols, imports, calls)
 Usage: normalize structure [OPTIONS] [COMMAND]
 
 Commands:
-  rebuild   Rebuild the file index
+  rebuild   Rebuild the structural index (symbols, calls, imports, and file tree)
   stats     Show index statistics (DB size vs codebase size)
   files     List indexed files (with optional prefix filter)
   packages  Index external packages (stdlib, site-packages) into global cache

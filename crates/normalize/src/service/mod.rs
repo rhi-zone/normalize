@@ -252,7 +252,6 @@ impl OutputFormatter for TranslateReport {
 
 #[cli(
     name = "normalize",
-    version = "0.1.0",
     description = "Fast code intelligence CLI",
     defaults = "config_defaults",
     global = [
@@ -864,7 +863,9 @@ impl NormalizeService {
     pub async fn ci(
         &self,
         #[param(help = "Skip syntax rules engine")] no_syntax: bool,
-        #[param(help = "Skip native rules engine (stale-summary, ratchet, budget)")]
+        #[param(
+            help = "Skip native rules engine (stale-summary, stale-docs, check-examples, check-refs, ratchet, budget)"
+        )]
         no_native: bool,
         #[param(help = "Skip fact rules engine")] no_fact: bool,
         #[param(help = "Treat warnings as errors (exit 1 on any warning)")] strict: bool,

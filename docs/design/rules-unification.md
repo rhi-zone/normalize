@@ -30,7 +30,7 @@ Two rule engines exist (now unified under `normalize rules`):
 - Tree-sitter pattern rules → outputs `Finding`
 - Compiled/interpreted Datalog rules → outputs `facts-rules-api::Diagnostic`
 
-Both managed together under `normalize rules run` (with `--engine syntax|fact|all`).
+Both managed together under `normalize rules run` (with `--type syntax|fact|all|native`).
 
 ## Design: Unified Diagnostic
 
@@ -91,13 +91,13 @@ This is the standard format already used by `normalize rules run` and most linte
 ### Current state (implemented)
 
 ```
-normalize rules run [--engine syntax|fact|all] [--fix] [--sarif]
-normalize rules list [--engine] [--tag] [--enabled]
+normalize rules run [--type syntax|fact|native|all] [--fix] [--sarif]
+normalize rules list [--type] [--tag] [--enabled]
 normalize rules enable/disable/show/tags/add/update/remove
 ```
 
 - `rules` is top-level (lifted from `syntax rules`)
-- `--engine` replaces `--type` for clarity
+- `--type` filters by rule engine (the planned rename to `--engine` was not implemented)
 - `normalize facts rules` and `normalize facts check` deleted (subsumed)
 - `normalize syntax` keeps `ast` and `query` (inspection, not rules)
 
@@ -184,10 +184,9 @@ This lets existing `RulePack` dylibs work unchanged while new engines can reques
 
 ```
 normalize rules run                        # all engines (syntax + fact + native)
-normalize rules run --engine syntax        # tree-sitter rules only
-normalize rules run --engine fact          # Datalog rules only
-normalize rules run --engine native        # hardcoded checks only
-normalize rules run --engine my-plugin     # user-provided dylib engine
+normalize rules run --type syntax          # tree-sitter rules only
+normalize rules run --type fact            # Datalog rules only
+normalize rules run --type native          # hardcoded checks only
 ```
 
 All engines produce `Vec<Issue>` (or the ABI-stable equivalent). The CLI merges, sorts, and renders through `DiagnosticsReport`.
@@ -198,9 +197,9 @@ All engines produce `Vec<Issue>` (or the ABI-stable equivalent). The CLI merges,
 2. **Add conversions** from `Finding`, `facts-rules-api::Diagnostic` (done — `diagnostic_convert.rs`)
 3. **Migrate `check-refs`, `stale-docs`, `check-examples`** to return `DiagnosticsReport` (done)
 4. **Unify into single `check` command** under `analyze` — `normalize analyze check [--refs] [--stale] [--examples]` (done)
-5. **Lift `rules` to top level**, rename `--type` → `--engine`, delete redundant facts subcommands (done)
+5. **Lift `rules` to top level**, delete redundant facts subcommands (done; `--type` flag kept as-is)
 6. **Rename `facts` → `structure`** (done)
 7. **Migrate `security`** to `DiagnosticsReport` (different severity mapping)
-8. **Wire native checks as an engine** in `normalize rules run --engine native`
+8. **Wire native checks as engine** in `normalize rules run --type native` (done)
 9. **Generalize `CheckEngine` trait** for user-defined dylib engines
 10. **Revert `coverage`/`churn` enum wrappers** — no shared data shapes, split back to separate commands (done)

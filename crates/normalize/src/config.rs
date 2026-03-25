@@ -157,10 +157,18 @@ impl NormalizeConfig {
         if let Some(global_path) = Self::global_config_path() {
             sources.push(server_less::ConfigSource::File(global_path));
         }
-        sources.push(server_less::ConfigSource::File(
-            root.join(".normalize").join("config.toml"),
-        ));
-        <Self as server_less::ConfigTrait>::load(&sources).unwrap_or_default()
+        let project_config = root.join(".normalize").join("config.toml");
+        sources.push(server_less::ConfigSource::File(project_config.clone()));
+        <Self as server_less::ConfigTrait>::load(&sources).unwrap_or_else(|e| {
+            // Warn on parse errors so the user knows their config is being ignored.
+            // Missing files are silently skipped by ConfigTrait; only real errors surface here.
+            eprintln!(
+                "warning: failed to load {}: {} (using defaults — run `normalize config validate` for details)",
+                project_config.display(),
+                e
+            );
+            Self::default()
+        })
     }
 
     /// Get the global config path.

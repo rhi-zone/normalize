@@ -55,17 +55,17 @@ Keeping documentation in sync with code: preventing stale docs, broken examples.
 
 | Phase | Tools |
 |-------|-------|
-| Detect | `normalize rules run --engine native` (runs all doc checks) |
+| Detect | `normalize rules run --type native` (runs all doc checks) |
 | Locate | `grep`, `view` |
 | Update | `edit`, write tools |
-| Verify | `normalize rules run --engine native`, manual testing |
+| Verify | `normalize rules run --type native`, manual testing |
 
 ## Detection Methods
 
 ### Automated Checks
 ```bash
 # Run all documentation checks (broken refs, stale docs, missing examples, SUMMARY.md)
-normalize rules run --engine native
+normalize rules run --type native
 
 # Filter to specific rule IDs:
 normalize rules run --rule check-refs       # broken doc references
@@ -173,7 +173,7 @@ pub fn fetch_user(id: u64) -> Result<User> { ... }
 ```yaml
 - name: Check documentation
   run: |
-    normalize rules run --engine native
+    normalize rules run --type native
     cargo test --doc
 ```
 
