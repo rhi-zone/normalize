@@ -1313,9 +1313,9 @@ dependencies = [
 
 [[package]]
 name = "ascent-interpreter"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6767b873d310161266f2359386d4de67ba2963e190d59399e9175ca831baec1d"
+checksum = "105f0add306b58c8a1e591c0460877db814fc3b99b2960c7dfb25e5d3ece197c"
 dependencies = [
  "derive-syn-parse",
  "dynasmrt",

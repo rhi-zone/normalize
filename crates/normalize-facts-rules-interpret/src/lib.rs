@@ -573,13 +573,10 @@ pub fn run_rules_source(
     let program = Program::from_ast(ast).map_err(InterpretError::Parse)?;
 
     // Create engine, populate facts, and run to fixpoint.
-    //
-    // NOTE: JIT is intentionally disabled here. ascent-interpreter 0.1.1 has a bug where
-    // the JIT compares interned String values by their intern IDs (u32) using packed integer
-    // comparison rather than lexicographic string content. This produces incorrect results for
-    // rules using `if a < b` with String columns (e.g. `cycle(a, b) <-- ..., if a < b`).
-    // Re-enable when ascent-interpreter fixes JIT string comparison.
     let mut engine = Engine::new(program);
+    engine
+        .enable_jit()
+        .map_err(|e| InterpretError::Parse(e.to_string()))?;
     populate_facts(&mut engine, relations)?;
     engine
         .run()
@@ -978,9 +975,8 @@ pub fn run_rule_with_cache(
 /// across all subsequent engine instances — avoiding repeated JIT compilation of
 /// identical rule bodies.
 ///
-/// NOTE: JIT compiler sharing is structured but JIT is currently disabled pending an
-/// ascent-interpreter bug fix (see `run_rules_source` for details). The `shared_jit`
-/// infrastructure will become active once JIT is re-enabled.
+/// JIT compiler sharing is active: the first rule is compiled with JIT enabled, and
+/// subsequent rules reuse the shared compiled state via `set_jit_compiler`.
 ///
 /// Applies per-rule allow patterns and severity promotion, identical to `run_rule`.
 /// Returns all diagnostics from all rules combined.
@@ -992,7 +988,7 @@ pub fn run_rules_batch(
         return Ok(Vec::new());
     }
 
-    let mut _shared_jit: Option<SharedJitCompiler> = None;
+    let mut shared_jit: Option<SharedJitCompiler> = None;
     let mut all_diagnostics = Vec::new();
 
     for rule in rules {
@@ -1003,12 +999,12 @@ pub fn run_rules_batch(
 
         let mut engine = Engine::new(program);
 
-        // JIT sharing: disabled until ascent-interpreter JIT string comparison is fixed.
-        // Uncomment to enable once the upstream bug is resolved:
-        //   match _shared_jit.take() {
-        //       Some(jit) => engine.set_jit_compiler(jit),
-        //       None => engine.enable_jit().map_err(|e| InterpretError::Parse(e.to_string()))?,
-        //   }
+        match shared_jit.take() {
+            Some(jit) => engine.set_jit_compiler(jit),
+            None => engine
+                .enable_jit()
+                .map_err(|e| InterpretError::Parse(e.to_string()))?,
+        }
 
         populate_facts(&mut engine, relations)?;
         engine
@@ -1016,8 +1012,7 @@ pub fn run_rules_batch(
             .map_err(|e| InterpretError::Eval(e.to_string()))?;
         engine.materialize();
 
-        // Capture the shared JIT for when it's re-enabled.
-        _shared_jit = engine.share_jit_compiler();
+        shared_jit = engine.share_jit_compiler();
 
         let mut diagnostics = extract_diagnostics(&engine);
 
