@@ -798,6 +798,77 @@ to depend on. The LSP is useful day-to-day.
 
 ---
 
+### 0.3.0 — "Understand and refactor"
+
+**Theme:** normalize becomes the tool you reach for when you need to understand a codebase
+and make a cross-cutting change safely. The index is no longer just for analysis — it backs
+precise multi-file edits. The ranking surface (introduced in 0.2.0) is the primary entry
+point for codebase understanding. Linting grows a semantic tier.
+
+**Pillar 1 — `normalize rank` completion**
+
+The `analyze` redesign (0.2.0) introduced `normalize rank` and migrated ~20 commands. The
+remaining `analyze` commands fall into two categories: graph navigation (→ `view`) and
+big-picture synthesis (→ `normalize understand` or similar). 0.3.0 completes the migration:
+
+- [ ] Migrate graph navigation commands into `view`: `call-graph`, `trace`, `dependents`,
+  `provenance` become `normalize view <target> callers/callees/dependents/trace`
+- [ ] Identify and name the "big picture" pattern: `architecture`, `summary`, `health`,
+  `coupling-clusters` share a trait — synthesized understanding of a module/codebase, not
+  a ranked list and not a graph traversal. Design `normalize understand` or equivalent,
+  or find the unifying trait. Don't force it — only formalize when the pattern is clear.
+- [ ] `analyze` dissolves once all commands have a proper home, or gets a new identity if
+  a residual set has genuine coherence.
+
+**Pillar 2 — Semantic refactoring (the stated top-level goal)**
+
+The index has qualified import resolution, resolved call graphs, and scope analysis. The
+`normalize-edit` and `normalize-shadow` crates exist. The missing piece is a layer that
+uses them together for correct multi-file edits:
+
+- [ ] `normalize rename <target> <new-name>` — rename a symbol across all its usages,
+  qualified imports, and definition site. Requires: find-all-references (index + scope),
+  shadowing analysis (normalize-scope), conflict detection (would new name shadow something?),
+  shadow-first dry run by default.
+- [ ] `normalize refs <target>` — find all references to a symbol (read + write sites),
+  grouped by file. The read layer for rename and future refactors.
+- [ ] `normalize extract <file:start-end> <new-name>` — extract a code region into a new
+  function/method, updating the call site. Single-file first; cross-file (move extracted
+  fn to another module) as stretch.
+- [ ] `normalize inline <target>` — inline a single-use function or a constant. Single-file
+  first.
+- [ ] `normalize move <target> <destination>` — move a symbol (function, class, type) to
+  another file, updating all import sites. Requires rename infrastructure + import rewriting.
+- [ ] All refactors: `--dry-run` flag shows diff, no writes; shadow-first mode for safe
+  preview. `normalize-shadow` already exists for this.
+
+**Pillar 3 — Semantic rules (stretch goal)**
+
+Syntax rules are single-file AST queries. Semantic rules need the index:
+
+- [ ] `SemanticRule` trait (analogous to `SyntaxRule`) — a rule that receives the index +
+  facts DB and emits `Diagnostic` items. Runs after index is built (not per-file).
+- [ ] First semantic rules: `unused-export` (symbol exported but no callers across project),
+  `import-cycle` (already detectable via `normalize-graph`, just needs rule wiring),
+  `dead-parameter` (function param never read in any call path — requires scope).
+- [ ] `normalize rules run --engine semantic` or integrated into `normalize ci`.
+- [ ] Semantic rules are necessarily slower than syntax rules — design for incremental
+  evaluation (re-run only on changed files' transitive dependents).
+
+**Dependencies / preconditions:**
+- Incremental Datalog (ascent-interpreter steps 1-3) should be wired before semantic rules
+  are practical at scale. `import-cycle` via `normalize-graph` doesn't need Datalog, so it
+  can land early.
+- `normalize refs` is the foundation for rename and move — implement first.
+- The `view` navigation fold can happen independently of the refactoring pillar.
+
+**Not targeting 0.3.0:**
+- Full AST rewriting (requires tree-sitter edit API integration for round-trip fidelity)
+- Type-aware refactoring (normalize has no type resolver; tree-sitter gives CST not AST)
+- Jinja2 grammar crate publish
+
+---
+
 ## Post-polish review
 
 After the fixpoint polish loop reaches 0 findings, do a retrospective pass:
