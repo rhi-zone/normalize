@@ -91,6 +91,16 @@ echo "Checksum verified."
 # Extract
 tar xz -C "$TMPWORK" -f "$TMPWORK/normalize.tar.gz"
 
+# Check existing installation
+EXISTING=""
+if [ -x "$INSTALL_DIR/normalize" ]; then
+    EXISTING=$("$INSTALL_DIR/normalize" --version 2>/dev/null | awk '{print $2}' || true)
+fi
+if [ "$EXISTING" = "$VERSION" ]; then
+    echo "normalize $TAG is already installed. Nothing to do."
+    exit 0
+fi
+
 # Install
 mkdir -p "$INSTALL_DIR"
 if [ -w "$INSTALL_DIR" ]; then
@@ -103,7 +113,11 @@ fi
 chmod +x "$INSTALL_DIR/normalize"
 
 echo ""
-echo "Installed normalize $TAG to $INSTALL_DIR/normalize"
+if [ -n "$EXISTING" ]; then
+    echo "Upgraded normalize $EXISTING → $VERSION at $INSTALL_DIR/normalize"
+else
+    echo "Installed normalize $TAG to $INSTALL_DIR/normalize"
+fi
 
 # Verify
 if command -v normalize >/dev/null 2>&1 || "$INSTALL_DIR/normalize" --version >/dev/null 2>&1; then
