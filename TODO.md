@@ -780,8 +780,10 @@ to depend on. The LSP is useful day-to-day.
   `ENGINE_CACHE` (keyed by root + rule_id) to retract only changed-file facts and re-derive.
   Daemon integration point documented with a TODO comment in `daemon.rs::refresh_root` pointing
   to `collect_fact_diagnostics_incremental` with `Some(&watched.last_affected)`.
-  **Remaining:** wire daemon to call `collect_fact_diagnostics_incremental` after each index
-  refresh (see TODO comment in `daemon.rs`); fix JIT string comparison bug to make eval fast.
+  Daemon wired: after each index refresh, daemon calls `collect_fact_diagnostics_incremental`
+  with `Some(&watched.last_affected)` to warm the `ENGINE_CACHE` — next `normalize ci` or
+  `normalize rules run` in the same process uses the incremental path automatically.
+  **Remaining:** fix JIT string comparison bug in ascent-interpreter to make eval fast.
 - [ ] Fix JIT string comparison bug in ascent-interpreter and re-enable `SharedJitCompiler`
   in `run_rules_source` / `run_rules_batch`. **Release blocker: ascent-interpreter is our own
   project — this is fixable on our timeline. Incremental eval reduces re-derivation scope;
