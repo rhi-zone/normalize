@@ -792,9 +792,9 @@ to depend on. The LSP is useful day-to-day.
 - [x] `view` refactor phase 2: dissolve `ViewOutput` enum into `ViewReport` + `view list` — done 2026-03-16
 
 *CI readiness (from P1 — see "CI readiness" section above):*
-- [ ] `normalize ci` command
-- [ ] Install script (curl | sh)
-- [ ] CI documentation (`docs/ci.md`)
+- [x] `normalize ci` command — `--no-syntax/native/fact`, `--strict`, `--sarif`, `-p <path>`, graceful index-not-built handling
+- [x] Install script (curl | sh) — SHA256 verification, `NORMALIZE_VERSION` pinning, `~/.local/bin` default
+- [x] CI documentation (`docs/ci.md`) — GitHub Actions/GitLab snippets, ratchet bootstrap workflow, SARIF output
 - [ ] Polish pass (--help, exit codes, error messages)
 
 *Release mechanics:*
