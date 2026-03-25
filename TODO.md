@@ -929,10 +929,10 @@ mean every type will be *used* often — but it should *exist* as an option. Age
 users opt in when they need it; the absence of an option forces multi-call workarounds
 regardless of how rarely the context is useful.
 
-*What to build first* is a data question: mine Claude Code session logs to find which
-multi-call sequences actually co-occur in real debugging/investigation sessions. The
-`scripts/session-corrections.sh` pattern can be adapted for command-sequence mining.
-Don't design composed calls from intuition alone.
+The work is mechanical and inevitable — every context type will need to exist eventually,
+so build them. Mine Claude Code session logs (adapt `scripts/session-corrections.sh` for
+command-sequence analysis) to find what's *still missing* after the obvious types are
+covered, not to decide what to build first.
 
 Context types that should exist (independent of priority):
 - **Blast radius**: "if I change X, what breaks?" — forward reachability (callers,
