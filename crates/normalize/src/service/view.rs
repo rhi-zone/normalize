@@ -86,7 +86,14 @@ impl ViewService {
     fn display_call_graph(&self, entries: &[CallEntry]) -> String {
         entries
             .iter()
-            .map(|e| format!("  {}:{}:{}", e.file, e.line, e.symbol))
+            .map(|e| {
+                let access_suffix = e
+                    .access
+                    .as_deref()
+                    .map(|a| format!(" [{a}]"))
+                    .unwrap_or_default();
+                format!("  {}:{}:{}{}", e.file, e.line, e.symbol, access_suffix)
+            })
             .collect::<Vec<_>>()
             .join("\n")
     }

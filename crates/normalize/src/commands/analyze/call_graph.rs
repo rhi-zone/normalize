@@ -10,6 +10,11 @@ pub struct CallEntry {
     pub symbol: String,
     pub line: usize,
     pub direction: String, // "caller" or "callee"
+    /// Whether the reference is a read, write, or read-write access.
+    /// `None` when the index or scope engine cannot determine the distinction
+    /// for the given language or call site.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub access: Option<String>,
 }
 
 /// Build the call graph results without printing (for service layer).
@@ -67,6 +72,7 @@ pub async fn build_call_graph(
                         symbol: sym,
                         line,
                         direction: "caller".to_string(),
+                        access: None,
                     });
                 }
             }
@@ -85,6 +91,7 @@ pub async fn build_call_graph(
                         symbol: name,
                         line,
                         direction: "callee".to_string(),
+                        access: None,
                     });
                 }
             }
