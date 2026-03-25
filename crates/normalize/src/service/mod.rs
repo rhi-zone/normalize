@@ -935,11 +935,23 @@ impl NormalizeService {
             let native_root = effective_root.clone();
             let native_config = load_rules_config(&native_root);
             let threshold = 10;
+            let stale_summary_filenames: Vec<String> = native_config
+                .rules
+                .rules
+                .get("stale-summary")
+                .map(|r| r.filenames.clone())
+                .unwrap_or_default();
 
             let (summary_res, stale_res, examples_res, refs_res, ratchet_res, budget_res) = tokio::join!(
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
-                    move || normalize_native_rules::build_stale_summary_report(&root, threshold)
+                    move || {
+                        normalize_native_rules::build_stale_summary_report(
+                            &root,
+                            threshold,
+                            &stale_summary_filenames,
+                        )
+                    }
                 }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();

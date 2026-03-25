@@ -73,16 +73,46 @@ pub struct RuleOverride {
     /// Additional tags to add to this rule (appends to built-in tags).
     #[serde(default)]
     pub tags: Vec<String>,
+    /// Rule-specific: filenames to require in each directory (OR semantics).
+    ///
+    /// Used by `stale-summary` and `missing-summary`. A directory is compliant
+    /// if it contains **any** of the listed files. Defaults to `["SUMMARY.md"]`
+    /// when not set. To require both files, use two `[[rule]]` entries instead.
+    ///
+    /// Accepts either a single string (`filename = "CLAUDE.md"`) or a list
+    /// (`filenames = ["SUMMARY.md", "CLAUDE.md"]`). The single-string form is
+    /// deserialized as a one-element list.
+    #[serde(default, deserialize_with = "deserialize_filenames")]
+    pub filenames: Vec<String>,
+}
+
+fn deserialize_filenames<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize as _;
+
+    #[derive(serde::Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        One(String),
+        Many(Vec<String>),
+    }
+
+    match OneOrMany::deserialize(deserializer)? {
+        OneOrMany::One(s) => Ok(vec![s]),
+        OneOrMany::Many(v) => Ok(v),
+    }
 }
 
 impl normalize_core::Merge for RuleOverride {
     /// Merge two `RuleOverride` values, with `other` taking priority.
     ///
     /// - `Option` fields: `other`'s value wins if `Some`; falls back to `self`.
-    /// - Vec fields (`allow`, `tags`): if `other`'s field is non-empty it replaces
-    ///   `self`'s field entirely; an empty `other` field inherits from `self`.
-    ///   **This means you cannot reset a Vec to empty via merge** — an empty `other`
-    ///   vec is treated as "no override" rather than "clear the list".
+    /// - Vec fields (`allow`, `tags`, `filenames`): if `other`'s field is non-empty
+    ///   it replaces `self`'s field entirely; an empty `other` field inherits from
+    ///   `self`. **This means you cannot reset a Vec to empty via merge** — an empty
+    ///   `other` vec is treated as "no override" rather than "clear the list".
     fn merge(self, other: Self) -> Self {
         Self {
             severity: other.severity.or(self.severity),
@@ -96,6 +126,11 @@ impl normalize_core::Merge for RuleOverride {
                 self.tags
             } else {
                 other.tags
+            },
+            filenames: if other.filenames.is_empty() {
+                self.filenames
+            } else {
+                other.filenames
             },
         }
     }

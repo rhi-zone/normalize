@@ -11,16 +11,20 @@ struct StaleSummary {
     dir: String,
     commits_since_update: usize,
     last_summary_commit: String,
-    /// True if the directory has uncommitted changes not reflected in SUMMARY.md.
+    /// True if the directory has uncommitted changes not reflected in the doc file.
     has_uncommitted_changes: bool,
+    /// The doc filename that was found (e.g. "SUMMARY.md" or "CLAUDE.md").
+    filename: String,
 }
 
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 struct MissingSummary {
     dir: String,
     total_commits: usize,
-    /// True if the directory has uncommitted changes with no SUMMARY.md at all.
+    /// True if the directory has uncommitted changes with no doc file at all.
     has_uncommitted_changes: bool,
+    /// The candidate doc filenames that were checked (none were found).
+    filenames: Vec<String>,
 }
 
 /// Report produced by the stale-summary native rule check.
@@ -35,7 +39,7 @@ pub struct StaleSummaryReport {
 impl OutputFormatter for StaleSummaryReport {
     fn format_text(&self) -> String {
         let mut lines = Vec::new();
-        lines.push("SUMMARY.md Freshness Check".to_string());
+        lines.push("Doc File Freshness Check".to_string());
         lines.push(String::new());
         lines.push(format!("Directories checked: {}", self.dirs_checked));
         lines.push(format!("Staleness threshold: {} commits", self.threshold));
@@ -43,30 +47,37 @@ impl OutputFormatter for StaleSummaryReport {
 
         let total = self.stale.len() + self.missing.len();
         if total == 0 {
-            lines.push("All SUMMARY.md files are up to date.".to_string());
+            lines.push("All doc files are up to date.".to_string());
         } else {
             if !self.missing.is_empty() {
-                lines.push(format!("Missing SUMMARY.md ({}):", self.missing.len()));
+                lines.push(format!("Missing doc file ({}):", self.missing.len()));
                 for m in &self.missing {
+                    let candidates = m.filenames.join(" or ");
                     let suffix = if m.has_uncommitted_changes {
-                        " + uncommitted changes".to_string()
+                        format!(
+                            "{} commits + uncommitted changes, no {}",
+                            m.total_commits, candidates
+                        )
                     } else {
-                        format!("{} commits with no SUMMARY.md", m.total_commits)
+                        format!("{} commits with no {}", m.total_commits, candidates)
                     };
                     lines.push(format!("  {} ({})", m.dir, suffix));
                 }
                 lines.push(String::new());
             }
             if !self.stale.is_empty() {
-                lines.push(format!("Stale SUMMARY.md ({}):", self.stale.len()));
+                lines.push(format!("Stale doc file ({}):", self.stale.len()));
                 for s in &self.stale {
                     let suffix = if s.has_uncommitted_changes {
                         format!(
-                            "{} commits + uncommitted changes since last update",
-                            s.commits_since_update
+                            "{} commits + uncommitted changes since {} last updated",
+                            s.commits_since_update, s.filename
                         )
                     } else {
-                        format!("{} commits since last update", s.commits_since_update)
+                        format!(
+                            "{} commits since {} last updated",
+                            s.commits_since_update, s.filename
+                        )
                     };
                     lines.push(format!("  {} ({})", s.dir, suffix));
                 }
@@ -181,13 +192,11 @@ fn git_commit_count(root: &Path, since_commit: Option<&str>, rel_dir: &str) -> u
 }
 
 /// Returns true if `rel_dir` has uncommitted changes (staged or unstaged) that are
-/// NOT limited to SUMMARY.md itself (i.e., real content changes needing documentation).
-fn git_has_uncommitted_content_changes(root: &Path, rel_dir: &str) -> bool {
-    let dir_prefix = if rel_dir == "." {
-        String::new()
-    } else {
-        format!("{}/", rel_dir)
-    };
+/// NOT limited to doc files themselves (i.e., real content changes needing documentation).
+///
+/// `doc_paths` lists the relative paths of doc files to exclude from the signal
+/// (e.g. `["SUMMARY.md", "src/SUMMARY.md"]`).
+fn git_has_uncommitted_content_changes(root: &Path, rel_dir: &str, doc_paths: &[String]) -> bool {
     let out = Command::new("git")
         .args([
             "-C",
@@ -205,8 +214,8 @@ fn git_has_uncommitted_content_changes(root: &Path, rel_dir: &str) -> bool {
         .any(|l| {
             // Each line: "XY path" where XY are status codes
             let path = l.get(3..).unwrap_or("").trim();
-            // Exclude SUMMARY.md itself from the "content changed" signal
-            path != format!("{}SUMMARY.md", dir_prefix).as_str() && path != "SUMMARY.md"
+            // Exclude all candidate doc files from the "content changed" signal
+            !doc_paths.iter().any(|dp| dp.as_str() == path)
         })
 }
 
@@ -226,13 +235,29 @@ fn git_summary_has_uncommitted_changes(root: &Path, summary_path: &str) -> bool 
     !String::from_utf8_lossy(&out.stdout).trim().is_empty()
 }
 
+/// Default filenames checked by `stale-summary` when none are configured.
+pub const DEFAULT_FILENAMES: &[&str] = &["SUMMARY.md"];
+
 /// Build a [`StaleSummaryReport`] by walking the repository under `root` and checking
-/// each directory for a `SUMMARY.md` that is up-to-date.
+/// each directory for a doc file that is up-to-date.
 ///
-/// A `SUMMARY.md` is considered stale when the number of commits since its last
+/// `filenames` lists the candidate doc filenames (e.g. `["SUMMARY.md", "CLAUDE.md"]`).
+/// A directory is compliant when it has **any** of those files and none of the present
+/// ones are stale (OR semantics). Pass an empty slice to fall back to [`DEFAULT_FILENAMES`].
+///
+/// A doc file is considered stale when the number of commits since its last
 /// update (plus any uncommitted content changes in the directory) exceeds `threshold`.
-/// Directories without any `SUMMARY.md` are reported as missing.
-pub fn build_stale_summary_report(root: &Path, threshold: usize) -> StaleSummaryReport {
+/// Directories without any matching doc file are reported as missing.
+pub fn build_stale_summary_report(
+    root: &Path,
+    threshold: usize,
+    filenames: &[String],
+) -> StaleSummaryReport {
+    let filenames: Vec<&str> = if filenames.is_empty() {
+        DEFAULT_FILENAMES.to_vec()
+    } else {
+        filenames.iter().map(String::as_str).collect()
+    };
     let mut stale = Vec::new();
     let mut missing = Vec::new();
     let mut dirs_checked = 0;
@@ -279,41 +304,73 @@ pub fn build_stale_summary_report(root: &Path, threshold: usize) -> StaleSummary
 
         dirs_checked += 1;
 
-        let summary_path = if rel_dir.is_empty() {
-            "SUMMARY.md".to_string()
-        } else {
-            format!("{}/SUMMARY.md", rel_dir)
-        };
-
         let dir_label = if rel_dir.is_empty() {
             ".".to_string()
         } else {
             rel_dir.to_string()
         };
 
-        // git status is cheap — always re-check for uncommitted changes.
-        let content_dirty = git_has_uncommitted_content_changes(root, &rel_dir_git);
-        let summary_dirty = git_summary_has_uncommitted_changes(root, &summary_path);
-        let has_uncommitted = content_dirty && !summary_dirty;
+        // Build the relative paths for each candidate filename.
+        let candidate_paths: Vec<String> = filenames
+            .iter()
+            .map(|f| {
+                if rel_dir.is_empty() {
+                    f.to_string()
+                } else {
+                    format!("{}/{}", rel_dir, f)
+                }
+            })
+            .collect();
 
-        // If SUMMARY.md is staged (about to be committed), skip the staleness check: the
-        // pending commit will fix it. This prevents false positives during pre-commit hooks.
-        if summary_dirty {
+        // git status is cheap — always re-check for uncommitted changes.
+        // "content_dirty" excludes all candidate doc files from the signal.
+        let content_dirty =
+            git_has_uncommitted_content_changes(root, &rel_dir_git, &candidate_paths);
+
+        // If ANY candidate doc file is staged (about to be committed), skip the
+        // staleness check: the pending commit will fix it.
+        let any_doc_dirty = candidate_paths
+            .iter()
+            .any(|p| git_summary_has_uncommitted_changes(root, p));
+        if any_doc_dirty {
             continue;
         }
 
-        // Use cached git log result if available (same HEAD = commits haven't changed).
+        // For OR semantics: find the candidate that has the most recent commit
+        // (smallest commits_since_update). If none have ever been committed,
+        // the directory is treated as missing.
+        //
+        // Cache key: dir_label — we store the best result across all candidates.
         let cached = cache.as_ref().and_then(|c| c.dirs.get(&dir_label));
         let (last_summary_commit, commits_count) = if let Some(entry) = cached {
             (entry.last_summary_commit.clone(), entry.commits_count)
         } else {
-            let last = git_last_commit(root, &summary_path);
-            let count = if let Some(ref h) = last {
-                git_commit_count(root, Some(h), &rel_dir_git)
-            } else {
-                git_commit_count(root, None, &rel_dir_git)
-            };
-            (last, count)
+            // Try each candidate filename; pick the one with the fewest commits
+            // since its last update (i.e. the freshest doc file).
+            let mut best: Option<(String, usize)> = None; // (commit_hash, count)
+            for doc_path in &candidate_paths {
+                if let Some(last) = git_last_commit(root, doc_path) {
+                    let count = git_commit_count(root, Some(&last), &rel_dir_git);
+                    best = Some(match best {
+                        None => (last, count),
+                        Some((prev_hash, prev_count)) => {
+                            if count <= prev_count {
+                                (last, count)
+                            } else {
+                                (prev_hash, prev_count)
+                            }
+                        }
+                    });
+                }
+            }
+            match best {
+                Some((hash, count)) => (Some(hash), count),
+                None => {
+                    // No doc file has ever been committed — use total dir commit count.
+                    let count = git_commit_count(root, None, &rel_dir_git);
+                    (None, count)
+                }
+            }
         };
 
         // Store result for cache write.
@@ -327,9 +384,12 @@ pub fn build_stale_summary_report(root: &Path, threshold: usize) -> StaleSummary
 
         // Effective change count: committed changes + 1 if there are uncommitted content changes.
         // This lets the threshold govern both: a directory is stale when
-        //   committed_changes + (has_uncommitted ? 1 : 0) > threshold
+        //   committed_changes + (content_dirty ? 1 : 0) > threshold
         // so occasional uncommitted edits don't immediately trigger the check.
-        let effective_count = commits_count + usize::from(has_uncommitted);
+        let effective_count = commits_count + usize::from(content_dirty);
+
+        // Display name: first candidate filename (representative for messages).
+        let primary_filename = filenames.first().copied().unwrap_or("SUMMARY.md");
 
         match last_summary_commit {
             Some(last_commit) => {
@@ -338,7 +398,8 @@ pub fn build_stale_summary_report(root: &Path, threshold: usize) -> StaleSummary
                         dir: dir_label,
                         commits_since_update: commits_count,
                         last_summary_commit: last_commit,
-                        has_uncommitted_changes: has_uncommitted,
+                        has_uncommitted_changes: content_dirty,
+                        filename: primary_filename.to_string(),
                     });
                 }
             }
@@ -347,7 +408,8 @@ pub fn build_stale_summary_report(root: &Path, threshold: usize) -> StaleSummary
                     missing.push(MissingSummary {
                         dir: dir_label,
                         total_commits: commits_count,
-                        has_uncommitted_changes: has_uncommitted,
+                        has_uncommitted_changes: content_dirty,
+                        filenames: filenames.iter().map(|s| s.to_string()).collect(),
                     });
                 }
             }
@@ -386,19 +448,25 @@ impl From<StaleSummaryReport> for DiagnosticsReport {
             .missing
             .into_iter()
             .map(|m| {
+                let candidates = m.filenames.join(" or ");
+                let primary = m
+                    .filenames
+                    .first()
+                    .map(String::as_str)
+                    .unwrap_or("SUMMARY.md");
                 let message = if m.has_uncommitted_changes {
                     format!(
-                        "no SUMMARY.md found ({} commits + uncommitted changes touch this directory)",
-                        m.total_commits
+                        "no {} found ({} commits + uncommitted changes touch this directory)",
+                        candidates, m.total_commits
                     )
                 } else {
                     format!(
-                        "no SUMMARY.md found ({} commits touch this directory)",
-                        m.total_commits
+                        "no {} found ({} commits touch this directory)",
+                        candidates, m.total_commits
                     )
                 };
                 Issue {
-                    file: format!("{}/SUMMARY.md", m.dir),
+                    file: format!("{}/{}", m.dir, primary),
                     line: None,
                     column: None,
                     end_line: None,
@@ -408,7 +476,10 @@ impl From<StaleSummaryReport> for DiagnosticsReport {
                     severity: Severity::Warning,
                     source: "stale-summary".into(),
                     related: vec![],
-                    suggestion: Some("add a SUMMARY.md describing this directory's purpose".into()),
+                    suggestion: Some(format!(
+                        "add a {} describing this directory's purpose",
+                        candidates
+                    )),
                 }
             })
             .collect();
@@ -416,17 +487,17 @@ impl From<StaleSummaryReport> for DiagnosticsReport {
         issues.extend(report.stale.into_iter().map(|s| {
             let message = if s.has_uncommitted_changes {
                 format!(
-                    "{} commits + uncommitted changes since SUMMARY.md was last updated (threshold: {})",
-                    s.commits_since_update, threshold
+                    "{} commits + uncommitted changes since {} was last updated (threshold: {})",
+                    s.commits_since_update, s.filename, threshold
                 )
             } else {
                 format!(
-                    "{} commits since SUMMARY.md was last updated (threshold: {})",
-                    s.commits_since_update, threshold
+                    "{} commits since {} was last updated (threshold: {})",
+                    s.commits_since_update, s.filename, threshold
                 )
             };
             Issue {
-                file: format!("{}/SUMMARY.md", s.dir),
+                file: format!("{}/{}", s.dir, s.filename),
                 line: None,
                 column: None,
                 end_line: None,
@@ -437,8 +508,8 @@ impl From<StaleSummaryReport> for DiagnosticsReport {
                 source: "stale-summary".into(),
                 related: vec![],
                 suggestion: Some(format!(
-                    "rewrite {}/SUMMARY.md to describe what is currently in the directory (not a changelog — one unified current-state description)",
-                    s.dir
+                    "rewrite {}/{} to describe what is currently in the directory (not a changelog — one unified current-state description)",
+                    s.dir, s.filename
                 )),
             }
         }));

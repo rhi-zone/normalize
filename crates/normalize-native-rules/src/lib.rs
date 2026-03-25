@@ -47,13 +47,13 @@ pub const NATIVE_RULES: &[NativeRuleDescriptor] = &[
     NativeRuleDescriptor {
         id: "missing-summary",
         default_severity: "warning",
-        message: "Directory is missing a SUMMARY.md file",
+        message: "Directory is missing a required doc file (default: SUMMARY.md; configurable via filenames)",
         tags: &["documentation"],
     },
     NativeRuleDescriptor {
         id: "stale-summary",
         default_severity: "info",
-        message: "SUMMARY.md hasn't been updated since files in the directory changed",
+        message: "Doc file hasn't been updated since files in the directory changed (default: SUMMARY.md; configurable via filenames)",
         tags: &["documentation"],
     },
     NativeRuleDescriptor {
