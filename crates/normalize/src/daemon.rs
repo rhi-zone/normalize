@@ -632,24 +632,35 @@ impl DaemonServer {
                             );
                             watched.last_affected = affected_vec.clone();
 
-                            // TODO(incremental-datalog): wire fact-rule incremental eval here.
+                            // Incremental Datalog evaluation: re-derive only the strata affected
+                            // by the changed files.  The ENGINE_CACHE in normalize-rules is keyed
+                            // by (root, rule_id) and lives for the lifetime of the process, so
+                            // each watched root gets its own set of primed engines.  On the first
+                            // call the engine is primed (full eval); subsequent calls retract
+                            // stale facts and re-derive only the affected strata.
                             //
-                            // When a rules-run is triggered after an index refresh, the daemon
-                            // should call:
-                            //
-                            //   normalize_rules::collect_fact_diagnostics_incremental(
-                            //       root,
-                            //       &config.rules,
-                            //       None,   // filter_ids
-                            //       None,   // filter_rule
-                            //       Some(&watched.last_affected),
-                            //   )
-                            //
-                            // The `last_affected` vec (changed files ∪ their reverse dependents)
-                            // is exactly the `changed_files` argument that drives retraction and
-                            // re-derivation in the incremental engine.  The engine cache is keyed
-                            // by `(root, rule_id)` and lives for the lifetime of the process, so
-                            // each watched root gets its own set of primed engines.
+                            // The daemon does not broadcast individual fact diagnostics — that is
+                            // the job of `normalize rules run` (CI path).  The daemon's role here
+                            // is to prime the ENGINE_CACHE so that the next `normalize rules run`
+                            // in this root can use the incremental path instead of a cold start.
+                            {
+                                let config = NormalizeConfig::load(root);
+                                let diagnostics = rt.block_on(
+                                    normalize_rules::collect_fact_diagnostics_incremental(
+                                        root,
+                                        &config.rules,
+                                        None, // filter_ids — run all enabled rules
+                                        None, // filter_rule — no single-rule filter
+                                        Some(&watched.last_affected),
+                                    ),
+                                );
+                                tracing::info!(
+                                    root = ?root,
+                                    diagnostics = diagnostics.len(),
+                                    affected = watched.last_affected.len(),
+                                    "incremental fact-rule eval complete"
+                                );
+                            }
 
                             // Broadcast index-refresh event. SendError means no
                             // active subscribers -- that is fine.
