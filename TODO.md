@@ -921,24 +921,37 @@ incremental evaluation so they're fast enough for pre-commit use:
 - Incremental Datalog wiring can happen independently of new rules.
 - JIT fix is upstream; don't block anything on it.
 
-**Pillar 6 — Discoverability (minimize tool calls per query)**
+**Pillar 6 — Discoverability (every context type expressible in one call)**
 
-The goal: an agent or user should be able to answer "what does this do?" with one
-`normalize view` call, not a grep + read + read + read chain. Every extra round-trip
-is latency for humans and tokens for agents.
+The design principle: every useful type of context around a symbol or file should be
+expressible as a single normalize call, not a sequence of greps and reads. This doesn't
+mean every type will be *used* often — but it should *exist* as an option. Agents and
+users opt in when they need it; the absence of an option forces multi-call workarounds
+regardless of how rarely the context is useful.
 
-- [ ] `normalize view <directory>` should surface `SUMMARY.md` content as a preamble
-  before the symbol list (opt-in via config, or on by default for directory views).
-  For `--json`, add a `"summary"` field. Agents get orientation + symbols in one call.
-- [ ] `normalize view <file>` should surface `//!` crate/module-level doc comments
-  (Rust) and equivalent in other languages. Same idea: docs and symbols together.
-- [ ] `rust/missing-module-doc` syntax rule — flag `lib.rs`/`mod.rs` files with no
-  `//!` inner doc comment. The idiomatic Rust equivalent of the SUMMARY.md rule; lives
-  in the code rather than a sidecar file.
-- [ ] Split `stale-summary` native rule into `missing-summary` (presence) and
-  `stale-summary` (freshness) so they can have independent severity levels. Add `paths`
-  glob config to each so enforcement depth is configurable (e.g. require at crate roots
-  but not in deep fixture dirs).
+*What to build first* is a data question: mine Claude Code session logs to find which
+multi-call sequences actually co-occur in real debugging/investigation sessions. The
+`scripts/session-corrections.sh` pattern can be adapted for command-sequence mining.
+Don't design composed calls from intuition alone.
+
+Context types that should exist (independent of priority):
+- **Blast radius**: "if I change X, what breaks?" — forward reachability (callers,
+  importers, dependents). The dual: "why is X broken?" — backward reachability (what X
+  depends on, its call chain). Both are index queries; neither is expressible today in
+  one call without multiple `--referenced-by`/`--references`/`--graph` round-trips.
+- **Directory orientation**: `normalize view <dir>` surfacing `SUMMARY.md` as a preamble
+  and `//!` module docs for files. Agents get orientation + symbols without a separate
+  read.
+- **Change impact**: given a diff or set of changed files, what symbols/rules are affected?
+  Feeds into incremental eval (Pillar 4) and debugging alike.
+
+Concrete unblocked items:
+- [ ] `normalize view <directory>` surfaces `SUMMARY.md` as preamble; `--json` adds a
+  `"summary"` field.
+- [ ] `normalize view <file>` surfaces `//!` crate/module docs (Rust) and equivalents.
+- [ ] `rust/missing-module-doc` syntax rule — `lib.rs`/`mod.rs` files with no `//!`.
+- [ ] Split `stale-summary` into `missing-summary` (presence) + `stale-summary`
+  (freshness), each with `paths` glob config for per-depth enforcement.
 
 **Not targeting 0.3.0:**
 - Full AST rewriting (tree-sitter edit API, round-trip fidelity)
