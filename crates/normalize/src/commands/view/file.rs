@@ -45,6 +45,7 @@ pub fn build_view_file_service(
             line_range: None,
             grammar,
             warnings: Vec::new(),
+            summary: None,
         });
     }
 
@@ -116,5 +117,6 @@ pub fn build_view_file_service(
         line_range: None,
         grammar,
         warnings,
+        summary: None,
     })
 }

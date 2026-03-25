@@ -87,6 +87,7 @@ pub fn build_view_directory_service(
         view_node
     };
 
+    let summary = std::fs::read_to_string(dir.join("SUMMARY.md")).ok();
     let target = dir.to_string_lossy().to_string();
     Ok(ViewReport {
         target,
@@ -98,6 +99,7 @@ pub fn build_view_directory_service(
         line_range: None,
         grammar: None,
         warnings: Vec::new(),
+        summary,
     })
 }
 
@@ -219,6 +221,7 @@ pub fn build_view_filtered_service(
                 line_range: Some((*line, *line)),
                 grammar: None,
                 warnings: Vec::new(),
+                summary: None,
             }
         })
         .collect();

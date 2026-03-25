@@ -82,11 +82,32 @@ pub struct RuleOverride {
     /// Accepts either a single string (`filename = "CLAUDE.md"`) or a list
     /// (`filenames = ["SUMMARY.md", "CLAUDE.md"]`). The single-string form is
     /// deserialized as a one-element list.
-    #[serde(default, deserialize_with = "deserialize_filenames")]
+    #[serde(default, deserialize_with = "deserialize_one_or_many")]
     pub filenames: Vec<String>,
+    /// Rule-specific: directory glob patterns that scope this rule's coverage.
+    ///
+    /// Used by `missing-summary` and `stale-summary`. When set, the rule only
+    /// checks directories whose path (relative to the project root) matches at
+    /// least one of the listed glob patterns. An unset or empty `paths` list
+    /// preserves the default behavior: the rule applies to every directory.
+    ///
+    /// Accepts either a single string (`paths = "crates/*"`) or a list
+    /// (`paths = ["crates/*", "docs"]`). The single-string form is deserialized
+    /// as a one-element list.
+    ///
+    /// Example:
+    /// ```toml
+    /// [rules."missing-summary"]
+    /// paths = ["crates/*", "docs", "scripts"]
+    ///
+    /// [rules."stale-summary"]
+    /// paths = ["crates/*", "crates/*/src"]
+    /// ```
+    #[serde(default, deserialize_with = "deserialize_one_or_many")]
+    pub paths: Vec<String>,
 }
 
-fn deserialize_filenames<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+fn deserialize_one_or_many<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -109,7 +130,7 @@ impl normalize_core::Merge for RuleOverride {
     /// Merge two `RuleOverride` values, with `other` taking priority.
     ///
     /// - `Option` fields: `other`'s value wins if `Some`; falls back to `self`.
-    /// - Vec fields (`allow`, `tags`, `filenames`): if `other`'s field is non-empty
+    /// - Vec fields (`allow`, `tags`, `filenames`, `paths`): if `other`'s field is non-empty
     ///   it replaces `self`'s field entirely; an empty `other` field inherits from
     ///   `self`. **This means you cannot reset a Vec to empty via merge** — an empty
     ///   `other` vec is treated as "no override" rather than "clear the list".
@@ -131,6 +152,11 @@ impl normalize_core::Merge for RuleOverride {
                 self.filenames
             } else {
                 other.filenames
+            },
+            paths: if other.paths.is_empty() {
+                self.paths
+            } else {
+                other.paths
             },
         }
     }

@@ -17,7 +17,7 @@ pub use check_examples::build_check_examples_report;
 pub use check_refs::build_check_refs_report;
 pub use ratchet::{RatchetRulesReport, build_ratchet_report};
 pub use stale_docs::build_stale_docs_report;
-pub use stale_summary::build_stale_summary_report;
+pub use stale_summary::{build_missing_summary_report, build_stale_summary_report};
 
 /// Static descriptor for a native rule's default metadata.
 ///
@@ -46,14 +46,14 @@ pub const NATIVE_RULES: &[NativeRuleDescriptor] = &[
     },
     NativeRuleDescriptor {
         id: "missing-summary",
-        default_severity: "warning",
-        message: "Directory is missing a required doc file (default: SUMMARY.md; configurable via filenames)",
+        default_severity: "error",
+        message: "Directory is missing a required doc file (default: SUMMARY.md; configurable via filenames and paths)",
         tags: &["documentation"],
     },
     NativeRuleDescriptor {
         id: "stale-summary",
-        default_severity: "info",
-        message: "Doc file hasn't been updated since files in the directory changed (default: SUMMARY.md; configurable via filenames)",
+        default_severity: "error",
+        message: "Doc file hasn't been updated since files in the directory changed (default: SUMMARY.md; configurable via filenames and paths)",
         tags: &["documentation"],
     },
     NativeRuleDescriptor {

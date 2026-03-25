@@ -42,6 +42,9 @@ pub struct ViewReport {
     /// Warnings about unsupported features or missing capabilities
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
+    /// Contents of SUMMARY.md for directory views (None if absent)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
 }
 
 /// A list of `ViewReport` entries (returned by `normalize view list`).
@@ -89,15 +92,20 @@ fn pretty_opts() -> FormatOptions {
     }
 }
 
-fn render_dir(node: &ViewNode, opts: &FormatOptions) -> String {
-    let counts = count_dir_file_nodes(node);
-    let lines = format_view_node(node, opts);
-    format!(
+fn render_dir(report: &ViewReport, opts: &FormatOptions) -> String {
+    let counts = count_dir_file_nodes(&report.node);
+    let lines = format_view_node(&report.node, opts);
+    let tree_text = format!(
         "{}\n\n{} directories, {} files",
         lines.join("\n"),
         counts.directories,
         counts.files
-    )
+    );
+    if let Some(summary) = &report.summary {
+        format!("{}\n\n{}", summary.trim_end(), tree_text)
+    } else {
+        tree_text
+    }
 }
 
 fn render_file_report(report: &ViewReport, opts: &FormatOptions) -> String {
@@ -271,7 +279,7 @@ fn render_line_range(report: &ViewReport, use_colors: bool) -> String {
 impl OutputFormatter for ViewReport {
     fn format_text(&self) -> String {
         match &self.node.kind {
-            ViewNodeKind::Directory => render_dir(&self.node, &text_opts()),
+            ViewNodeKind::Directory => render_dir(self, &text_opts()),
             ViewNodeKind::File => render_file_report(self, &text_opts()),
             ViewNodeKind::Symbol(_) => {
                 // Pure line range: line_range set, source present, no imports/parent context
@@ -290,7 +298,7 @@ impl OutputFormatter for ViewReport {
 
     fn format_pretty(&self) -> String {
         match &self.node.kind {
-            ViewNodeKind::Directory => render_dir(&self.node, &pretty_opts()),
+            ViewNodeKind::Directory => render_dir(self, &pretty_opts()),
             ViewNodeKind::File => render_file_report(self, &pretty_opts()),
             ViewNodeKind::Symbol(_) => {
                 if self.line_range.is_some()

@@ -120,6 +120,7 @@ pub fn build_view_line_range_service(
         line_range: Some((actual_start, actual_end)),
         grammar,
         warnings: Vec::new(),
+        summary: None,
     })
 }
 

@@ -345,6 +345,7 @@ pub fn build_view_symbol_at_line_service(
         line_range: None,
         grammar,
         warnings: Vec::new(),
+        summary: None,
     })
 }
 
@@ -447,6 +448,7 @@ pub fn build_view_symbol_service(
             },
             grammar,
             warnings: Vec::new(),
+            summary: None,
         });
     }
 
@@ -487,6 +489,7 @@ pub fn build_view_symbol_service(
                 line_range: Some((sym.start_line, sym.end_line)),
                 grammar,
                 warnings: Vec::new(),
+                summary: None,
             });
         }
 
@@ -502,6 +505,7 @@ pub fn build_view_symbol_service(
             line_range: None,
             grammar,
             warnings: Vec::new(),
+            summary: None,
         });
     }
 
@@ -560,6 +564,7 @@ pub fn build_view_symbol_glob_service(
                 line_range: Some((m.symbol.start_line, m.symbol.end_line)),
                 grammar: grammar.clone(),
                 warnings: Vec::new(),
+                summary: None,
             }
         })
         .collect();

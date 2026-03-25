@@ -184,13 +184,14 @@ mod tests {
         use normalize_native_rules::check_examples::CheckExamplesReport;
         use normalize_native_rules::check_refs::CheckRefsReport;
         use normalize_native_rules::stale_docs::StaleDocsReport;
-        use normalize_native_rules::stale_summary::StaleSummaryReport;
+        use normalize_native_rules::stale_summary::{MissingSummaryReport, StaleSummaryReport};
         use normalize_native_rules::{BudgetRulesReport, RatchetRulesReport};
         assert_output_formatter::<BudgetRulesReport>();
         assert_output_formatter::<RatchetRulesReport>();
         assert_output_formatter::<CheckExamplesReport>();
         assert_output_formatter::<CheckRefsReport>();
         assert_output_formatter::<StaleDocsReport>();
+        assert_output_formatter::<MissingSummaryReport>();
         assert_output_formatter::<StaleSummaryReport>();
 
         // Service report types now implementing OutputFormatter

@@ -330,21 +330,58 @@ impl RulesService {
         .await
         .map_err(|e| format!("Task error: {e}"))?;
 
-        // Native engine (stale-summary, check-refs, stale-docs, check-examples, ratchet, budget)
+        // Native engine (missing-summary, stale-summary, check-refs, stale-docs, check-examples, ratchet, budget)
         // runs in async context; included in All and Native engine types.
         // All checks are independent — run them in parallel.
         if run_native {
             let native_root = effective_root.clone();
             let native_config = load_rules_config(&native_root);
             let threshold = 10;
+            let missing_summary_filenames: Vec<String> = native_config
+                .rules
+                .rules
+                .get("missing-summary")
+                .map(|r| r.filenames.clone())
+                .unwrap_or_default();
+            let missing_summary_paths: Vec<String> = native_config
+                .rules
+                .rules
+                .get("missing-summary")
+                .map(|r| r.paths.clone())
+                .unwrap_or_default();
             let stale_summary_filenames: Vec<String> = native_config
                 .rules
                 .rules
                 .get("stale-summary")
                 .map(|r| r.filenames.clone())
                 .unwrap_or_default();
+            let stale_summary_paths: Vec<String> = native_config
+                .rules
+                .rules
+                .get("stale-summary")
+                .map(|r| r.paths.clone())
+                .unwrap_or_default();
 
-            let (summary_res, stale_res, examples_res, refs_res, ratchet_res, budget_res) = tokio::join!(
+            let (
+                missing_res,
+                summary_res,
+                stale_res,
+                examples_res,
+                refs_res,
+                ratchet_res,
+                budget_res,
+            ) = tokio::join!(
+                tokio::task::spawn_blocking({
+                    let root = native_root.clone();
+                    move || {
+                        normalize_native_rules::build_missing_summary_report(
+                            &root,
+                            threshold,
+                            &missing_summary_filenames,
+                            &missing_summary_paths,
+                        )
+                    }
+                }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
                     move || {
@@ -352,6 +389,7 @@ impl RulesService {
                             &root,
                             threshold,
                             &stale_summary_filenames,
+                            &stale_summary_paths,
                         )
                     }
                 }),
@@ -378,6 +416,9 @@ impl RulesService {
             // global_allow filtering only touches the newly added native issues.
             let native_start = report.issues.len();
 
+            if let Ok(r) = missing_res {
+                report.merge(r.into());
+            }
             if let Ok(r) = summary_res {
                 report.merge(r.into());
             }

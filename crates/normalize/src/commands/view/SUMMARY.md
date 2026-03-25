@@ -4,4 +4,4 @@
 
 ## Architecture
 
-All view output goes through a single `ViewReport` struct with fields that are populated based on context (directory/file/symbol). The old `ViewOutput` enum and per-kind structs (`ViewFileReport`, `ViewSymbolReport`, etc.) have been dissolved. `normalize view list` is a new subcommand returning `ViewListReport(Vec<ViewReport>)` for multi-result views; `--kind` on `view list` lists symbols by kind.
+All view output goes through a single `ViewReport` struct with fields that are populated based on context (directory/file/symbol). The old `ViewOutput` enum and per-kind structs (`ViewFileReport`, `ViewSymbolReport`, etc.) have been dissolved. `normalize view list` is a new subcommand returning `ViewListReport(Vec<ViewReport>)` for multi-result views; `--kind` on `view list` lists symbols by kind. Directory views populate a `summary` field from `SUMMARY.md` if present; `format_text()` and `format_pretty()` prepend it before the file tree, and `--json` output includes it as `"summary": "..."` (omitted when absent).

@@ -340,6 +340,7 @@ pub async fn build_view_list_service(
                     line_range: None,
                     grammar: None,
                     warnings: Vec::new(),
+                    summary: None,
                 }
             })
             .collect();
