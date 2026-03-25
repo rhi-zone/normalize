@@ -1,0 +1,56 @@
+rg [OPTIONS] PATTERN [PATH ...]
+normalize rg [OPTIONS] PATTERN [PATH ...]
+
+USAGE:
+    rg [OPTIONS] PATTERN [PATH ...]    Search for PATTERN in each PATH (default: current directory)
+    rg [OPTIONS] -e PATTERN [PATH ...]    Use -e for multiple patterns or patterns starting with -
+    rg --files [PATH ...]                 List files that would be searched
+
+PATTERN SYNTAX:
+    Rust regex by default. Use -F/--fixed-strings for literal matches.
+    Meta variables ($X) are NOT supported here (use `normalize ast-grep` instead).
+
+OPTIONS:
+    -e, --regexp PATTERN    Pattern to search (may be specified multiple times)
+    -F, --fixed-strings     Treat pattern as a literal string
+    -i, --ignore-case       Case insensitive matching
+    -S, --smart-case        Case insensitive if pattern is all lowercase
+    -w, --word-regexp       Match whole words only
+    -v, --invert-match      Print lines that do NOT match
+
+    -n, --line-number       Show line numbers (default in terminal)
+    -N, --no-line-number    Suppress line numbers
+    -l, --files-with-matches    Only print file names with matches
+    -L, --files-without-match  Only print file names without matches
+    -c, --count             Print match count per file
+    -o, --only-matching     Print only matched parts
+    -H, --with-filename     Print file name for each match
+    -h, --no-filename       Suppress file name
+        --no-heading        Print file name on each line (default when piping)
+        --heading           Group matches by file (default in terminal)
+    -q, --quiet             Do not print output
+    -0, --null              Separate file names with NUL
+
+    -A, --after-context NUM   Show NUM lines after each match
+    -B, --before-context NUM  Show NUM lines before each match
+    -C, --context NUM         Show NUM lines before and after each match
+    -m, --max-count NUM       Stop after NUM matches per file
+        --max-depth NUM       Limit directory traversal depth
+
+    -g, --glob GLOB         Include/exclude files matching GLOB (prefix ! to exclude)
+        --hidden            Search hidden files and directories
+        --no-ignore         Don't use .gitignore / .ignore files
+        --no-ignore-vcs     Don't use .gitignore files only
+    -L, --follow            Follow symbolic links
+
+        --color WHEN        When to use colors: auto (default), always, never
+        --files             List files that would be searched
+        --stats             Print search statistics
+
+    -V, --version           Print version information
+        --help              Print this help
+
+NOTES:
+    Parity with ripgrep: most common flags supported. Some ripgrep-specific
+    flags (--pcre2, --type-add, --engine, --pre) are accepted but ignored.
+    Unsupported: --replace/-r (only search, no replace).

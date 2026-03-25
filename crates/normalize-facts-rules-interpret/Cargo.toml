@@ -6,6 +6,13 @@ license.workspace = true
 repository.workspace = true
 description = "Interpreted Datalog rule evaluation for normalize code facts"
 
+[features]
+# Enable JIT compilation in ascent-interpreter (x86_64-only).
+# When enabled, passes the "jit" feature through to ascent-interpreter.
+# Disabled by default so aarch64 and Windows builds are not broken by
+# dynasmrt x86 assembly code.
+jit = ["ascent-interpreter/jit"]
+
 [dependencies]
 normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.2.0" }
 abi_stable = "0.11"

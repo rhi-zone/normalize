@@ -39,7 +39,9 @@
 //!   file = "" for no location; line = 0 when the source has no line info.
 
 use abi_stable::std_types::ROption;
-use ascent_interpreter::eval::{Engine, SharedJitCompiler, SourceId, Value};
+#[cfg(feature = "jit")]
+use ascent_interpreter::eval::SharedJitCompiler;
+use ascent_interpreter::eval::{Engine, SourceId, Value};
 use ascent_interpreter::ir::Program;
 use ascent_interpreter::syntax::AscentProgram;
 use glob::Pattern;
@@ -573,9 +575,9 @@ pub fn run_rules_source(
     let program = Program::from_ast(ast).map_err(InterpretError::Parse)?;
 
     // Create engine, populate facts, and run to fixpoint.
-    // JIT is x86_64-only — aarch64 backend not yet available in ascent-interpreter.
+    // JIT is x86_64-only and requires the "jit" feature in ascent-interpreter.
     let mut engine = Engine::new(program);
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(all(target_arch = "x86_64", feature = "jit"))]
     engine
         .enable_jit()
         .map_err(|e| InterpretError::Parse(e.to_string()))?;
@@ -990,7 +992,7 @@ pub fn run_rules_batch(
         return Ok(Vec::new());
     }
 
-    #[cfg_attr(not(target_arch = "x86_64"), allow(unused_mut))]
+    #[cfg(all(target_arch = "x86_64", feature = "jit"))]
     let mut shared_jit: Option<SharedJitCompiler> = None;
     let mut all_diagnostics = Vec::new();
 
@@ -1002,7 +1004,7 @@ pub fn run_rules_batch(
 
         let mut engine = Engine::new(program);
 
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(all(target_arch = "x86_64", feature = "jit"))]
         match shared_jit.take() {
             Some(jit) => engine.set_jit_compiler(jit),
             None => engine
@@ -1016,7 +1018,7 @@ pub fn run_rules_batch(
             .map_err(|e| InterpretError::Eval(e.to_string()))?;
         engine.materialize();
 
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(all(target_arch = "x86_64", feature = "jit"))]
         {
             shared_jit = engine.share_jit_compiler();
         }
