@@ -797,7 +797,9 @@ to depend on. The LSP is useful day-to-day.
 - [x] `normalize ci` command — `--no-syntax/native/fact`, `--strict`, `--sarif`, `-p <path>`, graceful index-not-built handling
 - [x] Install script (curl | sh) — SHA256 verification, `NORMALIZE_VERSION` pinning, `~/.local/bin` default
 - [x] CI documentation (`docs/ci.md`) — GitHub Actions/GitLab snippets, ratchet bootstrap workflow, SARIF output
-- [ ] Polish pass (--help, exit codes, error messages)
+- [x] Polish pass — version string, --help accuracy, config parse warning, view error messages,
+  stale --engine flag references in docs. **Exit code 1 vs 2 differentiation (violations vs
+  setup errors) requires server-less `ExitCode`-carrying error type — deferred post-0.2.0.**
 
 *Release mechanics:*
 - [ ] Verify `normalize update` works against a real GitHub release (cross-platform smoke test)
