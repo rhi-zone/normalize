@@ -8,12 +8,12 @@ non-zero if any errors are found.
 
 Add two steps to any CI pipeline:
 
-```yaml
+```bash
 # 1. Install normalize
-- run: cargo install normalize
+curl -fsSL https://raw.githubusercontent.com/rhi-zone/normalize/master/install.sh | sh
 
 # 2. Run all checks
-- run: normalize ci
+normalize ci
 ```
 
 `normalize ci` exits 0 when there are no errors, exits 1 when errors are found. Warnings
@@ -57,7 +57,7 @@ normalize rules list --type fact      # see which fact rules are enabled
 
 ## GitHub Actions
 
-Complete working example with version pinning and Rust caching:
+Complete working example with version pinning and binary install:
 
 ```yaml
 name: normalize
@@ -73,31 +73,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
       - name: Install normalize
-        run: cargo install normalize --version "0.1.0" --locked
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/rhi-zone/normalize/master/install.sh | sh
+        env:
+          NORMALIZE_VERSION: "0.2.0"
+          INSTALL_DIR: /usr/local/bin
 
       - name: Run normalize ci
         run: normalize ci
 
       # Optional: SARIF upload for inline PR annotations
+      - name: Generate SARIF
+        if: always()
+        run: normalize ci --sarif > normalize.sarif || true
+
       - name: Upload SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: normalize.sarif
         continue-on-error: true
-
-      - name: Generate SARIF
-        if: always()
-        run: normalize ci --sarif > normalize.sarif || true
 ```
 
 For SARIF annotations on PRs, run `normalize ci --sarif` and upload the output to
 GitHub's code scanning API. The `--sarif` flag outputs SARIF 2.1.0 JSON to stdout.
+Generate the SARIF file before uploading it.
 
 ### Opting out of engines
 
@@ -110,16 +111,12 @@ GitHub's code scanning API. The `--sarif` flag outputs SARIF 2.1.0 JSON to stdou
 
 ```yaml
 normalize:
-  image: rust:latest
+  image: ubuntu:latest
   stage: test
-  cache:
-    key: normalize-$CI_COMMIT_REF_SLUG
-    paths:
-      - ~/.cargo/registry
-      - ~/.cargo/git
-      - target/
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq curl
+    - curl -fsSL https://raw.githubusercontent.com/rhi-zone/normalize/master/install.sh | sh
   script:
-    - cargo install normalize --version "0.1.0" --locked
     - normalize ci
   artifacts:
     when: always
@@ -127,6 +124,14 @@ normalize:
       codequality: normalize.json
   after_script:
     - normalize ci --json > normalize.json || true
+```
+
+To pin the version:
+
+```yaml
+  variables:
+    NORMALIZE_VERSION: "0.2.0"
+    INSTALL_DIR: /usr/local/bin
 ```
 
 ## Configuring for Your Repo
@@ -203,19 +208,16 @@ git commit -m "chore: add complexity budget"
 
 See `normalize ratchet --help` and `normalize budget --help` for the full API.
 
-## Pinning the normalize Version
+## Pinning the Version
 
-For reproducible CI, pin to a specific version and use `--locked` to respect
-`Cargo.lock`:
-
-```yaml
-- run: cargo install normalize --version "0.1.0" --locked
-```
-
-Or install from a release binary once they are available:
+Pin to a specific version for reproducible CI:
 
 ```bash
-curl -fsSL https://normalize.rs/install.sh | sh -s -- --version 0.1.0
+# Via install script (fast — downloads a prebuilt binary)
+NORMALIZE_VERSION=0.2.0 curl -fsSL https://raw.githubusercontent.com/rhi-zone/normalize/master/install.sh | sh
+
+# Via cargo (slower — compiles from source)
+cargo install normalize --version "0.2.0" --locked
 ```
 
 Check for new versions with:
@@ -223,3 +225,19 @@ Check for new versions with:
 ```bash
 normalize update --check
 ```
+
+## Troubleshooting
+
+**Index not built:** Fact rules require the index. Run `normalize structure rebuild` before
+`normalize ci`, or skip the fact engine with `--no-fact` if you haven't set up the index yet.
+
+**No config file:** If `.normalize/config.toml` doesn't exist, normalize uses built-in defaults.
+Run `normalize init` to generate a config file with commented-out options.
+
+**Rules not finding violations:** Verify grammars are installed (`normalize grammars list`).
+Syntax rules require the tree-sitter grammar for the target language. If the grammar is missing,
+those rules silently produce no results.
+
+**SHA256 mismatch on install:** The install script downloads `SHA256SUMS.txt` from the same
+release and verifies the archive before installing. A mismatch means the download was corrupted
+or the release assets don't match — retry the download. Do not skip verification.

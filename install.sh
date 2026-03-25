@@ -1,11 +1,12 @@
 #!/bin/bash
 # Normalize CLI installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/rhi-zone/normalize/master/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/rhi-zone/normalize/master/install.sh | sh
+# Version pinning: NORMALIZE_VERSION=0.2.0 curl -fsSL ... | sh
 
 set -e
 
 REPO="rhi-zone/normalize"
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 
 # Detect platform
 OS="$(uname -s)"
@@ -15,7 +16,7 @@ case "$OS" in
     Linux)
         case "$ARCH" in
             x86_64) TARGET="x86_64-unknown-linux-gnu" ;;
-            aarch64) TARGET="aarch64-unknown-linux-gnu" ;;
+            aarch64|arm64) TARGET="aarch64-unknown-linux-gnu" ;;
             *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
         esac
         ;;
@@ -28,38 +29,94 @@ case "$OS" in
         ;;
     *)
         echo "Unsupported OS: $OS"
-        echo "For Windows, download from: https://github.com/$REPO/releases"
+        echo "For Windows, use: irm https://raw.githubusercontent.com/$REPO/master/install.ps1 | iex"
         exit 1
         ;;
 esac
 
-# Get latest version
-echo "Fetching latest release..."
-LATEST=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+# Resolve version
+if [ -n "$NORMALIZE_VERSION" ]; then
+    VERSION="$NORMALIZE_VERSION"
+    # Strip leading 'v' if present
+    VERSION="${VERSION#v}"
+    TAG="v$VERSION"
+else
+    echo "Fetching latest release..."
+    TAG=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
+        | grep '"tag_name"' \
+        | sed -E 's/.*"([^"]+)".*/\1/')
+    if [ -z "$TAG" ]; then
+        echo "Failed to fetch latest version"
+        exit 1
+    fi
+    VERSION="${TAG#v}"
+fi
 
-if [ -z "$LATEST" ]; then
-    echo "Failed to fetch latest version"
+echo "Installing normalize $TAG for $TARGET..."
+
+# Download archive and checksums
+BASE_URL="https://github.com/$REPO/releases/download/$TAG"
+ARCHIVE="normalize-$TARGET.tar.gz"
+TMPWORK=$(mktemp -d)
+trap "rm -rf $TMPWORK" EXIT
+
+curl -fsSL "$BASE_URL/$ARCHIVE" -o "$TMPWORK/normalize.tar.gz"
+curl -fsSL "$BASE_URL/SHA256SUMS.txt" -o "$TMPWORK/SHA256SUMS.txt"
+
+# Verify checksum
+EXPECTED=$(grep "$ARCHIVE" "$TMPWORK/SHA256SUMS.txt" | awk '{print $1}')
+if [ -z "$EXPECTED" ]; then
+    echo "No checksum found for $ARCHIVE in SHA256SUMS.txt"
     exit 1
 fi
 
-echo "Installing normalize $LATEST for $TARGET..."
+if command -v sha256sum >/dev/null 2>&1; then
+    ACTUAL=$(sha256sum "$TMPWORK/normalize.tar.gz" | awk '{print $1}')
+elif command -v shasum >/dev/null 2>&1; then
+    ACTUAL=$(shasum -a 256 "$TMPWORK/normalize.tar.gz" | awk '{print $1}')
+else
+    echo "Warning: no sha256sum or shasum found; skipping checksum verification"
+    ACTUAL="$EXPECTED"
+fi
 
-# Download
-URL="https://github.com/$REPO/releases/download/$LATEST/normalize-$TARGET.tar.gz"
-TMPDIR=$(mktemp -d)
-trap "rm -rf $TMPDIR" EXIT
+if [ "$ACTUAL" != "$EXPECTED" ]; then
+    echo "Checksum mismatch!"
+    echo "  Expected: $EXPECTED"
+    echo "  Got:      $ACTUAL"
+    exit 1
+fi
 
-curl -fsSL "$URL" | tar xz -C "$TMPDIR"
+echo "Checksum verified."
+
+# Extract
+tar xz -C "$TMPWORK" -f "$TMPWORK/normalize.tar.gz"
 
 # Install
+mkdir -p "$INSTALL_DIR"
 if [ -w "$INSTALL_DIR" ]; then
-    mv "$TMPDIR/normalize" "$INSTALL_DIR/normalize"
+    mv "$TMPWORK/normalize" "$INSTALL_DIR/normalize"
 else
     echo "Installing to $INSTALL_DIR (requires sudo)..."
-    sudo mv "$TMPDIR/normalize" "$INSTALL_DIR/normalize"
+    sudo mv "$TMPWORK/normalize" "$INSTALL_DIR/normalize"
 fi
 
 chmod +x "$INSTALL_DIR/normalize"
 
-echo "Installed normalize $LATEST to $INSTALL_DIR/normalize"
-echo "Run 'normalize --help' to get started"
+echo ""
+echo "Installed normalize $TAG to $INSTALL_DIR/normalize"
+
+# Verify
+if command -v normalize >/dev/null 2>&1 || "$INSTALL_DIR/normalize" --version >/dev/null 2>&1; then
+    "$INSTALL_DIR/normalize" --version 2>/dev/null || true
+fi
+
+# PATH hint if needed
+case ":$PATH:" in
+    *":$INSTALL_DIR:"*) ;;
+    *)
+        echo ""
+        echo "NOTE: $INSTALL_DIR is not in your PATH."
+        echo "Add it to your shell config:"
+        echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+        ;;
+esac
