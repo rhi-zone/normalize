@@ -39,7 +39,7 @@
 //!   file = "" for no location; line = 0 when the source has no line info.
 
 use abi_stable::std_types::ROption;
-#[cfg(feature = "jit")]
+#[cfg(all(feature = "jit", target_arch = "x86_64"))]
 use ascent_interpreter::eval::SharedJitCompiler;
 use ascent_interpreter::eval::{Engine, SourceId, Value};
 use ascent_interpreter::ir::Program;
