@@ -118,16 +118,16 @@ case ":$PATH:" in
         echo "NOTE: $INSTALL_DIR is not in your PATH."
         case "${SHELL##*/}" in
             fish)
-                echo "Add it to your fish config:"
+                echo "Run (>> appends, never use >):"
                 echo "  fish_add_path $INSTALL_DIR"
                 ;;
             zsh)
-                echo "Add it to ~/.zshrc:"
-                echo "  export PATH=\"$INSTALL_DIR:\$PATH\""
+                echo "Run (>> appends, never use >):"
+                echo "  echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.zshrc"
                 ;;
             *)
-                echo "Add it to ~/.bashrc (or your shell's config):"
-                echo "  export PATH=\"$INSTALL_DIR:\$PATH\""
+                echo "Run (>> appends, never use >):"
+                echo "  echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.bashrc"
                 ;;
         esac
         ;;
