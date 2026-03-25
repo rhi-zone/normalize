@@ -325,6 +325,19 @@ fn process_file_matches(
             continue;
         }
 
+        if !rule.files.is_empty() {
+            let filename = ctx
+                .file
+                .file_name()
+                .map(|n| n.to_string_lossy())
+                .unwrap_or_default();
+            let matches_path = rule.files.iter().any(|p| p.matches(ctx.allow_path_str));
+            let matches_name = rule.files.iter().any(|p| p.matches(filename.as_ref()));
+            if !matches_path && !matches_name {
+                continue;
+            }
+        }
+
         if !check_requires(rule, ctx.source_registry, &ctx.source_ctx) {
             continue;
         }
@@ -780,7 +793,7 @@ mod tests {
     #[test]
     fn test_combined_query_predicate_scoping() {
         let loader = loader();
-        let grammar = loader.get("rust").ok().expect("rust grammar");
+        let grammar = loader.get("rust").expect("rust grammar");
 
         // Two patterns with same capture name but different predicate values
         let combined_query = r#"
@@ -863,7 +876,7 @@ fn main() {
     #[test]
     fn test_combined_rules_single_traversal() {
         let loader = loader();
-        let grammar = loader.get("rust").ok().expect("rust grammar");
+        let grammar = loader.get("rust").expect("rust grammar");
 
         // Simulate combining multiple rule queries
         let rules_queries = [
@@ -938,7 +951,7 @@ fn main() {
         // Rust grammar doesn't have `comment` node type but has `line_comment`.
         // A multi-pattern query with both should compile with only valid patterns.
         let loader = loader();
-        let grammar = loader.get("rust").ok().expect("rust grammar");
+        let grammar = loader.get("rust").expect("rust grammar");
 
         let query_str = r#"((comment) @match (#match? @match "TODO"))
 ((line_comment) @match (#match? @match "TODO"))"#;

@@ -13,6 +13,7 @@
 //! # severity = "warning"
 //! # message = "Avoid unwrap() on user input"
 //! # allow = ["**/tests/**"]
+//! # files = ["**/lib.rs", "**/mod.rs"]
 //! # requires = { "rust.edition" = ">=2024" }
 //! # enabled = true  # set to false to disable a builtin
 //! # fix = ""  # empty = delete match, or use "$capture" to substitute
@@ -63,6 +64,10 @@ pub struct Rule {
     pub message: String,
     /// Glob patterns for files where matches are allowed.
     pub allow: Vec<Pattern>,
+    /// Glob patterns for files where this rule applies (inclusion filter).
+    /// If non-empty, the rule only runs on files that match at least one pattern.
+    /// If empty, the rule runs on all files (subject to `allow` exclusions).
+    pub files: Vec<Pattern>,
     /// Source file path of this rule (empty for builtins).
     pub source_path: PathBuf,
     /// Languages this rule applies to (inferred from query or explicit).

@@ -61,6 +61,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         content: include_str!("rust_commented_out_code.scm"),
     },
     BuiltinRule {
+        id: "rust/missing-module-doc",
+        content: include_str!("rust_missing_module_doc.scm"),
+    },
+    BuiltinRule {
         id: "hardcoded-secret",
         content: include_str!("hardcoded_secret.scm"),
     },

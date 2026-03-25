@@ -290,3 +290,65 @@ fn run_fix_fixture(
         ))
     }
 }
+
+/// Dedicated test for `rust/missing-module-doc`.
+///
+/// This rule uses a `files` inclusion filter (`**/lib.rs`, `**/mod.rs`), which
+/// is incompatible with the standard `match.*` / `no_match.*` fixture convention.
+/// We test it directly using the named fixture files in
+/// `tests/fixtures/rust/missing-module-doc/`.
+#[test]
+fn test_rust_missing_module_doc() {
+    let fixture_dir =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rust/missing-module-doc");
+
+    let loader = GrammarLoader::new();
+    let debug = DebugFlags { timing: false };
+
+    let mut rules = load_all_rules(&fixture_dir, &Default::default());
+
+    // Enable only the rule under test.
+    for r in rules.iter_mut() {
+        r.enabled = r.id == "rust/missing-module-doc";
+    }
+
+    // lib.rs — no //! inner doc comment — must produce ≥1 findings.
+    let lib_rs = fixture_dir.join("lib.rs");
+    let findings = run_rules(
+        &rules,
+        &lib_rs,
+        &fixture_dir,
+        &loader,
+        None,
+        None,
+        None,
+        &debug,
+    );
+    assert!(
+        !findings.is_empty(),
+        "rust/missing-module-doc: lib.rs (no //! comment) should produce findings"
+    );
+
+    // A file with //! docs placed in a temp dir as lib.rs — must produce 0 findings.
+    let tmp = tempfile::tempdir_in(&fixture_dir).expect("failed to create tempdir");
+    let tmp_lib = tmp.path().join("lib.rs");
+    std::fs::write(
+        &tmp_lib,
+        "//! This module is documented.\n\npub struct Foo;\n",
+    )
+    .expect("failed to write tmp lib.rs");
+    let no_match_findings = run_rules(
+        &rules,
+        &tmp_lib,
+        &fixture_dir,
+        &loader,
+        None,
+        None,
+        None,
+        &debug,
+    );
+    assert!(
+        no_match_findings.is_empty(),
+        "rust/missing-module-doc: lib.rs with //! docs should produce no findings"
+    );
+}

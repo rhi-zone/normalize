@@ -207,6 +207,17 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         })
         .unwrap_or_default();
 
+    let files: Vec<Pattern> = frontmatter
+        .get("files")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str())
+                .filter_map(|s| Pattern::new(s).ok())
+                .collect()
+        })
+        .unwrap_or_default();
+
     let languages: Vec<String> = frontmatter
         .get("languages")
         .and_then(|v| v.as_array())
@@ -260,6 +271,7 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         severity,
         message,
         allow,
+        files,
         source_path: PathBuf::new(),
         languages,
         enabled,
