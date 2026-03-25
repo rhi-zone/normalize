@@ -839,6 +839,20 @@ the default path.
 - [ ] **Persistent query cache** — store per-file tree-sitter query results in the SQLite index
   so repeated `normalize view`, `normalize rank`, etc. don't re-parse unchanged files.
 
+**Pillar 5 — Perf and memory baseline**
+
+Before optimizing, measure. We have no perf benchmarks and no memory budget. The malloc
+crash in the pre-commit hook is a warning sign.
+
+- [ ] Establish wall-clock benchmarks for the hot paths: `structure rebuild`, `rules run`,
+  `view`, `rank`. Run against a mid-size real repo (normalize itself is a good target).
+  Track in CI so regressions are caught.
+- [ ] Profile memory usage of a full `structure rebuild` and `rules run --engine fact` on
+  normalize. Identify the top allocators. The pre-commit malloc crash suggests at least one
+  path has unbounded allocation.
+- [ ] Set memory budgets per command and enforce them in tests (e.g. `structure rebuild`
+  on normalize should not exceed N MB RSS).
+
 **Current state (post-0.2.0 audit):**
 - `normalize view` already has full graph navigation: `referenced-by`, `references`,
   `dependents`, `trace`, `graph` are wired and functional. The "fold call-graph into view"
