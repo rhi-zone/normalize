@@ -774,7 +774,12 @@ to depend on. The LSP is useful day-to-day.
 **Remaining before 0.2.0:**
 
 *LSP / index (from P0):*
-- [ ] Integrate incremental Datalog from ascent-interpreter (steps 1-3 done: interning, flat tuples, incremental eval; JIT is a **release blocker for performance** — fact rules work without it but are too slow on large repos for CI use)
+- [ ] Wire incremental Datalog evaluation: `run_rules_source_incremental()` exists in
+  `normalize-facts-rules-interpret` but is never called — every `normalize rules run --engine fact`
+  and `normalize ci` does full re-evaluation. Wire dirty-relation tracking so only facts for
+  changed files are re-derived. The daemon already tracks `last_affected` per file; the eval
+  API just needs a caller. **Release blocker: fact rules on a large repo are too slow for CI
+  without this.** JIT is a separate concern (disabled upstream bug) and does NOT block 0.2.0.
 
 *CLI surface (from P1):*
 - [x] `view` refactor phase 1: graph navigation + history as subcommands — done 2026-03-16
@@ -866,11 +871,9 @@ incremental evaluation so they're fast enough for pre-commit use:
 - [ ] New fact rules: `dead-parameter` (param never read in any call path, needs scope),
   `missing-test` (exported function with no test calling it), `stale-mock` (test mock
   references a function that no longer exists).
-- [ ] Wire incremental evaluation: when `normalize rules run --engine fact` is called on a
-  changed file, pass dirty/retracted relations from the facts delta rather than re-evaluating
-  everything. `run_rules_source_incremental()` exists — needs a caller that tracks deltas.
 - [ ] Unblock JIT: track upstream ascent-interpreter string comparison bug; re-enable
-  `SharedJitCompiler` in `run_rules_source` / `run_rules_batch` once fixed.
+  `SharedJitCompiler` in `run_rules_source` / `run_rules_batch` once fixed. Incremental
+  eval wiring is a 0.2.0 blocker (already moved there).
 
 **Dependencies / preconditions:**
 - `normalize refs` ships first — it's the foundation for rename, move, and dead-parameter rule.
