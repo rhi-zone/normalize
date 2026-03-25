@@ -802,69 +802,84 @@ to depend on. The LSP is useful day-to-day.
 
 **Theme:** normalize becomes the tool you reach for when you need to understand a codebase
 and make a cross-cutting change safely. The index is no longer just for analysis — it backs
-precise multi-file edits. The ranking surface (introduced in 0.2.0) is the primary entry
-point for codebase understanding. Linting grows a semantic tier.
+precise multi-file edits. Linting grows a semantic tier (18 fact rules already exist; the
+gap is polish + new rules, not infrastructure).
 
-**Pillar 1 — `normalize rank` completion**
+**Current state (post-0.2.0 audit):**
+- `normalize view` already has full graph navigation: `referenced-by`, `references`,
+  `dependents`, `trace`, `graph` are wired and functional. The "fold call-graph into view"
+  item from the 0.2.0 design is already done.
+- `commands/find_references.rs` exists but is not exposed as `normalize refs` — just needs
+  wiring.
+- 18 fact rules (Datalog) already exist: `circular-deps`, `dead-api`, `unused-import`,
+  `god-file`, `god-class`, `orphan-file`, `duplicate-symbol`, `fan-out`, `hub-file`,
+  `layering-violation`, `long-function`, and more. Semantic rules infrastructure is mature.
+- `normalize-facts-rules-builtins/src/circular_deps.rs` (compiled Ascent macro) may be
+  dead code — the Datalog version in `builtin_dl/circular_deps.dl` is what runs. Audit and
+  remove if so.
+- Incremental evaluation API (`run_rules_source_incremental`) is implemented but not wired
+  into any CLI call path. JIT disabled pending upstream string comparison bug fix.
 
-The `analyze` redesign (0.2.0) introduced `normalize rank` and migrated ~20 commands. The
-remaining `analyze` commands fall into two categories: graph navigation (→ `view`) and
-big-picture synthesis (→ `normalize understand` or similar). 0.3.0 completes the migration:
+**Pillar 1 — `analyze` dissolution**
 
-- [ ] Migrate graph navigation commands into `view`: `call-graph`, `trace`, `dependents`,
-  `provenance` become `normalize view <target> callers/callees/dependents/trace`
-- [ ] Identify and name the "big picture" pattern: `architecture`, `summary`, `health`,
-  `coupling-clusters` share a trait — synthesized understanding of a module/codebase, not
-  a ranked list and not a graph traversal. Design `normalize understand` or equivalent,
-  or find the unifying trait. Don't force it — only formalize when the pattern is clear.
-- [ ] `analyze` dissolves once all commands have a proper home, or gets a new identity if
-  a residual set has genuine coherence.
+`normalize view` has absorbed graph navigation. `normalize rank` has absorbed 21 ranking
+commands. `analyze` still hosts 19 commands that don't fit either:
 
-**Pillar 2 — Semantic refactoring (the stated top-level goal)**
+- [ ] Trend commands (`complexity-trend`, `length-trend`, `density-trend`, `test-ratio-trend`)
+  — time-series of ranking metrics. Fold into `rank` with `--trend` flag or dedicated
+  `normalize trend` subcommand.
+- [ ] Synthesis commands (`architecture`, `summary`, `health`, `coupling-clusters`,
+  `cross-repo-health`) — big-picture, not a ranked list. Find the unifying trait or leave
+  in `analyze` until the pattern is clear. Don't force a home.
+- [ ] Residual commands (`activity`, `docs`, `security`, `test-gaps`, `skeleton-diff`,
+  `repo-coupling`, `node-types`, `length`, `all`) — audit each: belongs in rank/view/rules
+  or stays as standalone?
+- [ ] Once all commands have a proper home, `analyze` dissolves. Don't rush this — clarity
+  matters more than speed.
 
-The index has qualified import resolution, resolved call graphs, and scope analysis. The
-`normalize-edit` and `normalize-shadow` crates exist. The missing piece is a layer that
-uses them together for correct multi-file edits:
+**Pillar 2 — Semantic refactoring**
 
-- [ ] `normalize rename <target> <new-name>` — rename a symbol across all its usages,
-  qualified imports, and definition site. Requires: find-all-references (index + scope),
-  shadowing analysis (normalize-scope), conflict detection (would new name shadow something?),
-  shadow-first dry run by default.
-- [ ] `normalize refs <target>` — find all references to a symbol (read + write sites),
-  grouped by file. The read layer for rename and future refactors.
-- [ ] `normalize extract <file:start-end> <new-name>` — extract a code region into a new
-  function/method, updating the call site. Single-file first; cross-file (move extracted
-  fn to another module) as stretch.
-- [ ] `normalize inline <target>` — inline a single-use function or a constant. Single-file
-  first.
-- [ ] `normalize move <target> <destination>` — move a symbol (function, class, type) to
-  another file, updating all import sites. Requires rename infrastructure + import rewriting.
-- [ ] All refactors: `--dry-run` flag shows diff, no writes; shadow-first mode for safe
-  preview. `normalize-shadow` already exists for this.
+Building blocks are all present. The gap is composition:
+
+- [ ] `normalize refs <target>` — expose `commands/find_references.rs` as a proper CLI
+  command. Groups results by file, shows read/write distinction where the scope engine
+  can determine it. This is the read layer for all refactors.
+- [ ] `normalize rename <target> <new-name>` — cross-file symbol rename. Uses `normalize refs`
+  to find all sites, normalise-scope for shadow/conflict detection, batch edit for atomic
+  multi-file rewrite, shadow git for preview. `--dry-run` shows diff, no writes. This is
+  the highest-value refactoring command.
+- [ ] `normalize move <target> <destination>` — move a symbol to another file, updating all
+  import sites. Requires rename infrastructure + import rewriting. After rename lands.
+- [ ] `normalize extract <file:start-end> <new-name>` — extract a region into a new function,
+  rewriting the call site. Single-file first; cross-file as stretch.
+- [ ] `normalize inline <target>` — inline a single-use function or constant. Single-file.
+- [ ] Post-edit index invalidation: after a multi-file edit, mark affected files dirty in the
+  daemon's reverse-dep graph so the index refreshes without a full rebuild.
 
 **Pillar 3 — Semantic rules (stretch goal)**
 
-Syntax rules are single-file AST queries. Semantic rules need the index:
+18 fact rules already exist and run via `--engine fact`. The gap is new rules and wiring
+incremental evaluation so they're fast enough for pre-commit use:
 
-- [ ] `SemanticRule` trait (analogous to `SyntaxRule`) — a rule that receives the index +
-  facts DB and emits `Diagnostic` items. Runs after index is built (not per-file).
-- [ ] First semantic rules: `unused-export` (symbol exported but no callers across project),
-  `import-cycle` (already detectable via `normalize-graph`, just needs rule wiring),
-  `dead-parameter` (function param never read in any call path — requires scope).
-- [ ] `normalize rules run --engine semantic` or integrated into `normalize ci`.
-- [ ] Semantic rules are necessarily slower than syntax rules — design for incremental
-  evaluation (re-run only on changed files' transitive dependents).
+- [ ] Audit and remove `normalize-facts-rules-builtins/src/circular_deps.rs` if dead code
+  (compiled Ascent macro superseded by Datalog version).
+- [ ] New fact rules: `dead-parameter` (param never read in any call path, needs scope),
+  `missing-test` (exported function with no test calling it), `stale-mock` (test mock
+  references a function that no longer exists).
+- [ ] Wire incremental evaluation: when `normalize rules run --engine fact` is called on a
+  changed file, pass dirty/retracted relations from the facts delta rather than re-evaluating
+  everything. `run_rules_source_incremental()` exists — needs a caller that tracks deltas.
+- [ ] Unblock JIT: track upstream ascent-interpreter string comparison bug; re-enable
+  `SharedJitCompiler` in `run_rules_source` / `run_rules_batch` once fixed.
 
 **Dependencies / preconditions:**
-- Incremental Datalog (ascent-interpreter steps 1-3) should be wired before semantic rules
-  are practical at scale. `import-cycle` via `normalize-graph` doesn't need Datalog, so it
-  can land early.
-- `normalize refs` is the foundation for rename and move — implement first.
-- The `view` navigation fold can happen independently of the refactoring pillar.
+- `normalize refs` ships first — it's the foundation for rename, move, and dead-parameter rule.
+- Incremental Datalog wiring can happen independently of new rules.
+- JIT fix is upstream; don't block anything on it.
 
 **Not targeting 0.3.0:**
-- Full AST rewriting (requires tree-sitter edit API integration for round-trip fidelity)
-- Type-aware refactoring (normalize has no type resolver; tree-sitter gives CST not AST)
+- Full AST rewriting (tree-sitter edit API, round-trip fidelity)
+- Type-aware refactoring (normalize has no type resolver)
 - Jinja2 grammar crate publish
 
 ---
