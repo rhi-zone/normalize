@@ -105,6 +105,8 @@ When unsure of syntax: `normalize <cmd> --help`. Fall back to Read only for exac
 
 **Done = committed + TODO.md updated + git status clean.** After tests pass, commit immediately. Update TODO.md (mark completed items, add follow-ups) in the same commit — not after.
 
+**Maintain CHANGELOG.md.** User-facing changes go in `CHANGELOG.md` (Keep a Changelog format) as they land — not in a batch at release time. Add entries under `## [Unreleased]` when committing the feature. At release, rename `[Unreleased]` to the version and add a new empty `[Unreleased]` section. The release workflow body should link to or excerpt the changelog rather than duplicating install instructions as the primary content.
+
 ## Session Handoff
 
 Use plan mode as a handoff mechanism when:

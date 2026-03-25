@@ -22,8 +22,8 @@ case "$OS" in
         ;;
     Darwin)
         case "$ARCH" in
-            x86_64) TARGET="x86_64-apple-darwin" ;;
             arm64) TARGET="aarch64-apple-darwin" ;;
+            x86_64) echo "Intel Macs are not supported. Use an Apple Silicon Mac or Linux."; exit 1 ;;
             *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
         esac
         ;;

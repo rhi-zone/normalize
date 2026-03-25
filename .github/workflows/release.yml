@@ -159,6 +159,20 @@ jobs:
             echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          VERSION="${VERSION#v}"
+          # Extract the block between this version's header and the next
+          NOTES=$(awk "/^## \[$VERSION\]/{found=1; next} found && /^## /{exit} found{print}" CHANGELOG.md)
+          # Pass multiline output through environment file
+          {
+            echo "notes<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -169,41 +183,26 @@ jobs:
           files: |
             release/*
           body: |
-            ## Normalize CLI ${{ steps.version.outputs.version }}
+            ${{ steps.changelog.outputs.notes }}
+
+            ---
 
             ### Installation
 
-            **Linux (x86_64)**
+            **Linux / macOS**
             ```bash
-            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/normalize-x86_64-unknown-linux-gnu.tar.gz | tar xz
-            sudo mv normalize /usr/local/bin/
+            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/master/install.sh | sh
             ```
 
-            **macOS (Apple Silicon)**
-            ```bash
-            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/normalize-aarch64-apple-darwin.tar.gz | tar xz
-            sudo mv normalize /usr/local/bin/
+            **Windows (PowerShell)**
+            ```powershell
+            irm https://raw.githubusercontent.com/${{ github.repository }}/master/install.ps1 | iex
             ```
 
-            **Windows**
-            Download `normalize-x86_64-pc-windows-msvc.zip` and extract to your PATH.
+            **Manual download:** pick the archive for your platform from the assets below, verify with `SHA256SUMS.txt`, and place the binary on your `PATH`.
 
             ### Grammars (Optional)
 
-            For tree-sitter parsing features, download and install grammars for your platform:
-
             ```bash
-            # Linux
-            mkdir -p ~/.config/normalize/grammars
-            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/normalize-grammars-x86_64-unknown-linux-gnu.tar.gz | tar xz -C ~/.config/normalize/grammars
-
-            # macOS (Apple Silicon)
-            mkdir -p ~/.config/normalize/grammars
-            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/normalize-grammars-aarch64-apple-darwin.tar.gz | tar xz -C ~/.config/normalize/grammars
+            normalize grammars install
             ```
-
-            Or use `normalize grammars install` after installing the CLI.
-
-            ### Checksums
-
-            See `SHA256SUMS.txt` for verification.
