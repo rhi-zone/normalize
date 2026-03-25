@@ -1268,16 +1268,31 @@ pub fn run_rules_report(
 
     // Fact rules
     if matches!(engine, RuleKind::All | RuleKind::Fact) {
+        // The Datalog evaluator recurses deeply for transitive queries (circular-deps etc.).
+        // Spawn on a thread with a larger stack to avoid stack overflow.
         let rt = tokio::runtime::Runtime::new().unwrap_or_else(|e| {
             tracing::warn!("failed to create tokio runtime: {}", e);
             panic!("failed to create tokio runtime: {}", e)
         });
-        let diagnostics = rt.block_on(collect_fact_diagnostics(
-            project_root,
-            &config.rules,
-            filter_ids.as_ref(),
-            filter_rule,
-        ));
+        let diagnostics = std::thread::Builder::new()
+            .stack_size(64 * 1024 * 1024) // 64MB: Datalog transitive queries recurse deeply
+            .spawn({
+                let project_root = project_root.to_path_buf();
+                let rules = config.rules.clone();
+                let filter_ids = filter_ids.clone();
+                let filter_rule = filter_rule.map(|s| s.to_string());
+                move || {
+                    rt.block_on(collect_fact_diagnostics(
+                        &project_root,
+                        &rules,
+                        filter_ids.as_ref(),
+                        filter_rule.as_deref(),
+                    ))
+                }
+            })
+            .expect("failed to spawn fact engine thread")
+            .join()
+            .expect("fact engine thread panicked");
         // Apply global-allow patterns from [rules] to fact-rule diagnostics.
         // Syntax rules apply global_allow during load_all_rules(); fact rules need it here.
         let global_allow: Vec<glob::Pattern> = config
