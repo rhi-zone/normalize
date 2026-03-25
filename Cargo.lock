@@ -1313,11 +1313,12 @@ dependencies = [
 
 [[package]]
 name = "ascent-interpreter"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce3554cf233f08b2104998e1d7fcc7a5774d8df0e0d5c367254791254bbc558a"
+checksum = "143c35391610064f7c6561a6d5e8ce30a76bbc20d51cd991549baa9ff9003233"
 dependencies = [
  "derive-syn-parse",
+ "dynasmrt",
  "hashbrown 0.16.1",
  "itertools 0.14.0",
  "petgraph",
@@ -2166,6 +2167,33 @@ name = "dyn-clone"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
+
+[[package]]
+name = "dynasm"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df4bf11ba8aecc00489b7ec4e8963cd3860651c3ea2a114394f8ba7e92a0e94a"
+dependencies = [
+ "bitflags 2.11.0",
+ "byteorder",
+ "lazy_static",
+ "proc-macro-error2",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "dynasmrt"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b38e5331d851567729d892ed28d898d22f49a96940b29e23b5c3e681bd30ffb3"
+dependencies = [
+ "byteorder",
+ "dynasm",
+ "fnv",
+ "memmap2",
+]
 
 [[package]]
 name = "either"
@@ -4780,6 +4808,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "479ca8adacdd7ce8f1fb39ce9ecccbfe93a3f1344b3d0d97f20bc0196208f62b"
 dependencies = [
  "proc-macro2",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "proc-macro-error-attr2"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96de42df36bb9bba5542fe9f1a054b8cc87e172759a1868aa05c1f3acc89dfc5"
+dependencies = [
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
+name = "proc-macro-error2"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11ec05c52be0a07b08061f7dd003e7d7092e0472bc731b4af7bb1ef876109802"
+dependencies = [
+ "proc-macro-error-attr2",
+ "proc-macro2",
+ "quote",
  "syn 2.0.117",
 ]
 
