@@ -921,6 +921,25 @@ incremental evaluation so they're fast enough for pre-commit use:
 - Incremental Datalog wiring can happen independently of new rules.
 - JIT fix is upstream; don't block anything on it.
 
+**Pillar 6 — Discoverability (minimize tool calls per query)**
+
+The goal: an agent or user should be able to answer "what does this do?" with one
+`normalize view` call, not a grep + read + read + read chain. Every extra round-trip
+is latency for humans and tokens for agents.
+
+- [ ] `normalize view <directory>` should surface `SUMMARY.md` content as a preamble
+  before the symbol list (opt-in via config, or on by default for directory views).
+  For `--json`, add a `"summary"` field. Agents get orientation + symbols in one call.
+- [ ] `normalize view <file>` should surface `//!` crate/module-level doc comments
+  (Rust) and equivalent in other languages. Same idea: docs and symbols together.
+- [ ] `rust/missing-module-doc` syntax rule — flag `lib.rs`/`mod.rs` files with no
+  `//!` inner doc comment. The idiomatic Rust equivalent of the SUMMARY.md rule; lives
+  in the code rather than a sidecar file.
+- [ ] Split `stale-summary` native rule into `missing-summary` (presence) and
+  `stale-summary` (freshness) so they can have independent severity levels. Add `paths`
+  glob config to each so enforcement depth is configurable (e.g. require at crate roots
+  but not in deep fixture dirs).
+
 **Not targeting 0.3.0:**
 - Full AST rewriting (tree-sitter edit API, round-trip fidelity)
 - Type-aware refactoring (normalize has no type resolver)
