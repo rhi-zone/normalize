@@ -573,7 +573,9 @@ pub fn run_rules_source(
     let program = Program::from_ast(ast).map_err(InterpretError::Parse)?;
 
     // Create engine, populate facts, and run to fixpoint.
+    // JIT is x86_64-only — aarch64 backend not yet available in ascent-interpreter.
     let mut engine = Engine::new(program);
+    #[cfg(target_arch = "x86_64")]
     engine
         .enable_jit()
         .map_err(|e| InterpretError::Parse(e.to_string()))?;
@@ -988,6 +990,7 @@ pub fn run_rules_batch(
         return Ok(Vec::new());
     }
 
+    #[cfg_attr(not(target_arch = "x86_64"), allow(unused_mut))]
     let mut shared_jit: Option<SharedJitCompiler> = None;
     let mut all_diagnostics = Vec::new();
 
@@ -999,6 +1002,7 @@ pub fn run_rules_batch(
 
         let mut engine = Engine::new(program);
 
+        #[cfg(target_arch = "x86_64")]
         match shared_jit.take() {
             Some(jit) => engine.set_jit_compiler(jit),
             None => engine
@@ -1012,7 +1016,10 @@ pub fn run_rules_batch(
             .map_err(|e| InterpretError::Eval(e.to_string()))?;
         engine.materialize();
 
-        shared_jit = engine.share_jit_compiler();
+        #[cfg(target_arch = "x86_64")]
+        {
+            shared_jit = engine.share_jit_compiler();
+        }
 
         let mut diagnostics = extract_diagnostics(&engine);
 
