@@ -113,15 +113,15 @@ if [ -z "$SKIP_INSTALL" ]; then
     chmod +x "$INSTALL_DIR/normalize"
 fi
 
-echo ""
-if [ -n "$EXISTING" ]; then
-    echo "Upgraded normalize $EXISTING → $VERSION at $INSTALL_DIR/normalize"
-else
-    echo "Installed normalize $TAG to $INSTALL_DIR/normalize"
-fi
+if [ -z "$SKIP_INSTALL" ]; then
+    echo ""
+    if [ -n "$EXISTING" ]; then
+        echo "Upgraded normalize $EXISTING → $VERSION at $INSTALL_DIR/normalize"
+    else
+        echo "Installed normalize $TAG to $INSTALL_DIR/normalize"
+    fi
 
-# Verify
-if command -v normalize >/dev/null 2>&1 || "$INSTALL_DIR/normalize" --version >/dev/null 2>&1; then
+    # Verify
     "$INSTALL_DIR/normalize" --version 2>/dev/null || true
 fi
 
