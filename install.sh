@@ -97,20 +97,21 @@ if [ -x "$INSTALL_DIR/normalize" ]; then
     EXISTING=$("$INSTALL_DIR/normalize" --version 2>/dev/null | awk '{print $2}' || true)
 fi
 if [ "$EXISTING" = "$VERSION" ]; then
-    echo "normalize $TAG is already installed. Nothing to do."
-    exit 0
+    echo "normalize $TAG is already installed."
+    SKIP_INSTALL=true
 fi
 
 # Install
-mkdir -p "$INSTALL_DIR"
-if [ -w "$INSTALL_DIR" ]; then
-    mv "$TMPWORK/normalize" "$INSTALL_DIR/normalize"
-else
-    echo "Installing to $INSTALL_DIR (requires sudo)..."
-    sudo mv "$TMPWORK/normalize" "$INSTALL_DIR/normalize"
+if [ -z "$SKIP_INSTALL" ]; then
+    mkdir -p "$INSTALL_DIR"
+    if [ -w "$INSTALL_DIR" ]; then
+        mv "$TMPWORK/normalize" "$INSTALL_DIR/normalize"
+    else
+        echo "Installing to $INSTALL_DIR (requires sudo)..."
+        sudo mv "$TMPWORK/normalize" "$INSTALL_DIR/normalize"
+    fi
+    chmod +x "$INSTALL_DIR/normalize"
 fi
-
-chmod +x "$INSTALL_DIR/normalize"
 
 echo ""
 if [ -n "$EXISTING" ]; then
