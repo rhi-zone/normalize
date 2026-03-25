@@ -849,8 +849,12 @@ impl NormalizeService {
     /// ratchet, budget), and fact rules engine in sequence. Returns a `CiReport` with grouped
     /// findings. Use `--strict` to treat warnings as errors; `--sarif` for GitHub Actions output.
     ///
+    /// If the structural index has not been built, fact rules are skipped with a warning
+    /// diagnostic rather than erroring out. Run `normalize structure rebuild` to build the index.
+    ///
     /// Examples:
     ///   normalize ci                           # run all engines, exit 1 on errors
+    ///   normalize ci --path src/               # scope run to a subdirectory
     ///   normalize ci --no-native               # skip native checks (stale-summary, ratchet, budget)
     ///   normalize ci --strict                  # treat warnings as errors
     ///   normalize ci --sarif                   # SARIF output for GitHub Actions annotations
@@ -868,13 +872,16 @@ impl NormalizeService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        #[param(help = "Maximum number of issues to show in detail (default: 50)")] _limit: Option<
+        #[param(short = 'p', help = "Scope run to this directory (relative to root)")] path: Option<
+            String,
+        >,
+        #[param(help = "Maximum number of issues to show in detail (default: 50)")] limit: Option<
             usize,
         >,
         pretty: bool,
         compact: bool,
     ) -> Result<commands::ci::CiReport, String> {
-        use normalize_output::diagnostics::DiagnosticsReport;
+        use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
         use normalize_rules::{
             RuleKind, apply_native_rules_config, load_rules_config, run_rules_report,
         };
@@ -888,6 +895,14 @@ impl NormalizeService {
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
         self.resolve_format(pretty, compact, &effective_root);
 
+        // Target scope: --path scopes runs to a subdirectory (defaults to project root).
+        let target_root = path
+            .as_deref()
+            .map(|p| effective_root.join(p))
+            .unwrap_or_else(|| effective_root.clone());
+
+        let _limit = limit.unwrap_or(50).min(10_000);
+
         let start = Instant::now();
         let mut merged = DiagnosticsReport::new();
         let mut engines_run: Vec<String> = Vec::new();
@@ -895,10 +910,11 @@ impl NormalizeService {
         // Syntax engine
         if !no_syntax {
             let root_clone = effective_root.clone();
+            let target_clone = target_root.clone();
             let config = load_rules_config(&root_clone);
             let report = tokio::task::spawn_blocking(move || {
                 run_rules_report(
-                    &root_clone,
+                    &target_clone,
                     &root_clone,
                     None,
                     None,
@@ -967,25 +983,51 @@ impl NormalizeService {
             engines_run.push("native".into());
         }
 
-        // Fact engine
+        // Fact engine — requires a built index. If the index does not exist, emit a warning
+        // diagnostic and skip rather than failing or auto-building (which can be slow in CI).
         if !no_fact {
-            let fact_root = effective_root.clone();
-            let config = load_rules_config(&fact_root);
-            let report = tokio::task::spawn_blocking(move || {
-                run_rules_report(
-                    &fact_root,
-                    &fact_root,
-                    None,
-                    None,
-                    &RuleKind::Fact,
-                    &[],
-                    &config,
-                )
-            })
-            .await
-            .map_err(|e| format!("Task error (fact): {e}"))?;
-            merged.merge(report);
-            engines_run.push("fact".into());
+            let normalize_dir = effective_root.join(".normalize");
+            let index_path = normalize_dir.join("index.sqlite");
+            if !index_path.exists() {
+                tracing::warn!(
+                    "fact rules skipped: index not built at {:?}; run `normalize structure rebuild`",
+                    index_path
+                );
+                merged.issues.push(Issue {
+                    rule_id: "ci/fact-rules-skipped".into(),
+                    file: ".normalize/index.sqlite".into(),
+                    line: None,
+                    column: None,
+                    end_line: None,
+                    end_column: None,
+                    message:
+                        "fact rules skipped: index not built — run `normalize structure rebuild`"
+                            .into(),
+                    severity: Severity::Warning,
+                    source: "ci".into(),
+                    related: Vec::new(),
+                    suggestion: Some("run `normalize structure rebuild` to build the index".into()),
+                });
+            } else {
+                let fact_root = effective_root.clone();
+                let target_clone = target_root.clone();
+                let config = load_rules_config(&fact_root);
+                let report = tokio::task::spawn_blocking(move || {
+                    run_rules_report(
+                        &target_clone,
+                        &fact_root,
+                        None,
+                        None,
+                        &RuleKind::Fact,
+                        &[],
+                        &config,
+                    )
+                })
+                .await
+                .map_err(|e| format!("Task error (fact): {e}"))?;
+                merged.merge(report);
+                engines_run.push("fact".into());
+            }
         }
 
         merged.sort();

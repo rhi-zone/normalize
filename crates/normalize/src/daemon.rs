@@ -624,12 +624,32 @@ impl DaemonServer {
                             }
 
                             let affected_vec: Vec<PathBuf> = affected.into_iter().collect();
-                            eprintln!(
-                                "[watch] {} changed, {} affected by dep tracking",
-                                changed.len(),
-                                affected_vec.len()
+                            tracing::info!(
+                                changed = changed.len(),
+                                affected = affected_vec.len(),
+                                root = ?root,
+                                "index refreshed"
                             );
                             watched.last_affected = affected_vec.clone();
+
+                            // TODO(incremental-datalog): wire fact-rule incremental eval here.
+                            //
+                            // When a rules-run is triggered after an index refresh, the daemon
+                            // should call:
+                            //
+                            //   normalize_rules::collect_fact_diagnostics_incremental(
+                            //       root,
+                            //       &config.rules,
+                            //       None,   // filter_ids
+                            //       None,   // filter_rule
+                            //       Some(&watched.last_affected),
+                            //   )
+                            //
+                            // The `last_affected` vec (changed files ∪ their reverse dependents)
+                            // is exactly the `changed_files` argument that drives retraction and
+                            // re-derivation in the incremental engine.  The engine cache is keyed
+                            // by `(root, rule_id)` and lives for the lifetime of the process, so
+                            // each watched root gets its own set of primed engines.
 
                             // Broadcast index-refresh event. SendError means no
                             // active subscribers -- that is fine.

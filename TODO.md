@@ -774,12 +774,14 @@ to depend on. The LSP is useful day-to-day.
 **Remaining before 0.2.0:**
 
 *LSP / index (from P0):*
-- [ ] Wire incremental Datalog evaluation: `run_rules_source_incremental()` exists in
-  `normalize-facts-rules-interpret` but is never called — every `normalize rules run --engine fact`
-  and `normalize ci` does full re-evaluation. Wire dirty-relation tracking so only facts for
-  changed files are re-derived. The daemon already tracks `last_affected` per file; the eval
-  API just needs a caller. **Release blocker: fact rules on a large repo are too slow for CI
-  without this.**
+- [x] Wire incremental Datalog evaluation: `CachedRuleEngine`, `prime_rule_engine`,
+  `run_rule_incremental`, and `run_rule_with_cache` added to `normalize-facts-rules-interpret`.
+  `collect_fact_diagnostics_incremental` in `normalize-rules/src/runner.rs` uses a process-level
+  `ENGINE_CACHE` (keyed by root + rule_id) to retract only changed-file facts and re-derive.
+  Daemon integration point documented with a TODO comment in `daemon.rs::refresh_root` pointing
+  to `collect_fact_diagnostics_incremental` with `Some(&watched.last_affected)`.
+  **Remaining:** wire daemon to call `collect_fact_diagnostics_incremental` after each index
+  refresh (see TODO comment in `daemon.rs`); fix JIT string comparison bug to make eval fast.
 - [ ] Fix JIT string comparison bug in ascent-interpreter and re-enable `SharedJitCompiler`
   in `run_rules_source` / `run_rules_batch`. **Release blocker: ascent-interpreter is our own
   project — this is fixable on our timeline. Incremental eval reduces re-derivation scope;

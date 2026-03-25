@@ -432,3 +432,8 @@ fn test_help_rules_update() {
 fn test_help_rules_remove() {
     insta::assert_snapshot!(snapshot_help(&["rules", "remove"]));
 }
+
+#[test]
+fn test_help_ci() {
+    insta::assert_snapshot!(snapshot_help(&["ci"]));
+}

@@ -1,0 +1,41 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+expression: "snapshot_help(&[\"ci\"])"
+---
+Run all configured quality checks and exit non-zero if any errors are found.
+
+Usage: normalize ci [OPTIONS]
+
+Options:
+      --no-syntax                  Skip syntax rules engine
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
+      --no-native                  Skip native rules engine (stale-summary, ratchet, budget)
+      --jsonl                      Output one JSON object per line (for arrays)
+      --no-fact                    Skip fact rules engine
+      --json                       Output machine-readable JSON
+      --strict                     Treat warnings as errors (exit 1 on any warning)
+      --jq <jq>                    Filter output through jq expression
+      --sarif                      Output in SARIF format for GitHub Actions
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+  -r, --root <root>                Root directory (defaults to current directory)
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+  -p, --path <path>                Scope run to this directory (relative to root)
+      --limit <limit>              Maximum number of issues to show in detail (default: 50)
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help
+
+Runs the syntax rules engine (tree-sitter queries), native rules engine (stale-summary,
+ratchet, budget), and fact rules engine in sequence. Returns a `CiReport` with grouped
+findings. Use `--strict` to treat warnings as errors; `--sarif` for GitHub Actions output.
+
+If the structural index has not been built, fact rules are skipped with a warning
+diagnostic rather than erroring out. Run `normalize structure rebuild` to build the index.
+
+Examples:
+normalize ci                           # run all engines, exit 1 on errors
+normalize ci --path src/               # scope run to a subdirectory
+normalize ci --no-native               # skip native checks (stale-summary, ratchet, budget)
+normalize ci --strict                  # treat warnings as errors
+normalize ci --sarif                   # SARIF output for GitHub Actions annotations
+normalize ci --json                    # structured JSON output

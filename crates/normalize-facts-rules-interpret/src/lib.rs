@@ -39,12 +39,13 @@
 //!   file = "" for no location; line = 0 when the source has no line info.
 
 use abi_stable::std_types::ROption;
-use ascent_interpreter::eval::{Engine, SharedJitCompiler, Value};
+use ascent_interpreter::eval::{Engine, SharedJitCompiler, SourceId, Value};
 use ascent_interpreter::ir::Program;
 use ascent_interpreter::syntax::AscentProgram;
 use glob::Pattern;
 use normalize_facts_rules_api::{Diagnostic, DiagnosticLevel, Relations};
 use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 /// Preamble declaring the built-in input relations.
@@ -615,6 +616,361 @@ pub fn run_rules_source_incremental(
     Ok(extract_diagnostics(engine))
 }
 
+// =============================================================================
+// Incremental evaluation: cached engine with source-tagged facts
+// =============================================================================
+
+/// A primed engine that supports incremental re-evaluation.
+///
+/// Holds an `Engine` whose input facts are tagged per source file so that facts
+/// for changed files can be retracted and re-inserted before calling
+/// [`run_incremental`](Engine::run_incremental).  The `rule_source_hash` field
+/// is used by callers to detect when the rule source has changed and the cache
+/// must be discarded.
+pub struct CachedRuleEngine {
+    /// The underlying interpreter engine, already primed with source-tagged facts.
+    pub engine: Engine,
+    /// Stable hash of the rule source string used to prime this engine.
+    /// If the `.dl` source changes, callers must discard the cache.
+    pub rule_source_hash: u64,
+}
+
+impl CachedRuleEngine {
+    /// Compute a stable hash of a rule source string.
+    pub fn hash_source(source: &str) -> u64 {
+        let mut h = DefaultHasher::new();
+        source.hash(&mut h);
+        h.finish()
+    }
+}
+
+/// Prime an engine for a rule, populating all facts with per-file source tags.
+///
+/// Runs a full evaluation and returns a `CachedRuleEngine` ready for subsequent
+/// incremental re-evaluations via [`run_rule_incremental`].
+pub fn prime_rule_engine(
+    rule: &FactsRule,
+    relations: &Relations,
+) -> Result<CachedRuleEngine, InterpretError> {
+    let full_source = format!("{}\n{}", PREAMBLE, &rule.source);
+    let ast: AscentProgram =
+        syn::parse_str(&full_source).map_err(|e| InterpretError::Parse(e.to_string()))?;
+    let program = Program::from_ast(ast).map_err(InterpretError::Parse)?;
+
+    let mut engine = Engine::new(program);
+    populate_facts_with_sources(&mut engine, relations)?;
+    engine
+        .run()
+        .map_err(|e| InterpretError::Eval(e.to_string()))?;
+    engine.materialize();
+
+    Ok(CachedRuleEngine {
+        engine,
+        rule_source_hash: CachedRuleEngine::hash_source(&rule.source),
+    })
+}
+
+/// Run a rule incrementally against a cached engine.
+///
+/// `changed_files` are the relative file paths whose facts have changed (added,
+/// modified, or deleted).  For each changed file this function:
+/// 1. Retracts all facts tagged with that file's source ID.
+/// 2. Re-inserts the file's current facts from `new_relations`, tagged with its source ID.
+///
+/// Then calls [`Engine::run_incremental`] over the affected input relations.
+///
+/// The set of "dirty" input relations is inferred by inspecting which fact
+/// types have rows referencing any of the changed files.  The set of
+/// "retracted" relations is always a superset of dirty (since we always retract
+/// before re-inserting), so retracted == dirty.
+///
+/// Returns diagnostics from the incremental re-evaluation.
+pub fn run_rule_incremental(
+    cached: &mut CachedRuleEngine,
+    new_relations: &Relations,
+    changed_files: &[&str],
+) -> Result<Vec<Diagnostic>, InterpretError> {
+    if changed_files.is_empty() {
+        // Nothing changed — return existing diagnostics without re-running.
+        return Ok(extract_diagnostics(&cached.engine));
+    }
+
+    let changed_set: std::collections::HashSet<&str> = changed_files.iter().copied().collect();
+
+    // Retract all facts for the changed files.
+    let mut sources_to_retract: Vec<SourceId> = Vec::new();
+    for file in changed_files {
+        let source_id = cached.engine.intern_source(file);
+        sources_to_retract.push(source_id);
+    }
+    cached.engine.retract_sources(sources_to_retract);
+
+    // Track which input relations received new facts for any changed file.
+    let mut dirty_input_relations: std::collections::HashSet<&'static str> =
+        std::collections::HashSet::new();
+
+    // Re-insert facts for changed files only (inline loops, no closures to avoid lifetime issues).
+    for s in new_relations.symbols.iter() {
+        if changed_set.contains(s.file.as_str()) {
+            let sid = cached.engine.intern_source(s.file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "symbol",
+                    vec![
+                        Value::string(&s.file),
+                        Value::string(&s.name),
+                        Value::string(&s.kind),
+                        Value::U32(s.line),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("symbol");
+        }
+    }
+    for s in new_relations.imports.iter() {
+        if changed_set.contains(s.from_file.as_str()) {
+            let sid = cached.engine.intern_source(s.from_file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "import",
+                    vec![
+                        Value::string(&s.from_file),
+                        Value::string(&s.module_specifier),
+                        Value::string(&s.name),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("import");
+        }
+    }
+    for s in new_relations.calls.iter() {
+        if changed_set.contains(s.caller_file.as_str()) {
+            let sid = cached.engine.intern_source(s.caller_file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "call",
+                    vec![
+                        Value::string(&s.caller_file),
+                        Value::string(&s.caller_name),
+                        Value::string(&s.callee_name),
+                        Value::U32(s.line),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("call");
+        }
+    }
+    for s in new_relations.visibilities.iter() {
+        if changed_set.contains(s.file.as_str()) {
+            let sid = cached.engine.intern_source(s.file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "visibility",
+                    vec![
+                        Value::string(&s.file),
+                        Value::string(&s.name),
+                        Value::string(&s.visibility),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("visibility");
+        }
+    }
+    for s in new_relations.attributes.iter() {
+        if changed_set.contains(s.file.as_str()) {
+            let sid = cached.engine.intern_source(s.file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "attribute",
+                    vec![
+                        Value::string(&s.file),
+                        Value::string(&s.name),
+                        Value::string(&s.attribute),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("attribute");
+        }
+    }
+    for s in new_relations.parents.iter() {
+        if changed_set.contains(s.file.as_str()) {
+            let sid = cached.engine.intern_source(s.file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "parent",
+                    vec![
+                        Value::string(&s.file),
+                        Value::string(&s.child_name),
+                        Value::string(&s.parent_name),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("parent");
+        }
+    }
+    for s in new_relations.qualifiers.iter() {
+        if changed_set.contains(s.caller_file.as_str()) {
+            let sid = cached.engine.intern_source(s.caller_file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "qualifier",
+                    vec![
+                        Value::string(&s.caller_file),
+                        Value::string(&s.caller_name),
+                        Value::string(&s.callee_name),
+                        Value::string(&s.qualifier),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("qualifier");
+        }
+    }
+    for s in new_relations.symbol_ranges.iter() {
+        if changed_set.contains(s.file.as_str()) {
+            let sid = cached.engine.intern_source(s.file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "symbol_range",
+                    vec![
+                        Value::string(&s.file),
+                        Value::string(&s.name),
+                        Value::U32(s.start_line),
+                        Value::U32(s.end_line),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("symbol_range");
+        }
+    }
+    for s in new_relations.implements.iter() {
+        if changed_set.contains(s.file.as_str()) {
+            let sid = cached.engine.intern_source(s.file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "implements",
+                    vec![
+                        Value::string(&s.file),
+                        Value::string(&s.name),
+                        Value::string(&s.interface),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("implements");
+        }
+    }
+    for s in new_relations.is_impls.iter() {
+        if changed_set.contains(s.file.as_str()) {
+            let sid = cached.engine.intern_source(s.file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "is_impl",
+                    vec![Value::string(&s.file), Value::string(&s.name)],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("is_impl");
+        }
+    }
+    for s in new_relations.type_methods.iter() {
+        if changed_set.contains(s.file.as_str()) {
+            let sid = cached.engine.intern_source(s.file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "type_method",
+                    vec![
+                        Value::string(&s.file),
+                        Value::string(&s.type_name),
+                        Value::string(&s.method_name),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("type_method");
+        }
+    }
+    // All dirty input relations are also retracted (we retracted + re-inserted).
+    let dirty_vec: Vec<&str> = dirty_input_relations.iter().copied().collect();
+    cached
+        .engine
+        .run_incremental(&dirty_vec, &dirty_vec)
+        .map_err(|e| InterpretError::Eval(e.to_string()))?;
+    cached.engine.materialize();
+
+    Ok(extract_diagnostics(&cached.engine))
+}
+
+/// Run a FactsRule with a cached engine, using incremental evaluation when possible.
+///
+/// On the first call (or when the cache is `None`), performs a full evaluation via
+/// [`prime_rule_engine`] and stores the result in `*cached_engine`.
+///
+/// On subsequent calls with a warm cache, delegates to [`run_rule_incremental`]
+/// if `changed_files` is non-empty.  If `changed_files` is empty the cached
+/// diagnostics are returned directly without re-running the engine.
+///
+/// If the rule source has changed since the engine was primed (detected via hash),
+/// the cache is discarded and a full re-evaluation is performed.
+///
+/// `changed_files` are relative file paths (the same strings used as keys in the
+/// index).  Pass an empty slice to skip incremental eval and return cached results.
+pub fn run_rule_with_cache(
+    cached_engine: &mut Option<CachedRuleEngine>,
+    rule: &FactsRule,
+    relations: &Relations,
+    changed_files: &[&str],
+) -> Result<Vec<Diagnostic>, InterpretError> {
+    let expected_hash = CachedRuleEngine::hash_source(&rule.source);
+
+    // Discard stale cache when rule source changed.
+    if let Some(cached) = cached_engine.as_ref()
+        && cached.rule_source_hash != expected_hash
+    {
+        tracing::debug!(
+            rule_id = %rule.id,
+            "rule source changed — discarding engine cache"
+        );
+        *cached_engine = None;
+    }
+
+    if cached_engine.is_none() {
+        // Cold path: prime the engine with a full evaluation.
+        tracing::debug!(rule_id = %rule.id, "priming incremental engine (full eval)");
+        let primed = prime_rule_engine(rule, relations)?;
+        let diagnostics = extract_diagnostics(&primed.engine);
+        *cached_engine = Some(primed);
+        return Ok(diagnostics);
+    }
+
+    // Warm path: incremental re-evaluation.
+    let cached = cached_engine.as_mut().unwrap();
+    tracing::debug!(
+        rule_id = %rule.id,
+        changed = changed_files.len(),
+        "running incremental Datalog eval"
+    );
+    run_rule_incremental(cached, relations, changed_files)
+}
+
 /// Run multiple rules against the same relations, sharing a single JIT compiler.
 ///
 /// For the batch path (running all rules against the same index snapshot), this
@@ -699,6 +1055,172 @@ pub fn run_rules_batch(
     }
 
     Ok(all_diagnostics)
+}
+
+/// Populate the engine with facts from Relations, tagging each fact with a per-file source ID.
+///
+/// Used by [`prime_rule_engine`] to enable source-based retraction for incremental evaluation.
+/// Each fact's file path is interned as a source name so that facts for a changed file can be
+/// retracted with [`Engine::retract_sources`] before re-inserting the updated facts.
+fn populate_facts_with_sources(
+    engine: &mut Engine,
+    relations: &Relations,
+) -> Result<(), InterpretError> {
+    for s in relations.symbols.iter() {
+        let sid = engine.intern_source(s.file.as_str());
+        engine
+            .insert_with_source(
+                "symbol",
+                vec![
+                    Value::string(&s.file),
+                    Value::string(&s.name),
+                    Value::string(&s.kind),
+                    Value::U32(s.line),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for s in relations.imports.iter() {
+        let sid = engine.intern_source(s.from_file.as_str());
+        engine
+            .insert_with_source(
+                "import",
+                vec![
+                    Value::string(&s.from_file),
+                    Value::string(&s.module_specifier),
+                    Value::string(&s.name),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for s in relations.calls.iter() {
+        let sid = engine.intern_source(s.caller_file.as_str());
+        engine
+            .insert_with_source(
+                "call",
+                vec![
+                    Value::string(&s.caller_file),
+                    Value::string(&s.caller_name),
+                    Value::string(&s.callee_name),
+                    Value::U32(s.line),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for s in relations.visibilities.iter() {
+        let sid = engine.intern_source(s.file.as_str());
+        engine
+            .insert_with_source(
+                "visibility",
+                vec![
+                    Value::string(&s.file),
+                    Value::string(&s.name),
+                    Value::string(&s.visibility),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for s in relations.attributes.iter() {
+        let sid = engine.intern_source(s.file.as_str());
+        engine
+            .insert_with_source(
+                "attribute",
+                vec![
+                    Value::string(&s.file),
+                    Value::string(&s.name),
+                    Value::string(&s.attribute),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for s in relations.parents.iter() {
+        let sid = engine.intern_source(s.file.as_str());
+        engine
+            .insert_with_source(
+                "parent",
+                vec![
+                    Value::string(&s.file),
+                    Value::string(&s.child_name),
+                    Value::string(&s.parent_name),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for s in relations.qualifiers.iter() {
+        let sid = engine.intern_source(s.caller_file.as_str());
+        engine
+            .insert_with_source(
+                "qualifier",
+                vec![
+                    Value::string(&s.caller_file),
+                    Value::string(&s.caller_name),
+                    Value::string(&s.callee_name),
+                    Value::string(&s.qualifier),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for s in relations.symbol_ranges.iter() {
+        let sid = engine.intern_source(s.file.as_str());
+        engine
+            .insert_with_source(
+                "symbol_range",
+                vec![
+                    Value::string(&s.file),
+                    Value::string(&s.name),
+                    Value::U32(s.start_line),
+                    Value::U32(s.end_line),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for s in relations.implements.iter() {
+        let sid = engine.intern_source(s.file.as_str());
+        engine
+            .insert_with_source(
+                "implements",
+                vec![
+                    Value::string(&s.file),
+                    Value::string(&s.name),
+                    Value::string(&s.interface),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for s in relations.is_impls.iter() {
+        let sid = engine.intern_source(s.file.as_str());
+        engine
+            .insert_with_source(
+                "is_impl",
+                vec![Value::string(&s.file), Value::string(&s.name)],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for s in relations.type_methods.iter() {
+        let sid = engine.intern_source(s.file.as_str());
+        engine
+            .insert_with_source(
+                "type_method",
+                vec![
+                    Value::string(&s.file),
+                    Value::string(&s.type_name),
+                    Value::string(&s.method_name),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    Ok(())
 }
 
 /// Populate the engine with facts from Relations.

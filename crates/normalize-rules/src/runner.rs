@@ -6,6 +6,42 @@ use normalize_syntax_rules::{self, DebugFlags};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
+
+// =============================================================================
+// Process-level incremental engine cache
+// =============================================================================
+
+/// Safety wrapper that makes `CachedRuleEngine` usable in a `static Mutex`.
+///
+/// `Engine` contains JIT-compiled raw pointers (`*mut PackedJitContextV3`) that are
+/// not `Send`.  The `Mutex` guarantees exclusive access, so no data races are possible —
+/// we just have to tell the compiler it is safe to move the value across threads.
+struct SendableEngine(interpret::CachedRuleEngine);
+
+// SAFETY: access is serialized by the surrounding Mutex; no data races are possible.
+unsafe impl Send for SendableEngine {}
+
+/// Process-level cache mapping `"{canonical_root}::{rule_id}"` → `CachedRuleEngine`.
+///
+/// This enables incremental Datalog evaluation across successive invocations of
+/// `normalize rules run --engine fact` within the same process (daemon or long-running
+/// CLI session).  Each rule gets its own primed engine so retraction and re-derivation
+/// are scoped to the files that actually changed.
+///
+/// Cache invalidation is handled inside [`interpret::run_rule_with_cache`] via the
+/// `rule_source_hash` field: if a `.dl` file changes, the hash no longer matches and
+/// the entry is discarded before performing a fresh full evaluation.
+static ENGINE_CACHE: OnceLock<Mutex<HashMap<String, SendableEngine>>> = OnceLock::new();
+
+fn engine_cache() -> &'static Mutex<HashMap<String, SendableEngine>> {
+    ENGINE_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Build the cache key for a given project root + rule ID.
+fn engine_cache_key(root: &Path, rule_id: &str) -> String {
+    format!("{}::{}", root.to_string_lossy(), rule_id)
+}
 
 /// Rule type filter for list/run commands.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
@@ -997,11 +1033,34 @@ pub fn list_tags(
 }
 
 /// Collect fact rule diagnostics without printing (returns raw diagnostics).
+///
+/// Performs a full evaluation via [`interpret::run_rules_batch`]. For the incremental
+/// path (daemon/LSP), use [`collect_fact_diagnostics_incremental`] instead.
 pub async fn collect_fact_diagnostics(
     root: &Path,
     config: &RulesConfig,
     filter_ids: Option<&HashSet<String>>,
     filter_rule: Option<&str>,
+) -> Vec<normalize_facts_rules_api::Diagnostic> {
+    collect_fact_diagnostics_incremental(root, config, filter_ids, filter_rule, None).await
+}
+
+/// Collect fact rule diagnostics with optional incremental evaluation.
+///
+/// `changed_files` is a slice of relative file paths (e.g. `["src/foo.rs"]`) whose
+/// index facts have changed since the last call.  When `Some`, the process-level
+/// engine cache is consulted: each rule's engine is primed on the first call and
+/// only the strata affected by the changed files are re-derived on subsequent calls.
+///
+/// Pass `None` for `changed_files` to bypass the cache and do a fresh full evaluation.
+/// This is the correct choice for one-shot CLI invocations where no previous engine
+/// state is available or relevant.
+pub async fn collect_fact_diagnostics_incremental(
+    root: &Path,
+    config: &RulesConfig,
+    filter_ids: Option<&HashSet<String>>,
+    filter_rule: Option<&str>,
+    changed_files: Option<&[PathBuf]>,
 ) -> Vec<normalize_facts_rules_api::Diagnostic> {
     let all_rules_unfiltered = interpret::load_all_rules(root, config);
     let all_rules: Vec<_> = all_rules_unfiltered
@@ -1018,19 +1077,95 @@ pub async fn collect_fact_diagnostics(
     let relations = match ensure_relations(root).await {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("Error building relations: {}", e);
+            tracing::warn!("failed to build relations for fact rules: {}", e);
             return Vec::new();
         }
     };
 
-    let rule_refs: Vec<&interpret::FactsRule> = all_rules.iter().collect();
-    let mut all_diagnostics = match interpret::run_rules_batch(&rule_refs, &relations) {
-        Ok(diagnostics) => diagnostics,
-        Err(e) => {
-            eprintln!("Error running fact rules batch: {}", e);
-            Vec::new()
+    let mut all_diagnostics: Vec<normalize_facts_rules_api::Diagnostic> = Vec::new();
+
+    if let Some(changed) = changed_files {
+        // Incremental path: use per-rule cached engines.
+        let changed_strs: Vec<&str> = changed
+            .iter()
+            .map(|p| p.to_str().unwrap_or(""))
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error
+        let mut cache = engine_cache().lock().unwrap();
+
+        for rule in &all_rules {
+            let cache_key = engine_cache_key(root, &rule.id);
+            // Remove from map so we can take ownership and pass &mut Option.
+            let mut cached_engine: Option<interpret::CachedRuleEngine> =
+                cache.remove(&cache_key).map(|s| s.0);
+
+            let mut diagnostics = match interpret::run_rule_with_cache(
+                &mut cached_engine,
+                rule,
+                &relations,
+                &changed_strs,
+            ) {
+                Ok(d) => d,
+                Err(e) => {
+                    tracing::warn!(rule_id = %rule.id, "incremental fact rule failed: {}", e);
+                    // Put the cache entry back even on error to avoid losing the primed engine.
+                    if let Some(engine) = cached_engine {
+                        cache.insert(cache_key, SendableEngine(engine));
+                    }
+                    continue;
+                }
+            };
+
+            // Store the (potentially newly primed) engine back in the cache.
+            if let Some(engine) = cached_engine {
+                cache.insert(cache_key, SendableEngine(engine));
+            }
+
+            // Apply per-rule allow patterns and severity (mirrors run_rules_batch logic).
+            if !rule.allow.is_empty() {
+                use abi_stable::std_types::ROption;
+                diagnostics.retain(|d| {
+                    let match_str = match d.location.as_ref() {
+                        ROption::RSome(loc) => loc.file.as_str(),
+                        ROption::RNone => d.message.as_str(),
+                    };
+                    !rule.allow.iter().any(|p| p.matches(match_str))
+                });
+            }
+            use normalize_facts_rules_api::DiagnosticLevel;
+            use normalize_rules_config::Severity;
+            match rule.severity {
+                Severity::Error => {
+                    for d in &mut diagnostics {
+                        d.level = DiagnosticLevel::Error;
+                    }
+                }
+                Severity::Info | Severity::Hint => {
+                    for d in &mut diagnostics {
+                        if d.level == DiagnosticLevel::Warning {
+                            d.level = DiagnosticLevel::Hint;
+                        }
+                    }
+                }
+                Severity::Warning => {}
+            }
+
+            all_diagnostics.extend(diagnostics);
         }
-    };
+        // Cache mutex released here when `cache` drops.
+    } else {
+        // Full-evaluation path (no incremental cache): original batch behavior.
+        let rule_refs: Vec<&interpret::FactsRule> = all_rules.iter().collect();
+        all_diagnostics = match interpret::run_rules_batch(&rule_refs, &relations) {
+            Ok(diagnostics) => diagnostics,
+            Err(e) => {
+                tracing::warn!("fact rules batch failed: {}", e);
+                Vec::new()
+            }
+        };
+    }
 
     interpret::filter_inline_allowed(&mut all_diagnostics, root);
     all_diagnostics
