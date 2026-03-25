@@ -20,11 +20,15 @@ if [ -x "./target/debug/normalize" ] || [ -x "./target/release/normalize" ]; the
     [ -x "$NORMALIZE" ] || NORMALIZE="./target/release/normalize"
 
     if [ -x "$NORMALIZE" ]; then
-        # All rule engines: syntax, native (SUMMARY.md, broken refs, etc.), fact (if index ready).
+        # Run syntax + native engines (SUMMARY.md staleness, broken refs, etc.).
         # severity=error issues block commits; warnings are informational.
         # Use `normalize rules run --limit 0` to see full list.
-        echo "Running normalize rules..."
-        $NORMALIZE rules run
+        # NOTE: --type fact is skipped here due to a known malloc crash in the fact
+        # engine (heap corruption in ascent-interpreter / abi_stable dylib boundary).
+        # Tracked as a 0.3.0 bug; re-enable once fixed.
+        echo "Running normalize rules (syntax + native)..."
+        $NORMALIZE rules run --type syntax
+        $NORMALIZE rules run --type native
     fi
 fi
 
