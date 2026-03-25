@@ -45,6 +45,7 @@ members = [
     "crates/normalize-rules",
     "crates/normalize-rules-config",
     "xtask",
+    "benches",
 ]
 
 [workspace.package]

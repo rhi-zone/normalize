@@ -1,0 +1,24 @@
+[package]
+name = "normalize-bench"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[[bench]]
+name = "structure_rebuild"
+harness = false
+
+[[bench]]
+name = "rules_runner"
+harness = false
+
+[[bench]]
+name = "cli_commands"
+harness = false
+
+[dependencies]
+criterion = { version = "0.5", features = ["async_tokio"] }
+normalize-facts = { path = "../crates/normalize-facts" }
+normalize-rules = { path = "../crates/normalize-rules" }
+tokio = { version = "1", features = ["full"] }
+tempfile = "3"

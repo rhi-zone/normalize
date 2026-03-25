@@ -844,9 +844,9 @@ the default path.
 Before optimizing, measure. We have no perf benchmarks and no memory budget. The malloc
 crash in the pre-commit hook is a warning sign.
 
-- [ ] Establish wall-clock benchmarks for the hot paths: `structure rebuild`, `rules run`,
+- [x] Establish wall-clock benchmarks for the hot paths: `structure rebuild`, `rules run`,
   `view`, `rank`. Run against a mid-size real repo (normalize itself is a good target).
-  Track in CI so regressions are caught.
+  Track in CI so regressions are caught. (`benches/` crate added with criterion; baseline TBD values in `docs/perf-baseline.md`)
 - [ ] Profile memory usage of a full `structure rebuild` and `rules run --engine fact` on
   normalize. Identify the top allocators. The pre-commit malloc crash suggests at least one
   path has unbounded allocation.
