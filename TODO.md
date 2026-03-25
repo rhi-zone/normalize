@@ -813,12 +813,31 @@ to depend on. The LSP is useful day-to-day.
 
 ---
 
-### 0.3.0 — "Understand and refactor"
+### 0.3.0 — "Understand and refactor, fast"
 
 **Theme:** normalize becomes the tool you reach for when you need to understand a codebase
 and make a cross-cutting change safely. The index is no longer just for analysis — it backs
 precise multi-file edits. Linting grows a semantic tier (18 fact rules already exist; the
-gap is polish + new rules, not infrastructure).
+gap is polish + new rules, not infrastructure). Everything is incremental: no cold rebuilds,
+no full re-evaluations on every invocation.
+
+**Pillar 4 — Incremental everything**
+
+The daemon is running but CLI invocations don't route through it — every `normalize rules run`
+is a cold eval, every `structure rebuild` re-indexes the world. The goal: make the fast path
+the default path.
+
+- [ ] **Incremental index** — on `structure rebuild`, only re-index files changed since the
+  last build (mtime/hash based). Full rebuild only when schema changes or forced with `--full`.
+- [ ] **CLI → daemon routing** — `normalize rules run` (and `normalize ci`) should talk to
+  the running daemon and get the pre-warmed Datalog cache instead of cold-evaluating. If no
+  daemon is running, fall back to cold eval transparently.
+- [ ] **Incremental syntax rules** — currently no incremental path; only re-run queries on
+  files that changed since last run. Cache results keyed by file hash.
+- [ ] **Incremental native rules** — stale-summary, broken-ref, ratchet, budget checks should
+  skip files whose content and deps haven't changed.
+- [ ] **Persistent query cache** — store per-file tree-sitter query results in the SQLite index
+  so repeated `normalize view`, `normalize rank`, etc. don't re-parse unchanged files.
 
 **Current state (post-0.2.0 audit):**
 - `normalize view` already has full graph navigation: `referenced-by`, `references`,
