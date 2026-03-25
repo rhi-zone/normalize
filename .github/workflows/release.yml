@@ -185,12 +185,6 @@ jobs:
             sudo mv normalize /usr/local/bin/
             ```
 
-            **macOS (Intel)**
-            ```bash
-            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/normalize-x86_64-apple-darwin.tar.gz | tar xz
-            sudo mv normalize /usr/local/bin/
-            ```
-
             **Windows**
             Download `normalize-x86_64-pc-windows-msvc.zip` and extract to your PATH.
 
