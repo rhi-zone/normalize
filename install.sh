@@ -118,7 +118,7 @@ case ":$PATH:" in
         echo "NOTE: $INSTALL_DIR is not in your PATH."
         case "${SHELL##*/}" in
             fish)
-                echo "Run (>> appends, never use >):"
+                echo "Run:"
                 echo "  fish_add_path $INSTALL_DIR"
                 ;;
             zsh)
