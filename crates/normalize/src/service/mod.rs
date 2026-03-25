@@ -252,7 +252,7 @@ impl OutputFormatter for TranslateReport {
 
 #[cli(
     name = "normalize",
-    description = "Fast code intelligence CLI",
+    description = "Structural code intelligence: index symbols and calls, enforce rules, track complexity.",
     defaults = "config_defaults",
     global = [
         pretty = "Human-friendly output with colors and formatting",
