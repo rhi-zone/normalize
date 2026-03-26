@@ -65,6 +65,10 @@ Baseline audit in `docs/agent-ux-audit.md` (2026-03-21) covers 12 commands acros
 - [x] Run full audit pass over all ~30+ subcommands — Pass 2 committed 2026-03-26, 37 commands evaluated
 - [ ] Re-run multi-model audit after fixes to verify improvement
 
+### `normalize grep` path scoping
+
+`normalize grep` should accept an optional positional path argument to scope the search to a directory or file — same as `normalize view <path>`. Currently documented in help examples but not implemented (`--root` is the workaround). Fix: add `path: Option<String>` positional param, use it as the search root when provided.
+
 ### ~~Main Crate Responsibility Boundaries~~ (audited 2026-03-15 — no action needed)
 
 Crate split is correct. All 38 published crates justified. No reusable logic trapped in `normalize`; no unjustified extractions. Single-consumer domain libraries (graph, scope, edit, deps, etc.) are correctly placed — the test is "CLI wiring vs. domain logic", not "has 2+ consumers". Revisit only if a concrete second consumer appears for a specific module.
