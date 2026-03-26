@@ -726,6 +726,7 @@ to depend on. The LSP is useful day-to-day.
 *CLI surface (from P1):*
 - [x] `view` refactor phase 1: graph navigation + history as subcommands — done 2026-03-16
 - [x] `view` refactor phase 2: dissolve `ViewOutput` enum into `ViewReport` + `view list` — done 2026-03-16
+- [x] `normalize view <file>` surfaces module-level doc comments as preamble — Rust `//!`, Python docstrings, Go package comments, JS/TS JSDoc, Ruby leading `#` — done 2026-03-26
 
 *CI readiness (from P1 — see "CI readiness" section above):*
 - [x] `normalize ci` command — `--no-syntax/native/fact`, `--strict`, `--sarif`, `-p <path>`, graceful index-not-built handling

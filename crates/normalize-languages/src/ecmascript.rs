@@ -352,3 +352,28 @@ fn collect_import_names(import_clause: &Node, content: &str, names: &mut Vec<Str
         }
     }
 }
+
+/// Extract the file-level JSDoc comment from JavaScript/TypeScript source.
+///
+/// Looks for a `/** ... */` block comment at the very top of the file
+/// (after optional shebang or blank lines). The comment must start with `/**`
+/// to qualify as JSDoc. Regular `/* ... */` comments without the double `*`
+/// are not extracted.
+pub fn extract_js_module_doc(src: &str) -> Option<String> {
+    // Skip shebang line if present
+    let trimmed = if src.starts_with("#!") {
+        src[src.find('\n').map(|i| i + 1).unwrap_or(src.len())..].trim_start()
+    } else {
+        src.trim_start()
+    };
+
+    // Must start with `/**` (JSDoc), not just `/*`
+    if !trimmed.starts_with("/**") {
+        return None;
+    }
+
+    let end = trimmed.find("*/")?;
+    let block = &trimmed[..end + 2];
+    let doc = clean_block_doc_comment(block);
+    if doc.is_empty() { None } else { Some(doc) }
+}

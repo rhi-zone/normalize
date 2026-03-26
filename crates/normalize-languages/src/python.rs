@@ -229,6 +229,10 @@ impl Language for Python {
         &["**/test_*.py", "**/*_test.py"]
     }
 
+    fn extract_module_doc(&self, src: &str) -> Option<String> {
+        extract_python_module_doc(src)
+    }
+
     fn body_has_docstring(&self, body: &Node, content: &str) -> bool {
         let _ = content;
         body.child(0)
@@ -316,6 +320,48 @@ impl Language for Python {
 }
 
 impl LanguageSymbols for Python {}
+
+/// Extract the module-level docstring from Python source.
+///
+/// Skips shebang lines and coding-declaration comments, then looks for a
+/// triple-quoted string as the first non-comment, non-blank content.
+fn extract_python_module_doc(src: &str) -> Option<String> {
+    let mut lines = src.lines().peekable();
+    // Skip shebang and coding comments (PEP 263)
+    loop {
+        match lines.peek() {
+            Some(line) => {
+                let t = line.trim();
+                if t.starts_with("#!") || t.starts_with("# -*-") || t.starts_with("# coding") {
+                    lines.next();
+                } else {
+                    break;
+                }
+            }
+            None => return None,
+        }
+    }
+    let remaining: String = lines.collect::<Vec<_>>().join("\n");
+    let trimmed = remaining.trim_start();
+
+    // Must start with triple-quote string
+    let (quote, rest) = if let Some(rest) = trimmed.strip_prefix("\"\"\"") {
+        ("\"\"\"", rest)
+    } else if let Some(rest) = trimmed.strip_prefix("'''") {
+        ("'''", rest)
+    } else {
+        return None;
+    };
+
+    // Find the closing triple-quote
+    let end = rest.find(quote)?;
+    let doc = rest[..end].trim();
+    if doc.is_empty() {
+        None
+    } else {
+        Some(doc.to_string())
+    }
+}
 
 /// Extract a Python docstring from a function or class body.
 ///

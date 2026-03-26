@@ -247,6 +247,23 @@ pub trait Language: Send + Sync {
         None
     }
 
+    // === Module-level documentation ===
+
+    /// Extract the module-level doc comment from raw file source.
+    ///
+    /// Called when viewing a file (not a specific symbol) to populate `ViewReport.summary`.
+    /// Returns `None` if this language has no module-doc convention or the file has none.
+    ///
+    /// Conventions by language:
+    /// - Rust: leading `//!` inner-doc comment lines
+    /// - Python: first statement is a string literal (`"""..."""`)
+    /// - Go: line comment(s) immediately before `package foo`
+    /// - JavaScript/TypeScript: leading `/** ... */` block comment at top of file
+    /// - Ruby: leading `#` comment block (ignoring `# frozen_string_literal` lines)
+    fn extract_module_doc(&self, _src: &str) -> Option<String> {
+        None
+    }
+
     // === Helpers ===
 
     /// Get the name of a node (typically via "name" field)

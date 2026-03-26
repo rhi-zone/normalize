@@ -159,6 +159,10 @@ impl Language for Ruby {
     ) -> Option<ContainerBody> {
         crate::body::analyze_end_body(body_node, content, inner_indent)
     }
+
+    fn extract_module_doc(&self, src: &str) -> Option<String> {
+        extract_ruby_module_doc(src)
+    }
 }
 
 impl LanguageSymbols for Ruby {}
@@ -167,7 +171,6 @@ impl LanguageSymbols for Ruby {}
 ///
 /// Collects leading `#` comment lines, skipping `# frozen_string_literal` and
 /// similar magic comment lines (which appear before actual doc comments).
-#[allow(dead_code)]
 fn extract_ruby_module_doc(src: &str) -> Option<String> {
     let mut lines = Vec::new();
     let mut past_magic = false;

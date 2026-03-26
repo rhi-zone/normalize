@@ -42,7 +42,7 @@ pub struct ViewReport {
     /// Warnings about unsupported features or missing capabilities
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
-    /// Contents of SUMMARY.md for directory views (None if absent)
+    /// Module-level doc comment (for file views) or SUMMARY.md contents (for dir views)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
 }
@@ -183,7 +183,11 @@ fn render_file_report(report: &ViewReport, opts: &FormatOptions) -> String {
             text.push('\n');
         }
     }
-    text
+    if let Some(summary) = &report.summary {
+        format!("{}\n\n{}", summary.trim_end(), text)
+    } else {
+        text
+    }
 }
 
 fn render_symbol_report(report: &ViewReport, use_colors: bool) -> String {

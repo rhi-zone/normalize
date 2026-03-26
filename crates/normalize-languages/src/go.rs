@@ -150,6 +150,10 @@ impl Language for Go {
         &["**/*_test.go"]
     }
 
+    fn extract_module_doc(&self, src: &str) -> Option<String> {
+        extract_go_package_doc(src)
+    }
+
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")
     }
@@ -165,6 +169,54 @@ impl Language for Go {
 }
 
 impl LanguageSymbols for Go {}
+
+/// Extract the Go package comment from source.
+///
+/// The Go convention is a block of `//` comments immediately before
+/// the `package` keyword. Scans backwards from the `package` line.
+/// A blank line between the comment and `package` means it is NOT a doc comment.
+fn extract_go_package_doc(src: &str) -> Option<String> {
+    let lines: Vec<&str> = src.lines().collect();
+    // Find the package declaration line
+    let pkg_idx = lines.iter().position(|l| {
+        let t = l.trim();
+        t.starts_with("package ") || t == "package"
+    })?;
+
+    // A blank line immediately before package means no doc comment
+    if pkg_idx > 0 && lines[pkg_idx - 1].trim().is_empty() {
+        return None;
+    }
+
+    // Collect comment lines immediately preceding the package line
+    let mut doc_lines: Vec<&str> = Vec::new();
+    let mut idx = pkg_idx;
+    while idx > 0 {
+        idx -= 1;
+        let t = lines[idx].trim();
+        if t.starts_with("//") {
+            doc_lines.push(t);
+        } else {
+            break;
+        }
+    }
+
+    if doc_lines.is_empty() {
+        return None;
+    }
+
+    // Reverse to get lines in original order and strip `//` prefix
+    doc_lines.reverse();
+    let text = doc_lines
+        .iter()
+        .map(|l| l.trim_start_matches("//").trim_start())
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string();
+
+    if text.is_empty() { None } else { Some(text) }
+}
 
 impl Go {
     fn parse_import_spec(node: &Node, content: &str, line: usize) -> Option<Import> {

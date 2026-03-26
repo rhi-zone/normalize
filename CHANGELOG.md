@@ -8,12 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- **`normalize rules compile <file.dl>`** — validates a Datalog rules file without executing it. Parses the `.dl` file, checks that all relation names used in rule heads and bodies are declared (or are built-in), and reports errors in `path:line:col: error: message` format. Exits 1 when errors are found, 0 on success. Supports `--json` for the full `RulesCompileReport` (includes `valid`, `errors`, `warnings`, `relations_used`).
-- **`normalize rename <target> <new-name>`** — top-level cross-file symbol rename. Resolves the target via the facts index, finds all call sites and import statements, checks for name conflicts, then applies (or previews with `--dry-run`) the batch edit across every affected file. Returns a `RenameReport` with every site touched, structured as `definition`/`call`/`import` kinds. Use `--force` to bypass conflict checks.
+- **`normalize view <file>` shows module-level docs**: when viewing a file (not a symbol), the module-level doc comment is shown as a preamble before the symbol list. Supported: `//!` inner-doc comments in Rust, module docstrings in Python, package comments in Go, file-top JSDoc (`/** ... */`) in JavaScript/TypeScript, and leading `#` comment blocks in Ruby. The doc text also appears as `"summary"` in `--json` output.
 
-### Fixed
-
-- **`normalize rules run --type fact` no longer crashes** with `corrupted double-linked list` (heap corruption). The `abi_stable`/dylib rule pack loader has been removed; fact rules now run purely as interpreted `.dl` files with no dynamic library loading.
 
 ## [0.2.0] — 2026-03-25
 

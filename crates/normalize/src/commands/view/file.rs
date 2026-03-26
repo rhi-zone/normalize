@@ -53,7 +53,7 @@ pub fn build_view_file_service(
     let grammar = support.as_ref().map(|s| s.grammar_name().to_string());
 
     let mut warnings = Vec::new();
-    if let Some(lang) = support
+    if let Some(lang) = support.as_ref()
         && lang.as_symbols().is_none()
     {
         warnings.push(format!(
@@ -61,6 +61,11 @@ pub fn build_view_file_service(
             lang.name()
         ));
     }
+
+    // Extract module-level doc comment for the summary field
+    let summary = support
+        .as_ref()
+        .and_then(|lang| lang.extract_module_doc(&content));
 
     let extractor = skeleton::SkeletonExtractor::new();
     let skeleton_result = extractor.extract(&full_path, &content);
@@ -117,6 +122,6 @@ pub fn build_view_file_service(
         line_range: None,
         grammar,
         warnings,
-        summary: None,
+        summary,
     })
 }

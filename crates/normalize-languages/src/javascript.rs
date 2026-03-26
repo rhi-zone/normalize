@@ -107,6 +107,10 @@ impl Language for JavaScript {
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
         ecmascript::get_visibility(node, content)
     }
+
+    fn extract_module_doc(&self, src: &str) -> Option<String> {
+        ecmascript::extract_js_module_doc(src)
+    }
 }
 
 impl LanguageSymbols for JavaScript {}
