@@ -177,16 +177,20 @@ impl ViewService {
         #[param(help = "Hide all docstrings")] no_docs: bool,
         #[param(help = "Hide parent/ancestor context")] no_parent: bool,
         #[param(help = "Context view: skeleton + imports combined")] context: bool,
-        #[param(
-            help = "Prepend ancestor directory context files; value = max ancestor levels (e.g. --dir-context 2)"
-        )]
-        dir_context: Option<u32>,
+        #[param(help = "Prepend ancestor directory context files (N levels up, -1=all)")]
+        dir_context: Option<i32>,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
         #[param(short = 'i', help = "Case-insensitive symbol matching")] case_insensitive: bool,
         pretty: bool,
         compact: bool,
     ) -> Result<ViewReport, String> {
+        if depth.is_some_and(|d| d < -1) {
+            return Err(format!(
+                "--depth: invalid value {} (use -1 for all, 0+ for N levels)",
+                depth.unwrap()
+            ));
+        }
         let root_path = root
             .map(PathBuf::from)
             .map(Ok)
@@ -207,13 +211,18 @@ impl ViewService {
 
         let ctx_files = config.view.context_files();
 
-        // --dir-context N: prepend context files, walking up N ancestor levels (default: all)
+        // --dir-context N: prepend context files from ancestor dirs (-1=all, N>=0=N levels up)
         if let Some(depth) = dir_context {
+            if depth < -1 {
+                return Err(format!(
+                    "--dir-context: invalid depth {depth} (use -1 for all ancestors, 0+ for N levels)"
+                ));
+            }
             let target_path = target
                 .as_ref()
                 .map(|t| root_path.join(t))
                 .unwrap_or_else(|| root_path.clone());
-            let max_depth = if depth == 0 {
+            let max_depth = if depth < 0 {
                 None
             } else {
                 Some(depth as usize)
@@ -315,6 +324,12 @@ impl ViewService {
         pretty: bool,
         compact: bool,
     ) -> Result<ViewListReport, String> {
+        if depth.is_some_and(|d| d < -1) {
+            return Err(format!(
+                "--depth: invalid value {} (use -1 for all, 0+ for N levels)",
+                depth.unwrap()
+            ));
+        }
         let root_path = root
             .map(std::path::PathBuf::from)
             .map(Ok)
