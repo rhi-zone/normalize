@@ -889,13 +889,19 @@ commands. `analyze` still hosts 19 commands that don't fit either:
 
 Building blocks are all present. The gap is composition:
 
-- [ ] `normalize refs <target>` — expose `commands/find_references.rs` as a proper CLI
-  command. Groups results by file, shows read/write distinction where the scope engine
-  can determine it. This is the read layer for all refactors.
-- [ ] `normalize rename <target> <new-name>` — cross-file symbol rename. Uses `normalize refs`
-  to find all sites, normalise-scope for shadow/conflict detection, batch edit for atomic
-  multi-file rewrite, shadow git for preview. `--dry-run` shows diff, no writes. This is
-  the highest-value refactoring command.
+- [x] `normalize refs` absorbed into `view referenced-by` — `CallEntry.access:
+  Option<String>` field added (values: `"read"`/`"write"`/`"read-write"`); currently
+  always `None` pending index + scope engine changes below.
+- [ ] **Populate `access` in `CallEntry`** — two parts:
+  1. Extend the `calls` table schema with an `access` column; update tree-sitter extraction
+     per language (Rust: distinguish `foo()` call vs `foo = ...` assignment; JS/TS/Python
+     similar). Lives in `crates/normalize-facts/src/symbols.rs` + per-language `.scm` files.
+  2. Wire populated value through `view referenced-by` output and the `display_call_graph`
+     formatter (display side already handles it — just needs non-None data).
+- [ ] `normalize rename <target> <new-name>` — cross-file symbol rename. Uses
+  `view referenced-by` to find all sites, normalize-scope for shadow/conflict detection,
+  batch edit for atomic multi-file rewrite, shadow git for preview. `--dry-run` shows
+  diff, no writes. This is the highest-value refactoring command.
 - [ ] `normalize move <target> <destination>` — move a symbol to another file, updating all
   import sites. Requires rename infrastructure + import rewriting. After rename lands.
 - [ ] `normalize extract <file:start-end> <new-name>` — extract a region into a new function,
