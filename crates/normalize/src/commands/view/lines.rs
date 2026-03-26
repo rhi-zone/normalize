@@ -121,6 +121,7 @@ pub fn build_view_line_range_service(
         grammar,
         warnings: Vec::new(),
         summary: None,
+        dir_context: None,
     })
 }
 

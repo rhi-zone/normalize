@@ -424,8 +424,7 @@ normalize rules enable debug-print --dry-run  # preview what would change
 normalize rules list                         # all rules
 normalize rules list --tag debug-print       # rules matching a tag
 normalize rules list --language rust --enabled  # enabled Rust rules
-normalize rules tags                         # all tags (builtin + user-defined)
-normalize rules tags --show-rules            # expand each tag to its member rules
+normalize rules tags                         # all tags with member rule IDs (builtin + user-defined)
 normalize rules tags --tag debug-print       # show what's in one tag
 ```
 
@@ -462,7 +461,7 @@ js/console-log           error   debug-print  pre-commit
 
 `rules show <id>` renders the full documentation for one rule — rationale, examples, remediation, when to disable.
 
-`rules tags --show-rules` expands by tag:
+`rules tags` lists tags with their member rules:
 
 ```
 debug-print  [builtin]   js/console-log  python/print-debug  rust/println-debug  go/fmt-print

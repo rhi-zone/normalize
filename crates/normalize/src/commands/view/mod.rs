@@ -365,6 +365,7 @@ pub async fn build_view_list_service(
                     grammar: None,
                     warnings: Vec::new(),
                     summary: None,
+                    dir_context: None,
                 }
             })
             .collect();

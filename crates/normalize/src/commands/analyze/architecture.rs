@@ -20,6 +20,23 @@ use serde::Serialize;
 use std::collections::HashSet;
 use std::path::Path;
 
+/// Strip `.claude/worktrees/<hash>/` prefixes from paths so agents see clean workspace-relative
+/// paths instead of opaque worktree fragments like `...ba395f/crates/normalize/src/output.rs`.
+fn clean_path(path: &str) -> &str {
+    // Match ".claude/worktrees/<segment>/" prefix (possibly nested, e.g. agent-a0ba21f0/.claude/...)
+    // Walk forward consuming any ".claude/worktrees/<hash>/" segments.
+    let mut s = path;
+    while let Some(rest) = s.strip_prefix(".claude/worktrees/") {
+        // skip the hash segment and following slash
+        if let Some(slash) = rest.find('/') {
+            s = &rest[slash + 1..];
+        } else {
+            break;
+        }
+    }
+    s
+}
+
 /// Full architecture analysis report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ArchitectureReport {
@@ -53,7 +70,7 @@ impl OutputFormatter for ArchitectureReport {
             let top: Vec<_> = self.hub_modules.iter().take(hub_limit).collect();
             let parts: Vec<String> = top
                 .iter()
-                .map(|h| format!("{} ({} dependents)", truncate_path(&h.path, 40), h.fan_in))
+                .map(|h| format!("{} ({} dependents)", clean_path(&h.path), h.fan_in))
                 .collect();
             lines.push(format!("HUBS: {}", parts.join(", ")));
         }
@@ -87,14 +104,7 @@ impl OutputFormatter for ArchitectureReport {
             let top: Vec<_> = self.symbol_hotspots.iter().take(5).collect();
             let parts: Vec<String> = top
                 .iter()
-                .map(|s| {
-                    format!(
-                        "{}:{} ({} callers)",
-                        truncate_path(&s.file, 20),
-                        s.name,
-                        s.callers
-                    )
-                })
+                .map(|s| format!("{}:{} ({} callers)", clean_path(&s.file), s.name, s.callers))
                 .collect();
             lines.push(format!("SYMBOLS: {}", parts.join(", ")));
         }
@@ -104,7 +114,7 @@ impl OutputFormatter for ArchitectureReport {
             let parts: Vec<String> = self
                 .orphan_modules
                 .iter()
-                .map(|o| truncate_path(&o.path, 40).to_string())
+                .map(|o| clean_path(&o.path).to_string())
                 .collect();
             lines.push(format!("ORPHANS: {}", parts.join(", ")));
         }

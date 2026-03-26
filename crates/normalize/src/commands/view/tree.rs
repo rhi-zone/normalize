@@ -104,6 +104,7 @@ pub fn build_view_directory_service(
         grammar: None,
         warnings: Vec::new(),
         summary,
+        dir_context: None,
     })
 }
 
@@ -226,6 +227,7 @@ pub fn build_view_filtered_service(
                 grammar: None,
                 warnings: Vec::new(),
                 summary: None,
+                dir_context: None,
             }
         })
         .collect();

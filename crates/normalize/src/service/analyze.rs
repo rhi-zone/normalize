@@ -138,12 +138,25 @@ impl AnalyzeService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(
+            short = 'l',
+            help = "Maximum number of cross-import entries to include in output (0 = no limit, default 20)"
+        )]
+        limit: Option<usize>,
     ) -> Result<ArchitectureReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         let idx = crate::index::ensure_ready(&root_path).await?;
-        crate::commands::analyze::architecture::analyze_architecture(&idx)
+        let mut report = crate::commands::analyze::architecture::analyze_architecture(&idx)
             .await
-            .map_err(|e| AnalyzeError::Message(format!("Architecture analysis failed: {}", e)))
+            .map_err(|e| AnalyzeError::Message(format!("Architecture analysis failed: {}", e)))?;
+        // Cap cross_imports to avoid bloated JSON output for agents.
+        // Default cap is 20; --limit 0 disables the cap.
+        let cap = match limit.unwrap_or(20) {
+            0 => usize::MAX,
+            n => n,
+        };
+        report.cross_imports.truncate(cap);
+        Ok(report)
     }
 
     /// Run health analysis (file counts, complexity stats, large file warnings)

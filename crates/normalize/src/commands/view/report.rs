@@ -45,6 +45,9 @@ pub struct ViewReport {
     /// Module-level doc comment (for file views) or SUMMARY.md contents (for dir views)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
+    /// Context files prepended via `--dir-context` (root→target order, merged content)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dir_context: Option<String>,
 }
 
 /// A list of `ViewReport` entries (returned by `normalize view list`).

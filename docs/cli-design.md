@@ -93,7 +93,7 @@ Commands with most subcommands:
 rules list     [--tag <tag>] [--language <lang>] [--enabled] [--disabled] [--type syntax|fact] [--expand]
 rules run      [--tag <tag>] [--language <lang>] [--rule <id>] [--fix] [--dry-run]
 rules show     <id>
-rules tags     [--show-rules] [--tag <tag>]
+rules tags     [--tag <tag>]
 rules enable   <tag-or-id>   [--dry-run]
 rules disable  <tag-or-id>   [--dry-run]
 rules add      <url>

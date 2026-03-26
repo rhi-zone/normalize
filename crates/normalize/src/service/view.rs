@@ -36,6 +36,8 @@ pub struct ViewService {
     pretty: Cell<bool>,
     /// Text prefix to prepend to the default view output (used for --dir-context).
     view_prefix: Cell<String>,
+    /// Raw context content (without display separator) for populating `ViewReport::dir_context`.
+    dir_context_content: std::cell::RefCell<Option<String>>,
 }
 
 impl ViewService {
@@ -43,6 +45,7 @@ impl ViewService {
         Self {
             pretty: Cell::new(pretty.get()),
             view_prefix: Cell::new(String::new()),
+            dir_context_content: std::cell::RefCell::new(None),
         }
     }
 
@@ -255,12 +258,13 @@ impl ViewService {
                     }
                     if !ctx_content.is_empty() {
                         self.view_prefix.set(format!("{}\n\n---\n\n", ctx_content));
+                        *self.dir_context_content.borrow_mut() = Some(ctx_content);
                     }
                 }
             }
         }
 
-        crate::commands::view::build_view_service(
+        let mut report = crate::commands::view::build_view_service(
             target.as_deref(),
             &root_path,
             depth.unwrap_or_else(|| config.view.depth()),
@@ -281,7 +285,14 @@ impl ViewService {
             case_insensitive,
             &[],
         )
-        .await
+        .await?;
+
+        // Populate dir_context for JSON consumers (--json/--jq).
+        if let Some(content) = self.dir_context_content.borrow_mut().take() {
+            report.dir_context = Some(content);
+        }
+
+        Ok(report)
     }
 
     /// Show what references this symbol (callers in the call graph; requires facts index)

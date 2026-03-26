@@ -96,12 +96,12 @@ impl SyntaxService {
         #[param(help = "Output as S-expression")] sexp: bool,
         #[param(
             short = 'd',
-            help = "Limit tree depth (-1 = unlimited, 0 = root only, default -1)"
+            help = "Limit tree depth (-1 = unlimited, 0 = root only, default 5)"
         )]
         depth: Option<i32>,
         compact: bool,
     ) -> Result<serde_json::Value, String> {
-        let depth_val = depth.unwrap_or(-1);
+        let depth_val = depth.unwrap_or(5);
         self.compact.set(compact);
 
         let file_path = PathBuf::from(&file);

@@ -672,7 +672,6 @@ impl RulesService {
     #[cli(display_with = "display_output")]
     pub fn tags(
         &self,
-        #[param(help = "Expand each tag to show its member rules")] show_rules: bool,
         #[param(help = "Show only this specific tag")] tag: Option<String>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
@@ -688,15 +687,7 @@ impl RulesService {
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
         self.resolve_format(pretty, compact);
         let config = load_rules_config(&effective_root);
-        let mut report = list_tags_structured(&effective_root, tag.as_deref(), &config)?;
-        // When show_rules is false, clear the rules list to signal summary mode to format_text.
-        // The count field still carries the correct count.
-        if !show_rules {
-            for entry in &mut report.tags {
-                entry.rules.clear();
-            }
-        }
-        Ok(report)
+        list_tags_structured(&effective_root, tag.as_deref(), &config)
     }
 
     /// Add a rule from a URL
