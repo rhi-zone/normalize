@@ -1453,23 +1453,12 @@ pub fn compile_rules_source(source: &str) -> CompileResult {
     let ast: AscentProgram = match syn::parse_str(&full_source) {
         Ok(ast) => ast,
         Err(e) => {
-            // syn::Error::to_string() includes the message.
-            // Try to recover line/col from the span (works when proc-macro2 is built
-            // with span-locations; falls back to 0/0 otherwise).
-            let span = e.span();
-            let start = span.start();
-            // proc-macro2 LineColumn is 1-based but reports 0/0 when span-locations is off.
-            // Subtract the preamble line count so the numbers reference the user file.
-            let preamble_lines = PREAMBLE.lines().count();
-            let raw_line = start.line;
-            let user_line = if raw_line > preamble_lines {
-                raw_line - preamble_lines
-            } else {
-                0
-            };
+            // syn::Error::to_string() includes the error message.
+            // proc-macro2 is not built with span-locations in this workspace, so
+            // line/col info is unavailable; report 0/0 (unknown location).
             result.errors.push(CompileIssue {
-                line: user_line,
-                col: start.column,
+                line: 0,
+                col: 0,
                 message: e.to_string(),
             });
             return result;

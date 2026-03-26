@@ -356,7 +356,7 @@ Rules (custom enforcement, future):
 - [ ] Dependency path queries ("what's between A and B?")
 
 **Facts & Rules Architecture:**
-- [ ] `normalize rules compile <rules.dl>` command to build custom packs (sandboxed codegen)
+- [x] `normalize rules compile <rules.dl>` — validates syntax + checks all relation names against declared/built-in set; exits 1 on errors; CI-friendly
 - [x] ~~Self-install builtin dylib~~ — no longer applicable; builtins are embedded `.dl` files in `normalize-facts-rules-interpret/src/builtin_dl/`, no dylib or copy step needed.
 
 ### normalize-manifest: eval-backed parsing (`eval` feature gate)

@@ -835,6 +835,94 @@ impl RulesService {
 
         Ok(report)
     }
+
+    /// Validate and "compile" a Datalog rules file — check syntax and relation names
+    ///
+    /// Parses the `.dl` file, validates that all referenced relations are declared (or
+    /// are built-in), and reports errors with file/line context.  Exits with status 1
+    /// when errors are found so it can be used in CI pipelines.
+    ///
+    /// Examples:
+    ///   normalize rules compile my-rule.dl       # check a single rule file
+    ///   normalize rules compile .normalize/rules/arch.dl --json  # machine-readable output
+    #[cli(display_with = "display_output")]
+    pub fn compile(
+        &self,
+        #[param(positional, help = "Path to the .dl file to validate")] path: String,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<RulesCompileReport, String> {
+        use normalize_facts_rules_interpret::{compile_rules_source, parse_rule_content};
+
+        self.resolve_format(pretty, compact);
+
+        let effective_root = root
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+
+        let dl_path = if std::path::Path::new(&path).is_absolute() {
+            std::path::PathBuf::from(&path)
+        } else {
+            effective_root.join(&path)
+        };
+
+        let content = std::fs::read_to_string(&dl_path)
+            .map_err(|e| format!("Failed to read '{}': {e}", dl_path.display()))?;
+
+        // Strip frontmatter to get the Datalog source body
+        let default_id = dl_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("rule");
+        let rule = parse_rule_content(&content, default_id, false);
+        let source = rule.as_ref().map(|r| r.source.as_str()).unwrap_or(&content);
+
+        let compile_result = compile_rules_source(source);
+
+        let errors: Vec<CompileError> = compile_result
+            .errors
+            .into_iter()
+            .map(|e| CompileError {
+                line: e.line,
+                col: e.col,
+                message: e.message,
+            })
+            .collect();
+
+        let warnings: Vec<CompileWarning> = compile_result
+            .warnings
+            .into_iter()
+            .map(|w| CompileWarning {
+                line: w.line,
+                col: w.col,
+                message: w.message,
+            })
+            .collect();
+
+        let valid = errors.is_empty();
+
+        let report = RulesCompileReport {
+            path,
+            valid,
+            errors,
+            warnings,
+            relations_used: compile_result.relations_used,
+        };
+
+        if report.valid {
+            Ok(report)
+        } else {
+            // Signal failure to the CLI via Err so the process exits with status 1.
+            // The formatted output is passed as the error string so it appears on stderr.
+            Err(self.display_output(&report))
+        }
+    }
 }
 
 /// Load `RulesRunConfig` from the project config files.

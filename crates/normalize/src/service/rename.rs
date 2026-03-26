@@ -251,6 +251,7 @@ pub(crate) async fn do_rename_report(
         }
 
         // 2. Does any importer file already import something named new_name?
+        #[allow(clippy::collapsible_if)]
         if !importers.is_empty() {
             if let Some(idx) = crate::index::open_if_enabled(&root).await {
                 for (file, _, _, _) in &importers {

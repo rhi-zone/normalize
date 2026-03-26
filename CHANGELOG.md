@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`normalize rules compile <file.dl>`** — validates a Datalog rules file without executing it. Parses the `.dl` file, checks that all relation names used in rule heads and bodies are declared (or are built-in), and reports errors in `path:line:col: error: message` format. Exits 1 when errors are found, 0 on success. Supports `--json` for the full `RulesCompileReport` (includes `valid`, `errors`, `warnings`, `relations_used`).
 - **`normalize rename <target> <new-name>`** — top-level cross-file symbol rename. Resolves the target via the facts index, finds all call sites and import statements, checks for name conflicts, then applies (or previews with `--dry-run`) the batch edit across every affected file. Returns a `RenameReport` with every site touched, structured as `definition`/`call`/`import` kinds. Use `--force` to bypass conflict checks.
 
 ### Fixed

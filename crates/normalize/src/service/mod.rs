@@ -821,6 +821,7 @@ impl NormalizeService {
     ///   normalize rename src/lib.rs/old_fn new_fn --dry-run   # preview changes
     ///   normalize rename src/lib.rs/old_fn new_fn --force     # ignore name conflicts
     #[cli(display_with = "display_output")]
+    #[allow(clippy::too_many_arguments)]
     pub async fn rename(
         &self,
         #[param(positional, help = "Target symbol (path/Symbol)")] target: String,
