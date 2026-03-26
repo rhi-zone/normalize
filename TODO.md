@@ -78,54 +78,13 @@ Crate split is correct. All 38 published crates justified. No reusable logic tra
 
 ### `analyze` Architecture Redesign (high priority)
 
-**Key insight (2026-03-16):** Every other top-level subcommand unifies a domain via a trait with multiple implementations (`rules` → `RuleEngine`, `tools` → tool trait, `syntax` → `Language`). `analyze` has no such trait — it's a grab-bag.
+**Done (2026-03-16):** `normalize rank` introduced with 20+ commands migrated from `analyze`. Graph navigation (`call_graph`, `trace`, `dependents`, `provenance`) folded into `view` (`referenced-by`, `references`, `dependents`, `trace`, `graph`, `history`, `blame`). `ViewOutput` enum dissolved; `ViewReport`/`ViewNode` unified. `view list` added.
 
-**User intent audit reveals three distinct intents:**
-
-1. **"Rank my codebase by X"** — the user wants an ordered list of files/modules/functions by some metric. Input tier (file-only, git, index) is an implementation detail, not a user-facing concept. This is ~80% of current `analyze` commands. **→ belongs in `normalize rank`**
-
-2. **"Navigate this symbol/module"** — the user has a specific thing and wants to see what's connected. `call_graph`, `trace`, `dependents`, `provenance`. Cross-file extension of `view`. **→ design pending; possibly folds into `view`**
-
-3. **"Give me the big picture"** — synthesized understanding, not a list. `architecture`, `summary`, `health`. **→ design pending**
-
-**Decided: introduce `normalize rank` as a top-level subcommand.**
-- Unifying primitive: `Rankable` trait — produce an ordered list of (item, score) pairs
-- All current `analyze` commands that produce ranked tables migrate here
-- Input tier (files/git/index) is a precondition, not part of the interface
-- `RankEntry` infrastructure already exists in `normalize-analyze::ranked` — rename/repurpose
-- Commands to migrate: complexity, files, size, ceremony, hotspots, coupling, ownership, test-ratio, test-gaps, budget, density, uniqueness, imports, surface, depth-map, layering, module-health, call-complexity, duplicates (all variants), fragments, docs, security, contributors, activity, trend-metric, skeleton-diff
-- `analyze` shrinks to only the non-ranking commands (graph navigation + big picture) during transition; eventually dissolves or gets renamed
-
-**Decided (2026-03-16): graph navigation folds into `view`.**
-- `call_graph`, `trace`, `dependents`, `provenance` are all "given a named entity, show me
-  its neighborhood in the graph" — same mental model as `view`, just cross-file.
-- Pattern: `normalize view <target> <subcommand>` — target first, operation second.
-  e.g. `normalize view src/foo.rs/Bar callers`, `normalize view src/foo.rs/Bar history`
-- `--history` flag on `view` becomes `normalize view <target> history` (same target syntax)
-- These are navigation, not ranking — belong in `view`, not `analyze` or `rank`
-- See ADR in `docs/architecture-decisions.md` for full rationale
-
-**`view` refactor — remaining work (design decisions 2026-03-16):**
-
-Data model:
-- `ViewOutput` enum dissolves entirely — no enum returns
-- `view` returns `ViewReport` (single `ViewNode` tree) — exactly one result or error, never empty
-- `view list` returns `Vec<ViewReport>` — can be empty; multiple results OK; at a non-glob specific path, only occurs when same name has different kinds (e.g. TypeScript `type T` + `const T`)
-- `ViewReport` is always a `ViewNode` tree — directory/file/symbol all same shape, no separate structs per kind
-- `--kind` is a target constraint applied consistently to both `view` and `view list`; not a rendering filter
-- Ambiguous `view` → `Err()` containing: reason why multiple matches exist + identifiers of all matches + hint to use `--kind` or `view list`
-- `GlobMatches`, `KindFilter` variants fold into `view list` (`Vec<ViewReport>`)
-- `grep` stays top-level — text match shape is fundamentally different from code entity view
-
-Implementation:
-- [x] Replace `ViewOutput` enum with `ViewReport` (single `ViewNode` tree)
-- [x] Add `view list` subcommand returning `Vec<ViewReport>`; `--kind`/`--only`/`--exclude` apply to both
-- [x] Fold `ViewFileReport`, `ViewSymbolReport`, `ViewSymbolNodeReport`, `ViewLineRangeReport`, `ViewGlobReport`, `ViewKindFilterReport`, `ViewMultipleMatchesReport`, `ViewFileContentReport` into unified `ViewReport`
+**Remaining in `analyze`:** trends (complexity-trend, length-trend, density-trend, trend), git history (activity, coupling-clusters, repo-coupling, cross-repo-health), big-picture (health, architecture, summary, all), plus docs/security/test-gaps/skeleton-diff. These stay until a clear home emerges.
 
 **Not yet decided:**
-- Where big-picture commands live (`architecture`, `summary`, `health`) — synthesized understanding, not ranking, not navigation. No trait identified yet. Leave in `analyze` until pattern is clear.
-- Non-ranked `analyze` commands stay put for now: `activity`, `trend-metric`, `docs`, `security`, `skeleton-diff`, `test-gaps`, `coupling-clusters`
-- Whether `analyze` dissolves entirely or gets a new identity — will become clear as view and rank absorb more commands
+- Where big-picture commands live (`architecture`, `summary`, `health`) — synthesized understanding, not ranking, not navigation. No trait identified yet.
+- Whether `analyze` dissolves entirely or gets a new identity — will become clear over time.
 
 ### Language trait: remaining .scm migration
 
