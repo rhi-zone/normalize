@@ -180,7 +180,7 @@ impl Metric for CallComplexityMetric {
                             let Some(&cn) = cq_capture_names.get(cap.index as usize) else {
                                 continue;
                             };
-                            if cn == "reference.call" {
+                            if cn == "call" || cn == "call.write" {
                                 // SAFETY: tree-sitter byte ranges are guaranteed to be char-boundary-aligned for valid UTF-8 source; read_to_string pre-validates UTF-8
                                 let callee_name = content[cap.node.byte_range()].to_string();
                                 let call_row = cap.node.start_position().row;
