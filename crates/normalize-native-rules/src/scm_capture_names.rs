@@ -57,7 +57,7 @@ impl OutputFormatter for ScmCaptureNamesReport {
 }
 
 /// Capture names that the facts system recognises in `.calls.scm` files.
-const ALLOWED_CALLS_CAPTURES: &[&str] = &["call", "call.qualifier"];
+const ALLOWED_CALLS_CAPTURES: &[&str] = &["call", "call.qualifier", "call.write"];
 
 /// Find all `.calls.scm` files under `root` (respecting `.gitignore`) and
 /// check that every capture they use is in the allowed set for that query type.
@@ -147,7 +147,7 @@ impl From<ScmCaptureNamesReport> for DiagnosticsReport {
                 end_column: None,
                 rule_id: "scm-capture-names".into(),
                 message: format!(
-                    "unexpected capture `{}` in .calls.scm file (allowed: @call, @call.qualifier)",
+                    "unexpected capture `{}` in .calls.scm file (allowed: @call, @call.qualifier, @call.write)",
                     u.capture
                 ),
                 severity: Severity::Warning,
