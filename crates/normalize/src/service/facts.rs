@@ -463,12 +463,16 @@ async fn index_language_packages(
 async fn rebuild_data(
     root: Option<&Path>,
     include: &[FactsContent],
+    only: &[String],
+    exclude: &[String],
 ) -> Result<RebuildReport, String> {
     let root = root
         .map(|p| p.to_path_buf())
         .map(Ok)
         .unwrap_or_else(std::env::current_dir)
         .map_err(|e| format!("Failed to get current directory: {e}"))?;
+
+    let filter = crate::commands::build_filter(&root, exclude, only);
 
     let mut idx = index::open(&root)
         .await
@@ -480,6 +484,34 @@ async fn rebuild_data(
         .refresh()
         .await
         .map_err(|e| format!("Error refreshing index: {}", e))?;
+
+    // If a filter is active, remove indexed files that don't match it.
+    // We do this after the full walk so the index's file-tree relationships
+    // are consistent, and then prune what the caller asked to exclude.
+    let file_count = if let Some(ref f) = filter {
+        let all_paths: Vec<String> = idx
+            .all_files()
+            .await
+            .map_err(|e| format!("Error listing indexed files: {}", e))?
+            .into_iter()
+            .filter(|entry| {
+                let path = std::path::Path::new(&entry.path);
+                !f.matches(path)
+            })
+            .map(|entry| entry.path)
+            .collect();
+        for path in &all_paths {
+            let _ = idx
+                .execute(&format!(
+                    "DELETE FROM files WHERE path = '{}'",
+                    path.replace('\'', "''")
+                ))
+                .await;
+        }
+        file_count.saturating_sub(all_paths.len())
+    } else {
+        file_count
+    };
 
     let mut result = RebuildReport {
         files: file_count,
@@ -715,9 +747,11 @@ impl FactsService {
     /// navigation commands (referenced-by, dependents, depth-map, etc.).
     ///
     /// Examples:
-    ///   normalize structure rebuild                          # rebuild with all content types
-    ///   normalize structure rebuild --include symbols        # only extract symbols
-    ///   normalize structure rebuild --include calls,imports  # extract calls and imports
+    ///   normalize structure rebuild                              # rebuild with all content types
+    ///   normalize structure rebuild --include symbols            # only extract symbols
+    ///   normalize structure rebuild --include calls,imports      # extract calls and imports
+    ///   normalize structure rebuild --only "src/**"              # only index files under src/
+    ///   normalize structure rebuild --exclude "vendor/**"        # skip vendor directory
     #[cli(display_with = "display_output")]
     pub async fn rebuild(
         &self,
@@ -727,6 +761,8 @@ impl FactsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(help = "Only include files matching glob patterns")] only: Vec<String>,
+        #[param(help = "Exclude files matching glob patterns")] exclude: Vec<String>,
     ) -> Result<RebuildReport, String> {
         let include: Vec<FactsContent> = if include.is_empty() {
             vec![
@@ -741,7 +777,7 @@ impl FactsService {
                 .collect::<Result<Vec<_>, _>>()?
         };
         let root_path = root.map(PathBuf::from);
-        rebuild_data(root_path.as_deref(), &include).await
+        rebuild_data(root_path.as_deref(), &include, &only, &exclude).await
     }
 
     /// Show index statistics (DB size vs codebase size)

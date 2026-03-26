@@ -279,6 +279,7 @@ impl ViewService {
             &exclude,
             &only,
             case_insensitive,
+            &[],
         )
         .await
     }
@@ -379,6 +380,7 @@ impl ViewService {
             &exclude,
             &only,
             case_insensitive,
+            &[],
         )
         .await
     }

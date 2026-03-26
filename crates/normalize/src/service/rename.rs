@@ -167,6 +167,7 @@ impl OutputFormatter for RenameReport {
 /// an `Err` describing the conflicts; the `RenameReport` is embedded in the error message.
 ///
 /// Gracefully degrades when the facts index is unavailable: renames the definition only.
+#[allow(dead_code)]
 pub(crate) async fn do_rename_report(
     target: &str,
     new_name: &str,

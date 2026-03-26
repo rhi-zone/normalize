@@ -1,9 +1,8 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 26
 expression: "snapshot_help(&[])"
 ---
-Structural code intelligence: index symbols and calls, enforce rules, track complexity.
+normalize - Structural code intelligence: index symbols and calls, enforce rules, track complexity.
 
 Usage: normalize [OPTIONS] [COMMAND]
 

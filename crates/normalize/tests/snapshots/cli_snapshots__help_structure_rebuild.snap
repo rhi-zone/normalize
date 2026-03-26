@@ -14,6 +14,8 @@ Options:
       --json                       Output machine-readable JSON
   -r, --root <root>                Root directory (defaults to current directory)
       --jq <jq>                    Filter output through jq expression
+      --only <only>                Only include files matching glob patterns
+      --exclude <exclude>          Exclude files matching glob patterns
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
@@ -24,6 +26,8 @@ at `.normalize/index.sqlite`. Required before running fact rules or cross-file
 navigation commands (referenced-by, dependents, depth-map, etc.).
 
 Examples:
-normalize structure rebuild                          # rebuild with all content types
-normalize structure rebuild --include symbols        # only extract symbols
-normalize structure rebuild --include calls,imports  # extract calls and imports
+normalize structure rebuild                              # rebuild with all content types
+normalize structure rebuild --include symbols            # only extract symbols
+normalize structure rebuild --include calls,imports      # extract calls and imports
+normalize structure rebuild --only "src/**"              # only index files under src/
+normalize structure rebuild --exclude "vendor/**"        # skip vendor directory

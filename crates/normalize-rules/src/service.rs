@@ -289,6 +289,8 @@ impl RulesService {
     ///   normalize rules run --rule rust/unwrap-in-impl   # single rule
     ///   normalize rules run --pretty           # colored output with details
     ///   normalize rules run --type syntax      # only syntax rules
+    ///   normalize rules run --only "*.rs"      # only Rust files
+    ///   normalize rules run --exclude "tests/" # skip test directories
     #[cli(display_with = "display_run")]
     #[allow(clippy::too_many_arguments)]
     pub async fn run(
@@ -311,6 +313,8 @@ impl RulesService {
         #[param(help = "Maximum number of issues to show in detail (default: 50)")] limit: Option<
             usize,
         >,
+        #[param(help = "Only include files matching glob patterns")] only: Vec<String>,
+        #[param(help = "Exclude files matching glob patterns")] exclude: Vec<String>,
         pretty: bool,
         compact: bool,
     ) -> Result<DiagnosticsReport, String> {
@@ -544,6 +548,28 @@ impl RulesService {
             report
                 .issues
                 .retain(|issue| issue.rule_id == filter.as_str());
+        }
+
+        // Apply --only / --exclude path filters to all issues.
+        if !only.is_empty() || !exclude.is_empty() {
+            let only_pats: Vec<glob::Pattern> = only
+                .iter()
+                .filter_map(|s| glob::Pattern::new(s).ok())
+                .collect();
+            let exclude_pats: Vec<glob::Pattern> = exclude
+                .iter()
+                .filter_map(|s| glob::Pattern::new(s).ok())
+                .collect();
+            report.issues.retain(|issue| {
+                let file = issue.file.as_str();
+                if !exclude_pats.is_empty() && exclude_pats.iter().any(|p| p.matches(file)) {
+                    return false;
+                }
+                if !only_pats.is_empty() && !only_pats.iter().any(|p| p.matches(file)) {
+                    return false;
+                }
+                true
+            });
         }
 
         report.sort();

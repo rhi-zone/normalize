@@ -29,6 +29,7 @@ pub mod history;
 pub mod package;
 pub mod rank;
 pub mod ratchet;
+pub mod rename;
 // rules module moved to normalize-rules crate; re-exported for internal use
 pub mod serve;
 pub mod sessions;
@@ -267,19 +268,23 @@ impl NormalizeService {
 
     /// Search for text patterns across the codebase using ripgrep regex syntax.
     ///
-    /// Accepts a regex `pattern`, optional `root`, `only` (include glob), `exclude` (exclude
-    /// glob), and `limit` flags. Returns a `GrepReport` with file paths, line numbers, and
-    /// matched text. Uses ripgrep regex: `|` for alternation, not BRE/ERE.
+    /// Accepts a regex `pattern`, optional positional `path` (or `--root`) for directory scoping,
+    /// `only` (include glob), `exclude` (exclude glob), and `limit` flags. Returns a `GrepReport`
+    /// with file paths, line numbers, and matched text. Uses ripgrep regex: `|` for alternation,
+    /// not BRE/ERE. When both `path` and `--root` are provided, `path` wins.
     ///
     /// Examples:
     ///   normalize grep "TODO" --only "*.rs"    # search Rust files for TODO
-    ///   normalize grep "fn main" --root src/   # search in specific directory
+    ///   normalize grep "fn main" src/          # search in specific directory
     ///   normalize grep "class \w+" --only "*.py" --json   # JSON output
     #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn grep(
         &self,
         #[param(positional, help = "Regex pattern to search for")] pattern: String,
+        #[param(positional, help = "Directory to search in (overrides --root)")] path: Option<
+            String,
+        >,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
@@ -290,7 +295,9 @@ impl NormalizeService {
         pretty: bool,
         compact: bool,
     ) -> Result<GrepReport, String> {
-        let root_path = root
+        // `path` positional takes precedence over `--root` flag.
+        let root_path = path
+            .or(root)
             .map(PathBuf::from)
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
@@ -938,11 +945,30 @@ impl NormalizeService {
             let native_root = effective_root.clone();
             let native_config = load_rules_config(&native_root);
             let threshold = 10;
+            let stale_summary_filenames: Vec<String> = native_config
+                .rules
+                .rules
+                .get("stale-summary")
+                .map(|r| r.filenames.clone())
+                .unwrap_or_default();
+            let stale_summary_paths: Vec<String> = native_config
+                .rules
+                .rules
+                .get("stale-summary")
+                .map(|r| r.paths.clone())
+                .unwrap_or_default();
 
             let (summary_res, stale_res, examples_res, refs_res, ratchet_res, budget_res) = tokio::join!(
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
-                    move || normalize_native_rules::build_stale_summary_report(&root, threshold)
+                    move || {
+                        normalize_native_rules::build_stale_summary_report(
+                            &root,
+                            threshold,
+                            &stale_summary_filenames,
+                            &stale_summary_paths,
+                        )
+                    }
                 }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
