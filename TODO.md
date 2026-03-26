@@ -63,7 +63,8 @@ Baseline audit in `docs/agent-ux-audit.md` (2026-03-21) covers 12 commands acros
 - [x] `package list --json` silently dropped multi-ecosystem advisory → `PackageListReport` now includes `ecosystems_detected: Vec<String>`; when multiple ecosystems exist, agents see all names and know to re-run with `--ecosystem` for complete results
 - [x] `analyze architecture --compact` showed only cross-imports (hubs/layers hidden when empty) → `format_text()` now emits compact tagged lines (`HUBS:`, `LAYERS:`, `COUPLING:`, `SYMBOLS:`, `ORPHANS:`, `SUMMARY:`) always, even when empty; `format_pretty()` retains the original tabular layout
 - [x] Run full audit pass over all ~30+ subcommands — Pass 2 committed 2026-03-26, 37 commands evaluated
-- [ ] Re-run multi-model audit after fixes to verify improvement
+- [x] Re-run multi-model audit after fixes to verify improvement — Pass 2 in `docs/agent-ux-audit-2.md` (2026-03-27): all 8 fixes confirmed; 6 remaining issues filed
+- [ ] `rules run --only` semantic gap: `files_checked` still counts all files even when `--only` filters output — filter should skip non-matching files in the runner itself
 
 ### ~~`normalize grep` path scoping~~ (done 2026-03-26)
 
