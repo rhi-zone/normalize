@@ -295,7 +295,7 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 
 4. **Unify rule engine config** — `syntax-rules` has a config system (`RulesConfig`, per-rule overrides, severity mapping). The other engines (native, fact, future SARIF) have none. Extract a shared `normalize-rules-config` crate (or extend `normalize-output`) with a unified config schema: rule IDs, severity overrides, enable/disable, per-directory excludes. All engines consult this at run time; `normalize rules run` passes it down.
 
-5. [x] **SARIF passthrough engine** (`--engine sarif`) — implemented: `SarifTool` config type in `normalize-rules-config`, `run_sarif_tools()` in runner, `[[rules.sarif-tools]]` in config.toml. Note: only runs when `--engine sarif` (not `all`) — intentional since external tools are expensive.
+5. [x] **SARIF passthrough engine** (`--engine sarif`) — implemented: `SarifTool` config type in `normalize-rules-config`, `run_sarif_tools()` in runner, `[[rules.sarif-tools]]` in config.toml. Runs with both `--type sarif` and `--type all` (default).
 
 ### Incremental-first architecture
 

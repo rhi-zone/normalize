@@ -1547,7 +1547,7 @@ pub fn run_rules_report(
     }
 
     // SARIF passthrough: run external tools and merge their SARIF output
-    if matches!(engine, RuleKind::Sarif) {
+    if matches!(engine, RuleKind::All | RuleKind::Sarif) {
         let sarif_report = run_sarif_tools(root, &config.rules.sarif_tools);
         report.merge(sarif_report);
     }
