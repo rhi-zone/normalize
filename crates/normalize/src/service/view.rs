@@ -202,6 +202,8 @@ impl ViewService {
             crate::tree::DocstringDisplay::Summary
         };
 
+        let ctx_files = config.view.context_files();
+
         // Handle --dir-context: store prefix so display_view can prepend it
         if dir_context {
             let target_path = target
@@ -209,7 +211,7 @@ impl ViewService {
                 .map(|t| root_path.join(t))
                 .unwrap_or_else(|| root_path.clone());
             if let Some(ctx) =
-                crate::commands::context::get_merged_context(&root_path, &target_path)
+                crate::commands::context::get_merged_context(&root_path, &target_path, &ctx_files)
             {
                 self.view_prefix.set(format!("{}\n\n---\n\n", ctx));
             }
@@ -234,6 +236,7 @@ impl ViewService {
             &exclude,
             &only,
             case_insensitive,
+            &ctx_files,
         )
         .await
     }
@@ -319,6 +322,8 @@ impl ViewService {
             crate::tree::DocstringDisplay::Summary
         };
 
+        let ctx_files = config.view.context_files();
+
         crate::commands::view::build_view_list_service(
             target.as_deref(),
             &root_path,
@@ -334,6 +339,7 @@ impl ViewService {
             &exclude,
             &only,
             case_insensitive,
+            &ctx_files,
         )
         .await
     }

@@ -62,6 +62,7 @@ pub fn build_view_directory_service(
     depth: i32,
     raw: bool,
     filter: Option<&Filter>,
+    context_files: &[&str],
 ) -> Result<ViewReport, String> {
     let effective_depth = if depth < 0 {
         None
@@ -87,7 +88,10 @@ pub fn build_view_directory_service(
         view_node
     };
 
-    let summary = std::fs::read_to_string(dir.join("SUMMARY.md")).ok();
+    // Check for the first matching context file in this directory (in priority order).
+    let summary = context_files
+        .iter()
+        .find_map(|name| std::fs::read_to_string(dir.join(name)).ok());
     let target = dir.to_string_lossy().to_string();
     Ok(ViewReport {
         target,

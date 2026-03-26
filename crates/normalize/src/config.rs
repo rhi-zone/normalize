@@ -32,6 +32,7 @@
 //! depth = 2                   # default tree depth (0=names, 1=signatures, 2=children)
 //! line_numbers = true         # show line numbers by default
 //! show_docs = true            # show full docstrings by default
+//! context_files = ["README.md", "SUMMARY.md", ".context.md"]  # preamble files for directory views
 //!
 //! [analyze]
 //! threshold = 10              # only show functions with complexity >= 10
@@ -120,7 +121,7 @@ pub struct NormalizeConfig {
     pub shadow: ShadowConfig,
     #[param(nested, serde)]
     pub aliases: AliasConfig,
-    #[param(nested)]
+    #[param(nested, serde)]
     pub view: ViewConfig,
     #[param(nested, serde)]
     pub analyze: AnalyzeConfig,
@@ -331,5 +332,33 @@ highlight = false
         assert_eq!(config.pretty.colors, Some(ColorMode::Always));
         assert_eq!(config.pretty.highlight, Some(false));
         assert!(!config.pretty.highlight());
+    }
+
+    #[test]
+    fn test_view_context_files_default() {
+        let dir = TempDir::new().unwrap();
+        let config = NormalizeConfig::load(dir.path());
+        // Default: ["SUMMARY.md", ".context.md"]
+        assert_eq!(
+            config.view.context_files(),
+            vec!["SUMMARY.md", ".context.md"]
+        );
+    }
+
+    #[test]
+    fn test_view_context_files_custom() {
+        let dir = TempDir::new().unwrap();
+        let moss_dir = dir.path().join(".normalize");
+        std::fs::create_dir_all(&moss_dir).unwrap();
+
+        let config_path = moss_dir.join("config.toml");
+        std::fs::write(
+            &config_path,
+            "[view]\ncontext_files = [\"README.md\", \"SUMMARY.md\"]\n",
+        )
+        .unwrap();
+
+        let config = NormalizeConfig::load(dir.path());
+        assert_eq!(config.view.context_files(), vec!["README.md", "SUMMARY.md"]);
     }
 }

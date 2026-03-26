@@ -16,9 +16,7 @@ use std::path::Path;
 pub use search::search_symbols;
 
 /// View command configuration.
-#[derive(
-    Debug, Clone, Deserialize, serde::Serialize, Default, schemars::JsonSchema, server_less::Config,
-)]
+#[derive(Debug, Clone, Deserialize, serde::Serialize, Default, schemars::JsonSchema)]
 #[serde(default)]
 pub struct ViewConfig {
     /// Default depth for tree expansion (0=names, 1=signatures, 2=children, -1=all)
@@ -27,7 +25,15 @@ pub struct ViewConfig {
     pub line_numbers: Option<bool>,
     /// Show full docstrings by default (vs summary)
     pub show_docs: Option<bool>,
+    /// Files to surface as preamble when viewing a directory.
+    /// Checked in order; first match per directory wins.
+    /// Used by both `normalize view <dir>` (immediate dir only) and `--dir-context` (full root→target walk).
+    /// Default: ["SUMMARY.md", ".context.md"]
+    pub context_files: Option<Vec<String>>,
 }
+
+/// Default context file names surfaced as directory preamble.
+pub const DEFAULT_CONTEXT_FILES: &[&str] = &["SUMMARY.md", ".context.md"];
 
 impl ViewConfig {
     pub fn depth(&self) -> i32 {
@@ -40,6 +46,14 @@ impl ViewConfig {
 
     pub fn show_docs(&self) -> bool {
         self.show_docs.unwrap_or(false)
+    }
+
+    /// Returns the configured context file names (in priority order).
+    pub fn context_files(&self) -> Vec<&str> {
+        match &self.context_files {
+            Some(names) => names.iter().map(|s| s.as_str()).collect(),
+            None => DEFAULT_CONTEXT_FILES.to_vec(),
+        }
     }
 }
 
@@ -67,6 +81,7 @@ pub async fn build_view_service(
     exclude: &[String],
     only: &[String],
     case_insensitive: bool,
+    context_files: &[&str],
 ) -> Result<report::ViewReport, String> {
     // Ensure daemon is running if configured
     daemon::maybe_start_daemon(root);
@@ -99,7 +114,13 @@ pub async fn build_view_service(
 
     // Handle "." as current directory
     if target_str == "." {
-        return tree::build_view_directory_service(root, depth, raw, filter.as_ref());
+        return tree::build_view_directory_service(
+            root,
+            depth,
+            raw,
+            filter.as_ref(),
+            context_files,
+        );
     }
 
     // Handle line targets: file.rs:30 (symbol at line) or file.rs:30-55 (range)
@@ -229,6 +250,7 @@ pub async fn build_view_service(
             depth,
             raw,
             filter.as_ref(),
+            context_files,
         )
     } else if full && unified.symbol_path.is_empty() {
         // --full: emit the raw source of the entire file via file service with depth out-of-range
@@ -306,6 +328,7 @@ pub async fn build_view_list_service(
     exclude: &[String],
     only: &[String],
     case_insensitive: bool,
+    context_files: &[&str],
 ) -> Result<report::ViewListReport, String> {
     daemon::maybe_start_daemon(root);
 
@@ -322,7 +345,8 @@ pub async fn build_view_list_service(
 
     // Directory → list children
     if target_str == "." {
-        let dir_report = tree::build_view_directory_service(root, depth, raw, filter.as_ref())?;
+        let dir_report =
+            tree::build_view_directory_service(root, depth, raw, filter.as_ref(), context_files)?;
         // Return all direct children as separate ViewReports
         let children: Vec<report::ViewReport> = dir_report
             .node
@@ -402,6 +426,7 @@ pub async fn build_view_list_service(
                     depth,
                     raw,
                     filter.as_ref(),
+                    context_files,
                 ) {
                     results.push(r);
                 }

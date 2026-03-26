@@ -375,7 +375,9 @@ impl NormalizeService {
             .canonicalize()
             .map_err(|e| format!("Failed to resolve target: {}", e))?;
 
-        let files = collect_context_files(&root_canon, &target_canon);
+        let config = NormalizeConfig::load(&root_path);
+        let ctx_names = config.view.context_files();
+        let files = collect_context_files(&root_canon, &target_canon, &ctx_names);
 
         if list {
             let paths: Vec<String> = files

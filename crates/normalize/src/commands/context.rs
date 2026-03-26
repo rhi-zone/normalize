@@ -9,7 +9,10 @@ use std::path::{Path, PathBuf};
 
 use crate::output::OutputFormatter;
 
-/// Context file names to look for (in priority order).
+/// Default context file names for the `normalize context` command (in priority order).
+/// These are `.context.md`-oriented names; directory tree views use `ViewConfig::context_files()`
+/// which defaults to `["SUMMARY.md", ".context.md"]`.
+#[cfg(test)]
 const CONTEXT_FILES: &[&str] = &[".context.md", "CONTEXT.md"];
 
 /// Context file list report (--list mode).
@@ -79,7 +82,10 @@ impl OutputFormatter for ContextReport {
 
 /// Collect context files from root to target directory.
 /// Returns files in order from root to target (most general to most specific).
-pub fn collect_context_files(root: &Path, target_dir: &Path) -> Vec<PathBuf> {
+///
+/// `names` is the ordered list of filenames to look for in each directory;
+/// the first match per directory wins. Callers should pass `ViewConfig::context_files()`.
+pub fn collect_context_files(root: &Path, target_dir: &Path, names: &[&str]) -> Vec<PathBuf> {
     let mut files = Vec::new();
 
     // Build path from root to target
@@ -103,7 +109,7 @@ pub fn collect_context_files(root: &Path, target_dir: &Path) -> Vec<PathBuf> {
 
     // Check each directory for context files
     for dir in dirs {
-        for name in CONTEXT_FILES {
+        for name in names {
             let path = dir.join(name);
             if path.exists() {
                 files.push(path);
@@ -117,7 +123,10 @@ pub fn collect_context_files(root: &Path, target_dir: &Path) -> Vec<PathBuf> {
 
 /// Get merged context content for a path.
 /// Used by other commands (e.g., view --dir-context).
-pub fn get_merged_context(root: &Path, target: &Path) -> Option<String> {
+///
+/// `names` is the ordered list of filenames to look for in each directory.
+/// Callers should pass `ViewConfig::context_files()`.
+pub fn get_merged_context(root: &Path, target: &Path, names: &[&str]) -> Option<String> {
     // Find the target directory - walk up from target until we find an existing dir
     let target_dir = if target.is_file() {
         target.parent().unwrap_or(root).to_path_buf()
@@ -138,7 +147,7 @@ pub fn get_merged_context(root: &Path, target: &Path) -> Option<String> {
     let root = root.canonicalize().ok()?;
     let target_dir = target_dir.canonicalize().ok()?;
 
-    let files = collect_context_files(&root, &target_dir);
+    let files = collect_context_files(&root, &target_dir, names);
     if files.is_empty() {
         return None;
     }
@@ -173,7 +182,7 @@ mod tests {
 
         fs::write(root.join("CONTEXT.md"), "Root context").unwrap();
 
-        let files = collect_context_files(root, root);
+        let files = collect_context_files(root, root, CONTEXT_FILES);
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with("CONTEXT.md"));
     }
@@ -187,7 +196,7 @@ mod tests {
         fs::create_dir_all(root.join("src")).unwrap();
         fs::write(root.join("src/.context.md"), "Src context").unwrap();
 
-        let files = collect_context_files(root, &root.join("src"));
+        let files = collect_context_files(root, &root.join("src"), CONTEXT_FILES);
         assert_eq!(files.len(), 2);
         assert!(files[0].ends_with("CONTEXT.md"));
         assert!(files[1].ends_with(".context.md"));
@@ -201,7 +210,7 @@ mod tests {
         fs::write(root.join("CONTEXT.md"), "Uppercase").unwrap();
         fs::write(root.join(".context.md"), "Dotfile").unwrap();
 
-        let files = collect_context_files(root, root);
+        let files = collect_context_files(root, root, CONTEXT_FILES);
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with(".context.md"));
     }
@@ -215,7 +224,7 @@ mod tests {
         fs::create_dir_all(root.join("sub")).unwrap();
         fs::write(root.join("sub/.context.md"), "Sub").unwrap();
 
-        let content = get_merged_context(root, &root.join("sub/file.rs")).unwrap();
+        let content = get_merged_context(root, &root.join("sub/file.rs"), CONTEXT_FILES).unwrap();
         assert!(content.contains("Root"));
         assert!(content.contains("Sub"));
     }
@@ -223,7 +232,26 @@ mod tests {
     #[test]
     fn test_no_context_files() {
         let tmp = tempdir().unwrap();
-        let files = collect_context_files(tmp.path(), tmp.path());
+        let files = collect_context_files(tmp.path(), tmp.path(), CONTEXT_FILES);
         assert!(files.is_empty());
+    }
+
+    #[test]
+    fn test_custom_context_files() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+
+        fs::write(root.join("SUMMARY.md"), "Summary content").unwrap();
+        fs::write(root.join("CONTEXT.md"), "Context content").unwrap();
+
+        // With custom names, only SUMMARY.md is found (first match wins)
+        let files = collect_context_files(root, root, &["SUMMARY.md", "CONTEXT.md"]);
+        assert_eq!(files.len(), 1);
+        assert!(files[0].ends_with("SUMMARY.md"));
+
+        // With only CONTEXT.md in the list, that's what we get
+        let files = collect_context_files(root, root, &["CONTEXT.md"]);
+        assert_eq!(files.len(), 1);
+        assert!(files[0].ends_with("CONTEXT.md"));
     }
 }
