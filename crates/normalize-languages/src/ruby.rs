@@ -159,9 +159,59 @@ impl Language for Ruby {
     ) -> Option<ContainerBody> {
         crate::body::analyze_end_body(body_node, content, inner_indent)
     }
+
+    fn extract_module_doc(&self, src: &str) -> Option<String> {
+        extract_ruby_module_doc(src)
+    }
 }
 
 impl LanguageSymbols for Ruby {}
+
+/// Extract the module-level doc comment from Ruby source.
+///
+/// Collects leading `#` comment lines, skipping `# frozen_string_literal` and
+/// similar magic comment lines (which appear before actual doc comments).
+fn extract_ruby_module_doc(src: &str) -> Option<String> {
+    let mut lines = Vec::new();
+    let mut past_magic = false;
+    for line in src.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            if lines.is_empty() {
+                continue; // skip leading blank lines
+            } else {
+                break; // blank line ends the comment block
+            }
+        }
+        if trimmed.starts_with('#') {
+            let text = trimmed.strip_prefix('#').unwrap_or("").trim_start();
+            // Skip magic comments: frozen_string_literal, encoding, etc.
+            if !past_magic
+                && (text.starts_with("frozen_string_literal")
+                    || text.starts_with("encoding")
+                    || text.starts_with("coding"))
+            {
+                continue;
+            }
+            past_magic = true;
+            lines.push(text.to_string());
+        } else {
+            break; // non-comment, non-blank line ends the block
+        }
+    }
+    if lines.is_empty() {
+        return None;
+    }
+    // Strip trailing empty comment lines
+    while lines.last().map(|l: &String| l.is_empty()).unwrap_or(false) {
+        lines.pop();
+    }
+    if lines.is_empty() {
+        None
+    } else {
+        Some(lines.join("\n"))
+    }
+}
 
 #[cfg(test)]
 mod tests {

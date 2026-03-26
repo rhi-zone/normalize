@@ -561,7 +561,7 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 **Remaining:**
 - [ ] Test selection: run only tests affected by changes (use call graph). Related: `analyze test-gaps` (see `docs/design/test-gaps.md`) shares the test-context classification
 - [ ] Task decomposition: break large tasks into validated subtasks
-- [ ] Cross-file refactoring: rename symbol across codebase
+- [x] Cross-file refactoring: rename symbol across codebase
 - [ ] Partial success: apply working edits, report failures
 - [ ] Human-in-the-loop escalation: ask user when stuck
 
@@ -827,7 +827,7 @@ Building blocks are all present. The gap is composition:
   Option<String>` field added (values: `"read"`/`"write"`/`"read-write"`); currently
   always `None` pending index + scope engine changes below.
 - [x] **Populate `access` in `CallEntry`** — `calls` table has `access TEXT` column (schema v7); `@call.write` capture in Rust `.scm` files populates it; `view referenced-by` displays `[read]`/`[write]`/`[read-write]`. Other languages: extend `.scm` files when grammars support write-position detection.
-- [ ] `normalize rename <target> <new-name>` — cross-file symbol rename. Uses
+- [x] `normalize rename <target> <new-name>` — cross-file symbol rename. Uses
   `view referenced-by` to find all sites, normalize-scope for shadow/conflict detection,
   batch edit for atomic multi-file rewrite, shadow git for preview. `--dry-run` shows
   diff, no writes. This is the highest-value refactoring command.

@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`normalize rename <target> <new-name>`** — top-level cross-file symbol rename. Resolves the target via the facts index, finds all call sites and import statements, checks for name conflicts, then applies (or previews with `--dry-run`) the batch edit across every affected file. Returns a `RenameReport` with every site touched, structured as `definition`/`call`/`import` kinds. Use `--force` to bypass conflict checks.
+
 ### Fixed
 
 - **`normalize rules run --type fact` no longer crashes** with `corrupted double-linked list` (heap corruption). The `abi_stable`/dylib rule pack loader has been removed; fact rules now run purely as interpreted `.dl` files with no dynamic library loading.

@@ -177,9 +177,10 @@ mod tests {
         use crate::health::HealthReport;
         assert_output_formatter::<HealthReport>();
 
-        use normalize_rules::{RulesListReport, RulesValidateReport};
+        use normalize_rules::{RulesCompileReport, RulesListReport, RulesValidateReport};
         assert_output_formatter::<RulesListReport>();
         assert_output_formatter::<RulesValidateReport>();
+        assert_output_formatter::<RulesCompileReport>();
 
         use normalize_native_rules::check_examples::CheckExamplesReport;
         use normalize_native_rules::check_refs::CheckRefsReport;
@@ -231,6 +232,9 @@ mod tests {
 
         use crate::service::view::TraceReport;
         assert_output_formatter::<TraceReport>();
+
+        use crate::service::rename::RenameReport;
+        assert_output_formatter::<RenameReport>();
 
         use normalize_rules::{RuleInfoReport, RuleShowReport, RulesTagsReport};
         assert_output_formatter::<RuleShowReport>();

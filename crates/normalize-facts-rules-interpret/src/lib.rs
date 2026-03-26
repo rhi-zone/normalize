@@ -1410,5 +1410,149 @@ fn extract_diagnostics(engine: &Engine) -> Vec<Diagnostic> {
     diagnostics
 }
 
+// =============================================================================
+// Compile / validate API
+// =============================================================================
+
+/// An issue (error or warning) found during compile-time validation of a `.dl` file.
+#[derive(Debug, Clone)]
+pub struct CompileIssue {
+    /// 1-based line number in the user source (0 = unknown).
+    pub line: usize,
+    /// 1-based column number in the user source (0 = unknown).
+    pub col: usize,
+    /// Human-readable description.
+    pub message: String,
+}
+
+/// The result of compile-time validation of a `.dl` source string.
+#[derive(Debug, Default)]
+pub struct CompileResult {
+    /// Hard errors — the program cannot run correctly.
+    pub errors: Vec<CompileIssue>,
+    /// Warnings — the program will run but may not behave as expected.
+    pub warnings: Vec<CompileIssue>,
+    /// All relation names referenced in rule heads or bodies (de-duplicated, sorted).
+    pub relations_used: Vec<String>,
+}
+
+/// Validate a `.dl` source string (already stripped of frontmatter) without executing it.
+///
+/// Checks:
+/// 1. Syntax: can the source be parsed as an Ascent program?
+/// 2. Semantics: are all relation names used in rule heads/bodies declared?
+///
+/// The `source` argument is the raw Datalog body (no TOML frontmatter).  The built-in
+/// preamble relations (`symbol`, `import`, etc.) are always available.
+pub fn compile_rules_source(source: &str) -> CompileResult {
+    let mut result = CompileResult::default();
+
+    let full_source = format!("{}\n{}", PREAMBLE, source);
+
+    // Step 1: syntax check
+    let ast: AscentProgram = match syn::parse_str(&full_source) {
+        Ok(ast) => ast,
+        Err(e) => {
+            // syn::Error::to_string() includes the message.
+            // Try to recover line/col from the span (works when proc-macro2 is built
+            // with span-locations; falls back to 0/0 otherwise).
+            let span = e.span();
+            let start = span.start();
+            // proc-macro2 LineColumn is 1-based but reports 0/0 when span-locations is off.
+            // Subtract the preamble line count so the numbers reference the user file.
+            let preamble_lines = PREAMBLE.lines().count();
+            let raw_line = start.line;
+            let user_line = if raw_line > preamble_lines {
+                raw_line - preamble_lines
+            } else {
+                0
+            };
+            result.errors.push(CompileIssue {
+                line: user_line,
+                col: start.column,
+                message: e.to_string(),
+            });
+            return result;
+        }
+    };
+
+    // Step 2: lower to IR (catches desugar / structural errors)
+    let program = match Program::from_ast(ast) {
+        Ok(p) => p,
+        Err(e) => {
+            result.errors.push(CompileIssue {
+                line: 0,
+                col: 0,
+                message: e,
+            });
+            return result;
+        }
+    };
+
+    // Step 3: collect declared relation names
+    let declared: std::collections::HashSet<&str> =
+        program.relations.keys().map(|s| s.as_str()).collect();
+
+    // Step 4: walk all rules and collect every relation name referenced
+    let mut used: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for rule in &program.rules {
+        for head in &rule.heads {
+            used.insert(head.relation.clone());
+            if !declared.contains(head.relation.as_str()) {
+                result.errors.push(CompileIssue {
+                    line: 0,
+                    col: 0,
+                    message: format!(
+                        "unknown relation '{}' used in rule head — declare it with `relation {}(...);` or check spelling",
+                        head.relation, head.relation
+                    ),
+                });
+            }
+        }
+        for body_item in &rule.body {
+            let rel_name = match body_item {
+                ascent_interpreter::ir::BodyItem::Clause(cl) => Some(cl.relation.as_str()),
+                ascent_interpreter::ir::BodyItem::Aggregation(agg) => Some(agg.relation.as_str()),
+                ascent_interpreter::ir::BodyItem::Generator(_)
+                | ascent_interpreter::ir::BodyItem::Condition(_) => None,
+            };
+            if let Some(name) = rel_name {
+                used.insert(name.to_string());
+                if !declared.contains(name) {
+                    result.errors.push(CompileIssue {
+                        line: 0,
+                        col: 0,
+                        message: format!(
+                            "unknown relation '{}' used in rule body — declare it with `relation {}(...);` or check spelling",
+                            name, name
+                        ),
+                    });
+                }
+            }
+        }
+    }
+
+    // Step 5: warn about user-declared relations that are never used in any rule
+    // (only for non-preamble relations)
+    let preamble_program: AscentProgram = syn::parse_str(PREAMBLE).expect("preamble is valid");
+    let preamble_relations: std::collections::HashSet<String> = preamble_program
+        .relations
+        .iter()
+        .map(|r| r.name.to_string())
+        .collect();
+    for name in program.relations.keys() {
+        if !preamble_relations.contains(name) && !used.contains(name) {
+            result.warnings.push(CompileIssue {
+                line: 0,
+                col: 0,
+                message: format!("relation '{name}' is declared but never used in any rule"),
+            });
+        }
+    }
+
+    result.relations_used = used.into_iter().collect();
+    result
+}
+
 #[cfg(test)]
 mod tests;

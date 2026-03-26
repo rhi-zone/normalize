@@ -21,6 +21,82 @@ fn resolve_pretty(pretty: bool, compact: bool) -> bool {
     !compact && (pretty || std::io::stdout().is_terminal())
 }
 
+/// A single error found when compiling a `.dl` rules file.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct CompileError {
+    /// 1-based line number in the source file (0 = unknown / not line-specific).
+    pub line: usize,
+    /// 1-based column number in the source file (0 = unknown).
+    pub col: usize,
+    /// Human-readable description of the error.
+    pub message: String,
+}
+
+/// A single warning found when compiling a `.dl` rules file.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct CompileWarning {
+    /// 1-based line number in the source file (0 = unknown / not line-specific).
+    pub line: usize,
+    /// 1-based column number in the source file (0 = unknown).
+    pub col: usize,
+    /// Human-readable description of the warning.
+    pub message: String,
+}
+
+/// Report returned by `normalize rules compile`.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct RulesCompileReport {
+    /// Path to the `.dl` file that was checked.
+    pub path: String,
+    /// `true` if no errors were found; `false` otherwise.
+    pub valid: bool,
+    /// Hard errors — the program cannot run correctly.
+    pub errors: Vec<CompileError>,
+    /// Warnings — the program will run but may not behave as expected.
+    pub warnings: Vec<CompileWarning>,
+    /// All relation names referenced in rule heads or bodies (sorted).
+    pub relations_used: Vec<String>,
+}
+
+impl OutputFormatter for RulesCompileReport {
+    fn format_text(&self) -> String {
+        let mut out = String::new();
+        for e in &self.errors {
+            if e.line > 0 {
+                out.push_str(&format!(
+                    "{}:{}:{}: error: {}\n",
+                    self.path, e.line, e.col, e.message
+                ));
+            } else {
+                out.push_str(&format!("{}: error: {}\n", self.path, e.message));
+            }
+        }
+        for w in &self.warnings {
+            if w.line > 0 {
+                out.push_str(&format!(
+                    "{}:{}:{}: warning: {}\n",
+                    self.path, w.line, w.col, w.message
+                ));
+            } else {
+                out.push_str(&format!("{}: warning: {}\n", self.path, w.message));
+            }
+        }
+        if self.valid {
+            out.push_str(&format!(
+                "{}: ok — {} relation{} used\n",
+                self.path,
+                self.relations_used.len(),
+                if self.relations_used.len() == 1 {
+                    ""
+                } else {
+                    "s"
+                },
+            ));
+        }
+        out
+    }
+}
+
 /// Report returned by `normalize rules validate`.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct RulesValidateReport {
