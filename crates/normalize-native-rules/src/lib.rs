@@ -8,7 +8,6 @@ pub mod budget;
 pub mod check_examples;
 pub mod check_refs;
 pub mod ratchet;
-pub mod scm_capture_names;
 pub mod stale_docs;
 pub mod stale_summary;
 pub(crate) mod walk;
@@ -17,7 +16,6 @@ pub use budget::{BudgetRulesReport, build_budget_report};
 pub use check_examples::build_check_examples_report;
 pub use check_refs::build_check_refs_report;
 pub use ratchet::{RatchetRulesReport, build_ratchet_report};
-pub use scm_capture_names::build_scm_capture_names_report;
 pub use stale_docs::build_stale_docs_report;
 pub use stale_summary::{build_missing_summary_report, build_stale_summary_report};
 
@@ -147,11 +145,5 @@ pub const NATIVE_RULES: &[NativeRuleDescriptor] = &[
         default_severity: "error",
         message: "Dependency diff exceeds configured budget limit",
         tags: &["quality", "budget"],
-    },
-    NativeRuleDescriptor {
-        id: "scm-capture-names",
-        default_severity: "warning",
-        message: "Unexpected capture name in a .calls.scm query file (not consumed by the facts system)",
-        tags: &["correctness", "query"],
     },
 ];
