@@ -26,8 +26,8 @@ struct ParsedSymbol {
 struct ParsedFileData {
     file_path: String,
     symbols: Vec<ParsedSymbol>,
-    /// (caller_symbol, callee_name, callee_qualifier, line)
-    calls: Vec<(String, String, Option<String>, usize)>,
+    /// (caller_symbol, callee_name, callee_qualifier, access, line)
+    calls: Vec<(String, String, Option<String>, Option<String>, usize)>,
     /// imports (for Python files only)
     imports: Vec<FlatImport>,
     /// (type_name, method_name) for interface/class method signatures
@@ -37,7 +37,7 @@ struct ParsedFileData {
 }
 
 // Not yet public - just delete .normalize/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 6;
+const SCHEMA_VERSION: i64 = 7;
 
 /// Check if a file path has a supported source extension.
 fn is_source_file(path: &str) -> bool {
@@ -196,7 +196,8 @@ impl FileIndex {
                 callee_name TEXT NOT NULL,
                 callee_qualifier TEXT,
                 callee_resolved_file TEXT,
-                line INTEGER NOT NULL
+                line INTEGER NOT NULL,
+                access TEXT
             )",
             (),
         )
@@ -406,6 +407,9 @@ impl FileIndex {
                 .await
                 .ok(); // ignore "duplicate column" error on fresh DBs
             conn.execute("ALTER TABLE calls ADD COLUMN callee_resolved_file TEXT", ())
+                .await
+                .ok(); // ignore "duplicate column" error on fresh DBs
+            conn.execute("ALTER TABLE calls ADD COLUMN access TEXT", ())
                 .await
                 .ok(); // ignore "duplicate column" error on fresh DBs
             conn.execute(
@@ -984,7 +988,7 @@ impl FileIndex {
         &self,
         symbol_name: &str,
         def_file: &str,
-    ) -> Result<Vec<(String, String, usize)>, libsql::Error> {
+    ) -> Result<Vec<(String, String, usize, Option<String>)>, libsql::Error> {
         // Handle Class.method format - split and search for method within class
         let (class_filter, method_name) = if symbol_name.contains('.') {
             let parts: Vec<&str> = symbol_name.splitn(2, '.').collect();
@@ -998,7 +1002,7 @@ impl FileIndex {
             let mut rows = self
                 .conn
                 .query(
-                    "SELECT c.caller_file, c.caller_symbol, c.line
+                    "SELECT c.caller_file, c.caller_symbol, c.line, c.access
                  FROM calls c
                  JOIN symbols s ON c.caller_file = s.file AND c.caller_symbol = s.name
                  WHERE c.callee_name = ?1 AND c.callee_qualifier = 'self' AND s.parent = ?2",
@@ -1011,6 +1015,7 @@ impl FileIndex {
                     row.get(0)?,
                     row.get(1)?,
                     u64::try_from(row.get::<i64>(2)?).unwrap_or(0) as usize,
+                    row.get::<Option<String>>(3)?,
                 ));
             }
 
@@ -1028,26 +1033,26 @@ impl FileIndex {
         // Branch 3: Import-based fallback for unresolved calls (callee_resolved_file IS NULL)
         // Branch 4: self.method() calls within a class
         let mut rows = self.conn.query(
-            "SELECT caller_file, caller_symbol, line FROM calls
+            "SELECT caller_file, caller_symbol, line, access FROM calls
              WHERE callee_name = ?1 AND callee_resolved_file = ?2
              UNION
-             SELECT caller_file, caller_symbol, line FROM calls
+             SELECT caller_file, caller_symbol, line, access FROM calls
              WHERE callee_name = ?1 AND caller_file = ?2
                AND callee_resolved_file IS NULL AND callee_qualifier IS NULL
              UNION
-             SELECT c.caller_file, c.caller_symbol, c.line
+             SELECT c.caller_file, c.caller_symbol, c.line, c.access
              FROM calls c
              JOIN imports i ON c.caller_file = i.file AND c.callee_name = COALESCE(i.alias, i.name)
              WHERE i.name = ?1 AND c.callee_resolved_file IS NULL
                AND (i.resolved_file = ?2 OR i.resolved_file IS NULL)
              UNION
-             SELECT c.caller_file, c.caller_symbol, c.line
+             SELECT c.caller_file, c.caller_symbol, c.line, c.access
              FROM calls c
              JOIN imports i ON c.caller_file = i.file AND c.callee_qualifier = COALESCE(i.alias, i.name)
              WHERE c.callee_name = ?1 AND i.module IS NULL AND c.callee_resolved_file IS NULL
                AND (i.resolved_file = ?2 OR i.resolved_file IS NULL)
              UNION
-             SELECT c.caller_file, c.caller_symbol, c.line
+             SELECT c.caller_file, c.caller_symbol, c.line, c.access
              FROM calls c
              JOIN symbols s ON c.caller_file = s.file AND c.caller_symbol = s.name
              WHERE c.callee_name = ?1 AND c.callee_qualifier = 'self'
@@ -1060,6 +1065,7 @@ impl FileIndex {
                 row.get(0)?,
                 row.get(1)?,
                 u64::try_from(row.get::<i64>(2)?).unwrap_or(0) as usize,
+                row.get::<Option<String>>(3)?,
             ));
         }
 
@@ -1071,11 +1077,11 @@ impl FileIndex {
         &self,
         file: &str,
         symbol_name: &str,
-    ) -> Result<Vec<(String, usize)>, libsql::Error> {
+    ) -> Result<Vec<(String, usize, Option<String>)>, libsql::Error> {
         let mut rows = self
             .conn
             .query(
-                "SELECT callee_name, line FROM calls WHERE caller_file = ?1 AND caller_symbol = ?2",
+                "SELECT callee_name, line, access FROM calls WHERE caller_file = ?1 AND caller_symbol = ?2",
                 params![file, symbol_name],
             )
             .await?;
@@ -1084,6 +1090,7 @@ impl FileIndex {
             callees.push((
                 row.get(0)?,
                 u64::try_from(row.get::<i64>(1)?).unwrap_or(0) as usize,
+                row.get::<Option<String>>(2)?,
             ));
         }
         Ok(callees)
@@ -1944,8 +1951,14 @@ impl FileIndex {
                     let kind = sym.kind.as_str();
                     if kind == "function" || kind == "method" {
                         let calls = parser.find_callees_for_symbol(&full_path, &content, sym);
-                        for (callee_name, line, qualifier) in calls {
-                            call_data.push((sym.name.clone(), callee_name, qualifier, line));
+                        for (callee_name, line, qualifier, access) in calls {
+                            call_data.push((
+                                sym.name.clone(),
+                                callee_name,
+                                qualifier,
+                                access,
+                                line,
+                            ));
                         }
                     }
                 }
@@ -2048,10 +2061,10 @@ impl FileIndex {
                 symbol_count += 1;
             }
 
-            for (caller_symbol, callee_name, qualifier, line) in &data.calls {
+            for (caller_symbol, callee_name, qualifier, access, line) in &data.calls {
                 self.conn.execute(
-                    "INSERT INTO calls (caller_file, caller_symbol, callee_name, callee_qualifier, line) VALUES (?1, ?2, ?3, ?4, ?5)",
-                    params![data.file_path.clone(), caller_symbol.clone(), callee_name.clone(), qualifier.clone(), *line as i64],
+                    "INSERT INTO calls (caller_file, caller_symbol, callee_name, callee_qualifier, access, line) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![data.file_path.clone(), caller_symbol.clone(), callee_name.clone(), qualifier.clone(), access.clone(), *line as i64],
                 ).await?;
                 call_count += 1;
             }
@@ -2181,10 +2194,10 @@ impl FileIndex {
                 let kind = sym.kind.as_str();
                 if kind == "function" || kind == "method" {
                     let calls = parser.find_callees_for_symbol(&full_path, &content, sym);
-                    for (callee_name, line, qualifier) in calls {
+                    for (callee_name, line, qualifier, access) in calls {
                         self.conn.execute(
-                            "INSERT INTO calls (caller_file, caller_symbol, callee_name, callee_qualifier, line) VALUES (?1, ?2, ?3, ?4, ?5)",
-                            params![file_path.clone(), sym.name.clone(), callee_name, qualifier, line as i64],
+                            "INSERT INTO calls (caller_file, caller_symbol, callee_name, callee_qualifier, access, line) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                            params![file_path.clone(), sym.name.clone(), callee_name, qualifier, access, line as i64],
                         ).await?;
                         call_count += 1;
                     }
@@ -2541,7 +2554,10 @@ class MyClass:
             .unwrap();
         assert!(!callers.is_empty(), "Should find callers of method_b");
 
-        let caller_names: Vec<&str> = callers.iter().map(|(_, name, _)| name.as_str()).collect();
+        let caller_names: Vec<&str> = callers
+            .iter()
+            .map(|(_, name, _, _)| name.as_str())
+            .collect();
         assert!(
             caller_names.contains(&"method_a"),
             "method_a should call method_b"
@@ -2640,7 +2656,7 @@ class MyClass:
             .find_callers("helper", "src/utils_a.py")
             .await
             .unwrap();
-        let caller_files: Vec<&str> = callers.iter().map(|(f, _, _)| f.as_str()).collect();
+        let caller_files: Vec<&str> = callers.iter().map(|(f, _, _, _)| f.as_str()).collect();
 
         // When imports are resolved, disambiguation is precise — only the correct
         // caller appears. When unresolved (no LocalDeps for test setup), both
@@ -2669,7 +2685,7 @@ class MyClass:
             .find_callers("helper", "src/utils_b.py")
             .await
             .unwrap();
-        let caller_files: Vec<&str> = callers.iter().map(|(f, _, _)| f.as_str()).collect();
+        let caller_files: Vec<&str> = callers.iter().map(|(f, _, _, _)| f.as_str()).collect();
         assert!(
             caller_files.contains(&"src/caller_b.py"),
             "caller_b.py calls helper() (imports utils_b), must be a caller. Got: {:?}\nimports: {:?}\ncalls: {:?}",

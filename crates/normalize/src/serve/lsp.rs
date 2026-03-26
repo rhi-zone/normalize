@@ -620,7 +620,7 @@ impl LanguageServer for NormalizeBackend {
         if let Some(def_file) = def_file
             && let Ok(callers) = index.find_callers(&word, &def_file).await
         {
-            for (file, _caller_name, line) in callers {
+            for (file, _caller_name, line, _access) in callers {
                 if let Some(loc) = make_location_at_line(&file, &root, line) {
                     locations.push(loc);
                 }
@@ -757,7 +757,7 @@ impl LanguageServer for NormalizeBackend {
         if let Some(def_file) = &def_file
             && let Ok(callers) = index.find_callers(&old_name, def_file).await
         {
-            for (file, _caller_name, line) in callers {
+            for (file, _caller_name, line, _access) in callers {
                 let target_path = root.join(&file);
                 if let Ok(target_uri) = Url::from_file_path(&target_path)
                     && let Ok(file_content) = std::fs::read_to_string(&target_path)

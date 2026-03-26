@@ -66,13 +66,13 @@ pub async fn build_call_graph(
     if show_callers {
         match idx.find_callers(&symbol, &def_file).await {
             Ok(callers) => {
-                for (file, sym, line) in callers {
+                for (file, sym, line, access) in callers {
                     results.push(CallEntry {
                         file,
                         symbol: sym,
                         line,
                         direction: "caller".to_string(),
-                        access: None,
+                        access,
                     });
                 }
             }
@@ -85,13 +85,13 @@ pub async fn build_call_graph(
     if show_callees {
         match idx.find_callees(&def_file, &symbol).await {
             Ok(callees) => {
-                for (name, line) in callees {
+                for (name, line, access) in callees {
                     results.push(CallEntry {
                         file: def_file.clone(),
                         symbol: name,
                         line,
                         direction: "callee".to_string(),
-                        access: None,
+                        access,
                     });
                 }
             }

@@ -416,7 +416,7 @@ fn extract_call_edges(
         }
         let caller_key = (rel_path.to_string(), sym.name.clone());
         let callees = parser.find_callees_for_symbol(abs_path, content, sym);
-        for (callee_name, _, _) in callees {
+        for (callee_name, _, _, _) in callees {
             edges.push((caller_key.clone(), callee_name));
         }
     }

@@ -1475,7 +1475,7 @@ async fn do_rename(
     // Collect all files to touch (deduplicated)
     let mut all_files: HashSet<String> = HashSet::new();
     all_files.insert(def_rel_path.clone());
-    for (file, _, _) in &callers {
+    for (file, _, _, _) in &callers {
         all_files.insert(file.clone());
     }
     for (file, _, _, _) in &importers {
@@ -1517,7 +1517,7 @@ async fn do_rename(
     // Group callers by file so we read each file once
     let mut callers_by_file: std::collections::HashMap<String, Vec<usize>> =
         std::collections::HashMap::new();
-    for (file, _, line) in &callers {
+    for (file, _, line, _) in &callers {
         callers_by_file.entry(file.clone()).or_default().push(*line);
     }
 

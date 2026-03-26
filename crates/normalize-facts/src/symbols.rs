@@ -249,7 +249,7 @@ impl SymbolParser {
 
         let calls = self.find_callees_for_symbol(path, content, &symbol);
         let mut unique: std::collections::HashSet<String> =
-            calls.into_iter().map(|(name, _, _)| name).collect();
+            calls.into_iter().map(|(name, _, _, _)| name).collect();
         let mut result: Vec<_> = unique.drain().collect();
         result.sort();
         result
@@ -257,15 +257,16 @@ impl SymbolParser {
 
     /// Find callees with line numbers (for call graph indexing)
     /// Returns: (callee_name, line, Option<qualifier>)
-    /// For foo.bar(), returns ("bar", line, Some("foo"))
-    /// For bar(), returns ("bar", line, None)
+    /// For foo.bar(), returns ("bar", line, Some("foo"), access)
+    /// For bar(), returns ("bar", line, None, access)
+    /// `access` is `Some("write")` when the call result is assigned; `None` otherwise.
     #[allow(dead_code)] // Call graph API - used by index
     pub fn find_callees_with_lines(
         &mut self,
         path: &Path,
         content: &str,
         symbol_name: &str,
-    ) -> Vec<(String, usize, Option<String>)> {
+    ) -> Vec<(String, usize, Option<String>, Option<String>)> {
         let symbol = match self.find_symbol(path, content, symbol_name) {
             Some(s) => s,
             None => return Vec::new(),
@@ -275,12 +276,14 @@ impl SymbolParser {
 
     /// Find callees for a pre-parsed symbol (avoids re-parsing the file)
     /// Use this when you already have the FlatSymbol from parse_file()
+    /// Returns `(callee_name, line, qualifier, access)` where `access` is
+    /// `Some("write")` when the call result is assigned, `None` otherwise.
     pub fn find_callees_for_symbol(
         &mut self,
         path: &Path,
         content: &str,
         symbol: &FlatSymbol,
-    ) -> Vec<(String, usize, Option<String>)> {
+    ) -> Vec<(String, usize, Option<String>, Option<String>)> {
         let support = match support_for_path(path) {
             Some(s) => s,
             None => return Vec::new(),
@@ -312,51 +315,92 @@ impl SymbolParser {
         Self::collect_calls_with_query(&tree.root_node(), &source, &query, symbol.start_line)
     }
 
-    /// Generic query-based call extraction using `@call` and `@call.qualifier` captures.
+    /// Generic query-based call extraction using `@call`, `@call.write`, and
+    /// `@call.qualifier` captures.
+    ///
+    /// - `@call` — call in read context (access = None)
+    /// - `@call.write` — call whose result is assigned (access = Some("write"))
+    /// - `@call.qualifier` — qualifier/receiver for method calls
+    ///
+    /// When both `@call` and `@call.write` match the same node (same byte offset +
+    /// line), the "write" tag wins.  This happens because write-context patterns use
+    /// `@call.write` while the generic patterns still use `@call`; deduplication via
+    /// a HashMap ensures a single entry per (name, line) pair with the most specific
+    /// access tag.
     fn collect_calls_with_query(
         root: &tree_sitter::Node,
         source: &str,
         query: &tree_sitter::Query,
         base_line: usize,
-    ) -> Vec<(String, usize, Option<String>)> {
+    ) -> Vec<(String, usize, Option<String>, Option<String>)> {
         let call_idx = query.capture_names().iter().position(|n| *n == "call");
+        let call_write_idx = query
+            .capture_names()
+            .iter()
+            .position(|n| *n == "call.write");
         let qualifier_idx = query
             .capture_names()
             .iter()
             .position(|n| *n == "call.qualifier");
 
-        let Some(call_idx) = call_idx else {
+        if call_idx.is_none() && call_write_idx.is_none() {
             return Vec::new();
-        };
+        }
 
         let mut qcursor = tree_sitter::QueryCursor::new();
-        let mut calls = Vec::new();
+        // Map (name, line) -> (qualifier, access) — "write" beats None
+        let mut call_map: std::collections::HashMap<
+            (String, usize),
+            (Option<String>, Option<String>),
+        > = std::collections::HashMap::new();
 
         let mut matches = qcursor.matches(query, *root, source.as_bytes());
         while let Some(m) = matches.next() {
             let mut name: Option<(&str, usize)> = None;
             let mut qualifier: Option<&str> = None;
+            let mut is_write = false;
 
             for capture in m.captures {
-                if capture.index as usize == call_idx {
+                let idx = capture.index as usize;
+                if Some(idx) == call_idx {
                     let text = &source[capture.node.byte_range()];
                     let line = capture.node.start_position().row + base_line;
                     name = Some((text, line));
-                } else if Some(capture.index as usize) == qualifier_idx {
+                } else if Some(idx) == call_write_idx {
+                    let text = &source[capture.node.byte_range()];
+                    let line = capture.node.start_position().row + base_line;
+                    name = Some((text, line));
+                    is_write = true;
+                } else if Some(idx) == qualifier_idx {
                     qualifier = Some(&source[capture.node.byte_range()]);
                 }
             }
 
             if let Some((call_name, line)) = name {
-                calls.push((
-                    call_name.to_string(),
-                    line,
-                    qualifier.map(|q| q.to_string()),
-                ));
+                let access = if is_write {
+                    Some("write".to_string())
+                } else {
+                    None
+                };
+                let key = (call_name.to_string(), line);
+                let entry = call_map
+                    .entry(key)
+                    .or_insert((qualifier.map(|q| q.to_string()), None));
+                // "write" wins over None
+                if access.is_some() {
+                    entry.1 = access;
+                }
+                // Update qualifier if present in this match
+                if let Some(q) = qualifier {
+                    entry.0 = Some(q.to_string());
+                }
             }
         }
 
-        calls
+        call_map
+            .into_iter()
+            .map(|((name, line), (qualifier, access))| (name, line, qualifier, access))
+            .collect()
     }
 
     /// Extract type references from a source file.
@@ -3045,7 +3089,7 @@ impl SymbolParser {
             for symbol in symbols {
                 let callees = self.find_callees_for_symbol(&full_path, &content, &symbol);
                 // Check if any callee matches, considering qualifiers
-                let is_caller = callees.iter().any(|(name, _, qualifier)| {
+                let is_caller = callees.iter().any(|(name, _, qualifier, _)| {
                     if name != symbol_name {
                         return false;
                     }
