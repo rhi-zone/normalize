@@ -22,12 +22,14 @@ struct ParsedSymbol {
     implements: Vec<String>,
 }
 
+/// One call-site entry: (caller_symbol, callee_name, callee_qualifier, access, line).
+type CallEntry = (String, String, Option<String>, Option<String>, usize);
+
 /// Parsed data for a single file, ready for database insertion
 struct ParsedFileData {
     file_path: String,
     symbols: Vec<ParsedSymbol>,
-    /// (caller_symbol, callee_name, callee_qualifier, access, line)
-    calls: Vec<(String, String, Option<String>, Option<String>, usize)>,
+    calls: Vec<CallEntry>,
     /// imports (for Python files only)
     imports: Vec<FlatImport>,
     /// (type_name, method_name) for interface/class method signatures

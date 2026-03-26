@@ -232,8 +232,10 @@ mod tests {
         use crate::service::view::TraceReport;
         assert_output_formatter::<TraceReport>();
 
-        use normalize_rules::RuleShowReport;
+        use normalize_rules::{RuleInfoReport, RuleShowReport, RulesTagsReport};
         assert_output_formatter::<RuleShowReport>();
+        assert_output_formatter::<RuleInfoReport>();
+        assert_output_formatter::<RulesTagsReport>();
 
         use crate::commands::tools::test::{TestListReport, TestRunReport};
         assert_output_formatter::<TestListReport>();

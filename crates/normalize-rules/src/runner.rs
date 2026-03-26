@@ -428,6 +428,124 @@ impl normalize_output::OutputFormatter for RulesListReport {
     }
 }
 
+/// Structured report for `normalize rules show <id>`.
+///
+/// Returned by `rules show` — contains machine-readable rule metadata suitable
+/// for agent consumption via `--json`.
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+pub struct RuleInfoReport {
+    /// Rule identifier (e.g. `rust/unwrap-in-impl`).
+    pub id: String,
+    /// Rule type: `"syntax"`, `"fact"`, or `"native"`.
+    pub rule_type: String,
+    /// Effective severity: `"error"`, `"warning"`, `"info"`, or `"hint"`.
+    pub severity: String,
+    /// Whether the rule is currently enabled.
+    pub enabled: bool,
+    /// Whether the rule ships with normalize (true) or is user-defined (false).
+    pub builtin: bool,
+    /// Tag labels attached to this rule.
+    pub tags: Vec<String>,
+    /// Languages this rule applies to (empty means all languages).
+    pub languages: Vec<String>,
+    /// Short human-readable message shown on a violation.
+    pub message: String,
+    /// Auto-fix replacement string, if any (`None` = no fix, `Some("")` = delete match).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fix: Option<String>,
+    /// Full documentation markdown, if present in the rule file.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Allow-list glob patterns that suppress violations for matching paths.
+    pub allow: Vec<String>,
+}
+
+impl normalize_output::OutputFormatter for RuleInfoReport {
+    fn format_text(&self) -> String {
+        let mut out = String::new();
+        out.push_str(&format!("{} [{}]\n", self.id, self.rule_type));
+        out.push_str(&format!("  severity: {}\n", self.severity));
+        out.push_str(&format!("  enabled:  {}\n", self.enabled));
+        if !self.tags.is_empty() {
+            out.push_str(&format!("  tags:     {}\n", self.tags.join(", ")));
+        }
+        if !self.languages.is_empty() {
+            out.push_str(&format!("  langs:    {}\n", self.languages.join(", ")));
+        }
+        if !self.allow.is_empty() {
+            out.push_str(&format!("  allow:    {}\n", self.allow.join("  ")));
+        }
+        if let Some(ref fix) = self.fix {
+            if fix.is_empty() {
+                out.push_str("  fix:      (delete match)\n");
+            } else {
+                out.push_str(&format!("  fix:      {}\n", fix));
+            }
+        }
+        out.push_str(&format!("  message:  {}\n", self.message));
+        if let Some(ref doc) = self.description {
+            out.push('\n');
+            out.push_str(doc);
+            out.push('\n');
+        } else {
+            out.push('\n');
+            out.push_str(
+                "(no documentation — add a markdown comment block after the frontmatter)\n",
+            );
+        }
+        out
+    }
+}
+
+/// One entry in a `RulesTagsReport`.
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+pub struct TagEntry {
+    /// Tag name (e.g. `correctness`).
+    pub tag: String,
+    /// Origin: `"builtin"`, `"user-defined"`, or `"builtin+user"`.
+    pub source: String,
+    /// Number of rules in this tag.
+    pub count: usize,
+    /// Rule IDs belonging to this tag.
+    pub rules: Vec<String>,
+}
+
+/// Structured report for `normalize rules tags`.
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+pub struct RulesTagsReport {
+    pub tags: Vec<TagEntry>,
+}
+
+impl normalize_output::OutputFormatter for RulesTagsReport {
+    fn format_text(&self) -> String {
+        if self.tags.is_empty() {
+            return "No tags found.\n".to_string();
+        }
+        let mut out = String::new();
+        for entry in &self.tags {
+            if entry.rules.is_empty() || entry.count == entry.rules.len() {
+                // summary mode: count only
+                out.push_str(&format!(
+                    "{:20} [{}]  {} rule{}\n",
+                    entry.tag,
+                    entry.source,
+                    entry.count,
+                    if entry.count == 1 { "" } else { "s" }
+                ));
+            } else {
+                // show_rules mode: list rule IDs
+                out.push_str(&format!(
+                    "{:20} [{}]  {}\n",
+                    entry.tag,
+                    entry.source,
+                    entry.rules.join("  ")
+                ));
+            }
+        }
+        out
+    }
+}
+
 /// Color the rule type indicator: `fact` in blue, `syntax` in cyan.
 /// Pad the plain text FIRST so ANSI codes don't corrupt column widths.
 fn paint_rule_type(rule_type: &str) -> String {
@@ -1036,6 +1154,121 @@ pub fn list_tags(
 ///
 /// Performs a full evaluation via [`interpret::run_rules_batch`]. For the incremental
 /// path (daemon/LSP), use [`collect_fact_diagnostics_incremental`] instead.
+/// Structured variant of `show_rule` — returns a `RuleInfoReport` instead of a pre-formatted
+/// string.  Used by `rules show` for machine-readable JSON output.
+pub fn show_rule_structured(
+    root: &Path,
+    id: &str,
+    config: &RulesRunConfig,
+) -> Result<RuleInfoReport, String> {
+    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
+    let fact_rules = interpret::load_all_rules(root, &config.rules);
+
+    let found_syntax = syntax_rules.iter().find(|r| r.id == id);
+    let found_fact = fact_rules.iter().find(|r| r.id == id);
+
+    match (found_syntax, found_fact) {
+        (Some(r), _) => Ok(RuleInfoReport {
+            id: r.id.clone(),
+            rule_type: "syntax".to_string(),
+            severity: r.severity.to_string(),
+            enabled: r.enabled,
+            builtin: r.builtin,
+            tags: r.tags.clone(),
+            languages: r.languages.clone(),
+            message: r.message.clone(),
+            fix: r.fix.clone(),
+            description: r.doc.clone(),
+            allow: r.allow.iter().map(|p| p.as_str().to_string()).collect(),
+        }),
+        (_, Some(r)) => Ok(RuleInfoReport {
+            id: r.id.clone(),
+            rule_type: "fact".to_string(),
+            severity: r.severity.to_string(),
+            enabled: r.enabled,
+            builtin: r.builtin,
+            tags: r.tags.clone(),
+            languages: Vec::new(),
+            message: r.message.clone(),
+            fix: None,
+            description: r.doc.clone(),
+            allow: r.allow.iter().map(|p| p.as_str().to_string()).collect(),
+        }),
+        _ => Err(format!("Rule not found: {}", id)),
+    }
+}
+
+/// Structured variant of `list_tags` — returns a `RulesTagsReport` instead of a pre-formatted
+/// string.  Used by `rules tags` for machine-readable JSON output.
+pub fn list_tags_structured(
+    root: &Path,
+    tag_filter: Option<&str>,
+    config: &RulesRunConfig,
+) -> Result<RulesTagsReport, String> {
+    let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
+    let fact_rules = interpret::load_all_rules(root, &config.rules);
+
+    let all_unified = build_unified_rules(&syntax_rules, &fact_rules);
+
+    let mut tag_map: std::collections::BTreeMap<String, (String, Vec<String>)> =
+        std::collections::BTreeMap::new();
+
+    for r in &syntax_rules {
+        for tag in &r.tags {
+            tag_map
+                .entry(tag.clone())
+                .or_insert_with(|| ("builtin".to_string(), Vec::new()))
+                .1
+                .push(r.id.clone());
+        }
+    }
+    for r in &fact_rules {
+        for tag in &r.tags {
+            tag_map
+                .entry(tag.clone())
+                .or_insert_with(|| ("builtin".to_string(), Vec::new()))
+                .1
+                .push(r.id.clone());
+        }
+    }
+
+    let rule_tags = &config.rule_tags;
+    for tag_name in rule_tags.keys() {
+        let entry = tag_map
+            .entry(tag_name.clone())
+            .or_insert_with(|| ("user-defined".to_string(), Vec::new()));
+        if entry.0 == "builtin" {
+            entry.0 = "builtin+user".to_string();
+        }
+        let mut visited = HashSet::new();
+        let resolved = expand_tag(tag_name, rule_tags, &all_unified, &mut visited);
+        for id in resolved {
+            if !entry.1.contains(&id.to_string()) {
+                entry.1.push(id.to_string());
+            }
+        }
+    }
+
+    if let Some(t) = tag_filter {
+        tag_map.retain(|k, _| k == t);
+    }
+
+    let tags = tag_map
+        .into_iter()
+        .map(|(tag, (source, rules))| {
+            let count = rules.len();
+            TagEntry {
+                tag,
+                source,
+                count,
+                rules,
+            }
+        })
+        .collect();
+
+    Ok(RulesTagsReport { tags })
+}
+
 pub async fn collect_fact_diagnostics(
     root: &Path,
     config: &RulesConfig,

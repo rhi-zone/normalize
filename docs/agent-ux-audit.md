@@ -510,13 +510,13 @@ Issues ordered by agent impact.
 
 | # | Issue | Command | Severity |
 |---|-------|---------|----------|
-| 1 | `rules show --json` and `rules tags --json` return human text wrapped in `{message: string}` instead of structured fields | `rules show`, `rules tags` | **High** — agents cannot read rule metadata programmatically |
+| 1 | ~~`rules show --json` and `rules tags --json` return human text wrapped in `{message: string}` instead of structured fields~~ **Fixed 2026-03-26** — `rules show` now returns `RuleInfoReport`, `rules tags` returns `RulesTagsReport` | `rules show`, `rules tags` | **High** — agents cannot read rule metadata programmatically |
 | 2 | `syntax query --compact` returns only a match count — all match data suppressed | `syntax query` | **High** — compact output is useless for pattern search |
 | 3 | `syntax ast --json` for a real file is 500KB+; no `--depth N` flag | `syntax ast` | **High** — output size makes it impractical for agent use; guide doc references `--depth` flag that doesn't exist |
 | 4 | `analyze health --json` and `analyze summary --json` are 180KB+ due to unbounded `large_files` array | `analyze health`, `analyze summary` | **High** — JSON response too large for practical agent consumption |
 | 5 | `package list --json` silently drops multi-ecosystem advisory; agent gets partial results | `package list` | **High** — silent data loss |
 | 6 | `analyze architecture --compact` omits hub modules and layer flows; compact is a subset of JSON | `analyze architecture` | **Medium** — agents using compact miss the most actionable outputs |
-| 7 | `daemon list` returns exit 1 + stderr when daemon is stopped instead of `{"running": false, "roots": []}` | `daemon list` | **Medium** — non-zero exit prevents agents from using `list` as a status check |
+| 7 | ~~`daemon list` returns exit 1 + stderr when daemon is stopped instead of `{"running": false, "roots": []}`~~ **Fixed 2026-03-26** — now returns exit 0 with `{running: false, roots: []}` when daemon is not running | `daemon list` | **Medium** — non-zero exit prevents agents from using `list` as a status check |
 | 8 | `package tree --json` has no `--depth` flag; full transitive graph is 122KB+ | `package tree` | **Medium** — agents wanting direct-deps-only receive the full closure |
 | 9 | `grammars list --json` has no path per grammar; two calls needed to confirm a grammar is loadable | `grammars list` | **Low** — inconvenient but workaround (grammars paths) exists |
 | 10 | `analyze docs` JSON encodes `by_language` as positional array `[documented, total]` instead of named fields | `analyze docs` | **Low** — positional arrays require documentation to decode |
@@ -551,7 +551,7 @@ Issues ordered by agent impact.
 | `config validate` | **GOOD** | Boolean + arrays |
 | `ci` | **GOOD** | `source` field useful; SARIF support notable |
 | `daemon status` | **GOOD** | Clean |
-| `daemon list` | **POOR** | Exit 1 when daemon stopped; no JSON response |
+| `daemon list` | **GOOD** (fixed 2026-03-26) | Exit 0 with `{running: false, roots: []}` when daemon stopped |
 | `analyze health` | **MIXED** | JSON too large for agent use |
 | `analyze summary` | **MIXED** | Best compact format; JSON too large |
 | `analyze security` | **GOOD** | `tools_skipped` field useful |
@@ -562,8 +562,8 @@ Issues ordered by agent impact.
 | `analyze test-gaps` | **MIXED** | File paths truncated in compact |
 | `syntax ast` | **POOR** | 500KB+ JSON for real files; no `--depth` flag |
 | `syntax query` | **POOR** compact | Compact returns count only; JSON is well-structured |
-| `rules show` | **POOR** JSON | Returns text blob instead of structured fields |
-| `rules tags` | **POOR** JSON | Same text-blob defect as `rules show` |
+| `rules show` | **GOOD** JSON (fixed 2026-03-26) | Returns structured `RuleInfoReport` with id, severity, enabled, tags, languages, message, fix, description, allow |
+| `rules tags` | **GOOD** JSON (fixed 2026-03-26) | Returns `RulesTagsReport` with `{tags: [{tag, source, count, rules}]}` |
 | `rules validate` | **GOOD** | Clean structured JSON |
 
 ## Pass 2 Quick Wins

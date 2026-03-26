@@ -10,9 +10,9 @@ use normalize_syntax_rules::apply_fixes;
 
 use crate::cmd_rules::run_syntax_rules;
 use crate::runner::{
-    ListFilters, RuleKind, RulesListReport, RulesRunConfig, add_rule, apply_native_rules_config,
-    build_list_report, enable_disable, list_tags, remove_rule, run_rules_report, show_rule,
-    update_rules,
+    ListFilters, RuleInfoReport, RuleKind, RulesListReport, RulesRunConfig, RulesTagsReport,
+    add_rule, apply_native_rules_config, build_list_report, enable_disable, list_tags_structured,
+    remove_rule, run_rules_report, show_rule_structured, update_rules,
 };
 
 /// Resolve pretty mode: enabled on TTY (or forced via --pretty), disabled by --compact.
@@ -551,19 +551,16 @@ impl RulesService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<RuleShowReport, String> {
+    ) -> Result<RuleInfoReport, String> {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        let use_colors = resolve_pretty(pretty, compact);
+        self.resolve_format(pretty, compact);
         let config = load_rules_config(&effective_root);
-        show_rule(&effective_root, &id, use_colors, &config).map(|msg| RuleShowReport {
-            success: true,
-            message: Some(msg),
-        })
+        show_rule_structured(&effective_root, &id, &config)
     }
 
     /// List all tags and the rules they group
@@ -580,26 +577,24 @@ impl RulesService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<RuleShowReport, String> {
+    ) -> Result<RulesTagsReport, String> {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        let use_colors = resolve_pretty(pretty, compact);
+        self.resolve_format(pretty, compact);
         let config = load_rules_config(&effective_root);
-        list_tags(
-            &effective_root,
-            show_rules,
-            tag.as_deref(),
-            use_colors,
-            &config,
-        )
-        .map(|msg| RuleShowReport {
-            success: true,
-            message: Some(msg),
-        })
+        let mut report = list_tags_structured(&effective_root, tag.as_deref(), &config)?;
+        // When show_rules is false, clear the rules list to signal summary mode to format_text.
+        // The count field still carries the correct count.
+        if !show_rules {
+            for entry in &mut report.tags {
+                entry.rules.clear();
+            }
+        }
+        Ok(report)
     }
 
     /// Add a rule from a URL

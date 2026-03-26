@@ -51,6 +51,10 @@ impl OutputFormatter for PackageInfoReport {
 pub struct PackageListReport {
     /// The ecosystem whose manifest was read (e.g. "cargo", "npm").
     pub ecosystem: String,
+    /// All ecosystems detected in the project root.
+    /// When more than one is present, only `ecosystem` was queried.
+    /// Agents should re-run with `--ecosystem <name>` to get results for others.
+    pub ecosystems_detected: Vec<String>,
     /// Declared dependencies with names and version requirements.
     pub packages: Vec<Dependency>,
 }
@@ -66,6 +70,13 @@ impl OutputFormatter for PackageListReport {
             let version = dep.version_req.as_deref().unwrap_or("*");
             let optional = if dep.optional { " (optional)" } else { "" };
             out.push_str(&format!("  {} {}{}\n", dep.name, version, optional));
+        }
+        if self.ecosystems_detected.len() > 1 {
+            out.push('\n');
+            out.push_str(&format!(
+                "note: multiple ecosystems detected: {} — use --ecosystem to query others",
+                self.ecosystems_detected.join(", ")
+            ));
         }
         out.trim_end().to_string()
     }
@@ -258,9 +269,11 @@ impl PackageService {
     ) -> Result<PackageListReport, String> {
         let _ = (pretty, compact);
         let root_path = root.as_deref().map(Path::new).unwrap_or(Path::new("."));
-        let (eco, packages) = crate::commands::package::get_list(ecosystem.as_deref(), root_path)?;
+        let (eco, packages, ecosystems_detected) =
+            crate::commands::package::get_list(ecosystem.as_deref(), root_path)?;
         Ok(PackageListReport {
             ecosystem: eco,
+            ecosystems_detected,
             packages,
         })
     }

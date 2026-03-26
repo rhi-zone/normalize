@@ -19,11 +19,12 @@ pub mod service;
 pub mod setup;
 
 pub use runner::{
-    ListFilters, RuleEntry, RuleKind, RuleOverride, RulesConfig, RulesListReport, RulesRunConfig,
-    SarifTool, abi_diagnostic_to_issue, add_rule, apply_native_rules_config, build_list_report,
-    build_relations_from_index, collect_fact_diagnostics, collect_fact_diagnostics_incremental,
-    enable_disable, finding_to_issue, list_tags, remove_rule, run_rules_report, run_sarif_tools,
-    show_rule, update_rules,
+    ListFilters, RuleEntry, RuleInfoReport, RuleKind, RuleOverride, RulesConfig, RulesListReport,
+    RulesRunConfig, RulesTagsReport, SarifTool, TagEntry, abi_diagnostic_to_issue, add_rule,
+    apply_native_rules_config, build_list_report, build_relations_from_index,
+    collect_fact_diagnostics, collect_fact_diagnostics_incremental, enable_disable,
+    finding_to_issue, list_tags, list_tags_structured, remove_rule, run_rules_report,
+    run_sarif_tools, show_rule, show_rule_structured, update_rules,
 };
 
 pub use loader::format_diagnostic;

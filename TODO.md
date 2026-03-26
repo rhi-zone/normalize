@@ -58,6 +58,10 @@ Baseline audit in `docs/agent-ux-audit.md` (2026-03-21) covers 12 commands acros
 - [x] `analyze health --json` and `analyze summary --json` bloated by unbounded `large_files` (180KB+) → added `--limit` (default 10, 0 = no limit) to `analyze health`
 - [x] `syntax ast --json` produces 673KB for a 200-line file → added `--depth` flag (default -1 = unlimited) that truncates the CST; `--compact` now shows a node-type outline instead of full dump
 - [x] `syntax query --compact` only showed match count → now shows one line per match: `path:line: @capture = text`
+- [x] `rules show --json` and `rules tags --json` returned `{message: string, success: bool}` text blobs → now return `RuleInfoReport` (structured fields: id, severity, enabled, tags, languages, message, fix, description, allow) and `RulesTagsReport` (`{tags: [{tag, source, count, rules}]}`)
+- [x] `daemon list` returned exit 1 + stderr when daemon not running → now returns exit 0 with `{running: false, roots: []}` (only exits 1 on actual errors like socket permission denied)
+- [x] `package list --json` silently dropped multi-ecosystem advisory → `PackageListReport` now includes `ecosystems_detected: Vec<String>`; when multiple ecosystems exist, agents see all names and know to re-run with `--ecosystem` for complete results
+- [x] `analyze architecture --compact` showed only cross-imports (hubs/layers hidden when empty) → `format_text()` now emits compact tagged lines (`HUBS:`, `LAYERS:`, `COUPLING:`, `SYMBOLS:`, `ORPHANS:`, `SUMMARY:`) always, even when empty; `format_pretty()` retains the original tabular layout
 - [ ] Run full audit pass over all ~30+ subcommands (not just the 12 sampled)
 - [ ] Fix deferred single-model issues once patterns emerge across more commands
 - [ ] Re-run multi-model audit after fixes to verify improvement

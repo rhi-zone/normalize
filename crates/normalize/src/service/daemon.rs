@@ -107,12 +107,17 @@ impl OutputFormatter for DaemonRunReport {
 /// List of project roots currently watched by the daemon.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 pub struct DaemonRootsReport {
+    /// Whether the daemon process is currently running.
+    pub running: bool,
     /// Canonical paths of all watched project roots.
     pub roots: Vec<String>,
 }
 
 impl OutputFormatter for DaemonRootsReport {
     fn format_text(&self) -> String {
+        if !self.running {
+            return "Daemon is not running".to_string();
+        }
         if self.roots.is_empty() {
             "No roots being watched".to_string()
         } else {
@@ -429,7 +434,10 @@ impl DaemonService {
         let client = DaemonClient::new();
 
         if !client.is_available() {
-            return Err("Daemon is not running".to_string());
+            return Ok(DaemonRootsReport {
+                running: false,
+                roots: Vec::new(),
+            });
         }
 
         match client.list_roots() {
@@ -444,7 +452,10 @@ impl DaemonService {
                             .collect()
                     })
                     .unwrap_or_default();
-                Ok(DaemonRootsReport { roots })
+                Ok(DaemonRootsReport {
+                    running: true,
+                    roots,
+                })
             }
             Ok(resp) => Err(resp.error.unwrap_or_default()),
             Err(e) => Err(format!("Failed: {}", e)),

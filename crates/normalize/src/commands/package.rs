@@ -21,11 +21,22 @@ pub fn get_info(
     }
 }
 
-/// Get declared dependencies, returning (ecosystem_name, Vec<Dependency>).
-pub fn get_list(ecosystem: Option<&str>, root: &Path) -> Result<(String, Vec<Dependency>), String> {
+/// Get declared dependencies, returning (ecosystem_name, Vec<Dependency>, all_detected_ecosystems).
+pub fn get_list(
+    ecosystem: Option<&str>,
+    root: &Path,
+) -> Result<(String, Vec<Dependency>, Vec<String>), String> {
+    let detected = if ecosystem.is_none() {
+        detect_all_ecosystems(root)
+            .iter()
+            .map(|e| e.name().to_string())
+            .collect()
+    } else {
+        Vec::new()
+    };
     let eco = resolve_single_ecosystem(ecosystem, root)?;
     match eco.list_dependencies(root) {
-        Ok(deps) => Ok((eco.name().to_string(), deps)),
+        Ok(deps) => Ok((eco.name().to_string(), deps, detected)),
         Err(e) => Err(format!("error: {}", e)),
     }
 }

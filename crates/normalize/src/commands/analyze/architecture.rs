@@ -36,13 +36,107 @@ pub struct ArchitectureReport {
 }
 
 impl OutputFormatter for ArchitectureReport {
+    /// Compact one-line-per-item output optimised for agents and scripts.
+    ///
+    /// Each finding is prefixed with a category tag so callers can parse or
+    /// filter without knowing the full report schema.  Sections are always
+    /// emitted — even if the list is empty — so agents know that the analysis
+    /// ran and nothing was found, rather than mistaking silence for an error.
     fn format_text(&self) -> String {
+        let mut lines = Vec::new();
+
+        // HUBS: top-5 hub modules by hub_score
+        let hub_limit = 5;
+        if self.hub_modules.is_empty() {
+            lines.push("HUBS: none".to_string());
+        } else {
+            let top: Vec<_> = self.hub_modules.iter().take(hub_limit).collect();
+            let parts: Vec<String> = top
+                .iter()
+                .map(|h| format!("{} ({} dependents)", truncate_path(&h.path, 40), h.fan_in))
+                .collect();
+            lines.push(format!("HUBS: {}", parts.join(", ")));
+        }
+
+        // LAYERS: all inter-directory import flows
+        if self.layer_flows.is_empty() {
+            lines.push("LAYERS: none".to_string());
+        } else {
+            for flow in &self.layer_flows {
+                lines.push(format!(
+                    "LAYERS: {} → {} ({} imports)",
+                    flow.from_layer, flow.to_layer, flow.count
+                ));
+            }
+        }
+
+        // COUPLING: bidirectional cross-imports
+        if self.cross_imports.is_empty() {
+            lines.push("COUPLING: none".to_string());
+        } else {
+            for ci in &self.cross_imports {
+                lines.push(format!(
+                    "COUPLING: {} ↔ {} ({}/{} imports)",
+                    ci.module_a, ci.module_b, ci.a_to_b, ci.b_to_a
+                ));
+            }
+        }
+
+        // SYMBOLS: top-5 hotspots
+        if !self.symbol_hotspots.is_empty() {
+            let top: Vec<_> = self.symbol_hotspots.iter().take(5).collect();
+            let parts: Vec<String> = top
+                .iter()
+                .map(|s| {
+                    format!(
+                        "{}:{} ({} callers)",
+                        truncate_path(&s.file, 20),
+                        s.name,
+                        s.callers
+                    )
+                })
+                .collect();
+            lines.push(format!("SYMBOLS: {}", parts.join(", ")));
+        }
+
+        // ORPHANS
+        if !self.orphan_modules.is_empty() {
+            let parts: Vec<String> = self
+                .orphan_modules
+                .iter()
+                .map(|o| truncate_path(&o.path, 40).to_string())
+                .collect();
+            lines.push(format!("ORPHANS: {}", parts.join(", ")));
+        }
+
+        // SUMMARY
+        lines.push(format!(
+            "SUMMARY: {} modules, {} symbols, {} imports ({} resolved), {} cross-imports, {} orphans",
+            self.total_modules,
+            self.total_symbols,
+            self.total_imports,
+            self.resolved_imports,
+            self.cross_imports.len(),
+            self.orphan_modules.len(),
+        ));
+
+        if self.total_imports > 0 && self.resolved_imports == 0 {
+            lines.push(
+                "NOTE: no imports resolved to local files — coupling metrics require local import resolution".to_string(),
+            );
+        }
+
+        lines.join("\n")
+    }
+
+    /// Pretty tabular output for human terminals.
+    fn format_pretty(&self) -> String {
         let mut lines = Vec::new();
 
         // Cross-imports (bidirectional coupling)
         lines.push("## Cross-Imports (bidirectional coupling)".to_string());
         if self.cross_imports.is_empty() {
-            lines.push("  None detected ✓".to_string());
+            lines.push("  None detected".to_string());
         } else {
             for ci in &self.cross_imports {
                 lines.push(format!(
