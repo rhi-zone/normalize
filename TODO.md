@@ -217,9 +217,9 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 - [x] `recommended = true` frontmatter for genuine bug/correctness rules vs style opinions
 - [x] Recommended rules shown first in wizard (sorted before violation count)
 - [x] Standalone `normalize rules setup` command (don't require re-running `init`)
-- Group by tag/category instead of flat violation-count sort
-- Add batch operations: "enable all [correctness] rules", "disable all [style] rules"
-- Show practical impact: "2 violations (quick fix)" vs "847 violations (major cleanup)"
+- [x] Group by tag/category instead of flat violation-count sort
+- [x] Add batch operations: "enable all [correctness] rules", "disable all [style] rules"
+- [x] Show practical impact: "2 violations (quick fix)" vs "847 violations (major cleanup)"
 
 ### SARIF engine actionable output
 
@@ -268,44 +268,13 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 - Call-graph BFS is intra-project only (no cross-crate edges); future: integrate with `normalize-graph` if cross-crate call data exists
 - Trend charts (`normalize ratchet trend`) could visualize metric history over git log
 
-### CI readiness (release blocker for 0.2.0)
+### ~~CI readiness~~ (done — 0.2.0 shipped)
 
-Goal: a user should be able to add normalize to their CI pipeline in under 5 minutes with
-confidence it won't break randomly. The JIT work on ascent-interpreter is a release blocker
-for *performance* (fact rules can be slow on large repos), not for *functionality* — fact rules
-still run, they're just slower without JIT. Everything below can land before the JIT is done.
-
-- [ ] **`normalize ci` command** — single CI entry point. Runs all engines: syntax rules, native
-  rules (including ratchet + budget), and fact rules. Structured output + non-zero exit on any
-  failure. Flags to opt out of specific engines (`--no-fact`, `--no-ratchet`, etc.) for repos
-  that haven't configured them yet. Makes the CI config trivial: `run: normalize ci`. The repo's
-  `.normalize/config.toml` drives what actually runs (rule severities, enabled rules, thresholds).
-  Output should be CI-friendly: machine-parseable with `--json`, human-readable by default, SARIF
-  with `--sarif` for GitHub Actions native annotation support.
-
-- [ ] **Install script** — `curl -fsSL https://normalize.rs/install.sh | sh` (or equivalent).
-  Detects platform/arch, downloads the right binary from GitHub releases, installs to
-  `~/.local/bin` or `/usr/local/bin`. Also: a one-liner for CI that pins to a specific version
-  (`NORMALIZE_VERSION=0.2.0 curl ... | sh`). Currently `cargo install normalize` works but is
-  too slow for CI (full compile). Pre-built binaries exist in GitHub releases but there's no
-  ergonomic way to get them.
-
-- [ ] **CI documentation** — `docs/ci.md` (and a section in README). Covers: how to install in
-  CI (GitHub Actions, GitLab CI, CircleCI snippets), what `normalize ci` runs, how to configure
-  `.normalize/config.toml` for CI-only severity overrides, how to use ratchet + budget (bootstrap
-  workflow: `normalize ratchet add`, commit `.normalize/ratchet.json`, CI runs `normalize ci`),
-  how to pin the normalize version for reproducible CI.
-
-- [ ] **Version bump to 0.2.0** — all 38 published crates at v0.1.0. Bump to 0.2.0 before
-  release. The `xtask` or a script should handle the mechanical version update across all
-  `Cargo.toml` files. Check that `normalize update` (self-update) works against a real GitHub
-  release after tagging.
-
-- [ ] **Polish pass before release** — before tagging 0.2.0, audit `--help` text on all
-  commands for accuracy and completeness; verify all exit codes are correct (0 = clean,
-  1 = violations found, 2 = usage error); smoke-test on a real non-normalize repo; check that
-  error messages are actionable (not just "error: ...") for common failure modes (index not
-  built, no config file, unrecognized language).
+- [x] `normalize ci` command — `--no-syntax`/`--no-native`/`--no-fact`/`--strict`/`--sarif` flags, structured output, non-zero exit on errors.
+- [x] Install script — `install.sh` + `install.ps1`, platform/arch detection, SHA256 verification, version pinning via `NORMALIZE_VERSION`.
+- [x] CI documentation — `docs/ci.md` with GitHub Actions/GitLab/CircleCI snippets.
+- [x] Version bump to 0.2.0 — all 38 published crates bumped; `normalize update` works against GitHub releases.
+- [x] Polish pass — `--help` audit, exit codes verified, smoke-tested on external repos.
 
 ---
 
@@ -851,12 +820,7 @@ Building blocks are all present. The gap is composition:
 - [x] `normalize refs` absorbed into `view referenced-by` — `CallEntry.access:
   Option<String>` field added (values: `"read"`/`"write"`/`"read-write"`); currently
   always `None` pending index + scope engine changes below.
-- [ ] **Populate `access` in `CallEntry`** — two parts:
-  1. Extend the `calls` table schema with an `access` column; update tree-sitter extraction
-     per language (Rust: distinguish `foo()` call vs `foo = ...` assignment; JS/TS/Python
-     similar). Lives in `crates/normalize-facts/src/symbols.rs` + per-language `.scm` files.
-  2. Wire populated value through `view referenced-by` output and the `display_call_graph`
-     formatter (display side already handles it — just needs non-None data).
+- [x] **Populate `access` in `CallEntry`** — `calls` table has `access TEXT` column (schema v7); `@call.write` capture in Rust `.scm` files populates it; `view referenced-by` displays `[read]`/`[write]`/`[read-write]`. Other languages: extend `.scm` files when grammars support write-position detection.
 - [ ] `normalize rename <target> <new-name>` — cross-file symbol rename. Uses
   `view referenced-by` to find all sites, normalize-scope for shadow/conflict detection,
   batch edit for atomic multi-file rewrite, shadow git for preview. `--dry-run` shows
@@ -903,13 +867,11 @@ external-process safety (no allocator boundary, no ABI concerns) without paying 
 serialization cost — cheap enough for pre-commit. SARIF stays for heavy tools where JSON
 overhead is acceptable.
 
-- [ ] Drop `libloading`, `abi_stable`, `loader.rs` and the dylib search-path machinery.
-- [ ] Replace `RString`/`RVec` in `Relations` (and all `normalize-facts-rules-api` types)
-  with plain `String`/`Vec`. This fixes the heap corruption as a side effect.
+- [x] Drop `libloading`, `abi_stable`, `loader.rs` and the dylib search-path machinery. (commit 398b715b)
+- [x] Replace `RString`/`RVec` in `Relations` with plain `String`/`Vec`. Fixes heap corruption.
 - [ ] Add `rkyv` derive to `Relations` + fact types for the external-process boundary.
 - [ ] Define the external native rule protocol: receive rkyv Relations on stdin, write
   NDJSON diagnostics on stdout. Document in `docs/rules.md`.
-- [ ] Update the old "dylib implementation plan" entries in this file — they're superseded.
 
 **Dependencies / preconditions:**
 - `normalize refs` ships first — it's the foundation for rename, move, and dead-parameter rule.
@@ -942,12 +904,10 @@ Context types that should exist (independent of priority):
   Feeds into incremental eval (Pillar 4) and debugging alike.
 
 Concrete unblocked items:
-- [ ] `normalize view <directory>` surfaces `SUMMARY.md` as preamble; `--json` adds a
-  `"summary"` field.
-- [ ] `normalize view <file>` surfaces `//!` crate/module docs (Rust) and equivalents.
-- [ ] `rust/missing-module-doc` syntax rule — `lib.rs`/`mod.rs` files with no `//!`.
-- [ ] Split `stale-summary` into `missing-summary` (presence) + `stale-summary`
-  (freshness), each with `paths` glob config for per-depth enforcement.
+- [x] `normalize view <directory>` surfaces `SUMMARY.md` as preamble; `--json` adds `"summary"` field.
+- [x] `rust/missing-module-doc` syntax rule — `lib.rs`/`mod.rs` files with no `//!`.
+- [x] Split `stale-summary` into `missing-summary` (presence) + `stale-summary` (freshness), each with `paths` glob config.
+- [ ] `normalize view <file>` surfaces `//!` crate/module docs and equivalents for all languages.
 
 **Not targeting 0.3.0:**
 - Full AST rewriting (tree-sitter edit API, round-trip fidelity)
