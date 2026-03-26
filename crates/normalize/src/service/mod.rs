@@ -273,7 +273,7 @@ impl NormalizeService {
     ///
     /// Examples:
     ///   normalize grep "TODO" --only "*.rs"    # search Rust files for TODO
-    ///   normalize grep "fn main" src/          # search in specific directory
+    ///   normalize grep "fn main" --root src/   # search in specific directory
     ///   normalize grep "class \w+" --only "*.py" --json   # JSON output
     #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]

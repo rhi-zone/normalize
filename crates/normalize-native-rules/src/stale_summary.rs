@@ -721,7 +721,7 @@ impl From<StaleSummaryReport> for DiagnosticsReport {
                     source: "stale-summary".into(),
                     related: vec![],
                     suggestion: Some(format!(
-                        "rewrite {}/{} to describe what is currently in the directory (not a changelog — one unified current-state description)",
+                        "{}/{} should describe the directory's current purpose, key files, and how they fit together",
                         s.dir, s.filename
                     )),
                 }
