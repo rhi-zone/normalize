@@ -177,7 +177,8 @@ impl ViewService {
         #[param(help = "Hide all docstrings")] no_docs: bool,
         #[param(help = "Hide parent/ancestor context")] no_parent: bool,
         #[param(help = "Context view: skeleton + imports combined")] context: bool,
-        #[param(help = "Skip directory context files (on by default)")] no_dir_context: bool,
+        #[param(help = "Prepend ancestor directory context files (walks root → target)")]
+        dir_context: bool,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
         #[param(short = 'i', help = "Case-insensitive symbol matching")] case_insensitive: bool,
@@ -204,8 +205,8 @@ impl ViewService {
 
         let ctx_files = config.view.context_files();
 
-        // Prepend directory context by default; --no-dir-context suppresses it
-        if !no_dir_context {
+        // --dir-context: walk root → target, prepend context files from each ancestor
+        if dir_context {
             let target_path = target
                 .as_ref()
                 .map(|t| root_path.join(t))
