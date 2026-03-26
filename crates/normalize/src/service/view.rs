@@ -86,14 +86,7 @@ impl ViewService {
     fn display_call_graph(&self, entries: &[CallEntry]) -> String {
         entries
             .iter()
-            .map(|e| {
-                let access_suffix = e
-                    .access
-                    .as_deref()
-                    .map(|a| format!(" [{a}]"))
-                    .unwrap_or_default();
-                format!("  {}:{}:{}{}", e.file, e.line, e.symbol, access_suffix)
-            })
+            .map(|e| format!("  {}:{}:{}", e.file, e.line, e.symbol))
             .collect::<Vec<_>>()
             .join("\n")
     }
@@ -177,7 +170,9 @@ impl ViewService {
         #[param(help = "Hide all docstrings")] no_docs: bool,
         #[param(help = "Hide parent/ancestor context")] no_parent: bool,
         #[param(help = "Context view: skeleton + imports combined")] context: bool,
-        #[param(help = "Prepend ancestor directory context files (N levels up, -1=all)")]
+        #[param(
+            help = "Prepend context files: 1=target dir, 2=+parent, -1=all ancestors (Python list[:N] on target→root list)"
+        )]
         dir_context: Option<i32>,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
@@ -185,12 +180,6 @@ impl ViewService {
         pretty: bool,
         compact: bool,
     ) -> Result<ViewReport, String> {
-        if depth.is_some_and(|d| d < -1) {
-            return Err(format!(
-                "--depth: invalid value {} (use -1 for all, 0+ for N levels)",
-                depth.unwrap()
-            ));
-        }
         let root_path = root
             .map(PathBuf::from)
             .map(Ok)
@@ -209,31 +198,65 @@ impl ViewService {
             crate::tree::DocstringDisplay::Summary
         };
 
-        let ctx_files = config.view.context_files();
-
-        // --dir-context N: prepend context files from ancestor dirs (-1=all, N>=0=N levels up)
-        if let Some(depth) = dir_context {
-            if depth < -1 {
-                return Err(format!(
-                    "--dir-context: invalid depth {depth} (use -1 for all ancestors, 0+ for N levels)"
-                ));
-            }
+        // Handle --dir-context: collect all context files (target→root), apply Python
+        // list[:N] slice, then output root→target order as a prefix.
+        if let Some(n) = dir_context {
             let target_path = target
                 .as_ref()
                 .map(|t| root_path.join(t))
                 .unwrap_or_else(|| root_path.clone());
-            let max_depth = if depth < 0 {
-                None
+
+            // Resolve target directory for context collection.
+            let ctx_target_dir = if target_path.is_file() {
+                target_path.parent().unwrap_or(&root_path).to_path_buf()
+            } else if target_path.is_dir() {
+                target_path.clone()
             } else {
-                Some(depth as usize)
+                let mut dir = target_path.clone();
+                while !dir.exists() {
+                    match dir.parent() {
+                        Some(p) => dir = p.to_path_buf(),
+                        None => break,
+                    }
+                }
+                dir
             };
-            if let Some(ctx) = crate::commands::context::get_merged_context(
-                &root_path,
-                &target_path,
-                &ctx_files,
-                max_depth,
-            ) {
-                self.view_prefix.set(format!("{}\n\n---\n\n", ctx));
+
+            if let (Ok(root_canon), Ok(target_canon)) =
+                (root_path.canonicalize(), ctx_target_dir.canonicalize())
+            {
+                // Collect all files in target→root order (no depth limit).
+                let all_files = crate::commands::context::collect_context_files(
+                    &root_canon,
+                    &target_canon,
+                    None,
+                );
+
+                // Apply Python list[:N] slice on the target→root ordered list.
+                let len = all_files.len() as i64;
+                let end = if n >= 0 {
+                    (n as i64).min(len) as usize
+                } else {
+                    (len + n as i64).max(0) as usize
+                };
+
+                let sliced = &all_files[..end];
+
+                if !sliced.is_empty() {
+                    // Output in root→target order (most general first).
+                    let mut ctx_content = String::new();
+                    for (i, file) in sliced.iter().rev().enumerate() {
+                        if i > 0 {
+                            ctx_content.push_str("\n\n");
+                        }
+                        if let Ok(text) = std::fs::read_to_string(file) {
+                            ctx_content.push_str(&text);
+                        }
+                    }
+                    if !ctx_content.is_empty() {
+                        self.view_prefix.set(format!("{}\n\n---\n\n", ctx_content));
+                    }
+                }
             }
         }
 
@@ -256,7 +279,6 @@ impl ViewService {
             &exclude,
             &only,
             case_insensitive,
-            &ctx_files,
         )
         .await
     }
@@ -324,12 +346,6 @@ impl ViewService {
         pretty: bool,
         compact: bool,
     ) -> Result<ViewListReport, String> {
-        if depth.is_some_and(|d| d < -1) {
-            return Err(format!(
-                "--depth: invalid value {} (use -1 for all, 0+ for N levels)",
-                depth.unwrap()
-            ));
-        }
         let root_path = root
             .map(std::path::PathBuf::from)
             .map(Ok)
@@ -348,8 +364,6 @@ impl ViewService {
             crate::tree::DocstringDisplay::Summary
         };
 
-        let ctx_files = config.view.context_files();
-
         crate::commands::view::build_view_list_service(
             target.as_deref(),
             &root_path,
@@ -365,7 +379,6 @@ impl ViewService {
             &exclude,
             &only,
             case_insensitive,
-            &ctx_files,
         )
         .await
     }

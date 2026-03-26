@@ -29,7 +29,6 @@ pub mod history;
 pub mod package;
 pub mod rank;
 pub mod ratchet;
-pub mod rename;
 // rules module moved to normalize-rules crate; re-exported for internal use
 pub mod serve;
 pub mod sessions;
@@ -375,19 +374,20 @@ impl NormalizeService {
             .canonicalize()
             .map_err(|e| format!("Failed to resolve target: {}", e))?;
 
-        let config = NormalizeConfig::load(&root_path);
-        let ctx_names = config.view.context_files();
-        let files = collect_context_files(&root_canon, &target_canon, &ctx_names, None);
+        let files = collect_context_files(&root_canon, &target_canon, None);
 
+        // collect_context_files returns target→root order; reverse to root→target for display.
         if list {
             let paths: Vec<String> = files
                 .iter()
+                .rev()
                 .map(|f| f.to_str().unwrap_or("").to_string())
                 .collect();
             Ok(ContextKindReport::List(ContextListReport::new(paths)))
         } else {
             let entries = files
                 .iter()
+                .rev()
                 .map(|file| {
                     let rel_path = file.strip_prefix(&root_canon).unwrap_or(file);
                     let content = std::fs::read_to_string(file).unwrap_or_default();
@@ -810,52 +810,6 @@ impl NormalizeService {
         &self.edit
     }
 
-    /// Rename a symbol across its definition, call sites, and import statements.
-    ///
-    /// Resolves the target via the facts index and applies text edits in all affected
-    /// files. Falls back to definition-only rename when the index is unavailable.
-    ///
-    /// Aborts with an error listing conflicts when the new name already exists in the
-    /// definition file or as an import in any affected file. Use `--force` to proceed.
-    ///
-    /// Examples:
-    ///   normalize rename src/lib.rs/old_fn new_fn             # rename across all files
-    ///   normalize rename src/lib.rs/old_fn new_fn --dry-run   # preview changes
-    ///   normalize rename src/lib.rs/old_fn new_fn --force     # ignore name conflicts
-    #[cli(display_with = "display_output")]
-    #[allow(clippy::too_many_arguments)]
-    pub async fn rename(
-        &self,
-        #[param(positional, help = "Target symbol (path/Symbol)")] target: String,
-        #[param(positional, help = "New name for the symbol")] new_name: String,
-        #[param(help = "Dry run - show what would change without writing files")] dry_run: bool,
-        #[param(help = "Proceed even when name conflicts are detected")] force: bool,
-        #[param(short = 'm', help = "Message for shadow history")] message: Option<String>,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<rename::RenameReport, String> {
-        let root_path = root
-            .as_deref()
-            .map(std::path::Path::new)
-            .map(|p| p.to_path_buf())
-            .unwrap_or_else(|| {
-                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
-            });
-        self.resolve_format(pretty, compact, &root_path);
-        rename::do_rename_report(
-            &target,
-            &new_name,
-            Some(&root_path),
-            dry_run,
-            force,
-            message.as_deref(),
-        )
-        .await
-    }
-
     /// Analyze codebase (health, complexity, security, duplicates, docs)
     pub fn analyze(&self) -> &analyze::AnalyzeService {
         &self.analyze
@@ -979,66 +933,16 @@ impl NormalizeService {
             engines_run.push("syntax".into());
         }
 
-        // Native engine (missing-summary, stale-summary, check-refs, check-examples, ratchet, budget)
+        // Native engine (stale-summary, check-refs, check-examples, ratchet, budget)
         if !no_native {
             let native_root = effective_root.clone();
             let native_config = load_rules_config(&native_root);
             let threshold = 10;
-            let missing_summary_filenames: Vec<String> = native_config
-                .rules
-                .rules
-                .get("missing-summary")
-                .map(|r| r.filenames.clone())
-                .unwrap_or_default();
-            let missing_summary_paths: Vec<String> = native_config
-                .rules
-                .rules
-                .get("missing-summary")
-                .map(|r| r.paths.clone())
-                .unwrap_or_default();
-            let stale_summary_filenames: Vec<String> = native_config
-                .rules
-                .rules
-                .get("stale-summary")
-                .map(|r| r.filenames.clone())
-                .unwrap_or_default();
-            let stale_summary_paths: Vec<String> = native_config
-                .rules
-                .rules
-                .get("stale-summary")
-                .map(|r| r.paths.clone())
-                .unwrap_or_default();
 
-            let (
-                missing_res,
-                summary_res,
-                stale_res,
-                examples_res,
-                refs_res,
-                ratchet_res,
-                budget_res,
-            ) = tokio::join!(
+            let (summary_res, stale_res, examples_res, refs_res, ratchet_res, budget_res) = tokio::join!(
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
-                    move || {
-                        normalize_native_rules::build_missing_summary_report(
-                            &root,
-                            threshold,
-                            &missing_summary_filenames,
-                            &missing_summary_paths,
-                        )
-                    }
-                }),
-                tokio::task::spawn_blocking({
-                    let root = native_root.clone();
-                    move || {
-                        normalize_native_rules::build_stale_summary_report(
-                            &root,
-                            threshold,
-                            &stale_summary_filenames,
-                            &stale_summary_paths,
-                        )
-                    }
+                    move || normalize_native_rules::build_stale_summary_report(&root, threshold)
                 }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
@@ -1059,9 +963,6 @@ impl NormalizeService {
                 }),
             );
             let mut native_report = DiagnosticsReport::new();
-            if let Ok(r) = missing_res {
-                native_report.merge(r.into());
-            }
             if let Ok(r) = summary_res {
                 native_report.merge(r.into());
             }

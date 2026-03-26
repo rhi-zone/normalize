@@ -9,10 +9,7 @@ use std::path::{Path, PathBuf};
 
 use crate::output::OutputFormatter;
 
-/// Default context file names for the `normalize context` command (in priority order).
-/// These are `.context.md`-oriented names; directory tree views use `ViewConfig::context_files()`
-/// which defaults to `["SUMMARY.md", ".context.md"]`.
-#[cfg(test)]
+/// Context file names to look for (in priority order).
 const CONTEXT_FILES: &[&str] = &[".context.md", "CONTEXT.md"];
 
 /// Context file list report (--list mode).
@@ -80,73 +77,66 @@ impl OutputFormatter for ContextReport {
     }
 }
 
-/// Collect context files from root to target directory.
-/// Returns files in order from root to target (most general to most specific).
+/// Collect context files from target directory up to root.
 ///
-/// `names` is the ordered list of filenames to look for in each directory;
-/// the first match per directory wins. Callers should pass `ViewConfig::context_files()`.
-///
-/// `max_depth` limits how many ancestor levels above the target are included.
-/// `None` or `Some(0)` means the target directory only; `Some(2)` means target + 2 ancestors.
+/// Returns files in **target→root order** (most specific first).
+/// `max_depth` limits how many ancestor levels above the target to include:
+/// `None` means unlimited (include all ancestors up to root).
 pub fn collect_context_files(
     root: &Path,
     target_dir: &Path,
-    names: &[&str],
     max_depth: Option<usize>,
 ) -> Vec<PathBuf> {
     let mut files = Vec::new();
 
-    // Build path from root to target
-    let mut dirs = Vec::new();
+    // Walk up from target to root, collecting directories in target→root order.
     let mut current = target_dir.to_path_buf();
+    let mut depth = 0usize;
 
-    // Walk up from target to root, collecting directories
-    while current.starts_with(root) {
-        dirs.push(current.clone());
-        if current == root {
+    loop {
+        if !current.starts_with(root) {
             break;
         }
-        match current.parent() {
-            Some(p) => current = p.to_path_buf(),
-            None => break,
+
+        // Check max_depth: depth 0 is the target dir itself; depth 1 is the parent, etc.
+        // max_depth=None means unlimited; max_depth=Some(n) means include up to n levels
+        // above target (i.e. depths 0..=n).
+        if let Some(max) = max_depth
+            && depth > max
+        {
+            break;
         }
-    }
 
-    // Reverse to get root-to-target order; apply depth limit from the target end
-    dirs.reverse();
-    let depth = max_depth.unwrap_or(0);
-    let start = if depth < dirs.len() {
-        dirs.len() - 1 - depth
-    } else {
-        0
-    };
-    let dirs = &dirs[start..];
-
-    // Check each directory for context files
-    for dir in dirs {
-        for name in names {
-            let path = dir.join(name);
+        for name in CONTEXT_FILES {
+            let path = current.join(name);
             if path.exists() {
                 files.push(path);
                 break; // Only take first match per directory
             }
         }
+
+        if current == root {
+            break;
+        }
+        match current.parent() {
+            Some(p) => {
+                current = p.to_path_buf();
+                depth += 1;
+            }
+            None => break,
+        }
     }
 
+    // Result is in target→root order.
     files
 }
 
 /// Get merged context content for a path.
 /// Used by other commands (e.g., view --dir-context).
 ///
-/// `names` is the ordered list of filenames to look for in each directory.
-/// Callers should pass `ViewConfig::context_files()`.
-pub fn get_merged_context(
-    root: &Path,
-    target: &Path,
-    names: &[&str],
-    max_depth: Option<usize>,
-) -> Option<String> {
+/// `max_depth` is passed through to `collect_context_files`.
+/// The merged content is emitted in root→target order (most general first).
+pub fn get_merged_context(root: &Path, target: &Path, max_depth: Option<usize>) -> Option<String> {
     // Find the target directory - walk up from target until we find an existing dir
     let target_dir = if target.is_file() {
         target.parent().unwrap_or(root).to_path_buf()
@@ -167,13 +157,15 @@ pub fn get_merged_context(
     let root = root.canonicalize().ok()?;
     let target_dir = target_dir.canonicalize().ok()?;
 
-    let files = collect_context_files(&root, &target_dir, names, max_depth);
-    if files.is_empty() {
+    // Collect in target→root order, then reverse for root→target output.
+    let files_target_to_root = collect_context_files(&root, &target_dir, max_depth);
+    if files_target_to_root.is_empty() {
         return None;
     }
 
+    // Output in root→target order (most general first).
     let mut content = String::new();
-    for (i, file) in files.iter().enumerate() {
+    for (i, file) in files_target_to_root.iter().rev().enumerate() {
         if i > 0 {
             content.push_str("\n\n");
         }
@@ -202,13 +194,13 @@ mod tests {
 
         fs::write(root.join("CONTEXT.md"), "Root context").unwrap();
 
-        let files = collect_context_files(root, root, CONTEXT_FILES);
+        let files = collect_context_files(root, root, None);
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with("CONTEXT.md"));
     }
 
     #[test]
-    fn test_collect_hierarchical_context() {
+    fn test_collect_hierarchical_context_target_to_root_order() {
         let tmp = tempdir().unwrap();
         let root = tmp.path();
 
@@ -216,10 +208,43 @@ mod tests {
         fs::create_dir_all(root.join("src")).unwrap();
         fs::write(root.join("src/.context.md"), "Src context").unwrap();
 
-        let files = collect_context_files(root, &root.join("src"), CONTEXT_FILES);
+        let files = collect_context_files(root, &root.join("src"), None);
         assert_eq!(files.len(), 2);
-        assert!(files[0].ends_with("CONTEXT.md"));
-        assert!(files[1].ends_with(".context.md"));
+        // target→root: src first, then root
+        assert!(files[0].ends_with(".context.md"));
+        assert!(files[1].ends_with("CONTEXT.md"));
+    }
+
+    #[test]
+    fn test_collect_max_depth_zero() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+
+        fs::write(root.join("CONTEXT.md"), "Root context").unwrap();
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(root.join("src/.context.md"), "Src context").unwrap();
+
+        // max_depth=0 means only the target dir itself
+        let files = collect_context_files(root, &root.join("src"), Some(0));
+        assert_eq!(files.len(), 1);
+        assert!(files[0].ends_with(".context.md"));
+    }
+
+    #[test]
+    fn test_collect_max_depth_one() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+
+        fs::write(root.join("CONTEXT.md"), "Root context").unwrap();
+        fs::create_dir_all(root.join("a/b")).unwrap();
+        fs::write(root.join("a/.context.md"), "A context").unwrap();
+        fs::write(root.join("a/b/.context.md"), "B context").unwrap();
+
+        // max_depth=1 means target + one parent
+        let files = collect_context_files(root, &root.join("a/b"), Some(1));
+        assert_eq!(files.len(), 2);
+        assert!(files[0].ends_with("b/.context.md"));
+        assert!(files[1].ends_with("a/.context.md"));
     }
 
     #[test]
@@ -230,13 +255,13 @@ mod tests {
         fs::write(root.join("CONTEXT.md"), "Uppercase").unwrap();
         fs::write(root.join(".context.md"), "Dotfile").unwrap();
 
-        let files = collect_context_files(root, root, CONTEXT_FILES);
+        let files = collect_context_files(root, root, None);
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with(".context.md"));
     }
 
     #[test]
-    fn test_get_merged_context() {
+    fn test_get_merged_context_root_to_target_order() {
         let tmp = tempdir().unwrap();
         let root = tmp.path();
 
@@ -244,34 +269,20 @@ mod tests {
         fs::create_dir_all(root.join("sub")).unwrap();
         fs::write(root.join("sub/.context.md"), "Sub").unwrap();
 
-        let content = get_merged_context(root, &root.join("sub/file.rs"), CONTEXT_FILES).unwrap();
-        assert!(content.contains("Root"));
-        assert!(content.contains("Sub"));
+        let content = get_merged_context(root, &root.join("sub/file.rs"), None).unwrap();
+        // Root should appear before Sub in the merged output
+        let root_pos = content.find("Root").unwrap();
+        let sub_pos = content.find("Sub").unwrap();
+        assert!(
+            root_pos < sub_pos,
+            "root→target order: Root should come before Sub"
+        );
     }
 
     #[test]
     fn test_no_context_files() {
         let tmp = tempdir().unwrap();
-        let files = collect_context_files(tmp.path(), tmp.path(), CONTEXT_FILES);
+        let files = collect_context_files(tmp.path(), tmp.path(), None);
         assert!(files.is_empty());
-    }
-
-    #[test]
-    fn test_custom_context_files() {
-        let tmp = tempdir().unwrap();
-        let root = tmp.path();
-
-        fs::write(root.join("SUMMARY.md"), "Summary content").unwrap();
-        fs::write(root.join("CONTEXT.md"), "Context content").unwrap();
-
-        // With custom names, only SUMMARY.md is found (first match wins)
-        let files = collect_context_files(root, root, &["SUMMARY.md", "CONTEXT.md"]);
-        assert_eq!(files.len(), 1);
-        assert!(files[0].ends_with("SUMMARY.md"));
-
-        // With only CONTEXT.md in the list, that's what we get
-        let files = collect_context_files(root, root, &["CONTEXT.md"]);
-        assert_eq!(files.len(), 1);
-        assert!(files[0].ends_with("CONTEXT.md"));
     }
 }

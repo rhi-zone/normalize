@@ -6,10 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Added
+### Changed
 
-- **`normalize view <file>` shows module-level docs**: when viewing a file (not a symbol), the module-level doc comment is shown as a preamble before the symbol list. Supported: `//!` inner-doc comments in Rust, module docstrings in Python, package comments in Go, file-top JSDoc (`/** ... */`) in JavaScript/TypeScript, and leading `#` comment blocks in Ruby. The doc text also appears as `"summary"` in `--json` output.
-
+- **`normalize view --dir-context`** now accepts an integer `N` instead of a boolean flag. `N` selects context files using Python `list[:N]` semantics on the target→root ordered list: `1` = target dir only, `2` = target + parent, `-1` = all ancestors, `0` = none. Pass the flag without a value to get all ancestors (equivalent to `-1`).
 
 ## [0.2.0] — 2026-03-25
 
