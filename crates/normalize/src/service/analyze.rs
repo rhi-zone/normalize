@@ -148,6 +148,7 @@ impl AnalyzeService {
 
     /// Run health analysis (file counts, complexity stats, large file warnings)
     #[cli(default, display_with = "display_output")]
+    #[allow(clippy::too_many_arguments)]
     pub fn health(
         &self,
         #[param(positional, help = "Target file or directory")] target: Option<String>,
@@ -156,6 +157,11 @@ impl AnalyzeService {
         >,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        #[param(
+            short = 'l',
+            help = "Maximum number of large files to include in output (0 = no limit, default 10)"
+        )]
+        limit: Option<usize>,
         pretty: bool,
         compact: bool,
     ) -> Result<AnalyzeReport, AnalyzeError> {
@@ -171,7 +177,7 @@ impl AnalyzeService {
         let config = crate::config::NormalizeConfig::load(&root_path);
         let filter =
             Self::build_filter_with_config(&root_path, &config.analyze, "health", &exclude, &only);
-        Ok(crate::commands::analyze::report::analyze(
+        let mut report = crate::commands::analyze::report::analyze(
             target.as_deref(),
             &root_path,
             true,
@@ -181,7 +187,17 @@ impl AnalyzeService {
             None,
             None,
             filter.as_ref(),
-        ))
+        );
+        // Cap large_files to avoid bloated JSON output for agents.
+        // Default cap is 10; --limit 0 disables the cap.
+        let cap = match limit.unwrap_or(10) {
+            0 => usize::MAX,
+            n => n,
+        };
+        if let Some(ref mut health) = report.health {
+            health.large_files.truncate(cap);
+        }
+        Ok(report)
     }
 
     /// Run all analysis passes

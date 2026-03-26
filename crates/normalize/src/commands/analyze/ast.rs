@@ -1,6 +1,17 @@
 //! AST inspection for syntax rule authoring.
 
 pub fn node_to_json(node: tree_sitter::Node, source: &str) -> serde_json::Value {
+    node_to_json_depth(node, source, -1, 0)
+}
+
+/// Build a JSON representation of the tree, stopping at `max_depth` levels.
+/// `max_depth` of -1 means unlimited; 0 means root only (no children).
+pub fn node_to_json_depth(
+    node: tree_sitter::Node,
+    source: &str,
+    max_depth: i32,
+    current_depth: i32,
+) -> serde_json::Value {
     let mut obj = serde_json::json!({
         "kind": node.kind(),
         "start": {
@@ -15,16 +26,81 @@ pub fn node_to_json(node: tree_sitter::Node, source: &str) -> serde_json::Value 
 
     if node.child_count() == 0 {
         obj["text"] = serde_json::json!(node.utf8_text(source.as_bytes()).unwrap_or(""));
+    } else if max_depth >= 0 && current_depth >= max_depth {
+        // Depth limit reached — mark children as truncated
+        obj["truncated"] = serde_json::json!(true);
+        obj["child_count"] = serde_json::json!(node.child_count());
     } else {
         let mut children = Vec::new();
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            children.push(node_to_json(child, source));
+            children.push(node_to_json_depth(
+                child,
+                source,
+                max_depth,
+                current_depth + 1,
+            ));
         }
         obj["children"] = serde_json::json!(children);
     }
 
     obj
+}
+
+/// Build a compact outline of the tree (node type + field name, no source text).
+/// When `max_depth` >= 0, stops at that many levels deep.
+pub fn tree_to_outline(
+    node: tree_sitter::Node,
+    max_depth: i32,
+    current_depth: i32,
+    buf: &mut String,
+) {
+    let prefix = "  ".repeat(current_depth as usize);
+    let kind = node.kind();
+    let start = node.start_position();
+    let end = node.end_position();
+
+    let field_info = if let Some(parent) = node.parent() {
+        let mut cursor = parent.walk();
+        let mut result = String::new();
+        for (i, child) in parent.children(&mut cursor).enumerate() {
+            if child.id() == node.id() {
+                if let Some(field) = parent.field_name_for_child(i as u32) {
+                    result = format!("{}: ", field);
+                }
+                break;
+            }
+        }
+        result
+    } else {
+        String::new()
+    };
+
+    buf.push_str(&format!(
+        "{}{}({}) [L{}-L{}]\n",
+        prefix,
+        field_info,
+        kind,
+        start.row + 1,
+        end.row + 1,
+    ));
+
+    if max_depth >= 0 && current_depth >= max_depth {
+        if node.child_count() > 0 {
+            let child_prefix = "  ".repeat(current_depth as usize + 1);
+            buf.push_str(&format!(
+                "{}... {} children truncated\n",
+                child_prefix,
+                node.child_count()
+            ));
+        }
+        return;
+    }
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        tree_to_outline(child, max_depth, current_depth + 1, buf);
+    }
 }
 
 fn tree_to_string(source: &str, node: tree_sitter::Node, indent: usize, buf: &mut String) {
@@ -152,10 +228,14 @@ fn node_at_line_to_string(source: &str, root: tree_sitter::Node, line: usize, bu
 }
 
 /// Build AST output as (json_value, text_string).
+/// `depth`: -1 = unlimited, 0 = root only, N = N levels deep.
+/// `compact`: if true, produce an outline without source text instead of the full tree dump.
 pub fn build_ast_output(
     file: &std::path::Path,
     at_line: Option<usize>,
     sexp: bool,
+    depth: i32,
+    compact: bool,
 ) -> Result<(serde_json::Value, String), String> {
     use crate::parsers::grammar_loader;
     use normalize_languages::support_for_path;
@@ -180,13 +260,15 @@ pub fn build_ast_output(
 
     let root = tree.root_node();
 
-    let json_value = node_to_json(root, &content);
+    let json_value = node_to_json_depth(root, &content, depth, 0);
 
     let mut text = String::new();
     if let Some(line) = at_line {
         node_at_line_to_string(&content, root, line, &mut text);
     } else if sexp {
         text = root.to_sexp();
+    } else if compact {
+        tree_to_outline(root, depth, 0, &mut text);
     } else {
         tree_to_string(&content, root, 0, &mut text);
     }

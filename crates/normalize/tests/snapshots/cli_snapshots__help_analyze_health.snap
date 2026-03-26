@@ -17,6 +17,7 @@ Options:
       --jsonl                      Output one JSON object per line (for arrays)
       --only <only>                Include only paths matching pattern
       --json                       Output machine-readable JSON
+  -l, --limit <limit>              Maximum number of large files to include in output (0 = no limit, default 10)
       --jq <jq>                    Filter output through jq expression
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --output-schema              Print JSON Schema of the subcommand's return type and exit

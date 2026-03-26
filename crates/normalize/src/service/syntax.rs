@@ -6,28 +6,72 @@
 use crate::commands::syntax::node_types::NodeTypesReport;
 use normalize_syntax_rules::MatchResult;
 use server_less::cli;
+use std::cell::Cell;
 use std::path::PathBuf;
 
 /// Tree-sitter AST inspection and query tools.
 #[derive(Default)]
-pub struct SyntaxService;
+pub struct SyntaxService {
+    /// True when compact mode is active (set by `ast` before display).
+    compact: Cell<bool>,
+    /// Cached text representation for AST compact/depth output.
+    ast_text: std::cell::RefCell<String>,
+}
 
 impl SyntaxService {
     pub fn new() -> Self {
-        Self
+        Self {
+            compact: Cell::new(false),
+            ast_text: std::cell::RefCell::new(String::new()),
+        }
     }
 
     fn display_ast(&self, v: &serde_json::Value) -> String {
-        serde_json::to_string_pretty(v).unwrap_or_default()
+        if self.compact.get() {
+            self.ast_text.borrow().clone()
+        } else {
+            serde_json::to_string_pretty(v).unwrap_or_default()
+        }
     }
 
     fn display_query(&self, results: &[MatchResult]) -> String {
-        format!("{} matches", results.len())
+        if results.is_empty() {
+            return "0 matches".to_string();
+        }
+        let mut lines = Vec::with_capacity(results.len());
+        for m in results {
+            let file = m.file.display();
+            // Show one line per capture in the match.
+            if m.captures.is_empty() {
+                let preview = truncate_text(&m.text, 80);
+                lines.push(format!("{}:{}: {}", file, m.start_row, preview));
+            } else {
+                for (capture_name, capture_text) in &m.captures {
+                    let preview = truncate_text(capture_text, 80);
+                    lines.push(format!(
+                        "{}:{}: @{} = {}",
+                        file, m.start_row, capture_name, preview
+                    ));
+                }
+            }
+        }
+        lines.join("\n")
     }
 
     fn display_node_types(&self, r: &NodeTypesReport) -> String {
         use normalize_output::OutputFormatter;
         r.format_text()
+    }
+}
+
+fn truncate_text(s: &str, max_chars: usize) -> String {
+    // Collapse newlines to spaces for single-line display.
+    let single: String = s.lines().map(str::trim).collect::<Vec<_>>().join(" ");
+    if single.chars().count() <= max_chars {
+        single
+    } else {
+        let truncated: String = single.chars().take(max_chars).collect();
+        format!("{}...", truncated)
     }
 }
 
@@ -42,16 +86,29 @@ impl SyntaxService {
     ///   normalize syntax ast src/main.rs             # show full AST for a file
     ///   normalize syntax ast src/main.rs -l 42       # show AST node at line 42
     ///   normalize syntax ast src/main.rs --sexp      # output as S-expression
+    ///   normalize syntax ast src/main.rs --depth 3   # show only 3 levels deep
+    ///   normalize syntax ast src/main.rs --compact   # show node-type outline, no source text
     #[cli(display_with = "display_ast")]
     pub fn ast(
         &self,
         #[param(positional, help = "File to inspect")] file: String,
         #[param(short = 'l', help = "Show node at specific line")] at_line: Option<usize>,
         #[param(help = "Output as S-expression")] sexp: bool,
+        #[param(
+            short = 'd',
+            help = "Limit tree depth (-1 = unlimited, 0 = root only, default -1)"
+        )]
+        depth: Option<i32>,
+        compact: bool,
     ) -> Result<serde_json::Value, String> {
+        let depth_val = depth.unwrap_or(-1);
+        self.compact.set(compact);
+
         let file_path = PathBuf::from(&file);
-        let (json, _text) =
-            crate::commands::analyze::ast::build_ast_output(&file_path, at_line, sexp)?;
+        let (json, text) = crate::commands::analyze::ast::build_ast_output(
+            &file_path, at_line, sexp, depth_val, compact,
+        )?;
+        *self.ast_text.borrow_mut() = text;
         Ok(json)
     }
 

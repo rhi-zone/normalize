@@ -21,6 +21,7 @@ Options:
   -r, --root <root>                Root directory (defaults to current directory)
       --exclude <exclude>          Exclude paths matching pattern
       --only <only>                Include only paths matching pattern
+  -l, --limit <limit>              Maximum number of large files to include in output (0 = no limit, default 10)
   -h, --help                       Print help
   -V, --version                    Print version
 

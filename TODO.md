@@ -55,6 +55,9 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 Baseline audit in `docs/agent-ux-audit.md` (2026-03-21) covers 12 commands across 3 models (Haiku, Sonnet, Opus). Quick wins fixed. Remaining work:
 
+- [x] `analyze health --json` and `analyze summary --json` bloated by unbounded `large_files` (180KB+) → added `--limit` (default 10, 0 = no limit) to `analyze health`
+- [x] `syntax ast --json` produces 673KB for a 200-line file → added `--depth` flag (default -1 = unlimited) that truncates the CST; `--compact` now shows a node-type outline instead of full dump
+- [x] `syntax query --compact` only showed match count → now shows one line per match: `path:line: @capture = text`
 - [ ] Run full audit pass over all ~30+ subcommands (not just the 12 sampled)
 - [ ] Fix deferred single-model issues once patterns emerge across more commands
 - [ ] Re-run multi-model audit after fixes to verify improvement
