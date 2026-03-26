@@ -10,91 +10,15 @@ use normalize_syntax_rules::apply_fixes;
 
 use crate::cmd_rules::run_syntax_rules;
 use crate::runner::{
-    ListFilters, RuleInfoReport, RuleKind, RulesListReport, RulesRunConfig, RulesTagsReport,
-    add_rule, apply_native_rules_config, build_list_report, enable_disable, list_tags_structured,
-    remove_rule, run_rules_report, show_rule_structured, update_rules,
+    ListFilters, RuleKind, RulesListReport, RulesRunConfig, add_rule, apply_native_rules_config,
+    build_list_report, enable_disable, list_tags, remove_rule, run_rules_report, show_rule,
+    update_rules,
 };
 
 /// Resolve pretty mode: enabled on TTY (or forced via --pretty), disabled by --compact.
 fn resolve_pretty(pretty: bool, compact: bool) -> bool {
     use std::io::IsTerminal;
     !compact && (pretty || std::io::stdout().is_terminal())
-}
-
-/// A single error found when compiling a `.dl` rules file.
-#[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct CompileError {
-    /// 1-based line number in the source file (0 = unknown / not line-specific).
-    pub line: usize,
-    /// 1-based column number in the source file (0 = unknown).
-    pub col: usize,
-    /// Human-readable description of the error.
-    pub message: String,
-}
-
-/// A single warning found when compiling a `.dl` rules file.
-#[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct CompileWarning {
-    /// 1-based line number in the source file (0 = unknown / not line-specific).
-    pub line: usize,
-    /// 1-based column number in the source file (0 = unknown).
-    pub col: usize,
-    /// Human-readable description of the warning.
-    pub message: String,
-}
-
-/// Report returned by `normalize rules compile`.
-#[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct RulesCompileReport {
-    /// Path to the `.dl` file that was checked.
-    pub path: String,
-    /// `true` if no errors were found; `false` otherwise.
-    pub valid: bool,
-    /// Hard errors — the program cannot run correctly.
-    pub errors: Vec<CompileError>,
-    /// Warnings — the program will run but may not behave as expected.
-    pub warnings: Vec<CompileWarning>,
-    /// All relation names referenced in rule heads or bodies (sorted).
-    pub relations_used: Vec<String>,
-}
-
-impl OutputFormatter for RulesCompileReport {
-    fn format_text(&self) -> String {
-        let mut out = String::new();
-        for e in &self.errors {
-            if e.line > 0 {
-                out.push_str(&format!(
-                    "{}:{}:{}: error: {}\n",
-                    self.path, e.line, e.col, e.message
-                ));
-            } else {
-                out.push_str(&format!("{}: error: {}\n", self.path, e.message));
-            }
-        }
-        for w in &self.warnings {
-            if w.line > 0 {
-                out.push_str(&format!(
-                    "{}:{}:{}: warning: {}\n",
-                    self.path, w.line, w.col, w.message
-                ));
-            } else {
-                out.push_str(&format!("{}: warning: {}\n", self.path, w.message));
-            }
-        }
-        if self.valid {
-            out.push_str(&format!(
-                "{}: ok — {} relation{} used\n",
-                self.path,
-                self.relations_used.len(),
-                if self.relations_used.len() == 1 {
-                    ""
-                } else {
-                    "s"
-                },
-            ));
-        }
-        out
-    }
 }
 
 /// Report returned by `normalize rules validate`.
@@ -289,8 +213,6 @@ impl RulesService {
     ///   normalize rules run --rule rust/unwrap-in-impl   # single rule
     ///   normalize rules run --pretty           # colored output with details
     ///   normalize rules run --type syntax      # only syntax rules
-    ///   normalize rules run --only "*.rs"      # only Rust files
-    ///   normalize rules run --exclude "tests/" # skip test directories
     #[cli(display_with = "display_run")]
     #[allow(clippy::too_many_arguments)]
     pub async fn run(
@@ -313,8 +235,6 @@ impl RulesService {
         #[param(help = "Maximum number of issues to show in detail (default: 50)")] limit: Option<
             usize,
         >,
-        #[param(help = "Only include files matching glob patterns")] only: Vec<String>,
-        #[param(help = "Exclude files matching glob patterns")] exclude: Vec<String>,
         pretty: bool,
         compact: bool,
     ) -> Result<DiagnosticsReport, String> {
@@ -410,68 +330,18 @@ impl RulesService {
         .await
         .map_err(|e| format!("Task error: {e}"))?;
 
-        // Native engine (missing-summary, stale-summary, check-refs, stale-docs, check-examples, ratchet, budget)
-        // runs in async context; included in All and Native engine types.
+        // Native engine (stale-summary, check-refs, stale-docs, check-examples, ratchet, budget,
+        // scm-capture-names) runs in async context; included in All and Native engine types.
         // All checks are independent — run them in parallel.
         if run_native {
             let native_root = effective_root.clone();
             let native_config = load_rules_config(&native_root);
             let threshold = 10;
-            let missing_summary_filenames: Vec<String> = native_config
-                .rules
-                .rules
-                .get("missing-summary")
-                .map(|r| r.filenames.clone())
-                .unwrap_or_default();
-            let missing_summary_paths: Vec<String> = native_config
-                .rules
-                .rules
-                .get("missing-summary")
-                .map(|r| r.paths.clone())
-                .unwrap_or_default();
-            let stale_summary_filenames: Vec<String> = native_config
-                .rules
-                .rules
-                .get("stale-summary")
-                .map(|r| r.filenames.clone())
-                .unwrap_or_default();
-            let stale_summary_paths: Vec<String> = native_config
-                .rules
-                .rules
-                .get("stale-summary")
-                .map(|r| r.paths.clone())
-                .unwrap_or_default();
 
-            let (
-                missing_res,
-                summary_res,
-                stale_res,
-                examples_res,
-                refs_res,
-                ratchet_res,
-                budget_res,
-            ) = tokio::join!(
+            let (summary_res, stale_res, examples_res, refs_res, ratchet_res, budget_res, scm_res) = tokio::join!(
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
-                    move || {
-                        normalize_native_rules::build_missing_summary_report(
-                            &root,
-                            threshold,
-                            &missing_summary_filenames,
-                            &missing_summary_paths,
-                        )
-                    }
-                }),
-                tokio::task::spawn_blocking({
-                    let root = native_root.clone();
-                    move || {
-                        normalize_native_rules::build_stale_summary_report(
-                            &root,
-                            threshold,
-                            &stale_summary_filenames,
-                            &stale_summary_paths,
-                        )
-                    }
+                    move || normalize_native_rules::build_stale_summary_report(&root, threshold)
                 }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
@@ -490,15 +360,16 @@ impl RulesService {
                     let root = native_root.clone();
                     move || normalize_native_rules::build_budget_report(&root)
                 }),
+                tokio::task::spawn_blocking({
+                    let root = native_root.clone();
+                    move || normalize_native_rules::build_scm_capture_names_report(&root)
+                }),
             );
 
             // Track how many issues existed before adding native results so
             // global_allow filtering only touches the newly added native issues.
             let native_start = report.issues.len();
 
-            if let Ok(r) = missing_res {
-                report.merge(r.into());
-            }
             if let Ok(r) = summary_res {
                 report.merge(r.into());
             }
@@ -515,6 +386,9 @@ impl RulesService {
                 report.merge(r.into());
             }
             if let Ok(r) = budget_res {
+                report.merge(r.into());
+            }
+            if let Ok(r) = scm_res {
                 report.merge(r.into());
             }
 
@@ -548,28 +422,6 @@ impl RulesService {
             report
                 .issues
                 .retain(|issue| issue.rule_id == filter.as_str());
-        }
-
-        // Apply --only / --exclude path filters to all issues.
-        if !only.is_empty() || !exclude.is_empty() {
-            let only_pats: Vec<glob::Pattern> = only
-                .iter()
-                .filter_map(|s| glob::Pattern::new(s).ok())
-                .collect();
-            let exclude_pats: Vec<glob::Pattern> = exclude
-                .iter()
-                .filter_map(|s| glob::Pattern::new(s).ok())
-                .collect();
-            report.issues.retain(|issue| {
-                let file = issue.file.as_str();
-                if !exclude_pats.is_empty() && exclude_pats.iter().any(|p| p.matches(file)) {
-                    return false;
-                }
-                if !only_pats.is_empty() && !only_pats.iter().any(|p| p.matches(file)) {
-                    return false;
-                }
-                true
-            });
         }
 
         report.sort();
@@ -653,16 +505,19 @@ impl RulesService {
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<RuleInfoReport, String> {
+    ) -> Result<RuleShowReport, String> {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        self.resolve_format(pretty, compact);
+        let use_colors = resolve_pretty(pretty, compact);
         let config = load_rules_config(&effective_root);
-        show_rule_structured(&effective_root, &id, &config)
+        show_rule(&effective_root, &id, use_colors, &config).map(|msg| RuleShowReport {
+            success: true,
+            message: Some(msg),
+        })
     }
 
     /// List all tags and the rules they group
@@ -672,22 +527,33 @@ impl RulesService {
     #[cli(display_with = "display_output")]
     pub fn tags(
         &self,
+        #[param(help = "Expand each tag to show its member rules")] show_rules: bool,
         #[param(help = "Show only this specific tag")] tag: Option<String>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
         pretty: bool,
         compact: bool,
-    ) -> Result<RulesTagsReport, String> {
+    ) -> Result<RuleShowReport, String> {
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        self.resolve_format(pretty, compact);
+        let use_colors = resolve_pretty(pretty, compact);
         let config = load_rules_config(&effective_root);
-        list_tags_structured(&effective_root, tag.as_deref(), &config)
+        list_tags(
+            &effective_root,
+            show_rules,
+            tag.as_deref(),
+            use_colors,
+            &config,
+        )
+        .map(|msg| RuleShowReport {
+            success: true,
+            message: Some(msg),
+        })
     }
 
     /// Add a rule from a URL
@@ -851,94 +717,6 @@ impl RulesService {
         };
 
         Ok(report)
-    }
-
-    /// Validate and "compile" a Datalog rules file — check syntax and relation names
-    ///
-    /// Parses the `.dl` file, validates that all referenced relations are declared (or
-    /// are built-in), and reports errors with file/line context.  Exits with status 1
-    /// when errors are found so it can be used in CI pipelines.
-    ///
-    /// Examples:
-    ///   normalize rules compile my-rule.dl       # check a single rule file
-    ///   normalize rules compile .normalize/rules/arch.dl --json  # machine-readable output
-    #[cli(display_with = "display_output")]
-    pub fn compile(
-        &self,
-        #[param(positional, help = "Path to the .dl file to validate")] path: String,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<RulesCompileReport, String> {
-        use normalize_facts_rules_interpret::{compile_rules_source, parse_rule_content};
-
-        self.resolve_format(pretty, compact);
-
-        let effective_root = root
-            .as_deref()
-            .map(std::path::PathBuf::from)
-            .map(Ok)
-            .unwrap_or_else(std::env::current_dir)
-            .map_err(|e| format!("Failed to get current directory: {e}"))?;
-
-        let dl_path = if std::path::Path::new(&path).is_absolute() {
-            std::path::PathBuf::from(&path)
-        } else {
-            effective_root.join(&path)
-        };
-
-        let content = std::fs::read_to_string(&dl_path)
-            .map_err(|e| format!("Failed to read '{}': {e}", dl_path.display()))?;
-
-        // Strip frontmatter to get the Datalog source body
-        let default_id = dl_path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("rule");
-        let rule = parse_rule_content(&content, default_id, false);
-        let source = rule.as_ref().map(|r| r.source.as_str()).unwrap_or(&content);
-
-        let compile_result = compile_rules_source(source);
-
-        let errors: Vec<CompileError> = compile_result
-            .errors
-            .into_iter()
-            .map(|e| CompileError {
-                line: e.line,
-                col: e.col,
-                message: e.message,
-            })
-            .collect();
-
-        let warnings: Vec<CompileWarning> = compile_result
-            .warnings
-            .into_iter()
-            .map(|w| CompileWarning {
-                line: w.line,
-                col: w.col,
-                message: w.message,
-            })
-            .collect();
-
-        let valid = errors.is_empty();
-
-        let report = RulesCompileReport {
-            path,
-            valid,
-            errors,
-            warnings,
-            relations_used: compile_result.relations_used,
-        };
-
-        if report.valid {
-            Ok(report)
-        } else {
-            // Signal failure to the CLI via Err so the process exits with status 1.
-            // The formatted output is passed as the error string so it appears on stderr.
-            Err(self.display_output(&report))
-        }
     }
 }
 

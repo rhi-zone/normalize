@@ -8,18 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- **`normalize grep <path>`** — optional positional `path` argument scopes the search tree (consistent with `view`, `edit`, `rank`). The existing `--root` flag is preserved for backward compatibility; `path` takes precedence when both are given.
-- **`normalize rules run --only`/`--exclude`** — glob pattern filtering for which files get diagnostics returned. `--only "*.rs"` restricts to Rust files; `--exclude "tests/"` skips test directories. Applies post-collection across syntax, fact, and native rule engines.
-- **`normalize structure rebuild --only`/`--exclude`** — glob pattern filtering for which files get indexed. Files not matching the filter are removed from the index after the walk.
-- **`normalize analyze architecture --limit`** — caps the number of `cross_imports` entries in the output (default 20, `--limit 0` disables). Reduces default JSON response from ~196KB to ~10KB, matching the `analyze health --limit` pattern.
-
-### Changed
-
-- **`normalize view --dir-context`** now accepts an integer `N` instead of a boolean flag. `N` selects context files using Python `list[:N]` semantics on the target→root ordered list: `1` = target dir only, `2` = target + parent, `-1` = all ancestors, `0` = none. Pass the flag without a value to get all ancestors (equivalent to `-1`).
-- **`normalize view --dir-context` JSON output** now includes a `dir_context` field in `ViewReport` containing the merged context content. Previously the context was only prepended to text output; agents using `--json` received no context.
-- **`normalize rules tags`** now always populates the `rules` array in JSON output (previously the array was empty by default and only filled when `--show-rules` was passed, which made agents misread it as "no rules in this tag"). The `--show-rules` flag has been removed; the rules list is now always included. Text output is unchanged.
-- **`normalize syntax ast`** default depth changed from unlimited (`-1`) to `5`. Pass `--depth -1` to restore the old unlimited behavior. This prevents agents from receiving enormous output when inspecting files.
-- **`normalize analyze architecture` compact output** no longer truncates hub and symbol paths with opaque worktree-hash prefixes (e.g. `...ba395f/crates/...`). Paths are now shown as clean workspace-relative paths (e.g. `crates/normalize/src/output.rs`).
+- **`scm-capture-names` native rule** — validates that `.calls.scm` tree-sitter query files only use capture names that the facts indexer actually consumes (`@call`, `@call.qualifier`). Silently-ignored captures (e.g. `@reference.call`) are flagged as warnings, catching the class of bug where a query emits data under an unrecognised name and the indexer silently skips it.
 
 ## [0.2.0] — 2026-03-25
 
