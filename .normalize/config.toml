@@ -292,5 +292,9 @@ enabled = false
 [rules."ruby/string-concat"]
 enabled = false
 
+[[rules.sarif-tools]]
+name = "validate-calls-scm"
+command = ["sh", "{root}/scripts/validate-calls-scm.sh", "{root}"]
+
 [aliases]
 todo = ["TODO.md"]

@@ -295,16 +295,7 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 
 4. **Unify rule engine config** — `syntax-rules` has a config system (`RulesConfig`, per-rule overrides, severity mapping). The other engines (native, fact, future SARIF) have none. Extract a shared `normalize-rules-config` crate (or extend `normalize-output`) with a unified config schema: rule IDs, severity overrides, enable/disable, per-directory excludes. All engines consult this at run time; `normalize rules run` passes it down.
 
-5. **SARIF passthrough engine** (`--engine sarif`) — accepts a list of external tool commands that emit SARIF output. Runs them with configurable parallelism (default: 8). Parses each tool's stdout as SARIF 2.1.0 and merges into `DiagnosticsReport`. Enables wrapping ESLint, clippy, semgrep, etc. without per-tool adapters. Config lives in `[rules.sarif]` in normalize.toml:
-   ```toml
-   [[rules.sarif.tools]]
-   name = "eslint"
-   command = ["npx", "eslint", "--format", "json", "{root}"]
-   [[rules.sarif.tools]]
-   name = "semgrep"
-   command = ["semgrep", "--sarif", "{root}"]
-   ```
-   Tools that emit JSON (not SARIF) need a `format = "json"` adapter — stretch goal.
+5. [x] **SARIF passthrough engine** (`--engine sarif`) — implemented: `SarifTool` config type in `normalize-rules-config`, `run_sarif_tools()` in runner, `[[rules.sarif-tools]]` in config.toml. Note: only runs when `--engine sarif` (not `all`) — intentional since external tools are expensive.
 
 ### Incremental-first architecture
 
@@ -955,3 +946,10 @@ find_cycles_dfs iterative conversion (was stack depth ever actually a problem?).
 - GITHUB_REPO constant → "rhi-zone/normalize"
 - Custom SHA256 implementation (Sha256 struct)
 - Expects GitHub release with SHA256SUMS.txt
+
+### Update CLAUDE.md — cargo test -q preference (2026-03-27)
+
+When normalize is clean, update CLAUDE.md Workflow section:
+- Change `cargo test` to `cargo test -q` in the example command
+- Add note: "Prefer `cargo test -q` over `cargo test` — quiet mode only prints failures, significantly reducing output noise and context usage."
+Conventional commit: `docs: prefer cargo test -q to reduce output noise`
