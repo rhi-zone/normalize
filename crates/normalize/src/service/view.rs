@@ -177,8 +177,10 @@ impl ViewService {
         #[param(help = "Hide all docstrings")] no_docs: bool,
         #[param(help = "Hide parent/ancestor context")] no_parent: bool,
         #[param(help = "Context view: skeleton + imports combined")] context: bool,
-        #[param(help = "Prepend ancestor directory context files (walks root → target)")]
-        dir_context: bool,
+        #[param(
+            help = "Prepend ancestor directory context files; value = max ancestor levels (e.g. --dir-context 2)"
+        )]
+        dir_context: Option<u32>,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
         #[param(short = 'i', help = "Case-insensitive symbol matching")] case_insensitive: bool,
@@ -205,15 +207,23 @@ impl ViewService {
 
         let ctx_files = config.view.context_files();
 
-        // --dir-context: walk root → target, prepend context files from each ancestor
-        if dir_context {
+        // --dir-context N: prepend context files, walking up N ancestor levels (default: all)
+        if let Some(depth) = dir_context {
             let target_path = target
                 .as_ref()
                 .map(|t| root_path.join(t))
                 .unwrap_or_else(|| root_path.clone());
-            if let Some(ctx) =
-                crate::commands::context::get_merged_context(&root_path, &target_path, &ctx_files)
-            {
+            let max_depth = if depth == 0 {
+                None
+            } else {
+                Some(depth as usize)
+            };
+            if let Some(ctx) = crate::commands::context::get_merged_context(
+                &root_path,
+                &target_path,
+                &ctx_files,
+                max_depth,
+            ) {
                 self.view_prefix.set(format!("{}\n\n---\n\n", ctx));
             }
         }

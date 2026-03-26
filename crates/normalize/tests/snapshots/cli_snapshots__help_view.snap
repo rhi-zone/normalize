@@ -45,7 +45,7 @@ Options:
       --no-docs                    Hide all docstrings
       --no-parent                  Hide parent/ancestor context
       --context                    Context view: skeleton + imports combined
-      --dir-context                Prepend directory context (.context.md files)
+      --dir-context <dir-context>  Prepend ancestor directory context files; value = max ancestor levels (e.g. --dir-context 2)
       --exclude <exclude>          Exclude paths matching pattern
       --only <only>                Include only paths matching pattern
   -i, --case-insensitive           Case-insensitive symbol matching

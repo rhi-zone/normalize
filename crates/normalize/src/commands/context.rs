@@ -85,7 +85,15 @@ impl OutputFormatter for ContextReport {
 ///
 /// `names` is the ordered list of filenames to look for in each directory;
 /// the first match per directory wins. Callers should pass `ViewConfig::context_files()`.
-pub fn collect_context_files(root: &Path, target_dir: &Path, names: &[&str]) -> Vec<PathBuf> {
+///
+/// `max_depth` limits how many ancestor levels above the target are included.
+/// `None` or `Some(0)` means the target directory only; `Some(2)` means target + 2 ancestors.
+pub fn collect_context_files(
+    root: &Path,
+    target_dir: &Path,
+    names: &[&str],
+    max_depth: Option<usize>,
+) -> Vec<PathBuf> {
     let mut files = Vec::new();
 
     // Build path from root to target
@@ -104,8 +112,15 @@ pub fn collect_context_files(root: &Path, target_dir: &Path, names: &[&str]) -> 
         }
     }
 
-    // Reverse to get root-to-target order
+    // Reverse to get root-to-target order; apply depth limit from the target end
     dirs.reverse();
+    let depth = max_depth.unwrap_or(0);
+    let start = if depth < dirs.len() {
+        dirs.len() - 1 - depth
+    } else {
+        0
+    };
+    let dirs = &dirs[start..];
 
     // Check each directory for context files
     for dir in dirs {
@@ -126,7 +141,12 @@ pub fn collect_context_files(root: &Path, target_dir: &Path, names: &[&str]) -> 
 ///
 /// `names` is the ordered list of filenames to look for in each directory.
 /// Callers should pass `ViewConfig::context_files()`.
-pub fn get_merged_context(root: &Path, target: &Path, names: &[&str]) -> Option<String> {
+pub fn get_merged_context(
+    root: &Path,
+    target: &Path,
+    names: &[&str],
+    max_depth: Option<usize>,
+) -> Option<String> {
     // Find the target directory - walk up from target until we find an existing dir
     let target_dir = if target.is_file() {
         target.parent().unwrap_or(root).to_path_buf()
@@ -147,7 +167,7 @@ pub fn get_merged_context(root: &Path, target: &Path, names: &[&str]) -> Option<
     let root = root.canonicalize().ok()?;
     let target_dir = target_dir.canonicalize().ok()?;
 
-    let files = collect_context_files(&root, &target_dir, names);
+    let files = collect_context_files(&root, &target_dir, names, max_depth);
     if files.is_empty() {
         return None;
     }
