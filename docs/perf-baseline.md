@@ -15,26 +15,26 @@ cargo bench
 
 | Benchmark | Median | Std Dev | Notes |
 |---|---|---|---|
-| parse_file(index.rs) | TBD | TBD | index.rs ~2000 lines, largest hot file |
+| parse_file(index.rs) | 32.8 ms | ~1.6 ms | index.rs ~2000 lines, largest hot file |
 
 ### structure_rebuild/full_refresh
 
 | Benchmark | Median | Std Dev | Notes |
 |---|---|---|---|
-| FileIndex::refresh(normalize-facts-core) | TBD | TBD | Small crate, ~10 source files |
+| FileIndex::refresh(normalize-facts-core) | 246.5 ms | ~3.5 ms | Small crate, ~10 source files |
 
 ### rules_runner
 
 | Benchmark | Median | Std Dev | Notes |
 |---|---|---|---|
-| build_relations_from_index(normalize) | TBD | TBD | Loads all symbols/imports/calls from SQLite |
+| build_relations_from_index(normalize) | 362.9 µs | ~6 µs | Loads all symbols/imports/calls from SQLite |
 
 ### cli_commands
 
 | Benchmark | Median | Std Dev | Notes |
 |---|---|---|---|
-| normalize view index.rs | TBD | TBD | Includes startup + parse, no index |
-| normalize rank complexity normalize-facts/src | TBD | TBD | Single-threaded walk+parse |
+| normalize view index.rs | 2.12 s | ~30 ms | Includes binary startup + parse, no index |
+| normalize rank complexity normalize-facts/src | 142.4 ms | ~1.5 ms | Single-threaded walk+parse, small crate |
 
 ## Known Hot Spots (from code audit)
 
