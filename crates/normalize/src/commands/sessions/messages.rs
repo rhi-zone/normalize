@@ -58,40 +58,143 @@ impl fmt::Display for RoleFilter {
     }
 }
 
-/// Sort order for messages output.
-#[derive(
-    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[serde(rename_all = "lowercase")]
-pub enum SortOrder {
-    /// Group messages by session, ordered within each session (default).
-    #[default]
-    Session,
-    /// Sort all messages chronologically across sessions by timestamp.
-    Timestamp,
+/// Sort direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortDir {
+    Ascending,
+    Descending,
 }
 
-impl FromStr for SortOrder {
+/// A single sort key with direction.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SortKey {
+    pub field: SortField,
+    pub dir: SortDir,
+}
+
+/// The fields that can be sorted on for `sessions messages`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortField {
+    /// Total token count for the turn (numeric, default desc).
+    Tokens,
+    /// Message timestamp (date, default desc for cross-session, asc within session).
+    Timestamp,
+    /// Session ID / name (string, default asc).
+    Session,
+}
+
+impl SortField {
+    /// Default sort direction for each field when no prefix is given.
+    fn default_dir(self) -> SortDir {
+        match self {
+            SortField::Tokens => SortDir::Descending,
+            SortField::Timestamp => SortDir::Descending,
+            SortField::Session => SortDir::Ascending,
+        }
+    }
+}
+
+impl FromStr for SortField {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "session" => Ok(SortOrder::Session),
-            "timestamp" | "time" => Ok(SortOrder::Timestamp),
+            "tokens" | "token" => Ok(SortField::Tokens),
+            "timestamp" | "time" | "ts" => Ok(SortField::Timestamp),
+            "session" => Ok(SortField::Session),
             _ => Err(format!(
-                "invalid sort '{}': expected 'session' or 'timestamp'",
+                "unknown sort field '{}': expected 'tokens', 'timestamp', or 'session'",
                 s
             )),
         }
     }
 }
 
-impl fmt::Display for SortOrder {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            SortOrder::Session => write!(f, "session"),
-            SortOrder::Timestamp => write!(f, "timestamp"),
+/// Parsed `--sort` specification: a list of (field, direction) pairs.
+///
+/// Syntax: comma-separated keys, each optionally prefixed with `-` (desc) or `+` (asc).
+/// When no prefix is given the field's default direction is used:
+/// - `tokens` → descending
+/// - `timestamp` → descending
+/// - `session` → ascending
+#[derive(Debug, Clone, Default)]
+pub struct SortSpec {
+    pub keys: Vec<SortKey>,
+}
+
+impl SortSpec {
+    /// Returns true if the spec is effectively a "sort by timestamp ascending" — meaning the only
+    /// key is `timestamp` and the direction is `Ascending`. This drives the display mode that
+    /// interleaves messages from all sessions chronologically.
+    pub fn is_timestamp_asc(&self) -> bool {
+        matches!(
+            self.keys.as_slice(),
+            [SortKey {
+                field: SortField::Timestamp,
+                dir: SortDir::Ascending
+            }]
+        )
+    }
+
+    /// Returns true if the spec contains a `timestamp` key (any direction), which means we
+    /// produce a flat interleaved list rather than session-grouped output.
+    pub fn has_timestamp(&self) -> bool {
+        self.keys.iter().any(|k| k.field == SortField::Timestamp)
+    }
+
+    /// Parse a `--sort` value string.
+    pub fn parse(s: &str) -> Result<Self, String> {
+        let mut keys = Vec::new();
+        for token in s.split(',') {
+            let token = token.trim();
+            if token.is_empty() {
+                continue;
+            }
+            let (dir, field_str) = if let Some(rest) = token.strip_prefix('-') {
+                (Some(SortDir::Descending), rest)
+            } else if let Some(rest) = token.strip_prefix('+') {
+                (Some(SortDir::Ascending), rest)
+            } else {
+                (None, token)
+            };
+            let field = SortField::from_str(field_str)?;
+            let dir = dir.unwrap_or_else(|| field.default_dir());
+            keys.push(SortKey { field, dir });
         }
+        Ok(SortSpec { keys })
+    }
+
+    /// Apply this sort spec to a slice of `MessageRecord` in-place.
+    pub fn sort_messages(&self, messages: &mut [MessageRecord]) {
+        if self.keys.is_empty() {
+            return;
+        }
+        messages.sort_by(|a, b| {
+            for key in &self.keys {
+                let ord = match key.field {
+                    SortField::Tokens => {
+                        let ta = a.usage.as_ref().map(|u| u.input + u.output).unwrap_or(0);
+                        let tb = b.usage.as_ref().map(|u| u.input + u.output).unwrap_or(0);
+                        ta.cmp(&tb)
+                    }
+                    SortField::Timestamp => {
+                        let ts_a = a.timestamp.as_deref().unwrap_or("");
+                        let ts_b = b.timestamp.as_deref().unwrap_or("");
+                        ts_a.cmp(ts_b)
+                    }
+                    SortField::Session => a.session_id.cmp(&b.session_id),
+                };
+                let ord = if key.dir == SortDir::Descending {
+                    ord.reverse()
+                } else {
+                    ord
+                };
+                if ord != std::cmp::Ordering::Equal {
+                    return ord;
+                }
+            }
+            std::cmp::Ordering::Equal
+        });
     }
 }
 
@@ -134,10 +237,10 @@ pub struct MessagesReport {
     #[serde(skip)]
     #[schemars(skip)]
     pub(crate) line_mode: bool,
-    /// Sort order applied to this report.
+    /// Parsed sort spec applied to this report.
     #[serde(skip)]
     #[schemars(skip)]
-    pub(crate) sort_order: SortOrder,
+    pub(crate) sort_spec: SortSpec,
 }
 
 /// Aggregate stats for the messages report.
@@ -231,8 +334,8 @@ impl OutputFormatter for MessagesReport {
                     lines.push(format!("  {:>4}-  {}", line_num + 1 + i + 1, ctx));
                 }
             }
-        } else if self.sort_order == SortOrder::Timestamp {
-            // Timestamp mode: no session grouping; show session ID inline per message
+        } else if self.sort_spec.has_timestamp() {
+            // Timestamp / flat mode: no session grouping; show session ID inline per message
             for (i, msg) in self.messages.iter().enumerate() {
                 if i > 0 {
                     lines.push("---".to_string());
@@ -401,8 +504,8 @@ impl OutputFormatter for MessagesReport {
                     ));
                 }
             }
-        } else if self.sort_order == SortOrder::Timestamp {
-            // Timestamp mode: no session grouping; show session ID inline per message
+        } else if self.sort_spec.has_timestamp() {
+            // Timestamp / flat mode: no session grouping; show session ID inline per message
             for msg in &self.messages {
                 let id_short = if msg.session_id.len() > 8 {
                     &msg.session_id[..8]
@@ -594,13 +697,17 @@ pub fn build_messages_report(
     all_projects: bool,
     session_filter: Option<&str>,
     show_usage: bool,
-    sort_by_tokens: bool,
-    sort_order: SortOrder,
+    sort: Option<&str>,
     context_lines: usize,
     mode: &super::SessionMode,
     agent_type: Option<&str>,
 ) -> Result<MessagesReport, String> {
     use super::stats::list_all_project_sessions_by_mode;
+
+    let sort_spec = match sort {
+        Some(s) => SortSpec::parse(s)?,
+        None => SortSpec::default(),
+    };
 
     let registry = FormatRegistry::new();
     let format: &dyn LogFormat = match format_name {
@@ -814,23 +921,8 @@ pub fn build_messages_report(
         }
     }
 
-    // Sort by descending total tokens if requested
-    if sort_by_tokens {
-        messages.sort_by(|a, b| {
-            let tok_a = a.usage.as_ref().map(|u| u.input + u.output).unwrap_or(0);
-            let tok_b = b.usage.as_ref().map(|u| u.input + u.output).unwrap_or(0);
-            tok_b.cmp(&tok_a)
-        });
-    }
-
-    // Sort chronologically across sessions when --sort timestamp is requested
-    if sort_order == SortOrder::Timestamp {
-        messages.sort_by(|a, b| {
-            let ts_a = a.timestamp.as_deref().unwrap_or("");
-            let ts_b = b.timestamp.as_deref().unwrap_or("");
-            ts_a.cmp(ts_b)
-        });
-    }
+    // Apply sort spec
+    sort_spec.sort_messages(&mut messages);
 
     // Build stats
     let mut by_role: HashMap<String, usize> = HashMap::new();
@@ -863,6 +955,6 @@ pub fn build_messages_report(
         truncated,
         show_usage,
         line_mode: context_lines > 0,
-        sort_order,
+        sort_spec,
     })
 }

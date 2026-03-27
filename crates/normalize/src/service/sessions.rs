@@ -298,7 +298,9 @@ impl SessionsService {
     ///   normalize sessions messages --role all                     # all roles (user + assistant)
     ///   normalize sessions messages --grep "error" --no-truncate   # search messages, full text
     ///   normalize sessions messages --grep "panic" --context 2     # matching lines with 2 lines of context
-    ///   normalize sessions messages --show-usage --sort-by-tokens  # heaviest turns first
+    ///   normalize sessions messages --show-usage --sort -tokens    # heaviest turns first
+    ///   normalize sessions messages --sort timestamp               # chronological across sessions
+    ///   normalize sessions messages --sort +session,-tokens        # by session asc, then tokens desc
     #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn messages(
@@ -317,12 +319,10 @@ impl SessionsService {
         >,
         #[param(short = 'n', help = "Maximum number of sessions")] limit: Option<usize>,
         #[param(help = "Show per-turn token usage (input/output/cache)")] show_usage: bool,
-        #[param(help = "Sort by descending token count (heaviest turns first)")]
-        sort_by_tokens: bool,
         #[param(
-            help = "Sort order: session (default, grouped by session) or timestamp (chronological across sessions)"
+            help = "Sort keys (comma-separated, prefix with - for desc or + for asc): tokens, timestamp, session. E.g. -tokens, +session,-tokens, timestamp"
         )]
-        sort: Option<crate::commands::sessions::messages::SortOrder>,
+        sort: Option<String>,
         #[param(
             short = 'C',
             help = "Lines of context around each matching line (requires --grep)"
@@ -350,7 +350,6 @@ impl SessionsService {
             return Err("--context requires --grep".to_string());
         }
         let mode = mode.unwrap_or_default();
-        let sort_order = sort.unwrap_or_default();
         crate::commands::sessions::build_messages_report(
             root_path,
             limit,
@@ -364,8 +363,7 @@ impl SessionsService {
             all_projects,
             session.as_deref(),
             show_usage,
-            sort_by_tokens,
-            sort_order,
+            sort.as_deref(),
             context_lines,
             &mode,
             agent_type.as_deref(),
