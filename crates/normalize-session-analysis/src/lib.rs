@@ -16,6 +16,18 @@ pub struct ToolStats {
     pub name: String,
     pub calls: usize,
     pub errors: usize,
+    /// Total characters across all tool result content for this tool.
+    pub output_chars: usize,
+}
+
+/// A single large tool result, for the top-N results by character count.
+#[derive(Debug, Clone, Default, Serialize, schemars::JsonSchema, Deserialize)]
+pub struct LargestToolResult {
+    pub tool_name: String,
+    pub chars: usize,
+    pub turn: usize,
+    /// First ~100 chars of content, trimmed.
+    pub preview: String,
 }
 
 impl ToolStats {
@@ -24,6 +36,7 @@ impl ToolStats {
             name: name.into(),
             calls: 0,
             errors: 0,
+            output_chars: 0,
         }
     }
 
@@ -426,6 +439,8 @@ pub struct SessionAnalysisReport {
     pub actual_cost: Option<f64>,
     /// Token deduplication statistics.
     pub dedup_tokens: Option<DedupTokenStats>,
+    /// Top 10 individual tool results by character count.
+    pub largest_tool_results: Vec<LargestToolResult>,
     /// Sort hint for tool rows in formatted output.
     /// Valid values: "name" (asc), "calls" (desc, default), "errors" (desc).
     /// Set by the CLI `--sort` flag; not serialized.
@@ -510,6 +525,21 @@ impl SessionAnalysisReport {
                     tool.calls,
                     tool.errors,
                     tool.success_rate() * 100.0
+                ));
+            }
+            lines.push(String::new());
+        }
+
+        // Largest tool results
+        if !self.largest_tool_results.is_empty() {
+            lines.push("## Largest Tool Results".to_string());
+            lines.push(String::new());
+            lines.push("| Tool | Chars | Turn | Preview |".to_string());
+            lines.push("|------|-------|------|---------|".to_string());
+            for r in &self.largest_tool_results {
+                lines.push(format!(
+                    "| {} | {} | {} | {} |",
+                    r.tool_name, r.chars, r.turn, r.preview
                 ));
             }
             lines.push(String::new());
@@ -933,6 +963,22 @@ impl SessionAnalysisReport {
                         String::new()
                     },
                     width = max_name_len
+                )?;
+            }
+            writeln!(out)?;
+        }
+
+        // Largest tool results
+        if !self.largest_tool_results.is_empty() {
+            writeln!(out, "\x1b[1;36m━━━ Largest Tool Results ━━━\x1b[0m")?;
+            for r in &self.largest_tool_results {
+                writeln!(
+                    out,
+                    "\x1b[33m{:>8}\x1b[0m chars  turn {:>4}  \x1b[36m{}\x1b[0m  {}",
+                    r.chars,
+                    r.turn,
+                    r.tool_name,
+                    r.preview.chars().take(60).collect::<String>()
                 )?;
             }
             writeln!(out)?;
@@ -1879,6 +1925,8 @@ pub fn analyze_session(session: &Session) -> SessionAnalysisReport {
     let mut retry_candidates: Vec<(usize, String, bool)> = Vec::new();
     // Output tokens per turn index (populated in the token usage pass below)
     let mut output_tokens_per_turn: Vec<u64> = Vec::new();
+    // Candidates for largest tool results: (chars, turn_idx, tool_name, preview)
+    let mut tool_result_candidates: Vec<(usize, usize, String, String)> = Vec::new();
 
     for (turn_idx, turn) in session.turns.iter().enumerate() {
         let mut tool_uses_in_turn = 0;
@@ -1888,6 +1936,8 @@ pub fn analyze_session(session: &Session) -> SessionAnalysisReport {
         let mut bash_commands: HashMap<String, Vec<(String, &'static str)>> = HashMap::new();
         // Track which tool_use IDs had errors
         let mut tool_errors: HashMap<String, bool> = HashMap::new();
+        // Map tool_use_id -> tool_name for result attribution
+        let mut tool_id_to_name: HashMap<String, String> = HashMap::new();
 
         for msg in &turn.messages {
             // Detect corrections in assistant messages
@@ -1915,6 +1965,7 @@ pub fn analyze_session(session: &Session) -> SessionAnalysisReport {
                         stat.calls += 1;
                         tool_uses_in_turn += 1;
                         tool_name_in_turn = Some(name.clone());
+                        tool_id_to_name.insert(id.clone(), name.clone());
 
                         // Track file operations
                         if let Some(file_path) = extract_file_path(name, input) {
@@ -1954,6 +2005,26 @@ pub fn analyze_session(session: &Session) -> SessionAnalysisReport {
                     } => {
                         // Track error status for Bash tool matching
                         tool_errors.insert(tool_use_id.clone(), *is_error);
+
+                        // Accumulate output_chars and collect largest result candidates
+                        let content_chars = content.chars().count();
+                        if let Some(tool_name) = tool_id_to_name.get(tool_use_id) {
+                            if let Some(stat) = analysis.tool_stats.get_mut(tool_name) {
+                                stat.output_chars += content_chars;
+                            }
+                            let preview: String = content
+                                .chars()
+                                .take(100)
+                                .collect::<String>()
+                                .trim()
+                                .to_string();
+                            tool_result_candidates.push((
+                                content_chars,
+                                turn_idx,
+                                tool_name.clone(),
+                                preview,
+                            ));
+                        }
 
                         if *is_error {
                             // Attribute error to tool stat
@@ -2037,6 +2108,19 @@ pub fn analyze_session(session: &Session) -> SessionAnalysisReport {
         let turn_range = (chain[0].0, chain[chain.len() - 1].0);
         analysis.tool_chains.push(ToolChain { tools, turn_range });
     }
+
+    // Build largest_tool_results: top 10 individual results by char count
+    tool_result_candidates.sort_by(|a, b| b.0.cmp(&a.0));
+    analysis.largest_tool_results = tool_result_candidates
+        .into_iter()
+        .take(10)
+        .map(|(chars, turn, tool_name, preview)| LargestToolResult {
+            tool_name,
+            chars,
+            turn,
+            preview,
+        })
+        .collect();
 
     // Analyze token usage and build output_tokens_per_turn
     analysis.total_turns = session.turns.len();

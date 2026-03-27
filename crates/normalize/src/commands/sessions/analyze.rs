@@ -80,7 +80,13 @@ pub fn aggregate_sessions(
                         .or_insert_with(|| ToolStats::new(&k));
                     stat.calls += v.calls;
                     stat.errors += v.errors;
+                    stat.output_chars += v.output_chars;
                 }
+
+                // Collect largest tool results for later re-ranking
+                aggregate
+                    .largest_tool_results
+                    .extend(a.largest_tool_results);
 
                 // Aggregate token stats
                 aggregate.token_stats.total_input += a.token_stats.total_input;
@@ -201,6 +207,12 @@ pub fn aggregate_sessions(
         dedup.uniqueness_ratio =
             (dedup.unique_input + dedup.unique_output) as f64 / dedup.total_billed as f64;
     }
+
+    // Re-rank and trim largest tool results across all sessions
+    aggregate
+        .largest_tool_results
+        .sort_by(|a, b| b.chars.cmp(&a.chars));
+    aggregate.largest_tool_results.truncate(10);
 
     // Update format to show aggregate info
     aggregate.format = format!("aggregate ({} sessions)", session_count);
