@@ -295,7 +295,7 @@ impl DiagnosticsReport {
 
         // Header counts all issues for complete picture
         let files_str = if self.files_checked > 0 {
-            format!("{} files", self.files_checked)
+            format!("{} files checked", self.files_checked)
         } else {
             format!("sources: {}", self.sources_run.join(", "))
         };

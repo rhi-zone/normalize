@@ -130,7 +130,7 @@ All sections are machine-parseable with their keyword prefixes.
 
 **Remaining issues:**
 
-1. **Path truncation in HUBS and SYMBOLS lines.** Paths are truncated to a short suffix (e.g., `...ba395f/crates/normalize/src/output.rs`). The `ba395f` fragment is a worktree hash — agents cannot resolve truncated paths to actual filesystem locations. Full paths are available in the JSON (`coupling_hotspots[].path`) and in COUPLING lines (which are full paths).
+1. ~~**Path truncation in HUBS and SYMBOLS lines.**~~ **FIXED** — Worktree hash fragments (`...ba395f/...`) have been cleaned from compact output. Full paths are now emitted in HUBS and SYMBOLS lines.
 
 2. ~~**JSON remains large (196KB).**~~ **FIXED** — `-l/--limit N` flag added (default 20). `cross_imports` is truncated to 20 entries by default; `--limit 0` disables the cap. JSON output is now ~few KB at default limit. Worktree hash fragments in paths are also cleaned from compact output.
 
@@ -202,19 +202,19 @@ Confirmed working. `grep "OutputFormatter" --only "*.rs"` returns only Rust-file
 
 | # | Issue | Command | Severity |
 |---|-------|---------|----------|
-| 2 | HUBS and SYMBOLS paths in compact output are truncated (`...hash/path`) — not resolvable | `analyze architecture` | **Medium** — truncated paths lose actionability |
+| 2 | ~~HUBS and SYMBOLS paths in compact output are truncated (`...hash/path`) — not resolvable~~ **FIXED** | `analyze architecture` | **FIXED** |
 | 3 | `--dir-context` context is text-only; not exposed in `ViewReport` JSON | `view` | **Medium** — agents using `--json` get no context |
 | 4 | `rules tags --json` default has `rules: []` for all tags; `--show-rules` flag not obvious | `rules tags` | **Low** — agents may read empty array as "no rules" |
 | 5 | `syntax ast` default depth is unlimited; agents must remember `--depth` flag for large files | `syntax ast` | **Low** — flag exists but default is footgun |
 
 ### PREVIOUSLY KNOWN ISSUES NOT RE-EVALUATED
 
-(These were in Pass 2 and have not been re-checked in this pass — still presumed open)
+(These were in Pass 2 and have not been re-checked in this pass — still presumed open unless marked)
 
-- `package tree --json` no `--depth` flag (full transitive closure, 122KB+)
+- ~~`package tree --json` no `--depth` flag (full transitive closure, 122KB+)~~ **FIXED** — `-d/--depth <N>` flag added to `package tree`. Limits output depth in both text and JSON. Also exposed as `max_depth` field in `PackageTreeReport`.
 - `analyze docs` JSON uses positional `[N, N]` array for `by_language` instead of named fields
 - `context` compact no per-file delimiter in multi-file repos
-- `ci` compact summary "N files" means files-checked, not files-with-issues
+- ~~`ci` compact summary "N files" means files-checked, not files-with-issues~~ **FIXED** — compact format now emits "N files checked" (was "N files"), disambiguating from files-with-issues.
 - `grammars list --json` has no `path` per grammar
 - `aliases` compact `+N` truncation
 

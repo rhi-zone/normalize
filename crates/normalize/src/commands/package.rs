@@ -161,23 +161,30 @@ pub fn print_human(info: &PackageInfo, ecosystem: &str) -> String {
 }
 
 /// Format a dependency tree in human-readable form.
-pub fn print_tree(tree: &DependencyTree) -> String {
+pub fn print_tree(tree: &DependencyTree, max_depth: Option<usize>) -> String {
     let mut out = String::new();
     for root in &tree.roots {
-        format_node_into(&mut out, root, 0);
+        format_node_into(&mut out, root, 0, max_depth);
     }
     out.trim_end().to_string()
 }
 
-fn format_node_into(out: &mut String, node: &normalize_ecosystems::TreeNode, depth: usize) {
+fn format_node_into(
+    out: &mut String,
+    node: &normalize_ecosystems::TreeNode,
+    depth: usize,
+    max_depth: Option<usize>,
+) {
     let indent = "  ".repeat(depth);
     if node.version.is_empty() {
         out.push_str(&format!("{}{}\n", indent, node.name));
     } else {
         out.push_str(&format!("{}{} v{}\n", indent, node.name, node.version));
     }
-    for child in &node.dependencies {
-        format_node_into(out, child, depth + 1);
+    if max_depth.is_none_or(|max| depth < max) {
+        for child in &node.dependencies {
+            format_node_into(out, child, depth + 1, max_depth);
+        }
     }
 }
 

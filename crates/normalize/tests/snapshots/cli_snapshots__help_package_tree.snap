@@ -11,6 +11,7 @@ Options:
       --pretty                     Human-friendly output with colors and formatting
       --compact                    Compact output without colors (overrides TTY detection)
   -r, --root <root>                Root directory (defaults to current directory)
+  -d, --depth <depth>              Maximum dependency depth to show (0 = roots only, default = unlimited)
       --jsonl                      Output one JSON object per line (for arrays)
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression
@@ -22,3 +23,4 @@ Options:
 Examples:
 normalize package tree                           # show full dependency tree
 normalize package tree -e cargo                  # show only Cargo dependency tree
+normalize package tree --depth 2                 # show only direct and transitive deps up to depth 2

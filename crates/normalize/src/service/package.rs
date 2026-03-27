@@ -89,11 +89,15 @@ pub struct PackageTreeReport {
     pub ecosystem: String,
     /// Dependency tree rooted at the direct dependencies.
     pub tree: DependencyTree,
+    /// Maximum depth rendered (None = unlimited). Stored for text formatting; not serialized.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub max_depth: Option<usize>,
 }
 
 impl OutputFormatter for PackageTreeReport {
     fn format_text(&self) -> String {
-        print_tree(&self.tree)
+        print_tree(&self.tree, self.max_depth)
     }
 }
 
@@ -283,6 +287,7 @@ impl PackageService {
     /// Examples:
     ///   normalize package tree                           # show full dependency tree
     ///   normalize package tree -e cargo                  # show only Cargo dependency tree
+    ///   normalize package tree --depth 2                 # show only direct and transitive deps up to depth 2
     #[cli(display_with = "display_output")]
     pub fn tree(
         &self,
@@ -291,6 +296,11 @@ impl PackageService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(
+            short = 'd',
+            help = "Maximum dependency depth to show (0 = roots only, default = unlimited)"
+        )]
+        depth: Option<usize>,
         pretty: bool,
         compact: bool,
     ) -> Result<PackageTreeReport, String> {
@@ -300,6 +310,7 @@ impl PackageService {
         Ok(PackageTreeReport {
             ecosystem: eco,
             tree,
+            max_depth: depth,
         })
     }
 
