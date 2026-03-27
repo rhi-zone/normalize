@@ -12,3 +12,6 @@ ascent = "0.8"
 
 # Serialization for diagnostics
 serde = { workspace = true, features = ["derive"] }
+
+# Zero-copy serialization for external-process rule protocol
+rkyv = { workspace = true }

@@ -18,7 +18,8 @@
 /// A symbol fact: a named entity defined in a file.
 ///
 /// Maps to Datalog: `symbol(file, name, kind, line)`
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
 pub struct SymbolFact {
     /// File path relative to project root
     pub file: String,
@@ -33,7 +34,8 @@ pub struct SymbolFact {
 /// An import fact: a dependency from one file to another module.
 ///
 /// Maps to Datalog: `import(from_file, to_module, name)`
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
 pub struct ImportFact {
     /// File containing the import
     pub from_file: String,
@@ -58,7 +60,8 @@ pub struct ImportFact {
 /// A call fact: a function call from one symbol to another.
 ///
 /// Maps to Datalog: `call(caller_file, caller_name, callee_name, line)`
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
 pub struct CallFact {
     /// File containing the call
     pub caller_file: String,
@@ -73,7 +76,8 @@ pub struct CallFact {
 /// A visibility fact: the visibility of a symbol.
 ///
 /// Maps to Datalog: `visibility(file, name, vis)`
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
 pub struct VisibilityFact {
     /// File path relative to project root
     pub file: String,
@@ -86,7 +90,8 @@ pub struct VisibilityFact {
 /// An attribute fact: one attribute annotation on a symbol.
 ///
 /// Maps to Datalog: `attribute(file, name, attr)`
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
 pub struct AttributeFact {
     /// File path relative to project root
     pub file: String,
@@ -99,7 +104,8 @@ pub struct AttributeFact {
 /// A parent fact: symbol nesting hierarchy.
 ///
 /// Maps to Datalog: `parent(file, child_name, parent_name)`
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
 pub struct ParentFact {
     /// File path relative to project root
     pub file: String,
@@ -112,7 +118,8 @@ pub struct ParentFact {
 /// A qualifier fact: call qualifier (receiver/module).
 ///
 /// Maps to Datalog: `qualifier(caller_file, caller_name, callee_name, qual)`
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
 pub struct QualifierFact {
     /// File containing the call
     pub caller_file: String,
@@ -127,7 +134,8 @@ pub struct QualifierFact {
 /// A symbol range fact: start and end lines of a symbol.
 ///
 /// Maps to Datalog: `symbol_range(file, name, start_line, end_line)`
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
 pub struct SymbolRangeFact {
     /// File path relative to project root
     pub file: String,
@@ -142,7 +150,8 @@ pub struct SymbolRangeFact {
 /// An implements fact: a symbol implements an interface/trait.
 ///
 /// Maps to Datalog: `implements(file, name, interface)`
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
 pub struct ImplementsFact {
     /// File path relative to project root
     pub file: String,
@@ -155,7 +164,8 @@ pub struct ImplementsFact {
 /// An is_impl fact: symbol is a trait/interface implementation.
 ///
 /// Maps to Datalog: `is_impl(file, name)`
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
 pub struct IsImplFact {
     /// File path relative to project root
     pub file: String,
@@ -166,7 +176,8 @@ pub struct IsImplFact {
 /// A type method fact: a method signature on a type.
 ///
 /// Maps to Datalog: `type_method(file, type_name, method_name)`
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
 pub struct TypeMethodFact {
     /// File path relative to project root
     pub file: String,
@@ -180,7 +191,8 @@ pub struct TypeMethodFact {
 ///
 /// This is the complete set of facts extracted from a codebase.
 /// Rule packs receive this and apply Datalog rules over it.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
 pub struct Relations {
     /// All symbols defined in the codebase
     pub symbols: Vec<SymbolFact>,

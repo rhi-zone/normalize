@@ -879,9 +879,9 @@ overhead is acceptable.
 
 - [x] Drop `libloading`, `abi_stable`, `loader.rs` and the dylib search-path machinery. (commit 398b715b)
 - [x] Replace `RString`/`RVec` in `Relations` with plain `String`/`Vec`. Fixes heap corruption.
-- [ ] Add `rkyv` derive to `Relations` + fact types for the external-process boundary.
-- [ ] Define the external native rule protocol: receive rkyv Relations on stdin, write
-  NDJSON diagnostics on stdout. Document in `docs/rules.md`.
+- [x] Add `rkyv` derive to `Relations` + fact types for the external-process boundary.
+- [x] Define the external native rule protocol: receive rkyv Relations on stdin, write
+  NDJSON diagnostics on stdout. Documented in `docs/rules-external-protocol.md`.
 
 **Dependencies / preconditions:**
 - `normalize refs` ships first — it's the foundation for rename, move, and dead-parameter rule.

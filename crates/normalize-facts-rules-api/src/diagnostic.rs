@@ -6,7 +6,19 @@
 use serde::{Deserialize, Serialize};
 
 /// Severity level for a diagnostic.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+)]
+#[rkyv(derive(Debug))]
 pub enum DiagnosticLevel {
     /// Informational hint
     Hint,
@@ -17,7 +29,10 @@ pub enum DiagnosticLevel {
 }
 
 /// A source code location.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
+)]
+#[rkyv(derive(Debug))]
 pub struct Location {
     /// File path relative to project root
     pub file: String,
@@ -48,7 +63,10 @@ impl Location {
 }
 
 /// A diagnostic produced by a rule.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
+)]
+#[rkyv(derive(Debug))]
 pub struct Diagnostic {
     /// Rule ID that produced this diagnostic (e.g., "circular-dependency")
     pub rule_id: String,
