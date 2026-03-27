@@ -253,6 +253,36 @@ fn format_symbol_info(m: &GrepMatch, colorize: bool) -> String {
     }
 }
 
+/// Returns a key that identifies the symbol group for a match.
+/// Two consecutive matches belong to the same group if they have identical symbol identity.
+fn symbol_group_key(m: &GrepMatch) -> Option<(&str, usize, usize)> {
+    match (&m.symbol, m.symbol_start, m.symbol_end) {
+        (Some(name), Some(start), Some(end)) => Some((name.as_str(), start, end)),
+        _ => None,
+    }
+}
+
+/// Write a symbol header line (plain text variant).
+fn write_symbol_header(out: &mut String, m: &GrepMatch) {
+    if let (Some(name), Some(start), Some(end)) = (&m.symbol, m.symbol_start, m.symbol_end) {
+        writeln!(out, "  ({} L{}-{}):", name, start, end).unwrap();
+    }
+}
+
+/// Write a symbol header line (pretty / colorized variant).
+fn write_symbol_header_pretty(out: &mut String, m: &GrepMatch) {
+    if let (Some(name), Some(start), Some(end)) = (&m.symbol, m.symbol_start, m.symbol_end) {
+        writeln!(
+            out,
+            "  ({} L{}-{}):",
+            Green.paint(name.as_str()),
+            start,
+            end
+        )
+        .unwrap();
+    }
+}
+
 impl OutputFormatter for GrepReport {
     fn format_text(&self) -> String {
         use std::collections::BTreeMap;
@@ -266,9 +296,25 @@ impl OutputFormatter for GrepReport {
         let mut out = String::new();
         for (file, matches) in by_file {
             writeln!(out, "{}:", file).unwrap();
-            for m in matches {
-                let sym_info = format_symbol_info(m, false);
-                writeln!(out, "  {}{}:{}", m.line, sym_info, m.content).unwrap();
+
+            let mut current_group: Option<(&str, usize, usize)> = None;
+            for m in &matches {
+                let group = symbol_group_key(m);
+                if group != current_group {
+                    // New symbol group — emit header if the match has a symbol
+                    if group.is_some() {
+                        write_symbol_header(&mut out, m);
+                    }
+                    current_group = group;
+                }
+                if group.is_some() {
+                    // Indented under symbol header
+                    writeln!(out, "    {}:{}", m.line, m.content).unwrap();
+                } else {
+                    // No symbol info — fall back to old format
+                    let sym_info = format_symbol_info(m, false);
+                    writeln!(out, "  {}{}:{}", m.line, sym_info, m.content).unwrap();
+                }
             }
         }
         write!(
@@ -292,7 +338,9 @@ impl OutputFormatter for GrepReport {
         let mut out = String::new();
         for (file, matches) in by_file {
             writeln!(out, "{}:", Cyan.paint(file)).unwrap();
-            for m in matches {
+
+            let mut current_group: Option<(&str, usize, usize)> = None;
+            for m in &matches {
                 // Highlight the match within the content
                 let content = if m.start < m.end && m.end <= m.content.len() {
                     format!(
@@ -304,15 +352,29 @@ impl OutputFormatter for GrepReport {
                 } else {
                     m.content.clone()
                 };
-                let sym_info = format_symbol_info(m, true);
-                writeln!(
-                    out,
-                    "  {}{}:{}",
-                    Yellow.paint(m.line.to_string()),
-                    sym_info,
-                    content
-                )
-                .unwrap();
+
+                let group = symbol_group_key(m);
+                if group != current_group {
+                    if group.is_some() {
+                        write_symbol_header_pretty(&mut out, m);
+                    }
+                    current_group = group;
+                }
+                if group.is_some() {
+                    // Indented under symbol header
+                    writeln!(out, "    {}:{}", Yellow.paint(m.line.to_string()), content).unwrap();
+                } else {
+                    // No symbol info — fall back to old format
+                    let sym_info = format_symbol_info(m, true);
+                    writeln!(
+                        out,
+                        "  {}{}:{}",
+                        Yellow.paint(m.line.to_string()),
+                        sym_info,
+                        content
+                    )
+                    .unwrap();
+                }
             }
         }
         write!(

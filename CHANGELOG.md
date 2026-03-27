@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Improved
+
+- **`normalize grep`** — consecutive matches within the same symbol are now grouped under a single `(SymbolName L48-61):` header rather than repeating the symbol tag on every line.
+
 ## [0.2.0] — 2026-03-25
 
 ### Added
