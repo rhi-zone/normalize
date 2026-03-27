@@ -803,9 +803,7 @@ crash in the pre-commit hook is a warning sign.
 - 18 fact rules (Datalog) already exist: `circular-deps`, `dead-api`, `unused-import`,
   `god-file`, `god-class`, `orphan-file`, `duplicate-symbol`, `fan-out`, `hub-file`,
   `layering-violation`, `long-function`, and more. Semantic rules infrastructure is mature.
-- `normalize-facts-rules-builtins/src/circular_deps.rs` (compiled Ascent macro) may be
-  dead code — the Datalog version in `builtin_dl/circular_deps.dl` is what runs. Audit and
-  remove if so.
+- ~~`normalize-facts-rules-builtins/src/circular_deps.rs`~~ (removed 2026-03-27) — the entire `normalize-facts-rules-builtins` crate was orphaned (no workspace members entry, no dependents). The Datalog version in `builtin_dl/circular_deps.dl` is what runs.
 - Incremental evaluation API (`run_rules_source_incremental`) is implemented but not wired
   into any CLI call path. JIT disabled pending upstream string comparison bug fix.
 
@@ -851,8 +849,7 @@ Building blocks are all present. The gap is composition:
 18 fact rules already exist and run via `--engine fact`. The gap is new rules and wiring
 incremental evaluation so they're fast enough for pre-commit use:
 
-- [ ] Audit and remove `normalize-facts-rules-builtins/src/circular_deps.rs` if dead code
-  (compiled Ascent macro superseded by Datalog version).
+- [x] Audit and remove `normalize-facts-rules-builtins` — entire crate deleted (was orphaned, not in workspace, no dependents). Datalog version runs.
 - [ ] New fact rules: `dead-parameter` (param never read in any call path, needs scope),
   `missing-test` (exported function with no test calling it), `stale-mock` (test mock
   references a function that no longer exists).
@@ -920,7 +917,7 @@ Concrete unblocked items:
 - [x] `normalize view <directory>` surfaces `SUMMARY.md` as preamble; `--json` adds `"summary"` field.
 - [x] `rust/missing-module-doc` syntax rule — `lib.rs`/`mod.rs` files with no `//!`.
 - [x] Split `stale-summary` into `missing-summary` (presence) + `stale-summary` (freshness), each with `paths` glob config.
-- [ ] `normalize view <file>` surfaces `//!` crate/module docs and equivalents for all languages.
+- [x] `normalize view <file>` surfaces `//!` crate/module docs and equivalents for all languages. (done — Rust `//!`, Python docstrings, Go package comments, JS JSDoc, Ruby `#` — implemented in `extract_module_doc` per language; duplicate of item at L735)
 
 **Not targeting 0.3.0:**
 - Full AST rewriting (tree-sitter edit API, round-trip fidelity)

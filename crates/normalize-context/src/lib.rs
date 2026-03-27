@@ -497,8 +497,16 @@ fn compare_yaml_to_caller(
 pub fn collect_new_context_files(start_dir: &Path, dir_name: &str) -> Vec<PathBuf> {
     let mut result = Vec::new();
     let mut current = start_dir.to_path_buf();
+    let home = dirs::home_dir();
 
+    // Walk up from start_dir, stopping before home (home is added explicitly below).
     loop {
+        // Stop the walk at home — the explicit global append below covers it,
+        // avoiding duplicates when start_dir is inside the home directory.
+        if home.as_deref() == Some(current.as_path()) {
+            break;
+        }
+
         let ctx_dir = current.join(".normalize").join(dir_name);
         if ctx_dir.is_dir() {
             let mut entries: Vec<PathBuf> = std::fs::read_dir(&ctx_dir)
@@ -519,7 +527,7 @@ pub fn collect_new_context_files(start_dir: &Path, dir_name: &str) -> Vec<PathBu
     }
 
     // Global layer: ~/.normalize/{dir_name}/
-    if let Some(home) = dirs::home_dir() {
+    if let Some(home) = home {
         let global_dir = home.join(".normalize").join(dir_name);
         if global_dir.is_dir() {
             let mut entries: Vec<PathBuf> = std::fs::read_dir(&global_dir)

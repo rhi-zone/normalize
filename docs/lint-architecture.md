@@ -196,12 +196,13 @@ Datalog rules over extracted facts: symbols, imports, calls. Uses the ascent-int
 normalize-syntax-rules         # AST pattern matching via tree-sitter queries (.scm)
 normalize-facts-core           # Data types (Symbol, SymbolKind, Visibility, Import, etc.)
 normalize-facts                # Extraction + SQLite storage (Extractor, FileIndex)
-normalize-facts-rules-api      # Stable ABI for compiled rule packs (Ascent + abi_stable)
-normalize-facts-rules-builtins # Compiled builtin rules (cdylib)
+normalize-facts-rules-api      # Relations + Diagnostic data types
+normalize-facts-rules-interpret # Datalog engine (ascent-interpreter) + builtin .dl rules
 ```
 
-The main `normalize` crate contains the interpreted Datalog engine (`interpret.rs`) and
-the builtin `.dl` rules (`builtin_dl/`).
+`normalize-facts-rules-interpret` contains the Datalog engine and all builtin `.dl` rules
+(circular-deps, unused-import, god-file, etc.). The `abi_stable`/dylib system was removed
+— see architecture-decisions.md for the current and planned rule architecture.
 
 ## Two Execution Paths for Fact Rules
 

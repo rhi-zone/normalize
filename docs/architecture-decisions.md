@@ -49,9 +49,8 @@ crates/
 │
 ├── normalize-facts/                   # Fact extraction + SQLite storage
 ├── normalize-facts-core/              # Fact data types (Symbol, Import, etc.)
-├── normalize-facts-rules-api/         # Stable ABI for rule plugins (abi_stable)
-├── normalize-facts-rules-builtins/    # Built-in fact rules (cdylib)
-├── normalize-facts-rules-interpret/   # Interpreted Datalog rules
+├── normalize-facts-rules-api/         # Data types for rule plugins (Relations, Diagnostic)
+├── normalize-facts-rules-interpret/   # Interpreted Datalog rules (builtin .dl files + engine)
 │
 ├── normalize-syntax-rules/            # Tree-sitter query rules (.scm)
 ├── normalize-rules-loader/            # Rule loading infrastructure
@@ -378,17 +377,16 @@ This is a third option for "don't lint these files at all" - coarser than inline
 ```
 normalize-facts-core               # data types only (SymbolKind, Symbol, Import, FlatSymbol, etc.)
 normalize-facts                    # full library: extraction + storage + queries (depends on core)
-├── normalize-facts-rules-api      # stable ABI for rule plugins
-└── normalize-facts-rules-builtins # default analysis rules
+normalize-facts-rules-api          # Relations + Diagnostic types (no ABI constraints)
+normalize-facts-rules-interpret    # Datalog engine + builtin .dl rules
 ```
 
-### Plugin architecture
+### Rule architecture (post-abi_stable removal)
 
-All rules (builtin and user) compile to dylibs via `abi_stable`:
-- Uniform infrastructure - no special-casing between builtin vs user rules
-- Builtins ship pre-compiled, users compile theirs with `normalize facts compile`
-- Rule packs can be shared and version-controlled independently
-- Hot-swappable without recompiling the main binary
+The `abi_stable`/dylib rule pack system was removed (heap corruption from allocator boundary
+mismatch). Builtin rules are all Datalog (`.dl` files interpreted by `ascent-interpreter`).
+Custom native rules use an external-process model (planned: rkyv Relations on stdin, NDJSON
+diagnostics on stdout) — see TODO.md for the rkyv boundary implementation plan.
 
 ## Multi-Repo Report Shape
 
