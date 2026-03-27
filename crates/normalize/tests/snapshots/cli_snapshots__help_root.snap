@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[])"
 ---
-Fast code intelligence CLI
+Structural code intelligence: index symbols and calls, enforce rules, track complexity.
 
 Usage: normalize [OPTIONS] [COMMAND]
 
