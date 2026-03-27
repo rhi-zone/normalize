@@ -8,6 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`missing-test` fact rule** — flags public functions that are never called from a test function (a function with a test attribute such as `#[test]`, `@test`, `@Test`, or `@pytest.mark`). Disabled by default. Entry-point and module-boundary files excluded via the default allow list.
+- **`stale-mock` fact rule** — flags mock/stub functions (identified by attributes such as `@Mock`, `@patch`, `@stub`, `mock`, `stub`, `fake`) that call a callee which no longer exists as a symbol in the index. Catches mocks that were not updated after a rename or deletion. Disabled by default.
 - **`normalize grep <path>`** — optional positional `path` argument scopes the search tree (consistent with `view`, `edit`, `rank`). The existing `--root` flag is preserved for backward compatibility; `path` takes precedence when both are given.
 - **`normalize rules run --only`/`--exclude`** — glob pattern filtering for which files get diagnostics returned. `--only "*.rs"` restricts to Rust files; `--exclude "tests/"` skips test directories. Applies post-collection across syntax, fact, and native rule engines.
 - **`normalize structure rebuild --only`/`--exclude`** — glob pattern filtering for which files get indexed. Files not matching the filter are removed from the index after the walk.

@@ -1,0 +1,57 @@
+# ---
+# id = "stale-mock"
+# message = "Mock or stub references a function that no longer exists in the index"
+# tags = ["testing", "maintenance"]
+# enabled = false
+# allow = []
+# ---
+#
+# A mock or stub function that calls a callee which no longer appears as a
+# symbol anywhere in the index is stale. This happens when the real function
+# was renamed or removed and the test double was not updated to match. Stale
+# mocks silently pass (the mock never fires) while real callers break, giving
+# false confidence in test coverage.
+#
+# A function is identified as a mock or stub if it carries a mock/stub
+# attribute (`@Mock`, `@mock`, `@patch`, `@stub`, `mock`, `stub`, `fake`).
+# This covers the common conventions in Java (Mockito `@Mock`), Python
+# (`@mock.patch`, `@patch`), and testing frameworks that annotate helpers.
+#
+# ## How to fix
+#
+# Update the mock to reference the new symbol name, or delete the mock if the
+# functionality it was covering has been removed entirely.
+#
+# ## When to disable
+#
+# If your project uses a naming convention for mocks that is not covered by
+# the attribute patterns above, add a project-level rule in
+# `.normalize/rules/` that extends or replaces this one.
+
+relation mock_func(String, String);
+mock_func(file, name) <--
+    symbol(file, name, _, _),
+    attribute(file, name, attr),
+    if attr == "@Mock"
+        || attr == "@mock"
+        || attr == "@patch"
+        || attr == "@stub"
+        || attr == "mock"
+        || attr == "stub"
+        || attr == "fake"
+        || attr == "Mock"
+        || attr == "Stub"
+        || attr == "Fake";
+
+relation existing_symbol(String);
+existing_symbol(name) <-- symbol(_, name, _, _);
+
+relation stale_call(String, String, String);
+stale_call(file, name, callee) <--
+    call(file, name, callee, _),
+    mock_func(file, name),
+    !existing_symbol(callee);
+
+diagnostic("warning", "stale-mock", file, line, name) <--
+    stale_call(file, name, _),
+    symbol(file, name, _, line);

@@ -850,9 +850,10 @@ Building blocks are all present. The gap is composition:
 incremental evaluation so they're fast enough for pre-commit use:
 
 - [x] Audit and remove `normalize-facts-rules-builtins` — entire crate deleted (was orphaned, not in workspace, no dependents). Datalog version runs.
-- [ ] New fact rules: `dead-parameter` (param never read in any call path, needs scope),
-  `missing-test` (exported function with no test calling it), `stale-mock` (test mock
-  references a function that no longer exists).
+- [x] New fact rules: `missing-test` (exported function with no test calling it) and
+  `stale-mock` (test mock references a function that no longer exists) — both added,
+  disabled by default, attribute-based detection.
+- [ ] New fact rule: `dead-parameter` (param never read in any call path, needs scope).
 - JIT fix and incremental eval wiring moved to 0.2.0 blockers.
 
 **Rules engine architecture — drop abi_stable, external process + rkyv for custom rules**

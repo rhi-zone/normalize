@@ -184,6 +184,14 @@ const BUILTIN_RULES: &[BuiltinFactsRule] = &[
         id: "missing-export",
         content: include_str!("builtin_dl/missing_export.dl"),
     },
+    BuiltinFactsRule {
+        id: "missing-test",
+        content: include_str!("builtin_dl/missing_test.dl"),
+    },
+    BuiltinFactsRule {
+        id: "stale-mock",
+        content: include_str!("builtin_dl/stale_mock.dl"),
+    },
 ];
 
 /// Load all rules from all sources, merged by ID.

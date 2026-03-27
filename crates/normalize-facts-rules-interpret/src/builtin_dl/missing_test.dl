@@ -1,0 +1,54 @@
+# ---
+# id = "missing-test"
+# message = "Public function has no direct test caller"
+# tags = ["testing", "quality"]
+# enabled = false
+# allow = ["**/main.rs", "**/main.py", "**/main.go", "**/main.ts", "**/main.js", "**/mod.rs", "**/lib.rs", "**/index.ts", "**/index.js"]
+# ---
+#
+# A public function that is never called directly from a test function has no
+# automated coverage. As a codebase grows, untested public APIs tend to
+# accumulate invisible regressions — the API drifts, the behaviour changes, and
+# there is no signal until production breaks.
+#
+# A function is considered "tested" if it is called by any function that
+# carries a test attribute (`#[test]`, `@test`, `@Test`, `@pytest.mark`, etc.).
+#
+# ## How to fix
+#
+# Add a test that calls the function directly (unit test) or indirectly through
+# an integration test. If the function is intentionally untestable (e.g. a
+# top-level entry point), add the file to the allow list.
+#
+# ## When to disable
+#
+# Entry-point files (main.rs, main.py, etc.), module re-export files (mod.rs,
+# lib.rs, index.ts), and similarly structural files are already excluded in
+# the default allow list. For library entry points with external test suites
+# not indexed here, add those files to the allow list.
+
+relation public_func(String, String);
+public_func(file, name) <--
+    symbol(file, name, kind, _),
+    visibility(file, name, vis),
+    if kind == "function" || kind == "method",
+    if vis == "public";
+
+relation test_func(String, String);
+test_func(file, name) <--
+    symbol(file, name, _, _),
+    attribute(file, name, attr),
+    if attr == "#[test]"
+        || attr == "#[cfg(test)]"
+        || attr == "@test"
+        || attr == "@Test"
+        || attr == "@pytest.mark"
+        || attr == "test";
+
+relation tested(String);
+tested(callee) <-- call(_, caller, callee, _), test_func(_, caller);
+
+diagnostic("warning", "missing-test", file, line, name) <--
+    public_func(file, name),
+    !tested(name),
+    symbol(file, name, _, line);
