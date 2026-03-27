@@ -957,9 +957,3 @@ find_cycles_dfs iterative conversion (was stack depth ever actually a problem?).
 - Custom SHA256 implementation (Sha256 struct)
 - Expects GitHub release with SHA256SUMS.txt
 
-### Update CLAUDE.md — cargo test -q preference (2026-03-27)
-
-When normalize is clean, update CLAUDE.md Workflow section:
-- Change `cargo test` to `cargo test -q` in the example command
-- Add note: "Prefer `cargo test -q` over `cargo test` — quiet mode only prints failures, significantly reducing output noise and context usage."
-Conventional commit: `docs: prefer cargo test -q to reduce output noise`

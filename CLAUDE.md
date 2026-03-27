@@ -101,7 +101,7 @@ When unsure of syntax: `normalize <cmd> --help`. Fall back to Read only for exac
 
 ## Workflow
 
-**Batch, then verify.** Edit all files first, then run `cargo clippy --all-targets --all-features -- -D warnings && cargo test` once. Pre-commit hook handles `cargo fmt`.
+**Batch, then verify.** Edit all files first, then run `cargo clippy --all-targets --all-features -- -D warnings && cargo test -q` once. Pre-commit hook handles `cargo fmt`. Prefer `cargo test -q` over `cargo test` — quiet mode only prints failures, significantly reducing output noise and context usage.
 
 **Done = committed + TODO.md updated + git status clean.** After tests pass, commit immediately. Update TODO.md (mark completed items, add follow-ups) in the same commit — not after. This applies to subagents too: every agent commit must include the TODO.md update for items it completed. "I'll mark it done later" is the failure mode.
 
