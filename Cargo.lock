@@ -3769,6 +3769,7 @@ dependencies = [
  "normalize-chat-sessions",
  "normalize-cli-parser",
  "normalize-code-similarity",
+ "normalize-context",
  "normalize-core",
  "normalize-deps",
  "normalize-ecosystems",
@@ -3906,6 +3907,20 @@ dependencies = [
  "normalize-languages",
  "streaming-iterator",
  "tree-sitter",
+]
+
+[[package]]
+name = "normalize-context"
+version = "0.2.0"
+dependencies = [
+ "dirs",
+ "normalize-output",
+ "regex",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tempfile",
 ]
 
 [[package]]

@@ -1,0 +1,23 @@
+[package]
+name = "normalize-context"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Frontmatter-filtered context resolution for normalize: hierarchical .normalize/context/ walk with YAML frontmatter matching"
+
+[features]
+default = []
+cli = ["dep:normalize-output"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+dirs = "5"
+regex = "1"
+schemars = "1"
+normalize-output = { path = "../normalize-output", version = "0.2.0", optional = true }
+
+[dev-dependencies]
+tempfile = "3"
