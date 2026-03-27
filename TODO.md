@@ -580,6 +580,11 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 
 ### Session Analysis Backlog
 
+**Replace `--sort-by-*` flags with `--sort <field>`:**
+- `--sort-by-x` proliferates flags. Replace with a single `--sort <field>` accepting composite sorts: `--sort -tokens,+session` (`-`=desc, `+`=asc, prefix omitted = sensible default). Sensible defaults: numeric→desc, string→asc, date→desc (except message/event sequences where chronological order is natural, so date→asc). Applies everywhere sort is exposed (sessions, tools, etc.).
+
+- [x] **Tool sequence filtering (`--sequence`):** `normalize sessions messages --sequence Grep,Grep,Read` — returns turns where consecutive tool calls match the pattern (case-insensitive prefix match), with `--context-turns N` surrounding context. Answers the "frequency vs motivation" gap: transition matrix shows how often, sequence filter shows what actually happened.
+
 **Composable message filters:**
 - `--has-tool <name>` — messages in turns that used a specific tool
 - `--min-chars <N>` / `--max-chars <N>` — filter by message length (not just truncation)
@@ -616,6 +621,10 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
   - Cross-agent comparison: Claude Code, Gemini CLI, OpenAI Codex, etc.
   - Goal: understand what behaviors to encode in normalize agent (model-agnostic reliability)
   - Maybe: automated agent testing harness (run same tasks across assistants)
+
+### Cross-file Context Construction (open research question)
+
+How should a SWE agent handle edits that require understanding module A to correctly edit module B? The index has the dependency graph, but we don't have a principled answer for context budget allocation across subtasks. Related to Pillar 2 (semantic refactoring) and Pillar 4 (incremental): a good answer probably involves the daemon pre-loading transitive context for a given edit target, so the agent doesn't have to re-read it. No concrete plan yet — needs more thought.
 
 ### Friction Signals (see `docs/research/agent-adaptation.md`)
 
