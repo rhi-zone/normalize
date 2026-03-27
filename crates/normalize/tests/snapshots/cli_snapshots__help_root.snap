@@ -2,14 +2,14 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[])"
 ---
-normalize - Structural code intelligence: index symbols and calls, enforce rules, track complexity.
+Structural code intelligence: index symbols and calls, enforce rules, track complexity.
 
 Usage: normalize [OPTIONS] [COMMAND]
 
 Commands:
   grep       Search for text patterns across the codebase using ripgrep regex syntax.
   aliases    List filter aliases (used by --exclude/--only)
-  context    Resolve contextual text from .normalize/context/ hierarchy
+  context    Show directory context (hierarchical .context.md files)
   init       Initialize normalize in current directory
   update     Check for and install updates
   translate  Translate code between programming languages

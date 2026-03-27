@@ -259,10 +259,42 @@ fn render_symbol_report(report: &ViewReport, use_colors: bool) -> String {
     text
 }
 
+/// Strip a trailing `:N-N` line-range suffix from a target string.
+/// Used to avoid doubling the range in headers like `file.md:10-20:10-20`.
+fn strip_range_suffix(target: &str) -> &str {
+    // Walk backwards: digits, '-', digits, ':'
+    let bytes = target.as_bytes();
+    let mut i = bytes.len();
+    // skip trailing digits (end line)
+    while i > 0 && bytes[i - 1].is_ascii_digit() {
+        i -= 1;
+    }
+    // expect '-'
+    if i == 0 || bytes[i - 1] != b'-' {
+        return target;
+    }
+    i -= 1;
+    // skip start digits
+    let end_of_digits = i;
+    while i > 0 && bytes[i - 1].is_ascii_digit() {
+        i -= 1;
+    }
+    if i == end_of_digits {
+        // no digits before '-'
+        return target;
+    }
+    // expect ':'
+    if i == 0 || bytes[i - 1] != b':' {
+        return target;
+    }
+    &target[..i - 1]
+}
+
 fn render_line_range(report: &ViewReport, use_colors: bool) -> String {
+    let base = strip_range_suffix(&report.target);
     let header = match report.line_range {
-        Some((s, e)) => format!("# {}:{}-{}\n\n", report.target, s, e),
-        None => format!("# {}\n\n", report.target),
+        Some((s, e)) => format!("# {}:{}-{}\n\n", base, s, e),
+        None => format!("# {}\n\n", base),
     };
     let content = report.source.as_deref().unwrap_or("");
     let rendered = if use_colors {
