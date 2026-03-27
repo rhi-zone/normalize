@@ -3,6 +3,8 @@
 //! Hosts all commands that produce an ordered list of items by some metric.
 
 use crate::analyze::complexity::ComplexityReport;
+use crate::analyze::function_length::LengthReport;
+use crate::analyze::test_gaps::TestGapsReport;
 use crate::commands::analyze::budget::LineBudgetReport;
 use crate::commands::analyze::call_complexity::CallComplexityReport;
 use crate::commands::analyze::ceremony::CeremonyReport;
@@ -150,6 +152,14 @@ impl RankService {
     }
 
     fn display_contributors(&self, r: &ContributorsReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_length(&self, r: &LengthReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_test_gaps(&self, r: &TestGapsReport) -> String {
         self.display_output(r)
     }
 
@@ -644,6 +654,137 @@ impl RankService {
             report.diff_ref = Some(diff_ref.clone());
         }
         Ok(report)
+    }
+
+    /// Find the longest functions in the codebase, ranked by line count.
+    ///
+    /// Accepts an optional `target` path, a `limit` on results, an `exclude` glob list,
+    /// and a `diff` ref to compare against. Returns a `LengthReport` with per-function
+    /// entries including file, line range, and optional delta from the diff ref.
+    #[server(group = "code")]
+    #[cli(display_with = "display_length")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn length(
+        &self,
+        #[param(positional, help = "Target file or directory")] target: Option<String>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of functions to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<LengthReport, String> {
+        let root_path = Self::root_path(root)?;
+        self.resolve_format(pretty, compact, &root_path);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let filter =
+            Self::build_filter_with_config(&root_path, &config.analyze, "length", &exclude, &only);
+        let effective_limit = match limit.unwrap_or(10) {
+            0 => usize::MAX,
+            n => n,
+        };
+        let allowlist = crate::commands::analyze::load_allow_file(&root_path, "length-allow");
+        let analysis_root = target
+            .as_ref()
+            .map(|t| root_path.join(t))
+            .unwrap_or_else(|| root_path.clone());
+        if analysis_root.is_file() {
+            return crate::commands::analyze::length::analyze_file_length(&analysis_root)
+                .ok_or_else(|| {
+                    format!(
+                        "could not analyze '{}' — unsupported file type",
+                        analysis_root.display()
+                    )
+                });
+        }
+        if !analysis_root.is_dir() {
+            return Err(format!(
+                "'{}' is not a file or directory",
+                analysis_root.display()
+            ));
+        }
+        let mut report = crate::commands::analyze::length::analyze_codebase_length(
+            &analysis_root,
+            effective_limit,
+            filter.as_ref(),
+            &allowlist,
+        );
+        if let Some(ref diff_ref) = diff {
+            use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
+            use crate::commands::analyze::length::apply_length_diff;
+            let hash = resolve_ref(&root_path, diff_ref)?;
+            let sub = analysis_root
+                .strip_prefix(&root_path)
+                .unwrap_or(std::path::Path::new(""))
+                .to_path_buf();
+            let baseline = run_in_worktree(&root_path, &hash, |wt| {
+                let wt_root = wt.join(&sub);
+                Ok(crate::commands::analyze::length::analyze_codebase_length(
+                    &wt_root,
+                    usize::MAX,
+                    None,
+                    &[],
+                ))
+            })?;
+            apply_length_diff(&mut report, &baseline, diff_ref);
+        }
+        Ok(report)
+    }
+
+    /// Identify public functions that lack test coverage, ranked by risk score.
+    ///
+    /// Uses the facts index to find callables with no test references, then ranks them
+    /// by a risk heuristic (complexity × call-site count). `min_risk` filters out low-risk
+    /// entries. Returns a `TestGapsReport` with per-function risk scores and locations.
+    #[server(group = "test")]
+    #[cli(display_with = "display_test_gaps")]
+    #[allow(clippy::too_many_arguments)]
+    pub async fn test_gaps(
+        &self,
+        #[param(positional, help = "Target file or directory")] target: Option<String>,
+        #[param(help = "Show all functions including tested")] all: bool,
+        #[param(help = "Only show functions above this risk threshold")] min_risk: Option<f64>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 'l', help = "Maximum number of entries to show (0=no limit)")]
+        limit: Option<usize>,
+        #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
+        #[param(help = "Include only paths matching pattern")] only: Vec<String>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<TestGapsReport, String> {
+        let root_path = Self::root_path(root)?;
+        self.resolve_format(pretty, compact, &root_path);
+        let config = crate::config::NormalizeConfig::load(&root_path);
+        let filter = Self::build_filter_with_config(
+            &root_path,
+            &config.analyze,
+            "test-gaps",
+            &exclude,
+            &only,
+        );
+        let allowlist = crate::commands::analyze::load_allow_file(&root_path, "test-gaps-allow");
+        let effective_limit = match limit.unwrap_or(20) {
+            0 => usize::MAX,
+            n => n,
+        };
+        Ok(crate::commands::analyze::test_gaps::analyze_test_gaps(
+            &root_path,
+            target.as_deref(),
+            all,
+            min_risk,
+            effective_limit,
+            filter.as_ref(),
+            &allowlist,
+        )
+        .await)
     }
 
     /// Break down line counts by purpose: business logic, tests, docs, config, and generated code.

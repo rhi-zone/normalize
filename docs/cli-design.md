@@ -79,7 +79,7 @@ Output format flags (`--json`, `--jq`, `--pretty`, `--compact`) are defined once
 Total: ~110 entry points (21 top-level + subcommands)
 
 Commands with most subcommands:
-- `analyze`: 44 (health, all, summary, complexity, complexity-trend, length, length-trend, ceremony, duplicates, duplicate-types, uniqueness, call-complexity, fragments, size, density, density-trend, module-health, imports, depth-map, surface, layering, docs, files, call-graph, trace, architecture, graph, dependents, coupling, coupling-clusters, hotspots, ownership, contributors, activity, repo-coupling, cross-repo-health, provenance, trend, test-ratio, test-gaps, budget, test-ratio-trend, security, skeleton-diff)
+- `analyze`: ~20 (health, summary, architecture, docs, security, skeleton-diff, coupling-clusters, activity, repo-coupling, cross-repo-health, and others — see `normalize analyze --help` for current list; many commands have been migrated to `rank`, `trend`, `syntax`, and `view`)
 - `syntax`: 3 (ast, query, node-types)
 - `rules`: 10 (list, run, enable, disable, show, tags, add, update, remove, validate)
 - `edit`: 10 (delete, replace, swap, insert, undo, redo, goto, batch, history)

@@ -30,10 +30,6 @@ Commands:
   all                Run all analysis passes
   summary            Auto-generated single-page codebase overview
 
-Code quality:
-  length             Find the longest functions in the codebase, ranked by line count.
-  node-types         List all node types and field names for a tree-sitter grammar.
-
 Repository:
   docs               Measure documentation coverage: which public symbols lack doc comments.
 
@@ -45,9 +41,6 @@ Git history:
   activity           Show commit activity across multiple repositories over time windows.
   repo-coupling      Detect temporal coupling between repositories: pairs that receive commits together.
   cross-repo-health  Rank repositories by composite tech-debt score (churn × complexity × coupling).
-
-Testing:
-  test-gaps          Identify public functions that lack test coverage, ranked by risk score.
 
 Security:
   security           Scan the codebase for security issues (hardcoded secrets, unsafe patterns).

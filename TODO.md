@@ -76,7 +76,7 @@ Crate split is correct. All 38 published crates justified. No reusable logic tra
 
 ### Analyze Command Consolidation — remaining work
 
-**Current: ~38 commands** (after 2026-03-15/16 consolidation: deleted `analyze parse`, `analyze query`, `analyze all`, `analyze node-types` → moved to `syntax`; merged 4 trend commands; deleted `normalize-rules-loader`). Trend commands moved to `normalize trend` on 2026-03-28 (5 methods removed from analyze, 5 added to trend service).
+**Current: ~35 commands** (after 2026-03-15/16 consolidation: deleted `analyze parse`, `analyze query`, `analyze all`, `analyze node-types` → moved to `syntax`; merged 4 trend commands; deleted `normalize-rules-loader`). Trend commands moved to `normalize trend` on 2026-03-28 (5 methods removed from analyze, 5 added to trend service). `analyze length` and `analyze test-gaps` moved to `rank`; `analyze node-types` duplicate removed (2026-03-28).
 
 **Phase 3 rank infrastructure (done 2026-03-12):**
 - `RankEntry` trait + `Column`/`Align` + `format_ranked_table()` in `normalize-analyze::ranked`
@@ -91,7 +91,7 @@ Crate split is correct. All 38 published crates justified. No reusable logic tra
 
 **Done (2026-03-16):** `normalize rank` introduced with 20+ commands migrated from `analyze`. Graph navigation (`call_graph`, `trace`, `dependents`, `provenance`) folded into `view` (`referenced-by`, `references`, `dependents`, `trace`, `graph`, `history`, `blame`). `ViewOutput` enum dissolved; `ViewReport`/`ViewNode` unified. `view list` added.
 
-**Remaining in `analyze`:** git history (activity, coupling-clusters, repo-coupling, cross-repo-health), big-picture (health, architecture, summary, all), plus docs/security/test-gaps/skeleton-diff. Trend commands moved to `normalize trend`. These stay until a clear home emerges.
+**Remaining in `analyze`:** git history (activity, coupling-clusters, repo-coupling, cross-repo-health), big-picture (health, architecture, summary), plus docs/security/skeleton-diff. Trend commands moved to `normalize trend`. `length` and `test-gaps` moved to `rank` (2026-03-28). These stay until a clear home emerges.
 
 **Not yet decided:**
 - Where big-picture commands live (`architecture`, `summary`, `health`) — synthesized understanding, not ranking, not navigation. No trait identified yet.
@@ -818,8 +818,11 @@ commands. `analyze` still hosts 19 commands that don't fit either:
 - [ ] Synthesis commands (`architecture`, `summary`, `health`, `coupling-clusters`,
   `cross-repo-health`) — big-picture, not a ranked list. Find the unifying trait or leave
   in `analyze` until the pattern is clear. Don't force a home.
-- [ ] Residual commands (`activity`, `docs`, `security`, `test-gaps`, `skeleton-diff`,
-  `repo-coupling`, `node-types`, `length`, `all`) — audit each: belongs in rank/view/rules
+- [x] `length` → moved to `rank length` (2026-03-28)
+- [x] `test-gaps` → moved to `rank test-gaps` (2026-03-28)
+- [x] `node-types` → removed from `analyze`; `syntax node-types` already existed (2026-03-28)
+- [ ] Residual commands (`activity`, `docs`, `security`, `skeleton-diff`,
+  `repo-coupling`, `all`) — audit each: belongs in rank/view/rules
   or stays as standalone?
 - [ ] Once all commands have a proper home, `analyze` dissolves. Don't rush this — clarity
   matters more than speed.

@@ -21,6 +21,7 @@ Options:
 Code quality:
   complexity       Rank functions by cyclomatic complexity, worst first.
   ceremony         Rank files by boilerplate ratio: fraction of callables that are trait/interface implementations.
+  length           Find the longest functions in the codebase, ranked by line count.
   uniqueness       Rank modules by code uniqueness: fraction of functions with no structural near-twin.
   call-complexity  Rank functions by effective complexity: cyclomatic complexity summed over the full call graph.
   duplicates       Detect duplicate or similar code blocks and functions across the codebase.
@@ -47,4 +48,5 @@ Git history:
 
 Testing:
   test-ratio       Rank modules by test-to-implementation line ratio.
+  test-gaps        Identify public functions that lack test coverage, ranked by risk score.
   budget           Break down line counts by purpose: business logic, tests, docs, config, and generated code.

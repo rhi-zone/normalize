@@ -2,29 +2,48 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"length\"])"
 ---
-Find the longest functions in the codebase, ranked by line count.
+Analyze codebase (health, complexity, security, duplicates, docs)
 
-Usage: normalize analyze length [OPTIONS] [target]
+Usage: normalize analyze [OPTIONS] [target]
 
 Arguments:
   [target]  Target file or directory
 
 Options:
       --pretty                     Human-friendly output with colors and formatting
-  -r, --root <root>                Root directory (defaults to current directory)
       --compact                    Compact output without colors (overrides TTY detection)
-  -l, --limit <limit>              Maximum number of functions to show (0=no limit)
-      --exclude <exclude>          Exclude paths matching pattern
       --jsonl                      Output one JSON object per line (for arrays)
       --json                       Output machine-readable JSON
-      --only <only>                Include only paths matching pattern
-      --diff <diff>                Show delta vs this git ref (branch, tag, commit, HEAD~N)
       --jq <jq>                    Filter output through jq expression
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -r, --root <root>                Root directory (defaults to current directory)
+      --exclude <exclude>          Exclude paths matching pattern
+      --only <only>                Include only paths matching pattern
+  -l, --limit <limit>              Maximum number of large files to include in output (0 = no limit, default 10)
   -h, --help                       Print help
+  -V, --version                    Print version
 
-Accepts an optional `target` path, a `limit` on results, an `exclude` glob list,
-and a `diff` ref to compare against. Returns a `LengthReport` with per-function
-entries including file, line range, and optional delta from the diff ref.
+Commands:
+  health             Run health analysis (file counts, complexity stats, large file warnings)
+  all                Run all analysis passes
+  summary            Auto-generated single-page codebase overview
+
+Repository:
+  docs               Measure documentation coverage: which public symbols lack doc comments.
+
+Graph analysis:
+  architecture       Analyze architectural structure: coupling, dependency cycles, and hub modules.
+
+Git history:
+  coupling-clusters  Find clusters of files that change together in git history (connected components).
+  activity           Show commit activity across multiple repositories over time windows.
+  repo-coupling      Detect temporal coupling between repositories: pairs that receive commits together.
+  cross-repo-health  Rank repositories by composite tech-debt score (churn × complexity × coupling).
+
+Security:
+  security           Scan the codebase for security issues (hardcoded secrets, unsafe patterns).
+
+Diff:
+  skeleton-diff      Show structural (skeleton) changes between a base ref and HEAD.

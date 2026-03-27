@@ -17,6 +17,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Moved
 
+- **`normalize analyze length`** → **`normalize rank length`** — ranking command (longest functions by line count) now lives under `rank` where ranked-list commands belong.
+- **`normalize analyze test-gaps`** → **`normalize rank test-gaps`** — ranking command (public functions lacking test coverage, ranked by risk score) now lives under `rank`.
+- **`normalize analyze node-types`** removed — duplicate of `normalize syntax node-types` which already existed. Use `normalize syntax node-types` instead.
 - **`normalize trend`** — new top-level subcommand for time-series health metrics. Replaces `normalize analyze complexity-trend`, `analyze length-trend`, `analyze density-trend`, `analyze test-ratio-trend`, and `analyze trend`. New names: `normalize trend complexity`, `normalize trend length`, `normalize trend density`, `normalize trend test-ratio`, `normalize trend multi` (all metrics).
 
 ### Changed
