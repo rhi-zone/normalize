@@ -79,6 +79,8 @@ impl SessionsService {
     ///   normalize sessions list --mode subagent       # list subagent sessions only
     ///   normalize sessions list --mode all            # list interactive + subagent sessions
     ///   normalize sessions list --agent-type Explore  # only Explore agents
+    ///   normalize sessions list --sort duration       # longest sessions first
+    ///   normalize sessions list --sort +name          # alphabetical by session name
     #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn list(
@@ -101,6 +103,10 @@ impl SessionsService {
         >,
         #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
         agent_type: Option<String>,
+        #[param(
+            help = "Sort keys (comma-separated, prefix with - for desc or + for asc): date, duration, name. E.g. duration, +name, -date"
+        )]
+        sort: Option<String>,
         pretty: bool,
         compact: bool,
     ) -> Result<SessionListReport, String> {
@@ -123,6 +129,7 @@ impl SessionsService {
             all_projects,
             &mode,
             agent_type.as_deref(),
+            sort.as_deref(),
         )
     }
 
@@ -216,6 +223,8 @@ impl SessionsService {
     ///   normalize sessions stats --group-by project          # group results by project
     ///   normalize sessions stats --group-by project,day      # group by project and day
     ///   normalize sessions stats --mode subagent             # stats for subagent sessions only
+    ///   normalize sessions stats --sort name                 # sort tool rows alphabetically
+    ///   normalize sessions stats --sort errors               # sort tool rows by error count
     #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn stats(
@@ -244,6 +253,10 @@ impl SessionsService {
         >,
         #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
         agent_type: Option<String>,
+        #[param(
+            help = "Sort tool rows (comma-separated, prefix with - for desc or + for asc): calls, errors, name. E.g. name, -errors"
+        )]
+        sort: Option<String>,
     ) -> Result<SessionAnalysisReport, String> {
         let limit = limit.unwrap_or(0);
         let root_path = root.as_deref().map(std::path::Path::new);
@@ -288,6 +301,7 @@ impl SessionsService {
             all_projects,
             &mode,
             agent_type.as_deref(),
+            sort.as_deref(),
         )
     }
 
@@ -404,6 +418,8 @@ impl SessionsService {
     ///   normalize sessions patterns --days 30               # patterns for the last 30 days
     ///   normalize sessions patterns --mode subagent         # patterns for subagent sessions only
     ///   normalize sessions patterns --all-projects          # patterns across all projects
+    ///   normalize sessions patterns --sort tool_count       # sort outliers by tool usage
+    ///   normalize sessions patterns --sort +path            # sort outliers alphabetically by path
     #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn patterns(
@@ -430,6 +446,10 @@ impl SessionsService {
         >,
         #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
         agent_type: Option<String>,
+        #[param(
+            help = "Sort outlier rows (comma-separated, prefix with - for desc or + for asc): divergence, tool_count, turn_count, path. E.g. tool_count, +path"
+        )]
+        sort: Option<String>,
         pretty: bool,
         compact: bool,
     ) -> Result<PatternsReport, String> {
@@ -452,6 +472,7 @@ impl SessionsService {
             all_projects,
             &mode,
             agent_type.as_deref(),
+            sort.as_deref(),
         )
     }
 

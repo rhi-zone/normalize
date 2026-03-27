@@ -3,11 +3,65 @@
 use super::{
     analyze::{aggregate_sessions, print_sessions_analysis},
     session_matches_grep,
+    sort::{DefaultDir, SortDir, SortSpec},
 };
 use crate::sessions::{FormatRegistry, LogFormat, SessionFile};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::time::{Duration, SystemTime};
+
+/// Fields that `sessions stats` can be sorted on (affects the per-tool rows).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatsSortField {
+    /// Sort tool rows by call count (numeric, default desc).
+    Calls,
+    /// Sort tool rows by error count (numeric, default desc).
+    Errors,
+    /// Sort tool rows by name (string, default asc).
+    Name,
+}
+
+impl DefaultDir for StatsSortField {
+    fn default_dir(self) -> SortDir {
+        match self {
+            StatsSortField::Calls => SortDir::Descending,
+            StatsSortField::Errors => SortDir::Descending,
+            StatsSortField::Name => SortDir::Ascending,
+        }
+    }
+}
+
+impl FromStr for StatsSortField {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "calls" | "call" => Ok(StatsSortField::Calls),
+            "errors" | "error" | "err" => Ok(StatsSortField::Errors),
+            "name" | "tool" => Ok(StatsSortField::Name),
+            _ => Err(format!(
+                "unknown sort field '{}': expected 'calls', 'errors', or 'name'",
+                s
+            )),
+        }
+    }
+}
+
+/// Convert a `SortSpec<StatsSortField>` to the hint string expected by `sort_tool_stats_by_hint`.
+fn stats_sort_hint(spec: &SortSpec<StatsSortField>) -> Option<String> {
+    let key = spec.keys.first()?;
+    let prefix = match key.dir {
+        SortDir::Ascending => "+",
+        SortDir::Descending => "-",
+    };
+    let name = match key.field {
+        StatsSortField::Calls => "calls",
+        StatsSortField::Errors => "errors",
+        StatsSortField::Name => "name",
+    };
+    Some(format!("{}{}", prefix, name))
+}
 
 /// Parse a date string (YYYY-MM-DD) to SystemTime.
 pub(crate) fn parse_date(s: &str) -> Option<SystemTime> {
@@ -239,6 +293,7 @@ pub fn build_stats_data(
     all_projects: bool,
     mode: &super::SessionMode,
     agent_type: Option<&str>,
+    sort: Option<&str>,
 ) -> Result<crate::sessions::SessionAnalysisReport, String> {
     let registry = FormatRegistry::new();
     let format: &dyn LogFormat = match format_name {
@@ -313,8 +368,16 @@ pub fn build_stats_data(
     }
 
     let paths: Vec<_> = sessions.iter().map(|s| s.path.clone()).collect();
-    aggregate_sessions(&paths, format_name)
-        .ok_or_else(|| "No sessions could be analyzed".to_string())
+    let mut report = aggregate_sessions(&paths, format_name)
+        .ok_or_else(|| "No sessions could be analyzed".to_string())?;
+
+    // Apply sort hint to tool rows in formatted output.
+    if let Some(s) = sort {
+        let sort_spec = SortSpec::<StatsSortField>::parse(s)?;
+        report.tool_sort = stats_sort_hint(&sort_spec);
+    }
+
+    Ok(report)
 }
 
 /// List project directories under ~/.claude/projects/.

@@ -8,6 +8,7 @@ pub mod plans;
 #[cfg(feature = "sessions-web")]
 mod serve;
 pub mod show;
+pub mod sort;
 pub mod stats;
 
 pub use list::{SessionListReport, build_session_list};

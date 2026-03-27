@@ -27,6 +27,7 @@ Options:
   -r, --root <root>                Root directory (defaults to current directory)
       --mode <mode>                Session mode: interactive (default), subagent, or all
       --agent-type <agent-type>    Filter by agent type (e.g. Explore, general-purpose, Plan)
+      --sort <sort>                Sort tool rows (comma-separated, prefix with - for desc or + for asc): calls, errors, name. E.g. name, -errors
   -h, --help                       Print help
 
 Examples:
@@ -35,3 +36,5 @@ normalize sessions stats --days 30                   # stats for the last 30 day
 normalize sessions stats --group-by project          # group results by project
 normalize sessions stats --group-by project,day      # group by project and day
 normalize sessions stats --mode subagent             # stats for subagent sessions only
+normalize sessions stats --sort name                 # sort tool rows alphabetically
+normalize sessions stats --sort errors               # sort tool rows by error count

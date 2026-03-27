@@ -26,6 +26,7 @@ Options:
   -r, --root <root>                Root directory (defaults to current directory)
       --mode <mode>                Session mode: interactive (default), subagent, or all
       --agent-type <agent-type>    Filter by agent type (e.g. Explore, general-purpose, Plan)
+      --sort <sort>                Sort keys (comma-separated, prefix with - for desc or + for asc): date, duration, name. E.g. duration, +name, -date
   -h, --help                       Print help
 
 Examples:
@@ -37,3 +38,5 @@ normalize sessions list --format codex        # only show Codex sessions
 normalize sessions list --mode subagent       # list subagent sessions only
 normalize sessions list --mode all            # list interactive + subagent sessions
 normalize sessions list --agent-type Explore  # only Explore agents
+normalize sessions list --sort duration       # longest sessions first
+normalize sessions list --sort +name          # alphabetical by session name

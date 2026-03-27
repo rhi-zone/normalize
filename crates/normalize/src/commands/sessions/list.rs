@@ -1,11 +1,50 @@
 //! List sessions command.
 
 use super::format_age;
+use super::sort::{DefaultDir, SortDir, SortSpec};
 use crate::output::OutputFormatter;
 use crate::sessions::{ContentBlock, FormatRegistry, LogFormat, Role, SessionFile};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
+
+/// Fields that `sessions list` can be sorted on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListSortField {
+    /// Session modification time / age (date, default desc).
+    Date,
+    /// Session duration in seconds (numeric, default desc).
+    Duration,
+    /// Session ID / name (string, default asc).
+    Name,
+}
+
+impl DefaultDir for ListSortField {
+    fn default_dir(self) -> SortDir {
+        match self {
+            ListSortField::Date => SortDir::Descending,
+            ListSortField::Duration => SortDir::Descending,
+            ListSortField::Name => SortDir::Ascending,
+        }
+    }
+}
+
+impl FromStr for ListSortField {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "date" | "timestamp" | "time" | "mtime" => Ok(ListSortField::Date),
+            "duration" | "dur" => Ok(ListSortField::Duration),
+            "name" | "session" | "id" => Ok(ListSortField::Name),
+            _ => Err(format!(
+                "unknown sort field '{}': expected 'date', 'duration', or 'name'",
+                s
+            )),
+        }
+    }
+}
 
 /// A session in the list
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -277,6 +316,7 @@ pub fn build_session_list(
     all_projects: bool,
     mode: &super::SessionMode,
     agent_type: Option<&str>,
+    sort: Option<&str>,
 ) -> Result<SessionListReport, String> {
     use super::stats::{list_all_project_sessions_by_mode, parse_date};
     use std::time::{Duration, SystemTime};
@@ -338,16 +378,15 @@ pub fn build_session_list(
         });
     }
 
-    sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
-    let total_before_limit = sessions.len();
-    if limit > 0 {
-        sessions.truncate(limit);
-    }
-    let truncated = super::TruncationInfo::if_truncated(total_before_limit, limit);
+    // Parse sort spec. Default when no --sort given: date descending (newest first).
+    let sort_spec: SortSpec<ListSortField> = match sort {
+        Some(s) => SortSpec::parse(s)?,
+        None => SortSpec::default(),
+    };
 
     let has_subagents = sessions.iter().any(|s| s.parent_id.is_some());
 
-    let items: Vec<SessionListItem> = sessions
+    let mut items: Vec<SessionListItem> = sessions
         .iter()
         .map(|s| {
             let id = s
@@ -374,6 +413,58 @@ pub fn build_session_list(
             }
         })
         .collect();
+
+    if sort_spec.keys.is_empty() {
+        // Default: newest first (smallest age_seconds = most recent).
+        items.sort_by(|a, b| a.age_seconds.cmp(&b.age_seconds));
+    } else {
+        items.sort_by(|a, b| {
+            for key in &sort_spec.keys {
+                // For Date, "descending" means newest first = ascending age_seconds.
+                // So we invert the comparison for Date to get the intuitive behaviour.
+                let ord: std::cmp::Ordering = match key.field {
+                    ListSortField::Date => {
+                        // Descending date = newest first = smaller age_seconds first.
+                        // Ascending date = oldest first = larger age_seconds first.
+                        let cmp = a.age_seconds.cmp(&b.age_seconds);
+                        if key.dir == SortDir::Descending {
+                            cmp
+                        } else {
+                            cmp.reverse()
+                        }
+                    }
+                    ListSortField::Duration => {
+                        let da = a.duration_seconds.unwrap_or(0);
+                        let db = b.duration_seconds.unwrap_or(0);
+                        let cmp = da.cmp(&db);
+                        if key.dir == SortDir::Descending {
+                            cmp.reverse()
+                        } else {
+                            cmp
+                        }
+                    }
+                    ListSortField::Name => {
+                        let cmp = a.id.cmp(&b.id);
+                        if key.dir == SortDir::Descending {
+                            cmp.reverse()
+                        } else {
+                            cmp
+                        }
+                    }
+                };
+                if ord != std::cmp::Ordering::Equal {
+                    return ord;
+                }
+            }
+            std::cmp::Ordering::Equal
+        });
+    }
+
+    let total_before_limit = items.len();
+    if limit > 0 {
+        items.truncate(limit);
+    }
+    let truncated = super::TruncationInfo::if_truncated(total_before_limit, limit);
 
     Ok(SessionListReport {
         sessions: items,

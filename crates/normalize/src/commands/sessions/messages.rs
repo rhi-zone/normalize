@@ -1,6 +1,7 @@
 //! Extract all messages across sessions into a flat, queryable form.
 
 use super::list::project_from_path;
+use super::sort::DefaultDir;
 use super::stats::parse_date;
 use crate::output::OutputFormatter;
 use crate::sessions::{ContentBlock, FormatRegistry, LogFormat, SessionFile, TokenUsage};
@@ -58,19 +59,8 @@ impl fmt::Display for RoleFilter {
     }
 }
 
-/// Sort direction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SortDir {
-    Ascending,
-    Descending,
-}
-
-/// A single sort key with direction.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SortKey {
-    pub field: SortField,
-    pub dir: SortDir,
-}
+// Re-export shared sort types so callers can import from here if needed.
+pub use super::sort::{SortDir, SortKey, SortSpec};
 
 /// The fields that can be sorted on for `sessions messages`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,8 +73,7 @@ pub enum SortField {
     Session,
 }
 
-impl SortField {
-    /// Default sort direction for each field when no prefix is given.
+impl DefaultDir for SortField {
     fn default_dir(self) -> SortDir {
         match self {
             SortField::Tokens => SortDir::Descending,
@@ -110,19 +99,7 @@ impl FromStr for SortField {
     }
 }
 
-/// Parsed `--sort` specification: a list of (field, direction) pairs.
-///
-/// Syntax: comma-separated keys, each optionally prefixed with `-` (desc) or `+` (asc).
-/// When no prefix is given the field's default direction is used:
-/// - `tokens` → descending
-/// - `timestamp` → descending
-/// - `session` → ascending
-#[derive(Debug, Clone, Default)]
-pub struct SortSpec {
-    pub keys: Vec<SortKey>,
-}
-
-impl SortSpec {
+impl SortSpec<SortField> {
     /// Returns true if the spec is effectively a "sort by timestamp ascending" — meaning the only
     /// key is `timestamp` and the direction is `Ascending`. This drives the display mode that
     /// interleaves messages from all sessions chronologically.
@@ -140,28 +117,6 @@ impl SortSpec {
     /// produce a flat interleaved list rather than session-grouped output.
     pub fn has_timestamp(&self) -> bool {
         self.keys.iter().any(|k| k.field == SortField::Timestamp)
-    }
-
-    /// Parse a `--sort` value string.
-    pub fn parse(s: &str) -> Result<Self, String> {
-        let mut keys = Vec::new();
-        for token in s.split(',') {
-            let token = token.trim();
-            if token.is_empty() {
-                continue;
-            }
-            let (dir, field_str) = if let Some(rest) = token.strip_prefix('-') {
-                (Some(SortDir::Descending), rest)
-            } else if let Some(rest) = token.strip_prefix('+') {
-                (Some(SortDir::Ascending), rest)
-            } else {
-                (None, token)
-            };
-            let field = SortField::from_str(field_str)?;
-            let dir = dir.unwrap_or_else(|| field.default_dir());
-            keys.push(SortKey { field, dir });
-        }
-        Ok(SortSpec { keys })
     }
 
     /// Apply this sort spec to a slice of `MessageRecord` in-place.
@@ -240,7 +195,7 @@ pub struct MessagesReport {
     /// Parsed sort spec applied to this report.
     #[serde(skip)]
     #[schemars(skip)]
-    pub(crate) sort_spec: SortSpec,
+    pub(crate) sort_spec: SortSpec<SortField>,
 }
 
 /// Aggregate stats for the messages report.

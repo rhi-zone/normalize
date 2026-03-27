@@ -9,9 +9,52 @@ use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::Write as _;
 use std::path::Path;
+use std::str::FromStr;
 
+use super::sort::{DefaultDir, SortDir, SortSpec};
 use super::stats::{list_all_project_sessions_by_mode, parse_date};
 use super::{SessionMode, list_sessions_by_mode, session_matches_grep};
+
+/// Fields that `sessions patterns` can be sorted on (affects the outlier rows).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PatternsSortField {
+    /// Sort by divergence score (f64, default desc).
+    Divergence,
+    /// Sort by total tool call count (numeric, default desc).
+    ToolCount,
+    /// Sort by turn count (numeric, default desc).
+    TurnCount,
+    /// Sort by session path (string, default asc).
+    Path,
+}
+
+impl DefaultDir for PatternsSortField {
+    fn default_dir(self) -> SortDir {
+        match self {
+            PatternsSortField::Divergence => SortDir::Descending,
+            PatternsSortField::ToolCount => SortDir::Descending,
+            PatternsSortField::TurnCount => SortDir::Descending,
+            PatternsSortField::Path => SortDir::Ascending,
+        }
+    }
+}
+
+impl FromStr for PatternsSortField {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "divergence" | "div" => Ok(PatternsSortField::Divergence),
+            "tool_count" | "tools" | "tool-count" => Ok(PatternsSortField::ToolCount),
+            "turn_count" | "turns" | "turn-count" => Ok(PatternsSortField::TurnCount),
+            "path" | "session" => Ok(PatternsSortField::Path),
+            _ => Err(format!(
+                "unknown sort field '{}': expected 'divergence', 'tool_count', 'turn_count', or 'path'",
+                s
+            )),
+        }
+    }
+}
 
 /// A single session's metadata for the patterns report.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -462,6 +505,7 @@ pub fn build_patterns_report(
     all_projects: bool,
     mode: &SessionMode,
     agent_type: Option<&str>,
+    sort: Option<&str>,
 ) -> Result<PatternsReport, String> {
     let registry = FormatRegistry::new();
     let format: &dyn LogFormat = match format_name {
@@ -593,12 +637,43 @@ pub fn build_patterns_report(
         });
     }
 
-    // Sort outliers by divergence (highest first)
-    outlier_data.sort_by(|a, b| {
-        b.divergence
-            .partial_cmp(&a.divergence)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    // Parse sort spec (default: divergence descending).
+    let sort_spec: SortSpec<PatternsSortField> = match sort {
+        Some(s) => SortSpec::parse(s)?,
+        None => SortSpec::default(),
+    };
+
+    // Sort outliers: apply sort spec or fall back to divergence descending.
+    if sort_spec.keys.is_empty() {
+        outlier_data.sort_by(|a, b| {
+            b.divergence
+                .partial_cmp(&a.divergence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+    } else {
+        outlier_data.sort_by(|a, b| {
+            for key in &sort_spec.keys {
+                let ord: std::cmp::Ordering = match key.field {
+                    PatternsSortField::Divergence => a
+                        .divergence
+                        .partial_cmp(&b.divergence)
+                        .unwrap_or(std::cmp::Ordering::Equal),
+                    PatternsSortField::ToolCount => a.tool_count.cmp(&b.tool_count),
+                    PatternsSortField::TurnCount => a.turn_count.cmp(&b.turn_count),
+                    PatternsSortField::Path => a.path.cmp(&b.path),
+                };
+                let ord = if key.dir == SortDir::Descending {
+                    ord.reverse()
+                } else {
+                    ord
+                };
+                if ord != std::cmp::Ordering::Equal {
+                    return ord;
+                }
+            }
+            std::cmp::Ordering::Equal
+        });
+    }
     outlier_data.truncate(10);
 
     // Extract common start/end tools from population matrix

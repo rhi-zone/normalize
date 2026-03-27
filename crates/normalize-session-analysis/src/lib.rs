@@ -426,6 +426,12 @@ pub struct SessionAnalysisReport {
     pub actual_cost: Option<f64>,
     /// Token deduplication statistics.
     pub dedup_tokens: Option<DedupTokenStats>,
+    /// Sort hint for tool rows in formatted output.
+    /// Valid values: "name" (asc), "calls" (desc, default), "errors" (desc).
+    /// Set by the CLI `--sort` flag; not serialized.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub tool_sort: Option<String>,
 }
 
 impl SessionAnalysisReport {
@@ -496,7 +502,7 @@ impl SessionAnalysisReport {
             lines.push("| Tool | Calls | Errors | Success Rate |".to_string());
             lines.push("|------|-------|--------|--------------|".to_string());
             let mut tools: Vec<_> = self.tool_stats.values().collect();
-            tools.sort_by(|a, b| b.calls.cmp(&a.calls));
+            sort_tool_stats_by_hint(&mut tools, self.tool_sort.as_deref());
             for tool in tools {
                 lines.push(format!(
                     "| {} | {} | {} | {:.0}% |",
@@ -899,7 +905,7 @@ impl SessionAnalysisReport {
             writeln!(out, "\x1b[1;36m━━━ Tool Usage ━━━\x1b[0m")?;
 
             let mut tools: Vec<_> = self.tool_stats.values().collect();
-            tools.sort_by(|a, b| b.calls.cmp(&a.calls));
+            sort_tool_stats_by_hint(&mut tools, self.tool_sort.as_deref());
 
             let max_calls = tools.first().map(|t| t.calls).unwrap_or(1);
             let max_name_len = tools.iter().map(|t| t.name.len()).max().unwrap_or(10);
@@ -1718,6 +1724,46 @@ fn detect_retry_hotspots(
     });
 
     hotspots
+}
+
+/// Sort a mutable slice of `ToolStats` references according to a sort hint string.
+/// Valid hints: `"name"` (ascending), `"calls"` (descending, default),
+/// `"errors"` (descending), `"+name"` / `"-calls"` etc.
+/// Unknown or empty hints fall back to calls-descending.
+fn sort_tool_stats_by_hint(tools: &mut Vec<&ToolStats>, hint: Option<&str>) {
+    let (field, descending) = match hint {
+        None | Some("") | Some("calls") | Some("-calls") => ("calls", true),
+        Some("+calls") => ("calls", false),
+        Some("name") | Some("+name") => ("name", false),
+        Some("-name") => ("name", true),
+        Some("errors") | Some("-errors") => ("errors", true),
+        Some("+errors") => ("errors", false),
+        _ => ("calls", true), // fallback
+    };
+    match field {
+        "name" => {
+            if descending {
+                tools.sort_by(|a, b| b.name.cmp(&a.name));
+            } else {
+                tools.sort_by(|a, b| a.name.cmp(&b.name));
+            }
+        }
+        "errors" => {
+            if descending {
+                tools.sort_by(|a, b| b.errors.cmp(&a.errors).then(b.calls.cmp(&a.calls)));
+            } else {
+                tools.sort_by(|a, b| a.errors.cmp(&b.errors).then(a.calls.cmp(&b.calls)));
+            }
+        }
+        _ => {
+            // calls
+            if descending {
+                tools.sort_by(|a, b| b.calls.cmp(&a.calls));
+            } else {
+                tools.sort_by(|a, b| a.calls.cmp(&b.calls));
+            }
+        }
+    }
 }
 
 /// Build command stats from invocation data.
