@@ -21,6 +21,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`normalize syntax ast`** default depth changed from unlimited (`-1`) to `5`. Pass `--depth -1` to restore the old unlimited behavior. This prevents agents from receiving enormous output when inspecting files.
 - **`normalize analyze architecture` compact output** no longer truncates hub and symbol paths with opaque worktree-hash prefixes (e.g. `...ba395f/crates/...`). Paths are now shown as clean workspace-relative paths (e.g. `crates/normalize/src/output.rs`).
 
+### Improved
+
+- **`normalize grep`** — consecutive matches within the same symbol are now grouped under a single `(SymbolName L48-61):` header rather than repeating the symbol tag on every line.
+- **`normalize view <file>:N-M`** — header no longer duplicates the line range (was `file.rs:10-20:10-20`, now `file.rs:10-20`).
+
 ## [0.2.0] — 2026-03-25
 
 ### Added
