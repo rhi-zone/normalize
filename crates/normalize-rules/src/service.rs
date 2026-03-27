@@ -551,6 +551,8 @@ impl RulesService {
         }
 
         // Apply --only / --exclude path filters to all issues.
+        // After filtering, recompute files_checked so it reflects only the files
+        // that matched the filter (rather than all files with violations pre-filter).
         if !only.is_empty() || !exclude.is_empty() {
             let only_pats: Vec<glob::Pattern> = only
                 .iter()
@@ -570,6 +572,10 @@ impl RulesService {
                 }
                 true
             });
+            // Recount files_checked from the filtered issues.
+            let unique_files: std::collections::HashSet<&str> =
+                report.issues.iter().map(|i| i.file.as_str()).collect();
+            report.files_checked = unique_files.len();
         }
 
         report.sort();
