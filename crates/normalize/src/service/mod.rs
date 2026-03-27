@@ -39,7 +39,10 @@ pub mod view;
 
 use crate::commands;
 use crate::commands::aliases::{AliasesReport, detect_project_languages};
-use crate::commands::context::{ContextListReport, ContextReport, collect_context_files};
+use crate::commands::context::{
+    CallerContext, ContextBlock, ContextListReport, ContextReport, collect_new_context_files,
+    parse_match_pairs, read_stdin_context, resolve_context, yaml_to_json,
+};
 use crate::config::NormalizeConfig;
 use crate::output::OutputFormatter;
 use crate::text_search::{self, GrepReport};
@@ -148,9 +151,16 @@ impl NormalizeService {
 
     /// Display bridge for ContextKindReport (dispatches to inner type).
     fn display_context(&self, value: &ContextKindReport) -> String {
+        let pretty = self.pretty.get();
         match value {
             ContextKindReport::List(r) => r.format_text(),
-            ContextKindReport::Full(r) => r.format_text(),
+            ContextKindReport::Full(r) => {
+                if pretty {
+                    r.format_pretty()
+                } else {
+                    r.format_text()
+                }
+            }
         }
     }
 
@@ -167,10 +177,7 @@ impl NormalizeService {
     }
 }
 
-/// Output type for `normalize context`: either a list of context files or full merged content.
-///
-/// The `list` subcommand returns `List`; the default (no subcommand) returns `Full` with the
-/// merged `.context.md` content for the requested path.
+/// Output type for `normalize context`: either a list of context files or full content.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 #[serde(tag = "kind")]
 pub enum ContextKindReport {
@@ -183,6 +190,13 @@ impl OutputFormatter for ContextKindReport {
         match self {
             Self::List(r) => r.format_text(),
             Self::Full(r) => r.format_text(),
+        }
+    }
+
+    fn format_pretty(&self) -> String {
+        match self {
+            Self::List(r) => r.format_text(),
+            Self::Full(r) => r.format_pretty(),
         }
     }
 }
@@ -345,64 +359,65 @@ impl NormalizeService {
         Ok(AliasesReport::build(&config, &languages))
     }
 
-    /// Show directory context (hierarchical .context.md files)
+    /// Resolve contextual text from .normalize/context/ hierarchy
+    ///
+    /// Walks .normalize/context/ directories bottom-up from the working directory
+    /// (project-specific first, global ~/.normalize/context/ last). Each .md file
+    /// may contain YAML frontmatter; blocks are filtered by matching the frontmatter
+    /// against caller-provided context (--match / --stdin).
+    ///
+    /// Without conditions and no matching frontmatter keys → block always matches.
     ///
     /// Examples:
-    ///   normalize context                      # show .context.md files for current dir
-    ///   normalize context src/                 # show context for a subdirectory
-    ///   normalize context --list               # list all .context.md file paths
+    ///   normalize context                                          # dump all (no filter)
+    ///   normalize context --match hook=UserPromptSubmit            # filter by key=value
+    ///   normalize context --match claudecode.hook=UserPromptSubmit # nested dot-path
+    ///   echo '{"hook":"X"}' | normalize context --stdin --prefix claudecode
+    ///   normalize context --all --list                            # list all source files
     #[cli(display_with = "display_context")]
+    #[allow(clippy::too_many_arguments)]
     pub fn context(
         &self,
-        #[param(positional, help = "Target path to collect context for")] target: Option<String>,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(help = "Show only file paths, not content")] list: bool,
+        #[param(help = "Root directory for hierarchy walk (default: cwd)")] root: Option<String>,
+        #[param(help = "Match context against KEY=VALUE pair (repeatable)")] r#match: Vec<String>,
+        #[param(help = "Read context JSON from stdin")] stdin: bool,
+        #[param(help = "Namespace stdin JSON under this prefix")] prefix: Option<String>,
+        #[param(help = "Return all context entries without filtering")] all: bool,
+        #[param(help = "Context directory name inside .normalize/ (default: context)")]
+        from: Option<String>,
+        #[param(help = "Show source file paths only, not content")] list: bool,
     ) -> Result<ContextKindReport, String> {
         let root_path = root
             .map(PathBuf::from)
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        let target_str = target.as_deref().unwrap_or(".");
-        let target = root_path.join(target_str);
 
-        let target_dir = if target.is_file() {
-            target.parent().unwrap_or(&root_path).to_path_buf()
-        } else {
-            target.clone()
-        };
+        let dir_name = from.as_deref().unwrap_or("context");
 
-        let root_canon = root_path
-            .canonicalize()
-            .map_err(|e| format!("Failed to resolve root: {}", e))?;
-        let target_canon = target_dir
-            .canonicalize()
-            .map_err(|e| format!("Failed to resolve target: {}", e))?;
-
-        let files = collect_context_files(&root_canon, &target_canon, None);
-
-        // collect_context_files returns target→root order; reverse to root→target for display.
         if list {
-            let paths: Vec<String> = files
-                .iter()
-                .rev()
-                .map(|f| f.to_str().unwrap_or("").to_string())
-                .collect();
-            Ok(ContextKindReport::List(ContextListReport::new(paths)))
-        } else {
-            let entries = files
-                .iter()
-                .rev()
-                .map(|file| {
-                    let rel_path = file.strip_prefix(&root_canon).unwrap_or(file);
-                    let content = std::fs::read_to_string(file).unwrap_or_default();
-                    (rel_path.display().to_string(), content)
-                })
-                .collect();
-            Ok(ContextKindReport::Full(ContextReport::new(entries)))
+            let files = collect_new_context_files(&root_path, dir_name);
+            return Ok(ContextKindReport::List(ContextListReport::new(files)));
         }
+
+        // Build caller context from --match pairs and optionally --stdin.
+        let mut caller_ctx: CallerContext = parse_match_pairs(&r#match)?;
+        if stdin {
+            let stdin_ctx = read_stdin_context(prefix.as_deref())?;
+            caller_ctx.extend(stdin_ctx);
+        }
+
+        let raw = resolve_context(&root_path, dir_name, &caller_ctx, all);
+        let blocks: Vec<ContextBlock> = raw
+            .into_iter()
+            .map(|(source, metadata, body)| ContextBlock {
+                source,
+                metadata: yaml_to_json(metadata),
+                body,
+            })
+            .collect();
+
+        Ok(ContextKindReport::Full(ContextReport::new(blocks)))
     }
 
     /// Initialize normalize in current directory

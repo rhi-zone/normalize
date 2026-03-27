@@ -2,27 +2,38 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"context\"])"
 ---
-Show directory context (hierarchical .context.md files)
+Resolve contextual text from .normalize/context/ hierarchy
 
-Usage: normalize context [OPTIONS] [target]
-
-Arguments:
-  [target]  Target path to collect context for
+Usage: normalize context [OPTIONS]
 
 Options:
       --pretty                     Human-friendly output with colors and formatting
-  -r, --root <root>                Root directory (defaults to current directory)
+      --root <root>                Root directory for hierarchy walk (default: cwd)
       --compact                    Compact output without colors (overrides TTY detection)
-      --list                       Show only file paths, not content
+      --match <match>              Match context against KEY=VALUE pair (repeatable)
       --jsonl                      Output one JSON object per line (for arrays)
+      --stdin                      Read context JSON from stdin
       --json                       Output machine-readable JSON
+      --prefix <prefix>            Namespace stdin JSON under this prefix
+      --all                        Return all context entries without filtering
       --jq <jq>                    Filter output through jq expression
+      --from <from>                Context directory name inside .normalize/ (default: context)
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --list                       Show source file paths only, not content
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
 
+Walks .normalize/context/ directories bottom-up from the working directory
+(project-specific first, global ~/.normalize/context/ last). Each .md file
+may contain YAML frontmatter; blocks are filtered by matching the frontmatter
+against caller-provided context (--match / --stdin).
+
+Without conditions and no matching frontmatter keys → block always matches.
+
 Examples:
-normalize context                      # show .context.md files for current dir
-normalize context src/                 # show context for a subdirectory
-normalize context --list               # list all .context.md file paths
+normalize context                                          # dump all (no filter)
+normalize context --match hook=UserPromptSubmit            # filter by key=value
+normalize context --match claudecode.hook=UserPromptSubmit # nested dot-path
+echo '{"hook":"X"}' | normalize context --stdin --prefix claudecode
+normalize context --all --list                            # list all source files

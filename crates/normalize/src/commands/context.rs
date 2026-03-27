@@ -1,95 +1,119 @@
 //! Directory context: hierarchical context files.
 //!
-//! Collects and merges `.context.md` and `CONTEXT.md` files from the directory
-//! hierarchy, from project root to target path.
+//! Resolves contextual text from `.normalize/context/` directories walked
+//! hierarchically (project → parent → ... → global `~/.normalize/context/`).
+//! Source files are Markdown with optional YAML frontmatter. Frontmatter is
+//! matched against caller-provided context to filter which blocks are returned.
 
 use serde::Serialize;
-use std::fs;
+use std::collections::HashMap;
+use std::io::Read as _;
 use std::path::{Path, PathBuf};
 
 use crate::output::OutputFormatter;
 
-/// Context file names to look for (in priority order).
-const CONTEXT_FILES: &[&str] = &[".context.md", "CONTEXT.md"];
+// ---------------------------------------------------------------------------
+// Report structs
+// ---------------------------------------------------------------------------
 
 /// Context file list report (--list mode).
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ContextListReport {
-    paths: Vec<String>,
+    pub files: Vec<PathBuf>,
 }
 
 impl ContextListReport {
-    pub fn new(paths: Vec<String>) -> Self {
-        Self { paths }
+    pub fn new(files: Vec<PathBuf>) -> Self {
+        Self { files }
     }
 }
 
 impl OutputFormatter for ContextListReport {
     fn format_text(&self) -> String {
-        if self.paths.is_empty() {
+        if self.files.is_empty() {
             "No context files found.".to_string()
         } else {
-            self.paths.join("\n")
+            self.files
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect::<Vec<_>>()
+                .join("\n")
         }
     }
 }
 
-/// A single context file entry.
+/// A single resolved context block (one frontmatter+body unit).
 #[derive(Debug, Serialize, schemars::JsonSchema)]
-struct ContextEntry {
-    path: String,
-    content: String,
+pub struct ContextBlock {
+    pub source: PathBuf,
+    pub metadata: serde_json::Value,
+    pub body: String,
 }
 
 /// Context report (default mode).
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ContextReport {
-    entries: Vec<ContextEntry>,
+    pub blocks: Vec<ContextBlock>,
 }
 
 impl ContextReport {
-    /// Build from (relative_path, content) pairs.
-    pub fn new(entries: Vec<(String, String)>) -> Self {
-        Self {
-            entries: entries
-                .into_iter()
-                .map(|(path, content)| ContextEntry { path, content })
-                .collect(),
-        }
+    pub fn new(blocks: Vec<ContextBlock>) -> Self {
+        Self { blocks }
     }
 }
 
 impl OutputFormatter for ContextReport {
     fn format_text(&self) -> String {
-        if self.entries.is_empty() {
-            return "No context files found.".to_string();
+        if self.blocks.is_empty() {
+            return "No context found.".to_string();
         }
-        let mut lines = Vec::new();
-        for (i, entry) in self.entries.iter().enumerate() {
-            if i > 0 {
-                lines.push(String::new());
+        self.blocks
+            .iter()
+            .map(|b| b.body.trim().to_string())
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    }
+
+    fn format_pretty(&self) -> String {
+        if self.blocks.is_empty() {
+            return "No context found.".to_string();
+        }
+        let mut out = String::new();
+        for block in &self.blocks {
+            if !out.is_empty() {
+                out.push_str("\n\n");
             }
-            lines.push(format!("# {}", entry.path));
-            lines.push(String::new());
-            lines.push(entry.content.clone());
+            out.push_str(&format!("<!-- {} -->\n", block.source.display()));
+            let body = block.body.trim();
+            if !body.is_empty() {
+                out.push('\n');
+                out.push_str(body);
+            }
         }
-        lines.join("\n")
+        out
     }
 }
 
-/// Collect context files from target directory up to root.
+// ---------------------------------------------------------------------------
+// Legacy support: the old `.context.md` / `CONTEXT.md` walk
+//
+// Kept because `service/view.rs` `--dir-context` still uses it.
+// ---------------------------------------------------------------------------
+
+/// Legacy context file names (old system).
+const LEGACY_CONTEXT_FILES: &[&str] = &[".context.md", "CONTEXT.md"];
+
+/// Collect legacy `.context.md` / `CONTEXT.md` files from target up to root.
 ///
 /// Returns files in **target→root order** (most specific first).
-/// `max_depth` limits how many ancestor levels above the target to include:
-/// `None` means unlimited (include all ancestors up to root).
+/// `max_depth` limits how many ancestor levels above target to include:
+/// `None` means unlimited.
 pub fn collect_context_files(
     root: &Path,
     target_dir: &Path,
     max_depth: Option<usize>,
 ) -> Vec<PathBuf> {
     let mut files = Vec::new();
-
-    // Walk up from target to root, collecting directories in target→root order.
     let mut current = target_dir.to_path_buf();
     let mut depth = 0usize;
 
@@ -97,24 +121,18 @@ pub fn collect_context_files(
         if !current.starts_with(root) {
             break;
         }
-
-        // Check max_depth: depth 0 is the target dir itself; depth 1 is the parent, etc.
-        // max_depth=None means unlimited; max_depth=Some(n) means include up to n levels
-        // above target (i.e. depths 0..=n).
         if let Some(max) = max_depth
             && depth > max
         {
             break;
         }
-
-        for name in CONTEXT_FILES {
+        for name in LEGACY_CONTEXT_FILES {
             let path = current.join(name);
             if path.exists() {
                 files.push(path);
-                break; // Only take first match per directory
+                break;
             }
         }
-
         if current == root {
             break;
         }
@@ -127,23 +145,17 @@ pub fn collect_context_files(
         }
     }
 
-    // Result is in target→root order.
     files
 }
 
-/// Get merged context content for a path.
-/// Used by other commands (e.g., view --dir-context).
-///
-/// `max_depth` is passed through to `collect_context_files`.
-/// The merged content is emitted in root→target order (most general first).
+/// Get merged context content for a path (legacy system).
+/// Used by `view --dir-context`.
 pub fn get_merged_context(root: &Path, target: &Path, max_depth: Option<usize>) -> Option<String> {
-    // Find the target directory - walk up from target until we find an existing dir
     let target_dir = if target.is_file() {
         target.parent().unwrap_or(root).to_path_buf()
     } else if target.is_dir() {
         target.to_path_buf()
     } else {
-        // Target doesn't exist - find first existing parent
         let mut dir = target.to_path_buf();
         while !dir.exists() {
             match dir.parent() {
@@ -157,19 +169,17 @@ pub fn get_merged_context(root: &Path, target: &Path, max_depth: Option<usize>) 
     let root = root.canonicalize().ok()?;
     let target_dir = target_dir.canonicalize().ok()?;
 
-    // Collect in target→root order, then reverse for root→target output.
     let files_target_to_root = collect_context_files(&root, &target_dir, max_depth);
     if files_target_to_root.is_empty() {
         return None;
     }
 
-    // Output in root→target order (most general first).
     let mut content = String::new();
     for (i, file) in files_target_to_root.iter().rev().enumerate() {
         if i > 0 {
             content.push_str("\n\n");
         }
-        if let Ok(text) = fs::read_to_string(file) {
+        if let Ok(text) = std::fs::read_to_string(file) {
             content.push_str(&text);
         }
     }
@@ -181,19 +191,581 @@ pub fn get_merged_context(root: &Path, target: &Path, max_depth: Option<usize>) 
     }
 }
 
+// ---------------------------------------------------------------------------
+// New context system: .normalize/context/ with YAML frontmatter
+// ---------------------------------------------------------------------------
+
+/// A flat key-value map representing caller-provided context.
+/// Keys are dot-paths (e.g. `"claudecode.hook"`), values are strings.
+pub type CallerContext = HashMap<String, String>;
+
+/// Parse `--match KEY=VALUE` pairs into a [`CallerContext`].
+pub fn parse_match_pairs(pairs: &[String]) -> Result<CallerContext, String> {
+    let mut map = CallerContext::new();
+    for pair in pairs {
+        if let Some((k, v)) = pair.split_once('=') {
+            map.insert(k.to_string(), v.to_string());
+        } else {
+            return Err(format!("--match argument must be KEY=VALUE, got: {pair:?}"));
+        }
+    }
+    Ok(map)
+}
+
+/// Read JSON from stdin and merge into caller context, optionally under `prefix`.
+pub fn read_stdin_context(prefix: Option<&str>) -> Result<CallerContext, String> {
+    let mut buf = String::new();
+    std::io::stdin()
+        .read_to_string(&mut buf)
+        .map_err(|e| format!("Failed to read stdin: {e}"))?;
+
+    if buf.trim().is_empty() {
+        return Ok(CallerContext::new());
+    }
+
+    let value: serde_json::Value =
+        serde_json::from_str(&buf).map_err(|e| format!("stdin is not valid JSON: {e}"))?;
+
+    let nested: serde_json::Value = if let Some(pfx) = prefix {
+        serde_json::json!({ pfx: value })
+    } else {
+        value
+    };
+
+    let mut map = CallerContext::new();
+    flatten_json(&nested, "", &mut map);
+    Ok(map)
+}
+
+/// Flatten a JSON object into dot-path string pairs.
+fn flatten_json(value: &serde_json::Value, prefix: &str, out: &mut CallerContext) {
+    match value {
+        serde_json::Value::Object(obj) => {
+            for (k, v) in obj {
+                let key = if prefix.is_empty() {
+                    k.clone()
+                } else {
+                    format!("{prefix}.{k}")
+                };
+                flatten_json(v, &key, out);
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for (i, v) in arr.iter().enumerate() {
+                let key = if prefix.is_empty() {
+                    i.to_string()
+                } else {
+                    format!("{prefix}.{i}")
+                };
+                flatten_json(v, &key, out);
+            }
+        }
+        other => {
+            out.insert(prefix.to_string(), json_scalar_to_string(other));
+        }
+    }
+}
+
+fn json_scalar_to_string(v: &serde_json::Value) -> String {
+    match v {
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::Null => "null".to_string(),
+        other => other.to_string(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Frontmatter parsing
+// ---------------------------------------------------------------------------
+
+/// A parsed block: optional frontmatter YAML value + body text.
+#[derive(Debug)]
+struct ParsedBlock {
+    frontmatter: Option<serde_yaml::Value>,
+    body: String,
+}
+
+/// Parse a Markdown file into one or more blocks.
+///
+/// A file may contain multiple blocks separated by `---` fence lines. Each block is:
+/// - `---\n<yaml>\n---\n<body>` — a block with frontmatter
+/// - plain text — a block without frontmatter (always matches)
+///
+/// The file may begin with `---` (standard frontmatter) or directly with content.
+/// Multiple blocks per file are supported: after a body, a new `---` starts the
+/// next block's YAML frontmatter.
+fn parse_blocks(content: &str) -> Vec<ParsedBlock> {
+    // Collect positions of `---` fence lines (lines that are exactly `---`).
+    let lines: Vec<&str> = content.lines().collect();
+    let mut fence_positions: Vec<usize> = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, l)| **l == "---")
+        .map(|(i, _)| i)
+        .collect();
+
+    if fence_positions.is_empty() {
+        // No fences → single plain body block.
+        return vec![ParsedBlock {
+            frontmatter: None,
+            body: content.to_string(),
+        }];
+    }
+
+    let mut blocks = Vec::new();
+    let total_lines = lines.len();
+
+    // If first fence is at line 0, the file starts with frontmatter.
+    // We process fences in pairs: fence[n] opens YAML, fence[n+1] closes it.
+    // Between two fences is YAML; after the closing fence is the body until the
+    // next opening fence (or EOF).
+    //
+    // If there's content before the first fence, it's a plain body block.
+
+    // Consume any content before the first fence as a plain block.
+    if fence_positions[0] > 0 {
+        let body = lines[..fence_positions[0]].join("\n");
+        if !body.trim().is_empty() {
+            blocks.push(ParsedBlock {
+                frontmatter: None,
+                body,
+            });
+        }
+        let start = fence_positions[0];
+        fence_positions.retain(|&f| f >= start);
+    }
+
+    // Now process fence pairs: opening fence at fence_positions[0], closing at fence_positions[1].
+    let mut fp_idx = 0usize;
+    while fp_idx < fence_positions.len() {
+        let open_fence = fence_positions[fp_idx];
+
+        if fp_idx + 1 < fence_positions.len() {
+            // We have a closing fence.
+            let close_fence = fence_positions[fp_idx + 1];
+
+            // YAML content is between open_fence+1 and close_fence-1.
+            let yaml_lines = &lines[open_fence + 1..close_fence];
+            let yaml_text = yaml_lines.join("\n");
+
+            // Try to parse as YAML mapping.
+            let frontmatter = match serde_yaml::from_str::<serde_yaml::Value>(&yaml_text) {
+                Ok(v) if v.is_mapping() || v.is_null() => Some(v),
+                _ => None,
+            };
+
+            // Body is from close_fence+1 until the next open fence (or EOF).
+            let body_start = close_fence + 1;
+            let body_end = if fp_idx + 2 < fence_positions.len() {
+                fence_positions[fp_idx + 2]
+            } else {
+                total_lines
+            };
+            let body = lines[body_start..body_end].join("\n");
+
+            if frontmatter.is_some() {
+                blocks.push(ParsedBlock { frontmatter, body });
+                fp_idx += 2;
+            } else {
+                // Didn't parse as YAML → treat the whole region as a plain body.
+                let plain_body = lines[open_fence..body_end].join("\n");
+                blocks.push(ParsedBlock {
+                    frontmatter: None,
+                    body: plain_body,
+                });
+                fp_idx += 2;
+            }
+        } else {
+            // Orphan opening fence with no closing fence — treat remainder as plain body.
+            let body = lines[open_fence..].join("\n");
+            blocks.push(ParsedBlock {
+                frontmatter: None,
+                body,
+            });
+            fp_idx += 1;
+        }
+    }
+
+    blocks
+}
+
+// ---------------------------------------------------------------------------
+// Matching logic
+// ---------------------------------------------------------------------------
+
+/// Look up a dot-path in a `serde_yaml::Value`.
+/// `"claudecode.hook"` navigates `{claudecode: {hook: ...}}`.
+#[allow(dead_code)]
+fn yaml_get_dotpath<'a>(value: &'a serde_yaml::Value, path: &str) -> Option<&'a serde_yaml::Value> {
+    let mut current = value;
+    for segment in path.split('.') {
+        current = current.get(segment)?;
+    }
+    Some(current)
+}
+
+/// Look up a dot-path key in the caller context.
+fn caller_get(ctx: &CallerContext, path: &str) -> Option<String> {
+    ctx.get(path).cloned()
+}
+
+/// Convert a `serde_yaml::Value` scalar to a string for comparison.
+fn yaml_scalar_to_string(v: &serde_yaml::Value) -> Option<String> {
+    match v {
+        serde_yaml::Value::String(s) => Some(s.clone()),
+        serde_yaml::Value::Bool(b) => Some(b.to_string()),
+        serde_yaml::Value::Number(n) => Some(n.to_string()),
+        serde_yaml::Value::Null => Some("null".to_string()),
+        _ => None,
+    }
+}
+
+/// Evaluate a single match strategy leaf.
+///
+/// `field_path` — dot-path into the caller context
+/// `strategy_node` — YAML value describing the strategy (`{equals: "..."}` etc.)
+/// `caller_ctx` — caller-provided context
+fn eval_strategy(
+    field_path: &str,
+    strategy_node: &serde_yaml::Value,
+    caller_ctx: &CallerContext,
+) -> bool {
+    match strategy_node {
+        // Bare scalar → shorthand for equals.
+        serde_yaml::Value::String(_)
+        | serde_yaml::Value::Bool(_)
+        | serde_yaml::Value::Number(_) => {
+            let expected = yaml_scalar_to_string(strategy_node).unwrap_or_default();
+            caller_get(caller_ctx, field_path)
+                .map(|v| v == expected)
+                .unwrap_or(false)
+        }
+        serde_yaml::Value::Mapping(map) => {
+            // Expect exactly one key: the strategy name.
+            let (strategy_name, args) = match map.iter().next() {
+                Some(pair) => pair,
+                None => return false,
+            };
+            let strategy_name = match strategy_name.as_str() {
+                Some(s) => s,
+                None => return false,
+            };
+            match strategy_name {
+                "equals" => {
+                    let expected = yaml_scalar_to_string(args).unwrap_or_default();
+                    caller_get(caller_ctx, field_path)
+                        .map(|v| v == expected)
+                        .unwrap_or(false)
+                }
+                "contains" => {
+                    let needle = yaml_scalar_to_string(args).unwrap_or_default();
+                    caller_get(caller_ctx, field_path)
+                        .map(|v| v.contains(needle.as_str()))
+                        .unwrap_or(false)
+                }
+                "keywords" => {
+                    let keywords: Vec<String> = match args {
+                        serde_yaml::Value::Sequence(seq) => {
+                            seq.iter().filter_map(yaml_scalar_to_string).collect()
+                        }
+                        _ => return false,
+                    };
+                    let caller_val = match caller_get(caller_ctx, field_path) {
+                        Some(v) => v,
+                        None => return false,
+                    };
+                    keywords.iter().any(|kw| caller_val.contains(kw.as_str()))
+                }
+                "regex" => {
+                    let pattern = yaml_scalar_to_string(args).unwrap_or_default();
+                    let re = match regex::Regex::new(&pattern) {
+                        Ok(r) => r,
+                        Err(_) => return false,
+                    };
+                    caller_get(caller_ctx, field_path)
+                        .map(|v| re.is_match(&v))
+                        .unwrap_or(false)
+                }
+                "exists" => {
+                    let expected_exists = match args {
+                        serde_yaml::Value::Bool(b) => *b,
+                        _ => true,
+                    };
+                    let actual_exists = caller_get(caller_ctx, field_path).is_some();
+                    actual_exists == expected_exists
+                }
+                "one_of" => {
+                    let options: Vec<String> = match args {
+                        serde_yaml::Value::Sequence(seq) => {
+                            seq.iter().filter_map(yaml_scalar_to_string).collect()
+                        }
+                        _ => return false,
+                    };
+                    caller_get(caller_ctx, field_path)
+                        .map(|v| options.iter().any(|opt| opt == &v))
+                        .unwrap_or(false)
+                }
+                _ => false,
+            }
+        }
+        _ => false,
+    }
+}
+
+/// Evaluate a conditions node (may contain `all:` / `any:` / leaf conditions).
+fn eval_conditions(node: &serde_yaml::Value, caller_ctx: &CallerContext) -> bool {
+    match node {
+        serde_yaml::Value::Mapping(map) => {
+            // Check for `all:` / `any:` keys.
+            let has_all = map.contains_key("all");
+            let has_any = map.contains_key("any");
+
+            if has_all || has_any {
+                let mut result = true;
+
+                if has_all && let Some(serde_yaml::Value::Sequence(items)) = map.get("all") {
+                    for item in items {
+                        if !eval_conditions(item, caller_ctx) {
+                            result = false;
+                            break;
+                        }
+                    }
+                }
+
+                if has_any && let Some(serde_yaml::Value::Sequence(items)) = map.get("any") {
+                    let any_pass = items.iter().any(|item| eval_conditions(item, caller_ctx));
+                    result = result && any_pass;
+                }
+
+                result
+            } else {
+                // Leaf: { field.path: {strategy: args} } or { field.path: bare_value }
+                // All entries in the map must pass (AND).
+                for (field_key, strategy_node) in map {
+                    let field_path = match field_key.as_str() {
+                        Some(s) => s,
+                        None => return false,
+                    };
+                    if !eval_strategy(field_path, strategy_node, caller_ctx) {
+                        return false;
+                    }
+                }
+                true
+            }
+        }
+        serde_yaml::Value::Sequence(items) => {
+            // Bare sequence → treat as `all:`.
+            items.iter().all(|item| eval_conditions(item, caller_ctx))
+        }
+        _ => false,
+    }
+}
+
+/// Decide whether a parsed block matches the caller context.
+///
+/// Rules:
+/// 1. `--all` → always true (caller passes `all_flag=true`).
+/// 2. Block has `conditions:` → evaluate the conditions tree.
+/// 3. No `conditions:`: for each frontmatter key (excluding `conditions:`), try
+///    dot-path lookup in caller context with `equals`. Missing caller keys don't
+///    fail. If frontmatter is empty or null → always matches.
+fn block_matches(block: &ParsedBlock, caller_ctx: &CallerContext, all_flag: bool) -> bool {
+    if all_flag {
+        return true;
+    }
+
+    let fm = match &block.frontmatter {
+        None => return true, // No frontmatter → always matches.
+        Some(v) => v,
+    };
+
+    // Null / empty frontmatter → always matches.
+    if fm.is_null() {
+        return true;
+    }
+    let map = match fm.as_mapping() {
+        Some(m) => m,
+        None => return true,
+    };
+    if map.is_empty() {
+        return true;
+    }
+
+    // Check for `conditions:` key.
+    if let Some(conditions_node) = map.get("conditions") {
+        return eval_conditions(conditions_node, caller_ctx);
+    }
+
+    // No conditions block: match each frontmatter key with equals.
+    // Only keys that also exist in caller_ctx are compared (missing = skip, not fail).
+    // If no keys overlap → always matches (caller context irrelevant).
+    let mut any_key_compared = false;
+    for (k, v) in map {
+        let key_str = match k.as_str() {
+            Some(s) => s,
+            None => continue,
+        };
+        // Navigate nested keys: `claudecode.hook` → check if caller has that dot-path.
+        // We need to flatten the YAML frontmatter key hierarchy to dot-paths for comparison.
+        // E.g., frontmatter `claudecode: {hook: UserPromptSubmit}` → key `claudecode`, value mapping.
+        // Compare by flattening the frontmatter value against caller context.
+        if !compare_yaml_to_caller(key_str, v, caller_ctx, &mut any_key_compared) {
+            return false;
+        }
+    }
+
+    true
+}
+
+/// Recursively compare a frontmatter subtree against the caller context.
+/// Returns `false` if any present caller key fails its equals check.
+/// Sets `any_key_compared` to `true` if any key was compared.
+fn compare_yaml_to_caller(
+    prefix: &str,
+    value: &serde_yaml::Value,
+    caller_ctx: &CallerContext,
+    _any_compared: &mut bool,
+) -> bool {
+    match value {
+        serde_yaml::Value::Mapping(map) => {
+            for (k, v) in map {
+                let child_key = match k.as_str() {
+                    Some(s) => s,
+                    None => continue,
+                };
+                let full_path = format!("{prefix}.{child_key}");
+                if !compare_yaml_to_caller(&full_path, v, caller_ctx, _any_compared) {
+                    return false;
+                }
+            }
+            true
+        }
+        scalar => {
+            // Leaf: compare against caller context at `prefix`.
+            if let Some(caller_val) = caller_get(caller_ctx, prefix) {
+                *_any_compared = true;
+                let fm_val = yaml_scalar_to_string(scalar).unwrap_or_default();
+                caller_val == fm_val
+            } else {
+                // Key not in caller context → skip (don't fail).
+                true
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Directory walk
+// ---------------------------------------------------------------------------
+
+/// Collect `.md` files from `.normalize/{dir_name}/` directories walked
+/// bottom-up from `start_dir` toward the filesystem root.
+/// Also includes `~/.normalize/{dir_name}/` as a global layer.
+///
+/// Returns files in order: closest (project-specific) first, global last.
+pub fn collect_new_context_files(start_dir: &Path, dir_name: &str) -> Vec<PathBuf> {
+    let mut result = Vec::new();
+    let mut current = start_dir.to_path_buf();
+
+    loop {
+        let ctx_dir = current.join(".normalize").join(dir_name);
+        if ctx_dir.is_dir() {
+            let mut entries: Vec<PathBuf> = std::fs::read_dir(&ctx_dir)
+                .into_iter()
+                .flatten()
+                .filter_map(|e| e.ok())
+                .map(|e| e.path())
+                .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("md"))
+                .collect();
+            entries.sort();
+            result.extend(entries);
+        }
+
+        match current.parent() {
+            Some(p) => current = p.to_path_buf(),
+            None => break,
+        }
+    }
+
+    // Global layer: ~/.normalize/{dir_name}/
+    if let Some(home) = dirs::home_dir() {
+        let global_dir = home.join(".normalize").join(dir_name);
+        if global_dir.is_dir() {
+            let mut entries: Vec<PathBuf> = std::fs::read_dir(&global_dir)
+                .into_iter()
+                .flatten()
+                .filter_map(|e| e.ok())
+                .map(|e| e.path())
+                .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("md"))
+                .collect();
+            entries.sort();
+            result.extend(entries);
+        }
+    }
+
+    result
+}
+
+/// Resolve context blocks from the hierarchy.
+///
+/// Files are collected bottom-up (project-specific first, global last).
+/// Blocks within each file are parsed and matched against `caller_ctx`.
+pub fn resolve_context(
+    start_dir: &Path,
+    dir_name: &str,
+    caller_ctx: &CallerContext,
+    all_flag: bool,
+) -> Vec<(PathBuf, serde_yaml::Value, String)> {
+    let files = collect_new_context_files(start_dir, dir_name);
+    let mut results = Vec::new();
+
+    for file_path in &files {
+        let content = match std::fs::read_to_string(file_path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let blocks = parse_blocks(&content);
+        for block in blocks {
+            if block_matches(&block, caller_ctx, all_flag) {
+                let body = block.body.trim().to_string();
+                if body.is_empty() && block.frontmatter.is_none() {
+                    continue;
+                }
+                let metadata = block.frontmatter.unwrap_or(serde_yaml::Value::Null);
+                results.push((file_path.clone(), metadata, body));
+            }
+        }
+    }
+
+    results
+}
+
+/// Convert a `serde_yaml::Value` to `serde_json::Value`.
+pub fn yaml_to_json(v: serde_yaml::Value) -> serde_json::Value {
+    // serde_yaml → serde_json via intermediate serialization.
+    serde_json::to_value(v).unwrap_or(serde_json::Value::Null)
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
     use tempfile::tempdir;
 
+    // --- Legacy collect_context_files tests (unchanged behavior) ---
+
     #[test]
     fn test_collect_single_context_file() {
         let tmp = tempdir().unwrap();
         let root = tmp.path();
-
         fs::write(root.join("CONTEXT.md"), "Root context").unwrap();
-
         let files = collect_context_files(root, root, None);
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with("CONTEXT.md"));
@@ -203,14 +775,11 @@ mod tests {
     fn test_collect_hierarchical_context_target_to_root_order() {
         let tmp = tempdir().unwrap();
         let root = tmp.path();
-
         fs::write(root.join("CONTEXT.md"), "Root context").unwrap();
         fs::create_dir_all(root.join("src")).unwrap();
         fs::write(root.join("src/.context.md"), "Src context").unwrap();
-
         let files = collect_context_files(root, &root.join("src"), None);
         assert_eq!(files.len(), 2);
-        // target→root: src first, then root
         assert!(files[0].ends_with(".context.md"));
         assert!(files[1].ends_with("CONTEXT.md"));
     }
@@ -219,12 +788,9 @@ mod tests {
     fn test_collect_max_depth_zero() {
         let tmp = tempdir().unwrap();
         let root = tmp.path();
-
         fs::write(root.join("CONTEXT.md"), "Root context").unwrap();
         fs::create_dir_all(root.join("src")).unwrap();
         fs::write(root.join("src/.context.md"), "Src context").unwrap();
-
-        // max_depth=0 means only the target dir itself
         let files = collect_context_files(root, &root.join("src"), Some(0));
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with(".context.md"));
@@ -234,13 +800,10 @@ mod tests {
     fn test_collect_max_depth_one() {
         let tmp = tempdir().unwrap();
         let root = tmp.path();
-
         fs::write(root.join("CONTEXT.md"), "Root context").unwrap();
         fs::create_dir_all(root.join("a/b")).unwrap();
         fs::write(root.join("a/.context.md"), "A context").unwrap();
         fs::write(root.join("a/b/.context.md"), "B context").unwrap();
-
-        // max_depth=1 means target + one parent
         let files = collect_context_files(root, &root.join("a/b"), Some(1));
         assert_eq!(files.len(), 2);
         assert!(files[0].ends_with("b/.context.md"));
@@ -251,10 +814,8 @@ mod tests {
     fn test_dotfile_takes_priority() {
         let tmp = tempdir().unwrap();
         let root = tmp.path();
-
         fs::write(root.join("CONTEXT.md"), "Uppercase").unwrap();
         fs::write(root.join(".context.md"), "Dotfile").unwrap();
-
         let files = collect_context_files(root, root, None);
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with(".context.md"));
@@ -264,13 +825,10 @@ mod tests {
     fn test_get_merged_context_root_to_target_order() {
         let tmp = tempdir().unwrap();
         let root = tmp.path();
-
         fs::write(root.join("CONTEXT.md"), "Root").unwrap();
         fs::create_dir_all(root.join("sub")).unwrap();
         fs::write(root.join("sub/.context.md"), "Sub").unwrap();
-
         let content = get_merged_context(root, &root.join("sub/file.rs"), None).unwrap();
-        // Root should appear before Sub in the merged output
         let root_pos = content.find("Root").unwrap();
         let sub_pos = content.find("Sub").unwrap();
         assert!(
@@ -284,5 +842,179 @@ mod tests {
         let tmp = tempdir().unwrap();
         let files = collect_context_files(tmp.path(), tmp.path(), None);
         assert!(files.is_empty());
+    }
+
+    // --- New context system tests ---
+
+    #[test]
+    fn test_parse_blocks_plain() {
+        let blocks = parse_blocks("Hello world");
+        assert_eq!(blocks.len(), 1);
+        assert!(blocks[0].frontmatter.is_none());
+        assert_eq!(blocks[0].body.trim(), "Hello world");
+    }
+
+    #[test]
+    fn test_parse_blocks_with_frontmatter() {
+        let content = "---\nhook: test\n---\nBody text\n";
+        let blocks = parse_blocks(content);
+        assert_eq!(blocks.len(), 1);
+        assert!(blocks[0].frontmatter.is_some());
+        assert_eq!(blocks[0].body.trim(), "Body text");
+    }
+
+    #[test]
+    fn test_parse_blocks_multiple() {
+        let content = "---\nhook: a\n---\nBlock A\n\n---\nhook: b\n---\nBlock B\n";
+        let blocks = parse_blocks(content);
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].body.trim(), "Block A");
+        assert_eq!(blocks[1].body.trim(), "Block B");
+    }
+
+    #[test]
+    fn test_block_matches_no_frontmatter() {
+        let block = ParsedBlock {
+            frontmatter: None,
+            body: "text".into(),
+        };
+        let ctx = CallerContext::new();
+        assert!(block_matches(&block, &ctx, false));
+    }
+
+    #[test]
+    fn test_block_matches_empty_frontmatter() {
+        let block = ParsedBlock {
+            frontmatter: Some(serde_yaml::Value::Mapping(Default::default())),
+            body: "text".into(),
+        };
+        let ctx = CallerContext::new();
+        assert!(block_matches(&block, &ctx, false));
+    }
+
+    #[test]
+    fn test_block_matches_simple_equals_pass() {
+        let fm: serde_yaml::Value = serde_yaml::from_str("hook: UserPromptSubmit").unwrap();
+        let block = ParsedBlock {
+            frontmatter: Some(fm),
+            body: "text".into(),
+        };
+        let mut ctx = CallerContext::new();
+        ctx.insert("hook".into(), "UserPromptSubmit".into());
+        assert!(block_matches(&block, &ctx, false));
+    }
+
+    #[test]
+    fn test_block_matches_simple_equals_fail() {
+        let fm: serde_yaml::Value = serde_yaml::from_str("hook: UserPromptSubmit").unwrap();
+        let block = ParsedBlock {
+            frontmatter: Some(fm),
+            body: "text".into(),
+        };
+        let mut ctx = CallerContext::new();
+        ctx.insert("hook".into(), "OtherHook".into());
+        assert!(!block_matches(&block, &ctx, false));
+    }
+
+    #[test]
+    fn test_block_matches_missing_caller_key_passes() {
+        // Frontmatter has `hook: X` but caller doesn't provide `hook` → matches (skip).
+        let fm: serde_yaml::Value = serde_yaml::from_str("hook: UserPromptSubmit").unwrap();
+        let block = ParsedBlock {
+            frontmatter: Some(fm),
+            body: "text".into(),
+        };
+        let ctx = CallerContext::new(); // no keys
+        assert!(block_matches(&block, &ctx, false));
+    }
+
+    #[test]
+    fn test_block_matches_nested_frontmatter() {
+        let fm: serde_yaml::Value =
+            serde_yaml::from_str("claudecode:\n  hook: UserPromptSubmit\n").unwrap();
+        let block = ParsedBlock {
+            frontmatter: Some(fm),
+            body: "text".into(),
+        };
+        let mut ctx = CallerContext::new();
+        ctx.insert("claudecode.hook".into(), "UserPromptSubmit".into());
+        assert!(block_matches(&block, &ctx, false));
+    }
+
+    #[test]
+    fn test_block_matches_all_flag() {
+        let fm: serde_yaml::Value = serde_yaml::from_str("hook: something").unwrap();
+        let block = ParsedBlock {
+            frontmatter: Some(fm),
+            body: "text".into(),
+        };
+        let ctx = CallerContext::new();
+        assert!(block_matches(&block, &ctx, true));
+    }
+
+    #[test]
+    fn test_conditions_equals() {
+        let fm: serde_yaml::Value = serde_yaml::from_str(
+            "conditions:\n  all:\n    - hook:\n        equals: UserPromptSubmit\n",
+        )
+        .unwrap();
+        let block = ParsedBlock {
+            frontmatter: Some(fm),
+            body: "text".into(),
+        };
+        let mut ctx = CallerContext::new();
+        ctx.insert("hook".into(), "UserPromptSubmit".into());
+        assert!(block_matches(&block, &ctx, false));
+    }
+
+    #[test]
+    fn test_conditions_any() {
+        let fm: serde_yaml::Value = serde_yaml::from_str(
+            "conditions:\n  any:\n    - lang:\n        equals: rust\n    - lang:\n        equals: go\n",
+        )
+        .unwrap();
+        let block = ParsedBlock {
+            frontmatter: Some(fm),
+            body: "text".into(),
+        };
+        let mut ctx = CallerContext::new();
+        ctx.insert("lang".into(), "go".into());
+        assert!(block_matches(&block, &ctx, false));
+    }
+
+    #[test]
+    fn test_resolve_context_basic() {
+        let tmp = tempdir().unwrap();
+        let ctx_dir = tmp.path().join(".normalize").join("context");
+        fs::create_dir_all(&ctx_dir).unwrap();
+        fs::write(
+            ctx_dir.join("hints.md"),
+            "---\nhook: test\n---\nDo the thing.\n",
+        )
+        .unwrap();
+
+        let mut caller = CallerContext::new();
+        caller.insert("hook".into(), "test".into());
+
+        let results = resolve_context(tmp.path(), "context", &caller, false);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].2, "Do the thing.");
+    }
+
+    #[test]
+    fn test_parse_match_pairs() {
+        let pairs = vec!["hook=UserPromptSubmit".to_string(), "lang=rust".to_string()];
+        let ctx = parse_match_pairs(&pairs).unwrap();
+        assert_eq!(ctx.get("hook").unwrap(), "UserPromptSubmit");
+        assert_eq!(ctx.get("lang").unwrap(), "rust");
+    }
+
+    #[test]
+    fn test_flatten_json() {
+        let json: serde_json::Value =
+            serde_json::json!({"claudecode": {"hook": "UserPromptSubmit"}});
+        let mut map = CallerContext::new();
+        flatten_json(&json, "", &mut map);
+        assert_eq!(map.get("claudecode.hook").unwrap(), "UserPromptSubmit");
     }
 }
