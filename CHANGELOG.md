@@ -36,6 +36,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Improved
 
+- **`normalize context` compact output** now includes `<!-- source -->` file path comments and `---` separators between blocks when multiple context files are merged. Single-block output is unchanged.
 - **`normalize ci` / `normalize rules run` compact output** `(N files)` header now reads `(N files checked)` to clarify it is the number of files scanned, not files with issues.
 - **`normalize package tree --depth N`** — new flag caps the dependency tree at depth `N` (0 = roots only). Limits both text and JSON output. Default: unlimited (current behavior).
 - **`normalize grep`** — consecutive matches within the same symbol are now grouped under a single `(SymbolName L48-61):` header rather than repeating the symbol tag on every line.
