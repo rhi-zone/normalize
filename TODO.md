@@ -773,8 +773,7 @@ the default path.
 - [x] **CLI → daemon routing** — `normalize rules run` (and `normalize ci`) should talk to
   the running daemon and get the pre-warmed Datalog cache instead of cold-evaluating. If no
   daemon is running, fall back to cold eval transparently.
-- [ ] **Incremental syntax rules** — currently no incremental path; only re-run queries on
-  files that changed since last run. Cache results keyed by file hash.
+- [x] **Incremental syntax rules** — mtime-based per-file cache in `.normalize/syntax-cache.json`; nanosecond precision; invalidates on rule set change. Done in `crates/normalize-syntax-rules/src/runner.rs`.
 - [ ] **Incremental native rules** — stale-summary, broken-ref, ratchet, budget checks should
   skip files whose content and deps haven't changed.
 - [ ] **Persistent query cache** — store per-file tree-sitter query results in the SQLite index

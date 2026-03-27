@@ -1456,6 +1456,7 @@ pub fn apply_native_rules_config(
 fn try_fact_rules_via_daemon(
     root: &Path,
     filter_ids: Option<&HashSet<String>>,
+    filter_rule: Option<&str>,
 ) -> Option<Vec<normalize_output::diagnostics::Issue>> {
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::net::UnixStream;
@@ -1481,6 +1482,7 @@ fn try_fact_rules_via_daemon(
         "cmd": "run_rules",
         "root": root,
         "filter_ids": filter_ids_vec,
+        "filter_rule": filter_rule,
     });
     let json = serde_json::to_string(&request).ok()?;
     stream.write_all(json.as_bytes()).ok()?;
@@ -1511,6 +1513,7 @@ fn try_fact_rules_via_daemon(
 fn try_fact_rules_via_daemon(
     _root: &Path,
     _filter_ids: Option<&HashSet<String>>,
+    _filter_rule: Option<&str>,
 ) -> Option<Vec<normalize_output::diagnostics::Issue>> {
     None
 }
@@ -1576,7 +1579,9 @@ pub fn run_rules_report(
         // Try to route through the daemon's warm ENGINE_CACHE for fast results.
         // The daemon primes the cache after each file-change event, so this path
         // avoids the cold ~45-second Datalog eval on large codebases.
-        if let Some(daemon_issues) = try_fact_rules_via_daemon(project_root, filter_ids.as_ref()) {
+        if let Some(daemon_issues) =
+            try_fact_rules_via_daemon(project_root, filter_ids.as_ref(), filter_rule)
+        {
             for issue in daemon_issues {
                 report.issues.push(issue);
             }

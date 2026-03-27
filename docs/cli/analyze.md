@@ -1,24 +1,19 @@
 # normalize analyze
 
-Analyze codebase quality: health, security, docs, call graphs, and more.
+Analyze codebase quality: health, security, docs, and architectural structure.
 
-Ranked-list commands (complexity, size, coupling, duplicates, etc.) have moved to
-[`normalize rank`](rank.md).
+Commands that produce ranked lists have moved to [`normalize rank`](rank.md).
+Time-series trend commands have moved to [`normalize trend`](trend.md).
+Graph navigation (`call-graph`, `trace`, `dependents`, `graph`) has moved to [`normalize view`](../cli-design.md).
 
 ## Subcommands
 
-### Health & Scoring
+### Health & Overview
 | Subcommand | Description |
 |------------|-------------|
 | `health` | File counts, complexity stats, large file warnings (default when no subcommand) |
-| `cross-repo-health` | Rank repos by tech debt (churn + complexity + coupling) |
 | `summary` | Auto-generated single-page codebase overview |
-| `trend` | Track health metrics over git history at regular intervals |
-
-### Coverage & Testing
-| Subcommand | Description |
-|------------|-------------|
-| `test-gaps` | Untested public functions ranked by risk |
+| `all` | Run all analysis passes |
 
 ### Churn & Coupling
 | Subcommand | Description |
@@ -26,35 +21,23 @@ Ranked-list commands (complexity, size, coupling, duplicates, etc.) have moved t
 | `coupling-clusters` | Change-clusters: connected components of coupled files |
 | `activity` | Cross-repo activity over time |
 | `repo-coupling` | Analyze cross-repo coupling |
+| `cross-repo-health` | Rank repos by tech debt (churn + complexity + coupling) |
 
 ### Dependencies & Structure
 | Subcommand | Description |
 |------------|-------------|
-| `architecture` | Codebase architecture: coupling, cycles, dependencies |
-| `graph` | Graph-theoretic properties of the dependency graph (`--on modules\|symbols\|types`) |
-| `call-graph` | Show callers and/or callees of a symbol (`--callers`, `--callees`) |
-| `trace` | Trace value provenance for a symbol |
-| `dependents` | Reverse-dependency closure: who depends on this file/symbol? |
+| `architecture` | Codebase architecture: coupling, cycles, hub modules |
 
 ### Documentation
 | Subcommand | Description |
 |------------|-------------|
-| `docs` | Documentation coverage |
+| `docs` | Documentation coverage (public symbols with/without doc comments) |
 
 ### Cross-cutting
 | Subcommand | Description |
 |------------|-------------|
 | `security` | Security vulnerability patterns |
 | `skeleton-diff` | Structural changes between a base ref and HEAD |
-| `provenance` | Git blame → session mapping + code relations |
-
-### Trend helpers
-| Subcommand | Description |
-|------------|-------------|
-| `complexity-trend` | Complexity trend over git history |
-| `length-trend` | Function length trend over git history |
-| `density-trend` | Information density trend over git history |
-| `test-ratio-trend` | Test ratio trend over git history |
 
 ## Examples
 
@@ -65,23 +48,26 @@ normalize analyze
 # Security scan
 normalize analyze security
 
-# Trace a symbol's data flow
-normalize analyze trace parse_config
-
-# Call graph
-normalize analyze call-graph handle_request --callers
-normalize analyze call-graph handle_request --callees
-
-# Dependency graph analysis
-normalize analyze graph                              # Module-level graph
-normalize analyze graph --on symbols                 # Symbol-level graph
-normalize analyze graph --on types                   # Type dependency graph
+# Architecture analysis
+normalize analyze architecture
 
 # Ranked lists are now under normalize rank:
 normalize rank complexity                 # cyclomatic complexity per function
 normalize rank hotspots                   # churn × complexity hotspots
 normalize rank duplicates                 # code duplicates
 normalize rank coupling                   # temporal coupling
+normalize rank length                     # longest functions
+normalize rank test-gaps                  # untested public functions
+
+# Trend charts are now under normalize trend:
+normalize trend complexity                # complexity trend over git history
+normalize trend length                    # function length trend
+normalize trend test-ratio                # test ratio trend
+
+# Graph navigation is now under normalize view:
+normalize view referenced-by MyFunction   # callers of a symbol
+normalize view references MyFunction      # callees of a symbol
+normalize view graph src/lib.rs           # dependency graph
 ```
 
 ## Options

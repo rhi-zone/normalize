@@ -86,6 +86,8 @@ pub enum Request {
         root: PathBuf,
         /// Optional rule ID filter (None = all enabled rules).
         filter_ids: Option<Vec<String>>,
+        /// Optional single-rule filter (by rule ID); narrows further than filter_ids.
+        filter_rule: Option<String>,
     },
 }
 
@@ -380,11 +382,20 @@ mod unix_impl {
                 Request::Subscribe { .. } => {
                     Response::err("Subscribe must be handled in the socket loop")
                 }
-                Request::RunRules { root, filter_ids } => self.run_rules(root, filter_ids),
+                Request::RunRules {
+                    root,
+                    filter_ids,
+                    filter_rule,
+                } => self.run_rules(root, filter_ids, filter_rule),
             }
         }
 
-        fn run_rules(&self, root: PathBuf, filter_ids: Option<Vec<String>>) -> Response {
+        fn run_rules(
+            &self,
+            root: PathBuf,
+            filter_ids: Option<Vec<String>>,
+            filter_rule: Option<String>,
+        ) -> Response {
             use std::collections::HashSet;
 
             let config = NormalizeConfig::load(&root);
@@ -406,7 +417,7 @@ mod unix_impl {
                             &root,
                             &rules,
                             filter_ids_set.as_ref(),
-                            None,
+                            filter_rule.as_deref(),
                             None, // no changed_files filter — full eval with warm cache
                         ))
                     }
@@ -812,6 +823,7 @@ mod unix_impl {
             &self,
             root: &Path,
             filter_ids: Option<Vec<String>>,
+            filter_rule: Option<String>,
         ) -> Result<Response, String> {
             use std::io::{BufRead, BufReader, Write};
             let mut stream = UnixStream::connect(&self.socket_path)
@@ -825,6 +837,7 @@ mod unix_impl {
             let request = Request::RunRules {
                 root: root.to_path_buf(),
                 filter_ids,
+                filter_rule,
             };
             let json = serde_json::to_string(&request).map_err(|e| e.to_string())?;
             stream
@@ -984,6 +997,7 @@ impl DaemonClient {
         &self,
         _root: &Path,
         _filter_ids: Option<Vec<String>>,
+        _filter_rule: Option<String>,
     ) -> Result<Response, String> {
         Err("normalize daemon is not supported on Windows".to_string())
     }

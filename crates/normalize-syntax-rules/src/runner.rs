@@ -7,8 +7,136 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use streaming_iterator::StreamingIterator;
 
+/// Serializable representation of a `Finding` for caching.
+///
+/// Same fields as `Finding` but derives `Serialize`/`Deserialize` so it can be
+/// persisted to `.normalize/syntax-cache.json`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CachedFinding {
+    pub rule_id: String,
+    pub file: std::path::PathBuf,
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+    pub start_byte: usize,
+    pub end_byte: usize,
+    pub message: String,
+    pub severity: Severity,
+    pub matched_text: String,
+    pub fix: Option<String>,
+    pub captures: HashMap<String, String>,
+}
+
+impl From<Finding> for CachedFinding {
+    fn from(f: Finding) -> Self {
+        Self {
+            rule_id: f.rule_id,
+            file: f.file,
+            start_line: f.start_line,
+            start_col: f.start_col,
+            end_line: f.end_line,
+            end_col: f.end_col,
+            start_byte: f.start_byte,
+            end_byte: f.end_byte,
+            message: f.message,
+            severity: f.severity,
+            matched_text: f.matched_text,
+            fix: f.fix,
+            captures: f.captures,
+        }
+    }
+}
+
+impl From<CachedFinding> for Finding {
+    fn from(c: CachedFinding) -> Self {
+        Self {
+            rule_id: c.rule_id,
+            file: c.file,
+            start_line: c.start_line,
+            start_col: c.start_col,
+            end_line: c.end_line,
+            end_col: c.end_col,
+            start_byte: c.start_byte,
+            end_byte: c.end_byte,
+            message: c.message,
+            severity: c.severity,
+            matched_text: c.matched_text,
+            fix: c.fix,
+            captures: c.captures,
+        }
+    }
+}
+
+/// Per-file cache entry: mtime + findings from the last successful run.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct FileCacheEntry {
+    /// Nanoseconds since UNIX epoch (subsecond precision avoids false hits within the same second).
+    mtime_nanos: u128,
+    findings: Vec<CachedFinding>,
+}
+
+/// On-disk cache for syntax-rule findings, keyed by file path.
+///
+/// Stored at `.normalize/syntax-cache.json` inside the project root.
+/// Invalidated in full when the active rule set changes.
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+struct SyntaxCache {
+    /// Hash of the active rule IDs + their query source, used for global invalidation.
+    rules_hash: String,
+    files: HashMap<String, FileCacheEntry>,
+}
+
+impl SyntaxCache {
+    fn load(project_root: &Path) -> Self {
+        let path = project_root.join(".normalize/syntax-cache.json");
+        if let Ok(data) = std::fs::read_to_string(&path) {
+            serde_json::from_str(&data).unwrap_or_default()
+        } else {
+            Self::default()
+        }
+    }
+
+    fn save(&self, project_root: &Path) {
+        let dir = project_root.join(".normalize");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("syntax-cache.json");
+        if let Ok(json) = serde_json::to_string(self) {
+            let _ = std::fs::write(path, json);
+        }
+    }
+}
+
+/// Compute a hash of the active rule set for cache invalidation.
+fn compute_rules_hash(rules: &[&Rule]) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    for rule in rules {
+        rule.id.hash(&mut hasher);
+        rule.query_str.hash(&mut hasher);
+    }
+    format!("{:x}", hasher.finish())
+}
+
+/// Get the mtime of a file in nanoseconds since UNIX epoch, or 0 on failure.
+///
+/// Nanosecond precision is used to avoid false cache hits when a file is
+/// modified within the same second (e.g. during multi-pass fix application in
+/// tests and CI).
+fn file_mtime_nanos(path: &Path) -> u128 {
+    path.metadata()
+        .and_then(|m| m.modified())
+        .map(|t| {
+            t.duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        })
+        .unwrap_or(0)
+}
+
 /// A finding from running a rule.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Finding {
     /// ID of the rule that produced this finding.
     pub rule_id: String,
@@ -415,6 +543,14 @@ pub fn run_rules(
         return findings;
     }
 
+    // Load the on-disk cache and invalidate if the rule set changed.
+    let mut cache = SyntaxCache::load(&abs_project_root);
+    let rules_hash = compute_rules_hash(&active_rules);
+    if cache.rules_hash != rules_hash {
+        cache.files.clear();
+        cache.rules_hash = rules_hash;
+    }
+
     let files = collect_source_files(root);
     let mut files_by_grammar: HashMap<String, Vec<PathBuf>> = HashMap::new();
     for file in files {
@@ -466,6 +602,18 @@ pub fn run_rules(
         }
 
         for file in files {
+            let file_key = file.to_string_lossy().into_owned();
+            let mtime_nanos = file_mtime_nanos(file);
+
+            // Cache hit: file is unchanged since the last run.
+            if mtime_nanos > 0
+                && let Some(entry) = cache.files.get(&file_key)
+                && entry.mtime_nanos == mtime_nanos
+            {
+                findings.extend(entry.findings.iter().cloned().map(Finding::from));
+                continue;
+            }
+
             let rel_path = file.strip_prefix(root).unwrap_or(file);
             let rel_path_str = rel_path.to_string_lossy();
 
@@ -490,7 +638,23 @@ pub fn run_rules(
                 allow_path_str: &allow_path.display,
             };
 
-            process_file_matches(&file_ctx, &tree, combined, &mut findings);
+            let mut file_findings: Vec<Finding> = Vec::new();
+            process_file_matches(&file_ctx, &tree, combined, &mut file_findings);
+
+            // Update cache entry for this file.
+            cache.files.insert(
+                file_key,
+                FileCacheEntry {
+                    mtime_nanos,
+                    findings: file_findings
+                        .iter()
+                        .cloned()
+                        .map(CachedFinding::from)
+                        .collect(),
+                },
+            );
+
+            findings.extend(file_findings);
         }
     }
 
@@ -502,6 +666,8 @@ pub fn run_rules(
         );
         eprintln!("[timing] total: {:?}", start.elapsed());
     }
+
+    cache.save(&abs_project_root);
 
     findings
 }

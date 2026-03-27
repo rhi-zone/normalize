@@ -13,11 +13,11 @@ required-features = ["cli"]
 
 [features]
 default = []
-cli = ["dep:server-less", "dep:serde_json", "dep:tokio"]
+cli = ["dep:server-less", "dep:tokio"]
 
 [dependencies]
 server-less = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
+serde_json.workspace = true
 tokio = { workspace = true, optional = true }
 # Core
 serde.workspace = true
