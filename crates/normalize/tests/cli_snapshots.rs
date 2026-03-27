@@ -437,3 +437,34 @@ fn test_help_rules_remove() {
 fn test_help_ci() {
     insta::assert_snapshot!(snapshot_help(&["ci"]));
 }
+
+// trend subcommands
+#[test]
+fn test_help_trend() {
+    insta::assert_snapshot!(snapshot_help(&["trend"]));
+}
+
+#[test]
+fn test_help_trend_multi() {
+    insta::assert_snapshot!(snapshot_help(&["trend", "multi"]));
+}
+
+#[test]
+fn test_help_trend_complexity() {
+    insta::assert_snapshot!(snapshot_help(&["trend", "complexity"]));
+}
+
+#[test]
+fn test_help_trend_length() {
+    insta::assert_snapshot!(snapshot_help(&["trend", "length"]));
+}
+
+#[test]
+fn test_help_trend_density() {
+    insta::assert_snapshot!(snapshot_help(&["trend", "density"]));
+}
+
+#[test]
+fn test_help_trend_test_ratio() {
+    insta::assert_snapshot!(snapshot_help(&["trend", "test-ratio"]));
+}

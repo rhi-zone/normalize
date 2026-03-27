@@ -76,7 +76,7 @@ Crate split is correct. All 38 published crates justified. No reusable logic tra
 
 ### Analyze Command Consolidation — remaining work
 
-**Current: ~38 commands** (after 2026-03-15/16 consolidation: deleted `analyze parse`, `analyze query`, `analyze all`, `analyze node-types` → moved to `syntax`; merged 4 trend commands; deleted `normalize-rules-loader`).
+**Current: ~38 commands** (after 2026-03-15/16 consolidation: deleted `analyze parse`, `analyze query`, `analyze all`, `analyze node-types` → moved to `syntax`; merged 4 trend commands; deleted `normalize-rules-loader`). Trend commands moved to `normalize trend` on 2026-03-28 (5 methods removed from analyze, 5 added to trend service).
 
 **Phase 3 rank infrastructure (done 2026-03-12):**
 - `RankEntry` trait + `Column`/`Align` + `format_ranked_table()` in `normalize-analyze::ranked`
@@ -91,7 +91,7 @@ Crate split is correct. All 38 published crates justified. No reusable logic tra
 
 **Done (2026-03-16):** `normalize rank` introduced with 20+ commands migrated from `analyze`. Graph navigation (`call_graph`, `trace`, `dependents`, `provenance`) folded into `view` (`referenced-by`, `references`, `dependents`, `trace`, `graph`, `history`, `blame`). `ViewOutput` enum dissolved; `ViewReport`/`ViewNode` unified. `view list` added.
 
-**Remaining in `analyze`:** trends (complexity-trend, length-trend, density-trend, trend), git history (activity, coupling-clusters, repo-coupling, cross-repo-health), big-picture (health, architecture, summary, all), plus docs/security/test-gaps/skeleton-diff. These stay until a clear home emerges.
+**Remaining in `analyze`:** git history (activity, coupling-clusters, repo-coupling, cross-repo-health), big-picture (health, architecture, summary, all), plus docs/security/test-gaps/skeleton-diff. Trend commands moved to `normalize trend`. These stay until a clear home emerges.
 
 **Not yet decided:**
 - Where big-picture commands live (`architecture`, `summary`, `health`) — synthesized understanding, not ranking, not navigation. No trait identified yet.
@@ -812,9 +812,9 @@ crash in the pre-commit hook is a warning sign.
 `normalize view` has absorbed graph navigation. `normalize rank` has absorbed 21 ranking
 commands. `analyze` still hosts 19 commands that don't fit either:
 
-- [ ] Trend commands (`complexity-trend`, `length-trend`, `density-trend`, `test-ratio-trend`)
-  — time-series of ranking metrics. Fold into `rank` with `--trend` flag or dedicated
-  `normalize trend` subcommand.
+- [x] Trend commands (`complexity-trend`, `length-trend`, `density-trend`, `test-ratio-trend`)
+  — moved to `normalize trend` top-level subcommand: `trend complexity`, `trend length`,
+  `trend density`, `trend test-ratio`, `trend multi` (all metrics). (2026-03-28)
 - [ ] Synthesis commands (`architecture`, `summary`, `health`, `coupling-clusters`,
   `cross-repo-health`) — big-picture, not a ranked list. Find the unifying trait or leave
   in `analyze` until the pattern is clear. Don't force a home.

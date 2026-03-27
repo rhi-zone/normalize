@@ -13,6 +13,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`normalize structure rebuild --only`/`--exclude`** — glob pattern filtering for which files get indexed. Files not matching the filter are removed from the index after the walk.
 - **`normalize analyze architecture --limit`** — caps the number of `cross_imports` entries in the output (default 20, `--limit 0` disables). Reduces default JSON response from ~196KB to ~10KB, matching the `analyze health --limit` pattern.
 
+### Moved
+
+- **`normalize trend`** — new top-level subcommand for time-series health metrics. Replaces `normalize analyze complexity-trend`, `analyze length-trend`, `analyze density-trend`, `analyze test-ratio-trend`, and `analyze trend`. New names: `normalize trend complexity`, `normalize trend length`, `normalize trend density`, `normalize trend test-ratio`, `normalize trend multi` (all metrics).
+
 ### Changed
 
 - **`normalize view --dir-context`** now accepts an integer `N` instead of a boolean flag. `N` selects context files using Python `list[:N]` semantics on the target→root ordered list: `1` = target dir only, `2` = target + parent, `-1` = all ancestors, `0` = none. Pass the flag without a value to get all ancestors (equivalent to `-1`).

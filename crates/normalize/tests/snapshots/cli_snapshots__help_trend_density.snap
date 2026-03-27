@@ -1,0 +1,24 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+expression: "snapshot_help(&[\"trend\", \"density\"])"
+---
+Show how information density has changed over git history.
+
+Usage: normalize trend density [OPTIONS]
+
+Options:
+      --pretty                     Human-friendly output with colors and formatting
+  -r, --root <root>                Root directory (defaults to current directory)
+      --compact                    Compact output without colors (overrides TTY detection)
+  -n, --snapshots <snapshots>      Number of snapshots to collect (default: 10)
+      --jsonl                      Output one JSON object per line (for arrays)
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help
+
+Walks `snapshots` evenly-spaced commits and computes a composite density score
+(compression ratio + token uniqueness) at each point. Returns a `ScalarTrendReport`.
+Higher values indicate denser, more information-rich code over time.

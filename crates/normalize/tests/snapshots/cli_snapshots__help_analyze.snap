@@ -31,13 +31,8 @@ Commands:
   summary            Auto-generated single-page codebase overview
 
 Code quality:
-  complexity-trend   Show how average cyclomatic complexity has changed over git history.
   length             Find the longest functions in the codebase, ranked by line count.
-  length-trend       Show how average function length has changed over git history.
   node-types         List all node types and field names for a tree-sitter grammar.
-
-Module structure:
-  density-trend      Show how information density has changed over git history.
 
 Repository:
   docs               Measure documentation coverage: which public symbols lack doc comments.
@@ -50,11 +45,9 @@ Git history:
   activity           Show commit activity across multiple repositories over time windows.
   repo-coupling      Detect temporal coupling between repositories: pairs that receive commits together.
   cross-repo-health  Rank repositories by composite tech-debt score (churn × complexity × coupling).
-  trend              Track multiple health metrics (complexity, length, test ratio, density) over git history.
 
 Testing:
   test-gaps          Identify public functions that lack test coverage, ranked by risk score.
-  test-ratio-trend   Show how the test-to-code ratio has changed over git history.
 
 Security:
   security           Scan the codebase for security issues (hardcoded secrets, unsafe patterns).

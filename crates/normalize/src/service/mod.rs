@@ -35,6 +35,7 @@ pub mod serve;
 pub mod sessions;
 pub mod syntax;
 pub mod tools;
+pub mod trend;
 pub mod view;
 
 use crate::commands;
@@ -71,6 +72,7 @@ pub struct NormalizeService {
     syntax: syntax::SyntaxService,
     sessions: sessions::SessionsService,
     tools: tools::ToolsService,
+    trend: trend::TrendService,
     view: view::ViewService,
 }
 
@@ -115,6 +117,7 @@ impl NormalizeService {
             syntax: syntax::SyntaxService::new(),
             sessions: sessions::SessionsService::new(&pretty),
             tools: tools::ToolsService::new(),
+            trend: trend::TrendService::new(&pretty),
             view: view::ViewService::new(&pretty),
             pretty,
         }
@@ -840,6 +843,11 @@ impl NormalizeService {
     /// Rank code by metrics (complexity, size, coupling, duplicates, and more)
     pub fn rank(&self) -> &rank::RankService {
         &self.rank
+    }
+
+    /// Track health metrics (complexity, length, test ratio, density) over git history
+    pub fn trend(&self) -> &trend::TrendService {
+        &self.trend
     }
 
     /// Track diff-based budgets (limits on how much things can change)

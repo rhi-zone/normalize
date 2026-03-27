@@ -27,6 +27,7 @@ Commands:
   edit       Structural editing of code symbols
   analyze    Analyze codebase (health, complexity, security, duplicates, docs)
   rank       Rank code by metrics (complexity, size, coupling, duplicates, and more)
+  trend      Track health metrics (complexity, length, test ratio, density) over git history
   budget     Track diff-based budgets (limits on how much things can change)
   ratchet    Track metric regressions with a ratchet baseline
   rules      Manage and run syntax/fact rules

@@ -11,7 +11,6 @@ use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
 use crate::commands::analyze::skeleton_diff::SkeletonDiffReport;
 use crate::commands::analyze::summary::SummaryReport;
-use crate::commands::analyze::trend::{ScalarTrendReport, TrendReport};
 use crate::commands::syntax::node_types::NodeTypesReport;
 use crate::output::OutputFormatter;
 use server_less::cli;
@@ -268,44 +267,6 @@ impl AnalyzeService {
         Ok(report)
     }
 
-    /// Show how average cyclomatic complexity has changed over git history.
-    ///
-    /// Walks `snapshots` evenly-spaced commits on the current branch, computing average
-    /// complexity at each point. Returns a `ScalarTrendReport` suitable for plotting
-    /// or diffing. Lower values indicate improvement.
-    #[server(group = "code")]
-    #[cli(display_with = "display_output")]
-    pub fn complexity_trend(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(short = 'n', help = "Number of snapshots to collect (default: 10)")]
-        snapshots: Option<usize>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<ScalarTrendReport, AnalyzeError> {
-        let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
-        crate::commands::analyze::trend::analyze_scalar_trend(
-            &root_path,
-            "avg_complexity",
-            snapshots.unwrap_or(10),
-            false, // lower complexity is better
-            |wt| {
-                let report = crate::commands::analyze::complexity::analyze_codebase_complexity(
-                    wt,
-                    usize::MAX,
-                    None,
-                    None,
-                    &[],
-                );
-                report.full_stats.map(|s| s.total_avg)
-            },
-        )
-        .map_err(AnalyzeError::from)
-    }
-
     /// Find the longest functions in the codebase, ranked by line count.
     ///
     /// Accepts an optional `target` path, a `limit` on results, an `exclude` glob list,
@@ -385,42 +346,6 @@ impl AnalyzeService {
             apply_length_diff(&mut report, &baseline, diff_ref);
         }
         Ok(report)
-    }
-
-    /// Show how average function length has changed over git history.
-    ///
-    /// Walks `snapshots` evenly-spaced commits, computing average function line count at
-    /// each point. Returns a `ScalarTrendReport`. Lower values indicate improvement.
-    #[server(group = "code")]
-    #[cli(display_with = "display_output")]
-    pub fn length_trend(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(short = 'n', help = "Number of snapshots to collect (default: 10)")]
-        snapshots: Option<usize>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<ScalarTrendReport, AnalyzeError> {
-        let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
-        crate::commands::analyze::trend::analyze_scalar_trend(
-            &root_path,
-            "avg_length",
-            snapshots.unwrap_or(10),
-            false, // shorter functions is better
-            |wt| {
-                let report = crate::commands::analyze::length::analyze_codebase_length(
-                    wt,
-                    usize::MAX,
-                    None,
-                    &[],
-                );
-                report.full_stats.map(|s| s.total_avg)
-            },
-        )
-        .map_err(AnalyzeError::from)
     }
 
     /// Measure documentation coverage: which public symbols lack doc comments.
@@ -621,71 +546,6 @@ impl AnalyzeService {
         .await)
     }
 
-    /// Show how the test-to-code ratio has changed over git history.
-    ///
-    /// Walks `snapshots` evenly-spaced commits and computes the fraction of files that
-    /// are test files at each point. Returns a `ScalarTrendReport`. Higher values indicate
-    /// better test coverage over time.
-    #[server(group = "test")]
-    #[cli(display_with = "display_output")]
-    pub fn test_ratio_trend(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(short = 'n', help = "Number of snapshots to collect (default: 10)")]
-        snapshots: Option<usize>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<ScalarTrendReport, AnalyzeError> {
-        let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
-        crate::commands::analyze::trend::analyze_scalar_trend(
-            &root_path,
-            "overall_test_ratio",
-            snapshots.unwrap_or(10),
-            true, // higher test ratio is better
-            |wt| {
-                let report =
-                    crate::commands::analyze::test_ratio::analyze_test_ratio(wt, usize::MAX);
-                Some(report.overall_ratio)
-            },
-        )
-        .map_err(AnalyzeError::from)
-    }
-
-    /// Show how information density has changed over git history.
-    ///
-    /// Walks `snapshots` evenly-spaced commits and computes a composite density score
-    /// (compression ratio + token uniqueness) at each point. Returns a `ScalarTrendReport`.
-    /// Higher values indicate denser, more information-rich code over time.
-    #[server(group = "modules")]
-    #[cli(display_with = "display_output")]
-    pub fn density_trend(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(short = 'n', help = "Number of snapshots to collect (default: 10)")]
-        snapshots: Option<usize>,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<ScalarTrendReport, AnalyzeError> {
-        let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
-        crate::commands::analyze::trend::analyze_scalar_trend(
-            &root_path,
-            "overall_density_score",
-            snapshots.unwrap_or(10),
-            true, // higher density score is better
-            |wt| {
-                let report = crate::commands::analyze::density::analyze_density(wt, usize::MAX, 0);
-                Some((report.overall_compression_ratio + report.overall_token_uniqueness) / 2.0)
-            },
-        )
-        .map_err(AnalyzeError::from)
-    }
-
     /// Auto-generated single-page codebase overview
     #[cli(display_with = "display_output")]
     pub async fn summary(
@@ -741,29 +601,6 @@ impl AnalyzeService {
             &only,
         )
         .map_err(AnalyzeError::from)
-    }
-
-    /// Track multiple health metrics (complexity, length, test ratio, density) over git history.
-    ///
-    /// Walks `snapshots` evenly-spaced commits on the current branch and collects a composite
-    /// set of metrics at each point. Returns a `TrendReport` with per-snapshot values for
-    /// all tracked metrics, enabling holistic codebase trend analysis.
-    #[server(group = "git")]
-    #[cli(display_with = "display_output")]
-    pub fn trend(
-        &self,
-        #[param(short = 'n', help = "Number of historical snapshots (default: 6)")]
-        snapshots: Option<usize>,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        pretty: bool,
-        compact: bool,
-    ) -> Result<TrendReport, AnalyzeError> {
-        let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
-        crate::commands::analyze::trend::analyze_trend(&root_path, snapshots.unwrap_or(6))
-            .map_err(AnalyzeError::from)
     }
 
     /// List all node types and field names for a tree-sitter grammar.
