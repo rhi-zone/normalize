@@ -1,6 +1,10 @@
 //! Facts management service for server-less CLI.
 
 use crate::commands::facts::FactsContent;
+
+fn is_false(b: &bool) -> bool {
+    !b
+}
 use crate::index;
 use crate::output::OutputFormatter;
 use crate::paths::get_normalize_dir;
@@ -41,11 +45,22 @@ pub struct RebuildReport {
     pub calls: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub imports: Option<usize>,
+    /// Whether this was an incremental rebuild (true) or a full rebuild (false).
+    #[serde(skip_serializing_if = "is_false")]
+    pub incremental: bool,
 }
 
 impl OutputFormatter for RebuildReport {
     fn format_text(&self) -> String {
-        let mut out = format!("Indexed {} files", self.files);
+        if self.incremental && self.files == 0 {
+            return "Index up to date".to_string();
+        }
+        let mode = if self.incremental {
+            " (incremental)"
+        } else {
+            ""
+        };
+        let mut out = format!("Indexed {} files{}", self.files, mode);
         let mut parts = Vec::new();
         if let Some(s) = self.symbols
             && s > 0
@@ -465,6 +480,7 @@ async fn rebuild_data(
     include: &[FactsContent],
     only: &[String],
     exclude: &[String],
+    full: bool,
 ) -> Result<RebuildReport, String> {
     let root = root
         .map(|p| p.to_path_buf())
@@ -480,10 +496,16 @@ async fn rebuild_data(
 
     idx.set_progress(true);
 
-    let file_count = idx
-        .refresh()
-        .await
-        .map_err(|e| format!("Error refreshing index: {}", e))?;
+    let file_count = if full {
+        idx.refresh()
+            .await
+            .map_err(|e| format!("Error refreshing index: {}", e))?
+    } else {
+        idx.incremental_refresh()
+            .await
+            .map_err(|e| format!("Error refreshing index: {}", e))?
+            .len()
+    };
 
     // If a filter is active, remove indexed files that don't match it.
     // We do this after the full walk so the index's file-tree relationships
@@ -518,13 +540,19 @@ async fn rebuild_data(
         symbols: None,
         calls: None,
         imports: None,
+        incremental: !full,
     };
 
     if !include.is_empty() && !include.contains(&FactsContent::None) {
-        let mut stats = idx
-            .refresh_call_graph()
-            .await
-            .map_err(|e| format!("Error indexing call graph: {}", e))?;
+        let mut stats = if full {
+            idx.refresh_call_graph()
+                .await
+                .map_err(|e| format!("Error indexing call graph: {}", e))?
+        } else {
+            idx.incremental_call_graph_refresh()
+                .await
+                .map_err(|e| format!("Error indexing call graph: {}", e))?
+        };
 
         if !include.contains(&FactsContent::Symbols) {
             let _ = idx.execute("DELETE FROM symbols").await;
@@ -763,6 +791,7 @@ impl FactsService {
         >,
         #[param(help = "Only include files matching glob patterns")] only: Vec<String>,
         #[param(help = "Exclude files matching glob patterns")] exclude: Vec<String>,
+        #[param(help = "Force full rebuild even if incremental is possible")] full: bool,
     ) -> Result<RebuildReport, String> {
         let include: Vec<FactsContent> = if include.is_empty() {
             vec![
@@ -777,7 +806,7 @@ impl FactsService {
                 .collect::<Result<Vec<_>, _>>()?
         };
         let root_path = root.map(PathBuf::from);
-        rebuild_data(root_path.as_deref(), &include, &only, &exclude).await
+        rebuild_data(root_path.as_deref(), &include, &only, &exclude, full).await
     }
 
     /// Show index statistics (DB size vs codebase size)

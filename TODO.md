@@ -768,7 +768,7 @@ The daemon is running but CLI invocations don't route through it — every `norm
 is a cold eval, every `structure rebuild` re-indexes the world. The goal: make the fast path
 the default path.
 
-- [ ] **Incremental index** — on `structure rebuild`, only re-index files changed since the
+- [x] **Incremental index** — on `structure rebuild`, only re-index files changed since the
   last build (mtime/hash based). Full rebuild only when schema changes or forced with `--full`.
 - [ ] **CLI → daemon routing** — `normalize rules run` (and `normalize ci`) should talk to
   the running daemon and get the pre-warmed Datalog cache instead of cold-evaluating. If no
