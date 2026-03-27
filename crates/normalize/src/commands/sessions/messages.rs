@@ -729,8 +729,12 @@ pub fn build_messages_report(
     }
 
     sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
+    // When an explicit --sort is given we must load ALL sessions first so the
+    // sort is global, then apply a message-level limit afterwards.  Session-level
+    // truncation by recency is only correct for the default (no --sort) ordering.
+    let apply_session_limit = !sort_spec.explicit_sort;
     let total_before_limit = sessions.len();
-    let truncated = if session_filter.is_none() && limit > 0 {
+    let session_truncated = if apply_session_limit && session_filter.is_none() && limit > 0 {
         sessions.truncate(limit);
         super::TruncationInfo::if_truncated(total_before_limit, limit)
     } else {
@@ -878,6 +882,15 @@ pub fn build_messages_report(
 
     // Apply sort spec
     sort_spec.sort_messages(&mut messages);
+
+    // When --sort was explicitly given, apply message-level limit now (after global sort).
+    let truncated = if sort_spec.explicit_sort && limit > 0 {
+        let total_msgs = messages.len();
+        messages.truncate(limit);
+        super::TruncationInfo::if_truncated(total_msgs, limit)
+    } else {
+        session_truncated
+    };
 
     // Build stats
     let mut by_role: HashMap<String, usize> = HashMap::new();

@@ -31,11 +31,18 @@ pub struct SortKey<F> {
 #[derive(Debug, Clone)]
 pub struct SortSpec<F> {
     pub keys: Vec<SortKey<F>>,
+    /// True when `--sort` was explicitly passed by the caller; false for the default
+    /// (no `--sort`) case.  Commands use this to decide whether to apply truncation
+    /// before or after collecting and sorting records.
+    pub explicit_sort: bool,
 }
 
 impl<F> Default for SortSpec<F> {
     fn default() -> Self {
-        SortSpec { keys: Vec::new() }
+        SortSpec {
+            keys: Vec::new(),
+            explicit_sort: false,
+        }
     }
 }
 
@@ -59,6 +66,9 @@ impl<F: DefaultDir + FromStr<Err = String>> SortSpec<F> {
             let dir = dir.unwrap_or_else(|| field.default_dir());
             keys.push(SortKey { field, dir });
         }
-        Ok(SortSpec { keys })
+        Ok(SortSpec {
+            keys,
+            explicit_sort: true,
+        })
     }
 }
