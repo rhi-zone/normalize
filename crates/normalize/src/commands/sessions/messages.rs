@@ -188,6 +188,11 @@ pub struct MessageRecord {
     /// Lines after the match. Only set when --context is used with --grep.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub context_after: Vec<String>,
+    /// True when this message begins a new sequence match group (gap in turn numbers from previous).
+    /// Used by the formatter to emit a separator. Not serialized.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub sequence_gap: bool,
 }
 
 /// Report containing all extracted messages.
@@ -349,8 +354,12 @@ impl OutputFormatter for MessagesReport {
                     lines.push(format!("[{}] {}  {}", id_short, project, date));
                     last_session = Some(msg.session_id.clone());
                     last_date = Some(date.to_owned());
+                } else if msg.sequence_gap {
+                    // Gap between separate sequence match groups within the same session
+                    lines.push(String::new());
+                    lines.push("~~~ (gap) ~~~".to_string());
                 } else {
-                    // Separator between messages within the same session
+                    // Separator between consecutive messages within the same session
                     lines.push("---".to_string());
                 }
 
@@ -963,6 +972,7 @@ pub fn build_messages_report(
                             line_num: Some(line_idx),
                             context_before,
                             context_after,
+                            sequence_gap: false,
                         });
                     }
                 } else {
@@ -979,8 +989,21 @@ pub fn build_messages_report(
                         line_num: None,
                         context_before: Vec::new(),
                         context_after: Vec::new(),
+                        sequence_gap: false,
                     });
                 }
+            }
+        }
+    }
+
+    // Mark sequence gaps: within the same session, non-consecutive turn numbers indicate
+    // a gap between separate match groups. Used by the formatter to emit separators.
+    if sequence.is_some() {
+        for i in 1..messages.len() {
+            let same_session = messages[i].session_id == messages[i - 1].session_id;
+            let turn_gap = messages[i].turn > messages[i - 1].turn + 1;
+            if same_session && turn_gap {
+                messages[i].sequence_gap = true;
             }
         }
     }

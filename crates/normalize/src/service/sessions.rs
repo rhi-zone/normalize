@@ -381,7 +381,7 @@ impl SessionsService {
         if sequence_vec.is_some() && context_lines > 0 {
             return Err("--sequence and --context cannot be combined".to_string());
         }
-        let ctx_turns = context_turns.unwrap_or(1);
+        let ctx_turns = context_turns.unwrap_or(0);
         let mode = mode.unwrap_or_default();
         crate::commands::sessions::build_messages_report(
             root_path,
