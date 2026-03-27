@@ -65,8 +65,10 @@ pub use super::sort::{SortDir, SortKey, SortSpec};
 /// The fields that can be sorted on for `sessions messages`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortField {
-    /// Total token count for the turn (numeric, default desc).
+    /// Total token count for the turn (numeric, default desc). Falls back to char_count/4 when usage unavailable.
     Tokens,
+    /// Raw character count of the message content (numeric, default desc).
+    Chars,
     /// Message timestamp (date, default desc for cross-session, asc within session).
     Timestamp,
     /// Session ID / name (string, default asc).
@@ -77,6 +79,7 @@ impl DefaultDir for SortField {
     fn default_dir(self) -> SortDir {
         match self {
             SortField::Tokens => SortDir::Descending,
+            SortField::Chars => SortDir::Descending,
             SortField::Timestamp => SortDir::Descending,
             SortField::Session => SortDir::Ascending,
         }
@@ -89,10 +92,11 @@ impl FromStr for SortField {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "tokens" | "token" => Ok(SortField::Tokens),
+            "chars" | "char" | "characters" => Ok(SortField::Chars),
             "timestamp" | "time" | "ts" => Ok(SortField::Timestamp),
             "session" => Ok(SortField::Session),
             _ => Err(format!(
-                "unknown sort field '{}': expected 'tokens', 'timestamp', or 'session'",
+                "unknown sort field '{}': expected 'tokens', 'chars', 'timestamp', or 'session'",
                 s
             )),
         }
@@ -145,6 +149,7 @@ impl SortSpec<SortField> {
                         let ts_b = b.timestamp.as_deref().unwrap_or("");
                         ts_a.cmp(ts_b)
                     }
+                    SortField::Chars => a.char_count.cmp(&b.char_count),
                     SortField::Session => a.session_id.cmp(&b.session_id),
                 };
                 let ord = if key.dir == SortDir::Descending {
