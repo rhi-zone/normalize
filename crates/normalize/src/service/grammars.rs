@@ -85,7 +85,7 @@ impl GrammarService {
     ///   normalize grammars list --json   # machine-readable grammar list
     #[cli(display_with = "display_output")]
     pub fn list(&self) -> Result<GrammarListReport, String> {
-        let grammars = crate::parsers::available_external_grammars();
+        let grammars = crate::parsers::available_external_grammars_with_paths();
         Ok(GrammarListReport::new(grammars))
     }
 

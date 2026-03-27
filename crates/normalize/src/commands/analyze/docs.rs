@@ -4,9 +4,16 @@ use crate::filter::Filter;
 use crate::output::OutputFormatter;
 use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 use normalize_languages::is_test_path;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
+
+/// Per-language documentation statistics
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct LangDocStats {
+    pub documented: usize,
+    pub total: usize,
+}
 
 /// Doc coverage info for a single file
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
@@ -58,7 +65,7 @@ pub struct DocCoverageReport {
     pub total_callables: usize,
     pub documented: usize,
     pub coverage_percent: f64,
-    pub by_language: HashMap<String, (usize, usize)>, // (documented, total)
+    pub by_language: HashMap<String, LangDocStats>,
     pub worst_files: Vec<FileDocCoverage>,
 }
 
@@ -75,25 +82,25 @@ impl OutputFormatter for DocCoverageReport {
             out.push_str("## By Language\n");
             let mut langs: Vec<_> = self.by_language.iter().collect();
             langs.sort_by(|a, b| {
-                let pct_a = if a.1.1 > 0 {
-                    a.1.0 as f64 / a.1.1 as f64
+                let pct_a = if a.1.total > 0 {
+                    a.1.documented as f64 / a.1.total as f64
                 } else {
                     1.0
                 };
-                let pct_b = if b.1.1 > 0 {
-                    b.1.0 as f64 / b.1.1 as f64
+                let pct_b = if b.1.total > 0 {
+                    b.1.documented as f64 / b.1.total as f64
                 } else {
                     1.0
                 };
                 // normalize-syntax-allow: rust/unwrap-in-impl - pct values are finite ratios (0.0-1.0)
                 pct_a.partial_cmp(&pct_b).unwrap()
             });
-            for (lang, (documented, total)) in langs {
-                if *total > 0 {
-                    let pct = 100.0 * *documented as f64 / *total as f64;
+            for (lang, stats) in langs {
+                if stats.total > 0 {
+                    let pct = 100.0 * stats.documented as f64 / stats.total as f64;
                     out.push_str(&format!(
                         "  {:>3.0}% ({:>3}/{:>4}) {}\n",
-                        pct, documented, total, lang
+                        pct, stats.documented, stats.total, lang
                     ));
                 }
             }
@@ -142,7 +149,7 @@ pub async fn analyze_docs(
         None => Box::new(OnDemandResolver::new(root)),
     };
 
-    let mut by_language: HashMap<String, (usize, usize)> = HashMap::new();
+    let mut by_language: HashMap<String, LangDocStats> = HashMap::new();
     let mut file_coverages: Vec<FileDocCoverage> = Vec::new();
 
     // Process files sequentially
@@ -167,8 +174,8 @@ pub async fn analyze_docs(
     let worst_files: Vec<FileDocCoverage> = file_coverages.into_iter().take(limit).collect();
 
     // Calculate totals
-    let total_callables: usize = by_language.values().map(|(_, t)| t).sum();
-    let documented: usize = by_language.values().map(|(d, _)| d).sum();
+    let total_callables: usize = by_language.values().map(|s| s.total).sum();
+    let documented: usize = by_language.values().map(|s| s.documented).sum();
     let coverage_percent = if total_callables > 0 {
         100.0 * documented as f64 / total_callables as f64
     } else {
@@ -189,7 +196,7 @@ fn process_file(
     root: &Path,
     exclude_interface_impls: bool,
     resolver: &dyn crate::extract::InterfaceResolver,
-    by_language: &mut HashMap<String, (usize, usize)>,
+    by_language: &mut HashMap<String, LangDocStats>,
     file_coverages: &mut Vec<FileDocCoverage>,
 ) {
     use crate::skeleton::SkeletonExtractor;
@@ -251,9 +258,14 @@ fn process_file(
 
     if total > 0 {
         // Update language stats
-        let entry = by_language.entry(lang.name().to_string()).or_insert((0, 0));
-        entry.0 += documented;
-        entry.1 += total;
+        let entry = by_language
+            .entry(lang.name().to_string())
+            .or_insert(LangDocStats {
+                documented: 0,
+                total: 0,
+            });
+        entry.documented += documented;
+        entry.total += total;
 
         // Add file coverage
         file_coverages.push(FileDocCoverage {

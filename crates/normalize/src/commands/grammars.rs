@@ -4,15 +4,30 @@ use crate::output::OutputFormatter;
 use serde::Serialize;
 use std::path::PathBuf;
 
+/// A single grammar entry with its name and file path.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct GrammarEntry {
+    pub name: String,
+    pub path: String,
+}
+
 /// Grammar list report
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct GrammarListReport {
-    grammars: Vec<String>,
+    grammars: Vec<GrammarEntry>,
 }
 
 impl GrammarListReport {
-    pub fn new(grammars: Vec<String>) -> Self {
-        Self { grammars }
+    pub fn new(grammars: Vec<(String, PathBuf)>) -> Self {
+        Self {
+            grammars: grammars
+                .into_iter()
+                .map(|(name, path)| GrammarEntry {
+                    name,
+                    path: path.display().to_string(),
+                })
+                .collect(),
+        }
     }
 }
 
@@ -28,8 +43,8 @@ impl OutputFormatter for GrammarListReport {
             lines.join("\n")
         } else {
             let mut lines = vec![format!("Installed grammars ({}):", self.grammars.len())];
-            for name in &self.grammars {
-                lines.push(name.clone());
+            for entry in &self.grammars {
+                lines.push(entry.name.clone());
             }
             lines.join("\n")
         }

@@ -24,6 +24,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **`normalize analyze docs --json`** `by_language` field now serializes as named objects `{"documented": N, "total": N}` instead of positional arrays `[N, N]`.
+- **`normalize grammars list --json`** now returns objects with `name` and `path` fields instead of bare strings. Text output is unchanged.
+
 - **`normalize structure rebuild`** now defaults to incremental mode (mtime-based). Only files changed since the last build are re-indexed. Pass `--full` to force a complete rebuild. When no files have changed, the command prints "Index up to date". The `--json` output includes an `incremental: true` field when incremental mode was used.
 - **`normalize view --dir-context`** now accepts an integer `N` instead of a boolean flag. `N` selects context files using Python `list[:N]` semantics on the target→root ordered list: `1` = target dir only, `2` = target + parent, `-1` = all ancestors, `0` = none. Pass the flag without a value to get all ancestors (equivalent to `-1`).
 - **`normalize view --dir-context` JSON output** now includes a `dir_context` field in `ViewReport` containing the merged context content. Previously the context was only prepended to text output; agents using `--json` received no context.

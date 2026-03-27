@@ -553,6 +553,30 @@ impl GrammarLoader {
         grammars.sort();
         grammars
     }
+
+    /// List available grammars in search paths, with their file paths.
+    pub fn available_external_with_paths(&self) -> Vec<(String, std::path::PathBuf)> {
+        let mut grammars: Vec<(String, std::path::PathBuf)> = Vec::new();
+        let ext = grammar_extension();
+
+        for dir in &self.search_paths {
+            if let Ok(entries) = std::fs::read_dir(dir) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name();
+                    let name_str = name.to_string_lossy();
+                    if name_str.ends_with(ext) {
+                        let grammar_name = name_str.trim_end_matches(ext).to_string();
+                        if !grammars.iter().any(|(n, _)| n == &grammar_name) {
+                            grammars.push((grammar_name, entry.path()));
+                        }
+                    }
+                }
+            }
+        }
+
+        grammars.sort_by(|a, b| a.0.cmp(&b.0));
+        grammars
+    }
 }
 
 impl Default for GrammarLoader {

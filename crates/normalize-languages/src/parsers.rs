@@ -48,3 +48,8 @@ pub fn parse_with_grammar(grammar: &str, source: &str) -> Option<tree_sitter::Tr
 pub fn available_external_grammars() -> Vec<String> {
     grammar_loader().available_external()
 }
+
+/// List grammars available in external search paths, with their file paths.
+pub fn available_external_grammars_with_paths() -> Vec<(String, std::path::PathBuf)> {
+    grammar_loader().available_external_with_paths()
+}
