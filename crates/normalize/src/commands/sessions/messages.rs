@@ -128,8 +128,16 @@ impl SortSpec<SortField> {
             for key in &self.keys {
                 let ord = match key.field {
                     SortField::Tokens => {
-                        let ta = a.usage.as_ref().map(|u| u.input + u.output).unwrap_or(0);
-                        let tb = b.usage.as_ref().map(|u| u.input + u.output).unwrap_or(0);
+                        let ta = a
+                            .usage
+                            .as_ref()
+                            .map(|u| u.input + u.output)
+                            .unwrap_or(a.char_count as u64 / 4);
+                        let tb = b
+                            .usage
+                            .as_ref()
+                            .map(|u| u.input + u.output)
+                            .unwrap_or(b.char_count as u64 / 4);
                         ta.cmp(&tb)
                     }
                     SortField::Timestamp => {
