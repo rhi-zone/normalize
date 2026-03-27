@@ -24,6 +24,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **`normalize rules run` routes through daemon when running** — if `normalize daemon start` is active, `normalize rules run` (and any invocation that hits fact rules) sends the request to the daemon via Unix socket and receives pre-warmed Datalog evaluation results instead of cold-evaluating from scratch (~45 seconds on large codebases). Falls back to cold evaluation transparently when no daemon is running. A new `RunRules` request type is added to the daemon protocol.
+
 - **`normalize analyze docs --json`** `by_language` field now serializes as named objects `{"documented": N, "total": N}` instead of positional arrays `[N, N]`.
 - **`normalize grammars list --json`** now returns objects with `name` and `path` fields instead of bare strings. Text output is unchanged.
 

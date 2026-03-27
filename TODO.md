@@ -770,7 +770,7 @@ the default path.
 
 - [x] **Incremental index** — on `structure rebuild`, only re-index files changed since the
   last build (mtime/hash based). Full rebuild only when schema changes or forced with `--full`.
-- [ ] **CLI → daemon routing** — `normalize rules run` (and `normalize ci`) should talk to
+- [x] **CLI → daemon routing** — `normalize rules run` (and `normalize ci`) should talk to
   the running daemon and get the pre-warmed Datalog cache instead of cold-evaluating. If no
   daemon is running, fall back to cold eval transparently.
 - [ ] **Incremental syntax rules** — currently no incremental path; only re-run queries on

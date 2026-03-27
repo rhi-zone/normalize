@@ -77,6 +77,16 @@ pub enum Request {
     /// added automatically.
     #[serde(rename = "subscribe")]
     Subscribe { root: Option<PathBuf> },
+    /// Run fact rules for a root and return diagnostics.
+    /// Uses the warm ENGINE_CACHE if the daemon has already primed it via
+    /// incremental file-change processing, giving sub-second results vs.
+    /// a cold 45-second eval for large codebases.
+    #[serde(rename = "run_rules")]
+    RunRules {
+        root: PathBuf,
+        /// Optional rule ID filter (None = all enabled rules).
+        filter_ids: Option<Vec<String>>,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -370,6 +380,49 @@ mod unix_impl {
                 Request::Subscribe { .. } => {
                     Response::err("Subscribe must be handled in the socket loop")
                 }
+                Request::RunRules { root, filter_ids } => self.run_rules(root, filter_ids),
+            }
+        }
+
+        fn run_rules(&self, root: PathBuf, filter_ids: Option<Vec<String>>) -> Response {
+            use std::collections::HashSet;
+
+            let config = NormalizeConfig::load(&root);
+            let filter_ids_set: Option<HashSet<String>> =
+                filter_ids.map(|ids| ids.into_iter().collect());
+
+            let rt = tokio::runtime::Runtime::new().unwrap_or_else(|e| {
+                tracing::warn!("failed to create tokio runtime for run_rules: {}", e);
+                panic!("failed to create tokio runtime: {}", e)
+            });
+
+            let diagnostics = std::thread::Builder::new()
+                .stack_size(64 * 1024 * 1024)
+                .spawn({
+                    let root = root.clone();
+                    let rules = config.rules.clone();
+                    move || {
+                        rt.block_on(normalize_rules::collect_fact_diagnostics_incremental(
+                            &root,
+                            &rules,
+                            filter_ids_set.as_ref(),
+                            None,
+                            None, // no changed_files filter — full eval with warm cache
+                        ))
+                    }
+                })
+                .expect("failed to spawn run_rules thread")
+                .join()
+                .expect("run_rules thread panicked");
+
+            let issues: Vec<normalize_output::diagnostics::Issue> = diagnostics
+                .iter()
+                .map(normalize_rules::abi_diagnostic_to_issue)
+                .collect();
+
+            match serde_json::to_value(&issues) {
+                Ok(v) => Response::ok(serde_json::json!({ "issues": v })),
+                Err(e) => Response::err(&format!("failed to serialize issues: {}", e)),
             }
         }
 
@@ -750,6 +803,42 @@ mod unix_impl {
             Ok(())
         }
 
+        /// Run fact rules via the daemon, using its warm ENGINE_CACHE.
+        ///
+        /// Uses a 5-minute timeout since even cached evaluation can take a few
+        /// seconds on large codebases. Falls back to cold eval if the daemon is
+        /// unavailable or returns an error.
+        pub fn run_rules(
+            &self,
+            root: &Path,
+            filter_ids: Option<Vec<String>>,
+        ) -> Result<Response, String> {
+            use std::io::{BufRead, BufReader, Write};
+            let mut stream = UnixStream::connect(&self.socket_path)
+                .map_err(|e| format!("Failed to connect: {}", e))?;
+
+            // Fact-rule evaluation can take tens of seconds even with a warm cache.
+            // Use a 5-minute timeout to cover worst-case warm-cache eval.
+            stream.set_read_timeout(Some(Duration::from_secs(300))).ok();
+            stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
+
+            let request = Request::RunRules {
+                root: root.to_path_buf(),
+                filter_ids,
+            };
+            let json = serde_json::to_string(&request).map_err(|e| e.to_string())?;
+            stream
+                .write_all(json.as_bytes())
+                .map_err(|e| e.to_string())?;
+            stream.write_all(b"\n").map_err(|e| e.to_string())?;
+
+            let mut reader = BufReader::new(&stream);
+            let mut line = String::new();
+            reader.read_line(&mut line).map_err(|e| e.to_string())?;
+
+            serde_json::from_str(&line).map_err(|e| e.to_string())
+        }
+
         /// Subscribe to daemon events, calling `on_event` for each one.
         ///
         /// Blocks until the connection is closed or `on_event` returns `false`.
@@ -888,6 +977,14 @@ impl DaemonClient {
     }
 
     pub fn shutdown(&self) -> Result<(), String> {
+        Err("normalize daemon is not supported on Windows".to_string())
+    }
+
+    pub fn run_rules(
+        &self,
+        _root: &Path,
+        _filter_ids: Option<Vec<String>>,
+    ) -> Result<Response, String> {
         Err("normalize daemon is not supported on Windows".to_string())
     }
 

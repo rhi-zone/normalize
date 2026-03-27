@@ -1443,6 +1443,78 @@ pub fn apply_native_rules_config(
     });
 }
 
+/// Try to run fact rules via the daemon's warm ENGINE_CACHE.
+///
+/// Returns `Some(issues)` if the daemon is running and successfully evaluated
+/// the rules. Returns `None` if the daemon is unavailable or returns an error,
+/// in which case the caller should fall back to cold evaluation.
+///
+/// This avoids a circular-dependency between `normalize-rules` and the main
+/// `normalize` crate by talking to the daemon socket directly rather than
+/// through `DaemonClient`.
+#[cfg(unix)]
+fn try_fact_rules_via_daemon(
+    root: &Path,
+    filter_ids: Option<&HashSet<String>>,
+) -> Option<Vec<normalize_output::diagnostics::Issue>> {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::time::Duration;
+
+    let socket_path = dirs::config_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("normalize")
+        .join("daemon.sock");
+
+    if !socket_path.exists() {
+        return None;
+    }
+
+    let mut stream = UnixStream::connect(&socket_path).ok()?;
+    // Fact-rule evaluation can take tens of seconds even with a warm cache.
+    stream.set_read_timeout(Some(Duration::from_secs(300))).ok();
+    stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
+
+    let filter_ids_vec: Option<Vec<String>> = filter_ids.map(|ids| ids.iter().cloned().collect());
+
+    let request = serde_json::json!({
+        "cmd": "run_rules",
+        "root": root,
+        "filter_ids": filter_ids_vec,
+    });
+    let json = serde_json::to_string(&request).ok()?;
+    stream.write_all(json.as_bytes()).ok()?;
+    stream.write_all(b"\n").ok()?;
+
+    let mut reader = BufReader::new(&stream);
+    let mut line = String::new();
+    reader.read_line(&mut line).ok()?;
+
+    let resp: serde_json::Value = serde_json::from_str(&line).ok()?;
+    if !resp.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+        tracing::debug!("daemon run_rules returned error: {:?}", resp.get("error"));
+        return None;
+    }
+
+    let issues: Vec<normalize_output::diagnostics::Issue> =
+        serde_json::from_value(resp["data"]["issues"].clone()).ok()?;
+
+    tracing::info!(
+        root = ?root,
+        issues = issues.len(),
+        "fact rules served from daemon warm cache"
+    );
+    Some(issues)
+}
+
+#[cfg(not(unix))]
+fn try_fact_rules_via_daemon(
+    _root: &Path,
+    _filter_ids: Option<&HashSet<String>>,
+) -> Option<Vec<normalize_output::diagnostics::Issue>> {
+    None
+}
+
 /// Run all rules (syntax + fact) and return a unified DiagnosticsReport.
 pub fn run_rules_report(
     root: &Path,
@@ -1501,49 +1573,60 @@ pub fn run_rules_report(
 
     // Fact rules
     if matches!(engine, RuleKind::All | RuleKind::Fact) {
-        // The Datalog evaluator recurses deeply for transitive queries (circular-deps etc.).
-        // Spawn on a thread with a larger stack to avoid stack overflow.
-        let rt = tokio::runtime::Runtime::new().unwrap_or_else(|e| {
-            tracing::warn!("failed to create tokio runtime: {}", e);
-            panic!("failed to create tokio runtime: {}", e)
-        });
-        let diagnostics = std::thread::Builder::new()
-            .stack_size(64 * 1024 * 1024) // 64MB: Datalog transitive queries recurse deeply
-            .spawn({
-                let project_root = project_root.to_path_buf();
-                let rules = config.rules.clone();
-                let filter_ids = filter_ids.clone();
-                let filter_rule = filter_rule.map(|s| s.to_string());
-                move || {
-                    rt.block_on(collect_fact_diagnostics(
-                        &project_root,
-                        &rules,
-                        filter_ids.as_ref(),
-                        filter_rule.as_deref(),
-                    ))
-                }
-            })
-            .expect("failed to spawn fact engine thread")
-            .join()
-            .expect("fact engine thread panicked");
-        // Apply global-allow patterns from [rules] to fact-rule diagnostics.
-        // Syntax rules apply global_allow during load_all_rules(); fact rules need it here.
-        let global_allow: Vec<glob::Pattern> = config
-            .rules
-            .global_allow
-            .iter()
-            .filter_map(|s| glob::Pattern::new(s).ok())
-            .collect();
-        for d in &diagnostics {
-            let file = match &d.location {
-                Some(loc) => loc.file.as_str(),
-                None => d.message.as_str(),
-            };
-            if global_allow.is_empty() || !global_allow.iter().any(|p| p.matches(file)) {
-                report.issues.push(abi_diagnostic_to_issue(d));
+        // Try to route through the daemon's warm ENGINE_CACHE for fast results.
+        // The daemon primes the cache after each file-change event, so this path
+        // avoids the cold ~45-second Datalog eval on large codebases.
+        if let Some(daemon_issues) = try_fact_rules_via_daemon(project_root, filter_ids.as_ref()) {
+            for issue in daemon_issues {
+                report.issues.push(issue);
             }
+            report.sources_run.push("fact-rules".into());
+        } else {
+            // Fall back to cold evaluation when the daemon is unavailable.
+            // The Datalog evaluator recurses deeply for transitive queries (circular-deps etc.).
+            // Spawn on a thread with a larger stack to avoid stack overflow.
+            let rt = tokio::runtime::Runtime::new().unwrap_or_else(|e| {
+                tracing::warn!("failed to create tokio runtime: {}", e);
+                panic!("failed to create tokio runtime: {}", e)
+            });
+            let diagnostics = std::thread::Builder::new()
+                .stack_size(64 * 1024 * 1024) // 64MB: Datalog transitive queries recurse deeply
+                .spawn({
+                    let project_root = project_root.to_path_buf();
+                    let rules = config.rules.clone();
+                    let filter_ids = filter_ids.clone();
+                    let filter_rule = filter_rule.map(|s| s.to_string());
+                    move || {
+                        rt.block_on(collect_fact_diagnostics(
+                            &project_root,
+                            &rules,
+                            filter_ids.as_ref(),
+                            filter_rule.as_deref(),
+                        ))
+                    }
+                })
+                .expect("failed to spawn fact engine thread")
+                .join()
+                .expect("fact engine thread panicked");
+            // Apply global-allow patterns from [rules] to fact-rule diagnostics.
+            // Syntax rules apply global_allow during load_all_rules(); fact rules need it here.
+            let global_allow: Vec<glob::Pattern> = config
+                .rules
+                .global_allow
+                .iter()
+                .filter_map(|s| glob::Pattern::new(s).ok())
+                .collect();
+            for d in &diagnostics {
+                let file = match &d.location {
+                    Some(loc) => loc.file.as_str(),
+                    None => d.message.as_str(),
+                };
+                if global_allow.is_empty() || !global_allow.iter().any(|p| p.matches(file)) {
+                    report.issues.push(abi_diagnostic_to_issue(d));
+                }
+            }
+            report.sources_run.push("fact-rules".into());
         }
-        report.sources_run.push("fact-rules".into());
     }
 
     // SARIF passthrough: run external tools and merge their SARIF output
