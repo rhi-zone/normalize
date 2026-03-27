@@ -4,7 +4,7 @@ use super::list::project_from_path;
 use super::sort::DefaultDir;
 use super::stats::parse_date;
 use crate::output::OutputFormatter;
-use crate::sessions::{ContentBlock, FormatRegistry, LogFormat, SessionFile, TokenUsage};
+use crate::sessions::{ContentBlock, FormatRegistry, LogFormat, SessionFile, TokenUsage, Turn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -650,6 +650,82 @@ fn format_usage_pretty(usage: Option<&TokenUsage>) -> String {
     format!(" \x1b[90m[{}]\x1b[0m", parts.join(" "))
 }
 
+/// Check whether a tool name matches a pattern (case-insensitive prefix match).
+fn tool_name_matches(name: &str, pattern: &str) -> bool {
+    name.to_lowercase().starts_with(&pattern.to_lowercase())
+}
+
+/// Given a session's turns and a tool call sequence pattern, return a sorted, deduplicated
+/// set of turn indices that should be included in the output (matching turns plus context).
+fn find_sequence_turn_indices(
+    turns: &[Turn],
+    pattern: &[String],
+    context_turns: usize,
+) -> Vec<usize> {
+    if pattern.is_empty() {
+        return Vec::new();
+    }
+
+    // Flatten all tool-use calls from the session into (turn_idx, tool_name) pairs.
+    let tool_calls: Vec<(usize, String)> = turns
+        .iter()
+        .enumerate()
+        .flat_map(|(turn_idx, turn)| {
+            turn.messages.iter().flat_map(move |msg| {
+                msg.content.iter().filter_map(move |block| {
+                    if let ContentBlock::ToolUse { name, .. } = block {
+                        Some((turn_idx, name.clone()))
+                    } else {
+                        None
+                    }
+                })
+            })
+        })
+        .collect();
+
+    let n = pattern.len();
+    if tool_calls.len() < n {
+        return Vec::new();
+    }
+
+    // Find all starting positions where the subsequence matches.
+    let mut matched_turn_indices: Vec<usize> = Vec::new();
+    for start in 0..=(tool_calls.len() - n) {
+        let window = &tool_calls[start..start + n];
+        if window
+            .iter()
+            .zip(pattern.iter())
+            .all(|((_, name), pat)| tool_name_matches(name, pat))
+        {
+            // Collect the turn indices covered by this match window.
+            for (turn_idx, _) in window {
+                matched_turn_indices.push(*turn_idx);
+            }
+        }
+    }
+
+    if matched_turn_indices.is_empty() {
+        return Vec::new();
+    }
+
+    // Deduplicate matched turns, then expand with context.
+    matched_turn_indices.sort_unstable();
+    matched_turn_indices.dedup();
+
+    let total_turns = turns.len();
+    let mut result: Vec<usize> = Vec::new();
+    for &turn_idx in &matched_turn_indices {
+        let lo = turn_idx.saturating_sub(context_turns);
+        let hi = (turn_idx + context_turns + 1).min(total_turns);
+        for i in lo..hi {
+            result.push(i);
+        }
+    }
+    result.sort_unstable();
+    result.dedup();
+    result
+}
+
 /// Build a messages report by extracting messages from sessions.
 #[allow(clippy::too_many_arguments)]
 pub fn build_messages_report(
@@ -669,6 +745,8 @@ pub fn build_messages_report(
     context_lines: usize,
     mode: &super::SessionMode,
     agent_type: Option<&str>,
+    sequence: Option<&[String]>,
+    context_turns: usize,
 ) -> Result<MessagesReport, String> {
     use super::stats::list_all_project_sessions_by_mode;
 
@@ -780,7 +858,21 @@ pub fn build_messages_report(
             .unwrap_or_default();
         let project = project_from_path(&sf.path);
 
+        // When --sequence is set, determine which turns to include (matched + context).
+        let sequence_turn_set: Option<std::collections::HashSet<usize>> = sequence.map(|pat| {
+            find_sequence_turn_indices(&session.turns, pat, context_turns)
+                .into_iter()
+                .collect()
+        });
+
         for (turn_idx, turn) in session.turns.iter().enumerate() {
+            // Sequence filter: skip turns not in the matched set.
+            if let Some(ref turn_set) = sequence_turn_set
+                && !turn_set.contains(&turn_idx)
+            {
+                continue;
+            }
+
             for msg in &turn.messages {
                 // Role filter
                 let role_str = msg.role.to_string();

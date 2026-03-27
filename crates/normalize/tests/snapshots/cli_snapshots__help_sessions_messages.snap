@@ -7,31 +7,33 @@ Extract all messages across sessions into a flat, queryable form
 Usage: normalize sessions messages [OPTIONS]
 
 Options:
-      --pretty                     Human-friendly output with colors and formatting
-      --role <role>                Filter by role: user (default), assistant, tool, system, all
-      --compact                    Compact output without colors (overrides TTY detection)
-      --grep <grep>                Filter messages by content pattern
-      --days <days>                Filter sessions from the last N days
-      --jsonl                      Output one JSON object per line (for arrays)
-      --json                       Output machine-readable JSON
-      --since <since>              Filter sessions since date (YYYY-MM-DD)
-      --jq <jq>                    Filter output through jq expression
-      --until <until>              Filter sessions until date (YYYY-MM-DD)
-      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
-      --project <project>          Filter by specific project path
-      --all-projects               Show sessions from all projects
-      --output-schema              Print JSON Schema of the subcommand's return type and exit
-      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
-      --session <session>          Filter to a specific session ID
-      --format <format>            Force specific format: claude, codex, gemini, normalize
-  -n, --limit <limit>              Maximum number of sessions
-      --show-usage                 Show per-turn token usage (input/output/cache)
-      --sort <sort>                Sort keys (comma-separated, prefix with - for desc or + for asc): tokens, timestamp, session. E.g. -tokens, +session,-tokens, timestamp
-  -C, --context <context>          Lines of context around each matching line (requires --grep)
-  -r, --root <root>                Root directory (defaults to current directory)
-      --mode <mode>                Session mode: interactive (default), subagent, or all
-      --agent-type <agent-type>    Filter by agent type (e.g. Explore, general-purpose, Plan)
-  -h, --help                       Print help
+      --pretty                         Human-friendly output with colors and formatting
+      --role <role>                    Filter by role: user (default), assistant, tool, system, all
+      --compact                        Compact output without colors (overrides TTY detection)
+      --grep <grep>                    Filter messages by content pattern
+      --days <days>                    Filter sessions from the last N days
+      --jsonl                          Output one JSON object per line (for arrays)
+      --json                           Output machine-readable JSON
+      --since <since>                  Filter sessions since date (YYYY-MM-DD)
+      --jq <jq>                        Filter output through jq expression
+      --until <until>                  Filter sessions until date (YYYY-MM-DD)
+      --input-schema                   Print JSON Schema of the subcommand's input parameters and exit
+      --project <project>              Filter by specific project path
+      --all-projects                   Show sessions from all projects
+      --output-schema                  Print JSON Schema of the subcommand's return type and exit
+      --params-json <params-json>      Provide all parameters as a JSON object instead of individual flags
+      --session <session>              Filter to a specific session ID
+      --format <format>                Force specific format: claude, codex, gemini, normalize
+  -n, --limit <limit>                  Maximum number of sessions
+      --show-usage                     Show per-turn token usage (input/output/cache)
+      --sort <sort>                    Sort keys (comma-separated, prefix with - for desc or + for asc): tokens, timestamp, session. E.g. -tokens, +session,-tokens, timestamp
+  -C, --context <context>              Lines of context around each matching line (requires --grep)
+  -r, --root <root>                    Root directory (defaults to current directory)
+      --mode <mode>                    Session mode: interactive (default), subagent, or all
+      --agent-type <agent-type>        Filter by agent type (e.g. Explore, general-purpose, Plan)
+      --sequence <sequence>            Filter by consecutive tool call sequence (comma-separated tool names, e.g. Grep,Grep,Read)
+      --context-turns <context-turns>  Number of context turns to include around each sequence match (requires --sequence, default 1)
+  -h, --help                           Print help
 
 Examples:
 normalize sessions messages                                # user messages from recent sessions
@@ -41,3 +43,4 @@ normalize sessions messages --grep "panic" --context 2     # matching lines with
 normalize sessions messages --show-usage --sort -tokens    # heaviest turns first
 normalize sessions messages --sort timestamp               # chronological across sessions
 normalize sessions messages --sort +session,-tokens        # by session asc, then tokens desc
+normalize sessions messages --sequence Grep,Grep,Read      # turns where Grep,Grep,Read ran consecutively

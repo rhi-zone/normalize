@@ -315,6 +315,7 @@ impl SessionsService {
     ///   normalize sessions messages --show-usage --sort -tokens    # heaviest turns first
     ///   normalize sessions messages --sort timestamp               # chronological across sessions
     ///   normalize sessions messages --sort +session,-tokens        # by session asc, then tokens desc
+    ///   normalize sessions messages --sequence Grep,Grep,Read      # turns where Grep,Grep,Read ran consecutively
     #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn messages(
@@ -350,6 +351,14 @@ impl SessionsService {
         >,
         #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
         agent_type: Option<String>,
+        #[param(
+            help = "Filter by consecutive tool call sequence (comma-separated tool names, e.g. Grep,Grep,Read)"
+        )]
+        sequence: Option<String>,
+        #[param(
+            help = "Number of context turns to include around each sequence match (requires --sequence, default 1)"
+        )]
+        context_turns: Option<usize>,
         pretty: bool,
         compact: bool,
     ) -> Result<MessagesReport, String> {
@@ -363,6 +372,16 @@ impl SessionsService {
         if context_lines > 0 && grep.is_none() {
             return Err("--context requires --grep".to_string());
         }
+        let sequence_vec = sequence.map(|s| {
+            s.split(',')
+                .map(|t| t.trim().to_string())
+                .filter(|t| !t.is_empty())
+                .collect::<Vec<String>>()
+        });
+        if sequence_vec.is_some() && context_lines > 0 {
+            return Err("--sequence and --context cannot be combined".to_string());
+        }
+        let ctx_turns = context_turns.unwrap_or(1);
         let mode = mode.unwrap_or_default();
         crate::commands::sessions::build_messages_report(
             root_path,
@@ -381,6 +400,8 @@ impl SessionsService {
             context_lines,
             &mode,
             agent_type.as_deref(),
+            sequence_vec.as_deref(),
+            ctx_turns,
         )
     }
 
