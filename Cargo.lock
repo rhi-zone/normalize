@@ -3830,6 +3830,7 @@ dependencies = [
  "normalize-output",
  "normalize-path-resolve",
  "normalize-ratchet",
+ "normalize-refactor",
  "normalize-rules",
  "normalize-scope",
  "normalize-session-analysis",
@@ -4346,6 +4347,17 @@ dependencies = [
  "toml",
  "tracing",
  "tree-sitter",
+]
+
+[[package]]
+name = "normalize-refactor"
+version = "0.2.0"
+dependencies = [
+ "normalize-edit",
+ "normalize-facts",
+ "normalize-languages",
+ "normalize-shadow",
+ "tempfile",
 ]
 
 [[package]]

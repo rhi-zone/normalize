@@ -12,8 +12,9 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [features]
-default = []
-cli = ["dep:server-less", "dep:tokio"]
+default = ["fix"]
+cli = ["dep:server-less", "dep:tokio", "fix"]
+fix = []
 
 [dependencies]
 server-less = { workspace = true, optional = true }

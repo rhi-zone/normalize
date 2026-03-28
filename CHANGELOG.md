@@ -22,6 +22,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`normalize analyze node-types`** removed — duplicate of `normalize syntax node-types` which already existed. Use `normalize syntax node-types` instead.
 - **`normalize trend`** — new top-level subcommand for time-series health metrics. Replaces `normalize analyze complexity-trend`, `analyze length-trend`, `analyze density-trend`, `analyze test-ratio-trend`, and `analyze trend`. New names: `normalize trend complexity`, `normalize trend length`, `normalize trend density`, `normalize trend test-ratio`, `normalize trend multi` (all metrics).
 
+### Internal
+
+- **Refactoring engine** (`refactor/`) — new three-layer architecture for composable code transformations: semantic actions (query/mutation primitives), recipes (rename is the first), and a shared executor with dry-run/shadow support. `edit rename` is now a thin wrapper over `refactor::rename::plan_rename` + `RefactoringExecutor::apply`, reducing `do_rename` from ~270 lines to ~75. Foundation for future `move`, `extract`, and `inline` commands.
+- **`normalize-refactor` crate** — refactoring engine extracted from the main crate into `crates/normalize-refactor/`. Clean dependency boundary: depends only on normalize-edit, normalize-facts, normalize-languages, normalize-shadow. `plan_rename` now accepts pre-resolved path components instead of a raw target string, decoupling from path resolution.
+- **`normalize-syntax-rules` `fix` feature gate** — `apply_fixes` and `expand_fix_template` gated behind `default = ["fix"]`. Read-only rules consumers can disable with `default-features = false`. Establishes the boundary for future `normalize-refactor` integration.
+
 ### Changed
 
 - **Incremental syntax rules** — `normalize rules run --type syntax` now caches per-file results in `.normalize/syntax-cache.json` keyed by file mtime (nanosecond precision). Unchanged files are skipped on subsequent runs, cutting repeat run time dramatically on large codebases.

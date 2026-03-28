@@ -37,7 +37,9 @@ pub mod service;
 pub use builtin::BUILTIN_RULES;
 pub use loader::{RuleOverride, RulesConfig, load_all_rules, parse_rule_content};
 pub use query::{MatchResult, is_sexp_pattern, run_astgrep_query, run_sexp_query};
-pub use runner::{DebugFlags, Finding, apply_fixes, evaluate_predicates, run_rules};
+#[cfg(feature = "fix")]
+pub use runner::apply_fixes;
+pub use runner::{DebugFlags, Finding, evaluate_predicates, run_rules};
 pub use sources::{
     EnvSource, GitSource, GoSource, PathSource, PythonSource, RuleSource, RustSource,
     SourceContext, SourceRegistry, TypeScriptSource, builtin_registry,

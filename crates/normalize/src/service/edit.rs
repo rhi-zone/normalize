@@ -1363,7 +1363,6 @@ impl EditService {
 ///
 /// `target` is in `path/SymbolName` format (same as other edit commands).
 /// Set `force` to proceed even when name conflicts are detected.
-#[allow(clippy::too_many_arguments)]
 async fn do_rename(
     target: &str,
     new_name: &str,
@@ -1372,8 +1371,6 @@ async fn do_rename(
     force: bool,
     message: Option<&str>,
 ) -> Result<EditResult, String> {
-    use std::collections::HashSet;
-
     let root = root
         .map(|p| p.to_path_buf())
         // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted (OS-level failure)
@@ -1382,7 +1379,19 @@ async fn do_rename(
     let config = NormalizeConfig::load(&root);
     let shadow_enabled = config.shadow.enabled();
 
-    // Resolve the target path/symbol
+    // Build refactoring context
+    let index = match crate::index::ensure_ready(&root).await {
+        Ok(idx) => Some(idx),
+        Err(e) => {
+            eprintln!(
+                "warning: index not available ({}); renaming definition only",
+                e
+            );
+            None
+        }
+    };
+
+    // Resolve path before entering refactoring engine
     let unified = path_resolve::resolve_unified(target, &root)
         .ok_or_else(|| format!("No matches for: {}", target))?;
 
@@ -1393,236 +1402,42 @@ async fn do_rename(
         ));
     }
 
-    // normalize-syntax-allow: rust/unwrap-in-impl - symbol_path is non-empty (checked via is_empty() + early return above)
-    let old_name = unified.symbol_path.last().unwrap().as_str();
     let def_rel_path = unified.file_path.clone();
-    let def_abs_path = root.join(&def_rel_path);
+    // normalize-syntax-allow: rust/unwrap-in-impl - symbol_path is non-empty (checked above)
+    let old_name = unified.symbol_path.last().unwrap().clone();
 
-    let def_content = std::fs::read_to_string(&def_abs_path)
-        .map_err(|e| format!("Error reading {}: {}", def_rel_path, e))?;
-    let editor = edit::Editor::new();
+    let ctx = normalize_refactor::RefactoringContext {
+        root: root.clone(),
+        editor: edit::Editor::new(),
+        index,
+        loader: normalize_languages::GrammarLoader::new(),
+    };
 
-    // Find definition location
-    let loc = editor
-        .find_symbol(&def_abs_path, &def_content, old_name, false)
-        .ok_or_else(|| format!("Symbol '{}' not found in {}", old_name, def_rel_path))?;
+    // Plan
+    let plan =
+        normalize_refactor::rename::plan_rename(&ctx, &def_rel_path, &old_name, new_name, force)
+            .await?;
 
-    // Try to open index for cross-file awareness (graceful degradation)
-    let (callers, importers) = async {
-        match crate::index::ensure_ready(&root).await {
-            Ok(idx) => {
-                let callers = idx
-                    .find_callers(old_name, &def_rel_path)
-                    .await
-                    .unwrap_or_default();
-                let importers = idx
-                    .find_symbol_importers(old_name)
-                    .await
-                    .unwrap_or_default();
-                (callers, importers)
-            }
-            Err(e) => {
-                eprintln!(
-                    "warning: index not available ({}); renaming definition only",
-                    e
-                );
-                (vec![], vec![])
-            }
-        }
-    }
-    .await;
-
-    // ── Conflict detection ───────────────────────────────────────────────────
-    // Check before touching any file so we can abort cleanly.
-    if !force {
-        let mut conflicts: Vec<String> = vec![];
-
-        // 1. Does new_name already exist as a symbol in the definition file?
-        if editor
-            .find_symbol(&def_abs_path, &def_content, new_name, false)
-            .is_some()
-        {
-            conflicts.push(format!(
-                "{}: symbol '{}' already exists",
-                def_rel_path, new_name
-            ));
-        }
-
-        // 2. Does any importer file already import something named new_name?
-        if !importers.is_empty()
-            && let Some(idx) = crate::index::open_if_enabled(&root).await
-        {
-            for (file, _, _, _) in &importers {
-                if idx.has_import_named(file, new_name).await.unwrap_or(false) {
-                    conflicts.push(format!("{}: already imports '{}'", file, new_name));
-                }
-            }
-        }
-
-        if !conflicts.is_empty() {
-            let detail = conflicts
-                .iter()
-                .map(|c| format!("  {}", c))
-                .collect::<Vec<_>>()
-                .join("\n");
-            return Err(format!(
-                "Rename '{}' → '{}' would cause conflicts (use --force to override):\n{}",
-                old_name, new_name, detail
-            ));
-        }
+    // Print warnings
+    for warning in &plan.warnings {
+        eprintln!("warning: {}", warning);
     }
 
-    // Collect all files to touch (deduplicated)
-    let mut all_files: HashSet<String> = HashSet::new();
-    all_files.insert(def_rel_path.clone());
-    for (file, _, _, _) in &callers {
-        all_files.insert(file.clone());
-    }
-    for (file, _, _, _) in &importers {
-        all_files.insert(file.clone());
-    }
+    // Execute
+    let executor = normalize_refactor::RefactoringExecutor {
+        root: root.clone(),
+        dry_run,
+        shadow_enabled,
+        message: message.map(String::from),
+    };
 
-    // Shadow: snapshot before any writes
-    if !dry_run && shadow_enabled {
-        let abs_paths: Vec<_> = all_files.iter().map(|f| root.join(f)).collect();
-        let shadow = Shadow::new(&root);
-        if let Err(e) =
-            shadow.before_edit(&abs_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>())
-        {
-            eprintln!("warning: shadow git: {}", e);
-        }
-    }
-
-    let mut modified: Vec<String> = vec![];
-
-    // 1. Rename in definition file (symbol name is on start_line)
-    {
-        if let Some(new_content) =
-            editor.rename_identifier_in_line(&def_content, loc.start_line, old_name, new_name)
-        {
-            if dry_run {
-                modified.push(def_rel_path.clone());
-            } else {
-                match std::fs::write(&def_abs_path, &new_content) {
-                    Ok(_) => modified.push(def_rel_path.clone()),
-                    Err(e) => {
-                        eprintln!("error writing {}: {}", def_rel_path, e);
-                    }
-                }
-            }
-        }
-    }
-
-    // 2. Rename at call sites
-    // Group callers by file so we read each file once
-    let mut callers_by_file: std::collections::HashMap<String, Vec<usize>> =
-        std::collections::HashMap::new();
-    for (file, _, line, _) in &callers {
-        callers_by_file.entry(file.clone()).or_default().push(*line);
-    }
-
-    for (rel_path, lines) in &callers_by_file {
-        if rel_path == &def_rel_path {
-            // Already handled (definition); any self-recursive calls also in definition file
-            // will be handled in a single-pass re-read below if needed
-        }
-        let abs_path = root.join(rel_path);
-        let mut content = match std::fs::read_to_string(&abs_path) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-        let mut changed = false;
-        for &line_no in lines {
-            if let Some(new_content) =
-                editor.rename_identifier_in_line(&content, line_no, old_name, new_name)
-            {
-                content = new_content;
-                changed = true;
-            }
-        }
-        if changed {
-            if dry_run {
-                if !modified.contains(rel_path) {
-                    modified.push(rel_path.clone());
-                }
-            } else {
-                match std::fs::write(&abs_path, &content) {
-                    Ok(_) => {
-                        if !modified.contains(rel_path) {
-                            modified.push(rel_path.clone());
-                        }
-                    }
-                    Err(e) => eprintln!("error writing {}: {}", rel_path, e),
-                }
-            }
-        }
-    }
-
-    // 3. Rename in import statements
-    // Group importers by file so we read each file once
-    let mut importers_by_file: std::collections::HashMap<String, Vec<usize>> =
-        std::collections::HashMap::new();
-    for (file, _, _, line) in &importers {
-        importers_by_file
-            .entry(file.clone())
-            .or_default()
-            .push(*line);
-    }
-
-    for (rel_path, lines) in &importers_by_file {
-        let abs_path = root.join(rel_path);
-        let mut content = match std::fs::read_to_string(&abs_path) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-        let mut changed = false;
-        for &line_no in lines {
-            if let Some(new_content) =
-                editor.rename_identifier_in_line(&content, line_no, old_name, new_name)
-            {
-                content = new_content;
-                changed = true;
-            }
-        }
-        if changed {
-            if dry_run {
-                if !modified.contains(rel_path) {
-                    modified.push(rel_path.clone());
-                }
-            } else {
-                match std::fs::write(&abs_path, &content) {
-                    Ok(_) => {
-                        if !modified.contains(rel_path) {
-                            modified.push(rel_path.clone());
-                        }
-                    }
-                    Err(e) => eprintln!("error writing {}: {}", rel_path, e),
-                }
-            }
-        }
-    }
-
-    // Shadow: commit after all writes
-    if !dry_run && shadow_enabled && !modified.is_empty() {
-        let abs_paths: Vec<_> = modified.iter().map(|f| root.join(f)).collect();
-        let shadow = Shadow::new(&root);
-        let info = EditInfo {
-            operation: "rename".to_string(),
-            target: format!("{} -> {}", old_name, new_name),
-            files: abs_paths,
-            message: message.map(String::from),
-            workflow: None,
-        };
-        if let Err(e) = shadow.after_edit(&info) {
-            eprintln!("warning: shadow git: {}", e);
-        }
-    }
+    let modified = executor.apply(&plan)?;
 
     Ok(EditResult {
         success: true,
         operation: "rename".to_string(),
         file: Some(def_rel_path),
-        symbol: Some(old_name.to_string()),
+        symbol: Some(old_name),
         dry_run,
         new_content: None,
         changes: vec![],

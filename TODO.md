@@ -828,7 +828,7 @@ commands. `analyze` still hosts 19 commands that don't fit either:
 
 **Pillar 2 — Semantic refactoring**
 
-Building blocks are all present. The gap is composition:
+Building blocks are all present. Composition layer landed — `normalize-refactor` crate provides the engine:
 
 - [x] `normalize refs` absorbed into `view referenced-by` — `CallEntry.access:
   Option<String>` field added (values: `"read"`/`"write"`/`"read-write"`); currently
@@ -838,6 +838,14 @@ Building blocks are all present. The gap is composition:
   `view referenced-by` to find all sites, normalize-scope for shadow/conflict detection,
   batch edit for atomic multi-file rewrite, shadow git for preview. `--dry-run` shows
   diff, no writes. This is the highest-value refactoring command.
+- [x] **Refactoring engine** (`refactor/`): composable semantic actions (locate, find-references,
+  check-conflicts, plan-rename/delete/insert/replace) + recipes (rename) + shared executor
+  (dry-run/shadow). `do_rename` decomposed into `plan_rename` + `RefactoringExecutor::apply`.
+  Foundation for move/extract/inline and future TOML-defined recipes.
+- [x] **`normalize-refactor` crate extraction** — refactoring engine moved to own crate
+  (`crates/normalize-refactor/`). `plan_rename` takes pre-resolved path components; caller
+  does path resolution. `normalize-syntax-rules` `fix` feature gate established for future
+  `PlannedEdit` integration.
 - [ ] `normalize move <target> <destination>` — move a symbol to another file, updating all
   import sites. Requires rename infrastructure + import rewriting. After rename lands.
 - [ ] `normalize extract <file:start-end> <new-name>` — extract a region into a new function,

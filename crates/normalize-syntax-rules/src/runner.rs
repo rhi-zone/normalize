@@ -791,6 +791,7 @@ pub fn evaluate_predicates(
     true
 }
 
+#[cfg(feature = "fix")]
 /// Expand a fix template by substituting capture names with their values.
 /// Uses `$capture_name` syntax. `$match` is the full matched text.
 pub fn expand_fix_template(template: &str, captures: &HashMap<String, String>) -> String {
@@ -802,6 +803,7 @@ pub fn expand_fix_template(template: &str, captures: &HashMap<String, String>) -
     result
 }
 
+#[cfg(feature = "fix")]
 /// Apply one pass of fixes to findings, returning the number of files modified.
 ///
 /// Fixes are applied in descending byte-offset order within each file so that

@@ -43,6 +43,7 @@ members = [
     "crates/normalize-ratchet",
     "crates/normalize-rules",
     "crates/normalize-rules-config",
+    "crates/normalize-refactor",
     "crates/normalize-context",
     "xtask",
     "benches",
