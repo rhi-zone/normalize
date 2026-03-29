@@ -185,8 +185,9 @@ Fixes:
 - [x] **Warn on parse failure** — `load_rules_config` prints the parse error to stderr
   when config.toml exists but fails to deserialize. Falling back to defaults is OK as
   long as the user sees the warning.
-- [ ] **`normalize config check`** — validate config.toml and report errors (duplicate keys,
-  unknown sections, type mismatches). Should run in the pre-commit hook.
+- [x] **`normalize config validate`** — deep validation of config.toml: TOML syntax (duplicate
+  keys), JSON Schema compliance, serde deserialization, and rules config parsing. Checks both
+  project and global config. Exits non-zero on errors for CI/hook use.
 - [ ] **Validate on `rules run`** — emit a one-line warning at the start of `rules run`
   if config failed to parse, so the user sees it in CI output too.
 
@@ -990,25 +991,40 @@ pre-commit. That means the hot path (`rules run` on changed files) needs to be u
 possibly much less. Current cold `rules run` is seconds; even warm daemon routing is hundreds
 of ms.
 
-Strategies (non-exhaustive, needs investigation):
-- **Persistent daemon with pre-warmed state** — daemon already exists but CLI→daemon handoff
-  adds process-spawn overhead. Consider: keep a long-lived client connection, or make the
-  daemon callable in-process (library mode).
-- **Incremental invalidation at file granularity** — on a tool call that writes one file,
-  only re-run rules affected by that file. Syntax rules already have mtime cache; fact rules
-  need file-scoped Datalog retraction (Pillar 4); native rules need dependency tracking.
-- **Scope narrowing** — a hook knows which files changed. `rules run --files <list>` should
-  skip all work on unchanged files, including file walking. Today `--only` filters post-walk;
-  need pre-walk scoping.
-- **Query result caching in SQLite** — avoid re-parsing unchanged files for tree-sitter
-  queries (tags, complexity, calls). Already in Pillar 4 as "persistent query cache".
-- **Process overhead** — if even the daemon handoff is too slow, consider embedding normalize
-  as a library in the hook process (e.g. a Claude Code hook that `dlopen`s normalize).
+Measured (2026-03-29, normalize repo ~8450 files, ~2654 tracked):
 
-Open questions:
-- What's the actual latency budget? 100ms is a guess. Measure what's perceptible.
-- Which rules are worth running on every tool call vs. only pre-commit?
-- Can we tier rules by cost (syntax = cheap, fact = medium, native = expensive)?
+| Component | Debug | Release | Notes |
+|-----------|-------|---------|-------|
+| Full `rules run` | 65s | 13s | All engines |
+| Syntax only | 6s | 5.4s | 16 files matched; tree-sitter parse dominates |
+| Native only | 10s | 3.3s | File walking dominates (8436 files) |
+| Fact only | 30s | 13ms | Interpreter overhead in debug; release uses index |
+| Single file `--only` | 57s | — | **Does not short-circuit** — full walk still happens |
+| Startup (`--version`) | 13ms | — | Negligible |
+
+Key findings:
+- **`--only`/`--rule` don't short-circuit.** Filtering is post-walk, not pre-walk.
+- **Native cost is file walking**, not rule evaluation. 3s release just to enumerate 8k files.
+- **Fact rules are free in release** (13ms) via daemon warm cache. Debug is 30s (interpreter).
+- **Debug/release gap is 5x** (65s vs 13s), mostly from fact interpreter.
+
+Projected hook budget (release, file-scoped, 1-5 changed files):
+- Startup: ~13ms
+- Syntax (parse 1-5 files): ~50-100ms
+- Native (skip walker, check N files): ~10-50ms
+- Fact (daemon): ~13ms
+- **Total: ~100-200ms** — achievable
+
+Concrete steps (ordered by impact):
+- [ ] **`--files` flag** — accept explicit file list, bypass walker entirely. This is the
+  single highest-impact change. All three engines need to accept a pre-resolved file list
+  instead of walking the tree. Without this, nothing else matters.
+- [ ] **Pre-walk scoping for `--only`** — `--only` currently filters post-walk. Move the
+  glob filter into the walker so non-matching files are never enumerated.
+- [ ] **Persistent daemon for syntax** — syntax rules at 5s cold is too slow even in release.
+  Cache parsed results in the daemon; return cached diagnostics for unchanged files.
+- [ ] **Process overhead** — if even the daemon handoff is too slow, consider embedding normalize
+  as a library in the hook process (e.g. a Claude Code hook that `dlopen`s normalize).
 
 **Not targeting 0.3.0:**
 - Full AST rewriting (tree-sitter edit API, round-trip fidelity)

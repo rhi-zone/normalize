@@ -346,30 +346,64 @@ fn format_schema_annotated(
     out
 }
 
-/// Report from `normalize config validate`: whether the config file is schema-compliant.
+/// A single validation error with optional source location.
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
+pub struct ConfigError {
+    /// Which file the error was found in.
+    pub file: String,
+    /// Which validation phase caught the error: "toml", "schema", "deserialize", "rules".
+    pub phase: String,
+    /// Human-readable description of the error.
+    pub message: String,
+    /// Line number (1-based) if available from the TOML parser.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line: Option<usize>,
+    /// Column number (1-based) if available from the TOML parser.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub column: Option<usize>,
+}
+
+/// Report from `normalize config validate`: whether the config files are valid.
 ///
-/// `valid` is true only when `errors` is empty. `schema_source` identifies which schema
-/// was used for validation (e.g. the crate's built-in schema or a custom path).
+/// Runs multiple validation phases on each config file (project and global):
+/// 1. TOML syntax (catches duplicate keys, malformed syntax)
+/// 2. JSON Schema compliance (catches unknown sections, type mismatches)
+/// 3. Serde deserialization as `NormalizeConfig` (catches field type mismatches)
+/// 4. Rules config parsing (catches rules-specific deserialization errors)
+///
+/// `valid` is true only when `errors` is empty.
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ConfigValidateReport {
     pub valid: bool,
-    pub errors: Vec<String>,
-    pub config_path: String,
+    pub errors: Vec<ConfigError>,
+    /// Config files that were checked.
+    pub files_checked: Vec<String>,
     pub schema_source: String,
 }
 
 impl OutputFormatter for ConfigValidateReport {
     fn format_text(&self) -> String {
+        let total = self.errors.len();
         if self.valid {
-            format!("✓ Config is valid: {}", self.config_path)
+            let files = self.files_checked.join(", ");
+            format!(
+                "Config is valid ({} file(s) checked: {})",
+                self.files_checked.len(),
+                files
+            )
         } else {
-            let mut out = format!(
-                "✗ Config is invalid: {} ({} error(s))\n",
-                self.config_path,
-                self.errors.len()
-            );
+            let mut out = format!("Config is invalid: {total} error(s)\n");
             for err in &self.errors {
-                out.push_str(&format!("  - {err}\n"));
+                let loc = match (err.line, err.column) {
+                    (Some(l), Some(c)) => format!("{}:{}:{}", err.file, l, c),
+                    (Some(l), None) => format!("{}:{}", err.file, l),
+                    _ => err.file.clone(),
+                };
+                out.push_str(&format!(
+                    "  [{phase}] {loc}: {msg}\n",
+                    phase = err.phase,
+                    msg = err.message
+                ));
             }
             out.trim_end().to_string()
         }
@@ -442,6 +476,48 @@ fn load_schema(schema_path: Option<&str>) -> Result<serde_json::Value, String> {
             serde_json::to_value(schema).map_err(|e| format!("Schema serialization error: {e}"))
         }
     }
+}
+
+struct TomlSpan {
+    line: Option<usize>,
+    column: Option<usize>,
+}
+
+/// Extract line/column from a `toml::de::Error` span, if available.
+fn extract_toml_span(e: &toml::de::Error) -> TomlSpan {
+    match e.span() {
+        Some(range) => {
+            // toml crate reports byte offsets; we need the line number from the message
+            // which toml formats as "line N, column M". Fall back to byte offset.
+            // The Display impl includes "at line N column M" — parse it.
+            let msg = e.to_string();
+            let line = parse_location_field(&msg, "line ");
+            let col = parse_location_field(&msg, "column ");
+            if line.is_some() {
+                TomlSpan { line, column: col }
+            } else {
+                // byte offset is better than nothing
+                TomlSpan {
+                    line: Some(range.start),
+                    column: None,
+                }
+            }
+        }
+        None => {
+            // Try parsing from the display string
+            let msg = e.to_string();
+            let line = parse_location_field(&msg, "line ");
+            let col = parse_location_field(&msg, "column ");
+            TomlSpan { line, column: col }
+        }
+    }
+}
+
+fn parse_location_field(msg: &str, prefix: &str) -> Option<usize> {
+    let idx = msg.find(prefix)?;
+    let rest = &msg[idx + prefix.len()..];
+    let num_str: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+    num_str.parse().ok()
 }
 
 fn load_file_as_json(file_path: &str) -> Result<serde_json::Value, String> {
@@ -692,11 +768,13 @@ impl ConfigService {
         })
     }
 
-    /// Validate a config file against its JSON Schema
+    /// Validate config files: TOML syntax, JSON Schema compliance, serde deserialization,
+    /// and rules config parsing. Checks both project config (.normalize/config.toml) and
+    /// global config (~/.config/normalize/config.toml) unless --file overrides.
     ///
     /// Examples:
-    ///   normalize config validate                        # validate .normalize/config.toml
-    ///   normalize config validate --file custom.toml     # validate a custom config file
+    ///   normalize config validate                        # validate project + global config
+    ///   normalize config validate --file custom.toml     # validate a specific config file only
     #[cli(display_with = "display_validate")]
     pub fn validate(
         &self,
@@ -713,30 +791,141 @@ impl ConfigService {
     ) -> Result<ConfigValidateReport, String> {
         let root_path = Self::resolve_root(root)?;
         self.resolve_format(pretty, compact, &root_path);
-        let config_path = file.unwrap_or_else(|| default_config_file(&root_path));
         let schema_source = schema
             .clone()
             .unwrap_or_else(|| "NormalizeConfig (built-in)".to_string());
         let schema_json = load_schema(schema.as_deref())?;
-        let instance = load_file_as_json(&config_path)?;
-        let errors = validate_against_schema(&schema_json, &instance);
-        let valid = errors.is_empty();
-        if valid {
-            Ok(ConfigValidateReport {
-                valid,
-                errors,
-                config_path,
-                schema_source,
-            })
+
+        let mut all_errors: Vec<ConfigError> = Vec::new();
+        let mut files_checked: Vec<String> = Vec::new();
+
+        // Determine which files to check
+        let files_to_check: Vec<(String, bool)> = if let Some(ref f) = file {
+            vec![(f.clone(), true)]
         } else {
-            // Return Ok so server-less displays the report; exit code handled by valid field
-            Err(ConfigValidateReport {
-                valid,
-                errors,
-                config_path,
-                schema_source,
+            let mut files = Vec::new();
+            // Global config
+            if let Some(global_path) = NormalizeConfig::global_config_path() {
+                let gp = global_path.to_string_lossy().into_owned();
+                files.push((gp, false));
             }
-            .format_text())
+            // Project config
+            files.push((default_config_file(&root_path), true));
+            files
+        };
+
+        for (config_path, is_required) in &files_to_check {
+            let raw = match std::fs::read_to_string(config_path) {
+                Ok(s) => s,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    if *is_required {
+                        // Project config not existing is fine — no errors
+                        files_checked.push(config_path.clone());
+                    }
+                    continue;
+                }
+                Err(e) => {
+                    all_errors.push(ConfigError {
+                        file: config_path.clone(),
+                        phase: "io".to_string(),
+                        message: format!("cannot read file: {e}"),
+                        line: None,
+                        column: None,
+                    });
+                    continue;
+                }
+            };
+
+            if raw.trim().is_empty() {
+                files_checked.push(config_path.clone());
+                continue;
+            }
+
+            files_checked.push(config_path.clone());
+
+            // Phase 1: TOML syntax (catches duplicate keys, malformed syntax)
+            let toml_value: Option<toml::Value> = match toml::from_str::<toml::Value>(&raw) {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    let TomlSpan { line, column } = extract_toml_span(&e);
+                    all_errors.push(ConfigError {
+                        file: config_path.clone(),
+                        phase: "toml".to_string(),
+                        message: e.message().to_string(),
+                        line,
+                        column,
+                    });
+                    None
+                }
+            };
+
+            // Phase 2: JSON Schema validation (catches unknown sections, type mismatches)
+            if let Some(ref tv) = toml_value
+                && let Ok(json_val) = serde_json::to_value(tv)
+            {
+                let schema_errors = validate_against_schema(&schema_json, &json_val);
+                for msg in schema_errors {
+                    all_errors.push(ConfigError {
+                        file: config_path.clone(),
+                        phase: "schema".to_string(),
+                        message: msg,
+                        line: None,
+                        column: None,
+                    });
+                }
+            }
+
+            // Phase 3: Serde deserialization as NormalizeConfig (catches field type mismatches
+            // that schema validation may miss, e.g. wrong enum variants)
+            match toml::from_str::<NormalizeConfig>(&raw) {
+                Ok(_) => {}
+                Err(e) => {
+                    let TomlSpan { line, column } = extract_toml_span(&e);
+                    all_errors.push(ConfigError {
+                        file: config_path.clone(),
+                        phase: "deserialize".to_string(),
+                        message: e.message().to_string(),
+                        line,
+                        column,
+                    });
+                }
+            }
+
+            // Phase 4: Rules config parsing (separate deserialization path used by rules engine)
+            #[derive(serde::Deserialize, Default)]
+            #[serde(default)]
+            struct RulesOnlyConfig {
+                rules: normalize_rules::RulesConfig,
+                #[serde(rename = "rule-tags")]
+                #[allow(dead_code)]
+                rule_tags: std::collections::HashMap<String, Vec<String>>,
+            }
+            match toml::from_str::<RulesOnlyConfig>(&raw) {
+                Ok(_) => {}
+                Err(e) => {
+                    let TomlSpan { line, column } = extract_toml_span(&e);
+                    all_errors.push(ConfigError {
+                        file: config_path.clone(),
+                        phase: "rules".to_string(),
+                        message: e.message().to_string(),
+                        line,
+                        column,
+                    });
+                }
+            }
+        }
+
+        let valid = all_errors.is_empty();
+        let report = ConfigValidateReport {
+            valid,
+            errors: all_errors,
+            files_checked,
+            schema_source,
+        };
+        if valid {
+            Ok(report)
+        } else {
+            Err(report.format_text())
         }
     }
 

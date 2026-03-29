@@ -173,7 +173,7 @@ impl NormalizeConfig {
     }
 
     /// Get the global config path.
-    fn global_config_path() -> Option<std::path::PathBuf> {
+    pub fn global_config_path() -> Option<std::path::PathBuf> {
         let config_home = std::env::var("XDG_CONFIG_HOME")
             .map(std::path::PathBuf::from)
             .ok()
