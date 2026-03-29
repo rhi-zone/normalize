@@ -214,6 +214,7 @@ impl SyntaxRulesService {
             tag.as_deref(),
             None,
             &debug_flags,
+            None,
         );
 
         let fixes_applied = if fix {

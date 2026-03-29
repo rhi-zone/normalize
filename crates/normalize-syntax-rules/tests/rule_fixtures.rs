@@ -139,6 +139,7 @@ fn test_rule_fixtures() {
             None,
             None,
             &debug,
+            None,
         );
 
         // Partition findings by fixture file type.
@@ -270,6 +271,7 @@ fn run_fix_fixture(
             None,
             None,
             debug,
+            None,
         );
         let fixable: Vec<_> = findings.into_iter().filter(|f| f.fix.is_some()).collect();
         if fixable.is_empty() {
@@ -323,6 +325,7 @@ fn test_rust_missing_module_doc() {
         None,
         None,
         &debug,
+        None,
     );
     assert!(
         !findings.is_empty(),
@@ -346,6 +349,7 @@ fn test_rust_missing_module_doc() {
         None,
         None,
         &debug,
+        None,
     );
     assert!(
         no_match_findings.is_empty(),

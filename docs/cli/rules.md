@@ -47,6 +47,8 @@ normalize rules run --rule rust/unwrap-in-impl   # Specific rule
 normalize rules run --fix                        # Apply auto-fixes (syntax only)
 normalize rules run --sarif                      # SARIF output
 normalize rules run src/                         # Target specific path
+normalize rules run --files src/main.rs src/lib.rs  # Explicit file list (bypasses walker)
+normalize rules run --files src/lib.rs --only "*.rs" # Compose with filters
 ```
 
 Arguments:
@@ -62,6 +64,9 @@ Options:
 - `--compact` — Plain text output (default)
 - `--json` — JSON output (automatic from `DiagnosticsReport`)
 - `--debug <FLAGS>` — Debug flags (comma-separated)
+- `--only <GLOB>` — Only include files matching glob patterns
+- `--exclude <GLOB>` — Exclude files matching glob patterns
+- `--files <PATH>...` — Explicit file paths to check (bypasses file walker; for hook-grade latency)
 
 Output goes through `DiagnosticsReport`, so all standard output formats (`--json`, `--jsonl`, `--jq`, `--schema`, `--pretty`, `--sarif`) work consistently. Both syntax and fact engine findings are merged, sorted by file/line/severity, and rendered through the same pipeline.
 

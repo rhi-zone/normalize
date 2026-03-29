@@ -4273,6 +4273,7 @@ dependencies = [
  "normalize-languages",
  "normalize-output",
  "normalize-ratchet",
+ "normalize-rules-config",
  "rayon",
  "regex",
  "schemars",
@@ -4397,6 +4398,7 @@ dependencies = [
 name = "normalize-rules-config"
 version = "0.2.0"
 dependencies = [
+ "glob",
  "normalize-core",
  "schemars",
  "serde",

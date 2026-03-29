@@ -128,13 +128,25 @@ fn count_complexity_with_query(
 /// Walks all source files under `root`, parses each with tree-sitter, and emits
 /// an issue for every function whose cyclomatic complexity meets or exceeds the
 /// threshold.
-pub fn build_high_complexity_report(root: &Path, threshold: usize) -> DiagnosticsReport {
+pub fn build_high_complexity_report(
+    root: &Path,
+    threshold: usize,
+    explicit_files: Option<&[std::path::PathBuf]>,
+) -> DiagnosticsReport {
     // Collect files first so we can process in parallel.
-    let files: Vec<_> = gitignore_walk(root)
-        .filter(|e| e.path().is_file())
-        .filter(|e| support_for_path(e.path()).is_some())
-        .map(|e| e.path().to_path_buf())
-        .collect();
+    let files: Vec<_> = if let Some(ef) = explicit_files {
+        ef.iter()
+            .filter(|p| p.is_file())
+            .filter(|p| support_for_path(p).is_some())
+            .cloned()
+            .collect()
+    } else {
+        gitignore_walk(root)
+            .filter(|e| e.path().is_file())
+            .filter(|e| support_for_path(e.path()).is_some())
+            .map(|e| e.path().to_path_buf())
+            .collect()
+    };
 
     let files_checked = files.len();
 

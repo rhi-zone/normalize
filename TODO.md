@@ -999,11 +999,11 @@ Measured (2026-03-29, normalize repo ~8450 files, ~2654 tracked):
 | Syntax only | 6s | 5.4s | 16 files matched; tree-sitter parse dominates |
 | Native only | 10s | 3.3s | File walking dominates (8436 files) |
 | Fact only | 30s | 13ms | Interpreter overhead in debug; release uses index |
-| Single file `--only` | 57s | — | **Does not short-circuit** — full walk still happens |
+| Single file `--only` | 57s | — | Now pre-walk scoped (was full walk, now filtered) |
 | Startup (`--version`) | 13ms | — | Negligible |
 
 Key findings:
-- **`--only`/`--rule` don't short-circuit.** Filtering is post-walk, not pre-walk.
+- **`--only` now pre-walk scoped** (syntax and advisory native rules). `--rule` still filters post-walk for native engine.
 - **Native cost is file walking**, not rule evaluation. 3s release just to enumerate 8k files.
 - **Fact rules are free in release** (13ms) via daemon warm cache. Debug is 30s (interpreter).
 - **Debug/release gap is 5x** (65s vs 13s), mostly from fact interpreter.
@@ -1021,11 +1021,14 @@ Concrete steps (ordered by impact):
   and native rules: daemon watches files, re-runs affected rules on change, caches
   per-file diagnostics. `rules run` asks daemon for cached results → instant response.
   The LSP already does this for syntax rules (two-tier diagnostics). Wire it for CLI.
-- [ ] **Pre-walk scoping for `--only`** — `--only` currently filters post-walk. Move the
-  glob filter into the walker so non-matching files are never enumerated.
-- [ ] **`--files` flag** — accept explicit file list, bypass walker entirely. Useful when
-  the daemon isn't running (CI, one-off checks). All three engines need to accept a
-  pre-resolved file list instead of walking the tree.
+- [x] **Pre-walk scoping for `--only`** — `PathFilter` struct in `normalize-rules-config`
+  compiled from `--only`/`--exclude` globs, threaded to syntax runner (`collect_source_files`)
+  and native rules (via `filtered_gitignore_walk` / `effective_files`). Post-walk filter kept
+  as safety net.
+- [x] **`--files` flag** — accept explicit file list, bypass walker entirely. Threaded through
+  syntax runner (`run_rules`), native threshold rules (`long-file`, `high-complexity`,
+  `long-function`). Fact rules unchanged (they query the index). Directory-based native
+  rules (stale-summary, check-refs, etc.) still walk the tree as they are project-level checks.
 - [ ] **Process overhead** — if even the daemon handoff is too slow, consider embedding normalize
   as a library in the hook process (e.g. a Claude Code hook that `dlopen`s normalize).
 

@@ -122,6 +122,8 @@ impl NormalizeBackend {
                     &normalize_rules::RuleKind::Syntax,
                     &[],
                     &rules_config,
+                    None,
+                    &normalize_rules_config::PathFilter::default(),
                 )
             })
             .await;
@@ -995,6 +997,8 @@ async fn run_and_publish_diagnostics(
             &rule_type_owned,
             &[],
             &rules_config,
+            None,
+            &normalize_rules_config::PathFilter::default(),
         )
     })
     .await;

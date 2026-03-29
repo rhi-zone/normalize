@@ -9,6 +9,7 @@ use std::collections::HashSet;
 use std::path::Path;
 
 /// Run syntax rules and return raw findings (no printing).
+#[allow(clippy::too_many_arguments)]
 pub fn run_syntax_rules(
     root: &Path,
     project_root: &Path,
@@ -17,6 +18,8 @@ pub fn run_syntax_rules(
     filter_ids: Option<&HashSet<String>>,
     config: &RulesConfig,
     debug: &DebugFlags,
+    files: Option<&[std::path::PathBuf]>,
+    path_filter: &normalize_rules_config::PathFilter,
 ) -> Vec<Finding> {
     let rules = load_all_rules(project_root, config);
     if rules.is_empty() {
@@ -32,5 +35,7 @@ pub fn run_syntax_rules(
         filter_tag,
         filter_ids,
         debug,
+        files,
+        path_filter,
     )
 }

@@ -506,6 +506,8 @@ pub fn run_rules(
     filter_tag: Option<&str>,
     filter_ids: Option<&std::collections::HashSet<String>>,
     debug: &DebugFlags,
+    files: Option<&[PathBuf]>,
+    path_filter: &normalize_rules_config::PathFilter,
 ) -> Vec<Finding> {
     let start = std::time::Instant::now();
     let raw_abs_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
@@ -551,7 +553,16 @@ pub fn run_rules(
         cache.rules_hash = rules_hash;
     }
 
-    let files = collect_source_files(root);
+    let files = if let Some(explicit) = files {
+        // Use the provided file list, filtering to supported languages.
+        explicit
+            .iter()
+            .filter(|f| support_for_path(f).is_some())
+            .cloned()
+            .collect()
+    } else {
+        collect_source_files(root, path_filter)
+    };
     let mut files_by_grammar: HashMap<String, Vec<PathBuf>> = HashMap::new();
     for file in files {
         if let Some(lang) = support_for_path(&file) {
@@ -871,8 +882,8 @@ pub fn apply_fixes(findings: &[Finding]) -> std::io::Result<usize> {
     Ok(files_modified)
 }
 
-/// Collect source files from a directory.
-fn collect_source_files(root: &Path) -> Vec<PathBuf> {
+/// Collect source files from a directory, optionally filtered by [`PathFilter`].
+fn collect_source_files(root: &Path, filter: &normalize_rules_config::PathFilter) -> Vec<PathBuf> {
     let mut files = Vec::new();
 
     let walker = ignore::WalkBuilder::new(root)
@@ -883,6 +894,12 @@ fn collect_source_files(root: &Path) -> Vec<PathBuf> {
     for entry in walker.flatten() {
         let path = entry.path();
         if path.is_file() && support_for_path(path).is_some() {
+            if !filter.is_empty() {
+                let rel = path.strip_prefix(root).unwrap_or(path);
+                if !filter.matches_path(rel) {
+                    continue;
+                }
+            }
             files.push(path.to_path_buf());
         }
     }

@@ -13,7 +13,7 @@ pub mod long_function;
 pub mod ratchet;
 pub mod stale_docs;
 pub mod stale_summary;
-pub(crate) mod walk;
+pub mod walk;
 
 pub use budget::{BudgetRulesReport, build_budget_report};
 pub use check_examples::build_check_examples_report;

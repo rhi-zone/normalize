@@ -1521,6 +1521,7 @@ fn try_fact_rules_via_daemon(
 }
 
 /// Run all rules (syntax + fact) and return a unified DiagnosticsReport.
+#[allow(clippy::too_many_arguments)]
 pub fn run_rules_report(
     root: &Path,
     project_root: &Path,
@@ -1529,6 +1530,8 @@ pub fn run_rules_report(
     engine: &RuleKind,
     debug: &[String],
     config: &RulesRunConfig,
+    files: Option<&[std::path::PathBuf]>,
+    path_filter: &normalize_rules_config::PathFilter,
 ) -> normalize_output::diagnostics::DiagnosticsReport {
     use normalize_output::diagnostics::DiagnosticsReport;
 
@@ -1565,6 +1568,8 @@ pub fn run_rules_report(
             filter_ids.as_ref(),
             &config.rules,
             &debug_flags,
+            files,
+            path_filter,
         );
         // Count unique files with violations for the report header.
         let unique_files: HashSet<&std::path::Path> =

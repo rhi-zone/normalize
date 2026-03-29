@@ -12,6 +12,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`stale-mock` fact rule** — flags mock/stub functions (identified by attributes such as `@Mock`, `@patch`, `@stub`, `mock`, `stub`, `fake`) that call a callee which no longer exists as a symbol in the index. Catches mocks that were not updated after a rename or deletion. Disabled by default.
 - **`normalize config validate` deep validation** — now runs four validation phases (TOML syntax, JSON Schema compliance, serde deserialization as `NormalizeConfig`, rules config parsing) on both project and global config files. Reports errors with file path, line/column when available, and validation phase. Exits non-zero on errors for CI/hook use.
 - **`normalize grep <path>`** — optional positional `path` argument scopes the search tree (consistent with `view`, `edit`, `rank`). The existing `--root` flag is preserved for backward compatibility; `path` takes precedence when both are given.
+- **`normalize rules run --files`** — accept an explicit list of file paths, bypassing the file tree walker entirely. Critical for hook-grade latency where the caller already knows which files changed. Composes with `--only`/`--exclude` for further filtering. Threaded through syntax rules, and native threshold rules (long-file, high-complexity, long-function).
 - **`normalize rules run --only`/`--exclude`** — glob pattern filtering for which files get diagnostics returned. `--only "*.rs"` restricts to Rust files; `--exclude "tests/"` skips test directories. Applies post-collection across syntax, fact, and native rule engines.
 - **`normalize structure rebuild --only`/`--exclude`** — glob pattern filtering for which files get indexed. Files not matching the filter are removed from the index after the walk.
 - **`normalize analyze architecture --limit`** — caps the number of `cross_imports` entries in the output (default 20, `--limit 0` disables). Reduces default JSON response from ~196KB to ~10KB, matching the `analyze health --limit` pattern.
@@ -22,6 +23,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`normalize analyze test-gaps`** → **`normalize rank test-gaps`** — ranking command (public functions lacking test coverage, ranked by risk score) now lives under `rank`.
 - **`normalize analyze node-types`** removed — duplicate of `normalize syntax node-types` which already existed. Use `normalize syntax node-types` instead.
 - **`normalize trend`** — new top-level subcommand for time-series health metrics. Replaces `normalize analyze complexity-trend`, `analyze length-trend`, `analyze density-trend`, `analyze test-ratio-trend`, and `analyze trend`. New names: `normalize trend complexity`, `normalize trend length`, `normalize trend density`, `normalize trend test-ratio`, `normalize trend multi` (all metrics).
+
+### Changed
+
+- **`normalize rules run --only`/`--exclude` pre-walk scoping** — glob patterns are now applied *before* file parsing and walking, not just after. Syntax rules skip non-matching files in `collect_source_files`; advisory native rules (long-file, high-complexity, long-function) receive a pre-filtered file list. The post-walk filter is kept as a safety net. Single-file `--only` runs are now proportional to the matched file count, not the full tree.
 
 ### Internal
 

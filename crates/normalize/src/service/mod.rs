@@ -955,6 +955,8 @@ impl NormalizeService {
                     &RuleKind::Syntax,
                     &[],
                     &config,
+                    None,
+                    &normalize_rules_config::PathFilter::default(),
                 )
             })
             .await
@@ -1085,6 +1087,8 @@ impl NormalizeService {
                         &RuleKind::Fact,
                         &[],
                         &config,
+                        None,
+                        &normalize_rules_config::PathFilter::default(),
                     )
                 })
                 .await

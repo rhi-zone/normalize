@@ -4,6 +4,7 @@
 //! loaded from `[rules]` in `.normalize/config.toml`.
 
 use std::collections::HashMap;
+use std::path::Path;
 
 /// Severity level for rule findings.
 ///
@@ -202,6 +203,58 @@ impl normalize_core::Merge for RulesConfig {
     }
 }
 
+/// Pre-walk path filter for `--only` / `--exclude` glob patterns.
+///
+/// Compiled once in the service layer and threaded to each rule engine so files
+/// can be skipped *before* parsing or walking. The post-walk filter in the
+/// service layer remains as a safety net.
+#[derive(Debug, Clone, Default)]
+pub struct PathFilter {
+    pub only: Vec<glob::Pattern>,
+    pub exclude: Vec<glob::Pattern>,
+}
+
+impl PathFilter {
+    /// Build a `PathFilter` from raw glob strings (as provided by CLI flags).
+    /// Invalid patterns are silently dropped (matches the post-walk filter behavior).
+    pub fn new(only: &[String], exclude: &[String]) -> Self {
+        Self {
+            only: only
+                .iter()
+                .filter_map(|s| glob::Pattern::new(s).ok())
+                .collect(),
+            exclude: exclude
+                .iter()
+                .filter_map(|s| glob::Pattern::new(s).ok())
+                .collect(),
+        }
+    }
+
+    /// Returns `true` if this filter has no patterns (i.e. passes everything).
+    pub fn is_empty(&self) -> bool {
+        self.only.is_empty() && self.exclude.is_empty()
+    }
+
+    /// Check whether a relative path passes the filter.
+    ///
+    /// - If `only` is non-empty, the path must match at least one `only` pattern.
+    /// - If `exclude` is non-empty, the path must not match any `exclude` pattern.
+    pub fn matches(&self, rel_path: &str) -> bool {
+        if !self.exclude.is_empty() && self.exclude.iter().any(|p| p.matches(rel_path)) {
+            return false;
+        }
+        if !self.only.is_empty() && !self.only.iter().any(|p| p.matches(rel_path)) {
+            return false;
+        }
+        true
+    }
+
+    /// Convenience: check a `Path` by converting to a string first.
+    pub fn matches_path(&self, rel_path: &Path) -> bool {
+        self.matches(&rel_path.to_string_lossy())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243,5 +296,35 @@ allow = ["**/tests/**", "crates/*/tests/**", "**/normalize-scope/**"]
         let ngl = config.rules.get("no-grammar-loader-new").unwrap();
         assert_eq!(ngl.allow.len(), 3);
         assert_eq!(ngl.allow[2], "**/normalize-scope/**");
+    }
+
+    #[test]
+    fn path_filter_empty_passes_everything() {
+        let f = PathFilter::default();
+        assert!(f.is_empty());
+        assert!(f.matches("anything/at/all.rs"));
+    }
+
+    #[test]
+    fn path_filter_only() {
+        let f = PathFilter::new(&["src/**/*.rs".into()], &[]);
+        assert!(f.matches("src/lib.rs"));
+        assert!(f.matches("src/deep/mod.rs"));
+        assert!(!f.matches("tests/integration.rs"));
+    }
+
+    #[test]
+    fn path_filter_exclude() {
+        let f = PathFilter::new(&[], &["**/tests/**".into()]);
+        assert!(f.matches("src/lib.rs"));
+        assert!(!f.matches("crates/foo/tests/bar.rs"));
+    }
+
+    #[test]
+    fn path_filter_only_and_exclude() {
+        let f = PathFilter::new(&["crates/**/*.rs".into()], &["**/tests/**".into()]);
+        assert!(f.matches("crates/foo/src/lib.rs"));
+        assert!(!f.matches("crates/foo/tests/it.rs")); // excluded
+        assert!(!f.matches("src/main.rs")); // not in only
     }
 }

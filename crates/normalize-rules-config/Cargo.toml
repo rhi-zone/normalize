@@ -10,4 +10,5 @@ description = "Shared rule configuration types (RulesConfig, RuleOverride) for n
 serde.workspace = true
 schemars = "1"
 toml.workspace = true
+glob = "0.3"
 normalize-core = { path = "../normalize-core", version = "0.2.0" }

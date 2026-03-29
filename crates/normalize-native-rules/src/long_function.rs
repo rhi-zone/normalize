@@ -88,12 +88,24 @@ fn analyze_file(path: &Path, root: &Path, threshold: usize) -> Vec<(String, Stri
 ///
 /// Walks all source files under `root`, parses each with tree-sitter, and emits
 /// an issue for every function whose line span meets or exceeds the threshold.
-pub fn build_long_function_report(root: &Path, threshold: usize) -> DiagnosticsReport {
-    let files: Vec<_> = gitignore_walk(root)
-        .filter(|e| e.path().is_file())
-        .filter(|e| support_for_path(e.path()).is_some())
-        .map(|e| e.path().to_path_buf())
-        .collect();
+pub fn build_long_function_report(
+    root: &Path,
+    threshold: usize,
+    explicit_files: Option<&[std::path::PathBuf]>,
+) -> DiagnosticsReport {
+    let files: Vec<_> = if let Some(ef) = explicit_files {
+        ef.iter()
+            .filter(|p| p.is_file())
+            .filter(|p| support_for_path(p).is_some())
+            .cloned()
+            .collect()
+    } else {
+        gitignore_walk(root)
+            .filter(|e| e.path().is_file())
+            .filter(|e| support_for_path(e.path()).is_some())
+            .map(|e| e.path().to_path_buf())
+            .collect()
+    };
 
     let files_checked = files.len();
 

@@ -59,23 +59,35 @@ fn load_allow_patterns(root: &Path) -> Vec<glob::Pattern> {
 /// Walks all source files under `root`, counts lines, and emits an issue for
 /// each file exceeding the threshold. Lock files and allowlisted paths are
 /// skipped.
-pub fn build_long_file_report(root: &Path, threshold: usize) -> DiagnosticsReport {
+pub fn build_long_file_report(
+    root: &Path,
+    threshold: usize,
+    files: Option<&[std::path::PathBuf]>,
+) -> DiagnosticsReport {
     let allow_patterns = load_allow_patterns(root);
 
     let mut issues = Vec::new();
     let mut files_checked = 0usize;
 
-    for entry in gitignore_walk(root) {
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
+    let walked_files: Vec<std::path::PathBuf>;
+    let file_paths: Box<dyn Iterator<Item = &std::path::Path>> = if let Some(explicit) = files {
+        Box::new(
+            explicit
+                .iter()
+                .filter(|p| p.is_file())
+                .filter(|p| normalize_languages::support_for_path(p).is_some())
+                .map(|p| p.as_path()),
+        )
+    } else {
+        walked_files = gitignore_walk(root)
+            .filter(|e| e.path().is_file())
+            .filter(|e| normalize_languages::support_for_path(e.path()).is_some())
+            .map(|e| e.path().to_path_buf())
+            .collect();
+        Box::new(walked_files.iter().map(|p| p.as_path()))
+    };
 
-        // Only check files we recognize as source code.
-        if normalize_languages::support_for_path(path).is_none() {
-            continue;
-        }
-
+    for path in file_paths {
         let rel_path = path
             .strip_prefix(root)
             .unwrap_or(path)

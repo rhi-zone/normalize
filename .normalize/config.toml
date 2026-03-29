@@ -321,6 +321,8 @@ allow = [
     "crates/normalize-languages/src/registry.rs",
     # Language files have large unused_node_kinds_audit test functions
     "crates/normalize-languages/src/*.rs",
+    # Rules service run() method: large due to orchestrating multiple engines
+    "crates/normalize-rules/src/service.rs",
 ]
 
 [rules."go/context-todo"]

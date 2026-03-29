@@ -314,6 +314,7 @@ impl RulesService {
     ///   normalize rules run --type syntax      # only syntax rules
     ///   normalize rules run --only "*.rs"      # only Rust files
     ///   normalize rules run --exclude "tests/" # skip test directories
+    ///   normalize rules run --files src/main.rs src/lib.rs  # explicit file list
     #[cli(display_with = "display_run")]
     #[allow(clippy::too_many_arguments)]
     pub async fn run(
@@ -338,6 +339,7 @@ impl RulesService {
         >,
         #[param(help = "Only include files matching glob patterns")] only: Vec<String>,
         #[param(help = "Exclude files matching glob patterns")] exclude: Vec<String>,
+        #[param(help = "Explicit file paths to check (bypasses file walker)")] files: Vec<String>,
         pretty: bool,
         compact: bool,
     ) -> Result<DiagnosticsReport, String> {
@@ -364,9 +366,33 @@ impl RulesService {
             .unwrap_or_else(|| effective_root.clone());
         let project_root = effective_root.clone();
 
+        // Resolve --files to absolute paths (relative to effective_root).
+        let explicit_files: Option<Vec<std::path::PathBuf>> = if files.is_empty() {
+            None
+        } else {
+            Some(
+                files
+                    .iter()
+                    .map(|f| {
+                        let p = std::path::PathBuf::from(f);
+                        if p.is_absolute() {
+                            p
+                        } else {
+                            effective_root.join(p)
+                        }
+                    })
+                    .collect(),
+            )
+        };
+
+        // Parse --only / --exclude into a PathFilter early so every engine can
+        // skip non-matching files *before* doing expensive work (parsing, walking).
+        let path_filter = normalize_rules_config::PathFilter::new(&only, &exclude);
+
         // --fix path: syntax-only, loop until no fixable issues remain
         if fix {
             let debug_flags = normalize_syntax_rules::DebugFlags::from_args(&debug);
+            let fix_filter = path_filter.clone();
             tokio::task::spawn_blocking(move || {
                 const MAX_FIX_ITERATIONS: usize = 100;
                 let mut total_fixed = 0usize;
@@ -389,6 +415,8 @@ impl RulesService {
                         None,
                         &config.rules,
                         &debug_flags,
+                        explicit_files.as_deref(),
+                        &fix_filter,
                     );
                     let fixable_count = findings.iter().filter(|f| f.fix.is_some()).count();
                     if fixable_count == 0 {
@@ -419,6 +447,8 @@ impl RulesService {
         let rule_filter = rule.clone();
 
         // Syntax + fact + SARIF engines via run_rules_report() (blocking)
+        let explicit_files_clone = explicit_files.clone();
+        let syntax_filter = path_filter.clone();
         let mut report = tokio::task::spawn_blocking(move || {
             run_rules_report(
                 &target_root,
@@ -428,6 +458,8 @@ impl RulesService {
                 &rule_type,
                 &debug,
                 &config,
+                explicit_files_clone.as_deref(),
+                &syntax_filter,
             )
         })
         .await
@@ -579,6 +611,38 @@ impl RulesService {
                 report.merge(r.into());
             }
 
+            // When --only/--exclude is active but no --files given, merge the
+            // path filter into explicit_files so advisory rules skip non-matching
+            // files before parsing.  When --files *is* given, the filter refines
+            // the explicit list.
+            let effective_files: Option<Vec<std::path::PathBuf>> = if !path_filter.is_empty() {
+                if let Some(ref ef) = explicit_files {
+                    Some(
+                        ef.iter()
+                            .filter(|p| {
+                                let rel = p.strip_prefix(&native_root).unwrap_or(p);
+                                path_filter.matches_path(rel)
+                            })
+                            .cloned()
+                            .collect(),
+                    )
+                } else {
+                    // Walk once, filtering by PathFilter, and share the list
+                    // across all advisory rules.
+                    Some(
+                        normalize_native_rules::walk::filtered_gitignore_walk(
+                            &native_root,
+                            &path_filter,
+                        )
+                        .filter(|e| e.path().is_file())
+                        .map(|e| e.path().to_path_buf())
+                        .collect(),
+                    )
+                }
+            } else {
+                explicit_files.clone()
+            };
+
             // Advisory threshold rules (default disabled — only run when explicitly enabled).
             // These can be expensive (tree-sitter parsing), so we check enabled status first.
             let (long_file_res, high_complexity_res, long_function_res) = tokio::join!(
@@ -588,8 +652,13 @@ impl RulesService {
                     }
                     let root = native_root.clone();
                     let threshold = long_file_threshold;
+                    let ef = effective_files.clone();
                     tokio::task::spawn_blocking(move || {
-                        normalize_native_rules::build_long_file_report(&root, threshold)
+                        normalize_native_rules::build_long_file_report(
+                            &root,
+                            threshold,
+                            ef.as_deref(),
+                        )
                     })
                     .await
                     .ok()
@@ -600,8 +669,13 @@ impl RulesService {
                     }
                     let root = native_root.clone();
                     let threshold = high_complexity_threshold;
+                    let ef = effective_files.clone();
                     tokio::task::spawn_blocking(move || {
-                        normalize_native_rules::build_high_complexity_report(&root, threshold)
+                        normalize_native_rules::build_high_complexity_report(
+                            &root,
+                            threshold,
+                            ef.as_deref(),
+                        )
                     })
                     .await
                     .ok()
@@ -612,8 +686,13 @@ impl RulesService {
                     }
                     let root = native_root.clone();
                     let threshold = long_function_threshold;
+                    let ef = effective_files.clone();
                     tokio::task::spawn_blocking(move || {
-                        normalize_native_rules::build_long_function_report(&root, threshold)
+                        normalize_native_rules::build_long_function_report(
+                            &root,
+                            threshold,
+                            ef.as_deref(),
+                        )
                     })
                     .await
                     .ok()
@@ -662,29 +741,13 @@ impl RulesService {
                 .retain(|issue| issue.rule_id == filter.as_str());
         }
 
-        // Apply --only / --exclude path filters to all issues.
-        // After filtering, recompute files_checked so it reflects only the files
-        // that matched the filter (rather than all files with violations pre-filter).
-        if !only.is_empty() || !exclude.is_empty() {
-            let only_pats: Vec<glob::Pattern> = only
-                .iter()
-                .filter_map(|s| glob::Pattern::new(s).ok())
-                .collect();
-            let exclude_pats: Vec<glob::Pattern> = exclude
-                .iter()
-                .filter_map(|s| glob::Pattern::new(s).ok())
-                .collect();
-            report.issues.retain(|issue| {
-                let file = issue.file.as_str();
-                if !exclude_pats.is_empty() && exclude_pats.iter().any(|p| p.matches(file)) {
-                    return false;
-                }
-                if !only_pats.is_empty() && !only_pats.iter().any(|p| p.matches(file)) {
-                    return false;
-                }
-                true
-            });
-            // Recount files_checked from the filtered issues.
+        // Safety-net: apply --only / --exclude path filters to all issues post-walk.
+        // The pre-walk filter handles syntax and advisory native rules; this catches
+        // engines that don't support pre-walk filtering (fact rules, non-advisory native).
+        if !path_filter.is_empty() {
+            report
+                .issues
+                .retain(|issue| path_filter.matches(issue.file.as_str()));
             let unique_files: std::collections::HashSet<&str> =
                 report.issues.iter().map(|i| i.file.as_str()).collect();
             report.files_checked = unique_files.len();
