@@ -410,7 +410,8 @@ impl RulesService {
         .await
         .map_err(|e| format!("Task error: {e}"))?;
 
-        // Native engine (missing-summary, stale-summary, check-refs, stale-docs, check-examples, ratchet, budget)
+        // Native engine (missing-summary, stale-summary, check-refs, stale-docs, check-examples,
+        // ratchet, budget, large-file, high-complexity, long-function)
         // runs in async context; included in All and Native engine types.
         // All checks are independent — run them in parallel.
         if run_native {
@@ -441,6 +442,29 @@ impl RulesService {
                 .get("stale-summary")
                 .map(|r| r.paths.clone())
                 .unwrap_or_default();
+
+            // Helper: check if a native rule is enabled given config overrides and
+            // the descriptor's default_enabled. A `--rule <id>` filter implicitly
+            // enables the targeted rule so users can test disabled rules on demand.
+            let is_native_enabled = |rule_id: &str| -> bool {
+                if rule_filter.as_deref() == Some(rule_id) {
+                    return true;
+                }
+                let desc = normalize_native_rules::NATIVE_RULES
+                    .iter()
+                    .find(|d| d.id == rule_id);
+                let default = desc.map(|d| d.default_enabled).unwrap_or(true);
+                native_config
+                    .rules
+                    .rules
+                    .get(rule_id)
+                    .and_then(|o| o.enabled)
+                    .unwrap_or(default)
+            };
+
+            let run_large_file = is_native_enabled("large-file");
+            let run_high_complexity = is_native_enabled("high-complexity");
+            let run_long_function = is_native_enabled("long-function");
 
             let (
                 missing_res,
@@ -516,6 +540,54 @@ impl RulesService {
             }
             if let Ok(r) = budget_res {
                 report.merge(r.into());
+            }
+
+            // Advisory threshold rules (default disabled — only run when explicitly enabled).
+            // These can be expensive (tree-sitter parsing), so we check enabled status first.
+            let (large_file_res, high_complexity_res, long_function_res) = tokio::join!(
+                async {
+                    if !run_large_file {
+                        return None;
+                    }
+                    let root = native_root.clone();
+                    tokio::task::spawn_blocking(move || {
+                        normalize_native_rules::build_large_file_report(&root)
+                    })
+                    .await
+                    .ok()
+                },
+                async {
+                    if !run_high_complexity {
+                        return None;
+                    }
+                    let root = native_root.clone();
+                    tokio::task::spawn_blocking(move || {
+                        normalize_native_rules::build_high_complexity_report(&root)
+                    })
+                    .await
+                    .ok()
+                },
+                async {
+                    if !run_long_function {
+                        return None;
+                    }
+                    let root = native_root.clone();
+                    tokio::task::spawn_blocking(move || {
+                        normalize_native_rules::build_long_function_report(&root)
+                    })
+                    .await
+                    .ok()
+                },
+            );
+
+            if let Some(r) = large_file_res {
+                report.merge(r);
+            }
+            if let Some(r) = high_complexity_res {
+                report.merge(r);
+            }
+            if let Some(r) = long_function_res {
+                report.merge(r);
             }
 
             // Apply global_allow patterns to native-rule issues (syntax/fact rules

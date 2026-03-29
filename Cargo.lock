@@ -4272,12 +4272,15 @@ dependencies = [
  "normalize-languages",
  "normalize-output",
  "normalize-ratchet",
+ "rayon",
  "regex",
  "schemars",
  "serde",
  "serde_json",
+ "streaming-iterator",
  "tokio",
  "tracing",
+ "tree-sitter",
 ]
 
 [[package]]

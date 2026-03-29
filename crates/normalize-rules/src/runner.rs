@@ -638,7 +638,9 @@ pub fn build_list_report(
                 .and_then(|o| o.severity.as_deref())
                 .unwrap_or(desc.default_severity)
                 .to_string();
-            let enabled = override_.and_then(|o| o.enabled).unwrap_or(true);
+            let enabled = override_
+                .and_then(|o| o.enabled)
+                .unwrap_or(desc.default_enabled);
             let mut tags: Vec<String> = desc.tags.iter().map(|t| t.to_string()).collect();
             if let Some(o) = override_ {
                 tags.extend(o.tags.iter().cloned());

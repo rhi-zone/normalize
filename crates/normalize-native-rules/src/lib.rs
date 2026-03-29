@@ -1,12 +1,15 @@
 //! Native rule checks for normalize.
 //!
-//! Implements stale-summary, check-refs, stale-docs, check-examples, ratchet, and budget as
-//! pure Rust checks (no tree-sitter AST parsing). These are the "native engine"
-//! checks invoked by `normalize rules run --engine native`.
+//! Implements stale-summary, check-refs, stale-docs, check-examples, ratchet, budget,
+//! large-file, high-complexity, and long-function as pure Rust checks. These are the
+//! "native engine" checks invoked by `normalize rules run --engine native`.
 
 pub mod budget;
 pub mod check_examples;
 pub mod check_refs;
+pub mod high_complexity;
+pub mod large_file;
+pub mod long_function;
 pub mod ratchet;
 pub mod stale_docs;
 pub mod stale_summary;
@@ -15,6 +18,9 @@ pub(crate) mod walk;
 pub use budget::{BudgetRulesReport, build_budget_report};
 pub use check_examples::build_check_examples_report;
 pub use check_refs::build_check_refs_report;
+pub use high_complexity::build_high_complexity_report;
+pub use large_file::build_large_file_report;
+pub use long_function::build_long_function_report;
 pub use ratchet::{RatchetRulesReport, build_ratchet_report};
 pub use stale_docs::build_stale_docs_report;
 pub use stale_summary::{build_missing_summary_report, build_stale_summary_report};
@@ -34,6 +40,9 @@ pub struct NativeRuleDescriptor {
     pub message: &'static str,
     /// Tags used for grouping and filtering (e.g. `&["docs", "quality"]`).
     pub tags: &'static [&'static str],
+    /// Whether the rule is enabled by default (before any project-level override).
+    /// Advisory rules like `large-file` default to `false`.
+    pub default_enabled: bool,
 }
 
 /// All native rules with their default metadata.
@@ -43,107 +52,146 @@ pub const NATIVE_RULES: &[NativeRuleDescriptor] = &[
         default_severity: "warning",
         message: "Backtick reference in docs/comments doesn't resolve to a known symbol or file",
         tags: &["correctness", "documentation"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "missing-summary",
         default_severity: "error",
         message: "Directory is missing a required doc file (default: SUMMARY.md; configurable via filenames and paths)",
         tags: &["documentation"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "stale-summary",
         default_severity: "error",
         message: "Doc file hasn't been updated since files in the directory changed (default: SUMMARY.md; configurable via filenames and paths)",
         tags: &["documentation"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "stale-doc",
         default_severity: "info",
         message: "Doc comment references a symbol that no longer exists",
         tags: &["documentation"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "missing-example",
         default_severity: "warning",
         message: "Example referenced in docs doesn't appear in the source file",
         tags: &["documentation"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "ratchet/complexity",
         default_severity: "error",
         message: "Cyclomatic complexity has regressed past the ratchet baseline",
         tags: &["quality", "complexity"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "ratchet/call-complexity",
         default_severity: "error",
         message: "Transitive call complexity has regressed past the ratchet baseline",
         tags: &["quality", "complexity"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "ratchet/line-count",
         default_severity: "error",
         message: "File line count has regressed past the ratchet baseline",
         tags: &["quality"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "ratchet/function-count",
         default_severity: "error",
         message: "Function count has regressed past the ratchet baseline",
         tags: &["quality"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "ratchet/class-count",
         default_severity: "error",
         message: "Class count has regressed past the ratchet baseline",
         tags: &["quality"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "ratchet/comment-line-count",
         default_severity: "error",
         message: "Comment line count has regressed past the ratchet baseline",
         tags: &["quality"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "budget/lines",
         default_severity: "error",
         message: "Line diff exceeds configured budget limit",
         tags: &["quality", "budget"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "budget/functions",
         default_severity: "error",
         message: "Function diff exceeds configured budget limit",
         tags: &["quality", "budget"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "budget/classes",
         default_severity: "error",
         message: "Class diff exceeds configured budget limit",
         tags: &["quality", "budget"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "budget/modules",
         default_severity: "error",
         message: "Module diff exceeds configured budget limit",
         tags: &["quality", "budget"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "budget/todos",
         default_severity: "error",
         message: "TODO/FIXME diff exceeds configured budget limit",
         tags: &["quality", "budget"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "budget/complexity-delta",
         default_severity: "error",
         message: "Complexity delta exceeds configured budget limit",
         tags: &["quality", "budget", "complexity"],
+        default_enabled: true,
     },
     NativeRuleDescriptor {
         id: "budget/dependencies",
         default_severity: "error",
         message: "Dependency diff exceeds configured budget limit",
         tags: &["quality", "budget"],
+        default_enabled: true,
+    },
+    NativeRuleDescriptor {
+        id: "large-file",
+        default_severity: "warning",
+        message: "Source file exceeds line count threshold (default: 500 lines)",
+        tags: &["quality"],
+        default_enabled: false,
+    },
+    NativeRuleDescriptor {
+        id: "high-complexity",
+        default_severity: "warning",
+        message: "Function exceeds cyclomatic complexity threshold (default: 20)",
+        tags: &["quality", "complexity"],
+        default_enabled: false,
+    },
+    NativeRuleDescriptor {
+        id: "long-function",
+        default_severity: "warning",
+        message: "Function exceeds line count threshold (default: 100 lines)",
+        tags: &["quality"],
+        default_enabled: false,
     },
 ];

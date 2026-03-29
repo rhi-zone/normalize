@@ -96,6 +96,7 @@ Crate split is correct. All 38 published crates justified. No reusable logic tra
 **Not yet decided:**
 - Where big-picture commands live (`architecture`, `summary`, `health`) — synthesized understanding, not ranking, not navigation. No trait identified yet.
 - Whether `analyze` dissolves entirely or gets a new identity — will become clear over time.
+- Health-style findings → rules (see Rules Unification item 6).
 
 ### Language trait: remaining .scm migration
 
@@ -294,9 +295,11 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 
 ### Rules Unification — remaining threads
 
-4. **Unify rule engine config** — `syntax-rules` has a config system (`RulesConfig`, per-rule overrides, severity mapping). The other engines (native, fact, future SARIF) have none. Extract a shared `normalize-rules-config` crate (or extend `normalize-output`) with a unified config schema: rule IDs, severity overrides, enable/disable, per-directory excludes. All engines consult this at run time; `normalize rules run` passes it down.
+4. [x] **Unify rule engine config** — done: all four engines (syntax, fact, native, SARIF) consume the shared `RulesConfig` from `normalize-rules-config`. `RuleOverride` supports severity/enabled/allow/tags/filenames/paths. `global_allow` applied consistently.
 
 5. [x] **SARIF passthrough engine** (`--engine sarif`) — implemented: `SarifTool` config type in `normalize-rules-config`, `run_sarif_tools()` in runner, `[[rules.sarif-tools]]` in config.toml. Runs with both `--type sarif` and `--type all` (default).
+
+6. **Health findings → native rules** — Phase 1 done: `large-file`, `high-complexity`, `long-function` native rules added to `normalize-native-rules` with default thresholds (500 lines, complexity 20, 100 lines). All default disabled (advisory). `--rule <id>` implicitly enables. `NativeRuleDescriptor` gained `default_enabled` field. Follow-ups: configurable thresholds via `RuleOverride` (needs numeric threshold field), `analyze health` aggregation of rule diagnostics.
 
 ### Incremental-first architecture
 
