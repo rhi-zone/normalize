@@ -1099,15 +1099,16 @@ pub fn load_rules_config(root: &Path) -> RulesRunConfig {
         .unwrap_or_default();
 
     let global: RulesOnlyConfig = toml::from_str(&global_content).unwrap_or_else(|e| {
-        tracing::warn!("failed to parse global rules config: {}", e);
+        eprintln!("warning: failed to parse global rules config: {e}");
+        eprintln!("  Rule overrides, severity settings, and allow patterns will not apply.");
         RulesOnlyConfig::default()
     });
     let project: RulesOnlyConfig = toml::from_str(&content).unwrap_or_else(|e| {
-        tracing::warn!(
-            "failed to parse project rules config at {:?}: {}",
-            project_path,
-            e
+        eprintln!(
+            "warning: failed to parse rules config at {}: {e}",
+            project_path.display()
         );
+        eprintln!("  Rule overrides, severity settings, and allow patterns will not apply.");
         RulesOnlyConfig::default()
     });
 

@@ -174,6 +174,22 @@ import-based matching when NULL (external/unresolved modules).
   - Current: --shadow flag works, but not default for all edits
   - Zero user interruption (user can edit while agent tests in background)
 
+### Config parse failures are silent (P0 bug)
+
+`load_rules_config` silently returns defaults when config.toml fails to parse (e.g.
+duplicate TOML key). This means a typo in config silently disables ALL rule overrides,
+severity settings, and allow patterns — with no warning. Users see unexpected rule
+behavior and have no way to know the config isn't loading.
+
+Fixes:
+- [x] **Warn on parse failure** — `load_rules_config` prints the parse error to stderr
+  when config.toml exists but fails to deserialize. Falling back to defaults is OK as
+  long as the user sees the warning.
+- [ ] **`normalize config check`** — validate config.toml and report errors (duplicate keys,
+  unknown sections, type mismatches). Should run in the pre-commit hook.
+- [ ] **Validate on `rules run`** — emit a one-line warning at the start of `rules run`
+  if config failed to parse, so the user sees it in CI output too.
+
 ### Configuration system
 
 Sections: `[daemon]`, `[index]`, `[aliases]`, `[view]`, `[analyze]`, `[grep]`, `[pretty]`, `[serve]`
