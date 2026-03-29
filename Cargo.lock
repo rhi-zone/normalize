@@ -3832,6 +3832,7 @@ dependencies = [
  "normalize-ratchet",
  "normalize-refactor",
  "normalize-rules",
+ "normalize-rules-config",
  "normalize-scope",
  "normalize-session-analysis",
  "normalize-shadow",
@@ -4399,6 +4400,7 @@ dependencies = [
  "normalize-core",
  "schemars",
  "serde",
+ "toml",
 ]
 
 [[package]]

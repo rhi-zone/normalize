@@ -57,9 +57,12 @@ pub struct SarifTool {
     pub command: Vec<String>,
 }
 
-/// Per-rule configuration override.
+/// Common per-rule configuration fields shared across all rule engines.
 ///
-/// Used under `[rules."rule-id"]` in `.normalize/config.toml`.
+/// Used under `[rules."rule-id"]` in `.normalize/config.toml`. These fields
+/// apply to every rule regardless of engine. Rule-specific configuration
+/// (e.g. thresholds, filenames) is defined as typed structs owned by each
+/// rule and deserialized from the same TOML table via `#[serde(flatten)]`.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, Default, schemars::JsonSchema)]
 #[serde(default)]
 pub struct RuleOverride {
@@ -73,41 +76,14 @@ pub struct RuleOverride {
     /// Additional tags to add to this rule (appends to built-in tags).
     #[serde(default)]
     pub tags: Vec<String>,
-    /// Rule-specific: filenames to require in each directory (OR semantics).
-    ///
-    /// Used by `stale-summary` and `missing-summary`. A directory is compliant
-    /// if it contains **any** of the listed files. Defaults to `["SUMMARY.md"]`
-    /// when not set. To require both files, use two `[[rule]]` entries instead.
-    ///
-    /// Accepts either a single string (`filename = "CLAUDE.md"`) or a list
-    /// (`filenames = ["SUMMARY.md", "CLAUDE.md"]`). The single-string form is
-    /// deserialized as a one-element list.
-    #[serde(default, deserialize_with = "deserialize_one_or_many")]
-    pub filenames: Vec<String>,
-    /// Rule-specific: directory glob patterns that scope this rule's coverage.
-    ///
-    /// Used by `missing-summary` and `stale-summary`. When set, the rule only
-    /// checks directories whose path (relative to the project root) matches at
-    /// least one of the listed glob patterns. An unset or empty `paths` list
-    /// preserves the default behavior: the rule applies to every directory.
-    ///
-    /// Accepts either a single string (`paths = "crates/*"`) or a list
-    /// (`paths = ["crates/*", "docs"]`). The single-string form is deserialized
-    /// as a one-element list.
-    ///
-    /// Example:
-    /// ```toml
-    /// [rules."missing-summary"]
-    /// paths = ["crates/*", "docs", "scripts"]
-    ///
-    /// [rules."stale-summary"]
-    /// paths = ["crates/*", "crates/*/src"]
-    /// ```
-    #[serde(default, deserialize_with = "deserialize_one_or_many")]
-    pub paths: Vec<String>,
+    /// Raw TOML table for rule-specific fields. Each rule deserializes its
+    /// own typed config from this via [`RuleOverride::rule_config`].
+    #[serde(flatten)]
+    #[schemars(skip)]
+    pub extra: std::collections::HashMap<String, toml::Value>,
 }
 
-fn deserialize_one_or_many<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+pub fn deserialize_one_or_many<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -130,11 +106,12 @@ impl normalize_core::Merge for RuleOverride {
     /// Merge two `RuleOverride` values, with `other` taking priority.
     ///
     /// - `Option` fields: `other`'s value wins if `Some`; falls back to `self`.
-    /// - Vec fields (`allow`, `tags`, `filenames`, `paths`): if `other`'s field is non-empty
-    ///   it replaces `self`'s field entirely; an empty `other` field inherits from
-    ///   `self`. **This means you cannot reset a Vec to empty via merge** — an empty
-    ///   `other` vec is treated as "no override" rather than "clear the list".
+    /// - Vec fields (`allow`, `tags`): if `other`'s field is non-empty it replaces
+    ///   `self`'s field entirely; an empty `other` field inherits from `self`.
+    /// - `extra` HashMap: merged key-by-key, `other`'s keys override `self`'s.
     fn merge(self, other: Self) -> Self {
+        let mut extra = self.extra;
+        extra.extend(other.extra);
         Self {
             severity: other.severity.or(self.severity),
             enabled: other.enabled.or(self.enabled),
@@ -148,17 +125,32 @@ impl normalize_core::Merge for RuleOverride {
             } else {
                 other.tags
             },
-            filenames: if other.filenames.is_empty() {
-                self.filenames
-            } else {
-                other.filenames
-            },
-            paths: if other.paths.is_empty() {
-                self.paths
-            } else {
-                other.paths
-            },
+            extra,
         }
+    }
+}
+
+impl RuleOverride {
+    /// Deserialize rule-specific config from the `extra` fields.
+    ///
+    /// Each rule defines a typed config struct and calls this to extract it.
+    /// Unknown fields in `extra` that don't match `T`'s fields are ignored.
+    ///
+    /// ```ignore
+    /// #[derive(Deserialize, Default)]
+    /// struct LargeFileConfig { threshold: Option<u64> }
+    ///
+    /// let cfg: LargeFileConfig = override_.rule_config();
+    /// let threshold = cfg.threshold.unwrap_or(500);
+    /// ```
+    pub fn rule_config<T: serde::de::DeserializeOwned + Default>(&self) -> T {
+        let table = toml::Value::Table(
+            self.extra
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        );
+        table.try_into().unwrap_or_default()
     }
 }
 

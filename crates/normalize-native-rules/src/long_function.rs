@@ -12,9 +12,6 @@ use streaming_iterator::StreamingIterator;
 
 use crate::walk::gitignore_walk;
 
-/// Default function line count threshold.
-const DEFAULT_THRESHOLD: usize = 100;
-
 /// Analyze a single file for long functions.
 ///
 /// Returns a vec of (rel_path, function_name, start_line, line_count) tuples.
@@ -91,9 +88,7 @@ fn analyze_file(path: &Path, root: &Path, threshold: usize) -> Vec<(String, Stri
 ///
 /// Walks all source files under `root`, parses each with tree-sitter, and emits
 /// an issue for every function whose line span meets or exceeds the threshold.
-pub fn build_long_function_report(root: &Path) -> DiagnosticsReport {
-    let threshold = DEFAULT_THRESHOLD;
-
+pub fn build_long_function_report(root: &Path, threshold: usize) -> DiagnosticsReport {
     let files: Vec<_> = gitignore_walk(root)
         .filter(|e| e.path().is_file())
         .filter(|e| support_for_path(e.path()).is_some())

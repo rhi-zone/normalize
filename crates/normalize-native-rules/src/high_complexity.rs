@@ -13,9 +13,6 @@ use streaming_iterator::StreamingIterator;
 
 use crate::walk::gitignore_walk;
 
-/// Default cyclomatic complexity threshold.
-const DEFAULT_THRESHOLD: usize = 20;
-
 /// Analyze a single file for high-complexity functions.
 ///
 /// Returns a vec of (rel_path, function_name, start_line, complexity) tuples.
@@ -131,9 +128,7 @@ fn count_complexity_with_query(
 /// Walks all source files under `root`, parses each with tree-sitter, and emits
 /// an issue for every function whose cyclomatic complexity meets or exceeds the
 /// threshold.
-pub fn build_high_complexity_report(root: &Path) -> DiagnosticsReport {
-    let threshold = DEFAULT_THRESHOLD;
-
+pub fn build_high_complexity_report(root: &Path, threshold: usize) -> DiagnosticsReport {
     // Collect files first so we can process in parallel.
     let files: Vec<_> = gitignore_walk(root)
         .filter(|e| e.path().is_file())

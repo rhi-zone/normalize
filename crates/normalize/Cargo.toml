@@ -78,6 +78,7 @@ normalize-native-rules = { path = "../normalize-native-rules", version = "0.2.0"
 normalize-budget = { path = "../normalize-budget", version = "0.2.0", features = ["cli"] }
 normalize-ratchet = { path = "../normalize-ratchet", version = "0.2.0", features = ["cli"] }
 normalize-rules = { path = "../normalize-rules", version = "0.2.0", features = ["cli"] }
+normalize-rules-config = { path = "../normalize-rules-config", version = "0.2.0" }
 normalize-context = { path = "../normalize-context", version = "0.2.0", features = ["cli"] }
 server-less = { workspace = true }
 normalize-cli-parser = { path = "../normalize-cli-parser", version = "0.2.0" }

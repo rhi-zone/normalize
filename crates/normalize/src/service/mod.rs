@@ -968,18 +968,29 @@ impl NormalizeService {
             let native_root = effective_root.clone();
             let native_config = load_rules_config(&native_root);
             let threshold = 10;
-            let stale_summary_filenames: Vec<String> = native_config
+
+            #[derive(serde::Deserialize, Default)]
+            struct SummaryRuleConfig {
+                #[serde(
+                    default,
+                    deserialize_with = "normalize_rules_config::deserialize_one_or_many"
+                )]
+                filenames: Vec<String>,
+                #[serde(
+                    default,
+                    deserialize_with = "normalize_rules_config::deserialize_one_or_many"
+                )]
+                paths: Vec<String>,
+            }
+
+            let stale_summary_cfg: SummaryRuleConfig = native_config
                 .rules
                 .rules
                 .get("stale-summary")
-                .map(|r| r.filenames.clone())
+                .map(|r| r.rule_config())
                 .unwrap_or_default();
-            let stale_summary_paths: Vec<String> = native_config
-                .rules
-                .rules
-                .get("stale-summary")
-                .map(|r| r.paths.clone())
-                .unwrap_or_default();
+            let stale_summary_filenames = stale_summary_cfg.filenames;
+            let stale_summary_paths = stale_summary_cfg.paths;
 
             let (summary_res, stale_res, examples_res, refs_res, ratchet_res, budget_res) = tokio::join!(
                 tokio::task::spawn_blocking({

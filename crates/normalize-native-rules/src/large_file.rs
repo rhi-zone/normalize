@@ -7,9 +7,6 @@ use std::path::Path;
 
 use crate::walk::gitignore_walk;
 
-/// Default line count threshold for the large-file rule.
-const DEFAULT_THRESHOLD: usize = 500;
-
 /// Well-known lock files that should never be flagged as large.
 fn is_lockfile(name: &str) -> bool {
     matches!(
@@ -62,8 +59,7 @@ fn load_allow_patterns(root: &Path) -> Vec<glob::Pattern> {
 /// Walks all source files under `root`, counts lines, and emits an issue for
 /// each file exceeding the threshold. Lock files and allowlisted paths are
 /// skipped.
-pub fn build_large_file_report(root: &Path) -> DiagnosticsReport {
-    let threshold = DEFAULT_THRESHOLD;
+pub fn build_large_file_report(root: &Path, threshold: usize) -> DiagnosticsReport {
     let allow_patterns = load_allow_patterns(root);
 
     let mut issues = Vec::new();

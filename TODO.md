@@ -933,6 +933,33 @@ Concrete unblocked items:
 - [x] Split `stale-summary` into `missing-summary` (presence) + `stale-summary` (freshness), each with `paths` glob config.
 - [x] `normalize view <file>` surfaces `//!` crate/module docs and equivalents for all languages. (done — Rust `//!`, Python docstrings, Go package comments, JS JSDoc, Ruby `#` — implemented in `extract_module_doc` per language; duplicate of item at L735)
 
+**Pillar 7 — Sub-100ms hot path (hook-grade latency)**
+
+normalize should be fast enough to run in a hook after every single tool call — not just
+pre-commit. That means the hot path (`rules run` on changed files) needs to be under 100ms,
+possibly much less. Current cold `rules run` is seconds; even warm daemon routing is hundreds
+of ms.
+
+Strategies (non-exhaustive, needs investigation):
+- **Persistent daemon with pre-warmed state** — daemon already exists but CLI→daemon handoff
+  adds process-spawn overhead. Consider: keep a long-lived client connection, or make the
+  daemon callable in-process (library mode).
+- **Incremental invalidation at file granularity** — on a tool call that writes one file,
+  only re-run rules affected by that file. Syntax rules already have mtime cache; fact rules
+  need file-scoped Datalog retraction (Pillar 4); native rules need dependency tracking.
+- **Scope narrowing** — a hook knows which files changed. `rules run --files <list>` should
+  skip all work on unchanged files, including file walking. Today `--only` filters post-walk;
+  need pre-walk scoping.
+- **Query result caching in SQLite** — avoid re-parsing unchanged files for tree-sitter
+  queries (tags, complexity, calls). Already in Pillar 4 as "persistent query cache".
+- **Process overhead** — if even the daemon handoff is too slow, consider embedding normalize
+  as a library in the hook process (e.g. a Claude Code hook that `dlopen`s normalize).
+
+Open questions:
+- What's the actual latency budget? 100ms is a guess. Measure what's perceptible.
+- Which rules are worth running on every tool call vs. only pre-commit?
+- Can we tier rules by cost (syntax = cheap, fact = medium, native = expensive)?
+
 **Not targeting 0.3.0:**
 - Full AST rewriting (tree-sitter edit API, round-trip fidelity)
 - Type-aware refactoring (normalize has no type resolver)

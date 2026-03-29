@@ -15,6 +15,29 @@ use crate::runner::{
     remove_rule, run_rules_report, show_rule_structured, update_rules,
 };
 
+/// Typed config for summary rules (stale-summary, missing-summary).
+/// Deserialized from `extra` fields on the `RuleOverride` via `rule_config()`.
+#[derive(serde::Deserialize, Default)]
+struct SummaryRuleConfig {
+    #[serde(
+        default,
+        deserialize_with = "normalize_rules_config::deserialize_one_or_many"
+    )]
+    filenames: Vec<String>,
+    #[serde(
+        default,
+        deserialize_with = "normalize_rules_config::deserialize_one_or_many"
+    )]
+    paths: Vec<String>,
+}
+
+/// Typed config for threshold-based rules (large-file, high-complexity, long-function).
+/// Deserialized from `extra` fields on the `RuleOverride` via `rule_config()`.
+#[derive(serde::Deserialize, Default)]
+struct ThresholdConfig {
+    threshold: Option<usize>,
+}
+
 /// Resolve pretty mode: enabled on TTY (or forced via --pretty), disabled by --compact.
 fn resolve_pretty(pretty: bool, compact: bool) -> bool {
     use std::io::IsTerminal;
@@ -418,30 +441,22 @@ impl RulesService {
             let native_root = effective_root.clone();
             let native_config = load_rules_config(&native_root);
             let threshold = 10;
-            let missing_summary_filenames: Vec<String> = native_config
+            let missing_summary_cfg: SummaryRuleConfig = native_config
                 .rules
                 .rules
                 .get("missing-summary")
-                .map(|r| r.filenames.clone())
+                .map(|r| r.rule_config())
                 .unwrap_or_default();
-            let missing_summary_paths: Vec<String> = native_config
-                .rules
-                .rules
-                .get("missing-summary")
-                .map(|r| r.paths.clone())
-                .unwrap_or_default();
-            let stale_summary_filenames: Vec<String> = native_config
+            let missing_summary_filenames = missing_summary_cfg.filenames;
+            let missing_summary_paths = missing_summary_cfg.paths;
+            let stale_summary_cfg: SummaryRuleConfig = native_config
                 .rules
                 .rules
                 .get("stale-summary")
-                .map(|r| r.filenames.clone())
+                .map(|r| r.rule_config())
                 .unwrap_or_default();
-            let stale_summary_paths: Vec<String> = native_config
-                .rules
-                .rules
-                .get("stale-summary")
-                .map(|r| r.paths.clone())
-                .unwrap_or_default();
+            let stale_summary_filenames = stale_summary_cfg.filenames;
+            let stale_summary_paths = stale_summary_cfg.paths;
 
             // Helper: check if a native rule is enabled given config overrides and
             // the descriptor's default_enabled. A `--rule <id>` filter implicitly
@@ -465,6 +480,28 @@ impl RulesService {
             let run_large_file = is_native_enabled("large-file");
             let run_high_complexity = is_native_enabled("high-complexity");
             let run_long_function = is_native_enabled("long-function");
+
+            let large_file_threshold: usize = native_config
+                .rules
+                .rules
+                .get("large-file")
+                .map(|r| r.rule_config::<ThresholdConfig>())
+                .and_then(|c| c.threshold)
+                .unwrap_or(500);
+            let high_complexity_threshold: usize = native_config
+                .rules
+                .rules
+                .get("high-complexity")
+                .map(|r| r.rule_config::<ThresholdConfig>())
+                .and_then(|c| c.threshold)
+                .unwrap_or(20);
+            let long_function_threshold: usize = native_config
+                .rules
+                .rules
+                .get("long-function")
+                .map(|r| r.rule_config::<ThresholdConfig>())
+                .and_then(|c| c.threshold)
+                .unwrap_or(100);
 
             let (
                 missing_res,
@@ -550,8 +587,9 @@ impl RulesService {
                         return None;
                     }
                     let root = native_root.clone();
+                    let threshold = large_file_threshold;
                     tokio::task::spawn_blocking(move || {
-                        normalize_native_rules::build_large_file_report(&root)
+                        normalize_native_rules::build_large_file_report(&root, threshold)
                     })
                     .await
                     .ok()
@@ -561,8 +599,9 @@ impl RulesService {
                         return None;
                     }
                     let root = native_root.clone();
+                    let threshold = high_complexity_threshold;
                     tokio::task::spawn_blocking(move || {
-                        normalize_native_rules::build_high_complexity_report(&root)
+                        normalize_native_rules::build_high_complexity_report(&root, threshold)
                     })
                     .await
                     .ok()
@@ -572,8 +611,9 @@ impl RulesService {
                         return None;
                     }
                     let root = native_root.clone();
+                    let threshold = long_function_threshold;
                     tokio::task::spawn_blocking(move || {
-                        normalize_native_rules::build_long_function_report(&root)
+                        normalize_native_rules::build_long_function_report(&root, threshold)
                     })
                     .await
                     .ok()
