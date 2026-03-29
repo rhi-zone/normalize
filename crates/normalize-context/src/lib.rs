@@ -70,18 +70,11 @@ impl normalize_output::OutputFormatter for ContextReport {
         if self.blocks.is_empty() {
             return "No context found.".to_string();
         }
-        if self.blocks.len() == 1 {
-            return self.blocks[0].body.trim().to_string();
-        }
-        let mut out = String::new();
-        for block in &self.blocks {
-            if !out.is_empty() {
-                out.push_str("\n\n---\n\n");
-            }
-            out.push_str(&format!("<!-- {} -->\n\n", block.source.display()));
-            out.push_str(block.body.trim());
-        }
-        out
+        self.blocks
+            .iter()
+            .map(|b| b.body.trim().to_string())
+            .collect::<Vec<_>>()
+            .join("\n\n")
     }
 
     fn format_pretty(&self) -> String {
