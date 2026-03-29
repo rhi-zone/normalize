@@ -31,7 +31,7 @@ struct SummaryRuleConfig {
     paths: Vec<String>,
 }
 
-/// Typed config for threshold-based rules (large-file, high-complexity, long-function).
+/// Typed config for threshold-based rules (long-file, high-complexity, long-function).
 /// Deserialized from `extra` fields on the `RuleOverride` via `rule_config()`.
 #[derive(serde::Deserialize, Default)]
 struct ThresholdConfig {
@@ -434,7 +434,7 @@ impl RulesService {
         .map_err(|e| format!("Task error: {e}"))?;
 
         // Native engine (missing-summary, stale-summary, check-refs, stale-docs, check-examples,
-        // ratchet, budget, large-file, high-complexity, long-function)
+        // ratchet, budget, long-file, high-complexity, long-function)
         // runs in async context; included in All and Native engine types.
         // All checks are independent — run them in parallel.
         if run_native {
@@ -477,14 +477,14 @@ impl RulesService {
                     .unwrap_or(default)
             };
 
-            let run_large_file = is_native_enabled("large-file");
+            let run_long_file = is_native_enabled("long-file");
             let run_high_complexity = is_native_enabled("high-complexity");
             let run_long_function = is_native_enabled("long-function");
 
-            let large_file_threshold: usize = native_config
+            let long_file_threshold: usize = native_config
                 .rules
                 .rules
-                .get("large-file")
+                .get("long-file")
                 .map(|r| r.rule_config::<ThresholdConfig>())
                 .and_then(|c| c.threshold)
                 .unwrap_or(500);
@@ -581,15 +581,15 @@ impl RulesService {
 
             // Advisory threshold rules (default disabled — only run when explicitly enabled).
             // These can be expensive (tree-sitter parsing), so we check enabled status first.
-            let (large_file_res, high_complexity_res, long_function_res) = tokio::join!(
+            let (long_file_res, high_complexity_res, long_function_res) = tokio::join!(
                 async {
-                    if !run_large_file {
+                    if !run_long_file {
                         return None;
                     }
                     let root = native_root.clone();
-                    let threshold = large_file_threshold;
+                    let threshold = long_file_threshold;
                     tokio::task::spawn_blocking(move || {
-                        normalize_native_rules::build_large_file_report(&root, threshold)
+                        normalize_native_rules::build_long_file_report(&root, threshold)
                     })
                     .await
                     .ok()
@@ -620,7 +620,7 @@ impl RulesService {
                 },
             );
 
-            if let Some(r) = large_file_res {
+            if let Some(r) = long_file_res {
                 report.merge(r);
             }
             if let Some(r) = high_complexity_res {

@@ -148,10 +148,7 @@ const BUILTIN_RULES: &[BuiltinFactsRule] = &[
         id: "god-class",
         content: include_str!("builtin_dl/god_class.dl"),
     },
-    BuiltinFactsRule {
-        id: "long-function",
-        content: include_str!("builtin_dl/long_function.dl"),
-    },
+    // long-function: superseded by configurable native rule in normalize-native-rules
     BuiltinFactsRule {
         id: "dead-api",
         content: include_str!("builtin_dl/dead_api.dl"),

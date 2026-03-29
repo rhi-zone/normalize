@@ -310,7 +310,7 @@ For **file-level or cross-location findings**:
 | `hotspots-allow` | Files with high git churn (metadata about file history) |
 | `duplicate-functions-allow` | Pairs of intentionally similar functions |
 | `duplicate-types-allow` | Pairs of intentionally similar types |
-| `large-files-allow` | Files allowed to exceed size threshold |
+| `large-files-allow` | Files allowed to exceed line count threshold (`long-file` rule) |
 
 These can't be inline comments because:
 - They're about whole files, not specific lines

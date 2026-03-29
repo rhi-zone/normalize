@@ -1,14 +1,14 @@
 //! Native rule checks for normalize.
 //!
 //! Implements stale-summary, check-refs, stale-docs, check-examples, ratchet, budget,
-//! large-file, high-complexity, and long-function as pure Rust checks. These are the
+//! long-file, high-complexity, and long-function as pure Rust checks. These are the
 //! "native engine" checks invoked by `normalize rules run --engine native`.
 
 pub mod budget;
 pub mod check_examples;
 pub mod check_refs;
 pub mod high_complexity;
-pub mod large_file;
+pub mod long_file;
 pub mod long_function;
 pub mod ratchet;
 pub mod stale_docs;
@@ -19,7 +19,7 @@ pub use budget::{BudgetRulesReport, build_budget_report};
 pub use check_examples::build_check_examples_report;
 pub use check_refs::build_check_refs_report;
 pub use high_complexity::build_high_complexity_report;
-pub use large_file::build_large_file_report;
+pub use long_file::build_long_file_report;
 pub use long_function::build_long_function_report;
 pub use ratchet::{RatchetRulesReport, build_ratchet_report};
 pub use stale_docs::build_stale_docs_report;
@@ -41,7 +41,7 @@ pub struct NativeRuleDescriptor {
     /// Tags used for grouping and filtering (e.g. `&["docs", "quality"]`).
     pub tags: &'static [&'static str],
     /// Whether the rule is enabled by default (before any project-level override).
-    /// Advisory rules like `large-file` default to `false`.
+    /// Advisory rules like `long-file` default to `false`.
     pub default_enabled: bool,
 }
 
@@ -174,7 +174,7 @@ pub const NATIVE_RULES: &[NativeRuleDescriptor] = &[
         default_enabled: true,
     },
     NativeRuleDescriptor {
-        id: "large-file",
+        id: "long-file",
         default_severity: "warning",
         message: "Source file exceeds line count threshold (default: 500 lines)",
         tags: &["quality"],

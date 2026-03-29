@@ -201,3 +201,47 @@ impl normalize_core::Merge for RulesConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn allow_field_not_swallowed_by_extra() {
+        let toml_str = r#"
+global-allow = ["**/fixtures/**"]
+
+[no-grammar-loader-new]
+allow = ["**/tests/**", "src/lib.rs"]
+threshold = 42
+"#;
+        let config: RulesConfig = toml::from_str(toml_str).unwrap();
+        let rule = config.rules.get("no-grammar-loader-new").unwrap();
+        assert_eq!(rule.allow, vec!["**/tests/**", "src/lib.rs"]);
+        assert!(!rule.extra.contains_key("allow"));
+        assert!(rule.extra.contains_key("threshold"));
+    }
+
+    #[test]
+    fn full_config_round_trip() {
+        // Simulate the actual config.toml structure
+        let toml_str = r#"
+global-allow = ["**/tests/fixtures/**", "**/fixtures/**", ".claude/**"]
+
+["rust/dbg-macro"]
+severity = "error"
+allow = ["**/tests/fixtures/**"]
+
+["no-grammar-loader-new"]
+allow = ["**/tests/**", "crates/*/tests/**", "**/normalize-scope/**"]
+"#;
+        let config: RulesConfig = toml::from_str(toml_str).unwrap();
+        let dbg = config.rules.get("rust/dbg-macro").unwrap();
+        assert_eq!(dbg.severity.as_deref(), Some("error"));
+        assert_eq!(dbg.allow, vec!["**/tests/fixtures/**"]);
+
+        let ngl = config.rules.get("no-grammar-loader-new").unwrap();
+        assert_eq!(ngl.allow.len(), 3);
+        assert_eq!(ngl.allow[2], "**/normalize-scope/**");
+    }
+}

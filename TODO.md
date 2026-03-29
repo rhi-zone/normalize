@@ -289,6 +289,26 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 - [x] Version bump to 0.2.0 — all 38 published crates bumped; `normalize update` works against GitHub releases.
 - [x] Polish pass — `--help` audit, exit codes verified, smoke-tested on external repos.
 
+### Tighten threshold rules to zero violations
+
+Rules enabled at generous thresholds (long-file 6400, high-complexity 65, long-function 350)
+to establish a floor. Target: reduce all to reasonable thresholds (long-file 500,
+high-complexity 20, long-function 100) by splitting/refactoring violating code. Track via
+ratchet once integrated.
+
+### Claude Code hooks for lint-on-save
+
+Once Pillar 7 (sub-100ms hot path) delivers acceptable perf, add Claude Code hooks that
+run `normalize rules run --files <changed>` after every tool call. This gives agents
+immediate feedback on violations they introduce. Blocked on Pillar 7.
+
+### Phase out *-allow files
+
+`.normalize/large-files-allow` and similar per-rule allowlists should migrate to
+`[rules."long-file"] allow = [...]` in config.toml. The file-based allowlists are a
+legacy pattern from before the config system existed. Remove the file-loading code
+once all entries are in config.
+
 ---
 
 ## P2 — Structural Improvements / Larger Refactors
@@ -299,7 +319,7 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 
 5. [x] **SARIF passthrough engine** (`--engine sarif`) — implemented: `SarifTool` config type in `normalize-rules-config`, `run_sarif_tools()` in runner, `[[rules.sarif-tools]]` in config.toml. Runs with both `--type sarif` and `--type all` (default).
 
-6. **Health findings → native rules** — Phase 1 done: `large-file`, `high-complexity`, `long-function` native rules added to `normalize-native-rules` with default thresholds (500 lines, complexity 20, 100 lines). All default disabled (advisory). `--rule <id>` implicitly enables. `NativeRuleDescriptor` gained `default_enabled` field. Follow-ups: configurable thresholds via `RuleOverride` (needs numeric threshold field), `analyze health` aggregation of rule diagnostics.
+6. **Health findings → native rules** — Phase 1 done: `long-file`, `high-complexity`, `long-function` native rules added to `normalize-native-rules` with default thresholds (500 lines, complexity 20, 100 lines). All default disabled (advisory). `--rule <id>` implicitly enables. `NativeRuleDescriptor` gained `default_enabled` field. Follow-ups: configurable thresholds via `RuleOverride` (needs numeric threshold field), `analyze health` aggregation of rule diagnostics.
 
 ### Incremental-first architecture
 
@@ -638,6 +658,20 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 - Tool avoidance: grep instead of normalize, spawning Explore agents
 - Follow-up patterns: `--types-only` → immediately view symbol
 - Repeated queries: same file viewed multiple times
+
+### Large File / Complexity Diagnostics — Open Question
+
+`normalize rules run` runs in the pre-commit hook and can flag large files and high
+complexity. Open questions:
+- Are large-file violations currently errors (blocking) or warnings in the pre-commit?
+- Should they be errors? Pre-commit is a safety net but late — the agent has already
+  written, re-read, and worked with the file by then.
+- Earlier signal: `PostToolUse` hook on Edit/Write that injects file-size into
+  `additionalContext` immediately after the edit. Actionable at creation time.
+- CC has no LSP, so the LSP diagnostic path doesn't help for agent workflows.
+- The right answer may be: errors in pre-commit (blocking) + hook for early warning.
+  Pre-commit already has `normalize rules run` — check whether large-file rules are
+  wired into it and at what severity.
 
 ### Workspace/Context Management
 
