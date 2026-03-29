@@ -1016,13 +1016,16 @@ Projected hook budget (release, file-scoped, 1-5 changed files):
 - **Total: ~100-200ms** — achievable
 
 Concrete steps (ordered by impact):
-- [ ] **`--files` flag** — accept explicit file list, bypass walker entirely. This is the
-  single highest-impact change. All three engines need to accept a pre-resolved file list
-  instead of walking the tree. Without this, nothing else matters.
+- [ ] **Daemon-cached diagnostics for all engines** — the daemon already caches fact rule
+  results (`RunRules` request, warm `ENGINE_CACHE`, 13ms in release). Extend to syntax
+  and native rules: daemon watches files, re-runs affected rules on change, caches
+  per-file diagnostics. `rules run` asks daemon for cached results → instant response.
+  The LSP already does this for syntax rules (two-tier diagnostics). Wire it for CLI.
 - [ ] **Pre-walk scoping for `--only`** — `--only` currently filters post-walk. Move the
   glob filter into the walker so non-matching files are never enumerated.
-- [ ] **Persistent daemon for syntax** — syntax rules at 5s cold is too slow even in release.
-  Cache parsed results in the daemon; return cached diagnostics for unchanged files.
+- [ ] **`--files` flag** — accept explicit file list, bypass walker entirely. Useful when
+  the daemon isn't running (CI, one-off checks). All three engines need to accept a
+  pre-resolved file list instead of walking the tree.
 - [ ] **Process overhead** — if even the daemon handoff is too slow, consider embedding normalize
   as a library in the hook process (e.g. a Claude Code hook that `dlopen`s normalize).
 
