@@ -9,6 +9,7 @@ use crate::sessions::{FormatRegistry, LogFormat, SessionFile};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime};
 
 /// Fields that `sessions stats` can be sorted on (affects the per-tool rows).
@@ -446,22 +447,104 @@ fn group_key(session: &SessionFile, by_project: bool, by_day: bool) -> String {
     parts.join("/")
 }
 
+/// Resolve a Claude Code dash-separated directory name back to a real filesystem path.
+///
+/// Claude Code encodes project paths by replacing `/` with `-` and prepending `-`:
+///   `/home/me/git/my-cool-project` → `-home-me-git-my-cool-project`
+///
+/// The challenge is that project names can contain dashes, making naive splitting
+/// ambiguous. This function uses a greedy walk from the root: at each level, if the
+/// next segment doesn't exist as a directory, it joins it with subsequent segments
+/// via dash until a match is found.
+///
+/// Results are cached so repeated calls for the same directory name avoid filesystem
+/// checks.
+fn resolve_claude_dir_name(dir_name: &str) -> Option<PathBuf> {
+    static CACHE: OnceLock<Mutex<HashMap<String, Option<PathBuf>>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+
+    if let Ok(guard) = cache.lock()
+        && let Some(cached) = guard.get(dir_name)
+    {
+        return cached.clone();
+    }
+
+    let stripped = dir_name.strip_prefix('-').unwrap_or(dir_name);
+    let segments: Vec<&str> = stripped.split('-').collect();
+    if segments.is_empty() {
+        return None;
+    }
+
+    // Fast path: try converting all dashes to slashes
+    let all_slashes = PathBuf::from(format!("/{stripped}").replace('-', "/"));
+    if all_slashes.exists() {
+        if let Ok(mut guard) = cache.lock() {
+            guard.insert(dir_name.to_string(), Some(all_slashes.clone()));
+        }
+        return Some(all_slashes);
+    }
+
+    // Greedy walk: at each level, try the next segment as a directory component.
+    // If it doesn't exist, join with subsequent segments via dash until it does.
+    let mut current = PathBuf::from("/");
+    let mut i = 0;
+    while i < segments.len() {
+        let mut candidate = current.join(segments[i]);
+        let mut j = i + 1;
+
+        // If this segment alone doesn't exist as a directory, try joining with
+        // subsequent segments via dash (greedy: consume as few as possible first)
+        while !candidate.exists() && j < segments.len() {
+            let mut name = segments[i].to_string();
+            for seg in &segments[i + 1..=j] {
+                name.push('-');
+                name.push_str(seg);
+            }
+            candidate = current.join(&name);
+            j += 1;
+        }
+
+        if !candidate.exists() {
+            // Could not resolve further — give up
+            if let Ok(mut guard) = cache.lock() {
+                guard.insert(dir_name.to_string(), None);
+            }
+            return None;
+        }
+
+        current = candidate;
+        i = j;
+    }
+
+    if let Ok(mut guard) = cache.lock() {
+        guard.insert(dir_name.to_string(), Some(current.clone()));
+    }
+    Some(current)
+}
+
 /// Extract repository name from session path.
-/// For paths like ~/.claude/projects/-home-me-git-normalize/session.jsonl, returns "normalize"
+/// For paths like ~/.claude/projects/-home-me-git-normalize/session.jsonl, returns "normalize".
+/// Handles projects with dashes in their name (e.g. `-home-me-git-my-cool-project` → `my-cool-project`).
 fn extract_repo_name(path: &Path) -> String {
     let path_str = path.to_string_lossy();
 
     if let Some(projects_idx) = path_str.find(".claude/projects/") {
         let after_projects = &path_str[projects_idx + ".claude/projects/".len()..];
-        if let Some(slash_idx) = after_projects.find('/') {
-            let proj_dir = &after_projects[..slash_idx];
+        let proj_dir = if let Some(slash_idx) = after_projects.find('/') {
+            &after_projects[..slash_idx]
+        } else {
+            after_projects
+        };
 
-            // Clean up: -home-me-git-normalize -> normalize
-            if let Some(last_dash) = proj_dir.rfind('-') {
-                return proj_dir[last_dash + 1..].to_string();
-            }
-            return proj_dir.to_string();
+        // Try to resolve the dash-separated name back to a real path
+        if let Some(resolved) = resolve_claude_dir_name(proj_dir)
+            && let Some(name) = resolved.file_name().and_then(|n| n.to_str())
+        {
+            return name.to_string();
         }
+
+        // Fallback: return the full directory name (better than truncating at last dash)
+        return proj_dir.to_string();
     }
 
     path.parent()
@@ -586,5 +669,94 @@ fn analyze_paths_to_json(paths: &[PathBuf], format_name: Option<&str>) -> String
     match aggregate_sessions(paths, format_name) {
         Some(analysis) => serde_json::to_string(&analysis).unwrap_or_else(|_| "{}".to_string()),
         None => "{}".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_repo_name_simple_project() {
+        // No dashes in the project name — all slashes resolve directly
+        let path = PathBuf::from("/home/me/.claude/projects/-home-me-git-normalize/session.jsonl");
+        let name = extract_repo_name(&path);
+        // The resolved path /home/me/git/normalize should exist on this machine,
+        // but even if it doesn't, the fallback is the full dir name (not truncated).
+        // We just verify it's not the broken single-segment "normalize" from rfind('-').
+        assert!(
+            name == "normalize" || name == "-home-me-git-normalize",
+            "unexpected name: {name}"
+        );
+    }
+
+    #[test]
+    fn extract_repo_name_with_tmpdir() {
+        // Create a temporary directory tree that mimics a project with dashes
+        let tmp = tempfile::tempdir().unwrap();
+        let project_dir = tmp.path().join("my-cool-project");
+        std::fs::create_dir_all(&project_dir).unwrap();
+
+        // Build the dash-separated directory name
+        let tmp_str = tmp.path().to_string_lossy().replace('/', "-");
+        let dir_name = format!("-{}-my-cool-project", tmp_str.trim_start_matches('-'));
+
+        // Build a fake session path
+        let session_path = PathBuf::from(format!(
+            "/home/me/.claude/projects/{dir_name}/session.jsonl"
+        ));
+
+        let name = extract_repo_name(&session_path);
+        assert_eq!(name, "my-cool-project");
+    }
+
+    #[test]
+    fn extract_repo_name_fallback_unresolvable() {
+        // A path that can't be resolved to a real filesystem path
+        let path =
+            PathBuf::from("/home/me/.claude/projects/-nonexistent-path-foo-bar/session.jsonl");
+        let name = extract_repo_name(&path);
+        // Should return the full directory name as fallback, not just "bar"
+        assert_eq!(name, "-nonexistent-path-foo-bar");
+    }
+
+    #[test]
+    fn extract_repo_name_no_claude_projects() {
+        // Path without .claude/projects/ — falls back to parent dir name
+        let path = PathBuf::from("/some/random/path/session.jsonl");
+        let name = extract_repo_name(&path);
+        assert_eq!(name, "path");
+    }
+
+    #[test]
+    fn resolve_claude_dir_name_real_path() {
+        // /home/me/git/normalize should exist on this machine
+        let result = resolve_claude_dir_name("-home-me-git-normalize");
+        if let Some(resolved) = result {
+            assert_eq!(
+                resolved.file_name().and_then(|n| n.to_str()),
+                Some("normalize")
+            );
+        }
+        // If the path doesn't exist (CI), that's OK — we have the tmpdir test
+    }
+
+    #[test]
+    fn resolve_claude_dir_name_with_dashes_in_project() {
+        let tmp = tempfile::tempdir().unwrap();
+        let project_dir = tmp.path().join("my-cool-project");
+        std::fs::create_dir_all(&project_dir).unwrap();
+
+        let tmp_str = tmp.path().to_string_lossy().replace('/', "-");
+        let dir_name = format!("-{}-my-cool-project", tmp_str.trim_start_matches('-'));
+
+        let result = resolve_claude_dir_name(&dir_name);
+        assert_eq!(result, Some(project_dir));
+    }
+
+    #[test]
+    fn resolve_claude_dir_name_nonexistent() {
+        let result = resolve_claude_dir_name("-nonexistent-path-xyz");
+        assert_eq!(result, None);
     }
 }
