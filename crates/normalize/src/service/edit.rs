@@ -7,7 +7,7 @@ use crate::config::NormalizeConfig;
 use crate::edit::EditorExt;
 use crate::service::history::HistoryService;
 use crate::shadow::{EditInfo, Shadow};
-use crate::{daemon, edit, path_resolve};
+use crate::{edit, path_resolve};
 use server_less::cli;
 
 // ── Internal output types (not exposed) ──────────────────────────────
@@ -433,8 +433,6 @@ fn do_edit(
                 .to_string(),
         );
     }
-
-    daemon::maybe_start_daemon(&root);
 
     let unified = path_resolve::resolve_unified(target, &root)
         .ok_or_else(|| format!("No matches for: {}", target))?;

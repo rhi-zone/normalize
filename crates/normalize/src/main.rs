@@ -1,3 +1,28 @@
+/// Return true if daemon auto-start should be skipped for this invocation.
+///
+/// Skips when:
+/// - The command is `daemon` (daemon subcommands manage the daemon themselves)
+/// - The command is `serve` (the MCP/HTTP/LSP server is a long-running process)
+/// - Any argument is a help/version/schema flag (informational, no side effects wanted)
+fn should_skip_daemon_autostart(argv: &[std::ffi::OsString]) -> bool {
+    let sub = argv.get(1).and_then(|s| s.to_str()).unwrap_or("");
+    if matches!(sub, "daemon" | "serve") {
+        return true;
+    }
+    argv.iter().skip(1).filter_map(|s| s.to_str()).any(|s| {
+        matches!(
+            s,
+            "--help"
+                | "-h"
+                | "--version"
+                | "-V"
+                | "--input-schema"
+                | "--output-schema"
+                | "--schema"
+        )
+    })
+}
+
 /// Help output styling is now handled by server-less.
 /// Schema flag support for Nursery integration.
 fn handle_schema_flag() -> bool {
@@ -89,6 +114,13 @@ async fn main() -> std::process::ExitCode {
     // Handle --schema for Nursery integration (before clap parsing)
     if handle_schema_flag() {
         return std::process::ExitCode::SUCCESS;
+    }
+
+    // Auto-start daemon in background before running any command (if configured).
+    // Skipped for daemon subcommands, serve, and informational flags.
+    if !should_skip_daemon_autostart(&argv) {
+        let root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        normalize::daemon::maybe_start_daemon(&root);
     }
 
     let service = normalize::service::NormalizeService::new();

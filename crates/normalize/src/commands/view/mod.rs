@@ -8,8 +8,8 @@ pub mod search;
 pub mod symbol;
 pub mod tree;
 
+use crate::path_resolve;
 use crate::tree::DocstringDisplay;
-use crate::{daemon, path_resolve};
 use serde::Deserialize;
 use std::path::Path;
 
@@ -83,9 +83,6 @@ pub async fn build_view_service(
     case_insensitive: bool,
     context_files: &[&str],
 ) -> Result<report::ViewReport, String> {
-    // Ensure daemon is running if configured
-    daemon::maybe_start_daemon(root);
-
     // Build filter if exclude/only patterns are specified
     let filter = super::build_filter(root, exclude, only);
 
@@ -330,8 +327,6 @@ pub async fn build_view_list_service(
     case_insensitive: bool,
     context_files: &[&str],
 ) -> Result<report::ViewListReport, String> {
-    daemon::maybe_start_daemon(root);
-
     let filter = super::build_filter(root, exclude, only);
 
     // Kind filter → list matching symbols
