@@ -1065,6 +1065,51 @@ Concrete steps (ordered by impact):
 
 ---
 
+**Pillar 8 — Git-behavioral analysis (co-change index)**
+
+normalize understands code *structurally* today (imports, calls, symbols). Git history is a
+complementary signal encoding human intent and actual change patterns — invisible from the AST.
+
+**The primitive: a co-change edge table in the index.**
+
+Import and call edges are already in SQLite. Co-change edges belong there too: a
+`co_change_edges(file_a, file_b, count)` table populated by `structure rebuild`, updated
+incrementally. `coupling-clusters` becomes a trivial graph query instead of recomputing from
+scratch. Stale-doc detection, churn analysis, and ownership queries all become free consumers.
+
+**Why SQLite (not a separate file):** same access pattern as other edges, same invalidation
+mechanism (`structure rebuild`), daemon already reads from it. No new cache invalidation logic
+needed.
+
+**Size management — per-file fanout cap (not time window):**
+- **≥2 co-changes threshold**: a single co-change is coincidence; two or more is a pattern.
+- **Skip large commits**: commits touching >50 files are mechanical operations (fmt, license
+  headers, mass rename). They carry zero semantic signal and generate most of the noise.
+- **Live files only**: prune edges where either file no longer exists in HEAD. Useless by
+  definition.
+- **Per-file fanout cap (K=20)**: each file stores at most its top K partners by frequency.
+  This is the primary size bound — it directly targets hub files (TODO.md, Cargo.lock,
+  CHANGELOG.md) that co-change with everything. Caps table size at `files × K` worst case,
+  regardless of repo size or history depth. Does NOT discard old coupling that is still strong.
+  Time window was considered and rejected: it's a size optimization dressed as a quality filter.
+  Old strong coupling is still real coupling.
+
+**Consumers (ordered by value):**
+1. `coupling-clusters` — replace recomputation with index query (immediate win)
+2. Stale-doc detection native rule — doc file + strongly-coupled code files → flag if code
+   changed more recently than doc
+3. Churn analysis — files with high commit frequency (already partially in `analyze hotspots`)
+4. Ownership concentration — files only touched by one author
+
+**Implementation steps:**
+- [ ] Add `co_change_edges` table to the index schema (`normalize-facts`)
+- [ ] Populate during `structure rebuild` using gix commit walk (now PATH-independent)
+- [ ] Incremental update: process only commits since last rebuild (append-only, cheap)
+- [ ] Update `coupling-clusters` to query index instead of recomputing
+- [ ] Add `stale-doc` native rule as first consumer
+
+---
+
 ## Post-polish review
 
 After the fixpoint polish loop reaches 0 findings, do a retrospective pass:
