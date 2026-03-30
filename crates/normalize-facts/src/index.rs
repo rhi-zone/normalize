@@ -39,7 +39,7 @@ struct ParsedFileData {
 }
 
 // Not yet public - just delete .normalize/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 7;
+const SCHEMA_VERSION: i64 = 8;
 
 /// Check if a file path has a supported source extension.
 fn is_source_file(path: &str) -> bool {
@@ -423,6 +423,11 @@ impl FileIndex {
             conn.execute("DELETE FROM type_refs", ()).await?;
             conn.execute("DELETE FROM symbol_attributes", ()).await?;
             conn.execute("DELETE FROM symbol_implements", ()).await?;
+            // co_change_edges: clear on schema bump so the next rebuild repopulates.
+            conn.execute("DELETE FROM co_change_edges", ()).await.ok();
+            conn.execute("DELETE FROM meta WHERE key = 'co_change_last_commit'", ())
+                .await
+                .ok();
             conn.execute(
                 "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?1)",
                 params![SCHEMA_VERSION.to_string()],
@@ -484,6 +489,29 @@ impl FileIndex {
         )
         .await
         .ok();
+
+        // Co-change edges: file pairs that appear together in commits.
+        // Populated by rebuild_co_change_edges(); queried by coupling-clusters.
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS co_change_edges (
+                file_a TEXT NOT NULL,
+                file_b TEXT NOT NULL,
+                count INTEGER NOT NULL,
+                PRIMARY KEY (file_a, file_b)
+            )",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_co_change_file_a ON co_change_edges(file_a)",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_co_change_file_b ON co_change_edges(file_b)",
+            (),
+        )
+        .await?;
 
         Ok(Self {
             conn,
@@ -2430,6 +2458,310 @@ impl FileIndex {
         }
         Ok(files)
     }
+
+    /// Rebuild (or incrementally update) the co-change edges table from git history.
+    ///
+    /// When `since_commit` is `None`, performs a full rebuild: clears the table and walks
+    /// all commits. When `since_commit` is `Some(sha)`, walks only commits after that SHA
+    /// and merges counts into the existing table before re-applying the per-file fanout cap.
+    ///
+    /// Algorithm:
+    /// 1. Walk commits via gix (pure-Rust, no `git` binary required).
+    /// 2. For each commit: skip if it touches >50 files (large mechanical commit, no signal).
+    /// 3. For each pair of source files in a commit: increment co-change count.
+    /// 4. Apply filters: drop pairs with count < 2, cap each file to top 20 partners.
+    /// 5. Upsert into `co_change_edges`.
+    /// 6. Record HEAD SHA in `meta.co_change_last_commit` for incremental use.
+    pub async fn rebuild_co_change_edges(
+        &self,
+        since_commit: Option<&str>,
+    ) -> Result<usize, libsql::Error> {
+        use std::collections::HashMap;
+
+        let root = &self.root;
+
+        // Open gix repository. If not a git repo, silently skip (not an error).
+        let repo = match open_gix_repo(root) {
+            Some(r) => r,
+            None => {
+                tracing::debug!("co-change: no git repository found at {:?}, skipping", root);
+                return Ok(0);
+            }
+        };
+
+        let head_sha = match repo.head_id() {
+            Ok(id) => id.to_string(),
+            Err(_) => return Ok(0),
+        };
+
+        // Walk commits, collecting per-commit file lists.
+        let commit_files = walk_commits_for_co_change(&repo, since_commit);
+
+        if commit_files.is_empty() && since_commit.is_none() {
+            // No history (or empty repo): ensure table is cleared and metadata stored.
+            self.conn.execute("DELETE FROM co_change_edges", ()).await?;
+            self.conn
+                .execute(
+                    "INSERT OR REPLACE INTO meta (key, value) VALUES ('co_change_last_commit', ?1)",
+                    params![head_sha],
+                )
+                .await?;
+            return Ok(0);
+        }
+
+        // For incremental: load existing counts from DB, merge new counts, re-apply cap.
+        // For full: start fresh.
+        let mut pair_counts: HashMap<(String, String), usize> = HashMap::new();
+
+        if since_commit.is_some() {
+            // Load existing edges into the map so we can merge.
+            let mut rows = self
+                .conn
+                .query("SELECT file_a, file_b, count FROM co_change_edges", ())
+                .await?;
+            while let Some(row) = rows.next().await? {
+                let a: String = row.get(0)?;
+                let b: String = row.get(1)?;
+                let c: i64 = row.get(2)?;
+                pair_counts.insert((a, b), c as usize);
+            }
+        }
+
+        // Accumulate new commit data.
+        for files in &commit_files {
+            // Files are already filtered to source files only.
+            if files.len() > 50 || files.len() < 2 {
+                continue;
+            }
+            let mut sorted = files.clone();
+            sorted.sort_unstable();
+            sorted.dedup();
+            for i in 0..sorted.len() {
+                for j in (i + 1)..sorted.len() {
+                    let key = (sorted[i].clone(), sorted[j].clone());
+                    *pair_counts.entry(key).or_default() += 1;
+                }
+            }
+        }
+
+        // Apply filters: drop count < 2, apply per-file top-20 fanout cap.
+        pair_counts.retain(|_, v| *v >= 2);
+        let pair_counts = apply_fanout_cap(pair_counts, 20);
+
+        // Write to DB.
+        if since_commit.is_some() {
+            // Full replace: clear and reinsert (we have the full merged set).
+            self.conn.execute("DELETE FROM co_change_edges", ()).await?;
+        } else {
+            self.conn.execute("DELETE FROM co_change_edges", ()).await?;
+        }
+
+        let mut inserted = 0usize;
+        for ((a, b), count) in &pair_counts {
+            self.conn.execute(
+                "INSERT OR REPLACE INTO co_change_edges (file_a, file_b, count) VALUES (?1, ?2, ?3)",
+                params![a.clone(), b.clone(), *count as i64],
+            ).await?;
+            inserted += 1;
+        }
+
+        // Record the HEAD SHA so the next incremental run knows where to resume.
+        self.conn
+            .execute(
+                "INSERT OR REPLACE INTO meta (key, value) VALUES ('co_change_last_commit', ?1)",
+                params![head_sha],
+            )
+            .await?;
+
+        Ok(inserted)
+    }
+
+    /// Query co-change edges from the index.
+    ///
+    /// Returns pairs `(file_a, file_b, count)` where count >= `min_count`.
+    /// Returns `Ok(None)` if the `co_change_edges` table is empty (not yet built),
+    /// so callers can fall back to the git walk.
+    pub async fn query_co_change_edges(
+        &self,
+        min_count: usize,
+    ) -> Result<Option<Vec<(String, String, usize)>>, libsql::Error> {
+        // Check if the table has any data.
+        let mut check = self
+            .conn
+            .query("SELECT COUNT(*) FROM co_change_edges", ())
+            .await?;
+        let total: i64 = if let Some(row) = check.next().await? {
+            row.get(0)?
+        } else {
+            0
+        };
+        if total == 0 {
+            return Ok(None);
+        }
+
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT file_a, file_b, count FROM co_change_edges WHERE count >= ?1",
+                params![min_count as i64],
+            )
+            .await?;
+
+        let mut result = Vec::new();
+        while let Some(row) = rows.next().await? {
+            let a: String = row.get(0)?;
+            let b: String = row.get(1)?;
+            let c: i64 = row.get(2)?;
+            result.push((a, b, c as usize));
+        }
+        Ok(Some(result))
+    }
+
+    /// Return the stored HEAD SHA from the last co-change rebuild, if any.
+    pub async fn co_change_last_commit(&self) -> Option<String> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT value FROM meta WHERE key = 'co_change_last_commit'",
+                (),
+            )
+            .await
+            .ok()?;
+        let row = rows.next().await.ok()??;
+        row.get(0).ok()
+    }
+}
+
+// =============================================================================
+// Co-change helpers (not on FileIndex — free functions to keep impl clean)
+// =============================================================================
+
+/// Open a gix repository at or containing `root`.
+fn open_gix_repo(root: &std::path::Path) -> Option<gix::Repository> {
+    gix::discover(root)
+        .ok()
+        .map(|r| r.into_sync().to_thread_local())
+}
+
+/// Walk commits via gix, returning per-commit lists of *source* files changed.
+///
+/// If `since_commit` is `Some(sha)`, only commits after (exclusive) that SHA are returned.
+/// Commits are yielded oldest-first from the HEAD ancestry.
+fn walk_commits_for_co_change(
+    repo: &gix::Repository,
+    since_commit: Option<&str>,
+) -> Vec<Vec<String>> {
+    let head_id = match repo.head_id() {
+        Ok(id) => id,
+        Err(_) => return Vec::new(),
+    };
+    let walk = match head_id.ancestors().all() {
+        Ok(w) => w,
+        Err(_) => return Vec::new(),
+    };
+
+    // If since_commit is specified, resolve it to an ObjectId for fast comparison.
+    let stop_id: Option<gix::hash::ObjectId> = since_commit.and_then(|sha| sha.parse().ok());
+
+    let mut result = Vec::new();
+
+    for info in walk {
+        let Ok(info) = info else { continue };
+        let commit_id = info.id();
+
+        // Stop when we hit the commit we already processed.
+        if let Some(ref stop) = stop_id
+            && commit_id == *stop
+        {
+            break;
+        }
+
+        let Ok(commit) = info.object() else { continue };
+        let Ok(tree) = commit.tree() else { continue };
+
+        let parent_tree = info
+            .parent_ids()
+            .next()
+            .and_then(|pid| pid.object().ok())
+            .and_then(|obj| obj.into_commit().tree().ok());
+
+        let changes = match repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), None) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let files: Vec<String> = changes
+            .into_iter()
+            .filter_map(|change| {
+                use gix::object::tree::diff::ChangeDetached;
+                let location = match change {
+                    ChangeDetached::Addition { location, .. } => location,
+                    ChangeDetached::Deletion { location, .. } => location,
+                    ChangeDetached::Modification { location, .. } => location,
+                    ChangeDetached::Rewrite {
+                        source_location, ..
+                    } => source_location,
+                };
+                let path_str = String::from_utf8_lossy(&location).into_owned();
+                // Only include source files (those with a supported language extension).
+                if is_source_file(&path_str) {
+                    Some(path_str)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if files.len() >= 2 {
+            result.push(files);
+        }
+    }
+
+    result
+}
+
+/// Apply a per-file fanout cap: for each file, keep only its top `cap` partners by count.
+///
+/// Returns a new HashMap with entries pruned to satisfy the cap.
+fn apply_fanout_cap(
+    pair_counts: std::collections::HashMap<(String, String), usize>,
+    cap: usize,
+) -> std::collections::HashMap<(String, String), usize> {
+    use std::collections::HashMap;
+
+    // Build per-file partner lists.
+    let mut file_partners: HashMap<String, Vec<(String, usize)>> = HashMap::new();
+    for ((a, b), count) in &pair_counts {
+        file_partners
+            .entry(a.clone())
+            .or_default()
+            .push((b.clone(), *count));
+        file_partners
+            .entry(b.clone())
+            .or_default()
+            .push((a.clone(), *count));
+    }
+
+    // For each file, keep only the top `cap` partners.
+    let mut allowed: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
+    for (file, mut partners) in file_partners {
+        partners.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+        partners.truncate(cap);
+        for (partner, _) in partners {
+            // Canonical key: lexicographically smaller goes first.
+            let key = if file <= partner {
+                (file.clone(), partner)
+            } else {
+                (partner, file.clone())
+            };
+            allowed.insert(key);
+        }
+    }
+
+    pair_counts
+        .into_iter()
+        .filter(|(k, _)| allowed.contains(k))
+        .collect()
 }
 
 #[cfg(test)]

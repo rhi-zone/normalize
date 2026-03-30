@@ -1102,10 +1102,10 @@ needed.
 4. Ownership concentration — files only touched by one author
 
 **Implementation steps:**
-- [ ] Add `co_change_edges` table to the index schema (`normalize-facts`)
-- [ ] Populate during `structure rebuild` using gix commit walk (now PATH-independent)
-- [ ] Incremental update: process only commits since last rebuild (append-only, cheap)
-- [ ] Update `coupling-clusters` to query index instead of recomputing
+- [x] Add `co_change_edges` table to the index schema (`normalize-facts`) — schema v8
+- [x] Populate during `structure rebuild` using gix commit walk (now PATH-independent)
+- [x] Incremental update: process only commits since last rebuild (append-only, cheap)
+- [x] Update `coupling-clusters` to query index instead of recomputing
 - [ ] Add `stale-doc` native rule as first consumer
 
 ---

@@ -5012,6 +5012,7 @@ name = "normalize-facts"
 version = "0.2.0"
 dependencies = [
  "dirs",
+ "gix",
  "ignore",
  "indicatif",
  "libsql",

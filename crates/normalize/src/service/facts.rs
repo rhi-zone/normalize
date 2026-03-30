@@ -45,6 +45,9 @@ pub struct RebuildReport {
     pub calls: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub imports: Option<usize>,
+    /// Number of co-change edge pairs written during this rebuild.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub co_change_edges: Option<usize>,
     /// Whether this was an incremental rebuild (true) or a full rebuild (false).
     #[serde(skip_serializing_if = "is_false")]
     pub incremental: bool,
@@ -76,6 +79,11 @@ impl OutputFormatter for RebuildReport {
             && i > 0
         {
             parts.push(format!("{} imports", i));
+        }
+        if let Some(e) = self.co_change_edges
+            && e > 0
+        {
+            parts.push(format!("{} co-change edges", e));
         }
         if !parts.is_empty() {
             out.push_str(&format!("\nIndexed {}", parts.join(", ")));
@@ -540,6 +548,7 @@ async fn rebuild_data(
         symbols: None,
         calls: None,
         imports: None,
+        co_change_edges: None,
         incremental: !full,
     };
 
@@ -570,6 +579,25 @@ async fn rebuild_data(
         result.symbols = Some(stats.symbols);
         result.calls = Some(stats.calls);
         result.imports = Some(stats.imports);
+    }
+
+    // Populate co-change edges from git history.
+    // For incremental rebuilds, pass the last-recorded HEAD SHA so we only process
+    // new commits. For full rebuilds, pass None to rebuild from scratch.
+    let since = if !full {
+        idx.co_change_last_commit().await
+    } else {
+        None
+    };
+    match idx.rebuild_co_change_edges(since.as_deref()).await {
+        Ok(edge_count) => {
+            if edge_count > 0 || full {
+                result.co_change_edges = Some(edge_count);
+            }
+        }
+        Err(e) => {
+            tracing::warn!("co-change edge rebuild failed (non-fatal): {}", e);
+        }
     }
 
     Ok(result)

@@ -28,8 +28,9 @@ pub struct CouplingClustersReport {
 
 /// Analyze temporal coupling clusters.
 ///
-/// Calls `analyze_coupling` to get pairwise edges, then runs union-find to produce
-/// connected components of files that change together.
+/// Queries the `co_change_edges` table from the structural index when available
+/// (populated by `normalize structure rebuild`). Falls back to walking git history
+/// directly when the table is empty, with a warning suggesting `structure rebuild`.
 pub fn analyze_coupling_clusters(
     root: &Path,
     min_commits: usize,
@@ -37,9 +38,66 @@ pub fn analyze_coupling_clusters(
     exclude_patterns: &[String],
     only_patterns: &[String],
 ) -> Result<CouplingClustersReport, String> {
-    // Get all pairwise coupling edges (use a high limit to get all pairs)
-    let coupling =
-        super::coupling::analyze_coupling(root, min_commits, usize::MAX, exclude_patterns)?;
+    // Try to load edges from the index first.
+    // `coupling_clusters` is a sync service method running inside a tokio runtime,
+    // so we use block_in_place to safely run async code from this sync context.
+    let index_edges: Option<Vec<(String, String, usize)>> = tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(try_load_edges_from_index(root, min_commits))
+    });
+
+    // Build coupling pairs: either from the index or by walking git history.
+    let raw_pairs: Vec<(String, String, usize)> = if let Some(edges) = index_edges {
+        edges
+    } else {
+        tracing::warn!(
+            "co_change_edges table is empty — falling back to git history walk. \
+             Run `normalize structure rebuild` to pre-compute the co-change index."
+        );
+        // Fall back: walk git history via existing coupling analysis.
+        let coupling =
+            super::coupling::analyze_coupling(root, min_commits, usize::MAX, exclude_patterns)?;
+        coupling
+            .pairs
+            .iter()
+            .map(|p| (p.file_a.clone(), p.file_b.clone(), p.shared_commits))
+            .collect()
+    };
+
+    // When coming from the index, we need to apply exclude patterns ourselves
+    // (the git-walk path filters via analyze_coupling, but the index path does not).
+    let excludes: Vec<glob::Pattern> = exclude_patterns
+        .iter()
+        .filter_map(|p| glob::Pattern::new(p).ok())
+        .collect();
+
+    let raw_pairs: Vec<(String, String, usize)> = raw_pairs
+        .into_iter()
+        .filter(|(a, b, _)| {
+            !excludes.iter().any(|pat| pat.matches(a)) && !excludes.iter().any(|pat| pat.matches(b))
+        })
+        .collect();
+
+    // Wrap into a CouplingReport-compatible structure so we can reuse the cluster logic.
+    // We don't need commits_a/commits_b for clustering; shared_commits is sufficient.
+    let coupling_pairs: Vec<super::coupling::CoupledPair> = raw_pairs
+        .iter()
+        .map(|(a, b, shared)| super::coupling::CoupledPair {
+            file_a: a.clone(),
+            file_b: b.clone(),
+            shared_commits: *shared,
+            commits_a: 0,
+            commits_b: 0,
+            confidence: 0.0,
+            pair_key: format!("{}::{}", a, b),
+            delta: None,
+        })
+        .collect();
+
+    let coupling = super::coupling::CouplingReport {
+        pairs: coupling_pairs,
+        repos: None,
+        diff_ref: None,
+    };
 
     let only_globs: Vec<glob::Pattern> = only_patterns
         .iter()
@@ -214,5 +272,23 @@ impl OutputFormatter for CouplingClustersReport {
         }
 
         lines.join("\n")
+    }
+}
+
+/// Try to load co-change edges from the structural index.
+///
+/// Returns `Some(edges)` when the index has co-change data, or `None` when the table
+/// is empty (index not yet built or the project has no git history).
+async fn try_load_edges_from_index(
+    root: &Path,
+    min_commits: usize,
+) -> Option<Vec<(String, String, usize)>> {
+    let idx = crate::index::open_if_enabled(root).await?;
+    match idx.query_co_change_edges(min_commits).await {
+        Ok(edges) => edges,
+        Err(e) => {
+            tracing::debug!("failed to query co_change_edges: {}", e);
+            None
+        }
     }
 }

@@ -19,6 +19,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`normalize rules run --only`/`--exclude`** — glob pattern filtering for which files get diagnostics returned. `--only "*.rs"` restricts to Rust files; `--exclude "tests/"` skips test directories. Applies post-collection across syntax, fact, and native rule engines.
 - **`normalize structure rebuild --only`/`--exclude`** — glob pattern filtering for which files get indexed. Files not matching the filter are removed from the index after the walk.
 - **`normalize analyze architecture --limit`** — caps the number of `cross_imports` entries in the output (default 20, `--limit 0` disables). Reduces default JSON response from ~196KB to ~10KB, matching the `analyze health --limit` pattern.
+- **Co-change edge index** — `normalize structure rebuild` now populates a `co_change_edges` table in the SQLite index with file pairs that frequently change together (co-change count ≥ 2, commits touching >50 files skipped as noise, per-file fanout capped at top 20 partners). Incremental: only new commits since the last rebuild are processed. `normalize analyze coupling-clusters` queries this table instead of re-walking git history on every invocation; falls back transparently to the git walk with a warning when the table is empty. Rebuild output now includes a `co_change_edges` count.
 
 ### Moved
 

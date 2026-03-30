@@ -30,6 +30,9 @@ normalize-local-deps = { path = "../normalize-local-deps", version = "0.2.0" }
 tree-sitter = "0.26"
 streaming-iterator = "0.1"
 
+# Git history (for co-change edge index)
+gix = { workspace = true }
+
 # Database
 libsql.workspace = true
 

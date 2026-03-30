@@ -138,12 +138,11 @@ fn extract_manifest_json(project_dir: &Path) -> Option<Value> {
     ];
     for filename in MANIFEST_FILENAMES {
         let path = project_dir.join(filename);
-        if path.is_file() {
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Some(manifest) = normalize_manifest::parse_manifest(filename, &content) {
-                    return Some(serde_json::to_value(&manifest).unwrap());
-                }
-            }
+        if path.is_file()
+            && let Ok(content) = std::fs::read_to_string(&path)
+            && let Some(manifest) = normalize_manifest::parse_manifest(filename, &content)
+        {
+            return Some(serde_json::to_value(&manifest).unwrap());
         }
     }
     None
@@ -334,10 +333,10 @@ fn extract_fixtures() {
 
         // --- manifest ---
         let manifest_expected = expected_dir.join("manifest.json");
-        if manifest_expected.exists() || update_mode() {
-            if let Some(manifest) = extract_manifest_json(&project_dir) {
-                write_or_compare_json(&manifest, &manifest_expected, &format!("{label} manifest"));
-            }
+        if (manifest_expected.exists() || update_mode())
+            && let Some(manifest) = extract_manifest_json(&project_dir)
+        {
+            write_or_compare_json(&manifest, &manifest_expected, &format!("{label} manifest"));
         }
 
         // --- execution ---
