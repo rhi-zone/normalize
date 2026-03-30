@@ -158,14 +158,17 @@ impl RuleSource for GitSource {
     fn evaluate(&self, ctx: &SourceContext) -> Option<HashMap<String, String>> {
         let mut result = HashMap::new();
 
-        // Get current branch
-        if let Ok(output) = std::process::Command::new("git")
-            .args(["rev-parse", "--abbrev-ref", "HEAD"])
-            .current_dir(ctx.project_root)
-            .output()
-            && output.status.success()
-        {
-            let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        // Get current branch via gix (no PATH dependency)
+        if let Some(branch) = gix::discover(ctx.project_root).ok().and_then(|repo| {
+            repo.head().ok().and_then(|head| {
+                head.referent_name().map(|name| {
+                    let b = name.as_bstr();
+                    b.strip_prefix(b"refs/heads/")
+                        .map(|s| String::from_utf8_lossy(s).into_owned())
+                        .unwrap_or_else(|| String::from_utf8_lossy(b).into_owned())
+                })
+            })
+        }) {
             result.insert("branch".to_string(), branch);
         }
 

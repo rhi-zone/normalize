@@ -1,5 +1,6 @@
 //! Cross-repo contributor analysis — author breadth, repo bus factor, overlap
 
+use super::git_utils;
 use crate::output::OutputFormatter;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -129,46 +130,24 @@ struct RepoShortlog {
     authors: HashMap<String, (String, usize)>, // email -> (name, commits)
 }
 
-/// Run `git shortlog -sne --all` on a single repo
+/// Collect per-author commit counts for one repo via gix.
 fn shortlog(repo: &Path) -> Option<RepoShortlog> {
     let repo_name = repo.file_name()?.to_str()?.to_string();
 
-    let output = std::process::Command::new("git")
-        .args(["shortlog", "-sne", "--all"])
-        .current_dir(repo)
-        .output()
-        .ok()?;
-
-    if !output.status.success() {
+    let counts = git_utils::git_author_commit_counts(repo);
+    if counts.is_empty() {
         return None;
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
     let mut authors: HashMap<String, (String, usize)> = HashMap::new();
-
-    for line in stdout.lines() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
+    for entry in counts {
+        let e = authors
+            .entry(entry.email.clone())
+            .or_insert((entry.name.clone(), 0));
+        if entry.name.len() > e.0.len() {
+            e.0 = entry.name;
         }
-        // Format: "   342\tAlice <alice@example.com>"
-        let (count_str, rest) = line.split_once('\t')?;
-        let count: usize = count_str.trim().parse().ok()?;
-
-        // Parse "Name <email>"
-        let (name, email) = if let Some(angle_start) = rest.rfind('<') {
-            let name = rest[..angle_start].trim().to_string();
-            let email = rest[angle_start + 1..]
-                .trim_end_matches('>')
-                .trim()
-                .to_string();
-            (name, email)
-        } else {
-            (rest.trim().to_string(), String::new())
-        };
-
-        let entry = authors.entry(email.clone()).or_insert((name, 0));
-        entry.1 += count;
+        e.1 += entry.commits;
     }
 
     Some(RepoShortlog {

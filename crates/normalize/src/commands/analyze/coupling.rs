@@ -1,5 +1,6 @@
 //! Temporal coupling analysis — find files that frequently change together
 
+use super::git_utils;
 use super::is_source_file;
 use crate::output::OutputFormatter;
 use glob::Pattern;
@@ -141,55 +142,28 @@ pub fn analyze_coupling(
         .filter_map(|p| Pattern::new(p).ok())
         .collect();
 
-    let git_dir = root.join(".git");
-    if !git_dir.exists() {
-        return Err("Not a git repository".to_string());
+    // Get per-commit file lists via gix — no PATH dependency on git binary.
+    let raw_commits = git_utils::git_per_commit_files(root);
+    if raw_commits.is_empty() {
+        return Err("Not a git repository or no commit history".to_string());
     }
 
-    // Get per-commit file lists using --name-only with commit delimiters
-    // Use %x00 (null byte) as delimiter since it can't appear in filenames
-    let output = std::process::Command::new("git")
-        .args(["log", "--pretty=format:%x00", "--name-only"])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("Failed to run git log: {}", e))?;
-
-    if !output.status.success() {
-        return Err("git log failed".to_string());
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    // Parse into per-commit file sets
-    let mut commits: Vec<Vec<String>> = Vec::new();
-    let mut current_files: Vec<String> = Vec::new();
-
-    for line in stdout.lines() {
-        if line.contains('\0') {
-            if !current_files.is_empty() {
-                commits.push(std::mem::take(&mut current_files));
-            }
-            continue;
-        }
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        let p = Path::new(trimmed);
-        if !is_source_file(p) {
-            continue;
-        }
-        if excludes.iter().any(|pat| pat.matches(trimmed)) {
-            continue;
-        }
-        // Only include files that still exist
-        if root.join(p).exists() {
-            current_files.push(trimmed.to_string());
-        }
-    }
-    if !current_files.is_empty() {
-        commits.push(current_files);
-    }
+    // Filter each commit's file list to source files that still exist on disk.
+    let commits: Vec<Vec<String>> = raw_commits
+        .into_iter()
+        .map(|files| {
+            files
+                .into_iter()
+                .filter(|f| {
+                    let p = Path::new(f.as_str());
+                    is_source_file(p)
+                        && !excludes.iter().any(|pat| pat.matches(f))
+                        && root.join(p).exists()
+                })
+                .collect::<Vec<_>>()
+        })
+        .filter(|f| !f.is_empty())
+        .collect();
 
     // Count per-file total commits
     let mut file_commits: HashMap<String, usize> = HashMap::new();

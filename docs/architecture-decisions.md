@@ -502,3 +502,37 @@ right primitive is identified. `analyze` shrinks toward zero; it doesn't get a n
   analysis passes don't.
 - **Reorganize `analyze` into sub-services** (graph, quality, structure): reorganizing a
   grab-bag produces a smaller grab-bag. The root cause was no unifying trait, not bad grouping.
+
+## Embedded Dependencies vs. Shell-outs (jaq, gix, rg, tree-sitter, ...)
+
+normalize embeds several large libraries rather than shelling out to external binaries. This
+is a deliberate tradeoff, not an oversight.
+
+**The rule:** if a feature depends on an external binary being in `$PATH`, it is not a feature
+— it is a suggestion. Users on NixOS, containers, CI environments, or systems managed by
+someone else cannot guarantee PATH contents. A tool that silently produces no output (or
+errors cryptically) because `rg` or `git` isn't on PATH is unreliable.
+
+**Specific decisions:**
+
+- **`rg` (ripgrep) → embedded via `grep_regex`/`ignore` crates**: `normalize grep` must work
+  identically everywhere. Shelling out to `rg` would make it a thin wrapper with a hard dep.
+  Embedding gives us the full ripgrep engine — `.gitignore` awareness, Unicode, PCRE2 — with
+  no PATH requirement.
+
+- **`jaq` (jq) → embedded**: `--jq` filtering is a first-class output mode on every command.
+  Requiring `jq` in PATH would mean half the agent/script consumers can't use it. jaq is
+  jq-compatible and compiles in cleanly.
+
+- **`gix` (gitoxide) → embedded, replacing git shell-outs**: git history analysis (`trend`,
+  `coupling-clusters`, co-change index) must not fail because `git` isn't in `$PATH`. gix is
+  pure Rust, no C FFI, faster than libgit2. Write operations (worktree add/remove) still shell
+  out since gix doesn't support them — that's acceptable because those operations are only used
+  in budget metrics, not in the critical analysis/rules path.
+
+- **`tree-sitter` → embedded**: the grammar loading and query engine are the core of normalize.
+  There is no world in which this is an external dep.
+
+**The cost is binary size and compile time.** That's real, but it's the right tradeoff for a
+developer tool that needs to be reliable across environments. The alternative — a tool that
+works on the developer's machine but fails in CI — is worse than a large binary.

@@ -51,6 +51,18 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ## P1 — Short-term Improvements (coherence / usability)
 
+### Eliminate remaining git shell-outs (budget metrics worktrees)
+
+The gix read-only migration is complete (`refactor: migrate git shell-outs to gix`). All
+read-only git operations now use gix; the `git` binary is no longer required for `normalize
+analyze`, `rules run`, `sessions`, or `ratchet`.
+
+`normalize-budget/src/metrics/functions.rs` (and possibly lines/modules/todos/dependencies) creates
+git worktrees to check out old code for before/after metric comparison. These are the last
+write shell-outs. Replace with in-memory blob reads via gix: read old file content directly
+from the object store, parse in memory, compute metrics, no filesystem checkout needed.
+Benefits: no PATH dep, dramatically faster (no fs writes), no cleanup needed.
+
 ### Agent UX: comprehensive compact output audit
 
 Baseline audit in `docs/agent-ux-audit.md` (2026-03-21) covers 12 commands across 3 models (Haiku, Sonnet, Opus). Quick wins fixed. Remaining work:

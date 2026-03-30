@@ -3,6 +3,7 @@
 //! Produces a graph linking commits to files (blame), sessions to commits
 //! (authored), and optionally imports/calls/co-change edges.
 
+use super::git_utils;
 use crate::output::OutputFormatter;
 use normalize_chat_sessions::{ClaudeCodeFormat, ContentBlock, LogFormat, Session};
 use rayon::prelude::*;
@@ -201,16 +202,7 @@ fn build_commit_session_map(root: &Path, sessions_path: Option<&Path>) -> Commit
 }
 
 fn resolve_full_hash(root: &Path, short: &str) -> Option<String> {
-    let output = std::process::Command::new("git")
-        .args(["rev-parse", short])
-        .current_dir(root)
-        .output()
-        .ok()?;
-    if output.status.success() {
-        Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
-    } else {
-        None
-    }
+    git_utils::resolve_ref(root, short).ok()
 }
 
 // ── Blame extraction ─────────────────────────────────────────────
@@ -247,26 +239,13 @@ fn blame_file(root: &Path, path: &str) -> Option<HashMap<String, usize>> {
 
 /// Collect git-tracked source files, optionally scoped to a target.
 fn git_tracked_files(root: &Path, target: Option<&str>) -> Vec<String> {
-    let mut args = vec!["ls-files".to_string()];
-    if let Some(t) = target {
-        args.push(t.to_string());
-    }
-
-    let output = std::process::Command::new("git")
-        .args(&args)
-        .current_dir(root)
-        .output()
-        .ok()
-        .filter(|o| o.status.success());
-
-    match output {
-        Some(o) => String::from_utf8_lossy(&o.stdout)
-            .lines()
-            .filter(|l| super::is_source_file(Path::new(l)))
-            .map(|l| l.to_string())
-            .collect(),
-        None => Vec::new(),
-    }
+    let all = git_utils::git_ls_files(root);
+    all.into_iter()
+        .filter(|l| {
+            let p = Path::new(l.as_str());
+            super::is_source_file(p) && target.is_none_or(|t| l.starts_with(t))
+        })
+        .collect()
 }
 
 // ── Co-change extraction ─────────────────────────────────────────

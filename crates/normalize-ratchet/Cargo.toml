@@ -16,6 +16,7 @@ normalize-output = { path = "../normalize-output", version = "0.2.0" }
 normalize-languages = { path = "../normalize-languages", version = "0.2.0" }
 normalize-path-resolve = { path = "../normalize-path-resolve", version = "0.2.0" }
 normalize-facts = { path = "../normalize-facts", version = "0.2.0" }
+gix = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }

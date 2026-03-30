@@ -1,7 +1,6 @@
 //! Git history helpers — shared worktree infrastructure for diff and trend analysis.
 
 use std::path::Path;
-use std::process::Command;
 
 /// A single commit with its unix timestamp.
 pub struct CommitInfo {
@@ -11,42 +10,14 @@ pub struct CommitInfo {
 
 /// Get all commits with timestamps, oldest first.
 pub fn git_log_timestamps(root: &Path) -> Result<Vec<CommitInfo>, String> {
-    let output = Command::new("git")
-        .args(["log", "--format=%H%x00%at", "--reverse"])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("Failed to run git log: {e}"))?;
-
-    if !output.status.success() {
-        return Err(format!(
-            "git log failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let commits: Vec<CommitInfo> = stdout
-        .lines()
-        .filter(|l| !l.is_empty())
-        .filter_map(|line| {
-            let parts: Vec<&str> = line.splitn(2, '\0').collect();
-            if parts.len() == 2 {
-                let ts = parts[1].parse::<i64>().ok()?;
-                Some(CommitInfo {
-                    hash: parts[0].to_string(),
-                    timestamp: ts,
-                })
-            } else {
-                None
-            }
+    let entries = super::git_utils::git_log_timestamps(root)?;
+    Ok(entries
+        .into_iter()
+        .map(|e| CommitInfo {
+            hash: e.hash,
+            timestamp: e.timestamp,
         })
-        .collect();
-
-    if commits.is_empty() {
-        return Err("No commits found in git history".to_string());
-    }
-
-    Ok(commits)
+        .collect())
 }
 
 /// Pick N commits at regular time intervals from the commit list.
@@ -99,75 +70,21 @@ pub fn select_snapshots(commits: &[CommitInfo], n: usize) -> Vec<&CommitInfo> {
 
 /// Resolve a git ref (branch name, tag, short hash, HEAD~N, etc.) to a full commit hash.
 pub fn resolve_ref(root: &Path, git_ref: &str) -> Result<String, String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--verify", git_ref])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("Failed to run git rev-parse: {e}"))?;
-
-    if !output.status.success() {
-        return Err(format!(
-            "git ref '{}' not found: {}",
-            git_ref,
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    super::git_utils::resolve_ref(root, git_ref)
 }
 
 /// Create a detached worktree at `hash`, run `callback`, then remove the worktree.
 ///
 /// The worktree is always removed after `callback` completes, even if it returns an error.
+/// Write operations (worktree add/remove) are not supported by gix — kept as shell-outs.
 pub fn run_in_worktree<T, F>(root: &Path, hash: &str, callback: F) -> Result<T, String>
 where
     F: FnOnce(&Path) -> Result<T, String>,
 {
-    let short = &hash[..7.min(hash.len())];
-    let worktree_name = format!("normalize-wt-{short}");
-    let worktree_path = std::env::temp_dir().join(&worktree_name);
-    let worktree_str = worktree_path.to_string_lossy().to_string();
-
-    // Clean up any stale worktree
-    if worktree_path.exists() {
-        let _ = Command::new("git")
-            .args(["worktree", "remove", &worktree_str, "--force"])
-            .current_dir(root)
-            .output();
-    }
-
-    // Create worktree
-    let add_output = Command::new("git")
-        .args(["worktree", "add", "--detach", &worktree_str, hash])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("Failed to create worktree: {e}"))?;
-
-    if !add_output.status.success() {
-        return Err(format!(
-            "git worktree add failed: {}",
-            String::from_utf8_lossy(&add_output.stderr).trim()
-        ));
-    }
-
-    // Run callback, always clean up after
-    let result = callback(&worktree_path);
-
-    let _ = Command::new("git")
-        .args(["worktree", "remove", &worktree_str, "--force"])
-        .current_dir(root)
-        .output();
-
-    result
+    super::git_utils::run_in_worktree(root, hash, callback)
 }
 
 /// Format a unix timestamp as YYYY-MM-DD.
 pub fn format_unix_date(ts: i64) -> String {
-    let output = Command::new("date")
-        .args(["-d", &format!("@{ts}"), "+%Y-%m-%d"])
-        .output();
-    match output {
-        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).trim().to_string(),
-        _ => format!("{ts}"),
-    }
+    super::git_utils::format_unix_date(ts)
 }

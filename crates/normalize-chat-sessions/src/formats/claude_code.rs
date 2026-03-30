@@ -48,12 +48,12 @@ impl LogFormat for ClaudeCodeFormat {
             return path_to_claude_dir(proj);
         }
 
-        if let Ok(output) = std::process::Command::new("git")
-            .args(["rev-parse", "--show-toplevel"])
-            .output()
-            && output.status.success()
+        // Discover git root via gix (no PATH dependency on git binary)
+        if let Ok(cwd) = std::env::current_dir()
+            && let Ok(repo) = gix::discover(&cwd)
+            && let Some(worktree) = repo.workdir()
         {
-            return path_to_claude_dir(Path::new(String::from_utf8_lossy(&output.stdout).trim()));
+            return path_to_claude_dir(worktree);
         }
 
         if let Ok(cwd) = std::env::current_dir() {

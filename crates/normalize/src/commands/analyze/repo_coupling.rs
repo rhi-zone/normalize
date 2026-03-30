@@ -1,5 +1,6 @@
 //! Cross-repo coupling analysis — dependency graph + temporal coupling signals
 
+use super::git_utils;
 use crate::output::OutputFormatter;
 use normalize_ecosystems::{DepSource, detect_all_ecosystems};
 use serde::Serialize;
@@ -270,35 +271,11 @@ fn gather_repo_data(repo: &Path) -> Option<RepoData> {
 }
 
 fn get_commit_timestamps(repo: &Path) -> Vec<u64> {
-    let output = std::process::Command::new("git")
-        .args(["log", "--pretty=format:%at"])
-        .current_dir(repo)
-        .output()
-        .ok();
-
-    match output {
-        Some(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
-            .lines()
-            .filter_map(|l| l.trim().parse::<u64>().ok())
-            .collect(),
-        _ => Vec::new(),
-    }
+    git_utils::git_commit_timestamps(repo)
 }
 
 fn get_remote_url(repo: &Path) -> Option<String> {
-    let output = std::process::Command::new("git")
-        .args(["remote", "get-url", "origin"])
-        .current_dir(repo)
-        .output()
-        .ok()?;
-
-    if output.status.success() {
-        let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if !url.is_empty() {
-            return Some(url);
-        }
-    }
-    None
+    git_utils::git_remote_origin_url(repo)
 }
 
 fn build_dep_graph(repos: &[RepoData]) -> Vec<DepEdge> {

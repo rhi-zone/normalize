@@ -8,6 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **No `git` binary required** — all read-only git operations (commit history, file churn, diff, ref resolution, branch lookup, remote URL, tracked files) now use `gix` (pure-Rust gitoxide). A `git` binary in `$PATH` is no longer a runtime dependency for `normalize analyze`, `normalize rules run`, `normalize sessions`, and `normalize ratchet`. Write operations (worktree add/remove) and a small number of operations without `gix` equivalents (`git blame`, `git status --porcelain`, path-filtered log count) remain as shell-outs.
+
 - **Daemon-cached diagnostics for all engines** — the daemon now caches syntax, fact, and native rule diagnostics and serves them instantly on `normalize rules run`. Cache is primed eagerly on file changes (incremental for syntax/fact, full re-run for native) and lazily on first request. When the daemon is running, `rules run` gets pre-computed results instead of running expensive local evaluation. Falls back to local evaluation transparently when the daemon is unavailable.
 - **`missing-test` fact rule** — flags public functions that are never called from a test function (a function with a test attribute such as `#[test]`, `@test`, `@Test`, or `@pytest.mark`). Disabled by default. Entry-point and module-boundary files excluded via the default allow list.
 - **`stale-mock` fact rule** — flags mock/stub functions (identified by attributes such as `@Mock`, `@patch`, `@stub`, `mock`, `stub`, `fake`) that call a callee which no longer exists as a symbol in the index. Catches mocks that were not updated after a rename or deletion. Disabled by default.

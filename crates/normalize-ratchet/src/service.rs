@@ -880,21 +880,19 @@ fn check_against_ref(
 ) -> Result<CheckReport, String> {
     use std::process::Command;
 
-    // Resolve the ref to a hash
-    let hash_output = Command::new("git")
-        .args(["rev-parse", "--verify", base_ref])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("failed to run git: {e}"))?;
-    if !hash_output.status.success() {
-        return Err(format!(
-            "git ref '{base_ref}' not found: {}",
-            String::from_utf8_lossy(&hash_output.stderr).trim()
-        ));
-    }
-    let hash = String::from_utf8_lossy(&hash_output.stdout)
-        .trim()
-        .to_string();
+    // Resolve the ref to a hash via gix (no PATH dependency)
+    let hash = {
+        use gix::bstr::BStr;
+        gix::discover(root)
+            .ok()
+            .and_then(|repo| {
+                let spec: &BStr = base_ref.as_bytes().into();
+                repo.rev_parse_single(spec)
+                    .ok()
+                    .map(|id| id.to_hex().to_string())
+            })
+            .ok_or_else(|| format!("git ref '{base_ref}' not found"))?
+    };
     // SAFETY: git hashes are always ASCII hex digits, so byte indexing is char-boundary-safe.
     let short = &hash[..7.min(hash.len())];
     // Include PID to avoid races when multiple processes check the same ref.
@@ -1074,20 +1072,19 @@ fn measure_at_ref(
 ) -> Result<MeasureReport, String> {
     use std::process::Command;
 
-    let hash_output = Command::new("git")
-        .args(["rev-parse", "--verify", base_ref])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("failed to run git: {e}"))?;
-    if !hash_output.status.success() {
-        return Err(format!(
-            "git ref '{base_ref}' not found: {}",
-            String::from_utf8_lossy(&hash_output.stderr).trim()
-        ));
-    }
-    let hash = String::from_utf8_lossy(&hash_output.stdout)
-        .trim()
-        .to_string();
+    // Resolve the ref to a hash via gix (no PATH dependency)
+    let hash = {
+        use gix::bstr::BStr;
+        gix::discover(root)
+            .ok()
+            .and_then(|repo| {
+                let spec: &BStr = base_ref.as_bytes().into();
+                repo.rev_parse_single(spec)
+                    .ok()
+                    .map(|id| id.to_hex().to_string())
+            })
+            .ok_or_else(|| format!("git ref '{base_ref}' not found"))?
+    };
     // SAFETY: git hashes are always ASCII hex digits, so byte indexing is char-boundary-safe.
     let short = &hash[..7.min(hash.len())];
     let worktree_name = format!("normalize-ratchet-wt-{short}-{}", std::process::id());

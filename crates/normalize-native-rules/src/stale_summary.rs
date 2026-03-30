@@ -6,6 +6,11 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
 
+/// Open the git repository at or containing `root` using gix.
+fn gix_open(root: &Path) -> Option<gix::Repository> {
+    gix::discover(root).ok()
+}
+
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 struct StaleSummary {
     dir: String,
@@ -159,11 +164,9 @@ fn save_cache(root: &Path, cache: &SummaryCache) {
 }
 
 fn git_head(root: &Path) -> Option<String> {
-    let out = Command::new("git")
-        .args(["-C", root.to_str().unwrap_or("."), "rev-parse", "HEAD"])
-        .output()
-        .ok()?;
-    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    let repo = gix_open(root)?;
+    let id = repo.head_id().ok()?;
+    let s = id.to_hex().to_string();
     if s.is_empty() { None } else { Some(s) }
 }
 

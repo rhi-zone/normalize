@@ -3,11 +3,11 @@
 //! Shows what symbols were added, removed, or changed between a base ref and HEAD,
 //! rather than line-level diffs.
 
+use super::git_utils;
 use crate::output::OutputFormatter;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// Status of a file in the diff.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -176,34 +176,12 @@ fn diff_symbols(
 
 /// Get file content at a specific git ref.
 fn git_show(root: &Path, git_ref: &str, file_path: &str) -> Option<String> {
-    let output = Command::new("git")
-        .args(["show", &format!("{}:{}", git_ref, file_path)])
-        .current_dir(root)
-        .output()
-        .ok()?;
-    if output.status.success() {
-        Some(String::from_utf8_lossy(&output.stdout).into_owned())
-    } else {
-        None
-    }
+    git_utils::git_show(root, git_ref, file_path)
 }
 
 /// Resolve base ref to merge-base with HEAD.
 fn resolve_base(root: &Path, base: &str) -> Result<String, String> {
-    let merge_base = Command::new("git")
-        .args(["merge-base", base, "HEAD"])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("Failed to run git merge-base: {}", e))?;
-
-    if merge_base.status.success() {
-        Ok(String::from_utf8_lossy(&merge_base.stdout)
-            .trim()
-            .to_string())
-    } else {
-        // Fall back to using the ref directly (e.g. HEAD~3)
-        Ok(base.to_string())
-    }
+    git_utils::resolve_merge_base(root, base)
 }
 
 /// Get list of changed files with their status (A/D/M).
@@ -211,36 +189,18 @@ fn get_diff_files_with_status(
     root: &Path,
     base_ref: &str,
 ) -> Result<Vec<(FileStatus, String)>, String> {
-    let output = Command::new("git")
-        .args(["diff", "--name-status", base_ref])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("Failed to run git diff: {}", e))?;
-
-    if !output.status.success() {
-        return Err(format!(
-            "git diff failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-
-    let files = String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .filter(|l| !l.is_empty())
-        .filter_map(|line| {
-            let (status_str, path) = line.split_once('\t')?;
-            let status = match status_str.chars().next()? {
-                'A' => FileStatus::Added,
-                'D' => FileStatus::Deleted,
-                'M' => FileStatus::Modified,
-                'R' | 'C' => FileStatus::Modified, // Renames/copies treated as modified
-                _ => return None,
+    let raw = git_utils::git_diff_name_status(root, base_ref)?;
+    Ok(raw
+        .into_iter()
+        .map(|(s, p)| {
+            let status = match s {
+                git_utils::DiffFileStatus::Added => FileStatus::Added,
+                git_utils::DiffFileStatus::Deleted => FileStatus::Deleted,
+                git_utils::DiffFileStatus::Modified => FileStatus::Modified,
             };
-            Some((status, path.to_string()))
+            (status, p)
         })
-        .collect();
-
-    Ok(files)
+        .collect())
 }
 
 /// Analyze structural differences between a base ref and HEAD.
@@ -250,18 +210,7 @@ pub fn analyze_skeleton_diff(
     exclude_patterns: &[String],
     only_patterns: &[String],
 ) -> Result<SkeletonDiffReport, String> {
-    // Check that we're in a git repository before attempting git commands
-    if !root.join(".git").exists()
-        && !std::process::Command::new("git")
-            .args(["rev-parse", "--git-dir"])
-            .current_dir(root)
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
-    {
-        return Err("Not a git repository".to_string());
-    }
-
+    // resolve_base (via gix) will return an error if not a git repository.
     let base_ref = resolve_base(root, base)?;
     let diff_files = get_diff_files_with_status(root, &base_ref)?;
 

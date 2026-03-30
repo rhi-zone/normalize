@@ -1,5 +1,6 @@
 //! Git history hotspot analysis
 
+use super::git_utils;
 use super::is_source_file;
 use crate::analyze::complexity::ComplexityAnalyzer;
 use crate::output::OutputFormatter;
@@ -175,59 +176,30 @@ impl ChurnStats {
     }
 }
 
-/// Parse `git log --pretty=format:%at --numstat` output into per-file churn stats with timestamps
+/// Build per-file churn stats via gix (no PATH dependency).
 fn parse_git_churn(root: &Path) -> Result<HashMap<String, ChurnStats>, String> {
-    let output = std::process::Command::new("git")
-        .args(["log", "--pretty=format:%at", "--numstat"])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("Failed to run git log: {}", e))?;
-
-    if !output.status.success() {
-        return Err("git log failed".to_string());
+    let raw = git_utils::git_file_churn_stats(root);
+    if raw.is_empty() {
+        // Check whether this is a genuine "no history" case or "not a repo" case.
+        if git_utils::open_repo(root).is_none() {
+            return Err("Not a git repository".to_string());
+        }
+        return Err("git log failed or no history found".to_string());
     }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut stats: HashMap<String, ChurnStats> = HashMap::new();
-    let mut current_timestamp = 0u64;
-
-    for line in stdout.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
-        // Try to parse as timestamp (just a number on its own line)
-        if let Ok(ts) = trimmed.parse::<u64>() {
-            // Timestamps are > 1_000_000_000 (year 2001+), numstat added/deleted are small
-            if ts > 1_000_000_000 {
-                current_timestamp = ts;
-                continue;
-            }
-        }
-
-        // Try to parse as numstat: added<TAB>deleted<TAB>path
-        let parts: Vec<&str> = trimmed.split('\t').collect();
-        if parts.len() != 3 {
-            continue;
-        }
-        if parts[0] == "-" || parts[1] == "-" {
-            continue;
-        }
-        let added = parts[0].parse::<usize>().unwrap_or(0);
-        let deleted = parts[1].parse::<usize>().unwrap_or(0);
-        let path = parts[2].to_string();
-
-        let entry = stats.entry(path).or_insert(ChurnStats {
-            commits: Vec::new(),
-        });
-        entry.commits.push(CommitChurn {
-            added,
-            deleted,
-            timestamp: current_timestamp,
-        });
-    }
-
+    let stats = raw
+        .into_iter()
+        .map(|(path, entries)| {
+            let commits = entries
+                .into_iter()
+                .map(|e| CommitChurn {
+                    added: e.added,
+                    deleted: e.deleted,
+                    timestamp: e.timestamp,
+                })
+                .collect();
+            (path, ChurnStats { commits })
+        })
+        .collect();
     Ok(stats)
 }
 
@@ -297,11 +269,7 @@ pub fn analyze_hotspots(
         .filter_map(|p| Pattern::new(p).ok())
         .collect();
 
-    let git_dir = root.join(".git");
-    if !git_dir.exists() {
-        return Err("Not a git repository".to_string());
-    }
-
+    // parse_git_churn (via gix) returns an error if not a git repository.
     let file_stats = parse_git_churn(root)?;
 
     // Filter to existing source files, excluding patterns

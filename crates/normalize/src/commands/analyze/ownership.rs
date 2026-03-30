@@ -1,5 +1,6 @@
 //! Git blame ownership analysis — bus factor, ownership concentration per file
 
+use super::git_utils;
 use super::is_source_file;
 use crate::output::OutputFormatter;
 use glob::Pattern;
@@ -196,22 +197,9 @@ fn blame_file(root: &Path, path: &str) -> Option<FileOwnership> {
     })
 }
 
-/// Collect source files from git ls-files
+/// Collect source files from the git index (tracked files).
 fn git_tracked_files(root: &Path) -> Vec<String> {
-    let output = std::process::Command::new("git")
-        .args(["ls-files"])
-        .current_dir(root)
-        .output()
-        .ok()
-        .filter(|o| o.status.success());
-
-    match output {
-        Some(o) => String::from_utf8_lossy(&o.stdout)
-            .lines()
-            .map(|l| l.to_string())
-            .collect(),
-        None => Vec::new(),
-    }
+    git_utils::git_ls_files(root)
 }
 
 /// Analyze file ownership via git blame, returning the report.

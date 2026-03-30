@@ -1,5 +1,6 @@
 //! Cross-repo activity over time — commit volume, author focus, and churn trends
 
+use super::git_utils;
 use crate::output::OutputFormatter;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
@@ -280,67 +281,24 @@ struct RawRepoData {
 fn gather_repo_data(repo: &Path) -> Option<RawRepoData> {
     let name = repo.file_name()?.to_str()?.to_string();
 
-    let output = std::process::Command::new("git")
-        .args(["log", "--all", "--format=%H %at %ae", "--numstat"])
-        .current_dir(repo)
-        .output()
-        .ok()?;
-
-    if !output.status.success() {
+    let raw = git_utils::git_activity_commits(repo);
+    if raw.is_empty() {
         return None;
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let commits = parse_git_log(&stdout);
+    let commits = raw
+        .into_iter()
+        .map(|c| CommitInfo {
+            timestamp: c.timestamp,
+            author: c.author_email,
+            file_stats: vec![FileStat {
+                insertions: c.insertions,
+                deletions: c.deletions,
+            }],
+        })
+        .collect();
 
     Some(RawRepoData { name, commits })
-}
-
-fn parse_git_log(output: &str) -> Vec<CommitInfo> {
-    let mut commits = Vec::new();
-    let mut current: Option<CommitInfo> = None;
-
-    for line in output.lines() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-
-        // Try to parse as commit header: <hash> <timestamp> <email>
-        let parts: Vec<&str> = line.splitn(3, ' ').collect();
-        if parts.len() == 3
-            && parts[0].len() == 40
-            && parts[0].chars().all(|c| c.is_ascii_hexdigit())
-        {
-            // Save previous commit
-            if let Some(c) = current.take() {
-                commits.push(c);
-            }
-            let timestamp = parts[1].parse::<u64>().unwrap_or(0);
-            current = Some(CommitInfo {
-                timestamp,
-                author: parts[2].to_string(),
-                file_stats: Vec::new(),
-            });
-        } else if let Some(ref mut c) = current {
-            // Try to parse as numstat line: <ins>\t<del>\t<file>
-            let stat_parts: Vec<&str> = line.split('\t').collect();
-            if stat_parts.len() >= 3 {
-                let ins = stat_parts[0].parse::<usize>().unwrap_or(0);
-                let del = stat_parts[1].parse::<usize>().unwrap_or(0);
-                c.file_stats.push(FileStat {
-                    insertions: ins,
-                    deletions: del,
-                });
-            }
-        }
-    }
-
-    if let Some(c) = current {
-        commits.push(c);
-    }
-
-    commits
 }
 
 /// Generate the last N window labels for the given granularity.

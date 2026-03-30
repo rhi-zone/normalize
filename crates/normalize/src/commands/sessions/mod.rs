@@ -353,13 +353,11 @@ pub(crate) fn get_sessions_dir(project: Option<&Path>) -> Option<PathBuf> {
         return Some(dir);
     }
 
-    // 2. Git root of current directory
-    if let Ok(output) = std::process::Command::new("git")
-        .args(["rev-parse", "--show-toplevel"])
-        .output()
-        && output.status.success()
-        && let Some(dir) =
-            path_to_claude_dir(Path::new(String::from_utf8_lossy(&output.stdout).trim()))
+    // 2. Git root of current directory (via gix — no PATH dependency)
+    if let Ok(cwd) = std::env::current_dir()
+        && let Ok(repo) = gix::discover(&cwd)
+        && let Some(worktree) = repo.workdir()
+        && let Some(dir) = path_to_claude_dir(worktree)
     {
         return Some(dir);
     }
