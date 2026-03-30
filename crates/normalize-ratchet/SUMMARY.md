@@ -16,7 +16,8 @@ Each baseline entry is a `(path, metric, aggregation) → value` triple stored i
 - `src/baseline.rs` — baseline file format (`.normalize/ratchet.json`), `Aggregate` enum, `RatchetConfig`, aggregation logic
 - `src/metrics/` — metric implementations (complexity, call-complexity, line-count, function-count, class-count, comment-line-count, file-stats)
 - `src/error.rs` — `RatchetError` enum (MetricNotFound, BaselineNotFound, BaselineRead, BaselineParse, MeasurementFailed) with per-variant doc comments
-- `src/service.rs` — `RatchetService` CLI service (`normalize ratchet`) with `measure`, `add`, `check`, `update`, `show`, `remove` commands; `build_ratchet_report()` for native rules integration. `measure` accepts `--diff-ref` (git ref to compute delta against); `check` accepts `--baseline-ref` (substitute a git ref as the baseline instead of ratchet.json).
+- `src/git_ops.rs` — gix-based git helpers: `open_repo`, `read_blob_text`, `walk_tree_at_ref`. Used by `service.rs` for ref-based measurement without requiring the `git` binary.
+- `src/service.rs` — `RatchetService` CLI service (`normalize ratchet`) with `measure`, `add`, `check`, `update`, `show`, `remove` commands; `build_ratchet_report()` for native rules integration. `measure` accepts `--diff-ref` (git ref to compute delta against); `check` accepts `--baseline-ref` (substitute a git ref as the baseline instead of ratchet.json). Ref-based operations use gix blob reads + a temp dir instead of `git worktree add/remove`.
 
 ## Metrics
 

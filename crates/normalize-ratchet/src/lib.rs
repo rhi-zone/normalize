@@ -6,6 +6,7 @@
 
 pub mod baseline;
 pub mod error;
+pub mod git_ops;
 pub mod metrics;
 
 #[cfg(feature = "cli")]

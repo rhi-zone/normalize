@@ -51,13 +51,18 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ## P1 — Short-term Improvements (coherence / usability)
 
-### ~~Eliminate remaining git shell-outs (budget metrics worktrees)~~ DONE
+### ~~Eliminate remaining git shell-outs (budget metrics worktrees + ratchet ref-based check/measure)~~ DONE
 
 All budget metrics now use gix in-memory blob reads — no filesystem checkout, no `git` binary
 required. `lines`, `modules`, `todos`, `dependencies` use `diff_tree_to_tree` comparing
 base_ref to HEAD. `functions`, `classes`, `complexity-delta` use `walk_tree_at_ref` to read
 blobs from the object store for the base tree, then read working tree from disk.
 Committed: `refactor(budget): replace git worktrees with in-memory gix blob reads`.
+
+Ratchet ref-based check/measure (`--baseline-ref`, `--diff-ref`) also migrated: now uses gix
+blob reads via `walk_tree_at_ref` materialised into a tempdir, replacing `git worktree add/remove`.
+No `git` binary in PATH is required for any normalize operation.
+Committed: `refactor(ratchet): replace git worktrees with in-memory gix blob reads`.
 
 ### ~~Migrate remaining read-only git shell-outs (blame, status, path-log)~~ DONE
 
@@ -308,13 +313,13 @@ other project-level decisions as they emerge (e.g., exclude patterns, SUMMARY.md
 - [x] Baseline stored in `.normalize/ratchet.json`; 6 aggregation strategies (mean/median/max/min/sum/count); defaults configurable via `[ratchet]` / `[ratchet.metrics.<name>]` in `.normalize/config.toml`
 - [x] `MetricFactory` type alias outside `cli` feature; `RatchetConfig` wired into `NormalizeConfig` via `#[param(nested, serde)]`
 - [x] Native rules integration: `normalize rules run` detects regressions via `ratchet/<metric>` rule IDs
-- [x] `--base <git-ref>` on `check` and `measure` for historical comparison via git worktrees
+- [x] `--base <git-ref>` on `check` and `measure` for historical comparison — originally via git worktrees; migrated to gix blob reads + tempdir (`refactor(ratchet): replace git worktrees with in-memory gix blob reads`)
 - [x] `normalize-budget` crate: diff-based budget system; each entry has `(path, metric, aggregate, ref) → {max_added, max_removed, max_total, max_net}` (all optional); budget stored in `.normalize/budget.json`
 - [x] 7 diff metrics: lines, functions, classes, modules, todos, complexity-delta, dependencies
 - [x] Native rules integration: `budget/<metric>` rule IDs alongside ratchet rules
 
 **Follow-up ideas (not planned):**
-- `--base` worktree approach is correct but slow for large repos; could cache measurements per git-ref in `.normalize/ratchet-cache/`
+- `--base` now uses gix blob reads + tempdir (no git binary); caching measurements per git-ref in `.normalize/ratchet-cache/` could further speed up large repos
 - Call-graph BFS is intra-project only (no cross-crate edges); future: integrate with `normalize-graph` if cross-crate call data exists
 - Trend charts (`normalize ratchet trend`) could visualize metric history over git log
 

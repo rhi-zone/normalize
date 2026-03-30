@@ -4,6 +4,7 @@
 
 use crate::baseline::{Aggregate, BaselineEntry, BaselineFile, RatchetConfig};
 use crate::error::RatchetError;
+use crate::git_ops;
 use crate::{MetricFactory, default_metrics};
 use normalize_metrics::filter_by_prefix;
 use normalize_output::OutputFormatter;
@@ -852,24 +853,36 @@ fn build_check_report(
     })
 }
 
-/// RAII guard that removes a git worktree on drop.
-struct WorktreeGuard<'a> {
-    path: &'a Path,
-    root: &'a Path,
-}
+/// Materialise all blobs at `base_ref` into a temporary directory and return its path.
+///
+/// The caller is responsible for cleaning up via the returned [`tempfile::TempDir`].
+/// Uses gix to read blobs directly from the object store — no `git` binary required.
+fn checkout_ref_to_tempdir(root: &Path, base_ref: &str) -> Result<tempfile::TempDir, String> {
+    let tmp = tempfile::tempdir().map_err(|e| format!("failed to create temp dir: {e}"))?;
+    let tmp_path = tmp.path().to_owned();
 
-impl Drop for WorktreeGuard<'_> {
-    fn drop(&mut self) {
-        use std::process::Command;
-        let worktree_str = self.path.to_string_lossy().to_string();
-        let _ = Command::new("git")
-            .args(["worktree", "remove", &worktree_str, "--force"])
-            .current_dir(self.root)
-            .output();
-    }
+    let repo = git_ops::open_repo(root).map_err(|e| e.to_string())?;
+
+    git_ops::walk_tree_at_ref(root, base_ref, |rel_path, blob_id| {
+        let Some(content) = git_ops::read_blob_text(&repo, blob_id) else {
+            return;
+        };
+        let dest = tmp_path.join(rel_path);
+        if let Some(parent) = dest.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&dest, content.as_bytes());
+    })
+    .map_err(|e| format!("failed to walk git tree at '{base_ref}': {e}"))?;
+
+    Ok(tmp)
 }
 
 /// Check against a historical git ref.
+///
+/// Reads all file blobs at `base_ref` from the git object store via gix (no `git` binary),
+/// writes them to a temporary directory, runs metric collection there, then compares against
+/// the current working tree.
 fn check_against_ref(
     root: &Path,
     base_ref: &str,
@@ -878,65 +891,13 @@ fn check_against_ref(
     aggregate: Aggregate,
     factory: &MetricFactory,
 ) -> Result<CheckReport, String> {
-    use std::process::Command;
-
-    // Resolve the ref to a hash via gix (no PATH dependency)
-    let hash = {
-        use gix::bstr::BStr;
-        gix::discover(root)
-            .ok()
-            .and_then(|repo| {
-                let spec: &BStr = base_ref.as_bytes().into();
-                repo.rev_parse_single(spec)
-                    .ok()
-                    .map(|id| id.to_hex().to_string())
-            })
-            .ok_or_else(|| format!("git ref '{base_ref}' not found"))?
-    };
-    // SAFETY: git hashes are always ASCII hex digits, so byte indexing is char-boundary-safe.
-    let short = &hash[..7.min(hash.len())];
-    // Include PID to avoid races when multiple processes check the same ref.
-    let worktree_name = format!("normalize-ratchet-wt-{short}-{}", std::process::id());
-    let worktree_path = std::env::temp_dir().join(&worktree_name);
-    let worktree_str = worktree_path.to_string_lossy().to_string();
-
-    // Clean up any stale worktree
-    if worktree_path.exists() {
-        let rm = Command::new("git")
-            .args(["worktree", "remove", &worktree_str, "--force"])
-            .current_dir(root)
-            .output()
-            .map_err(|e| format!("failed to remove stale worktree: {e}"))?;
-        if !rm.status.success() {
-            return Err(format!(
-                "failed to remove stale worktree: {}",
-                String::from_utf8_lossy(&rm.stderr).trim()
-            ));
-        }
-    }
-
-    // Create worktree
-    let add_output = Command::new("git")
-        .args(["worktree", "add", "--detach", &worktree_str, &hash])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("failed to create worktree: {e}"))?;
-    if !add_output.status.success() {
-        return Err(format!(
-            "git worktree add failed: {}",
-            String::from_utf8_lossy(&add_output.stderr).trim()
-        ));
-    }
-
-    // Guard ensures worktree is removed even if we return early via `?`.
-    let _guard = WorktreeGuard {
-        path: &worktree_path,
-        root,
-    };
+    // Materialise ref into a temp dir — dropped (and deleted) at end of scope.
+    let tmp = checkout_ref_to_tempdir(root, base_ref)?;
+    let ref_path = tmp.path();
 
     // Measure baseline at ref
     let baseline_measurements = {
-        let metrics = factory(&worktree_path);
+        let metrics = factory(ref_path);
         let metric_names: Vec<&str> = if let Some(m) = metric_filter {
             metrics
                 .iter()
@@ -953,7 +914,7 @@ fn check_against_ref(
                 .iter()
                 .find(|x| x.name() == metric_name)
                 .ok_or_else(|| format!("metric '{}' not found", metric_name))?;
-            let all = match m.measure_all(&worktree_path) {
+            let all = match m.measure_all(ref_path) {
                 Ok(v) => v,
                 Err(e) => {
                     tracing::warn!(
@@ -1002,7 +963,7 @@ fn check_against_ref(
         let current_all = match m.measure_all(root) {
             Ok(v) => v,
             Err(e) => {
-                tracing::warn!("could not measure {} at current worktree: {e}", metric_name);
+                tracing::warn!("could not measure {} at current tree: {e}", metric_name);
                 continue;
             }
         };
@@ -1062,6 +1023,9 @@ fn check_against_ref(
 }
 
 /// Measure at a historical git ref.
+///
+/// Reads all file blobs at `base_ref` from the git object store via gix (no `git` binary),
+/// writes them to a temporary directory, then runs metric collection there.
 fn measure_at_ref(
     root: &Path,
     base_ref: &str,
@@ -1070,58 +1034,8 @@ fn measure_at_ref(
     agg: Aggregate,
     factory: &MetricFactory,
 ) -> Result<MeasureReport, String> {
-    use std::process::Command;
-
-    // Resolve the ref to a hash via gix (no PATH dependency)
-    let hash = {
-        use gix::bstr::BStr;
-        gix::discover(root)
-            .ok()
-            .and_then(|repo| {
-                let spec: &BStr = base_ref.as_bytes().into();
-                repo.rev_parse_single(spec)
-                    .ok()
-                    .map(|id| id.to_hex().to_string())
-            })
-            .ok_or_else(|| format!("git ref '{base_ref}' not found"))?
-    };
-    // SAFETY: git hashes are always ASCII hex digits, so byte indexing is char-boundary-safe.
-    let short = &hash[..7.min(hash.len())];
-    let worktree_name = format!("normalize-ratchet-wt-{short}-{}", std::process::id());
-    let worktree_path = std::env::temp_dir().join(&worktree_name);
-    let worktree_str = worktree_path.to_string_lossy().to_string();
-
-    if worktree_path.exists() {
-        let rm = Command::new("git")
-            .args(["worktree", "remove", &worktree_str, "--force"])
-            .current_dir(root)
-            .output()
-            .map_err(|e| format!("failed to remove stale worktree: {e}"))?;
-        if !rm.status.success() {
-            return Err(format!(
-                "failed to remove stale worktree: {}",
-                String::from_utf8_lossy(&rm.stderr).trim()
-            ));
-        }
-    }
-
-    let add_output = Command::new("git")
-        .args(["worktree", "add", "--detach", &worktree_str, &hash])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("failed to create worktree: {e}"))?;
-    if !add_output.status.success() {
-        return Err(format!(
-            "git worktree add failed: {}",
-            String::from_utf8_lossy(&add_output.stderr).trim()
-        ));
-    }
-
-    let _guard = WorktreeGuard {
-        path: &worktree_path,
-        root,
-    };
-    measure(&worktree_path, path, metric, agg, factory)
+    let tmp = checkout_ref_to_tempdir(root, base_ref)?;
+    measure(tmp.path(), path, metric, agg, factory)
 }
 
 fn metric_higher_is_worse(metric_name: &str, factory: &MetricFactory) -> bool {
