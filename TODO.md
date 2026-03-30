@@ -59,6 +59,18 @@ base_ref to HEAD. `functions`, `classes`, `complexity-delta` use `walk_tree_at_r
 blobs from the object store for the base tree, then read working tree from disk.
 Committed: `refactor(budget): replace git worktrees with in-memory gix blob reads`.
 
+### ~~Migrate remaining read-only git shell-outs (blame, status, path-log)~~ DONE
+
+Remaining read-only shell-outs migrated to gix:
+- `git blame` → `repo.blame_file()` (ownership.rs, provenance.rs, view/history.rs)
+- `git status --porcelain` → `repo.status().into_index_worktree_iter()` (git_utils.rs, stale_summary.rs, sources.rs)
+- `git log -- path` (path-filtered count/last-commit) → commit walk with tree diffs (git_utils.rs, stale_summary.rs)
+- `git rev-list --count HEAD` → commit walk length (service/analyze.rs coupling_clusters)
+- `git rev-parse` shell-out (`resolve_ref_shellout`) → delegates to `resolve_ref()` gix wrapper
+- `git log --name-only` (co-change) → existing `git_per_commit_files()` gix helper (provenance.rs)
+- `git diff --cached` / `git status` in GitSource → `repo.is_dirty()` + index-vs-HEAD blob compare
+Committed: `refactor: migrate remaining git shell-outs to gix (blame, status, path-log)`.
+
 ### Agent UX: comprehensive compact output audit
 
 Baseline audit in `docs/agent-ux-audit.md` (2026-03-21) covers 12 commands across 3 models (Haiku, Sonnet, Opus). Quick wins fixed. Remaining work:

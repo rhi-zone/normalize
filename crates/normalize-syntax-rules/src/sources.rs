@@ -172,27 +172,30 @@ impl RuleSource for GitSource {
             result.insert("branch".to_string(), branch);
         }
 
-        // Check if file is staged
-        if let Ok(output) = std::process::Command::new("git")
-            .args(["diff", "--cached", "--name-only"])
-            .current_dir(ctx.project_root)
-            .output()
-            && output.status.success()
-        {
-            let staged = String::from_utf8_lossy(&output.stdout);
-            let is_staged = staged.lines().any(|l| l == ctx.rel_path);
-            result.insert("staged".to_string(), is_staged.to_string());
-        }
+        // Check staged and dirty state via gix (no PATH dependency).
+        if let Ok(repo) = gix::discover(ctx.project_root) {
+            // is_dirty: any staged or unstaged change in the repo.
+            let is_dirty = repo.is_dirty().unwrap_or(false);
+            result.insert("dirty".to_string(), is_dirty.to_string());
 
-        // Check if repo is dirty
-        if let Ok(output) = std::process::Command::new("git")
-            .args(["status", "--porcelain"])
-            .current_dir(ctx.project_root)
-            .output()
-            && output.status.success()
-        {
-            let dirty = !output.stdout.is_empty();
-            result.insert("dirty".to_string(), dirty.to_string());
+            // is_staged: the specific file appears in `git diff --cached` (index vs HEAD).
+            // Compare the file's blob in the HEAD tree vs the index — if they differ,
+            // the file is staged.
+            let is_staged = (|| -> Option<bool> {
+                let head_id = repo.head_id().ok()?;
+                let head_commit = head_id.object().ok()?.into_commit();
+                let head_tree = head_commit.tree().ok()?;
+                // Look up the file in HEAD tree and the index; compare blob ids.
+                let entry_in_head = head_tree.lookup_entry_by_path(ctx.rel_path).ok().flatten();
+                let head_blob_id = entry_in_head.map(|e| e.id().detach());
+                let index = repo.index_or_empty().ok()?;
+                let rel_bstr: &gix::bstr::BStr = ctx.rel_path.as_bytes().into();
+                let index_blob_id = index.entry_by_path(rel_bstr).map(|e| e.id);
+                // Staged if the file exists in index but not HEAD, or blobs differ.
+                Some(index_blob_id != head_blob_id)
+            })()
+            .unwrap_or(false);
+            result.insert("staged".to_string(), is_staged.to_string());
         }
 
         Some(result)

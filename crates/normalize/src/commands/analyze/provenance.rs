@@ -209,25 +209,22 @@ fn resolve_full_hash(root: &Path, short: &str) -> Option<String> {
 
 /// Per-file blame: commit hash → line count.
 fn blame_file(root: &Path, path: &str) -> Option<HashMap<String, usize>> {
-    let output = std::process::Command::new("git")
-        .args(["blame", "--line-porcelain", path])
-        .current_dir(root)
-        .output()
+    let repo = git_utils::open_repo(root)?;
+    let head_id = repo.head_id().ok()?;
+    let path_bstr: &gix::bstr::BStr = path.as_bytes().into();
+    let outcome = repo
+        .blame_file(
+            path_bstr,
+            head_id.detach(),
+            gix::repository::blame_file::Options::default(),
+        )
         .ok()?;
 
-    if !output.status.success() {
-        return None;
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Accumulate per-commit line counts from blame entries.
     let mut commit_lines: HashMap<String, usize> = HashMap::new();
-
-    for line in stdout.lines() {
-        // Lines starting with a 40-char hex hash followed by line numbers
-        if line.len() >= 40 && line.as_bytes()[..40].iter().all(|b| b.is_ascii_hexdigit()) {
-            let hash = &line[..40];
-            *commit_lines.entry(hash.to_string()).or_default() += 1;
-        }
+    for entry in &outcome.entries {
+        let hash = entry.commit_id.to_hex().to_string();
+        *commit_lines.entry(hash).or_default() += entry.len.get() as usize;
     }
 
     if commit_lines.is_empty() {
@@ -251,51 +248,19 @@ fn git_tracked_files(root: &Path, target: Option<&str>) -> Vec<String> {
 // ── Co-change extraction ─────────────────────────────────────────
 
 fn build_co_change_edges(root: &Path, files: &HashSet<String>) -> Vec<ProvenanceEdge> {
-    let output = std::process::Command::new("git")
-        .args(["log", "--pretty=format:%x00", "--name-only"])
-        .current_dir(root)
-        .output()
-        .ok()
-        .filter(|o| o.status.success());
+    let per_commit = git_utils::git_per_commit_files(root);
 
-    let Some(output) = output else {
-        return Vec::new();
-    };
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
     let mut pair_counts: HashMap<(String, String), usize> = HashMap::new();
-    let mut current_files: Vec<String> = Vec::new();
-
-    for line in stdout.lines() {
-        if line.contains('\0') {
-            if current_files.len() >= 2 && current_files.len() <= 50 {
-                current_files.sort();
-                current_files.dedup();
-                for i in 0..current_files.len() {
-                    for j in (i + 1)..current_files.len() {
-                        if files.contains(&current_files[i]) && files.contains(&current_files[j]) {
-                            let key = (current_files[i].clone(), current_files[j].clone());
-                            *pair_counts.entry(key).or_default() += 1;
-                        }
-                    }
-                }
-            }
-            current_files.clear();
+    for mut commit_files in per_commit {
+        if commit_files.len() < 2 || commit_files.len() > 50 {
             continue;
         }
-        let trimmed = line.trim();
-        if !trimmed.is_empty() {
-            current_files.push(trimmed.to_string());
-        }
-    }
-    // Handle last commit group
-    if current_files.len() >= 2 && current_files.len() <= 50 {
-        current_files.sort();
-        current_files.dedup();
-        for i in 0..current_files.len() {
-            for j in (i + 1)..current_files.len() {
-                if files.contains(&current_files[i]) && files.contains(&current_files[j]) {
-                    let key = (current_files[i].clone(), current_files[j].clone());
+        commit_files.sort();
+        commit_files.dedup();
+        for i in 0..commit_files.len() {
+            for j in (i + 1)..commit_files.len() {
+                if files.contains(&commit_files[i]) && files.contains(&commit_files[j]) {
+                    let key = (commit_files[i].clone(), commit_files[j].clone());
                     *pair_counts.entry(key).or_default() += 1;
                 }
             }

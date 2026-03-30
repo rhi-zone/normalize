@@ -110,7 +110,8 @@ roxmltree = "0.21"
 # Git library (pure-Rust, no PATH dependency)
 # sha1: required hash algorithm; revision: walk commits/resolve refs;
 # blob-diff: tree-to-tree diffs; index: read tracked files from git index
-gix = { version = "0.81", default-features = false, features = ["sha1", "revision", "blob-diff", "index"] }
+# blame: git blame API; status: index-vs-worktree status checks
+gix = { version = "0.81", default-features = false, features = ["sha1", "revision", "blob-diff", "index", "blame", "status"] }
 
 # Service framework
 server-less = { version = "0.4.8", default-features = false, features = ["cli", "jsonschema", "config"] }

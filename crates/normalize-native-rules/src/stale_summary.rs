@@ -4,7 +4,6 @@ use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use std::process::Command;
 
 /// Open the git repository at or containing `root` using gix.
 fn gix_open(root: &Path) -> Option<gix::Repository> {
@@ -171,46 +170,114 @@ fn git_head(root: &Path) -> Option<String> {
 }
 
 /// Returns the commit hash of the last commit touching `rel_path`, or None.
+///
+/// Walks the commit history and diffs each commit against its first parent.
 fn git_last_commit(root: &Path, rel_path: &str) -> Option<String> {
-    let out = Command::new("git")
-        .args([
-            "-C",
-            root.to_str().unwrap_or("."),
-            "log",
-            "-1",
-            "--format=%H",
-            "--",
-            rel_path,
-        ])
-        .output()
+    let repo = gix_open(root)?;
+    let head_id = repo.head_id().ok()?;
+    let walk = head_id
+        .ancestors()
+        .sorting(gix::revision::walk::Sorting::ByCommitTime(
+            gix::traverse::commit::simple::CommitTimeOrder::NewestFirst,
+        ))
+        .all()
         .ok()?;
-    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    if s.is_empty() { None } else { Some(s) }
+
+    for info in walk {
+        let Ok(info) = info else { continue };
+        let Ok(commit) = info.object() else { continue };
+        let Ok(tree) = commit.tree() else { continue };
+        let parent_tree = info
+            .parent_ids()
+            .next()
+            .and_then(|pid| pid.object().ok())
+            .and_then(|obj| obj.into_commit().tree().ok());
+        let changes = match repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), None) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        let touches = changes.iter().any(|change| {
+            use gix::object::tree::diff::ChangeDetached;
+            let loc = match change {
+                ChangeDetached::Addition { location, .. }
+                | ChangeDetached::Deletion { location, .. }
+                | ChangeDetached::Modification { location, .. } => location.as_slice(),
+                ChangeDetached::Rewrite {
+                    source_location, ..
+                } => source_location.as_slice(),
+            };
+            loc == rel_path.as_bytes()
+        });
+        if touches {
+            return Some(info.id.to_hex().to_string());
+        }
+    }
+    None
 }
 
 /// Counts commits touching `rel_dir` since `since_commit` (exclusive).
 /// If `since_commit` is None, counts all commits touching `rel_dir`.
 fn git_commit_count(root: &Path, since_commit: Option<&str>, rel_dir: &str) -> usize {
-    let range = since_commit
-        .map(|h| format!("{}..HEAD", h))
-        .unwrap_or_else(|| "HEAD".into());
-    let out = Command::new("git")
-        .args([
-            "-C",
-            root.to_str().unwrap_or("."),
-            "log",
-            "--oneline",
-            &range,
-            "--",
-            rel_dir,
-        ])
-        .output()
-        .ok();
-    let stdout = out.as_ref().map(|o| o.stdout.as_slice()).unwrap_or(&[]);
-    String::from_utf8_lossy(stdout)
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .count()
+    let Some(repo) = gix_open(root) else {
+        return 0;
+    };
+    let Ok(head_id) = repo.head_id() else {
+        return 0;
+    };
+    // Resolve the stop-commit (exclusive) if provided.
+    let stop_id: Option<gix::hash::ObjectId> = since_commit.and_then(|h| {
+        let spec: &gix::bstr::BStr = h.as_bytes().into();
+        repo.rev_parse_single(spec).ok().map(|id| id.detach())
+    });
+    let Ok(walk) = head_id
+        .ancestors()
+        .sorting(gix::revision::walk::Sorting::ByCommitTime(
+            gix::traverse::commit::simple::CommitTimeOrder::NewestFirst,
+        ))
+        .all()
+    else {
+        return 0;
+    };
+
+    let mut count = 0;
+    for info in walk {
+        let Ok(info) = info else { continue };
+        if stop_id.is_some_and(|stop| info.id == stop) {
+            break;
+        }
+        let Ok(commit) = info.object() else { continue };
+        let Ok(tree) = commit.tree() else { continue };
+        let parent_tree = info
+            .parent_ids()
+            .next()
+            .and_then(|pid| pid.object().ok())
+            .and_then(|obj| obj.into_commit().tree().ok());
+        let changes = match repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), None) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        let is_root = rel_dir == ".";
+        let touches = if is_root {
+            !changes.is_empty()
+        } else {
+            changes.iter().any(|change| {
+                use gix::object::tree::diff::ChangeDetached;
+                let loc = match change {
+                    ChangeDetached::Addition { location, .. }
+                    | ChangeDetached::Deletion { location, .. }
+                    | ChangeDetached::Modification { location, .. } => location.as_slice(),
+                    ChangeDetached::Rewrite {
+                        source_location, ..
+                    } => source_location.as_slice(),
+                };
+                loc.starts_with(rel_dir.as_bytes())
+            })
+        };
+        if touches {
+            count += 1;
+        }
+    }
+    count
 }
 
 /// Returns true if `rel_dir` has uncommitted changes (staged or unstaged) that are
@@ -219,42 +286,50 @@ fn git_commit_count(root: &Path, since_commit: Option<&str>, rel_dir: &str) -> u
 /// `doc_paths` lists the relative paths of doc files to exclude from the signal
 /// (e.g. `["SUMMARY.md", "src/SUMMARY.md"]`).
 fn git_has_uncommitted_content_changes(root: &Path, rel_dir: &str, doc_paths: &[String]) -> bool {
-    let out = Command::new("git")
-        .args([
-            "-C",
-            root.to_str().unwrap_or("."),
-            "status",
-            "--short",
-            "--",
-            rel_dir,
-        ])
-        .output();
-    let Ok(out) = out else { return false };
-    String::from_utf8_lossy(&out.stdout)
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .any(|l| {
-            // Each line: "XY path" where XY are status codes
-            let path = l.get(3..).unwrap_or("").trim();
-            // Exclude all candidate doc files from the "content changed" signal
-            !doc_paths.iter().any(|dp| dp.as_str() == path)
-        })
+    let Some(repo) = gix_open(root) else {
+        return false;
+    };
+    let pattern: gix::bstr::BString = rel_dir.into();
+    let patterns = if rel_dir == "." {
+        Vec::new()
+    } else {
+        vec![pattern]
+    };
+    let platform = match repo.status(gix::progress::Discard) {
+        Ok(p) => p.index_worktree_options_mut(|opts| {
+            opts.dirwalk_options = None;
+        }),
+        Err(_) => return false,
+    };
+    let mut iter = match platform.into_index_worktree_iter(patterns) {
+        Ok(it) => it,
+        Err(_) => return false,
+    };
+    iter.any(|item| {
+        let Ok(item) = item else { return false };
+        use gix::bstr::ByteSlice;
+        let rela = item.rela_path().to_str_lossy();
+        !doc_paths.iter().any(|dp| dp.as_str() == rela.as_ref())
+    })
 }
 
 /// Returns true if SUMMARY.md for `rel_dir` has uncommitted changes (it's being updated).
 fn git_summary_has_uncommitted_changes(root: &Path, summary_path: &str) -> bool {
-    let out = Command::new("git")
-        .args([
-            "-C",
-            root.to_str().unwrap_or("."),
-            "status",
-            "--short",
-            "--",
-            summary_path,
-        ])
-        .output();
-    let Ok(out) = out else { return false };
-    !String::from_utf8_lossy(&out.stdout).trim().is_empty()
+    let Some(repo) = gix_open(root) else {
+        return false;
+    };
+    let pattern: gix::bstr::BString = summary_path.into();
+    let platform = match repo.status(gix::progress::Discard) {
+        Ok(p) => p.index_worktree_options_mut(|opts| {
+            opts.dirwalk_options = None;
+        }),
+        Err(_) => return false,
+    };
+    let mut iter = match platform.into_index_worktree_iter(vec![pattern]) {
+        Ok(it) => it,
+        Err(_) => return false,
+    };
+    iter.any(|item| item.is_ok())
 }
 
 /// Default filenames checked by `stale-summary` and `missing-summary` when none are configured.

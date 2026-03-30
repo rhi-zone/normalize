@@ -132,25 +132,34 @@ impl OutputFormatter for OwnershipReport {
     }
 }
 
-/// Get ownership data for a single file via `git blame --line-porcelain`
+/// Get ownership data for a single file via gix blame.
 fn blame_file(root: &Path, path: &str) -> Option<FileOwnership> {
-    let output = std::process::Command::new("git")
-        .args(["blame", "--line-porcelain", path])
-        .current_dir(root)
-        .output()
+    let repo = git_utils::open_repo(root)?;
+    let head_id = repo.head_id().ok()?;
+    let path_bstr: &gix::bstr::BStr = path.as_bytes().into();
+    let outcome = repo
+        .blame_file(
+            path_bstr,
+            head_id.detach(),
+            gix::repository::blame_file::Options::default(),
+        )
         .ok()?;
 
-    if !output.status.success() {
-        return None;
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Accumulate per-author line counts by resolving each commit's author.
     let mut author_lines: HashMap<String, usize> = HashMap::new();
-
-    for line in stdout.lines() {
-        if let Some(author) = line.strip_prefix("author ") {
-            *author_lines.entry(author.to_string()).or_default() += 1;
-        }
+    for entry in &outcome.entries {
+        let lines = entry.len.get() as usize;
+        let author_name = repo
+            .find_object(entry.commit_id)
+            .ok()
+            .and_then(|obj| {
+                obj.into_commit()
+                    .author()
+                    .ok()
+                    .map(|a| String::from_utf8_lossy(a.name).into_owned())
+            })
+            .unwrap_or_else(|| "Unknown".to_string());
+        *author_lines.entry(author_name).or_default() += lines;
     }
 
     if author_lines.is_empty() {
@@ -158,10 +167,6 @@ fn blame_file(root: &Path, path: &str) -> Option<FileOwnership> {
     }
 
     let total_lines: usize = author_lines.values().sum();
-    if total_lines == 0 {
-        return None;
-    }
-
     if total_lines == 0 {
         return None;
     }

@@ -1,7 +1,7 @@
 //! Git utility functions using `gix` (gitoxide) — no PATH dependency.
 //!
 //! This module provides read-only git operations backed by the pure-Rust `gix` library.
-//! Write operations (worktree add/remove) remain as shell-outs in their respective callers
+//! Write operations (worktree add/remove) remain as shell-outs in `run_in_worktree`
 //! because `gix` does not support those yet.
 //!
 //! All public functions return `Option` or `Result` and degrade gracefully if the
@@ -266,47 +266,57 @@ pub fn git_remote_origin_url(root: &Path) -> Option<String> {
 /// Return true if `rel_dir` has uncommitted content changes (staged or unstaged) that
 /// are NOT limited to the `doc_paths`.
 ///
-/// Falls back to `false` on any error. This still uses a git shell-out because
-/// gix does not provide a stable `git status` API that accounts for worktree state.
+/// Falls back to `false` on any error.
 pub fn git_has_uncommitted_content_changes(
     root: &Path,
     rel_dir: &str,
     doc_paths: &[String],
 ) -> bool {
-    let out = std::process::Command::new("git")
-        .args([
-            "-C",
-            root.to_str().unwrap_or("."),
-            "status",
-            "--short",
-            "--",
-            rel_dir,
-        ])
-        .output();
-    let Ok(out) = out else { return false };
-    String::from_utf8_lossy(&out.stdout)
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .any(|l| {
-            let path = l.get(3..).unwrap_or("").trim();
-            !doc_paths.iter().any(|dp| dp.as_str() == path)
-        })
+    let Some(repo) = open_repo(root) else {
+        return false;
+    };
+    // Pass the directory path as a pattern so gix only checks files under it.
+    let pattern: gix::bstr::BString = rel_dir.into();
+    let patterns = if rel_dir == "." {
+        Vec::new()
+    } else {
+        vec![pattern]
+    };
+    let platform = match repo.status(gix::progress::Discard) {
+        Ok(p) => p.index_worktree_options_mut(|opts| {
+            opts.dirwalk_options = None;
+        }),
+        Err(_) => return false,
+    };
+    let mut iter = match platform.into_index_worktree_iter(patterns) {
+        Ok(it) => it,
+        Err(_) => return false,
+    };
+    iter.any(|item| {
+        let Ok(item) = item else { return false };
+        use gix::bstr::ByteSlice;
+        let rela = item.rela_path().to_str_lossy();
+        !doc_paths.iter().any(|dp| dp.as_str() == rela.as_ref())
+    })
 }
 
 /// Return true if `summary_path` has uncommitted changes (staged or unstaged).
 pub fn git_summary_has_uncommitted_changes(root: &Path, summary_path: &str) -> bool {
-    let out = std::process::Command::new("git")
-        .args([
-            "-C",
-            root.to_str().unwrap_or("."),
-            "status",
-            "--short",
-            "--",
-            summary_path,
-        ])
-        .output();
-    let Ok(out) = out else { return false };
-    !String::from_utf8_lossy(&out.stdout).trim().is_empty()
+    let Some(repo) = open_repo(root) else {
+        return false;
+    };
+    let pattern: gix::bstr::BString = summary_path.into();
+    let platform = match repo.status(gix::progress::Discard) {
+        Ok(p) => p.index_worktree_options_mut(|opts| {
+            opts.dirwalk_options = None;
+        }),
+        Err(_) => return false,
+    };
+    let mut iter = match platform.into_index_worktree_iter(vec![pattern]) {
+        Ok(it) => it,
+        Err(_) => return false,
+    };
+    iter.any(|item| item.is_ok())
 }
 
 // ── Commit count helpers (for stale-summary cache) ──────────────────────────
@@ -314,52 +324,119 @@ pub fn git_summary_has_uncommitted_changes(root: &Path, summary_path: &str) -> b
 /// Return the commit hash of the last commit touching `rel_path`, or `None`.
 ///
 /// Equivalent to `git log -1 --format=%H -- <rel_path>`.
-///
-/// NOTE: This is used in the incremental cache for stale-summary. Gix does not
-/// provide a simple "log -- path" API without loading full blame data, so we
-/// keep this as a shell-out for now.
+/// Walks the commit history and diffs each commit against its first parent to find
+/// commits that touched the given path.
 pub fn git_last_commit_for_path(root: &Path, rel_path: &str) -> Option<String> {
-    let out = std::process::Command::new("git")
-        .args([
-            "-C",
-            root.to_str().unwrap_or("."),
-            "log",
-            "-1",
-            "--format=%H",
-            "--",
-            rel_path,
-        ])
-        .output()
+    let repo = open_repo(root)?;
+    let head_id = repo.head_id().ok()?;
+    let walk = head_id
+        .ancestors()
+        .sorting(gix::revision::walk::Sorting::ByCommitTime(
+            gix::traverse::commit::simple::CommitTimeOrder::NewestFirst,
+        ))
+        .all()
         .ok()?;
-    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    if s.is_empty() { None } else { Some(s) }
+
+    for info in walk {
+        let Ok(info) = info else { continue };
+        let Ok(commit) = info.object() else { continue };
+        let Ok(tree) = commit.tree() else { continue };
+        let parent_tree = info
+            .parent_ids()
+            .next()
+            .and_then(|pid| pid.object().ok())
+            .and_then(|obj| obj.into_commit().tree().ok());
+        let changes = match repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), None) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        let touches = changes.iter().any(|change| {
+            use gix::object::tree::diff::ChangeDetached;
+            let loc = match change {
+                ChangeDetached::Addition { location, .. }
+                | ChangeDetached::Deletion { location, .. }
+                | ChangeDetached::Modification { location, .. } => location.as_slice(),
+                ChangeDetached::Rewrite {
+                    source_location, ..
+                } => source_location.as_slice(),
+            };
+            loc == rel_path.as_bytes()
+        });
+        if touches {
+            return Some(info.id.to_hex().to_string());
+        }
+    }
+    None
 }
 
 /// Count commits touching `rel_dir` since `since_commit` (exclusive).
 /// If `since_commit` is `None`, counts all commits touching `rel_dir`.
 ///
-/// NOTE: Kept as shell-out; gix does not provide a simple path-filtered commit count.
+/// Walks the commit history and diffs each commit to find those that touched any
+/// path under `rel_dir`.
 pub fn git_commit_count_for_path(root: &Path, since_commit: Option<&str>, rel_dir: &str) -> usize {
-    let range = since_commit
-        .map(|h| format!("{h}..HEAD"))
-        .unwrap_or_else(|| "HEAD".into());
-    let out = std::process::Command::new("git")
-        .args([
-            "-C",
-            root.to_str().unwrap_or("."),
-            "log",
-            "--oneline",
-            &range,
-            "--",
-            rel_dir,
-        ])
-        .output()
-        .ok();
-    let stdout = out.as_ref().map(|o| o.stdout.as_slice()).unwrap_or(&[]);
-    String::from_utf8_lossy(stdout)
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .count()
+    let Some(repo) = open_repo(root) else {
+        return 0;
+    };
+    let Ok(head_id) = repo.head_id() else {
+        return 0;
+    };
+    // Resolve the stop-commit (exclusive) if provided.
+    let stop_id: Option<gix::hash::ObjectId> = since_commit.and_then(|h| {
+        let spec: &gix::bstr::BStr = h.as_bytes().into();
+        repo.rev_parse_single(spec).ok().map(|id| id.detach())
+    });
+
+    let Ok(walk) = head_id
+        .ancestors()
+        .sorting(gix::revision::walk::Sorting::ByCommitTime(
+            gix::traverse::commit::simple::CommitTimeOrder::NewestFirst,
+        ))
+        .all()
+    else {
+        return 0;
+    };
+
+    let mut count = 0;
+    for info in walk {
+        let Ok(info) = info else { continue };
+        // Stop at since_commit (exclusive).
+        if stop_id.is_some_and(|stop| info.id == stop) {
+            break;
+        }
+        let Ok(commit) = info.object() else { continue };
+        let Ok(tree) = commit.tree() else { continue };
+        let parent_tree = info
+            .parent_ids()
+            .next()
+            .and_then(|pid| pid.object().ok())
+            .and_then(|obj| obj.into_commit().tree().ok());
+        let changes = match repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), None) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        let is_root = rel_dir == ".";
+        let touches = if is_root {
+            !changes.is_empty()
+        } else {
+            changes.iter().any(|change| {
+                use gix::object::tree::diff::ChangeDetached;
+                let loc = match change {
+                    ChangeDetached::Addition { location, .. }
+                    | ChangeDetached::Deletion { location, .. }
+                    | ChangeDetached::Modification { location, .. } => location.as_slice(),
+                    ChangeDetached::Rewrite {
+                        source_location, ..
+                    } => source_location.as_slice(),
+                };
+                loc.starts_with(rel_dir.as_bytes())
+            })
+        };
+        if touches {
+            count += 1;
+        }
+    }
+    count
 }
 
 // ── Per-file churn stats ─────────────────────────────────────────────────────
@@ -736,20 +813,9 @@ pub fn format_unix_date(ts: i64) -> String {
 
 // ── Worktree helpers (still shell-out, write ops not supported by gix) ───────
 
-/// Resolve a git ref to a full commit hash (shell-out fallback for worktree operations).
+/// Resolve a git ref to a full commit hash via gix.
 pub fn resolve_ref_shellout(root: &Path, git_ref: &str) -> Result<String, String> {
-    let output = std::process::Command::new("git")
-        .args(["rev-parse", "--verify", git_ref])
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("Failed to run git rev-parse: {e}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "git ref '{git_ref}' not found: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    resolve_ref(root, git_ref)
 }
 
 /// Create a detached worktree at `hash`, run `callback`, then remove the worktree.

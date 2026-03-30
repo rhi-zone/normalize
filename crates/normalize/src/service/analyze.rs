@@ -322,18 +322,14 @@ impl AnalyzeService {
         let mut merged_exclude = config.analyze.excludes_for("coupling-clusters");
         merged_exclude.extend(exclude);
         let effective_min = min_commits.unwrap_or_else(|| {
-            let total = std::process::Command::new("git")
-                .args(["rev-list", "--count", "HEAD"])
-                .current_dir(&root_path)
-                .output()
-                .ok()
-                .and_then(|o| {
-                    String::from_utf8_lossy(&o.stdout)
-                        .trim()
-                        .parse::<usize>()
-                        .ok()
-                })
-                .unwrap_or(60);
+            // Count total commits via gix commit walk (no PATH dependency).
+            let total = (|| -> Option<usize> {
+                let repo = crate::commands::analyze::git_utils::open_repo(&root_path)?;
+                let head_id = repo.head_id().ok()?;
+                let walk = head_id.ancestors().all().ok()?;
+                Some(walk.filter(|r| r.is_ok()).count())
+            })()
+            .unwrap_or(60);
             (total / 20).clamp(3, 50)
         });
         crate::commands::analyze::coupling_clusters::analyze_coupling_clusters(

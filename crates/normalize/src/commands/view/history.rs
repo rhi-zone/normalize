@@ -1,9 +1,13 @@
-//! Symbol history via git log.
+//! Symbol history via gix blame (line-range commit walk).
+//!
+//! Uses gix blame with a line range to find the commits that introduced lines
+//! in the target range. This is analogous to `git log -L` but implemented via
+//! the blame algorithm — each unique commit in the blame output for the range
+//! is returned in reverse-chronological order.
 
 use super::report::{ViewHistoryCommit, ViewHistoryReport};
 use super::symbol::find_symbol_ci;
 use std::path::Path;
-use std::process::Command;
 
 /// Find symbol by path (parent/child).
 fn find_symbol_by_path<'a>(
@@ -87,7 +91,11 @@ pub fn build_view_history_report(
     build_line_history_service(root, &file_path, start_line, end_line, limit)
 }
 
-/// Build history for a line range (service layer).
+/// Build history for a line range (service layer) via gix blame.
+///
+/// Blames the file restricted to [start_line, end_line] (1-based inclusive).
+/// Each unique commit_id in the blame output is resolved to author/date/message
+/// and returned in reverse-chronological order (newest first), up to `limit`.
 fn build_line_history_service(
     root: &Path,
     file_path: &str,
@@ -95,45 +103,68 @@ fn build_line_history_service(
     end_line: usize,
     limit: usize,
 ) -> Result<ViewHistoryReport, String> {
-    let line_range = format!("{},{}:{}", start_line, end_line, file_path);
+    let repo = gix::discover(root).map_err(|e| format!("Not a git repository: {e}"))?;
+    let head_id = repo
+        .head_id()
+        .map_err(|e| format!("Failed to resolve HEAD: {e}"))?;
 
-    let output = Command::new("git")
-        .current_dir(root)
-        .args([
-            "log",
-            "-L",
-            &line_range,
-            "--no-patch",
-            &format!("-{}", limit),
-            "--format=%H%x1f%an%x1f%as%x1f%s",
-        ])
-        .output()
-        .map_err(|e| format!("Failed to run git log: {}", e))?;
+    let path_bstr: &gix::bstr::BStr = file_path.as_bytes().into();
+    let ranges = gix::blame::BlameRanges::from_one_based_inclusive_range(
+        (start_line as u32)..=(end_line as u32),
+    )
+    .map_err(|e| format!("Invalid line range {start_line}..={end_line}: {e}"))?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("git log failed: {}", stderr));
+    let outcome = repo
+        .blame_file(
+            path_bstr,
+            head_id.detach(),
+            gix::repository::blame_file::Options {
+                ranges,
+                ..Default::default()
+            },
+        )
+        .map_err(|e| format!("git blame failed for {file_path}: {e}"))?;
+
+    // Collect unique commit ids preserving order (newest first from blame output).
+    let mut seen = std::collections::HashSet::new();
+    let mut unique_commit_ids: Vec<gix::hash::ObjectId> = Vec::new();
+    for entry in &outcome.entries {
+        if seen.insert(entry.commit_id) {
+            unique_commit_ids.push(entry.commit_id);
+        }
+        if unique_commit_ids.len() >= limit {
+            break;
+        }
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    let commits: Vec<ViewHistoryCommit> = stdout
-        .lines()
-        .filter(|line| !line.is_empty())
-        .filter_map(|line| {
-            let parts: Vec<&str> = line.split('\x1f').collect();
-            if parts.len() >= 4 {
-                Some(ViewHistoryCommit {
-                    hash: parts[0].to_string(),
-                    author: parts[1].to_string(),
-                    date: parts[2].to_string(),
-                    message: parts[3].to_string(),
-                })
-            } else {
-                None
-            }
-        })
-        .collect();
+    // Resolve each commit id to author/date/message.
+    let mut commits = Vec::new();
+    for commit_id in unique_commit_ids {
+        let Ok(obj) = repo.find_object(commit_id) else {
+            continue;
+        };
+        let commit_obj = obj.into_commit();
+        let hash = commit_id.to_hex().to_string();
+        use gix::bstr::ByteSlice;
+        let author = commit_obj
+            .author()
+            .ok()
+            .map(|a| a.name.to_str_lossy().into_owned())
+            .unwrap_or_default();
+        let timestamp = commit_obj.time().ok().map(|t| t.seconds).unwrap_or(0);
+        let date = crate::commands::analyze::git_utils::format_unix_date(timestamp);
+        let message = commit_obj
+            .message()
+            .ok()
+            .map(|m| m.summary().to_str_lossy().into_owned())
+            .unwrap_or_default();
+        commits.push(ViewHistoryCommit {
+            hash,
+            author,
+            date,
+            message,
+        });
+    }
 
     Ok(ViewHistoryReport {
         file: file_path.to_string(),
