@@ -1106,7 +1106,7 @@ needed.
 - [x] Populate during `structure rebuild` using gix commit walk (now PATH-independent)
 - [x] Incremental update: process only commits since last rebuild (append-only, cheap)
 - [x] Update `coupling-clusters` to query index instead of recomputing
-- [ ] Add `stale-doc` native rule as first consumer
+- [x] Add `stale-doc` native rule as first consumer
 
 ---
 

@@ -11,6 +11,7 @@ pub mod high_complexity;
 pub mod long_file;
 pub mod long_function;
 pub mod ratchet;
+pub mod stale_doc;
 pub mod stale_docs;
 pub mod stale_summary;
 pub mod walk;
@@ -22,6 +23,7 @@ pub use high_complexity::build_high_complexity_report;
 pub use long_file::build_long_file_report;
 pub use long_function::build_long_function_report;
 pub use ratchet::{RatchetRulesReport, build_ratchet_report};
+pub use stale_doc::{StaleDocConfig, build_stale_doc_report};
 pub use stale_docs::build_stale_docs_report;
 pub use stale_summary::{build_missing_summary_report, build_stale_summary_report};
 
@@ -70,10 +72,10 @@ pub const NATIVE_RULES: &[NativeRuleDescriptor] = &[
     },
     NativeRuleDescriptor {
         id: "stale-doc",
-        default_severity: "info",
-        message: "Doc comment references a symbol that no longer exists",
-        tags: &["documentation"],
-        default_enabled: true,
+        default_severity: "warning",
+        message: "Documentation file may be stale — a strongly co-changed code file was updated more recently",
+        tags: &["docs", "freshness"],
+        default_enabled: false,
     },
     NativeRuleDescriptor {
         id: "missing-example",

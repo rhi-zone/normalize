@@ -513,6 +513,7 @@ impl RulesService {
             let run_long_file = is_native_enabled("long-file");
             let run_high_complexity = is_native_enabled("high-complexity");
             let run_long_function = is_native_enabled("long-function");
+            let run_stale_doc = is_native_enabled("stale-doc");
 
             let long_file_threshold: usize = native_config
                 .rules
@@ -535,6 +536,13 @@ impl RulesService {
                 .map(|r| r.rule_config::<ThresholdConfig>())
                 .and_then(|c| c.threshold)
                 .unwrap_or(100);
+
+            let stale_doc_cfg: normalize_native_rules::StaleDocConfig = native_config
+                .rules
+                .rules
+                .get("stale-doc")
+                .map(|r| r.rule_config())
+                .unwrap_or_default();
 
             let (
                 missing_res,
@@ -644,9 +652,10 @@ impl RulesService {
                 explicit_files.clone()
             };
 
-            // Advisory threshold rules (default disabled — only run when explicitly enabled).
-            // These can be expensive (tree-sitter parsing), so we check enabled status first.
-            let (long_file_res, high_complexity_res, long_function_res) = tokio::join!(
+            // Advisory rules (default disabled — only run when explicitly enabled).
+            // long-file / high-complexity / long-function are tree-sitter-heavy.
+            // stale-doc requires the index and a git walk, so also advisory.
+            let (long_file_res, high_complexity_res, long_function_res, stale_doc_res) = tokio::join!(
                 async {
                     if !run_long_file {
                         return None;
@@ -698,6 +707,19 @@ impl RulesService {
                     .await
                     .ok()
                 },
+                async {
+                    if !run_stale_doc {
+                        return None;
+                    }
+                    let root = native_root.clone();
+                    let cfg = stale_doc_cfg;
+                    let ef = effective_files.clone();
+                    tokio::task::spawn_blocking(move || {
+                        normalize_native_rules::build_stale_doc_report(&root, cfg, ef.as_deref())
+                    })
+                    .await
+                    .ok()
+                },
             );
 
             if let Some(r) = long_file_res {
@@ -707,6 +729,9 @@ impl RulesService {
                 report.merge(r);
             }
             if let Some(r) = long_function_res {
+                report.merge(r);
+            }
+            if let Some(r) = stale_doc_res {
                 report.merge(r);
             }
 
