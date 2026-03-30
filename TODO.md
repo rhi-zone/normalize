@@ -51,17 +51,13 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ## P1 — Short-term Improvements (coherence / usability)
 
-### Eliminate remaining git shell-outs (budget metrics worktrees)
+### ~~Eliminate remaining git shell-outs (budget metrics worktrees)~~ DONE
 
-The gix read-only migration is complete (`refactor: migrate git shell-outs to gix`). All
-read-only git operations now use gix; the `git` binary is no longer required for `normalize
-analyze`, `rules run`, `sessions`, or `ratchet`.
-
-`normalize-budget/src/metrics/functions.rs` (and possibly lines/modules/todos/dependencies) creates
-git worktrees to check out old code for before/after metric comparison. These are the last
-write shell-outs. Replace with in-memory blob reads via gix: read old file content directly
-from the object store, parse in memory, compute metrics, no filesystem checkout needed.
-Benefits: no PATH dep, dramatically faster (no fs writes), no cleanup needed.
+All budget metrics now use gix in-memory blob reads — no filesystem checkout, no `git` binary
+required. `lines`, `modules`, `todos`, `dependencies` use `diff_tree_to_tree` comparing
+base_ref to HEAD. `functions`, `classes`, `complexity-delta` use `walk_tree_at_ref` to read
+blobs from the object store for the base tree, then read working tree from disk.
+Committed: `refactor(budget): replace git worktrees with in-memory gix blob reads`.
 
 ### Agent UX: comprehensive compact output audit
 

@@ -1,12 +1,14 @@
-//! Line-level diff metric using `git diff --numstat`.
+//! Line-level diff metric using gix.
 
 use super::{DiffMeasurement, DiffMetric};
+use crate::git_ops::{self, FileChangeKind};
 use std::path::Path;
-use std::process::Command;
 
 /// Line-level diff per file.
 ///
 /// Returns measurements with `(file_path, lines_added, lines_removed)` for every changed file.
+/// Compares the committed state at `base_ref` against HEAD (working-tree uncommitted changes
+/// are not included; the budget is enforced at commit/CI time).
 pub struct LineDeltaMetric;
 
 impl DiffMetric for LineDeltaMetric {
@@ -15,43 +17,48 @@ impl DiffMetric for LineDeltaMetric {
     }
 
     fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<DiffMeasurement>> {
-        let output = Command::new("git")
-            .args(["diff", "--numstat", base_ref, "--"])
-            .current_dir(root)
-            .output()
-            .map_err(|e| anyhow::anyhow!("failed to run git diff: {e}"))?;
+        let repo = git_ops::open_repo(root)?;
+        let changes = git_ops::diff_base_to_head(root, base_ref)?;
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("git diff --numstat failed: {stderr}"));
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
         let mut results = Vec::new();
 
-        for line in stdout.lines() {
-            // Format: "<added>\t<removed>\t<file>"
-            // Binary files show "-\t-\t<file>" — skip them.
-            let parts: Vec<&str> = line.splitn(3, '\t').collect();
-            if parts.len() != 3 {
+        for change in changes {
+            let old_lines = change
+                .old_id
+                .and_then(|id| git_ops::read_blob_bytes(&repo, id))
+                .map(|b| count_lines(&b))
+                .unwrap_or(0);
+
+            let new_lines = change
+                .new_id
+                .and_then(|id| git_ops::read_blob_bytes(&repo, id))
+                .map(|b| count_lines(&b))
+                .unwrap_or(0);
+
+            let added = new_lines.saturating_sub(old_lines) as f64;
+            let removed = old_lines.saturating_sub(new_lines) as f64;
+
+            // Skip files where nothing changed in terms of line count
+            if added == 0.0 && removed == 0.0 && change.kind == FileChangeKind::Modified {
                 continue;
             }
-            let added: f64 = match parts[0].parse() {
-                Ok(v) => v,
-                Err(_) => continue, // binary file indicator "-"
-            };
-            let removed: f64 = match parts[1].parse() {
-                Ok(v) => v,
-                Err(_) => continue,
-            };
-            let key = parts[2].trim().to_string();
-            results.push(DiffMeasurement {
-                key,
-                added,
-                removed,
-            });
+
+            if added > 0.0 || removed > 0.0 {
+                results.push(DiffMeasurement {
+                    key: change.path,
+                    added,
+                    removed,
+                });
+            }
         }
 
         Ok(results)
     }
+}
+
+fn count_lines(data: &[u8]) -> usize {
+    if data.is_empty() {
+        return 0;
+    }
+    data.iter().filter(|&&b| b == b'\n').count() + 1
 }

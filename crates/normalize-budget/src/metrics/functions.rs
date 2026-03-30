@@ -1,11 +1,11 @@
 //! Functions added/removed diff metric.
 
 use super::{DiffMeasurement, DiffMetric};
+use crate::git_ops;
 use normalize_facts::Extractor;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
-use std::process::Command;
 
 /// Functions/methods introduced or removed.
 ///
@@ -24,109 +24,42 @@ impl DiffMetric for FunctionDeltaMetric {
     }
 }
 
-/// Create a temporary git worktree at the given ref. Returns the worktree path.
-pub(crate) fn create_worktree(root: &Path, base_ref: &str) -> anyhow::Result<std::path::PathBuf> {
-    let hash_output = Command::new("git")
-        .args(["rev-parse", "--verify", base_ref])
-        .current_dir(root)
-        .output()
-        .map_err(|e| anyhow::anyhow!("failed to run git: {e}"))?;
-
-    if !hash_output.status.success() {
-        return Err(anyhow::anyhow!(
-            "git ref '{base_ref}' not found: {}",
-            String::from_utf8_lossy(&hash_output.stderr).trim()
-        ));
-    }
-
-    let hash = String::from_utf8_lossy(&hash_output.stdout)
-        .trim()
-        .to_string();
-    // SAFETY: git hashes are always ASCII hex digits, so byte indexing is char-boundary-safe.
-    let short = &hash[..7.min(hash.len())];
-    // Include PID to avoid race conditions when multiple normalize processes run concurrently.
-    let worktree_name = format!("normalize-budget-wt-{}-{}", short, std::process::id());
-    let worktree_path = std::env::temp_dir().join(&worktree_name);
-    let worktree_str = worktree_path.to_string_lossy().to_string();
-
-    // Clean up any stale worktree (same PID, same hash — should not normally exist)
-    if worktree_path.exists() {
-        let rm_out = Command::new("git")
-            .args(["worktree", "remove", &worktree_str, "--force"])
-            .current_dir(root)
-            .output();
-        match rm_out {
-            Ok(o) if !o.status.success() => {
-                tracing::warn!(
-                    "git worktree remove failed: {}",
-                    String::from_utf8_lossy(&o.stderr)
-                )
-            }
-            Err(e) => tracing::warn!("git worktree remove error: {e}"),
-            _ => {}
-        }
-    }
-
-    let add_output = Command::new("git")
-        .args(["worktree", "add", "--detach", &worktree_str, &hash])
-        .current_dir(root)
-        .output()
-        .map_err(|e| anyhow::anyhow!("failed to create worktree: {e}"))?;
-
-    if !add_output.status.success() {
-        return Err(anyhow::anyhow!(
-            "git worktree add failed: {}",
-            String::from_utf8_lossy(&add_output.stderr).trim()
-        ));
-    }
-
-    Ok(worktree_path)
-}
-
-/// RAII guard that removes a git worktree on drop.
-pub(crate) struct WorktreeGuard {
-    pub(crate) path: std::path::PathBuf,
-    pub(crate) root: std::path::PathBuf,
-}
-
-impl Drop for WorktreeGuard {
-    fn drop(&mut self) {
-        let worktree_str = self.path.to_string_lossy().to_string();
-        let _ = Command::new("git")
-            .args(["worktree", "remove", &worktree_str, "--force"])
-            .current_dir(&self.root)
-            .output();
-    }
-}
-
-/// Remove a temporary git worktree. Propagates errors on failure.
-#[allow(dead_code)]
-pub(crate) fn remove_worktree(root: &Path, worktree_path: &Path) -> anyhow::Result<()> {
-    let worktree_str = worktree_path.to_string_lossy().to_string();
-    let output = Command::new("git")
-        .args(["worktree", "remove", &worktree_str, "--force"])
-        .current_dir(root)
-        .output()
-        .map_err(|e| anyhow::anyhow!("failed to run git worktree remove: {e}"))?;
-    if !output.status.success() {
-        return Err(anyhow::anyhow!(
-            "git worktree remove failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    Ok(())
-}
-
-fn collect_symbols_for_kinds(scan_root: &Path, kinds: &[&str]) -> HashMap<String, ()> {
+/// Collect symbols of the given kinds from all files in the git tree at `git_ref`.
+///
+/// Uses gix to read file blobs directly from the object store — no filesystem checkout.
+fn collect_symbols_at_ref(
+    root: &Path,
+    git_ref: &str,
+    kinds: &[&str],
+) -> anyhow::Result<HashMap<String, ()>> {
+    let repo = git_ops::open_repo(root)?;
     let extractor = Extractor::new();
-    let all_files = normalize_path_resolve::all_files(scan_root, None);
+    let mut map = HashMap::new();
+
+    git_ops::walk_tree_at_ref(root, git_ref, |rel_path, blob_id| {
+        let Some(content) = git_ops::read_blob_text(&repo, blob_id) else {
+            return;
+        };
+        // Build a fake absolute path for language detection; content is from the blob.
+        let abs_path = root.join(rel_path);
+        let result = extractor.extract(&abs_path, &content);
+        collect_recursive(&result.symbols, rel_path, None, kinds, &mut map);
+    })?;
+
+    Ok(map)
+}
+
+/// Collect symbols from the current working tree (files on disk).
+fn collect_symbols_from_disk(root: &Path, kinds: &[&str]) -> HashMap<String, ()> {
+    let extractor = Extractor::new();
+    let all_files = normalize_path_resolve::all_files(root, None);
     let mut map = HashMap::new();
 
     for entry in &all_files {
         if entry.kind != normalize_path_resolve::PathMatchKind::File {
             continue;
         }
-        let abs_path = scan_root.join(&entry.path);
+        let abs_path = root.join(&entry.path);
         let Ok(content) = std::fs::read_to_string(&abs_path) else {
             continue;
         };
@@ -168,15 +101,8 @@ pub(crate) fn symbol_diff(
     base_ref: &str,
     kinds: &[&str],
 ) -> anyhow::Result<Vec<DiffMeasurement>> {
-    let worktree_path = create_worktree(root, base_ref)?;
-    let _guard = WorktreeGuard {
-        path: worktree_path.clone(),
-        root: root.to_path_buf(),
-    };
-    let base_map = collect_symbols_for_kinds(&worktree_path, kinds);
-    drop(_guard);
-
-    let current_map = collect_symbols_for_kinds(root, kinds);
+    let base_map = collect_symbols_at_ref(root, base_ref, kinds)?;
+    let current_map = collect_symbols_from_disk(root, kinds);
 
     let base_set: HashSet<&String> = base_map.keys().collect();
     let current_set: HashSet<&String> = current_map.keys().collect();

@@ -4890,6 +4890,7 @@ name = "normalize-budget"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "gix",
  "normalize-facts",
  "normalize-languages",
  "normalize-metrics",

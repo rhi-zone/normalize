@@ -1,13 +1,13 @@
 //! TODO/FIXME comment diff metric.
 
 use super::{DiffMeasurement, DiffMetric};
+use crate::git_ops;
 use std::path::Path;
-use std::process::Command;
 
 /// TODO/FIXME comments added or removed.
 ///
 /// Returns measurements with `(file_path, todos_added, todos_removed)` by counting
-/// lines matching `TODO` or `FIXME` in the diff output.
+/// lines containing `TODO` or `FIXME` in each changed file, comparing `base_ref` to HEAD.
 pub struct TodoDeltaMetric;
 
 impl DiffMetric for TodoDeltaMetric {
@@ -16,58 +16,44 @@ impl DiffMetric for TodoDeltaMetric {
     }
 
     fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<DiffMeasurement>> {
-        let output = Command::new("git")
-            .args(["diff", base_ref, "--"])
-            .current_dir(root)
-            .output()
-            .map_err(|e| anyhow::anyhow!("failed to run git diff: {e}"))?;
+        let repo = git_ops::open_repo(root)?;
+        let changes = git_ops::diff_base_to_head(root, base_ref)?;
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("git diff failed: {stderr}"));
-        }
+        let mut results = Vec::new();
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let mut file_added: std::collections::HashMap<String, f64> = Default::default();
-        let mut file_removed: std::collections::HashMap<String, f64> = Default::default();
-        let mut current_file = String::new();
+        for change in changes {
+            let old_count = change
+                .old_id
+                .and_then(|id| git_ops::read_blob_text(&repo, id))
+                .map(|c| count_todos(&c))
+                .unwrap_or(0);
 
-        for line in stdout.lines() {
-            if let Some(rest) = line.strip_prefix("+++ b/") {
-                current_file = rest.to_string();
-            } else if line.starts_with("--- ") || line.starts_with("diff --git") {
-                // skip
-            } else if line.starts_with('+') && !line.starts_with("+++") {
-                let content = line.get(1..).unwrap_or("");
-                if content.contains("TODO") || content.contains("FIXME") {
-                    *file_added.entry(current_file.clone()).or_default() += 1.0;
-                }
-            } else if line.starts_with('-') && !line.starts_with("---") {
-                let content = line.get(1..).unwrap_or("");
-                if content.contains("TODO") || content.contains("FIXME") {
-                    *file_removed.entry(current_file.clone()).or_default() += 1.0;
-                }
+            let new_count = change
+                .new_id
+                .and_then(|id| git_ops::read_blob_text(&repo, id))
+                .map(|c| count_todos(&c))
+                .unwrap_or(0);
+
+            let added = new_count.saturating_sub(old_count) as f64;
+            let removed = old_count.saturating_sub(new_count) as f64;
+
+            if added > 0.0 || removed > 0.0 {
+                results.push(DiffMeasurement {
+                    key: change.path,
+                    added,
+                    removed,
+                });
             }
         }
 
-        let mut all_files: std::collections::HashSet<String> = Default::default();
-        all_files.extend(file_added.keys().cloned());
-        all_files.extend(file_removed.keys().cloned());
-
-        let results = all_files
-            .into_iter()
-            .filter(|f| !f.is_empty())
-            .map(|f| {
-                let added = file_added.get(&f).copied().unwrap_or(0.0);
-                let removed = file_removed.get(&f).copied().unwrap_or(0.0);
-                DiffMeasurement {
-                    key: f,
-                    added,
-                    removed,
-                }
-            })
-            .collect();
-
         Ok(results)
     }
+}
+
+/// Count lines containing TODO or FIXME in a file's content.
+fn count_todos(content: &str) -> usize {
+    content
+        .lines()
+        .filter(|line| line.contains("TODO") || line.contains("FIXME"))
+        .count()
 }

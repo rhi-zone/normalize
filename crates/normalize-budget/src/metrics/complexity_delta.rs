@@ -1,7 +1,7 @@
 //! Complexity delta diff metric.
 
-use super::functions::{WorktreeGuard, create_worktree};
 use super::{DiffMeasurement, DiffMetric};
+use crate::git_ops;
 use normalize_languages::{Language, support_for_path};
 use std::collections::HashMap;
 use std::path::Path;
@@ -19,15 +19,8 @@ impl DiffMetric for ComplexityDeltaMetric {
     }
 
     fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<DiffMeasurement>> {
-        let worktree_path = create_worktree(root, base_ref)?;
-        let _guard = WorktreeGuard {
-            path: worktree_path.clone(),
-            root: root.to_path_buf(),
-        };
-        let base_map = collect_complexity(root, &worktree_path);
-        drop(_guard);
-
-        let current_map = collect_complexity(root, root);
+        let base_map = collect_complexity_at_ref(root, base_ref)?;
+        let current_map = collect_complexity_from_disk(root);
 
         let mut results = Vec::new();
         for (key, current_val) in &current_map {
@@ -70,15 +63,39 @@ impl DiffMetric for ComplexityDeltaMetric {
     }
 }
 
-fn collect_complexity(root: &Path, scan_root: &Path) -> HashMap<String, f64> {
-    let all_files = normalize_path_resolve::all_files(scan_root, None);
+/// Collect complexity metrics from all files in the git tree at `git_ref`.
+///
+/// Uses gix to read file blobs directly from the object store — no filesystem checkout.
+fn collect_complexity_at_ref(root: &Path, git_ref: &str) -> anyhow::Result<HashMap<String, f64>> {
+    let repo = git_ops::open_repo(root)?;
+    let mut map = HashMap::new();
+
+    git_ops::walk_tree_at_ref(root, git_ref, |rel_path, blob_id| {
+        let abs_path = root.join(rel_path);
+        let Some(support) = support_for_path(&abs_path) else {
+            return;
+        };
+        let Some(content) = git_ops::read_blob_text(&repo, blob_id) else {
+            return;
+        };
+        if let Some(entries) = analyze_file_complexity(&abs_path, rel_path, &content, support) {
+            map.extend(entries);
+        }
+    })?;
+
+    Ok(map)
+}
+
+/// Collect complexity metrics from the current working tree (files on disk).
+fn collect_complexity_from_disk(root: &Path) -> HashMap<String, f64> {
+    let all_files = normalize_path_resolve::all_files(root, None);
     let mut map = HashMap::new();
 
     for entry in &all_files {
         if entry.kind != normalize_path_resolve::PathMatchKind::File {
             continue;
         }
-        let abs_path = scan_root.join(&entry.path);
+        let abs_path = root.join(&entry.path);
         let Some(support) = support_for_path(&abs_path) else {
             continue;
         };
@@ -86,13 +103,7 @@ fn collect_complexity(root: &Path, scan_root: &Path) -> HashMap<String, f64> {
             continue;
         };
 
-        // Use path relative to root for stable keys across worktrees
-        let rel = root
-            .join(&entry.path)
-            .strip_prefix(root)
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|_| entry.path.clone());
-
+        let rel = entry.path.replace('\\', "/");
         if let Some(entries) = analyze_file_complexity(&abs_path, &rel, &content, support) {
             map.extend(entries);
         }

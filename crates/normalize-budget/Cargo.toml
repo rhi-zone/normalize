@@ -27,3 +27,4 @@ streaming-iterator = "0.1"
 tree-sitter = "0.26"
 server-less = { version = "0.4.7", default-features = false, features = ["cli", "jsonschema", "config"], optional = true }
 schemars = "1"
+gix = { workspace = true }

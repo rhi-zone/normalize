@@ -1,15 +1,15 @@
 //! Dependency diff metric: entries added/removed from manifests.
 
 use super::{DiffMeasurement, DiffMetric};
+use crate::git_ops;
 use std::path::Path;
-use std::process::Command;
 
 /// Dependencies added or removed from manifest files.
 ///
 /// Watches `Cargo.toml`, `package.json`, `requirements.txt`, `pyproject.toml`,
 /// `go.mod`, `pom.xml`, `build.gradle`, `*.gemspec`, and similar manifest files.
 /// Returns measurements with `(manifest_file, deps_added, deps_removed)` by counting
-/// dependency-like lines added/removed in the diff.
+/// dependency-like lines added/removed between `base_ref` and HEAD.
 pub struct DependencyDeltaMetric;
 
 /// Returns true if a file path looks like a dependency manifest.
@@ -53,67 +53,53 @@ fn looks_like_dep_line(line: &str) -> bool {
         && t != "dependencies" // go.mod
 }
 
+/// Count dependency-like lines in a manifest file's content.
+fn count_dep_lines(content: &str) -> usize {
+    content
+        .lines()
+        .filter(|line| looks_like_dep_line(line))
+        .count()
+}
+
 impl DiffMetric for DependencyDeltaMetric {
     fn name(&self) -> &'static str {
         "dependencies"
     }
 
     fn measure_diff(&self, root: &Path, base_ref: &str) -> anyhow::Result<Vec<DiffMeasurement>> {
-        let output = Command::new("git")
-            .args(["diff", base_ref, "--"])
-            .current_dir(root)
-            .output()
-            .map_err(|e| anyhow::anyhow!("failed to run git diff: {e}"))?;
+        let repo = git_ops::open_repo(root)?;
+        let changes = git_ops::diff_base_to_head(root, base_ref)?;
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("git diff failed: {stderr}"));
-        }
+        let mut results = Vec::new();
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let mut file_added: std::collections::HashMap<String, f64> = Default::default();
-        let mut file_removed: std::collections::HashMap<String, f64> = Default::default();
-        let mut current_file = String::new();
-        let mut in_manifest = false;
-
-        for line in stdout.lines() {
-            if let Some(rest) = line.strip_prefix("+++ b/") {
-                current_file = rest.to_string();
-                in_manifest = is_manifest(&current_file);
-            } else if line.starts_with("--- ") || line.starts_with("diff --git") {
-                // skip
-            } else if in_manifest {
-                if line.starts_with('+')
-                    && !line.starts_with("+++")
-                    && looks_like_dep_line(line.get(1..).unwrap_or(""))
-                {
-                    *file_added.entry(current_file.clone()).or_default() += 1.0;
-                } else if line.starts_with('-')
-                    && !line.starts_with("---")
-                    && looks_like_dep_line(line.get(1..).unwrap_or(""))
-                {
-                    *file_removed.entry(current_file.clone()).or_default() += 1.0;
-                }
+        for change in changes {
+            if !is_manifest(&change.path) {
+                continue;
             }
-        }
 
-        let mut all_files: std::collections::HashSet<String> = Default::default();
-        all_files.extend(file_added.keys().cloned());
-        all_files.extend(file_removed.keys().cloned());
+            let old_count = change
+                .old_id
+                .and_then(|id| git_ops::read_blob_text(&repo, id))
+                .map(|c| count_dep_lines(&c))
+                .unwrap_or(0);
 
-        let results = all_files
-            .into_iter()
-            .filter(|f| !f.is_empty())
-            .map(|f| {
-                let added = file_added.get(&f).copied().unwrap_or(0.0);
-                let removed = file_removed.get(&f).copied().unwrap_or(0.0);
-                DiffMeasurement {
-                    key: f,
+            let new_count = change
+                .new_id
+                .and_then(|id| git_ops::read_blob_text(&repo, id))
+                .map(|c| count_dep_lines(&c))
+                .unwrap_or(0);
+
+            let added = new_count.saturating_sub(old_count) as f64;
+            let removed = old_count.saturating_sub(new_count) as f64;
+
+            if added > 0.0 || removed > 0.0 {
+                results.push(DiffMeasurement {
+                    key: change.path,
                     added,
                     removed,
-                }
-            })
-            .collect();
+                });
+            }
+        }
 
         Ok(results)
     }
