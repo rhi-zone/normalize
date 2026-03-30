@@ -686,6 +686,7 @@ impl From<MissingSummaryReport> for DiagnosticsReport {
             files_checked: report.dirs_checked,
             sources_run: vec!["missing-summary".into()],
             tool_errors: vec![],
+            daemon_cached: false,
         }
     }
 }
@@ -733,6 +734,7 @@ impl From<StaleSummaryReport> for DiagnosticsReport {
             files_checked: report.dirs_checked,
             sources_run: vec!["stale-summary".into()],
             tool_errors: vec![],
+            daemon_cached: false,
         }
     }
 }

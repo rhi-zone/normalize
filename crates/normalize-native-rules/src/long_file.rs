@@ -155,5 +155,6 @@ pub fn build_long_file_report(
         files_checked,
         sources_run: vec!["long-file".into()],
         tool_errors: vec![],
+        daemon_cached: false,
     }
 }

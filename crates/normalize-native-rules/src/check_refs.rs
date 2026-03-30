@@ -207,6 +207,7 @@ impl From<CheckRefsReport> for DiagnosticsReport {
             files_checked: report.files_checked,
             sources_run: vec!["check-refs".into()],
             tool_errors: vec![],
+            daemon_cached: false,
         }
     }
 }

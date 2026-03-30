@@ -24,7 +24,7 @@ pub use runner::{
     apply_native_rules_config, build_list_report, build_relations_from_index,
     collect_fact_diagnostics, collect_fact_diagnostics_incremental, enable_disable,
     finding_to_issue, list_tags, list_tags_structured, remove_rule, run_rules_report,
-    run_sarif_tools, show_rule, show_rule_structured, update_rules,
+    run_sarif_tools, show_rule, show_rule_structured, try_rules_via_daemon, update_rules,
 };
 
 pub use loader::format_diagnostic;

@@ -131,6 +131,11 @@ pub struct DiagnosticsReport {
     /// Errors from tools that failed to run or produce valid output.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tool_errors: Vec<ToolFailure>,
+    /// Whether the results were served from the daemon's diagnostics cache.
+    /// When `true`, all requested engines were served from cache and the caller
+    /// should skip local re-evaluation of those engines.
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub daemon_cached: bool,
 }
 
 impl DiagnosticsReport {
@@ -141,6 +146,7 @@ impl DiagnosticsReport {
             files_checked: 0,
             sources_run: Vec::new(),
             tool_errors: Vec::new(),
+            daemon_cached: false,
         }
     }
 
@@ -566,6 +572,7 @@ mod tests {
             files_checked: 10,
             sources_run: vec!["check-refs".into()],
             tool_errors: vec![],
+            daemon_cached: false,
         };
         let text = report.format_text();
         assert!(text.contains("No issues found"));
@@ -627,6 +634,7 @@ mod tests {
             files_checked: 5,
             sources_run: vec!["check-refs".into()],
             tool_errors: vec![],
+            daemon_cached: false,
         };
         let b = DiagnosticsReport {
             issues: vec![Issue {
@@ -645,6 +653,7 @@ mod tests {
             files_checked: 8,
             sources_run: vec!["stale-docs".into()],
             tool_errors: vec![],
+            daemon_cached: false,
         };
         a.merge(b);
         assert_eq!(a.issues.len(), 2);
@@ -693,6 +702,7 @@ mod tests {
             files_checked: 2,
             sources_run: vec!["s".into()],
             tool_errors: vec![],
+            daemon_cached: false,
         };
         report.sort();
         assert_eq!(report.issues[0].file, "a.rs");
@@ -715,6 +725,7 @@ mod tests {
                     message: "did not emit valid JSON: expected value at line 1".into(),
                 },
             ],
+            daemon_cached: false,
         };
         let text = report.format_text();
         assert!(text.contains("2 tool errors:"));
@@ -732,6 +743,7 @@ mod tests {
                 tool: "tool-a".into(),
                 message: "error a".into(),
             }],
+            daemon_cached: false,
         };
         let b = DiagnosticsReport {
             issues: vec![],
@@ -741,6 +753,7 @@ mod tests {
                 tool: "tool-b".into(),
                 message: "error b".into(),
             }],
+            daemon_cached: false,
         };
         a.merge(b);
         assert_eq!(a.tool_errors.len(), 2);

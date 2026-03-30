@@ -1174,6 +1174,7 @@ pub fn build_ratchet_report(
                 files_checked: 0,
                 sources_run: vec!["ratchet".into()],
                 tool_errors: vec![],
+                daemon_cached: false,
             };
         }
     };
@@ -1225,6 +1226,7 @@ pub fn build_ratchet_report(
         files_checked: baseline.entries.len(),
         sources_run: vec!["ratchet".into()],
         tool_errors: vec![],
+        daemon_cached: false,
     }
 }
 

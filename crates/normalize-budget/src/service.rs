@@ -807,6 +807,7 @@ pub fn build_budget_report(
                 files_checked: 0,
                 sources_run: vec!["budget".into()],
                 tool_errors: vec![],
+                daemon_cached: false,
             };
         }
     };
@@ -864,6 +865,7 @@ pub fn build_budget_report(
         files_checked: entry_count,
         sources_run: vec!["budget".into()],
         tool_errors: vec![],
+        daemon_cached: false,
     }
 }
 

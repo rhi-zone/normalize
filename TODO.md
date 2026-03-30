@@ -1016,11 +1016,12 @@ Projected hook budget (release, file-scoped, 1-5 changed files):
 - **Total: ~100-200ms** — achievable
 
 Concrete steps (ordered by impact):
-- [ ] **Daemon-cached diagnostics for all engines** — the daemon already caches fact rule
-  results (`RunRules` request, warm `ENGINE_CACHE`, 13ms in release). Extend to syntax
-  and native rules: daemon watches files, re-runs affected rules on change, caches
-  per-file diagnostics. `rules run` asks daemon for cached results → instant response.
-  The LSP already does this for syntax rules (two-tier diagnostics). Wire it for CLI.
+- [x] **Daemon-cached diagnostics for all engines** — the daemon caches syntax, fact, and
+  native rule results in `DiagnosticsCache` on `WatchedRoot`. Cache primed eagerly on
+  file changes (incremental for syntax/fact, full for native) and lazily on first
+  `RunRules` request. `run_rules_report()` tries daemon for all cacheable engines first
+  via `try_rules_via_daemon()`. Service layer skips local native rules when
+  `report.daemon_cached` is true. `RunRules` protocol extended with `engine` field.
 - [x] **Pre-walk scoping for `--only`** — `PathFilter` struct in `normalize-rules-config`
   compiled from `--only`/`--exclude` globs, threaded to syntax runner (`collect_source_files`)
   and native rules (via `filtered_gitignore_walk` / `effective_files`). Post-walk filter kept

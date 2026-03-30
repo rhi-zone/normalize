@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Daemon-cached diagnostics for all engines** — the daemon now caches syntax, fact, and native rule diagnostics and serves them instantly on `normalize rules run`. Cache is primed eagerly on file changes (incremental for syntax/fact, full re-run for native) and lazily on first request. When the daemon is running, `rules run` gets pre-computed results instead of running expensive local evaluation. Falls back to local evaluation transparently when the daemon is unavailable.
 - **`missing-test` fact rule** — flags public functions that are never called from a test function (a function with a test attribute such as `#[test]`, `@test`, `@Test`, or `@pytest.mark`). Disabled by default. Entry-point and module-boundary files excluded via the default allow list.
 - **`stale-mock` fact rule** — flags mock/stub functions (identified by attributes such as `@Mock`, `@patch`, `@stub`, `mock`, `stub`, `fake`) that call a callee which no longer exists as a symbol in the index. Catches mocks that were not updated after a rename or deletion. Disabled by default.
 - **`normalize config validate` deep validation** — now runs four validation phases (TOML syntax, JSON Schema compliance, serde deserialization as `NormalizeConfig`, rules config parsing) on both project and global config files. Reports errors with file path, line/column when available, and validation phase. Exits non-zero on errors for CI/hook use.

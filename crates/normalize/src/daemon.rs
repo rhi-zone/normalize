@@ -77,10 +77,10 @@ pub enum Request {
     /// added automatically.
     #[serde(rename = "subscribe")]
     Subscribe { root: Option<PathBuf> },
-    /// Run fact rules for a root and return diagnostics.
-    /// Uses the warm ENGINE_CACHE if the daemon has already primed it via
-    /// incremental file-change processing, giving sub-second results vs.
-    /// a cold 45-second eval for large codebases.
+    /// Run rules for a root and return cached diagnostics.
+    /// Uses the daemon's diagnostics cache (syntax, fact, native) which is primed
+    /// eagerly on every file-change event, giving sub-millisecond results vs.
+    /// seconds of cold evaluation.
     #[serde(rename = "run_rules")]
     RunRules {
         root: PathBuf,
@@ -88,6 +88,8 @@ pub enum Request {
         filter_ids: Option<Vec<String>>,
         /// Optional single-rule filter (by rule ID); narrows further than filter_ids.
         filter_rule: Option<String>,
+        /// Which engine(s) to return results for: "syntax", "fact", "native", or None for all.
+        engine: Option<String>,
     },
 }
 
@@ -200,6 +202,17 @@ mod unix_impl {
             .join("daemon.sock")
     }
 
+    /// Cached diagnostics from the last full or incremental rule evaluation.
+    /// Stored per-engine so the daemon can return results instantly on `RunRules` requests.
+    #[derive(Default)]
+    struct DiagnosticsCache {
+        syntax_issues: Vec<normalize_output::diagnostics::Issue>,
+        native_issues: Vec<normalize_output::diagnostics::Issue>,
+        fact_issues: Vec<normalize_output::diagnostics::Issue>,
+        /// Whether the cache has been fully primed (first run completed).
+        primed: bool,
+    }
+
     /// A watched root with its file watcher.
     struct WatchedRoot {
         #[allow(dead_code)] // Watcher must be kept alive
@@ -211,6 +224,8 @@ mod unix_impl {
         /// Affected set from the most recent refresh: changed files ∪ their reverse dependents.
         /// Stored for future Datalog integration.
         last_affected: Vec<PathBuf>,
+        /// Cached diagnostics from all engines, updated incrementally on file changes.
+        diagnostics: DiagnosticsCache,
     }
 
     /// Global daemon server managing multiple roots.
@@ -337,6 +352,7 @@ mod unix_impl {
                     last_refresh: Instant::now(),
                     rev_deps,
                     last_affected: Vec::new(),
+                    diagnostics: DiagnosticsCache::default(),
                 },
             );
 
@@ -386,7 +402,8 @@ mod unix_impl {
                     root,
                     filter_ids,
                     filter_rule,
-                } => self.run_rules(root, filter_ids, filter_rule),
+                    engine,
+                } => self.run_rules(root, filter_ids, filter_rule, engine),
             }
         }
 
@@ -395,46 +412,263 @@ mod unix_impl {
             root: PathBuf,
             filter_ids: Option<Vec<String>>,
             filter_rule: Option<String>,
+            engine: Option<String>,
         ) -> Response {
-            use std::collections::HashSet;
+            // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error (thread panicked while holding lock)
+            let mut roots = self.roots.lock().unwrap();
+            let watched = match roots.get_mut(&root) {
+                Some(w) => w,
+                None => return Response::err("root not watched"),
+            };
 
-            let config = NormalizeConfig::load(&root);
+            // If cache is not yet primed, do a full prime now (lazily on first request).
+            if !watched.diagnostics.primed {
+                drop(roots); // release lock during expensive evaluation
+                self.prime_diagnostics_cache(&root);
+                roots = self.roots.lock().unwrap();
+            }
+
+            let watched = match roots.get(&root) {
+                Some(w) => w,
+                None => return Response::err("root removed during prime"),
+            };
+
+            // Collect issues from requested engines.
+            let mut issues: Vec<normalize_output::diagnostics::Issue> = Vec::new();
+            let include_syntax = engine.as_deref().is_none() || engine.as_deref() == Some("syntax");
+            let include_fact = engine.as_deref().is_none() || engine.as_deref() == Some("fact");
+            let include_native = engine.as_deref().is_none() || engine.as_deref() == Some("native");
+
+            if include_syntax {
+                issues.extend(watched.diagnostics.syntax_issues.iter().cloned());
+            }
+            if include_fact {
+                issues.extend(watched.diagnostics.fact_issues.iter().cloned());
+            }
+            if include_native {
+                issues.extend(watched.diagnostics.native_issues.iter().cloned());
+            }
+
+            // Apply optional filters.
             let filter_ids_set: Option<HashSet<String>> =
                 filter_ids.map(|ids| ids.into_iter().collect());
-
-            let rt = tokio::runtime::Runtime::new().unwrap_or_else(|e| {
-                tracing::warn!("failed to create tokio runtime for run_rules: {}", e);
-                panic!("failed to create tokio runtime: {}", e)
-            });
-
-            let diagnostics = std::thread::Builder::new()
-                .stack_size(64 * 1024 * 1024)
-                .spawn({
-                    let root = root.clone();
-                    let rules = config.rules.clone();
-                    move || {
-                        rt.block_on(normalize_rules::collect_fact_diagnostics_incremental(
-                            &root,
-                            &rules,
-                            filter_ids_set.as_ref(),
-                            filter_rule.as_deref(),
-                            None, // no changed_files filter — full eval with warm cache
-                        ))
-                    }
-                })
-                .expect("failed to spawn run_rules thread")
-                .join()
-                .expect("run_rules thread panicked");
-
-            let issues: Vec<normalize_output::diagnostics::Issue> = diagnostics
-                .iter()
-                .map(normalize_rules::abi_diagnostic_to_issue)
-                .collect();
+            if let Some(ref ids) = filter_ids_set {
+                issues.retain(|i| ids.contains(&i.rule_id));
+            }
+            if let Some(ref rule) = filter_rule {
+                issues.retain(|i| i.rule_id == rule.as_str());
+            }
 
             match serde_json::to_value(&issues) {
                 Ok(v) => Response::ok(serde_json::json!({ "issues": v })),
                 Err(e) => Response::err(&format!("failed to serialize issues: {}", e)),
             }
+        }
+
+        /// Prime the diagnostics cache for a root with a full evaluation of all engines.
+        /// Called lazily on the first `RunRules` request or after config invalidation.
+        fn prime_diagnostics_cache(&self, root: &Path) {
+            let config = NormalizeConfig::load(root);
+
+            // --- Fact rules ---
+            let fact_issues: Vec<normalize_output::diagnostics::Issue> = {
+                let root_owned = root.to_path_buf();
+                let rules = config.rules.clone();
+                std::thread::Builder::new()
+                    .stack_size(64 * 1024 * 1024)
+                    .spawn(move || {
+                        let rt = tokio::runtime::Runtime::new().unwrap();
+                        let diagnostics =
+                            rt.block_on(normalize_rules::collect_fact_diagnostics_incremental(
+                                &root_owned,
+                                &rules,
+                                None,
+                                None,
+                                None,
+                            ));
+                        diagnostics
+                            .iter()
+                            .map(normalize_rules::abi_diagnostic_to_issue)
+                            .collect()
+                    })
+                    .expect("failed to spawn fact prime thread")
+                    .join()
+                    .expect("fact prime thread panicked")
+            };
+
+            // --- Syntax rules ---
+            let syntax_issues: Vec<normalize_output::diagnostics::Issue> = {
+                let root_owned = root.to_path_buf();
+                let rules_config = config.rules.clone();
+                std::thread::Builder::new()
+                    .stack_size(64 * 1024 * 1024)
+                    .spawn(move || {
+                        let debug_flags = normalize_syntax_rules::DebugFlags::default();
+                        let path_filter = normalize_rules_config::PathFilter::default();
+                        let findings = normalize_rules::cmd_rules::run_syntax_rules(
+                            &root_owned,
+                            &root_owned,
+                            None,
+                            None,
+                            None,
+                            &rules_config,
+                            &debug_flags,
+                            None,
+                            &path_filter,
+                        );
+                        findings
+                            .iter()
+                            .map(|f| normalize_rules::finding_to_issue(f, &root_owned))
+                            .collect()
+                    })
+                    .expect("failed to spawn syntax prime thread")
+                    .join()
+                    .expect("syntax prime thread panicked")
+            };
+
+            // --- Native rules ---
+            let native_issues: Vec<normalize_output::diagnostics::Issue> = {
+                let root_owned = root.to_path_buf();
+                let rules_config = config.rules.clone();
+                std::thread::Builder::new()
+                    .stack_size(64 * 1024 * 1024)
+                    .spawn(move || {
+                        let rt = tokio::runtime::Runtime::new().unwrap();
+                        rt.block_on(Self::run_native_rules(&root_owned, &rules_config))
+                    })
+                    .expect("failed to spawn native prime thread")
+                    .join()
+                    .expect("native prime thread panicked")
+            };
+
+            tracing::info!(
+                root = ?root,
+                syntax = syntax_issues.len(),
+                fact = fact_issues.len(),
+                native = native_issues.len(),
+                "diagnostics cache fully primed"
+            );
+
+            // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error
+            let mut roots = self.roots.lock().unwrap();
+            if let Some(watched) = roots.get_mut(root) {
+                watched.diagnostics.syntax_issues = syntax_issues;
+                watched.diagnostics.fact_issues = fact_issues;
+                watched.diagnostics.native_issues = native_issues;
+                watched.diagnostics.primed = true;
+            }
+        }
+
+        /// Run all native rules and return unified Issues.
+        async fn run_native_rules(
+            root: &Path,
+            rules_config: &normalize_rules::RulesConfig,
+        ) -> Vec<normalize_output::diagnostics::Issue> {
+            use normalize_output::diagnostics::DiagnosticsReport;
+
+            /// Typed config for summary rules (mirrors normalize-rules service.rs).
+            #[derive(serde::Deserialize, Default)]
+            struct SummaryRuleConfig {
+                #[serde(
+                    default,
+                    deserialize_with = "normalize_rules_config::deserialize_one_or_many"
+                )]
+                filenames: Vec<String>,
+                #[serde(
+                    default,
+                    deserialize_with = "normalize_rules_config::deserialize_one_or_many"
+                )]
+                paths: Vec<String>,
+            }
+
+            // Read config for summary rules.
+            let missing_summary_cfg: SummaryRuleConfig = rules_config
+                .rules
+                .get("missing-summary")
+                .map(|r| r.rule_config())
+                .unwrap_or_default();
+            let stale_summary_cfg: SummaryRuleConfig = rules_config
+                .rules
+                .get("stale-summary")
+                .map(|r| r.rule_config())
+                .unwrap_or_default();
+            let threshold = 10;
+
+            let root_owned = root.to_path_buf();
+
+            let (
+                missing_res,
+                summary_res,
+                stale_res,
+                examples_res,
+                refs_res,
+                ratchet_res,
+                budget_res,
+            ) = tokio::join!(
+                tokio::task::spawn_blocking({
+                    let r = root_owned.clone();
+                    let fnames = missing_summary_cfg.filenames.clone();
+                    let paths = missing_summary_cfg.paths.clone();
+                    move || {
+                        normalize_native_rules::build_missing_summary_report(
+                            &r, threshold, &fnames, &paths,
+                        )
+                    }
+                }),
+                tokio::task::spawn_blocking({
+                    let r = root_owned.clone();
+                    let fnames = stale_summary_cfg.filenames.clone();
+                    let paths = stale_summary_cfg.paths.clone();
+                    move || {
+                        normalize_native_rules::build_stale_summary_report(
+                            &r, threshold, &fnames, &paths,
+                        )
+                    }
+                }),
+                tokio::task::spawn_blocking({
+                    let r = root_owned.clone();
+                    move || normalize_native_rules::build_stale_docs_report(&r)
+                }),
+                tokio::task::spawn_blocking({
+                    let r = root_owned.clone();
+                    move || normalize_native_rules::build_check_examples_report(&r)
+                }),
+                normalize_native_rules::build_check_refs_report(&root_owned),
+                tokio::task::spawn_blocking({
+                    let r = root_owned.clone();
+                    move || normalize_native_rules::build_ratchet_report(&r)
+                }),
+                tokio::task::spawn_blocking({
+                    let r = root_owned.clone();
+                    move || normalize_native_rules::build_budget_report(&r)
+                }),
+            );
+
+            let mut report = DiagnosticsReport::new();
+            if let Ok(r) = missing_res {
+                report.merge(r.into());
+            }
+            if let Ok(r) = summary_res {
+                report.merge(r.into());
+            }
+            if let Ok(r) = stale_res {
+                report.merge(r.into());
+            }
+            if let Ok(r) = examples_res {
+                report.merge(r.into());
+            }
+            if let Ok(r) = refs_res {
+                report.merge(r.into());
+            }
+            if let Ok(r) = ratchet_res {
+                report.merge(r.into());
+            }
+            if let Ok(r) = budget_res {
+                report.merge(r.into());
+            }
+
+            normalize_rules::apply_native_rules_config(&mut report, rules_config);
+            report.issues
         }
 
         fn refresh_root(&self, root: &Path) {
@@ -516,33 +750,119 @@ mod unix_impl {
                                 );
                                 watched.last_affected = affected_vec.clone();
 
-                                // Incremental Datalog evaluation: re-derive only the strata affected
-                                // by the changed files.  The ENGINE_CACHE in normalize-rules is keyed
-                                // by (root, rule_id) and lives for the lifetime of the process, so
-                                // each watched root gets its own set of primed engines.  On the first
-                                // call the engine is primed (full eval); subsequent calls retract
-                                // stale facts and re-derive only the affected strata.
-                                //
-                                // The daemon does not broadcast individual fact diagnostics — that is
-                                // the job of `normalize rules run` (CI path).  The daemon's role here
-                                // is to prime the ENGINE_CACHE so that the next `normalize rules run`
-                                // in this root can use the incremental path instead of a cold start.
+                                // Incremental evaluation of ALL engines: fact, syntax, and native.
+                                // Updates the diagnostics cache so `RunRules` requests return
+                                // pre-computed results instantly.
                                 {
                                     let config = NormalizeConfig::load(root);
-                                    let diagnostics = rt.block_on(
+
+                                    // --- Fact rules (incremental via ENGINE_CACHE) ---
+                                    let fact_diagnostics = rt.block_on(
                                         normalize_rules::collect_fact_diagnostics_incremental(
                                             root,
                                             &config.rules,
-                                            None, // filter_ids — run all enabled rules
-                                            None, // filter_rule — no single-rule filter
+                                            None,
+                                            None,
                                             Some(&watched.last_affected),
                                         ),
                                     );
+                                    let new_fact_issues: Vec<normalize_output::diagnostics::Issue> =
+                                        fact_diagnostics
+                                            .iter()
+                                            .map(normalize_rules::abi_diagnostic_to_issue)
+                                            .collect();
+                                    // Fact rules return the full set (engine handles incremental internally).
+                                    watched.diagnostics.fact_issues = new_fact_issues;
+
+                                    // --- Syntax rules (re-run on affected files, merge into cache) ---
+                                    {
+                                        let root_owned = root.to_path_buf();
+                                        let rules_config = config.rules.clone();
+                                        let affected_for_syntax = affected_vec.clone();
+                                        let new_syntax_issues: Vec<
+                                            normalize_output::diagnostics::Issue,
+                                        > = std::thread::Builder::new()
+                                            .stack_size(64 * 1024 * 1024)
+                                            .spawn(move || {
+                                                let debug_flags =
+                                                    normalize_syntax_rules::DebugFlags::default();
+                                                let path_filter =
+                                                    normalize_rules_config::PathFilter::default();
+                                                let findings =
+                                                    normalize_rules::cmd_rules::run_syntax_rules(
+                                                        &root_owned,
+                                                        &root_owned,
+                                                        None,
+                                                        None,
+                                                        None,
+                                                        &rules_config,
+                                                        &debug_flags,
+                                                        Some(&affected_for_syntax),
+                                                        &path_filter,
+                                                    );
+                                                findings
+                                                    .iter()
+                                                    .map(|f| {
+                                                        normalize_rules::finding_to_issue(
+                                                            f,
+                                                            &root_owned,
+                                                        )
+                                                    })
+                                                    .collect()
+                                            })
+                                            .expect("failed to spawn syntax refresh thread")
+                                            .join()
+                                            .expect("syntax refresh thread panicked");
+
+                                        // Remove stale issues for affected files, add new ones.
+                                        let affected_rel: HashSet<String> = affected_vec
+                                            .iter()
+                                            .filter_map(|p| {
+                                                p.strip_prefix(root)
+                                                    .ok()
+                                                    .map(|r| r.to_string_lossy().to_string())
+                                            })
+                                            .collect();
+                                        watched
+                                            .diagnostics
+                                            .syntax_issues
+                                            .retain(|i| !affected_rel.contains(&i.file));
+                                        watched.diagnostics.syntax_issues.extend(new_syntax_issues);
+                                    }
+
+                                    // --- Native rules (full re-run, replace cache) ---
+                                    // Native rules walk the tree and are project-level checks,
+                                    // so incremental per-file is not meaningful — replace the
+                                    // full set. This is still fast enough (~3s release) to run
+                                    // in the background on file change.
+                                    {
+                                        let root_owned = root.to_path_buf();
+                                        let rules_config = config.rules.clone();
+                                        let new_native_issues: Vec<
+                                            normalize_output::diagnostics::Issue,
+                                        > = std::thread::Builder::new()
+                                            .stack_size(64 * 1024 * 1024)
+                                            .spawn(move || {
+                                                let rt = tokio::runtime::Runtime::new().unwrap();
+                                                rt.block_on(Self::run_native_rules(
+                                                    &root_owned,
+                                                    &rules_config,
+                                                ))
+                                            })
+                                            .expect("failed to spawn native refresh thread")
+                                            .join()
+                                            .expect("native refresh thread panicked");
+                                        watched.diagnostics.native_issues = new_native_issues;
+                                    }
+
+                                    watched.diagnostics.primed = true;
                                     tracing::info!(
                                         root = ?root,
-                                        diagnostics = diagnostics.len(),
+                                        syntax = watched.diagnostics.syntax_issues.len(),
+                                        fact = watched.diagnostics.fact_issues.len(),
+                                        native = watched.diagnostics.native_issues.len(),
                                         affected = watched.last_affected.len(),
-                                        "incremental fact-rule eval complete"
+                                        "incremental diagnostics cache update complete"
                                     );
                                 }
 
@@ -814,23 +1134,22 @@ mod unix_impl {
             Ok(())
         }
 
-        /// Run fact rules via the daemon, using its warm ENGINE_CACHE.
+        /// Run rules via the daemon, returning cached diagnostics.
         ///
-        /// Uses a 5-minute timeout since even cached evaluation can take a few
-        /// seconds on large codebases. Falls back to cold eval if the daemon is
-        /// unavailable or returns an error.
+        /// Uses a 5-minute timeout since the first request may trigger a full
+        /// cache prime. Subsequent requests return instantly from cache.
         pub fn run_rules(
             &self,
             root: &Path,
             filter_ids: Option<Vec<String>>,
             filter_rule: Option<String>,
+            engine: Option<String>,
         ) -> Result<Response, String> {
             use std::io::{BufRead, BufReader, Write};
             let mut stream = UnixStream::connect(&self.socket_path)
                 .map_err(|e| format!("Failed to connect: {}", e))?;
 
-            // Fact-rule evaluation can take tens of seconds even with a warm cache.
-            // Use a 5-minute timeout to cover worst-case warm-cache eval.
+            // First request may trigger a full cache prime — use generous timeout.
             stream.set_read_timeout(Some(Duration::from_secs(300))).ok();
             stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
 
@@ -838,6 +1157,7 @@ mod unix_impl {
                 root: root.to_path_buf(),
                 filter_ids,
                 filter_rule,
+                engine,
             };
             let json = serde_json::to_string(&request).map_err(|e| e.to_string())?;
             stream
@@ -998,6 +1318,7 @@ impl DaemonClient {
         _root: &Path,
         _filter_ids: Option<Vec<String>>,
         _filter_rule: Option<String>,
+        _engine: Option<String>,
     ) -> Result<Response, String> {
         Err("normalize daemon is not supported on Windows".to_string())
     }

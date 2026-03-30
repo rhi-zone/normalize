@@ -1445,20 +1445,24 @@ pub fn apply_native_rules_config(
     });
 }
 
-/// Try to run fact rules via the daemon's warm ENGINE_CACHE.
+/// Try to run rules via the daemon's diagnostics cache.
 ///
-/// Returns `Some(issues)` if the daemon is running and successfully evaluated
-/// the rules. Returns `None` if the daemon is unavailable or returns an error,
-/// in which case the caller should fall back to cold evaluation.
+/// Returns `Some(issues)` if the daemon is running and successfully returned
+/// cached results. Returns `None` if the daemon is unavailable or returns an
+/// error, in which case the caller should fall back to local evaluation.
+///
+/// `engine` filters which engine's results to return: `Some("syntax")`,
+/// `Some("fact")`, `Some("native")`, or `None` for all engines.
 ///
 /// This avoids a circular-dependency between `normalize-rules` and the main
 /// `normalize` crate by talking to the daemon socket directly rather than
 /// through `DaemonClient`.
 #[cfg(unix)]
-fn try_fact_rules_via_daemon(
+pub fn try_rules_via_daemon(
     root: &Path,
     filter_ids: Option<&HashSet<String>>,
     filter_rule: Option<&str>,
+    engine: Option<&str>,
 ) -> Option<Vec<normalize_output::diagnostics::Issue>> {
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::net::UnixStream;
@@ -1474,7 +1478,7 @@ fn try_fact_rules_via_daemon(
     }
 
     let mut stream = UnixStream::connect(&socket_path).ok()?;
-    // Fact-rule evaluation can take tens of seconds even with a warm cache.
+    // First request may trigger a full cache prime — generous timeout.
     stream.set_read_timeout(Some(Duration::from_secs(300))).ok();
     stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
 
@@ -1485,6 +1489,7 @@ fn try_fact_rules_via_daemon(
         "root": root,
         "filter_ids": filter_ids_vec,
         "filter_rule": filter_rule,
+        "engine": engine,
     });
     let json = serde_json::to_string(&request).ok()?;
     stream.write_all(json.as_bytes()).ok()?;
@@ -1506,16 +1511,18 @@ fn try_fact_rules_via_daemon(
     tracing::info!(
         root = ?root,
         issues = issues.len(),
-        "fact rules served from daemon warm cache"
+        engine = ?engine,
+        "rules served from daemon cache"
     );
     Some(issues)
 }
 
 #[cfg(not(unix))]
-fn try_fact_rules_via_daemon(
+pub fn try_rules_via_daemon(
     _root: &Path,
     _filter_ids: Option<&HashSet<String>>,
     _filter_rule: Option<&str>,
+    _engine: Option<&str>,
 ) -> Option<Vec<normalize_output::diagnostics::Issue>> {
     None
 }
@@ -1557,44 +1564,76 @@ pub fn run_rules_report(
         filter_tag
     };
 
-    // Syntax rules
-    if matches!(engine, RuleKind::All | RuleKind::Syntax) {
-        let debug_flags = DebugFlags::from_args(debug);
-        let findings = crate::cmd_rules::run_syntax_rules(
-            root,
+    // Try to route ALL requested engines through the daemon's diagnostics cache.
+    // The daemon caches syntax, fact, and native rule results and updates them
+    // incrementally on file changes. This path avoids expensive local evaluation.
+    let daemon_engine = match engine {
+        RuleKind::Syntax => Some("syntax"),
+        RuleKind::Fact => Some("fact"),
+        RuleKind::Native => Some("native"),
+        RuleKind::All => None, // None = all engines
+        _ => None,             // Sarif not cached, will fall through
+    };
+    // Only try daemon for engines it caches (syntax, fact, native).
+    let daemon_covers_request = matches!(
+        engine,
+        RuleKind::All | RuleKind::Syntax | RuleKind::Fact | RuleKind::Native
+    );
+    let daemon_result = if daemon_covers_request {
+        try_rules_via_daemon(
             project_root,
-            filter_rule,
-            effective_tag,
             filter_ids.as_ref(),
-            &config.rules,
-            &debug_flags,
-            files,
-            path_filter,
-        );
-        // Count unique files with violations for the report header.
-        let unique_files: HashSet<&std::path::Path> =
-            findings.iter().map(|f| f.file.as_path()).collect();
-        report.files_checked = report.files_checked.max(unique_files.len());
-        for f in &findings {
-            report.issues.push(finding_to_issue(f, root));
-        }
-        report.sources_run.push("syntax-rules".into());
-    }
+            filter_rule,
+            daemon_engine,
+        )
+    } else {
+        None
+    };
 
-    // Fact rules
-    if matches!(engine, RuleKind::All | RuleKind::Fact) {
-        // Try to route through the daemon's warm ENGINE_CACHE for fast results.
-        // The daemon primes the cache after each file-change event, so this path
-        // avoids the cold ~45-second Datalog eval on large codebases.
-        if let Some(daemon_issues) =
-            try_fact_rules_via_daemon(project_root, filter_ids.as_ref(), filter_rule)
-        {
-            for issue in daemon_issues {
-                report.issues.push(issue);
-            }
+    if let Some(daemon_issues) = daemon_result {
+        for issue in daemon_issues {
+            report.issues.push(issue);
+        }
+        // Mark which sources were served from daemon.
+        if matches!(engine, RuleKind::All | RuleKind::Syntax) {
+            report.sources_run.push("syntax-rules".into());
+        }
+        if matches!(engine, RuleKind::All | RuleKind::Fact) {
             report.sources_run.push("fact-rules".into());
-        } else {
-            // Fall back to cold evaluation when the daemon is unavailable.
+        }
+        if matches!(engine, RuleKind::All | RuleKind::Native) {
+            report.sources_run.push("native".into());
+        }
+        report.daemon_cached = true;
+    } else {
+        // Fall back to local evaluation for each engine.
+
+        // Syntax rules
+        if matches!(engine, RuleKind::All | RuleKind::Syntax) {
+            let debug_flags = DebugFlags::from_args(debug);
+            let findings = crate::cmd_rules::run_syntax_rules(
+                root,
+                project_root,
+                filter_rule,
+                effective_tag,
+                filter_ids.as_ref(),
+                &config.rules,
+                &debug_flags,
+                files,
+                path_filter,
+            );
+            // Count unique files with violations for the report header.
+            let unique_files: HashSet<&std::path::Path> =
+                findings.iter().map(|f| f.file.as_path()).collect();
+            report.files_checked = report.files_checked.max(unique_files.len());
+            for f in &findings {
+                report.issues.push(finding_to_issue(f, root));
+            }
+            report.sources_run.push("syntax-rules".into());
+        }
+
+        // Fact rules
+        if matches!(engine, RuleKind::All | RuleKind::Fact) {
             // The Datalog evaluator recurses deeply for transitive queries (circular-deps etc.).
             // Spawn on a thread with a larger stack to avoid stack overflow.
             let rt = tokio::runtime::Runtime::new().unwrap_or_else(|e| {
@@ -1642,6 +1681,7 @@ pub fn run_rules_report(
     }
 
     // SARIF passthrough: run external tools and merge their SARIF output
+    // (SARIF is not cached by the daemon — always run locally)
     if matches!(engine, RuleKind::All | RuleKind::Sarif) {
         let sarif_report = run_sarif_tools(root, &config.rules.sarif_tools);
         report.merge(sarif_report);

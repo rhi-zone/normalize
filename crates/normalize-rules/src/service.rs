@@ -469,7 +469,8 @@ impl RulesService {
         // ratchet, budget, long-file, high-complexity, long-function)
         // runs in async context; included in All and Native engine types.
         // All checks are independent — run them in parallel.
-        if run_native {
+        // Skip when daemon already served cached native results.
+        if run_native && !report.daemon_cached {
             let native_root = effective_root.clone();
             let native_config = load_rules_config(&native_root);
             let threshold = 10;

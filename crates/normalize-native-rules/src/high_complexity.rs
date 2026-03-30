@@ -192,5 +192,6 @@ pub fn build_high_complexity_report(
         files_checked,
         sources_run: vec!["high-complexity".into()],
         tool_errors: vec![],
+        daemon_cached: false,
     }
 }

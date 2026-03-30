@@ -218,6 +218,7 @@ impl From<StaleDocsReport> for DiagnosticsReport {
             files_checked: report.files_checked,
             sources_run: vec!["stale-docs".into()],
             tool_errors: vec![],
+            daemon_cached: false,
         }
     }
 }
