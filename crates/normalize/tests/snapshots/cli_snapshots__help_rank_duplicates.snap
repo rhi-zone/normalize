@@ -34,6 +34,9 @@ Options:
   -l, --limit <limit>              Maximum number of results to show (0=no limit, clusters mode)
   -h, --help                       Print help
 
+Also known as: copy-paste detection, code clones, dead code candidates, duplicated
+logic, DRY violations. Finds code that has been copied and can be consolidated.
+
 Modes: `exact` (default) finds byte-identical bodies; `similar` uses MinHash fuzzy
 matching; `clusters` groups near-duplicates into connected components. Returns a
 `DuplicatesReport` with grouped matches and similarity scores.

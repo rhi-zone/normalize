@@ -21,6 +21,9 @@ Options:
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
 
+Finds undocumented public symbols, missing docstrings, and documentation gaps.
+Also known as: doc coverage, missing documentation, undocumented API surface.
+
 Returns a `DocCoverageReport` listing files ranked by undocumented public symbols,
 with per-file and overall coverage percentages. Respects the `exclude_interface_impls`
 config option to skip auto-generated trait implementations.

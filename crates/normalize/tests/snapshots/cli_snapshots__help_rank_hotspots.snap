@@ -21,6 +21,7 @@ Options:
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
 
+Also known as: technical debt hotspots, bug-prone files, high-churn files, risky code.
 Combines git churn (commit frequency) with cyclomatic complexity to surface
 files that change often and are hard to reason about. Use `recency` to weight
 recent commits higher. Returns a `HotspotsReport` with per-file risk scores.

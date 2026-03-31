@@ -297,6 +297,9 @@ impl ViewService {
 
     /// Show what references this symbol (callers in the call graph; requires facts index)
     ///
+    /// Also known as: find usages, find references, blast radius, impact analysis, call hierarchy
+    /// (upstream direction). Use this to understand who calls a function before changing it.
+    ///
     /// Examples:
     ///   normalize view referenced-by MyFunction      # callers of a symbol
     ///   normalize view referenced-by file.rs#MyFn    # callers of a specific method
@@ -398,6 +401,9 @@ impl ViewService {
 
     /// Show what this symbol references (callees in the call graph; requires facts index)
     ///
+    /// Also known as: outbound calls, call hierarchy (downstream direction), dependencies of a
+    /// function. Use this to understand what a symbol depends on.
+    ///
     /// Examples:
     ///   normalize view references MyFunction     # functions called by MyFunction
     ///   normalize view references file.rs#MyFn  # references from a specific method
@@ -448,6 +454,9 @@ impl ViewService {
     }
 
     /// Reverse-dependency closure: who imports this file or module? (requires facts index)
+    ///
+    /// Also known as: blast radius, impact analysis, reverse imports, dependents, upstream callers
+    /// at the module level. Use this before deleting or changing a module's public API.
     ///
     /// Examples:
     ///   normalize view dependents src/lib.rs           # modules that import lib.rs
@@ -505,6 +514,9 @@ impl ViewService {
     }
 
     /// Graph-theoretic properties of the dependency graph (requires facts index)
+    ///
+    /// Reports dependency cycles (circular imports), hub modules (high fan-in/fan-out),
+    /// and graph centrality. Also known as: circular dependency detection, import cycle finder.
     ///
     /// Examples:
     ///   normalize view graph                     # module dependency graph

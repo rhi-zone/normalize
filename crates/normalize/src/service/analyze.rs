@@ -125,6 +125,10 @@ impl AnalyzeService {
 impl AnalyzeService {
     /// Analyze architectural structure: coupling, dependency cycles, and hub modules.
     ///
+    /// Detects circular imports (dependency cycles), highly-coupled module pairs, and hub
+    /// modules (high fan-in or fan-out). Also known as: circular dependency detection,
+    /// architecture health, import cycle finder, god module detection.
+    ///
     /// Requires the facts index (`normalize structure rebuild`). Returns an `ArchitectureReport`
     /// with coupling pairs, cycle lists, and hub modules ranked by fan-in/fan-out.
     #[server(group = "graph")]
@@ -242,6 +246,9 @@ impl AnalyzeService {
 
     /// Scan the codebase for security issues (hardcoded secrets, unsafe patterns).
     ///
+    /// Also known as: secrets detection, credential scanning, hardcoded password finder,
+    /// API key leaks, vulnerability scanning, unsafe code audit.
+    ///
     /// Runs heuristic pattern matching across all indexed files. The optional `target`
     /// parameter filters findings to paths that contain the given substring. Returns a
     /// `SecurityReport` with ranked findings including file, line, and severity.
@@ -265,6 +272,9 @@ impl AnalyzeService {
     }
 
     /// Measure documentation coverage: which public symbols lack doc comments.
+    ///
+    /// Finds undocumented public symbols, missing docstrings, and documentation gaps.
+    /// Also known as: doc coverage, missing documentation, undocumented API surface.
     ///
     /// Returns a `DocCoverageReport` listing files ranked by undocumented public symbols,
     /// with per-file and overall coverage percentages. Respects the `exclude_interface_impls`
@@ -296,6 +306,10 @@ impl AnalyzeService {
     }
 
     /// Find clusters of files that change together in git history (connected components).
+    ///
+    /// Also known as: co-change analysis, change coupling, logical coupling, implicit coupling.
+    /// Groups files that share frequent commits — a sign of hidden dependencies not captured
+    /// in the import graph. Useful for refactoring planning and understanding blast radius.
     ///
     /// Groups files into clusters using temporal coupling edges weighted by shared commit
     /// count. `min_commits` controls the edge threshold (auto-scaled by repo size if

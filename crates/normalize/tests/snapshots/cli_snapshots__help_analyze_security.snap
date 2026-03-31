@@ -21,6 +21,9 @@ Options:
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
 
+Also known as: secrets detection, credential scanning, hardcoded password finder,
+API key leaks, vulnerability scanning, unsafe code audit.
+
 Runs heuristic pattern matching across all indexed files. The optional `target`
 parameter filters findings to paths that contain the given substring. Returns a
 `SecurityReport` with ranked findings including file, line, and severity.

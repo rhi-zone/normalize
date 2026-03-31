@@ -409,6 +409,7 @@ impl RankService {
 
     /// Rank files by churn × complexity: the highest-risk files for introducing bugs.
     ///
+    /// Also known as: technical debt hotspots, bug-prone files, high-churn files, risky code.
     /// Combines git churn (commit frequency) with cyclomatic complexity to surface
     /// files that change often and are hard to reason about. Use `recency` to weight
     /// recent commits higher. Returns a `HotspotsReport` with per-file risk scores.
@@ -477,8 +478,9 @@ impl RankService {
 
     /// Rank file pairs by temporal coupling: pairs that appear in the same git commits.
     ///
-    /// High coupling scores indicate implicit dependencies that aren't visible in the
-    /// import graph. `min_commits` sets the minimum shared-commit threshold. Returns
+    /// Also known as: co-change analysis, change coupling, logical coupling, implicit coupling,
+    /// hidden dependencies. High coupling scores indicate implicit dependencies not visible in
+    /// the import graph. `min_commits` sets the minimum shared-commit threshold. Returns
     /// a `CouplingReport` with ranked pairs and their shared-commit counts.
     #[server(group = "git")]
     #[cli(display_with = "display_coupling")]
@@ -739,6 +741,9 @@ impl RankService {
 
     /// Identify public functions that lack test coverage, ranked by risk score.
     ///
+    /// Also known as: untested code, coverage gaps, dead tests, orphaned functions, missing
+    /// test coverage. Finds public callables with no test references and ranks them by risk.
+    ///
     /// Uses the facts index to find callables with no test references, then ranks them
     /// by a risk heuristic (complexity × call-site count). `min_risk` filters out low-risk
     /// entries. Returns a `TestGapsReport` with per-function risk scores and locations.
@@ -884,9 +889,12 @@ impl RankService {
 
     /// Rank modules by code uniqueness: fraction of functions with no structural near-twin.
     ///
-    /// Uses MinHash similarity to find near-duplicate function bodies. Modules with low
-    /// uniqueness scores have many similar functions that are candidates for extraction or
-    /// consolidation. Returns a `UniquenessReport` with per-module scores.
+    /// Also known as: DRY violations, code reuse opportunities, copy-paste hotspots.
+    /// Modules with low uniqueness scores have many similar functions that are candidates
+    /// for extraction or consolidation.
+    ///
+    /// Uses MinHash similarity to find near-duplicate function bodies. Returns a
+    /// `UniquenessReport` with per-module scores.
     #[server(group = "code")]
     #[cli(display_with = "display_uniqueness")]
     #[allow(clippy::too_many_arguments)]
@@ -964,8 +972,11 @@ impl RankService {
 
     /// Rank modules by import fan-in: how many other modules import each module.
     ///
-    /// Requires the facts index (`normalize structure rebuild`). High fan-in modules are
-    /// architectural hubs — changes to them ripple widely. Returns an `ImportCentralityReport`
+    /// Also known as: most imported modules, architectural hubs, core dependencies, widely-used
+    /// modules, popular APIs. High fan-in modules are the ones with the highest blast radius —
+    /// changes to them ripple widely across the codebase.
+    ///
+    /// Requires the facts index (`normalize structure rebuild`). Returns an `ImportCentralityReport`
     /// with per-module fan-in counts and the most-imported symbols.
     #[server(group = "modules")]
     #[cli(display_with = "display_imports")]
@@ -1019,8 +1030,10 @@ impl RankService {
 
     /// Rank modules by API surface area: public symbol count, public ratio, and constraint score.
     ///
-    /// Modules with large surfaces are harder to evolve without breaking callers. The
-    /// constraint score combines symbol count with type complexity. Returns a `SurfaceReport`
+    /// Also known as: public API size, interface bloat, over-exposed modules. Modules with large
+    /// surfaces are harder to evolve without breaking callers (high blast radius).
+    ///
+    /// The constraint score combines symbol count with type complexity. Returns a `SurfaceReport`
     /// with per-module rankings.
     #[server(group = "modules")]
     #[cli(display_with = "display_surface")]
@@ -1069,6 +1082,10 @@ impl RankService {
     }
 
     /// Rank modules by dependency depth and ripple risk in the import graph.
+    ///
+    /// Also known as: blast radius, change impact, ripple effect analysis, dependency depth.
+    /// Modules deep in the import graph that are also widely imported have the highest ripple
+    /// risk — changes to them affect many other modules.
     ///
     /// Computes the longest import chain reaching each module (depth) and estimates how
     /// many modules would be affected by a change (ripple). Returns a `DepthMapReport`
@@ -1122,7 +1139,10 @@ impl RankService {
 
     /// Rank modules by import layering compliance: do imports flow in one direction?
     ///
-    /// Detects circular and upward imports that violate a clean layered architecture.
+    /// Also known as: dependency direction violations, upward imports, architecture violations,
+    /// circular dependency detection at the layer level. Detects imports that violate
+    /// a clean layered architecture (e.g., core importing from UI).
+    ///
     /// Returns a `LayeringReport` with per-module violation counts and the full list
     /// of problematic import edges.
     #[server(group = "modules")]
@@ -1208,6 +1228,10 @@ impl RankService {
 
     /// Rank functions by effective complexity: cyclomatic complexity summed over the full call graph.
     ///
+    /// Also known as: transitive complexity, call hierarchy depth, deep complexity, total
+    /// cognitive load. Reveals functions that look simple locally but trigger large complex
+    /// call trees — a common source of hard-to-test and hard-to-debug code.
+    ///
     /// Uses BFS on the call graph (requires facts index) to compute the total complexity
     /// reachable from each entry point. High scores indicate functions that are simple
     /// locally but call many complex sub-functions. Returns a `CallComplexityReport`.
@@ -1242,6 +1266,9 @@ impl RankService {
     }
 
     /// Detect duplicate or similar code blocks and functions across the codebase.
+    ///
+    /// Also known as: copy-paste detection, code clones, dead code candidates, duplicated
+    /// logic, DRY violations. Finds code that has been copied and can be consolidated.
     ///
     /// Modes: `exact` (default) finds byte-identical bodies; `similar` uses MinHash fuzzy
     /// matching; `clusters` groups near-duplicates into connected components. Returns a
