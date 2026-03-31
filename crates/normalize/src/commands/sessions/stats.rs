@@ -151,8 +151,10 @@ pub fn show_stats_grouped(
 
     // Compile grep pattern if provided
     let grep_re = grep.and_then(|p| regex::Regex::new(p).ok());
-    if grep.is_some() && grep_re.is_none() {
-        eprintln!("Invalid grep pattern: {}", grep.unwrap());
+    if let Some(pattern) = grep
+        && grep_re.is_none()
+    {
+        eprintln!("Invalid grep pattern: {}", pattern);
         return 1;
     }
 

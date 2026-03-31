@@ -34,7 +34,7 @@ about how to configure them.
 
 **After:** A footer is added after the rule list:
 
-```
+```text
 Configure: [rules."<id>"] in .normalize/config.toml
   severity, enabled, allow — or: normalize rules enable/disable <id>
   Global patterns: [rules] global-allow = ["**/fixtures/**"]
@@ -60,7 +60,7 @@ snippets so users can verify or manually replicate. Track in TODO.md.
 ## Remaining Gaps
 
 - `normalize rules list` does not show the per-rule config key inline (only in the
-  footer hint). Adding `[rules."<id>"]` as a second indented line per rule would
+  footer hint). Adding `` [rules."<id>"] `` as a second indented line per rule would
   make it even more copy-friendly, at the cost of visual density.
 - `normalize rules show` allow list is shown verbatim (full current override list),
   which can be very long. A "current config" vs "example config" split might help.
@@ -69,11 +69,10 @@ snippets so users can verify or manually replicate. Track in TODO.md.
 
 ## Principle
 
-**Every command should be self-documenting.** When a user runs `normalize rules show
-<id>`, they should get everything needed to configure that rule — no external docs
+**Every command should be self-documenting.** When a user runs `normalize rules show <id>`, they should get everything needed to configure that rule — no external docs
 required. When a user runs `normalize rules list`, they should get a clear path to
 "how do I change one of these?".
 
 The config section name changed from `[analyze.rules]` to `[rules]` in the
 2026-03-09 refactor. Any documentation or snippets showing the old name are now
-stale — the canonical name is `[rules]` and `[rules."<id>"]`.
+stale — the canonical name is `[rules]` and `` [rules."<id>"] ``.

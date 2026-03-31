@@ -214,8 +214,8 @@ impl OutputFormatter for AnalyzeReport {
                         sections.push(format!("### {}", risk.as_title()));
                         current_risk = Some(risk);
                     }
-                    let display_name = if func.file_path.is_some() {
-                        format!("{}:{}", func.file_path.as_ref().unwrap(), func.short_name())
+                    let display_name = if let Some(fp) = &func.file_path {
+                        format!("{}:{}", fp, func.short_name())
                     } else {
                         func.short_name()
                     };
@@ -255,8 +255,8 @@ impl OutputFormatter for AnalyzeReport {
                         sections.push(format!("### {}", cat.as_title()));
                         current_cat = Some(cat);
                     }
-                    let display_name = if func.file_path.is_some() {
-                        format!("{}:{}", func.file_path.as_ref().unwrap(), func.short_name())
+                    let display_name = if let Some(fp) = &func.file_path {
+                        format!("{}:{}", fp, func.short_name())
                     } else {
                         func.short_name()
                     };
@@ -318,8 +318,8 @@ impl OutputFormatter for AnalyzeReport {
                 sorted.sort_by(|a, b| b.complexity.cmp(&a.complexity));
 
                 for func in sorted.iter().take(10) {
-                    let display_name = if func.file_path.is_some() {
-                        format!("{}:{}", func.file_path.as_ref().unwrap(), func.short_name())
+                    let display_name = if let Some(fp) = &func.file_path {
+                        format!("{}:{}", fp, func.short_name())
                     } else {
                         func.short_name()
                     };
@@ -365,8 +365,8 @@ impl OutputFormatter for AnalyzeReport {
                 sorted.sort_by(|a, b| b.lines.cmp(&a.lines));
 
                 for func in sorted.iter().take(10) {
-                    let display_name = if func.file_path.is_some() {
-                        format!("{}:{}", func.file_path.as_ref().unwrap(), func.short_name())
+                    let display_name = if let Some(fp) = &func.file_path {
+                        format!("{}:{}", fp, func.short_name())
                     } else {
                         func.short_name()
                     };

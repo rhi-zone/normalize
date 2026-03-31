@@ -228,8 +228,7 @@ pub(crate) fn project_from_path(path: &Path) -> Option<String> {
     // Use the last segment as the project name (best-effort, since '-' is ambiguous)
     stripped
         .split('-')
-        .filter(|s| !s.is_empty())
-        .next_back()
+        .rfind(|s| !s.is_empty())
         .map(String::from)
 }
 
