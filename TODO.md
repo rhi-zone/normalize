@@ -1110,6 +1110,30 @@ needed.
 
 ---
 
+**Pillar 9 — Semantic retrieval (vector embeddings over structural chunks)**
+
+Semantic search over the codebase: embed symbols + doc comments + context windows and
+query by meaning rather than name. The retrieval result is structured data — agents and
+developers can locate conceptually related code without knowing exact identifiers.
+
+**Design:** `normalize-semantic` crate (fastembed + ONNX, no server), SQLite storage
+alongside the structural index, re-ranking by cosine similarity + staleness penalty.
+Config: `[embeddings] enabled = true` in `.normalize/config.toml`.
+
+**Implementation steps:**
+- [x] Create `normalize-semantic` crate with embedder, chunks, store, search, populate, service modules
+- [x] Add `normalize structure search <query>` command to `FactsService`
+- [x] Wire population into `structure rebuild` (non-fatal, skipped when disabled)
+- [x] Add `embeddings` field to `NormalizeConfig` and `RebuildReport`
+- [x] Add `normalize init` CTA for semantic search
+- [x] Add `assert_output_formatter::<SearchReport>()` in output.rs test
+- [ ] Daemon incremental: queue re-embedding on file change (follow-up)
+- [ ] Staleness computation from git history (currently stored as 0.0; follow-up)
+- [ ] Embed markdown docs (SUMMARY.md, CLAUDE.md, ADRs) as additional source types (follow-up)
+- [ ] Embed commit messages as source type (follow-up)
+
+---
+
 ## Post-polish review
 
 After the fixpoint polish loop reaches 0 findings, do a retrospective pass:

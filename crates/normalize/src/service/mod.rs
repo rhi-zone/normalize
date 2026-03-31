@@ -537,6 +537,11 @@ impl NormalizeService {
             if setup {
                 commands::init::run_setup_wizard(&root);
             }
+
+            // 8. Suggest enabling semantic search (CTA)
+            println!(
+                "\nSemantic search available. Enable with `embeddings.enabled = true` in .normalize/config.toml"
+            );
         } else {
             if index {
                 changes.push("Would index codebase".to_string());

@@ -48,6 +48,9 @@ pub struct RebuildReport {
     /// Number of co-change edge pairs written during this rebuild.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub co_change_edges: Option<usize>,
+    /// Number of symbol embeddings generated (only set when embeddings.enabled = true).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embeddings: Option<usize>,
     /// Whether this was an incremental rebuild (true) or a full rebuild (false).
     #[serde(skip_serializing_if = "is_false")]
     pub incremental: bool,
@@ -84,6 +87,11 @@ impl OutputFormatter for RebuildReport {
             && e > 0
         {
             parts.push(format!("{} co-change edges", e));
+        }
+        if let Some(emb) = self.embeddings
+            && emb > 0
+        {
+            parts.push(format!("{} embeddings", emb));
         }
         if !parts.is_empty() {
             out.push_str(&format!("\nIndexed {}", parts.join(", ")));
@@ -549,6 +557,7 @@ async fn rebuild_data(
         calls: None,
         imports: None,
         co_change_edges: None,
+        embeddings: None,
         incremental: !full,
     };
 
@@ -600,7 +609,47 @@ async fn rebuild_data(
         }
     }
 
+    // Populate semantic embeddings if enabled in config.
+    let embeddings_config = normalize_semantic::service::load_embeddings_config(&root);
+    if embeddings_config.enabled {
+        // Resolve HEAD commit for incremental invalidation tracking.
+        let head_commit = resolve_head_sha(&root);
+        // For incremental rebuilds, only re-embed changed files.
+        let changed: Option<Vec<String>> = if full {
+            None
+        } else {
+            // Collect changed paths from the incremental walk (not easily available here;
+            // use None to let populate handle it via the last_commit comparison).
+            None
+        };
+        match normalize_semantic::populate_embeddings(
+            idx.connection(),
+            &embeddings_config,
+            changed.as_deref(),
+            head_commit.as_deref(),
+        )
+        .await
+        {
+            Ok(stats) => {
+                if stats.symbols_embedded > 0 || full {
+                    result.embeddings = Some(stats.symbols_embedded);
+                }
+            }
+            Err(e) => {
+                tracing::warn!("embedding population failed (non-fatal): {}", e);
+            }
+        }
+    }
+
     Ok(result)
+}
+
+/// Attempt to resolve the current HEAD SHA for the given root.
+/// Returns None if not in a git repo or on failure.
+fn resolve_head_sha(root: &Path) -> Option<String> {
+    let repo = gix::discover(root).ok()?;
+    let head = repo.head_id().ok()?;
+    Some(head.to_string())
 }
 
 async fn stats_data(root: Option<&Path>) -> Result<FactsStats, String> {
@@ -944,6 +993,36 @@ impl FactsService {
             .map_err(|e| format!("Query error: {}", e))?;
 
         Ok(QueryReport { rows })
+    }
+
+    /// Search the semantic index for chunks matching a natural-language query
+    ///
+    /// Embeds the query with the configured model (nomic-embed-text-v1.5 by default),
+    /// performs cosine similarity search over all stored symbol embeddings, and
+    /// re-ranks results by staleness. Requires `embeddings.enabled = true` in
+    /// `.normalize/config.toml` and a prior `normalize structure rebuild`.
+    ///
+    /// Examples:
+    ///   normalize structure search "error handling"
+    ///   normalize structure search "database connection pool" --limit 5
+    ///   normalize structure search "authentication middleware" --json
+    #[cli(display_with = "display_output")]
+    pub async fn search(
+        &self,
+        #[param(positional, help = "Natural language query")] query: String,
+        #[param(short = 'n', help = "Maximum results to return (default 10)")] limit: Option<usize>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+    ) -> Result<normalize_semantic::service::SearchReport, String> {
+        let top_k = limit.unwrap_or(10);
+        let root_path = root
+            .map(PathBuf::from)
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+
+        normalize_semantic::service::run_search(&root_path, query, top_k).await
     }
 }
 

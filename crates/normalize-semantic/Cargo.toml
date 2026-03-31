@@ -1,0 +1,39 @@
+[package]
+name = "normalize-semantic"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Semantic retrieval layer for normalize: vector embeddings over structurally-derived chunks"
+
+[features]
+default = []
+cli = ["dep:server-less", "dep:schemars"]
+
+[dependencies]
+normalize-facts = { path = "../normalize-facts", version = "0.2.0" }
+normalize-output = { path = "../normalize-output", version = "0.2.0" }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+tracing = "0.1"
+thiserror = "2"
+anyhow = "1"
+
+# Embedding generation (ONNX-backed, no server required).
+# Use rustls TLS to avoid the openssl system dependency.
+fastembed = { version = "5", default-features = false, features = ["ort-download-binaries-rustls-tls", "hf-hub-rustls-tls"] }
+
+# Vector storage alongside existing SQLite schema
+sqlite-vec = "0.1.9-alpha.1"
+
+# Database (already in workspace)
+libsql = { workspace = true }
+
+# Git history for staleness computation
+gix = { workspace = true }
+
+# Service framework (CLI surface)
+server-less = { workspace = true, optional = true }
+schemars = { version = "1", optional = true }

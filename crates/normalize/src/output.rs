@@ -261,5 +261,8 @@ mod tests {
         assert_output_formatter::<PackageWhyReport>();
         assert_output_formatter::<PackageOutdatedReport>();
         assert_output_formatter::<PackageAuditReport>();
+
+        use normalize_semantic::service::SearchReport;
+        assert_output_formatter::<SearchReport>();
     }
 }

@@ -146,6 +146,9 @@ pub struct NormalizeConfig {
     /// Diff-based budget tracking (`[budget]` section).
     #[param(nested, serde)]
     pub budget: BudgetConfig,
+    /// Semantic embeddings configuration (`[embeddings]` section).
+    #[param(nested, serde)]
+    pub embeddings: normalize_semantic::EmbeddingsConfig,
 }
 
 impl NormalizeConfig {
