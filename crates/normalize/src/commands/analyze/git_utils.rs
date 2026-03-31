@@ -263,6 +263,39 @@ pub fn git_remote_origin_url(root: &Path) -> Option<String> {
 
 // ── Index status helpers ─────────────────────────────────────────────────────
 
+/// Returns true if `rel_path` has a staged change (index differs from HEAD).
+fn is_staged(repo: &gix::Repository, rel_path: &str) -> bool {
+    (|| -> Option<bool> {
+        let head_id = repo.head_id().ok()?;
+        let head_commit = head_id.object().ok()?.into_commit();
+        let head_tree = head_commit.tree().ok()?;
+        let entry_in_head = head_tree.lookup_entry_by_path(rel_path).ok().flatten();
+        let head_blob_id = entry_in_head.map(|e| e.id().detach());
+        let index = repo.index_or_empty().ok()?;
+        let rel_bstr: &gix::bstr::BStr = rel_path.as_bytes().into();
+        let index_blob_id = index.entry_by_path(rel_bstr).map(|e| e.id);
+        // Changed if present in one but not the other, or different blobs.
+        Some(index_blob_id != head_blob_id)
+    })()
+    .unwrap_or(false)
+}
+
+/// Returns true if `rel_path` has an unstaged change (worktree differs from index).
+fn is_unstaged(repo: &gix::Repository, rel_path: &str) -> bool {
+    let pattern: gix::bstr::BString = rel_path.into();
+    let platform = match repo.status(gix::progress::Discard) {
+        Ok(p) => p.index_worktree_options_mut(|opts| {
+            opts.dirwalk_options = None;
+        }),
+        Err(_) => return false,
+    };
+    let mut iter = match platform.into_index_worktree_iter(vec![pattern]) {
+        Ok(it) => it,
+        Err(_) => return false,
+    };
+    iter.any(|item| item.is_ok())
+}
+
 /// Return true if `rel_dir` has uncommitted content changes (staged or unstaged) that
 /// are NOT limited to the `doc_paths`.
 ///
@@ -275,7 +308,43 @@ pub fn git_has_uncommitted_content_changes(
     let Some(repo) = open_repo(root) else {
         return false;
     };
-    // Pass the directory path as a pattern so gix only checks files under it.
+    // Check staged changes (index vs HEAD) under rel_dir, excluding doc_paths.
+    let has_staged = (|| -> Option<bool> {
+        let head_id = repo.head_id().ok()?;
+        let head_commit = head_id.object().ok()?.into_commit();
+        let head_tree = head_commit.tree().ok()?;
+        let index = repo.index_or_empty().ok()?;
+        use gix::bstr::ByteSlice;
+        // Walk index entries; find any that differ from HEAD and are under rel_dir.
+        let is_root = rel_dir == ".";
+        for entry in index.entries() {
+            let rela = entry.path(&index);
+            let rela_str = rela.to_str_lossy();
+            if !is_root && !rela_str.starts_with(rel_dir) {
+                continue;
+            }
+            if doc_paths.iter().any(|dp| dp.as_str() == rela_str.as_ref()) {
+                continue;
+            }
+            // Check if this entry's blob differs from HEAD.
+            let head_blob_id = head_tree
+                .lookup_entry_by_path(rela_str.as_ref())
+                .ok()
+                .flatten()
+                .map(|e| e.id().detach());
+            if head_blob_id.as_ref() != Some(&entry.id) {
+                return Some(true);
+            }
+        }
+        Some(false)
+    })()
+    .unwrap_or(false);
+
+    if has_staged {
+        return true;
+    }
+
+    // Check unstaged changes (index vs worktree) under rel_dir, excluding doc_paths.
     let pattern: gix::bstr::BString = rel_dir.into();
     let patterns = if rel_dir == "." {
         Vec::new()
@@ -305,18 +374,12 @@ pub fn git_summary_has_uncommitted_changes(root: &Path, summary_path: &str) -> b
     let Some(repo) = open_repo(root) else {
         return false;
     };
-    let pattern: gix::bstr::BString = summary_path.into();
-    let platform = match repo.status(gix::progress::Discard) {
-        Ok(p) => p.index_worktree_options_mut(|opts| {
-            opts.dirwalk_options = None;
-        }),
-        Err(_) => return false,
-    };
-    let mut iter = match platform.into_index_worktree_iter(vec![pattern]) {
-        Ok(it) => it,
-        Err(_) => return false,
-    };
-    iter.any(|item| item.is_ok())
+    // Check staged first (index vs HEAD).
+    if is_staged(&repo, summary_path) {
+        return true;
+    }
+    // Check unstaged (index vs worktree).
+    is_unstaged(&repo, summary_path)
 }
 
 // ── Commit count helpers (for stale-summary cache) ──────────────────────────
