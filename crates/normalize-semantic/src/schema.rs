@@ -14,6 +14,10 @@
 ///
 /// The table is created lazily when embedding is first enabled so it does not
 /// affect repos that never turn on `embeddings.enabled`.
+///
+/// The UNIQUE constraint on `(source_type, source_path, source_id)` allows
+/// `INSERT OR REPLACE` for incremental updates without a delete-then-insert
+/// round-trip.
 pub const CREATE_EMBEDDINGS_TABLE: &str = "
 CREATE TABLE IF NOT EXISTS embeddings (
     id          INTEGER PRIMARY KEY,
@@ -24,8 +28,15 @@ CREATE TABLE IF NOT EXISTS embeddings (
     last_commit TEXT,            -- git HEAD SHA when last embedded
     staleness   REAL NOT NULL DEFAULT 0.0,
     chunk_text  TEXT NOT NULL,   -- the text that was embedded (for debugging / re-use)
-    embedding   BLOB NOT NULL    -- packed f32 array, length = model dimensions
+    embedding   BLOB NOT NULL,   -- packed f32 array, length = model dimensions
+    UNIQUE(source_type, source_path, source_id)
 )";
+
+/// DDL statements to drop embedding tables for a full rebuild.
+pub const DROP_EMBEDDINGS_TABLE: &str = "DROP TABLE IF EXISTS embeddings";
+pub const DROP_VEC_EMBEDDINGS_TABLE: &str = "DROP TABLE IF EXISTS vec_embeddings";
+pub const DROP_EMBEDDINGS_IDX_SOURCE: &str = "DROP INDEX IF EXISTS idx_embeddings_source";
+pub const DROP_EMBEDDINGS_IDX_MODEL: &str = "DROP INDEX IF EXISTS idx_embeddings_model";
 
 pub const CREATE_EMBEDDINGS_IDX_SOURCE: &str = "
 CREATE INDEX IF NOT EXISTS idx_embeddings_source

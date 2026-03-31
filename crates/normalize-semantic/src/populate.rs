@@ -11,6 +11,7 @@ use crate::store;
 use crate::vec_ext::register_vec_extension;
 use libsql::Connection;
 use std::collections::HashMap;
+use std::time::Instant;
 use tracing::{info, warn};
 
 /// Result of a population run.
@@ -36,14 +37,28 @@ pub async fn populate_embeddings(
     head_commit: Option<&str>,
     repo_root: Option<&std::path::Path>,
 ) -> anyhow::Result<PopulateStats> {
+    let started = Instant::now();
+    let is_full_rebuild = changed_paths.is_none();
+
     // Register sqlite-vec before touching the connection so that the
     // `vec_embeddings` virtual table is available for subsequent operations.
     register_vec_extension();
 
+    // For a full rebuild, drop and recreate tables instead of per-row deletes.
+    // This avoids leaving massive dead pages in SQLite.
+    if is_full_rebuild {
+        store::drop_embedding_tables(conn).await?;
+    }
+
     store::ensure_schema(conn).await?;
 
+    eprintln!("Loading embedding model {}...", config.model);
     let mut embedder = Embedder::load(&config.model, None)?;
     info!(model = %config.model, dims = embedder.dimensions, "Embedding model loaded");
+    eprintln!(
+        "Loaded model {} ({} dimensions)",
+        config.model, embedder.dimensions
+    );
 
     // Create the ANN virtual table now that we know the model's dimension count.
     store::ensure_vec_schema(conn, embedder.dimensions).await;
@@ -54,8 +69,12 @@ pub async fn populate_embeddings(
     let symbols = load_symbols(conn, changed_paths).await?;
 
     if symbols.is_empty() {
+        eprintln!("No symbols to embed.");
         return Ok(stats);
     }
+
+    let total = symbols.len();
+    eprintln!("Embedding {total} symbols...");
 
     // If incremental, delete old embeddings for changed paths first
     if let Some(paths) = changed_paths {
@@ -79,6 +98,7 @@ pub async fn populate_embeddings(
     let mut batch_symbols: Vec<SymbolRow> = Vec::new();
     let mut batch_texts: Vec<String> = Vec::new();
     let mut batch_staleness: Vec<f64> = Vec::new();
+    let mut done = 0usize;
 
     for symbol in symbols {
         // Load callers/callees for this symbol
@@ -111,6 +131,8 @@ pub async fn populate_embeddings(
                 &mut stats,
             )
             .await;
+            done += batch_symbols.len();
+            eprintln!("Embedded {done}/{total} symbols");
             batch_symbols.clear();
             batch_texts.clear();
             batch_staleness.clear();
@@ -130,11 +152,22 @@ pub async fn populate_embeddings(
             &mut stats,
         )
         .await;
+        done += batch_symbols.len();
+        eprintln!("Embedded {done}/{total} symbols");
     }
 
+    // Reclaim space after a full rebuild.
+    if is_full_rebuild {
+        eprintln!("Running VACUUM to reclaim space...");
+        store::vacuum(conn).await;
+    }
+
+    let elapsed = started.elapsed().as_secs_f64();
+    eprintln!("Embedding complete. {total} symbols in {elapsed:.1}s");
     info!(
         embedded = stats.symbols_embedded,
         errors = stats.errors,
+        elapsed_secs = elapsed,
         "Embedding population complete"
     );
 
@@ -156,6 +189,11 @@ async fn flush_batch(
     let text_refs: Vec<&str> = texts.iter().map(String::as_str).collect();
     match embedder.embed_batch(&text_refs) {
         Ok(vectors) => {
+            // Wrap the entire batch in a single transaction to avoid per-row
+            // transaction overhead (massive speedup for 9000+ symbols).
+            if let Err(e) = conn.execute("BEGIN", ()).await {
+                warn!(error = %e, "Failed to BEGIN transaction for batch");
+            }
             for (idx, (sym, (text, vec))) in symbols
                 .iter()
                 .zip(texts.iter().zip(vectors.iter()))
@@ -182,6 +220,9 @@ async fn flush_batch(
                         stats.errors += 1;
                     }
                 }
+            }
+            if let Err(e) = conn.execute("COMMIT", ()).await {
+                warn!(error = %e, "Failed to COMMIT transaction for batch");
             }
         }
         Err(e) => {

@@ -26,6 +26,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Co-change edge index** — `normalize structure rebuild` now populates a `co_change_edges` table in the SQLite index with file pairs that frequently change together (co-change count ≥ 2, commits touching >50 files skipped as noise, per-file fanout capped at top 20 partners). Incremental: only new commits since the last rebuild are processed. `normalize analyze coupling-clusters` queries this table instead of re-walking git history on every invocation; falls back transparently to the git walk with a warning when the table is empty. Rebuild output now includes a `co_change_edges` count.
 - **`stale-doc` native rule** — detects documentation files that are likely stale because strongly co-changed code files have been updated more recently. Queries the `co_change_edges` index for each doc file (`**/*.md`, `**/*.rst`, `docs/**/*`), finds code files it historically changes with, and flags the doc if any partner was committed more recently. `SUMMARY.md` is excluded (covered by `stale-summary`). Configurable via `[rules."stale-doc"]` with `min_co_changes` (default 3), `min_lag_days` (default 0), and `doc_patterns`. Disabled by default; requires `normalize structure rebuild` to populate the index.
 
+### Fixed
+
+- **Semantic embedding rebuild performance** — full rebuild now drops and recreates embedding tables instead of doing per-row deletes, avoiding massive SQLite bloat (675MB on disk for 75MB of data). Incremental updates use `INSERT OR REPLACE` with a UNIQUE constraint instead of SELECT-DELETE-INSERT per row. `VACUUM` runs after a full rebuild to reclaim dead pages.
+- **Semantic embedding progress output** — `structure rebuild` with embeddings enabled now prints progress to stderr: model loading, symbol count, per-batch progress ("Embedded 64/9051 symbols"), and a final summary with elapsed time.
+
 ### Moved
 
 - **`normalize analyze length`** → **`normalize rank length`** — ranking command (longest functions by line count) now lives under `rank` where ranked-list commands belong.

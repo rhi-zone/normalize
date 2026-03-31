@@ -9,7 +9,8 @@
 
 use crate::schema::{
     CREATE_EMBEDDINGS_IDX_MODEL, CREATE_EMBEDDINGS_IDX_SOURCE, CREATE_EMBEDDINGS_TABLE,
-    create_vec_embeddings_ddl,
+    DROP_EMBEDDINGS_IDX_MODEL, DROP_EMBEDDINGS_IDX_SOURCE, DROP_EMBEDDINGS_TABLE,
+    DROP_VEC_EMBEDDINGS_TABLE, create_vec_embeddings_ddl,
 };
 use crate::search::StoredEmbedding;
 use libsql::{Connection, params};
@@ -47,8 +48,9 @@ pub async fn vec_table_available(conn: &Connection) -> bool {
 
 /// Insert or replace one embedding row.
 ///
-/// Upserts based on `(source_type, source_path, source_id)` so re-indexing a
-/// symbol replaces the old vector rather than appending.
+/// Uses `INSERT OR REPLACE` keyed on the UNIQUE constraint
+/// `(source_type, source_path, source_id)` so re-indexing a symbol replaces the
+/// old vector in a single statement — no SELECT-then-DELETE round-trip.
 ///
 /// The corresponding row in `vec_embeddings` is also updated when the virtual
 /// table is available (best-effort; errors are silently ignored).
@@ -64,52 +66,11 @@ pub async fn upsert_embedding(
     chunk_text: &str,
     embedding_bytes: &[u8],
 ) -> Result<(), libsql::Error> {
-    // Collect the IDs of rows we are about to replace so we can remove them
-    // from vec_embeddings as well.
-    let deleted_ids: Vec<i64> = if let Some(sid) = source_id {
-        let mut rows = conn.query(
-            "SELECT id FROM embeddings WHERE source_type = ?1 AND source_path = ?2 AND source_id = ?3",
-            params![source_type, source_path, sid],
-        ).await?;
-        let mut ids = Vec::new();
-        while let Some(row) = rows.next().await? {
-            ids.push(row.get::<i64>(0)?);
-        }
-        conn.execute(
-            "DELETE FROM embeddings WHERE source_type = ?1 AND source_path = ?2 AND source_id = ?3",
-            params![source_type, source_path, sid],
-        )
-        .await?;
-        ids
-    } else {
-        let mut rows = conn.query(
-            "SELECT id FROM embeddings WHERE source_type = ?1 AND source_path = ?2 AND source_id IS NULL",
-            params![source_type, source_path],
-        ).await?;
-        let mut ids = Vec::new();
-        while let Some(row) = rows.next().await? {
-            ids.push(row.get::<i64>(0)?);
-        }
-        conn.execute(
-            "DELETE FROM embeddings WHERE source_type = ?1 AND source_path = ?2 AND source_id IS NULL",
-            params![source_type, source_path],
-        )
-        .await?;
-        ids
-    };
-
-    // Remove the old rows from the ANN index (best-effort; ignore errors if table absent).
-    for old_id in &deleted_ids {
-        let _ = conn
-            .execute(
-                "DELETE FROM vec_embeddings WHERE rowid = ?1",
-                params![*old_id],
-            )
-            .await;
-    }
-
+    // INSERT OR REPLACE: if a row with the same (source_type, source_path, source_id)
+    // already exists, SQLite deletes it and inserts the new one. This gives us a new
+    // rowid, which we use for the vec_embeddings mirror.
     conn.execute(
-        "INSERT INTO embeddings (source_type, source_path, source_id, model, last_commit, staleness, chunk_text, embedding)
+        "INSERT OR REPLACE INTO embeddings (source_type, source_path, source_id, model, last_commit, staleness, chunk_text, embedding)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![
             source_type,
@@ -125,6 +86,7 @@ pub async fn upsert_embedding(
     .await?;
 
     // Mirror into vec_embeddings for ANN queries (best-effort).
+    // INSERT OR REPLACE handles the case where the old rowid was already present.
     let new_id: i64 = {
         let mut rows = conn.query("SELECT last_insert_rowid()", ()).await?;
         if let Some(row) = rows.next().await? {
@@ -136,7 +98,7 @@ pub async fn upsert_embedding(
 
     let _ = conn
         .execute(
-            "INSERT INTO vec_embeddings(rowid, embedding) VALUES (?1, ?2)",
+            "INSERT OR REPLACE INTO vec_embeddings(rowid, embedding) VALUES (?1, ?2)",
             params![new_id, embedding_bytes.to_vec()],
         )
         .await;
@@ -307,13 +269,23 @@ pub async fn delete_embeddings_for_path(
     Ok(affected)
 }
 
-/// Delete all embeddings (full rebuild).
+/// Drop embedding tables entirely for a full rebuild.
 ///
-/// Also truncates `vec_embeddings` (best-effort).
-pub async fn clear_all_embeddings(conn: &Connection) -> Result<(), libsql::Error> {
-    conn.execute("DELETE FROM embeddings", ()).await?;
-    let _ = conn.execute("DELETE FROM vec_embeddings", ()).await;
+/// This is much faster than `DELETE FROM` for large tables — it avoids
+/// generating tombstone pages that bloat the database file.  The caller
+/// must call [`ensure_schema`] + [`ensure_vec_schema`] afterwards to
+/// recreate the tables.
+pub async fn drop_embedding_tables(conn: &Connection) -> Result<(), libsql::Error> {
+    let _ = conn.execute(DROP_VEC_EMBEDDINGS_TABLE, ()).await;
+    conn.execute(DROP_EMBEDDINGS_IDX_SOURCE, ()).await?;
+    conn.execute(DROP_EMBEDDINGS_IDX_MODEL, ()).await?;
+    conn.execute(DROP_EMBEDDINGS_TABLE, ()).await?;
     Ok(())
+}
+
+/// Run `VACUUM` to reclaim space after a full rebuild.
+pub async fn vacuum(conn: &Connection) {
+    let _ = conn.execute("VACUUM", ()).await;
 }
 
 /// Return the set of file paths that have at least one embedding for the given model.
