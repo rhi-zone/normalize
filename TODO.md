@@ -1129,7 +1129,7 @@ Config: `[embeddings] enabled = true` in `.normalize/config.toml`.
 - [x] Add `assert_output_formatter::<SearchReport>()` in output.rs test
 - [x] Replace heuristic `strip_doc_markers()` with tree-sitter-based extraction: `FlatSymbol.docstring` now carries clean text from `Language::extract_docstring`; stored as `doc:<text>` in `symbol_attributes`; `populate.rs` uses it directly without post-processing
 - [ ] Daemon incremental: queue re-embedding on file change (follow-up)
-- [ ] Staleness computation from git history (currently stored as 0.0; follow-up)
+- [x] Staleness computation from git history: `git_staleness.rs` walks commits per-file (cached by path); formula `min(1.0, commits_before_last_touch / 50.0)` wired into `populate_embeddings` via new `repo_root` param
 - [ ] Embed markdown docs (SUMMARY.md, CLAUDE.md, ADRs) as additional source types (follow-up)
 - [ ] Embed commit messages as source type (follow-up)
 

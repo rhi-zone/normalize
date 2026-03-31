@@ -627,6 +627,7 @@ async fn rebuild_data(
             &embeddings_config,
             changed.as_deref(),
             head_commit.as_deref(),
+            Some(&root),
         )
         .await
         {

@@ -7,5 +7,6 @@ Source files for the `normalize-semantic` crate.
 - `schema.rs` — SQLite DDL constants for the `embeddings` table and indices
 - `store.rs` — async SQLite helpers: `ensure_schema`, `upsert_embedding`, `load_all_embeddings`, `delete_embeddings_for_path`
 - `search.rs` — `rerank()`: cosine similarity + staleness penalty → sorted `Vec<SearchHit>`
-- `populate.rs` — `populate_embeddings()`: walks the structural index, builds chunks, batches through the embedder, writes to store
+- `git_staleness.rs` — `compute_staleness_batch()`: computes per-file staleness scores from git history; cached per unique file path to avoid redundant walks
+- `populate.rs` — `populate_embeddings()`: walks the structural index, builds chunks, batches through the embedder, writes to store; accepts `repo_root` to enable git-based staleness
 - `service.rs` — `SearchReport`, `SearchResultEntry`, `run_search()` (called from `FactsService::search`)

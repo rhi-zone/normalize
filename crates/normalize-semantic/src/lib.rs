@@ -27,6 +27,7 @@
 pub mod chunks;
 pub mod config;
 pub mod embedder;
+pub mod git_staleness;
 pub mod populate;
 pub mod schema;
 pub mod search;

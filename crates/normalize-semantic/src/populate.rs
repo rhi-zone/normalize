@@ -6,8 +6,10 @@
 use crate::chunks::{SymbolRow, build_symbol_chunk};
 use crate::config::EmbeddingsConfig;
 use crate::embedder::{Embedder, encode_vector};
+use crate::git_staleness::compute_staleness_batch;
 use crate::store;
 use libsql::Connection;
+use std::collections::HashMap;
 use tracing::{info, warn};
 
 /// Result of a population run.
@@ -31,6 +33,7 @@ pub async fn populate_embeddings(
     config: &EmbeddingsConfig,
     changed_paths: Option<&[String]>,
     head_commit: Option<&str>,
+    repo_root: Option<&std::path::Path>,
 ) -> anyhow::Result<PopulateStats> {
     store::ensure_schema(conn).await?;
 
@@ -56,9 +59,18 @@ pub async fn populate_embeddings(
     // Build context for co-change lookups (file → co-change neighbors)
     let co_change_map = load_co_change_map(conn).await?;
 
+    // Compute staleness per unique file path — one git walk per file, not per symbol.
+    let file_paths: Vec<&str> = symbols.iter().map(|s| s.file.as_str()).collect();
+    let staleness_map: HashMap<String, f64> = if let Some(root) = repo_root {
+        compute_staleness_batch(root, &file_paths)
+    } else {
+        HashMap::new()
+    };
+
     // Process in batches
     let mut batch_symbols: Vec<SymbolRow> = Vec::new();
     let mut batch_texts: Vec<String> = Vec::new();
+    let mut batch_staleness: Vec<f64> = Vec::new();
 
     for symbol in symbols {
         // Load callers/callees for this symbol
@@ -73,8 +85,11 @@ pub async fn populate_embeddings(
         let chunk_text =
             build_symbol_chunk(&symbol, doc.as_deref(), &callers, &callees, &co_changes);
 
+        let staleness = *staleness_map.get(&symbol.file).unwrap_or(&0.0);
+
         batch_symbols.push(symbol);
         batch_texts.push(chunk_text);
+        batch_staleness.push(staleness);
 
         if batch_texts.len() >= EMBED_BATCH_SIZE {
             flush_batch(
@@ -82,6 +97,7 @@ pub async fn populate_embeddings(
                 &mut embedder,
                 &batch_symbols,
                 &batch_texts,
+                &batch_staleness,
                 head_commit,
                 &config.model,
                 &mut stats,
@@ -89,6 +105,7 @@ pub async fn populate_embeddings(
             .await;
             batch_symbols.clear();
             batch_texts.clear();
+            batch_staleness.clear();
         }
     }
 
@@ -99,6 +116,7 @@ pub async fn populate_embeddings(
             &mut embedder,
             &batch_symbols,
             &batch_texts,
+            &batch_staleness,
             head_commit,
             &config.model,
             &mut stats,
@@ -116,11 +134,13 @@ pub async fn populate_embeddings(
 }
 
 /// Flush one batch of symbols through the embedder and store.
+#[allow(clippy::too_many_arguments)]
 async fn flush_batch(
     conn: &Connection,
     embedder: &mut Embedder,
     symbols: &[SymbolRow],
     texts: &[String],
+    staleness: &[f64],
     head_commit: Option<&str>,
     model_name: &str,
     stats: &mut PopulateStats,
@@ -128,8 +148,13 @@ async fn flush_batch(
     let text_refs: Vec<&str> = texts.iter().map(String::as_str).collect();
     match embedder.embed_batch(&text_refs) {
         Ok(vectors) => {
-            for (sym, (text, vec)) in symbols.iter().zip(texts.iter().zip(vectors.iter())) {
+            for (idx, (sym, (text, vec))) in symbols
+                .iter()
+                .zip(texts.iter().zip(vectors.iter()))
+                .enumerate()
+            {
                 let blob = encode_vector(vec);
+                let sym_staleness = staleness.get(idx).copied().unwrap_or(0.0) as f32;
                 match store::upsert_embedding(
                     conn,
                     "symbol",
@@ -137,7 +162,7 @@ async fn flush_batch(
                     Some(sym.rowid),
                     model_name,
                     head_commit,
-                    0.0, // staleness computed separately in future enhancement
+                    sym_staleness,
                     text,
                     &blob,
                 )
