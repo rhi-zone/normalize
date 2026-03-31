@@ -70,9 +70,9 @@ fn extract_string(line: &str, prefix: &str) -> Option<String> {
     let value = line.strip_prefix(prefix)?.trim();
     if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
         Some(value[1..value.len() - 1].to_string())
-    } else if value.starts_with('"') {
+    } else if let Some(stripped) = value.strip_prefix('"') {
         // Multi-line or unclosed - just take what's after the quote
-        Some(value[1..].trim_end_matches('"').to_string())
+        Some(stripped.trim_end_matches('"').to_string())
     } else {
         Some(value.to_string())
     }
@@ -122,7 +122,7 @@ impl PackageIndex for Opam {
         let opam_content = ureq::get(&opam_url)
             .call()?
             .into_string()
-            .map_err(|e| IndexError::Io(e))?;
+            .map_err(IndexError::Io)?;
 
         let meta = Self::parse_opam_file(&opam_content);
 

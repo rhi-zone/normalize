@@ -252,10 +252,10 @@ impl PackageIndex for FDroid {
 
     fn fetch(&self, name: &str) -> Result<PackageMeta, IndexError> {
         // Try main API first if Main repo is configured
-        if self.repos.contains(&FDroidRepo::Main) {
-            if let Ok((pkg, _)) = Self::fetch_from_api(name) {
-                return Ok(pkg);
-            }
+        if self.repos.contains(&FDroidRepo::Main)
+            && let Ok((pkg, _)) = Self::fetch_from_api(name)
+        {
+            return Ok(pkg);
         }
 
         // For other repos, we'd need to parse their index files
@@ -267,10 +267,10 @@ impl PackageIndex for FDroid {
         let mut all_versions = Vec::new();
 
         // Try main API if configured
-        if self.repos.contains(&FDroidRepo::Main) {
-            if let Ok(versions) = Self::fetch_versions_from_api(name) {
-                all_versions.extend(versions);
-            }
+        if self.repos.contains(&FDroidRepo::Main)
+            && let Ok(versions) = Self::fetch_versions_from_api(name)
+        {
+            all_versions.extend(versions);
         }
 
         if all_versions.is_empty() {

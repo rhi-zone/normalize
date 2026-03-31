@@ -89,12 +89,11 @@ impl PackageIndex for Conan {
         // Response is object with numeric keys, find exact match
         if let Some(obj) = response.as_object() {
             for pkg in obj.values() {
-                if let Some(pkg_name) = pkg["name"].as_str() {
-                    if pkg_name.eq_ignore_ascii_case(name) {
-                        if let Some(meta) = Self::parse_package(pkg_name, &pkg["info"]) {
-                            return Ok(meta);
-                        }
-                    }
+                if let Some(pkg_name) = pkg["name"].as_str()
+                    && pkg_name.eq_ignore_ascii_case(name)
+                    && let Some(meta) = Self::parse_package(pkg_name, &pkg["info"])
+                {
+                    return Ok(meta);
                 }
             }
         }

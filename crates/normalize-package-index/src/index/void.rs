@@ -324,15 +324,13 @@ impl Void {
         // Extract tar
         let mut archive = tar::Archive::new(std::io::Cursor::new(decompressed));
 
-        for entry in archive.entries().map_err(|e| IndexError::Io(e))? {
-            let mut entry = entry.map_err(|e| IndexError::Io(e))?;
-            let path = entry.path().map_err(|e| IndexError::Io(e))?;
+        for entry in archive.entries().map_err(IndexError::Io)? {
+            let mut entry = entry.map_err(IndexError::Io)?;
+            let path = entry.path().map_err(IndexError::Io)?;
 
             if path.to_string_lossy() == "index.plist" {
                 let mut xml = String::new();
-                entry
-                    .read_to_string(&mut xml)
-                    .map_err(|e| IndexError::Io(e))?;
+                entry.read_to_string(&mut xml).map_err(IndexError::Io)?;
                 return Self::parse_plist(&xml, repo);
             }
         }

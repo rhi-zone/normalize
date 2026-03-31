@@ -693,10 +693,10 @@ impl PackageIndex for Docker {
         }
 
         // Try Docker Hub if configured
-        if self.registries.contains(&DockerRegistry::DockerHub) {
-            if let Ok(versions) = Self::fetch_all_versions_dockerhub(name) {
-                return Ok(versions);
-            }
+        if self.registries.contains(&DockerRegistry::DockerHub)
+            && let Ok(versions) = Self::fetch_all_versions_dockerhub(name)
+        {
+            return Ok(versions);
         }
 
         Err(IndexError::NotFound(name.to_string()))
@@ -706,17 +706,17 @@ impl PackageIndex for Docker {
         let mut results = Vec::new();
 
         // Search Docker Hub if configured
-        if self.registries.contains(&DockerRegistry::DockerHub) {
-            if let Ok(packages) = Self::search_dockerhub(query) {
-                results.extend(packages);
-            }
+        if self.registries.contains(&DockerRegistry::DockerHub)
+            && let Ok(packages) = Self::search_dockerhub(query)
+        {
+            results.extend(packages);
         }
 
         // Search Quay if configured
-        if self.registries.contains(&DockerRegistry::Quay) {
-            if let Ok(packages) = Self::search_quay(query) {
-                results.extend(packages);
-            }
+        if self.registries.contains(&DockerRegistry::Quay)
+            && let Ok(packages) = Self::search_quay(query)
+        {
+            results.extend(packages);
         }
 
         // GHCR and GCR don't have public search APIs

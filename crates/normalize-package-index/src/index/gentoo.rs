@@ -180,7 +180,7 @@ impl Gentoo {
                     })
                     .unwrap_or(false)
             })
-            .last()
+            .next_back()
             .or_else(|| versions.last())
             .ok_or_else(|| IndexError::NotFound(name.to_string()))?;
 
@@ -303,7 +303,7 @@ impl Gentoo {
         );
 
         Ok(PackageMeta {
-            name: name.split('/').last().unwrap_or(name).to_string(),
+            name: name.split('/').next_back().unwrap_or(name).to_string(),
             version,
             description,
             homepage: None,
@@ -442,18 +442,17 @@ fn extract_version_from_html(html: &str) -> Option<String> {
             // Extract version from ebuild filename
             if let Some(start) = line.rfind('-')
                 && let Some(end) = line.find(".ebuild")
+                && start < end
             {
-                if start < end {
-                    let version = &line[start + 1..end];
-                    // Basic validation - version should start with digit
-                    if version
-                        .chars()
-                        .next()
-                        .map(|c| c.is_ascii_digit())
-                        .unwrap_or(false)
-                    {
-                        return Some(version.to_string());
-                    }
+                let version = &line[start + 1..end];
+                // Basic validation - version should start with digit
+                if version
+                    .chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+                {
+                    return Some(version.to_string());
                 }
             }
         }
@@ -469,7 +468,7 @@ fn extract_description_from_html(html: &str) -> Option<String> {
             // Simple extraction - in practice this would need proper HTML parsing
             if let Some(start) = line.find("content=\"").or_else(|| line.find('>')) {
                 let start = start + if line.contains("content=\"") { 9 } else { 1 };
-                if let Some(end) = line[start..].find(|c| c == '"' || c == '<') {
+                if let Some(end) = line[start..].find(['"', '<']) {
                     let desc = &line[start..start + end];
                     if !desc.is_empty() {
                         return Some(desc.to_string());

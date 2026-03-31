@@ -61,21 +61,21 @@ impl PackageIndex for Brew {
         let mut extra = HashMap::new();
 
         // Dependencies
-        if let Some(deps) = response["dependencies"].as_array() {
-            if !deps.is_empty() {
-                extra.insert(
-                    "dependencies".to_string(),
-                    serde_json::Value::Array(deps.clone()),
-                );
-            }
+        if let Some(deps) = response["dependencies"].as_array()
+            && !deps.is_empty()
+        {
+            extra.insert(
+                "dependencies".to_string(),
+                serde_json::Value::Array(deps.clone()),
+            );
         }
-        if let Some(build_deps) = response["build_dependencies"].as_array() {
-            if !build_deps.is_empty() {
-                extra.insert(
-                    "build_dependencies".to_string(),
-                    serde_json::Value::Array(build_deps.clone()),
-                );
-            }
+        if let Some(build_deps) = response["build_dependencies"].as_array()
+            && !build_deps.is_empty()
+        {
+            extra.insert(
+                "build_dependencies".to_string(),
+                serde_json::Value::Array(build_deps.clone()),
+            );
         }
 
         // Tap info
@@ -170,7 +170,7 @@ impl PackageIndex for Brew {
         // Try cache first
         let (data, _was_cached) =
             cache::fetch_with_cache(self.ecosystem(), "formula-all", &url, INDEX_CACHE_TTL)
-                .map_err(|e| IndexError::Network(e))?;
+                .map_err(IndexError::Network)?;
 
         let response: Vec<serde_json::Value> = serde_json::from_slice(&data)?;
 
@@ -243,14 +243,14 @@ fn extract_repository(formula: &serde_json::Value) -> Option<String> {
         // Extract owner/repo from GitHub URL
         // e.g., https://github.com/BurntSushi/ripgrep/archive/14.1.0.tar.gz
         let parts: Vec<&str> = url.split('/').collect();
-        if let Some(github_idx) = parts.iter().position(|&p| p == "github.com") {
-            if parts.len() > github_idx + 2 {
-                return Some(format!(
-                    "https://github.com/{}/{}",
-                    parts[github_idx + 1],
-                    parts[github_idx + 2]
-                ));
-            }
+        if let Some(github_idx) = parts.iter().position(|&p| p == "github.com")
+            && parts.len() > github_idx + 2
+        {
+            return Some(format!(
+                "https://github.com/{}/{}",
+                parts[github_idx + 1],
+                parts[github_idx + 2]
+            ));
         }
     }
 

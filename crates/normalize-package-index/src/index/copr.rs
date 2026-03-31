@@ -172,17 +172,16 @@ impl PackageIndex for Copr {
 
                 if let Some(items) = response["items"].as_array() {
                     for build in items {
-                        if let Some(pkg) = Self::parse_build(build, name) {
-                            if !versions
+                        if let Some(pkg) = Self::parse_build(build, name)
+                            && !versions
                                 .iter()
                                 .any(|v: &VersionMeta| v.version == pkg.version)
-                            {
-                                versions.push(VersionMeta {
-                                    version: pkg.version,
-                                    released: None,
-                                    yanked: false,
-                                });
-                            }
+                        {
+                            versions.push(VersionMeta {
+                                version: pkg.version,
+                                released: None,
+                                yanked: false,
+                            });
                         }
                     }
                 }

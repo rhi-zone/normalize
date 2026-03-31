@@ -30,7 +30,7 @@ impl HomebrewCasks {
             Self::CASKS_API,
             INDEX_CACHE_TTL,
         )
-        .map_err(|e| IndexError::Network(e))?;
+        .map_err(IndexError::Network)?;
 
         let casks: Vec<serde_json::Value> = serde_json::from_slice(&data)?;
         Ok(casks)

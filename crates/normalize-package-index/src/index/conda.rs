@@ -233,15 +233,15 @@ impl PackageIndex for Conda {
                 for pkgs_key in ["packages", "packages.conda"] {
                     if let Some(pkgs) = repodata[pkgs_key].as_object() {
                         for (_filename, pkg) in pkgs {
-                            if pkg["name"].as_str() == Some(name) {
-                                if let Some(version) = pkg["version"].as_str() {
-                                    let ver_with_channel = (version.to_string(), channel);
-                                    if !all_versions
-                                        .iter()
-                                        .any(|(v, c)| v == version && *c == channel)
-                                    {
-                                        all_versions.push(ver_with_channel);
-                                    }
+                            if pkg["name"].as_str() == Some(name)
+                                && let Some(version) = pkg["version"].as_str()
+                            {
+                                let ver_with_channel = (version.to_string(), channel);
+                                if !all_versions
+                                    .iter()
+                                    .any(|(v, c)| v == version && *c == channel)
+                                {
+                                    all_versions.push(ver_with_channel);
                                 }
                             }
                         }

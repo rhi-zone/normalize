@@ -66,15 +66,16 @@ impl PackageIndex for Hackage {
                 .unwrap_or_default(),
             maintainers: {
                 let mut m = Vec::new();
-                if let Some(author) = response["author"].as_str() {
-                    if !author.is_empty() {
-                        m.push(author.to_string());
-                    }
+                if let Some(author) = response["author"].as_str()
+                    && !author.is_empty()
+                {
+                    m.push(author.to_string());
                 }
-                if let Some(maintainer) = response["maintainer"].as_str() {
-                    if !maintainer.is_empty() && !m.contains(&maintainer.to_string()) {
-                        m.push(maintainer.to_string());
-                    }
+                if let Some(maintainer) = response["maintainer"].as_str()
+                    && !maintainer.is_empty()
+                    && !m.contains(&maintainer.to_string())
+                {
+                    m.push(maintainer.to_string());
                 }
                 m
             },

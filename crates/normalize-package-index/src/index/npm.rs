@@ -90,10 +90,10 @@ impl PackageIndex for NpmIndex {
         }
 
         // Funding info
-        if let Some(funding) = response.get("funding") {
-            if !funding.is_null() {
-                extra.insert("funding".to_string(), funding.clone());
-            }
+        if let Some(funding) = response.get("funding")
+            && !funding.is_null()
+        {
+            extra.insert("funding".to_string(), funding.clone());
         }
 
         Ok(PackageMeta {

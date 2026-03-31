@@ -304,10 +304,10 @@ impl PackageIndex for Msys2 {
         // Add exact match if present and matches environment
         if let Some(exact) = response["results"]["exact"].as_object() {
             let repo = exact.get("repo").and_then(|r| r.as_str());
-            if self.matches_env(repo) {
-                if let Some(pkg) = parse_msys2_package(exact, repo) {
-                    packages.push(pkg);
-                }
+            if self.matches_env(repo)
+                && let Some(pkg) = parse_msys2_package(exact, repo)
+            {
+                packages.push(pkg);
             }
         }
 
@@ -316,10 +316,10 @@ impl PackageIndex for Msys2 {
             for other in others {
                 if let Some(obj) = other.as_object() {
                     let repo = obj.get("repo").and_then(|r| r.as_str());
-                    if self.matches_env(repo) {
-                        if let Some(pkg) = parse_msys2_package(obj, repo) {
-                            packages.push(pkg);
-                        }
+                    if self.matches_env(repo)
+                        && let Some(pkg) = parse_msys2_package(obj, repo)
+                    {
+                        packages.push(pkg);
                     }
                 }
             }

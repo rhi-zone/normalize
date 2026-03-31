@@ -48,7 +48,7 @@ impl PackageIndex for Julia {
             .call()
             .map_err(|_| IndexError::NotFound(name.to_string()))?
             .into_string()
-            .map_err(|e| IndexError::Io(e))?;
+            .map_err(IndexError::Io)?;
 
         // Fetch Versions.toml for version info
         let versions_url = format!(
@@ -61,7 +61,7 @@ impl PackageIndex for Julia {
             .call()
             .map_err(|_| IndexError::NotFound(name.to_string()))?
             .into_string()
-            .map_err(|e| IndexError::Io(e))?;
+            .map_err(IndexError::Io)?;
 
         let pkg = parse_package_toml(&pkg_toml);
         let versions = parse_versions_toml(&versions_toml);
@@ -107,7 +107,7 @@ impl PackageIndex for Julia {
             .call()
             .map_err(|_| IndexError::NotFound(name.to_string()))?
             .into_string()
-            .map_err(|e| IndexError::Io(e))?;
+            .map_err(IndexError::Io)?;
 
         let versions = parse_versions_toml(&versions_toml);
 

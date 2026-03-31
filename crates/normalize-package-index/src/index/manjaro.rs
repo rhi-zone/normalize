@@ -311,10 +311,7 @@ impl Manjaro {
                 .lines()
                 .filter(|l| !l.is_empty())
                 .map(|d| {
-                    let name = d
-                        .split(|c| c == '>' || c == '<' || c == '=' || c == ':')
-                        .next()
-                        .unwrap_or(d);
+                    let name = d.split(['>', '<', '=', ':']).next().unwrap_or(d);
                     serde_json::Value::String(name.to_string())
                 })
                 .collect();

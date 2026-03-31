@@ -463,14 +463,14 @@ impl OpenSuse {
 
         // Parse repomd.xml to find primary.xml.zst location
         for line in xml.lines() {
-            if line.contains("primary.xml.zst") || line.contains("primary.xml.gz") {
-                if let Some(start) = line.find("href=\"") {
-                    let rest = &line[start + 6..];
-                    if let Some(end) = rest.find('"') {
-                        let href = &rest[..end];
-                        let base = repo.base_url().trim_end_matches("/repodata");
-                        return Ok(format!("{}/{}", base, href));
-                    }
+            if (line.contains("primary.xml.zst") || line.contains("primary.xml.gz"))
+                && let Some(start) = line.find("href=\"")
+            {
+                let rest = &line[start + 6..];
+                if let Some(end) = rest.find('"') {
+                    let href = &rest[..end];
+                    let base = repo.base_url().trim_end_matches("/repodata");
+                    return Ok(format!("{}/{}", base, href));
                 }
             }
         }

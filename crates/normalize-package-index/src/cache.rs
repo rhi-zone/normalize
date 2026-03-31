@@ -154,21 +154,21 @@ pub fn fetch_with_cache(
     let response = request.call().map_err(|e| e.to_string())?;
 
     // 304 Not Modified - use cached data
-    if response.status() == 304 {
-        if let Some(data) = read_index(ecosystem, name) {
-            // Update cached_at timestamp
-            if let Some(m) = meta {
-                write_index(
-                    ecosystem,
-                    name,
-                    &data,
-                    url,
-                    m.etag.as_deref(),
-                    m.last_modified.as_deref(),
-                );
-            }
-            return Ok((data, true));
+    if response.status() == 304
+        && let Some(data) = read_index(ecosystem, name)
+    {
+        // Update cached_at timestamp
+        if let Some(m) = meta {
+            write_index(
+                ecosystem,
+                name,
+                &data,
+                url,
+                m.etag.as_deref(),
+                m.last_modified.as_deref(),
+            );
         }
+        return Ok((data, true));
     }
 
     // Get response headers for caching

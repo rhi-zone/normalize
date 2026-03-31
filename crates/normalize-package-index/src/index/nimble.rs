@@ -31,7 +31,7 @@ impl Nimble {
             Self::PACKAGES_URL,
             INDEX_CACHE_TTL,
         )
-        .map_err(|e| IndexError::Network(e))?;
+        .map_err(IndexError::Network)?;
 
         let packages: Vec<serde_json::Value> = serde_json::from_slice(&data)?;
         Ok(packages)

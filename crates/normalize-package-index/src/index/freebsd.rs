@@ -249,13 +249,11 @@ impl FreeBsd {
             if path_str == "packagesite.yaml" {
                 // Parse JSON-lines
                 let reader = BufReader::new(entry);
-                for line in reader.lines() {
-                    if let Ok(line) = line {
-                        if !line.is_empty() {
-                            if let Some(pkg) = Self::parse_package(&line, repo) {
-                                packages.push(pkg);
-                            }
-                        }
+                for line in reader.lines().map_while(Result::ok) {
+                    if !line.is_empty()
+                        && let Some(pkg) = Self::parse_package(&line, repo)
+                    {
+                        packages.push(pkg);
                     }
                 }
                 break;

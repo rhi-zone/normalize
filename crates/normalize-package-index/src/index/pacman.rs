@@ -327,10 +327,7 @@ impl Pacman {
                 .filter(|l| !l.is_empty())
                 .map(|d| {
                     // Strip version constraints
-                    let name = d
-                        .split(|c| c == '>' || c == '<' || c == '=' || c == ':')
-                        .next()
-                        .unwrap_or(d);
+                    let name = d.split(['>', '<', '=', ':']).next().unwrap_or(d);
                     serde_json::Value::String(name.to_string())
                 })
                 .collect();
@@ -464,10 +461,10 @@ impl PackageIndex for Pacman {
         let mut packages = arch_common::search_official(Self::ARCH_API, query)?;
 
         // Also search AUR if included
-        if self.repos.contains(&ArchRepo::Aur) {
-            if let Ok(aur_packages) = arch_common::search_aur(Self::AUR_RPC, query) {
-                packages.extend(aur_packages);
-            }
+        if self.repos.contains(&ArchRepo::Aur)
+            && let Ok(aur_packages) = arch_common::search_aur(Self::AUR_RPC, query)
+        {
+            packages.extend(aur_packages);
         }
 
         Ok(packages)

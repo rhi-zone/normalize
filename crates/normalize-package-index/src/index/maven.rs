@@ -218,35 +218,33 @@ impl Maven {
 
         Ok(docs
             .iter()
-            .filter_map(|doc| {
-                Some(PackageMeta {
-                    name: format!(
-                        "{}:{}",
-                        doc["g"].as_str().unwrap_or(""),
-                        doc["a"].as_str().unwrap_or("")
-                    ),
-                    version: doc["latestVersion"]
-                        .as_str()
-                        .or_else(|| doc["v"].as_str())
-                        .unwrap_or("unknown")
-                        .to_string(),
-                    description: None,
-                    homepage: Some(format!(
-                        "https://mvnrepository.com/artifact/{}/{}",
-                        doc["g"].as_str().unwrap_or(""),
-                        doc["a"].as_str().unwrap_or("")
-                    )),
-                    repository: None,
-                    license: None,
-                    binaries: Vec::new(),
-                    extra: extra.clone(),
-                    keywords: Vec::new(),
-                    maintainers: Vec::new(),
-                    published: None,
-                    downloads: None,
-                    archive_url: None,
-                    checksum: None,
-                })
+            .map(|doc| PackageMeta {
+                name: format!(
+                    "{}:{}",
+                    doc["g"].as_str().unwrap_or(""),
+                    doc["a"].as_str().unwrap_or("")
+                ),
+                version: doc["latestVersion"]
+                    .as_str()
+                    .or_else(|| doc["v"].as_str())
+                    .unwrap_or("unknown")
+                    .to_string(),
+                description: None,
+                homepage: Some(format!(
+                    "https://mvnrepository.com/artifact/{}/{}",
+                    doc["g"].as_str().unwrap_or(""),
+                    doc["a"].as_str().unwrap_or("")
+                )),
+                repository: None,
+                license: None,
+                binaries: Vec::new(),
+                extra: extra.clone(),
+                keywords: Vec::new(),
+                maintainers: Vec::new(),
+                published: None,
+                downloads: None,
+                archive_url: None,
+                checksum: None,
             })
             .collect())
     }
@@ -275,10 +273,10 @@ impl PackageIndex for Maven {
         };
 
         // If Central is in our repos, try the search API first (better metadata)
-        if self.repos.contains(&MavenRepo::Central) {
-            if let Ok((pkg, _)) = Self::fetch_from_central_api(group_id, artifact_id) {
-                return Ok(pkg);
-            }
+        if self.repos.contains(&MavenRepo::Central)
+            && let Ok((pkg, _)) = Self::fetch_from_central_api(group_id, artifact_id)
+        {
+            return Ok(pkg);
         }
 
         // Fall back to checking each repository directly
@@ -332,14 +330,13 @@ impl PackageIndex for Maven {
                 "https://search.maven.org/solrsearch/select?q=g:{}+AND+a:{}&core=gav&rows=100&wt=json",
                 group_id, artifact_id
             );
-            if let Ok(response) = ureq::get(&url).call() {
-                if let Ok(json) = response.into_json::<serde_json::Value>()
-                    && let Some(docs) = json["response"]["docs"].as_array()
-                {
-                    for doc in docs {
-                        if let Some(v) = doc["v"].as_str() {
-                            all_versions.push((v.to_string(), MavenRepo::Central));
-                        }
+            if let Ok(response) = ureq::get(&url).call()
+                && let Ok(json) = response.into_json::<serde_json::Value>()
+                && let Some(docs) = json["response"]["docs"].as_array()
+            {
+                for doc in docs {
+                    if let Some(v) = doc["v"].as_str() {
+                        all_versions.push((v.to_string(), MavenRepo::Central));
                     }
                 }
             }

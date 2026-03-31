@@ -35,10 +35,7 @@ pub fn parse_official_package(pkg: &serde_json::Value, name: &str) -> Option<Pac
             .filter_map(|d| d.as_str())
             .map(|d| {
                 // Strip version constraints: "libc6>=2.17" -> "libc6"
-                let name = d
-                    .split(|c| c == '>' || c == '<' || c == '=' || c == ':')
-                    .next()
-                    .unwrap_or(d);
+                let name = d.split(['>', '<', '=', ':']).next().unwrap_or(d);
                 serde_json::Value::String(name.to_string())
             })
             .collect();
@@ -52,10 +49,7 @@ pub fn parse_official_package(pkg: &serde_json::Value, name: &str) -> Option<Pac
             .filter_map(|p| p.as_str())
             .map(|p| {
                 // Strip version constraints: "libfoo.so=1" -> "libfoo.so"
-                let name = p
-                    .split(|c| c == '>' || c == '<' || c == '=' || c == ':')
-                    .next()
-                    .unwrap_or(p);
+                let name = p.split(['>', '<', '=', ':']).next().unwrap_or(p);
                 serde_json::Value::String(name.to_string())
             })
             .collect();
@@ -112,10 +106,7 @@ pub fn parse_aur_package(pkg: &serde_json::Value, name: &str) -> Option<PackageM
             .filter_map(|d| d.as_str())
             .map(|d| {
                 // Strip version constraints: "pacman>6.1" -> "pacman"
-                let name = d
-                    .split(|c| c == '>' || c == '<' || c == '=' || c == ':')
-                    .next()
-                    .unwrap_or(d);
+                let name = d.split(['>', '<', '=', ':']).next().unwrap_or(d);
                 serde_json::Value::String(name.to_string())
             })
             .collect();
@@ -129,10 +120,7 @@ pub fn parse_aur_package(pkg: &serde_json::Value, name: &str) -> Option<PackageM
             .filter_map(|p| p.as_str())
             .map(|p| {
                 // Strip version constraints
-                let name = p
-                    .split(|c| c == '>' || c == '<' || c == '=' || c == ':')
-                    .next()
-                    .unwrap_or(p);
+                let name = p.split(['>', '<', '=', ':']).next().unwrap_or(p);
                 serde_json::Value::String(name.to_string())
             })
             .collect();
@@ -257,7 +245,7 @@ pub fn fetch_all_aur() -> Result<Vec<PackageMeta>, IndexError> {
     // Try cache first
     let (data, _was_cached) =
         cache::fetch_with_cache("pacman", "aur-packages-all", AUR_ARCHIVE, AUR_CACHE_TTL)
-            .map_err(|e| IndexError::Network(e))?;
+            .map_err(IndexError::Network)?;
 
     // Decompress gzipped data
     let mut decoder = GzDecoder::new(Cursor::new(data));

@@ -265,7 +265,7 @@ impl Apk {
             &url,
             INDEX_CACHE_TTL,
         )
-        .map_err(|e| IndexError::Network(e))?;
+        .map_err(IndexError::Network)?;
 
         // Check if data is gzip compressed
         let tar_data = if data.len() >= 2 && data[0] == 0x1f && data[1] == 0x8b {
@@ -273,7 +273,7 @@ impl Apk {
             let mut decompressed = Vec::new();
             decoder
                 .read_to_end(&mut decompressed)
-                .map_err(|e| IndexError::Io(e))?;
+                .map_err(IndexError::Io)?;
             decompressed
         } else {
             data
@@ -281,19 +281,17 @@ impl Apk {
 
         let mut archive = Archive::new(Cursor::new(tar_data));
 
-        for entry in archive.entries().map_err(|e| IndexError::Io(e))? {
-            let mut entry = entry.map_err(|e| IndexError::Io(e))?;
+        for entry in archive.entries().map_err(IndexError::Io)? {
+            let mut entry = entry.map_err(IndexError::Io)?;
             let path = entry
                 .path()
-                .map_err(|e| IndexError::Io(e))?
+                .map_err(IndexError::Io)?
                 .to_string_lossy()
                 .to_string();
 
             // Read entry content - must consume it to advance the iterator
             let mut content = Vec::new();
-            entry
-                .read_to_end(&mut content)
-                .map_err(|e| IndexError::Io(e))?;
+            entry.read_to_end(&mut content).map_err(IndexError::Io)?;
 
             if path == "APKINDEX" {
                 return Ok(Self::parse_apkindex(Cursor::new(content), repo));
@@ -434,10 +432,7 @@ impl ApkPackageBuilder {
                 })
                 .map(|d| {
                     // Strip version constraints and prefixes
-                    let name = d
-                        .split(|c| c == '>' || c == '<' || c == '=' || c == '~')
-                        .next()
-                        .unwrap_or(d);
+                    let name = d.split(['>', '<', '=', '~']).next().unwrap_or(d);
                     serde_json::Value::String(name.to_string())
                 })
                 .collect();
@@ -462,10 +457,7 @@ impl ApkPackageBuilder {
                 .split_whitespace()
                 .map(|p| {
                     // Strip version constraints
-                    let name = p
-                        .split(|c| c == '>' || c == '<' || c == '=' || c == '~')
-                        .next()
-                        .unwrap_or(p);
+                    let name = p.split(['>', '<', '=', '~']).next().unwrap_or(p);
                     serde_json::Value::String(name.to_string())
                 })
                 .collect();
@@ -491,8 +483,8 @@ impl ApkPackageBuilder {
 
         // Convert checksum (Q1... is SHA1 in base64)
         let checksum = self.checksum.map(|c| {
-            if c.starts_with("Q1") {
-                format!("sha1-base64:{}", &c[2..])
+            if let Some(stripped) = c.strip_prefix("Q1") {
+                format!("sha1-base64:{}", stripped)
             } else {
                 c
             }

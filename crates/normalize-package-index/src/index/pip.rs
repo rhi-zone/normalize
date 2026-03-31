@@ -59,15 +59,16 @@ impl PackageIndex for PipIndex {
                 .unwrap_or_default(),
             maintainers: {
                 let mut m = Vec::new();
-                if let Some(author) = info["author"].as_str() {
-                    if !author.is_empty() {
-                        m.push(author.to_string());
-                    }
+                if let Some(author) = info["author"].as_str()
+                    && !author.is_empty()
+                {
+                    m.push(author.to_string());
                 }
-                if let Some(maintainer) = info["maintainer"].as_str() {
-                    if !maintainer.is_empty() && !m.contains(&maintainer.to_string()) {
-                        m.push(maintainer.to_string());
-                    }
+                if let Some(maintainer) = info["maintainer"].as_str()
+                    && !maintainer.is_empty()
+                    && !m.contains(&maintainer.to_string())
+                {
+                    m.push(maintainer.to_string());
                 }
                 m
             },
@@ -140,10 +141,10 @@ fn extract_repo_url(info: &serde_json::Value) -> Option<String> {
     }
 
     // Fall back to home_page if it looks like a repo
-    if let Some(home) = info["home_page"].as_str() {
-        if home.contains("github.com") || home.contains("gitlab.com") {
-            return Some(home.to_string());
-        }
+    if let Some(home) = info["home_page"].as_str()
+        && (home.contains("github.com") || home.contains("gitlab.com"))
+    {
+        return Some(home.to_string());
     }
 
     None

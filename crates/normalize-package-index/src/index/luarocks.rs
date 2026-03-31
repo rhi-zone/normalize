@@ -95,7 +95,7 @@ impl PackageIndex for LuaRocks {
         let manifest = ureq::get(&manifest_url)
             .call()?
             .into_string()
-            .map_err(|e| IndexError::Io(e))?;
+            .map_err(IndexError::Io)?;
 
         let versions = Self::parse_manifest(&manifest, name)
             .ok_or_else(|| IndexError::NotFound(name.to_string()))?;
@@ -134,7 +134,7 @@ impl PackageIndex for LuaRocks {
         let manifest = ureq::get(&manifest_url)
             .call()?
             .into_string()
-            .map_err(|e| IndexError::Io(e))?;
+            .map_err(IndexError::Io)?;
 
         let versions = Self::parse_manifest(&manifest, name)
             .ok_or_else(|| IndexError::NotFound(name.to_string()))?;

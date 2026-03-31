@@ -33,7 +33,7 @@ impl Bioconductor {
                 for dep in dep_str.split(',') {
                     let dep_name = dep
                         .trim()
-                        .split(|c| c == ' ' || c == '(' || c == '\n')
+                        .split([' ', '(', '\n'])
                         .next()
                         .unwrap_or("")
                         .trim();

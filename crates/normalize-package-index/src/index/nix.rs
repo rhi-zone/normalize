@@ -34,7 +34,7 @@ use std::collections::HashMap;
 fn base64_encode(input: &str) -> String {
     const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let bytes = input.as_bytes();
-    let mut result = String::with_capacity((bytes.len() + 2) / 3 * 4);
+    let mut result = String::with_capacity(bytes.len().div_ceil(3) * 4);
 
     for chunk in bytes.chunks(3) {
         let mut buf = [0u8; 3];
