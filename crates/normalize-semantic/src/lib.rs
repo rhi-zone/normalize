@@ -32,6 +32,7 @@ pub mod populate;
 pub mod schema;
 pub mod search;
 pub mod store;
+pub mod vec_ext;
 
 #[cfg(feature = "cli")]
 pub mod service;

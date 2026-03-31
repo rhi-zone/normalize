@@ -8,6 +8,7 @@ use crate::config::EmbeddingsConfig;
 use crate::embedder::{Embedder, encode_vector};
 use crate::git_staleness::compute_staleness_batch;
 use crate::store;
+use crate::vec_ext::register_vec_extension;
 use libsql::Connection;
 use std::collections::HashMap;
 use tracing::{info, warn};
@@ -35,10 +36,17 @@ pub async fn populate_embeddings(
     head_commit: Option<&str>,
     repo_root: Option<&std::path::Path>,
 ) -> anyhow::Result<PopulateStats> {
+    // Register sqlite-vec before touching the connection so that the
+    // `vec_embeddings` virtual table is available for subsequent operations.
+    register_vec_extension();
+
     store::ensure_schema(conn).await?;
 
     let mut embedder = Embedder::load(&config.model, None)?;
     info!(model = %config.model, dims = embedder.dimensions, "Embedding model loaded");
+
+    // Create the ANN virtual table now that we know the model's dimension count.
+    store::ensure_vec_schema(conn, embedder.dimensions).await;
 
     let mut stats = PopulateStats::default();
 

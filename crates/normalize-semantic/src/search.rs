@@ -1,14 +1,17 @@
 //! ANN search with staleness-based re-ranking.
 //!
-//! Search flow:
-//! 1. Embed the query string with the same model used at index time.
-//! 2. Load all stored embeddings (for the active model) from SQLite.
-//! 3. Compute cosine similarity between query and each stored vector.
-//! 4. Re-rank: `score = cosine_sim * (1 - staleness_weight * staleness)`.
-//! 5. Return top-K results, sorted by final score descending.
+//! ## Search flow (ANN path — preferred)
+//! 1. Register the sqlite-vec extension via [`crate::vec_ext::register_vec_extension`].
+//! 2. Embed the query with the same model used at index time.
+//! 3. Ask the `vec_embeddings` virtual table for the top-[`crate::store::ANN_CANDIDATE_COUNT`]
+//!    nearest vectors.
+//! 4. Re-rank candidates: `score = cosine_sim * (1 - staleness_weight * staleness)`.
+//! 5. Return top-K results sorted by final score descending.
 //!
-//! For small-to-medium repos this brute-force ANN is fast enough.
-//! The sqlite-vec extension can be wired up for larger repos when needed.
+//! ## Search flow (brute-force fallback)
+//! Steps 2–5 above, but step 3 is replaced by loading all vectors from SQLite
+//! into memory.  Used when sqlite-vec is not available or `vec_embeddings`
+//! does not yet exist (e.g. on the first rebuild before the schema migration).
 
 use crate::embedder::{cosine_similarity, decode_vector};
 
@@ -38,7 +41,10 @@ pub struct SearchHit {
     pub last_commit: Option<String>,
 }
 
-/// In-memory representation of a stored embedding row (for brute-force search).
+/// In-memory representation of a stored embedding row.
+///
+/// Used for both the ANN candidate set (post-`vec_search`) and the brute-force
+/// fallback path.
 pub struct StoredEmbedding {
     pub id: i64,
     pub source_type: String,

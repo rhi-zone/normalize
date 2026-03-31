@@ -8,6 +8,7 @@
 use crate::config::EmbeddingsConfig;
 use crate::search::SearchHit;
 use crate::store;
+use crate::vec_ext::register_vec_extension;
 use normalize_output::OutputFormatter;
 use serde::{Deserialize, Serialize};
 
@@ -58,8 +59,11 @@ pub struct SearchReport {
     pub model: String,
     /// Ranked results, best first.
     pub results: Vec<SearchResultEntry>,
-    /// Total embeddings scanned.
+    /// Total embeddings scanned (ANN candidate count or full index size).
     pub total_scanned: usize,
+    /// `true` when the ANN index (`vec_embeddings`) was used; `false` when
+    /// the brute-force in-memory path was used instead.
+    pub ann_used: bool,
 }
 
 impl OutputFormatter for SearchReport {
@@ -71,9 +75,10 @@ impl OutputFormatter for SearchReport {
             );
         }
 
+        let search_mode = if self.ann_used { "ANN" } else { "brute-force" };
         let mut out = format!(
-            "Semantic search results for: \"{}\"\nModel: {} — scanned {} embeddings\n\n",
-            self.query, self.model, self.total_scanned
+            "Semantic search results for: \"{}\"\nModel: {} — scanned {} embeddings ({})\n\n",
+            self.query, self.model, self.total_scanned, search_mode
         );
 
         for (i, r) in self.results.iter().enumerate() {
@@ -127,6 +132,11 @@ pub async fn run_search(
         return Err("Semantic search not enabled.".to_string());
     }
 
+    // Register sqlite-vec as an auto-extension so the `vec_embeddings` virtual
+    // table is available on the connection we're about to open.  This is a
+    // no-op after the first call (guarded by OnceLock inside the function).
+    register_vec_extension();
+
     let idx = crate::open_index(root)
         .await
         .map_err(|e| format!("Failed to open index: {e}"))?;
@@ -136,6 +146,11 @@ pub async fn run_search(
     store::ensure_schema(conn)
         .await
         .map_err(|e| format!("Schema error: {e}"))?;
+
+    // Try to create the ANN virtual table.  The dimension count comes from the
+    // embedder config; default 768 matches nomic-embed-text-v1.5.
+    let dims = crate::embedder::dims_for_model(&config.model).unwrap_or(768);
+    store::ensure_vec_schema(conn, dims).await;
 
     let total = store::count_embeddings(conn, &config.model)
         .await
@@ -158,6 +173,7 @@ pub async fn run_search(
             model: config.model,
             results: Vec::new(),
             total_scanned: 0,
+            ann_used: false,
         });
     }
 
@@ -168,19 +184,33 @@ pub async fn run_search(
         .embed_one(&query)
         .map_err(|e| format!("Embedding failed: {e}"))?;
 
-    let stored = store::load_all_embeddings(conn, &config.model)
-        .await
-        .map_err(|e| format!("Failed to load embeddings: {e}"))?;
+    // Try ANN path first (sqlite-vec `vec_embeddings` virtual table).
+    // Fall back to brute-force if the extension isn't loaded or the table
+    // doesn't exist yet.
+    let query_bytes = crate::embedder::encode_vector(&query_vec);
+    let ann_candidate_count = std::cmp::max(store::ANN_CANDIDATE_COUNT, top_k);
 
-    let total_scanned = stored.len();
+    let (candidates, ann_used) = if let Some(ann_results) =
+        store::ann_search(conn, &config.model, &query_bytes, ann_candidate_count).await
+    {
+        (ann_results, true)
+    } else {
+        let all = store::load_all_embeddings(conn, &config.model)
+            .await
+            .map_err(|e| format!("Failed to load embeddings: {e}"))?;
+        (all, false)
+    };
 
-    let hits = crate::search::rerank(&query_vec, stored, top_k);
+    let total_scanned = candidates.len();
+
+    let hits = crate::search::rerank(&query_vec, candidates, top_k);
 
     Ok(SearchReport {
         query,
         model: config.model,
         results: hits.into_iter().map(SearchResultEntry::from).collect(),
         total_scanned,
+        ann_used,
     })
 }
 

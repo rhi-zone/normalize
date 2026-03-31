@@ -96,6 +96,19 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     (dot / (mag_a * mag_b)).clamp(-1.0, 1.0)
 }
 
+/// Return the known output dimensionality for a model without loading it.
+///
+/// Returns `None` for unknown models (caller should default to 768 or probe at
+/// load time via [`Embedder::dimensions`]).
+pub fn dims_for_model(name: &str) -> Option<usize> {
+    match name {
+        "nomic-embed-text-v1.5" => Some(768),
+        "all-MiniLM-L6-v2" => Some(384),
+        "all-MiniLM-L12-v2" => Some(384),
+        _ => None,
+    }
+}
+
 /// Resolve a model name string to a fastembed `EmbeddingModel`.
 fn resolve_model(name: &str) -> anyhow::Result<EmbeddingModel> {
     match name {
