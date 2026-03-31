@@ -128,4 +128,7 @@ pub struct FlatSymbol {
     pub is_interface_impl: bool,
     /// Parent interfaces/classes this symbol extends or implements
     pub implements: Vec<String>,
+    /// Documentation comment or docstring attached to this symbol, with markers already
+    /// stripped by the Language trait's `extract_docstring` implementation.
+    pub docstring: Option<String>,
 }

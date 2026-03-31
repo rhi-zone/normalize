@@ -124,45 +124,6 @@ pub fn build_symbol_chunk(
     parts.join("\n")
 }
 
-/// Strip doc-comment markers from raw comment text.
-///
-/// Handles:
-/// - `///` (Rust, C++, JS)
-/// - `//!` (Rust inner doc)
-/// - `--` (SQL, Lua)
-/// - `#` (Python, Ruby, Shell)
-/// - `/** ... */` and `/* ... */` block styles
-/// - `"""..."""` (Python docstring body — already stripped of delimiters)
-pub fn strip_doc_markers(raw: &str) -> String {
-    let mut lines: Vec<String> = Vec::new();
-    for line in raw.lines() {
-        let trimmed = line.trim();
-        let content = if let Some(rest) = trimmed.strip_prefix("///") {
-            rest.trim_start().to_string()
-        } else if let Some(rest) = trimmed.strip_prefix("//!") {
-            rest.trim_start().to_string()
-        } else if let Some(rest) = trimmed.strip_prefix("/**") {
-            rest.trim_start_matches('*').trim().to_string()
-        } else if let Some(rest) = trimmed.strip_prefix("*/") {
-            rest.trim().to_string()
-        } else if let Some(rest) = trimmed.strip_prefix("* ") {
-            rest.to_string()
-        } else if trimmed == "*" {
-            String::new()
-        } else if let Some(rest) = trimmed.strip_prefix("# ") {
-            rest.to_string()
-        } else if trimmed == "#" {
-            String::new()
-        } else if let Some(rest) = trimmed.strip_prefix("-- ") {
-            rest.to_string()
-        } else {
-            trimmed.to_string()
-        };
-        lines.push(content);
-    }
-    lines.join("\n")
-}
-
 /// Collapse soft line-wraps in prose. Single newlines within a paragraph
 /// become spaces; double newlines (paragraph breaks) are preserved.
 fn collapse_line_wraps(text: &str) -> String {
@@ -192,22 +153,6 @@ fn collapse_line_wraps(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_strip_doc_markers_rust() {
-        let raw = "/// Opens the database.\n/// Returns an error if the file is corrupt.";
-        let stripped = strip_doc_markers(raw);
-        assert!(stripped.contains("Opens the database."));
-        assert!(!stripped.contains("///"));
-    }
-
-    #[test]
-    fn test_strip_doc_markers_block() {
-        let raw = "/**\n * Computes the hash.\n * @param data input bytes\n */";
-        let stripped = strip_doc_markers(raw);
-        assert!(stripped.contains("Computes the hash."));
-        assert!(!stripped.contains("/**"));
-    }
 
     #[test]
     fn test_collapse_line_wraps() {

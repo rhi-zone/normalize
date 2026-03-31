@@ -3,7 +3,7 @@
 //! Called after `structure rebuild` when `embeddings.enabled = true`.
 //! For incremental rebuilds, only symbols in changed files are re-embedded.
 
-use crate::chunks::{SymbolRow, build_symbol_chunk, strip_doc_markers};
+use crate::chunks::{SymbolRow, build_symbol_chunk};
 use crate::config::EmbeddingsConfig;
 use crate::embedder::{Embedder, encode_vector};
 use crate::store;
@@ -66,17 +66,12 @@ pub async fn populate_embeddings(
         let callees = load_callees(conn, &symbol.name, &symbol.file).await;
         let co_changes = co_change_map.get(&symbol.file).cloned().unwrap_or_default();
 
-        // Load doc comment if present
-        let doc_raw = load_doc_comment(conn, &symbol.name, &symbol.file).await;
-        let doc_clean = doc_raw.as_deref().map(strip_doc_markers);
+        // Load doc comment if present (already clean text — markers stripped at index time
+        // by Language::extract_docstring; stored as `doc:<text>` in symbol_attributes)
+        let doc = load_doc_comment(conn, &symbol.name, &symbol.file).await;
 
-        let chunk_text = build_symbol_chunk(
-            &symbol,
-            doc_clean.as_deref(),
-            &callers,
-            &callees,
-            &co_changes,
-        );
+        let chunk_text =
+            build_symbol_chunk(&symbol, doc.as_deref(), &callers, &callees, &co_changes);
 
         batch_symbols.push(symbol);
         batch_texts.push(chunk_text);

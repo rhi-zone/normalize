@@ -1127,6 +1127,7 @@ Config: `[embeddings] enabled = true` in `.normalize/config.toml`.
 - [x] Add `embeddings` field to `NormalizeConfig` and `RebuildReport`
 - [x] Add `normalize init` CTA for semantic search
 - [x] Add `assert_output_formatter::<SearchReport>()` in output.rs test
+- [x] Replace heuristic `strip_doc_markers()` with tree-sitter-based extraction: `FlatSymbol.docstring` now carries clean text from `Language::extract_docstring`; stored as `doc:<text>` in `symbol_attributes`; `populate.rs` uses it directly without post-processing
 - [ ] Daemon incremental: queue re-embedding on file change (follow-up)
 - [ ] Staleness computation from git history (currently stored as 0.0; follow-up)
 - [ ] Embed markdown docs (SUMMARY.md, CLAUDE.md, ADRs) as additional source types (follow-up)

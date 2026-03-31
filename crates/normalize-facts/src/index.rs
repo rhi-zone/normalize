@@ -20,6 +20,7 @@ struct ParsedSymbol {
     attributes: Vec<String>,
     is_interface_impl: bool,
     implements: Vec<String>,
+    docstring: Option<String>,
 }
 
 /// One call-site entry: (caller_symbol, callee_name, callee_qualifier, access, line).
@@ -980,6 +981,14 @@ impl FileIndex {
                     .execute(
                         "INSERT INTO symbol_attributes (file, name, attribute) VALUES (?1, ?2, ?3)",
                         params![path.to_string(), sym.name.clone(), attr.clone()],
+                    )
+                    .await?;
+            }
+            if let Some(doc) = &sym.docstring {
+                self.conn
+                    .execute(
+                        "INSERT INTO symbol_attributes (file, name, attribute) VALUES (?1, ?2, ?3)",
+                        params![path.to_string(), sym.name.clone(), format!("doc:{doc}")],
                     )
                     .await?;
             }
@@ -1975,6 +1984,7 @@ impl FileIndex {
                         attributes: sym.attributes.clone(),
                         is_interface_impl: sym.is_interface_impl,
                         implements: sym.implements.clone(),
+                        docstring: sym.docstring.clone(),
                     });
 
                     // Only index calls for functions/methods
@@ -2080,6 +2090,12 @@ impl FileIndex {
                     self.conn.execute(
                         "INSERT INTO symbol_attributes (file, name, attribute) VALUES (?1, ?2, ?3)",
                         params![data.file_path.clone(), sym.name.clone(), attr.clone()],
+                    ).await?;
+                }
+                if let Some(doc) = &sym.docstring {
+                    self.conn.execute(
+                        "INSERT INTO symbol_attributes (file, name, attribute) VALUES (?1, ?2, ?3)",
+                        params![data.file_path.clone(), sym.name.clone(), format!("doc:{doc}")],
                     ).await?;
                 }
                 for iface in &sym.implements {
@@ -2211,6 +2227,12 @@ impl FileIndex {
                     self.conn.execute(
                         "INSERT INTO symbol_attributes (file, name, attribute) VALUES (?1, ?2, ?3)",
                         params![file_path.clone(), sym.name.clone(), attr.clone()],
+                    ).await?;
+                }
+                if let Some(doc) = &sym.docstring {
+                    self.conn.execute(
+                        "INSERT INTO symbol_attributes (file, name, attribute) VALUES (?1, ?2, ?3)",
+                        params![file_path.clone(), sym.name.clone(), format!("doc:{doc}")],
                     ).await?;
                 }
                 for iface in &sym.implements {

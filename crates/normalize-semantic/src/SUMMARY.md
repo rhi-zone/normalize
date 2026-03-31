@@ -2,7 +2,7 @@ Source files for the `normalize-semantic` crate.
 
 - `lib.rs` — crate root; re-exports `EmbeddingsConfig`, `populate_embeddings`, `SearchHit`
 - `config.rs` — `EmbeddingsConfig` struct (`[embeddings]` TOML section)
-- `chunks.rs` — context window builder (`build_symbol_chunk`, `strip_doc_markers`) and `SymbolRow` type
+- `chunks.rs` — context window builder (`build_symbol_chunk`) and `SymbolRow` type; doc comment text comes from the index (already marker-stripped by `Language::extract_docstring`)
 - `embedder.rs` — fastembed `TextEmbedding` wrapper with `encode_vector`/`decode_vector`/`cosine_similarity` utilities
 - `schema.rs` — SQLite DDL constants for the `embeddings` table and indices
 - `store.rs` — async SQLite helpers: `ensure_schema`, `upsert_embedding`, `load_all_embeddings`, `delete_embeddings_for_path`
