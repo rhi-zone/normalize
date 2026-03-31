@@ -158,6 +158,21 @@ Do not:
 - Use path dependencies in Cargo.toml — causes clippy to stash changes across repos
 - Use `--no-verify` — fix the issue or fix the hook
 
+## LLM-Driven Workflows
+
+**Text output is the agent interface.** LLMs consume the same `format_text()` output
+as humans — not JSON. `--json` exists for programmatic/scripted consumers, not for
+agents. JSON in an LLM context window is noise.
+
+**`normalize init --setup` works for both humans and LLMs.** In a TTY it prompts
+interactively; driven by an agent it reads the text output and issues commands
+(`rules enable <id>`, `rules disable <id>`, etc.). No special mode needed — the same
+interface serves both.
+
+**Non-interactive ≠ non-functional.** Every command must work without a TTY. When
+configuration is missing, print a clear actionable message to stderr and exit with a
+non-zero code. Never silently return empty results.
+
 ## Design Principles
 
 **Unify, don't multiply.** One interface for multiple cases > separate interfaces. Plugin systems > hardcoded switches. When user says "WTF is X" - ask: naming issue or design issue?
