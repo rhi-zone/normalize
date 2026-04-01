@@ -88,8 +88,15 @@ pub async fn populate_embeddings(
         }
     }
 
-    // Build context for co-change lookups (file → co-change neighbors)
+    // Build context maps with single bulk queries instead of per-symbol queries.
+    // This eliminates ~175k round-trips (58k symbols × 3 queries) during a full rebuild.
     let co_change_map = load_co_change_map(conn).await?;
+    eprintln!("Loading callers...");
+    let all_callers = load_all_callers(conn).await;
+    eprintln!("Loading callees...");
+    let all_callees = load_all_callees(conn).await;
+    eprintln!("Loading doc comments...");
+    let all_docs = load_all_doc_comments(conn).await;
 
     // Compute staleness per unique file path — one git walk per file, not per symbol.
     let file_paths: Vec<&str> = symbols.iter().map(|s| s.file.as_str()).collect();
@@ -106,14 +113,18 @@ pub async fn populate_embeddings(
     let mut done = 0usize;
 
     for symbol in symbols {
-        // Load callers/callees for this symbol
-        let callers = load_callers(conn, &symbol.name, &symbol.file).await;
-        let callees = load_callees(conn, &symbol.name, &symbol.file).await;
+        // Look up callers/callees from pre-loaded maps instead of per-symbol SQL
+        let callers = all_callers.get(&symbol.name).cloned().unwrap_or_default();
+        let callees = all_callees
+            .get(&(symbol.name.clone(), symbol.file.clone()))
+            .cloned()
+            .unwrap_or_default();
         let co_changes = co_change_map.get(&symbol.file).cloned().unwrap_or_default();
 
-        // Load doc comment if present (already clean text — markers stripped at index time
-        // by Language::extract_docstring; stored as `doc:<text>` in symbol_attributes)
-        let doc = load_doc_comment(conn, &symbol.name, &symbol.file).await;
+        // Look up doc comment from pre-loaded map
+        let doc = all_docs
+            .get(&(symbol.name.clone(), symbol.file.clone()))
+            .cloned();
 
         let chunk_text =
             build_symbol_chunk(&symbol, doc.as_deref(), &callers, &callees, &co_changes);
@@ -283,46 +294,109 @@ async fn load_symbols(
     Ok(symbols)
 }
 
-/// Load top callers for a symbol (returns caller symbol names, up to 10).
-async fn load_callers(conn: &Connection, symbol_name: &str, _file: &str) -> Vec<String> {
+/// Load all callers in one query, grouped by callee name.
+/// Returns a map: callee_name → top-10 caller names (by call count).
+async fn load_all_callers(conn: &Connection) -> HashMap<String, Vec<String>> {
+    let mut map: HashMap<String, Vec<String>> = HashMap::new();
+
     let Ok(mut rows) = conn
         .query(
-            "SELECT caller_symbol, COUNT(*) as cnt FROM calls WHERE callee_name = ?1 GROUP BY caller_symbol ORDER BY cnt DESC LIMIT 10",
-            libsql::params![symbol_name],
+            "SELECT callee_name, caller_symbol, COUNT(*) as cnt \
+             FROM calls \
+             GROUP BY callee_name, caller_symbol \
+             ORDER BY callee_name, cnt DESC",
+            (),
         )
         .await
     else {
-        return Vec::new();
+        return map;
     };
 
-    let mut callers = Vec::new();
     while let Ok(Some(row)) = rows.next().await {
-        if let Ok(name) = row.get::<String>(0) {
-            callers.push(name);
+        let Ok(callee) = row.get::<String>(0) else {
+            continue;
+        };
+        let Ok(caller) = row.get::<String>(1) else {
+            continue;
+        };
+        let entry = map.entry(callee).or_default();
+        if entry.len() < 10 {
+            entry.push(caller);
         }
     }
-    callers
+
+    map
 }
 
-/// Load callees for a symbol (returns callee names, up to 10).
-async fn load_callees(conn: &Connection, symbol_name: &str, file: &str) -> Vec<String> {
+/// Load all callees in one query, grouped by (caller_symbol, caller_file).
+/// Returns a map: (caller_symbol, caller_file) → callee names (up to 10).
+async fn load_all_callees(conn: &Connection) -> HashMap<(String, String), Vec<String>> {
+    let mut map: HashMap<(String, String), Vec<String>> = HashMap::new();
+
     let Ok(mut rows) = conn
         .query(
-            "SELECT callee_name FROM calls WHERE caller_symbol = ?1 AND caller_file = ?2 LIMIT 10",
-            libsql::params![symbol_name, file],
+            "SELECT caller_symbol, caller_file, callee_name FROM calls ORDER BY caller_symbol, caller_file",
+            (),
         )
         .await
     else {
-        return Vec::new();
+        return map;
     };
 
-    let mut callees = Vec::new();
     while let Ok(Some(row)) = rows.next().await {
-        if let Ok(name) = row.get::<String>(0) {
-            callees.push(name);
+        let Ok(caller_sym) = row.get::<String>(0) else {
+            continue;
+        };
+        let Ok(caller_file) = row.get::<String>(1) else {
+            continue;
+        };
+        let Ok(callee) = row.get::<String>(2) else {
+            continue;
+        };
+        let entry = map.entry((caller_sym, caller_file)).or_default();
+        if entry.len() < 10 {
+            entry.push(callee);
         }
     }
-    callees
+
+    map
+}
+
+/// Load all doc comments in one query from the symbol_attributes table.
+/// Returns a map: (name, file) → doc text.
+async fn load_all_doc_comments(conn: &Connection) -> HashMap<(String, String), String> {
+    let mut map: HashMap<(String, String), String> = HashMap::new();
+
+    let Ok(mut rows) = conn
+        .query(
+            "SELECT name, file, attribute FROM symbol_attributes WHERE attribute LIKE 'doc:%' ORDER BY name, file",
+            (),
+        )
+        .await
+    else {
+        return map;
+    };
+
+    while let Ok(Some(row)) = rows.next().await {
+        let Ok(name) = row.get::<String>(0) else {
+            continue;
+        };
+        let Ok(file) = row.get::<String>(1) else {
+            continue;
+        };
+        let Ok(attr) = row.get::<String>(2) else {
+            continue;
+        };
+        if let Some(doc) = attr.strip_prefix("doc:") {
+            let entry = map.entry((name, file)).or_default();
+            if !entry.is_empty() {
+                entry.push('\n');
+            }
+            entry.push_str(doc);
+        }
+    }
+
+    map
 }
 
 /// Load co-change neighbors for all files as a map: file → [neighbor_files].
@@ -354,31 +428,4 @@ async fn load_co_change_map(
     }
 
     Ok(map)
-}
-
-/// Attempt to load a doc comment for a symbol from the `symbol_attributes` table.
-/// Returns `None` if no doc comment is stored.
-async fn load_doc_comment(conn: &Connection, symbol_name: &str, file: &str) -> Option<String> {
-    let mut rows = conn
-        .query(
-            "SELECT attribute FROM symbol_attributes WHERE name = ?1 AND file = ?2 AND attribute LIKE 'doc:%'",
-            libsql::params![symbol_name, file],
-        )
-        .await
-        .ok()?;
-
-    let mut parts = Vec::new();
-    while let Ok(Some(row)) = rows.next().await {
-        if let Ok(attr) = row.get::<String>(0)
-            && let Some(doc) = attr.strip_prefix("doc:")
-        {
-            parts.push(doc.to_string());
-        }
-    }
-
-    if parts.is_empty() {
-        None
-    } else {
-        Some(parts.join("\n"))
-    }
 }
