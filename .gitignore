@@ -82,6 +82,7 @@ cache/
 # Root .normalize/ - ignore all but config/allow files
 /.normalize/*
 !/.normalize/config.toml
+!/.normalize/SUMMARY.md
 !/.normalize/duplicate-functions-allow
 !/.normalize/duplicate-blocks-allow
 !/.normalize/duplicate-types-allow
@@ -93,6 +94,7 @@ cache/
 # Normalize
 .normalize/*
 !.normalize/config.toml
+!.normalize/SUMMARY.md
 !.normalize/duplicate-functions-allow
 !.normalize/duplicate-blocks-allow
 !.normalize/duplicate-types-allow
@@ -102,3 +104,4 @@ cache/
 !.normalize/large-files-allow
 !.normalize/memory/
 .normalize/shadow
+.fastembed_cache/

@@ -1,0 +1,3 @@
+# .normalize
+
+Project-local normalize configuration and state. `config.toml` holds rule configuration, thresholds, and feature flags. `facts.db`/`index.db`/`index.sqlite`/`memory.db` are index databases. `syntax-cache.json` caches syntax rule results per file. `cache/` holds incremental analysis caches. `rules/` and `scripts/` contain custom rule definitions and helper scripts. `shadow/` stores shadow analysis data. `agent/` holds agent-related state. Allow-list files (`*-allow`) configure per-rule path exclusions for duplicate detection, hotspots, large files, and similar code checks. `benchmark-results.txt` records performance measurements.

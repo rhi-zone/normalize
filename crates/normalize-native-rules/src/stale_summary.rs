@@ -1,8 +1,8 @@
-use crate::walk::is_excluded_dir;
 use normalize_output::OutputFormatter;
 use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::path::Path;
 
 /// Open the git repository at or containing `root` using gix.
@@ -425,7 +425,7 @@ fn walk_dirs(root: &Path) -> Vec<(std::path::PathBuf, String)> {
         .filter(|e| {
             !e.path()
                 .components()
-                .any(|c| is_excluded_dir(c.as_os_str().to_string_lossy().as_ref()))
+                .any(|c| c.as_os_str() == OsStr::new(".git"))
         })
         .filter_map(|e| {
             let dir_path = e.path().to_path_buf();

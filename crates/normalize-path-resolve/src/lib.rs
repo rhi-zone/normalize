@@ -475,6 +475,9 @@ pub fn resolve(query: &str, root: &Path, path_source: Option<&dyn PathSource>) -
         let walker = WalkBuilder::new(root)
             .hidden(false)
             .git_ignore(true)
+            .git_global(true)
+            .git_exclude(true)
+            .filter_entry(|e| e.file_name() != ".git")
             .build();
         return walker
             .flatten()

@@ -889,6 +889,9 @@ fn collect_source_files(root: &Path, filter: &normalize_rules_config::PathFilter
     let walker = ignore::WalkBuilder::new(root)
         .hidden(false)
         .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .filter_entry(|e| e.file_name() != ".git")
         .build();
 
     for entry in walker.flatten() {
