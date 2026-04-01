@@ -197,6 +197,7 @@ pub async fn run_search(
         vec_conn.as_ref(),
     )
     .await
+    .filter(|r| !r.is_empty())
     {
         (ann_results, true)
     } else {
