@@ -500,6 +500,7 @@ mod unix_impl {
             let syntax_issues: Vec<normalize_output::diagnostics::Issue> = {
                 let root_owned = root.to_path_buf();
                 let rules_config = config.rules.clone();
+                let walk_config = config.walk.clone();
                 std::thread::Builder::new()
                     .stack_size(64 * 1024 * 1024)
                     .spawn(move || {
@@ -515,6 +516,7 @@ mod unix_impl {
                             &debug_flags,
                             None,
                             &path_filter,
+                            &walk_config,
                         );
                         findings
                             .iter()
@@ -530,11 +532,16 @@ mod unix_impl {
             let native_issues: Vec<normalize_output::diagnostics::Issue> = {
                 let root_owned = root.to_path_buf();
                 let rules_config = config.rules.clone();
+                let walk_config = config.walk.clone();
                 std::thread::Builder::new()
                     .stack_size(64 * 1024 * 1024)
                     .spawn(move || {
                         let rt = tokio::runtime::Runtime::new().unwrap();
-                        rt.block_on(Self::run_native_rules(&root_owned, &rules_config))
+                        rt.block_on(Self::run_native_rules(
+                            &root_owned,
+                            &rules_config,
+                            &walk_config,
+                        ))
                     })
                     .expect("failed to spawn native prime thread")
                     .join()
@@ -563,6 +570,7 @@ mod unix_impl {
         async fn run_native_rules(
             root: &Path,
             rules_config: &normalize_rules::RulesConfig,
+            walk_config: &normalize_rules_config::WalkConfig,
         ) -> Vec<normalize_output::diagnostics::Issue> {
             use normalize_output::diagnostics::DiagnosticsReport;
 
@@ -609,9 +617,10 @@ mod unix_impl {
                     let r = root_owned.clone();
                     let fnames = missing_summary_cfg.filenames.clone();
                     let paths = missing_summary_cfg.paths.clone();
+                    let wc = walk_config.clone();
                     move || {
                         normalize_native_rules::build_missing_summary_report(
-                            &r, threshold, &fnames, &paths,
+                            &r, threshold, &fnames, &paths, &wc,
                         )
                     }
                 }),
@@ -619,21 +628,24 @@ mod unix_impl {
                     let r = root_owned.clone();
                     let fnames = stale_summary_cfg.filenames.clone();
                     let paths = stale_summary_cfg.paths.clone();
+                    let wc = walk_config.clone();
                     move || {
                         normalize_native_rules::build_stale_summary_report(
-                            &r, threshold, &fnames, &paths,
+                            &r, threshold, &fnames, &paths, &wc,
                         )
                     }
                 }),
                 tokio::task::spawn_blocking({
                     let r = root_owned.clone();
-                    move || normalize_native_rules::build_stale_docs_report(&r)
+                    let wc = walk_config.clone();
+                    move || normalize_native_rules::build_stale_docs_report(&r, &wc)
                 }),
                 tokio::task::spawn_blocking({
                     let r = root_owned.clone();
-                    move || normalize_native_rules::build_check_examples_report(&r)
+                    let wc = walk_config.clone();
+                    move || normalize_native_rules::build_check_examples_report(&r, &wc)
                 }),
-                normalize_native_rules::build_check_refs_report(&root_owned),
+                normalize_native_rules::build_check_refs_report(&root_owned, walk_config),
                 tokio::task::spawn_blocking({
                     let r = root_owned.clone();
                     move || normalize_native_rules::build_ratchet_report(&r)
@@ -778,6 +790,7 @@ mod unix_impl {
                                     {
                                         let root_owned = root.to_path_buf();
                                         let rules_config = config.rules.clone();
+                                        let walk_config = config.walk.clone();
                                         let affected_for_syntax = affected_vec.clone();
                                         let new_syntax_issues: Vec<
                                             normalize_output::diagnostics::Issue,
@@ -799,6 +812,7 @@ mod unix_impl {
                                                         &debug_flags,
                                                         Some(&affected_for_syntax),
                                                         &path_filter,
+                                                        &walk_config,
                                                     );
                                                 findings
                                                     .iter()
@@ -838,6 +852,7 @@ mod unix_impl {
                                     {
                                         let root_owned = root.to_path_buf();
                                         let rules_config = config.rules.clone();
+                                        let walk_config = config.walk.clone();
                                         let new_native_issues: Vec<
                                             normalize_output::diagnostics::Issue,
                                         > = std::thread::Builder::new()
@@ -847,6 +862,7 @@ mod unix_impl {
                                                 rt.block_on(Self::run_native_rules(
                                                     &root_owned,
                                                     &rules_config,
+                                                    &walk_config,
                                                 ))
                                             })
                                             .expect("failed to spawn native refresh thread")

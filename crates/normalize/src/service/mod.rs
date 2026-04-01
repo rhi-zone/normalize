@@ -1034,24 +1034,28 @@ impl NormalizeService {
             let (summary_res, stale_res, examples_res, refs_res, ratchet_res, budget_res) = tokio::join!(
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
+                    let wc = native_config.walk.clone();
                     move || {
                         normalize_native_rules::build_stale_summary_report(
                             &root,
                             threshold,
                             &stale_summary_filenames,
                             &stale_summary_paths,
+                            &wc,
                         )
                     }
                 }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
-                    move || normalize_native_rules::build_stale_docs_report(&root)
+                    let wc = native_config.walk.clone();
+                    move || normalize_native_rules::build_stale_docs_report(&root, &wc)
                 }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
-                    move || normalize_native_rules::build_check_examples_report(&root)
+                    let wc = native_config.walk.clone();
+                    move || normalize_native_rules::build_check_examples_report(&root, &wc)
                 }),
-                normalize_native_rules::build_check_refs_report(&native_root),
+                normalize_native_rules::build_check_refs_report(&native_root, &native_config.walk),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
                     move || normalize_native_rules::build_ratchet_report(&root)

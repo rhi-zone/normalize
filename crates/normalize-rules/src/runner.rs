@@ -125,6 +125,8 @@ pub struct RulesRunConfig {
     /// Rules configuration covering all engines (syntax, fact, native, sarif).
     /// Per-rule overrides, global-allow patterns, and sarif-tools all live here.
     pub rules: RulesConfig,
+    /// Walk configuration for directory traversal (ignore files, exclusions).
+    pub walk: normalize_rules_config::WalkConfig,
 }
 
 // =============================================================================
@@ -1621,6 +1623,7 @@ pub fn run_rules_report(
                 &debug_flags,
                 files,
                 path_filter,
+                &config.walk,
             );
             // Count unique files with violations for the report header.
             let unique_files: HashSet<&std::path::Path> =
@@ -1659,6 +1662,11 @@ pub fn run_rules_report(
                 .expect("failed to spawn fact engine thread")
                 .join()
                 .expect("fact engine thread panicked");
+            // Filter out diagnostics for gitignored files. The fact engine queries the
+            // index, which may contain stale entries for files that were later added to
+            // .gitignore. Walk the project once to build the set of non-ignored paths.
+            let allowed_files = build_gitignore_allowed_set(project_root, &config.walk);
+
             // Apply global-allow patterns from [rules] to fact-rule diagnostics.
             // Syntax rules apply global_allow during load_all_rules(); fact rules need it here.
             let global_allow: Vec<glob::Pattern> = config
@@ -1672,6 +1680,10 @@ pub fn run_rules_report(
                     Some(loc) => loc.file.as_str(),
                     None => d.message.as_str(),
                 };
+                // Skip diagnostics for files that are gitignored (stale index entries).
+                if !allowed_files.contains(file) {
+                    continue;
+                }
                 if global_allow.is_empty() || !global_allow.iter().any(|p| p.matches(file)) {
                     report.issues.push(abi_diagnostic_to_issue(d));
                 }
@@ -2279,4 +2291,48 @@ fn abi_level(
 /// Format a diagnostic for terminal display.
 pub fn format_diagnostic(diag: &normalize_facts_rules_api::Diagnostic, use_colors: bool) -> String {
     crate::loader::format_diagnostic(diag, use_colors)
+}
+
+/// Build a set of non-ignored file paths under `root` using the `ignore` crate.
+///
+/// This walks the project respecting `.gitignore`, `.git/info/exclude`, and global
+/// gitignore — then returns the set of relative path strings that are *not* ignored.
+/// Used to filter out stale index entries (e.g. files that were indexed before being
+/// added to `.gitignore`).
+fn build_gitignore_allowed_set(
+    root: &Path,
+    walk_config: &normalize_rules_config::WalkConfig,
+) -> HashSet<String> {
+    let ignore_files = walk_config.ignore_files();
+    let has_gitignore = ignore_files.contains(&".gitignore");
+    let mut builder = ignore::WalkBuilder::new(root);
+    builder
+        .hidden(false)
+        .git_ignore(has_gitignore)
+        .git_global(has_gitignore)
+        .git_exclude(has_gitignore);
+    for file in &ignore_files {
+        if *file != ".gitignore" {
+            let ignore_path = root.join(file);
+            if ignore_path.exists() {
+                builder.add_ignore(ignore_path);
+            }
+        }
+    }
+    let excludes: Vec<String> = walk_config
+        .exclude()
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    builder.filter_entry(move |e| {
+        let name = e.file_name().to_string_lossy();
+        !excludes.iter().any(|pat| pat == name.as_ref())
+    });
+    let mut allowed = HashSet::new();
+    for entry in builder.build().flatten() {
+        if let Ok(rel) = entry.path().strip_prefix(root) {
+            allowed.insert(rel.to_string_lossy().into_owned());
+        }
+    }
+    allowed
 }

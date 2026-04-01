@@ -508,6 +508,7 @@ pub fn run_rules(
     debug: &DebugFlags,
     files: Option<&[PathBuf]>,
     path_filter: &normalize_rules_config::PathFilter,
+    walk_config: &normalize_rules_config::WalkConfig,
 ) -> Vec<Finding> {
     let start = std::time::Instant::now();
     let raw_abs_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
@@ -561,7 +562,7 @@ pub fn run_rules(
             .cloned()
             .collect()
     } else {
-        collect_source_files(root, path_filter)
+        collect_source_files(root, path_filter, walk_config)
     };
     let mut files_by_grammar: HashMap<String, Vec<PathBuf>> = HashMap::new();
     for file in files {
@@ -883,16 +884,40 @@ pub fn apply_fixes(findings: &[Finding]) -> std::io::Result<usize> {
 }
 
 /// Collect source files from a directory, optionally filtered by [`PathFilter`].
-fn collect_source_files(root: &Path, filter: &normalize_rules_config::PathFilter) -> Vec<PathBuf> {
+fn collect_source_files(
+    root: &Path,
+    filter: &normalize_rules_config::PathFilter,
+    walk_config: &normalize_rules_config::WalkConfig,
+) -> Vec<PathBuf> {
     let mut files = Vec::new();
 
-    let walker = ignore::WalkBuilder::new(root)
+    let ignore_files = walk_config.ignore_files();
+    let has_gitignore = ignore_files.contains(&".gitignore");
+    let mut builder = ignore::WalkBuilder::new(root);
+    builder
         .hidden(false)
-        .git_ignore(true)
-        .git_global(true)
-        .git_exclude(true)
-        .filter_entry(|e| e.file_name() != ".git")
-        .build();
+        .git_ignore(has_gitignore)
+        .git_global(has_gitignore)
+        .git_exclude(has_gitignore);
+    // Add any non-.gitignore ignore files
+    for file in &ignore_files {
+        if *file != ".gitignore" {
+            let ignore_path = root.join(file);
+            if ignore_path.exists() {
+                builder.add_ignore(ignore_path);
+            }
+        }
+    }
+    let excludes: Vec<String> = walk_config
+        .exclude()
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    builder.filter_entry(move |e| {
+        let name = e.file_name().to_string_lossy();
+        !excludes.iter().any(|pat| pat == name.as_ref())
+    });
+    let walker = builder.build();
 
     for entry in walker.flatten() {
         let path = entry.path();

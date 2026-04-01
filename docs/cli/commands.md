@@ -106,6 +106,10 @@ tests = ["*_test.go", "**/__tests__/**"]
 
 [serve]
 http_port = 8080
+
+[walk]
+ignore_files = [".gitignore"]       # gitignore-format files to respect
+exclude = [".git"]                  # directory names to always skip
 ```
 
 ## See Also

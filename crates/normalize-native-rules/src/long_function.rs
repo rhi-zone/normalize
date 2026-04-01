@@ -11,6 +11,7 @@ use std::path::Path;
 use streaming_iterator::StreamingIterator;
 
 use crate::walk::gitignore_walk;
+use normalize_rules_config::WalkConfig;
 
 /// Analyze a single file for long functions.
 ///
@@ -92,6 +93,7 @@ pub fn build_long_function_report(
     root: &Path,
     threshold: usize,
     explicit_files: Option<&[std::path::PathBuf]>,
+    walk_config: &WalkConfig,
 ) -> DiagnosticsReport {
     let files: Vec<_> = if let Some(ef) = explicit_files {
         ef.iter()
@@ -100,7 +102,7 @@ pub fn build_long_function_report(
             .cloned()
             .collect()
     } else {
-        gitignore_walk(root)
+        gitignore_walk(root, walk_config)
             .filter(|e| e.path().is_file())
             .filter(|e| support_for_path(e.path()).is_some())
             .map(|e| e.path().to_path_buf())

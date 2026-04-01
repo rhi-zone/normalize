@@ -203,6 +203,59 @@ impl normalize_core::Merge for RulesConfig {
     }
 }
 
+/// Configuration for directory walking behavior.
+///
+/// Controls which ignore files are respected and which directories are always
+/// excluded. Deserialized from `[walk]` in `.normalize/config.toml`.
+///
+/// ```toml
+/// [walk]
+/// ignore_files = [".gitignore"]   # default
+/// exclude = [".git"]              # default
+/// ```
+#[derive(
+    Debug,
+    Clone,
+    serde::Deserialize,
+    serde::Serialize,
+    Default,
+    schemars::JsonSchema,
+    normalize_core::Merge,
+)]
+#[serde(default)]
+pub struct WalkConfig {
+    /// List of gitignore-format files to respect. Default: `[".gitignore"]`.
+    /// Set to `[]` to disable gitignore-based exclusion entirely.
+    pub ignore_files: Option<Vec<String>>,
+    /// Additional directory/file name patterns to always skip. Default: `[".git"]`.
+    /// Matched against directory entry file names (not full paths).
+    pub exclude: Option<Vec<String>>,
+}
+
+impl WalkConfig {
+    /// Returns the ignore files to respect, defaulting to `[".gitignore"]`.
+    pub fn ignore_files(&self) -> Vec<&str> {
+        match &self.ignore_files {
+            Some(v) => v.iter().map(|s| s.as_str()).collect(),
+            None => vec![".gitignore"],
+        }
+    }
+
+    /// Returns the directory patterns to exclude, defaulting to `[".git"]`.
+    pub fn exclude(&self) -> Vec<&str> {
+        match &self.exclude {
+            Some(v) => v.iter().map(|s| s.as_str()).collect(),
+            None => vec![".git"],
+        }
+    }
+
+    /// Check whether a directory entry's file name matches any exclude pattern.
+    pub fn is_excluded(&self, file_name: &std::ffi::OsStr) -> bool {
+        let name = file_name.to_string_lossy();
+        self.exclude().iter().any(|pat| *pat == name.as_ref())
+    }
+}
+
 /// Pre-walk path filter for `--only` / `--exclude` glob patterns.
 ///
 /// Compiled once in the service layer and threaded to each rule engine so files
@@ -326,5 +379,80 @@ allow = ["**/tests/**", "crates/*/tests/**", "**/normalize-scope/**"]
         assert!(f.matches("crates/foo/src/lib.rs"));
         assert!(!f.matches("crates/foo/tests/it.rs")); // excluded
         assert!(!f.matches("src/main.rs")); // not in only
+    }
+
+    #[test]
+    fn walk_config_defaults() {
+        let config = WalkConfig::default();
+        assert_eq!(config.ignore_files(), vec![".gitignore"]);
+        assert_eq!(config.exclude(), vec![".git"]);
+        assert!(config.is_excluded(std::ffi::OsStr::new(".git")));
+        assert!(!config.is_excluded(std::ffi::OsStr::new("src")));
+    }
+
+    #[test]
+    fn walk_config_custom() {
+        let config = WalkConfig {
+            ignore_files: Some(vec![".gitignore".into(), ".npmignore".into()]),
+            exclude: Some(vec![".git".into(), "node_modules".into()]),
+        };
+        assert_eq!(config.ignore_files(), vec![".gitignore", ".npmignore"]);
+        assert_eq!(config.exclude(), vec![".git", "node_modules"]);
+        assert!(config.is_excluded(std::ffi::OsStr::new("node_modules")));
+        assert!(!config.is_excluded(std::ffi::OsStr::new("src")));
+    }
+
+    #[test]
+    fn walk_config_empty_disables() {
+        let config = WalkConfig {
+            ignore_files: Some(vec![]),
+            exclude: Some(vec![]),
+        };
+        assert!(config.ignore_files().is_empty());
+        assert!(config.exclude().is_empty());
+        assert!(!config.is_excluded(std::ffi::OsStr::new(".git")));
+    }
+
+    #[test]
+    fn walk_config_deserialize() {
+        let toml_str = r#"
+ignore_files = [".gitignore", ".dockerignore"]
+exclude = [".git", "node_modules", ".cache"]
+"#;
+        let config: WalkConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.ignore_files(), vec![".gitignore", ".dockerignore"]);
+        assert_eq!(config.exclude(), vec![".git", "node_modules", ".cache"]);
+    }
+
+    #[test]
+    fn walk_config_merge_option_semantics() {
+        use normalize_core::Merge;
+
+        // When both are default (None), result is default
+        let a = WalkConfig::default();
+        let b = WalkConfig::default();
+        let merged = a.merge(b);
+        assert_eq!(merged.ignore_files(), vec![".gitignore"]);
+        assert_eq!(merged.exclude(), vec![".git"]);
+
+        // When self has custom and other is default (None), self wins
+        let a = WalkConfig {
+            ignore_files: Some(vec![".npmignore".into()]),
+            exclude: Some(vec!["dist".into()]),
+        };
+        let b = WalkConfig::default();
+        let merged = a.merge(b);
+        assert_eq!(merged.ignore_files(), vec![".npmignore"]);
+        assert_eq!(merged.exclude(), vec!["dist"]);
+
+        // When other has custom, other wins
+        let a = WalkConfig::default();
+        let b = WalkConfig {
+            ignore_files: Some(vec![".npmignore".into()]),
+            exclude: None,
+        };
+        let merged = a.merge(b);
+        assert_eq!(merged.ignore_files(), vec![".npmignore"]);
+        assert_eq!(merged.exclude(), vec![".git"]); // self's None → default
     }
 }

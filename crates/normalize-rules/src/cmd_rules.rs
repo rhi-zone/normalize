@@ -20,6 +20,7 @@ pub fn run_syntax_rules(
     debug: &DebugFlags,
     files: Option<&[std::path::PathBuf]>,
     path_filter: &normalize_rules_config::PathFilter,
+    walk_config: &normalize_rules_config::WalkConfig,
 ) -> Vec<Finding> {
     let rules = load_all_rules(project_root, config);
     if rules.is_empty() {
@@ -37,5 +38,6 @@ pub fn run_syntax_rules(
         debug,
         files,
         path_filter,
+        walk_config,
     )
 }

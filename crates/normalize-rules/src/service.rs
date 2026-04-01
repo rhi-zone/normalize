@@ -417,6 +417,7 @@ impl RulesService {
                         &debug_flags,
                         explicit_files.as_deref(),
                         &fix_filter,
+                        &config.walk,
                     );
                     let fixable_count = findings.iter().filter(|f| f.fix.is_some()).count();
                     if fixable_count == 0 {
@@ -555,35 +556,41 @@ impl RulesService {
             ) = tokio::join!(
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
+                    let wc = native_config.walk.clone();
                     move || {
                         normalize_native_rules::build_missing_summary_report(
                             &root,
                             threshold,
                             &missing_summary_filenames,
                             &missing_summary_paths,
+                            &wc,
                         )
                     }
                 }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
+                    let wc = native_config.walk.clone();
                     move || {
                         normalize_native_rules::build_stale_summary_report(
                             &root,
                             threshold,
                             &stale_summary_filenames,
                             &stale_summary_paths,
+                            &wc,
                         )
                     }
                 }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
-                    move || normalize_native_rules::build_stale_docs_report(&root)
+                    let wc = native_config.walk.clone();
+                    move || normalize_native_rules::build_stale_docs_report(&root, &wc)
                 }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
-                    move || normalize_native_rules::build_check_examples_report(&root)
+                    let wc = native_config.walk.clone();
+                    move || normalize_native_rules::build_check_examples_report(&root, &wc)
                 }),
-                normalize_native_rules::build_check_refs_report(&native_root),
+                normalize_native_rules::build_check_refs_report(&native_root, &native_config.walk),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
                     move || normalize_native_rules::build_ratchet_report(&root)
@@ -642,6 +649,7 @@ impl RulesService {
                         normalize_native_rules::walk::filtered_gitignore_walk(
                             &native_root,
                             &path_filter,
+                            &native_config.walk,
                         )
                         .filter(|e| e.path().is_file())
                         .map(|e| e.path().to_path_buf())
@@ -663,11 +671,13 @@ impl RulesService {
                     let root = native_root.clone();
                     let threshold = long_file_threshold;
                     let ef = effective_files.clone();
+                    let wc = native_config.walk.clone();
                     tokio::task::spawn_blocking(move || {
                         normalize_native_rules::build_long_file_report(
                             &root,
                             threshold,
                             ef.as_deref(),
+                            &wc,
                         )
                     })
                     .await
@@ -680,11 +690,13 @@ impl RulesService {
                     let root = native_root.clone();
                     let threshold = high_complexity_threshold;
                     let ef = effective_files.clone();
+                    let wc = native_config.walk.clone();
                     tokio::task::spawn_blocking(move || {
                         normalize_native_rules::build_high_complexity_report(
                             &root,
                             threshold,
                             ef.as_deref(),
+                            &wc,
                         )
                     })
                     .await
@@ -697,11 +709,13 @@ impl RulesService {
                     let root = native_root.clone();
                     let threshold = long_function_threshold;
                     let ef = effective_files.clone();
+                    let wc = native_config.walk.clone();
                     tokio::task::spawn_blocking(move || {
                         normalize_native_rules::build_long_function_report(
                             &root,
                             threshold,
                             ef.as_deref(),
+                            &wc,
                         )
                     })
                     .await
@@ -1172,6 +1186,7 @@ pub fn load_rules_config(root: &Path) -> RulesRunConfig {
         rules: crate::runner::RulesConfig,
         #[serde(rename = "rule-tags")]
         rule_tags: std::collections::HashMap<String, Vec<String>>,
+        walk: Option<normalize_rules_config::WalkConfig>,
     }
 
     // Load global config first
@@ -1212,5 +1227,15 @@ pub fn load_rules_config(root: &Path) -> RulesRunConfig {
     // config only overrides a subset of rules.
     use normalize_core::Merge as _;
     let rules = global.rules.merge(project.rules);
-    RulesRunConfig { rule_tags, rules }
+    // Walk config: project overrides global if specified.
+    let walk = match (global.walk, project.walk) {
+        (_, Some(p)) => p,
+        (Some(g), None) => g,
+        (None, None) => normalize_rules_config::WalkConfig::default(),
+    };
+    RulesRunConfig {
+        rule_tags,
+        rules,
+        walk,
+    }
 }

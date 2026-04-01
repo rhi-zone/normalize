@@ -26,6 +26,7 @@ normalize-native-rules = { path = "../normalize-native-rules", version = "0.2.0"
 normalize-facts = { path = "../normalize-facts", version = "0.2.0" }
 normalize-languages = { path = "../normalize-languages", version = "0.2.0" }
 glob = "0.3.3"
+ignore = { workspace = true }
 tracing = "0.1"
 toml = { workspace = true }
 toml_edit = "0.22"

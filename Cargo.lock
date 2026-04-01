@@ -5641,6 +5641,7 @@ dependencies = [
  "chrono",
  "dirs 5.0.1",
  "glob",
+ "ignore",
  "libsql",
  "normalize-core",
  "normalize-facts",

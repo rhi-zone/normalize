@@ -215,6 +215,8 @@ impl SyntaxRulesService {
             None,
             &debug_flags,
             None,
+            &normalize_rules_config::PathFilter::default(),
+            &normalize_rules_config::WalkConfig::default(),
         );
 
         let fixes_applied = if fix {

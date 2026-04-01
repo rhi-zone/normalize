@@ -75,7 +75,10 @@ fn normalize_dir(root: &Path) -> std::path::PathBuf {
 }
 
 /// Build a CheckRefsReport without printing (for service layer).
-pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, String> {
+pub async fn build_check_refs_report(
+    root: &Path,
+    walk_config: &normalize_rules_config::WalkConfig,
+) -> Result<CheckRefsReport, String> {
     // Open index to get known symbols
     let db_path = normalize_dir(root).join("index.sqlite");
     let idx = normalize_facts::FileIndex::open(&db_path, root)
@@ -99,7 +102,7 @@ pub async fn build_check_refs_report(root: &Path) -> Result<CheckRefsReport, Str
     }
 
     // Find markdown files
-    let md_files: Vec<_> = crate::walk::gitignore_walk(root)
+    let md_files: Vec<_> = crate::walk::gitignore_walk(root, walk_config)
         .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("md"))
         .map(|e| e.path().to_path_buf())
         .collect();

@@ -6,6 +6,7 @@ use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 use std::path::Path;
 
 use crate::walk::gitignore_walk;
+use normalize_rules_config::WalkConfig;
 
 /// Well-known lock files that should never be flagged as large.
 fn is_lockfile(name: &str) -> bool {
@@ -63,6 +64,7 @@ pub fn build_long_file_report(
     root: &Path,
     threshold: usize,
     files: Option<&[std::path::PathBuf]>,
+    walk_config: &WalkConfig,
 ) -> DiagnosticsReport {
     let allow_patterns = load_allow_patterns(root);
 
@@ -79,7 +81,7 @@ pub fn build_long_file_report(
                 .map(|p| p.as_path()),
         )
     } else {
-        walked_files = gitignore_walk(root)
+        walked_files = gitignore_walk(root, walk_config)
             .filter(|e| e.path().is_file())
             .filter(|e| normalize_languages::support_for_path(e.path()).is_some())
             .map(|e| e.path().to_path_buf())

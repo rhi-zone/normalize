@@ -63,6 +63,10 @@
 //!
 //! [serve]
 //! fact_debounce_ms = 1500     # debounce for LSP fact diagnostics (ms)
+//!
+//! [walk]
+//! ignore_files = [".gitignore"]  # gitignore-format files to respect (default: [".gitignore"])
+//! exclude = [".git"]             # directory names to always skip (default: [".git"])
 //! ```
 
 use crate::commands::analyze::AnalyzeConfig;
@@ -149,6 +153,9 @@ pub struct NormalizeConfig {
     /// Semantic embeddings configuration (`[embeddings]` section).
     #[param(nested, serde)]
     pub embeddings: normalize_semantic::EmbeddingsConfig,
+    /// Walk configuration for directory traversal (`[walk]` section).
+    #[param(nested, serde)]
+    pub walk: normalize_rules_config::WalkConfig,
 }
 
 impl NormalizeConfig {
@@ -363,5 +370,38 @@ highlight = false
 
         let config = NormalizeConfig::load(dir.path());
         assert_eq!(config.view.context_files(), vec!["README.md", "SUMMARY.md"]);
+    }
+
+    #[test]
+    fn test_walk_config_default() {
+        let dir = TempDir::new().unwrap();
+        let config = NormalizeConfig::load(dir.path());
+        assert_eq!(config.walk.ignore_files(), vec![".gitignore"]);
+        assert_eq!(config.walk.exclude(), vec![".git"]);
+    }
+
+    #[test]
+    fn test_walk_config_custom() {
+        let dir = TempDir::new().unwrap();
+        let moss_dir = dir.path().join(".normalize");
+        std::fs::create_dir_all(&moss_dir).unwrap();
+
+        let config_path = moss_dir.join("config.toml");
+        std::fs::write(
+            &config_path,
+            r#"
+[walk]
+ignore_files = [".gitignore", ".npmignore"]
+exclude = [".git", "node_modules", ".cache"]
+"#,
+        )
+        .unwrap();
+
+        let config = NormalizeConfig::load(dir.path());
+        assert_eq!(config.walk.ignore_files(), vec![".gitignore", ".npmignore"]);
+        assert_eq!(
+            config.walk.exclude(),
+            vec![".git", "node_modules", ".cache"]
+        );
     }
 }

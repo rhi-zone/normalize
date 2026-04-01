@@ -62,7 +62,10 @@ impl OutputFormatter for StaleDocsReport {
 }
 
 /// Build a StaleDocsReport without printing (for service layer).
-pub fn build_stale_docs_report(root: &Path) -> StaleDocsReport {
+pub fn build_stale_docs_report(
+    root: &Path,
+    walk_config: &normalize_rules_config::WalkConfig,
+) -> StaleDocsReport {
     use std::sync::OnceLock;
 
     static COVERS_RE: OnceLock<regex::Regex> = OnceLock::new();
@@ -70,7 +73,7 @@ pub fn build_stale_docs_report(root: &Path) -> StaleDocsReport {
     let covers_re =
         COVERS_RE.get_or_init(|| regex::Regex::new(r"<!--\s*covers:\s*(.+?)\s*-->").unwrap());
 
-    let md_files: Vec<_> = crate::walk::gitignore_walk(root)
+    let md_files: Vec<_> = crate::walk::gitignore_walk(root, walk_config)
         .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("md"))
         .map(|e| e.path().to_path_buf())
         .collect();
@@ -126,7 +129,7 @@ pub fn build_stale_docs_report(root: &Path) -> StaleDocsReport {
                     continue;
                 }
 
-                let matching = find_covered_files(root, pattern);
+                let matching = find_covered_files(root, pattern, walk_config);
 
                 if matching.is_empty() {
                     continue;
@@ -224,7 +227,11 @@ impl From<StaleDocsReport> for DiagnosticsReport {
 }
 
 /// Find files matching a cover pattern (glob or path prefix)
-fn find_covered_files(root: &Path, pattern: &str) -> Vec<String> {
+fn find_covered_files(
+    root: &Path,
+    pattern: &str,
+    walk_config: &normalize_rules_config::WalkConfig,
+) -> Vec<String> {
     // Reject patterns that could escape the project root via path traversal.
     // Check both the pattern string and the resolved full path.
     let pattern_path = std::path::Path::new(pattern);
@@ -273,7 +280,7 @@ fn find_covered_files(root: &Path, pattern: &str) -> Vec<String> {
             vec![pattern.to_string()]
         } else if target.is_dir() {
             // Find all files in directory
-            crate::walk::gitignore_walk(&target)
+            crate::walk::gitignore_walk(&target, walk_config)
                 .filter(|e| e.file_type().is_some_and(|ft| ft.is_file()))
                 .filter_map(|e| {
                     e.path()

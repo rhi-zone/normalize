@@ -245,6 +245,10 @@ line_numbers = false
 
 [filter.aliases]
 tests = ["**/test_*.py", "**/*_test.go"]
+
+[walk]
+ignore_files = [".gitignore"]       # gitignore-format files to respect (default)
+exclude = [".git", "node_modules"]  # directory names to always skip
 ```
 
 ### Custom Lint Tools

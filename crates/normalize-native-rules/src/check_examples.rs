@@ -51,7 +51,10 @@ impl OutputFormatter for CheckExamplesReport {
 }
 
 /// Build a CheckExamplesReport without printing (for service layer).
-pub fn build_check_examples_report(root: &Path) -> CheckExamplesReport {
+pub fn build_check_examples_report(
+    root: &Path,
+    walk_config: &normalize_rules_config::WalkConfig,
+) -> CheckExamplesReport {
     use std::collections::HashSet;
 
     let marker_start_re =
@@ -60,8 +63,8 @@ pub fn build_check_examples_report(root: &Path) -> CheckExamplesReport {
 
     let mut defined_examples: HashSet<String> = HashSet::new();
 
-    for entry in
-        crate::walk::gitignore_walk(root).filter(|e| e.file_type().is_some_and(|ft| ft.is_file()))
+    for entry in crate::walk::gitignore_walk(root, walk_config)
+        .filter(|e| e.file_type().is_some_and(|ft| ft.is_file()))
     {
         let path = entry.path();
 
@@ -90,7 +93,7 @@ pub fn build_check_examples_report(root: &Path) -> CheckExamplesReport {
     let mut missing: Vec<MissingExample> = Vec::new();
     let mut refs_found = 0;
 
-    for entry in crate::walk::gitignore_walk(root)
+    for entry in crate::walk::gitignore_walk(root, walk_config)
         .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("md"))
     {
         let path = entry.path();

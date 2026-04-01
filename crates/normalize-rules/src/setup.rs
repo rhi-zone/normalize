@@ -97,6 +97,7 @@ pub fn run_setup_wizard(root: &Path) -> i32 {
     let rules_config = RulesRunConfig {
         rule_tags: config.rule_tags.clone(),
         rules: config.rules.clone(),
+        walk: config.walk.clone(),
     };
     let report = run_rules_report(
         root,

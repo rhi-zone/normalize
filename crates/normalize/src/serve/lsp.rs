@@ -113,6 +113,7 @@ impl NormalizeBackend {
                 let rules_config = normalize_rules::RulesRunConfig {
                     rule_tags: config.rule_tags.0.clone(),
                     rules: config.rules.clone(),
+                    walk: config.walk.clone(),
                 };
                 normalize_rules::run_rules_report(
                     &file_owned,
@@ -988,6 +989,7 @@ async fn run_and_publish_diagnostics(
         let rules_config = normalize_rules::RulesRunConfig {
             rule_tags: config.rule_tags.0.clone(),
             rules: config.rules.clone(),
+            walk: config.walk.clone(),
         };
         normalize_rules::run_rules_report(
             &root_owned,

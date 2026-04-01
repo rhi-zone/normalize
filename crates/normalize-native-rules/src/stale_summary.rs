@@ -419,8 +419,11 @@ fn dir_matches_paths(dir_label: &str, paths: &[String]) -> bool {
 ///
 /// Yields `(dir_path, rel_dir_str, rel_dir_git, dir_label)` tuples for every
 /// non-empty directory in the repository tree (after excluding VCS/build dirs).
-fn walk_dirs(root: &Path) -> Vec<(std::path::PathBuf, String)> {
-    crate::walk::gitignore_walk(root)
+fn walk_dirs(
+    root: &Path,
+    walk_config: &normalize_rules_config::WalkConfig,
+) -> Vec<(std::path::PathBuf, String)> {
+    crate::walk::gitignore_walk(root, walk_config)
         .filter(|e| e.file_type().is_some_and(|ft| ft.is_dir()))
         .filter(|e| {
             !e.path()
@@ -471,6 +474,7 @@ pub fn build_missing_summary_report(
     threshold: usize,
     filenames: &[String],
     paths: &[String],
+    walk_config: &normalize_rules_config::WalkConfig,
 ) -> MissingSummaryReport {
     let filenames: Vec<&str> = if filenames.is_empty() {
         DEFAULT_FILENAMES.to_vec()
@@ -487,7 +491,7 @@ pub fn build_missing_summary_report(
         .and_then(|h| load_cache(root).filter(|c| c.head == h));
     let mut updated_dirs: HashMap<String, CacheEntry> = HashMap::new();
 
-    let dirs = walk_dirs(root);
+    let dirs = walk_dirs(root, walk_config);
 
     for (dir_path, dir_label) in &dirs {
         // Apply paths filter: skip directories that don't match any configured glob.
@@ -624,6 +628,7 @@ pub fn build_stale_summary_report(
     threshold: usize,
     filenames: &[String],
     paths: &[String],
+    walk_config: &normalize_rules_config::WalkConfig,
 ) -> StaleSummaryReport {
     let filenames: Vec<&str> = if filenames.is_empty() {
         DEFAULT_FILENAMES.to_vec()
@@ -640,7 +645,7 @@ pub fn build_stale_summary_report(
         .and_then(|h| load_cache(root).filter(|c| c.head == h));
     let mut updated_dirs: HashMap<String, CacheEntry> = HashMap::new();
 
-    let dirs = walk_dirs(root);
+    let dirs = walk_dirs(root, walk_config);
 
     for (dir_path, dir_label) in &dirs {
         // Apply paths filter: skip directories that don't match any configured glob.
