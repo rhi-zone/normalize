@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"sessions\"])"
 ---
-Analyze agent session logs (Claude Code, Codex, Gemini)
+Review AI agent session logs. Use to check cost, duration, and tool usage across coding sessions.
 
 Usage: normalize sessions [OPTIONS] [COMMAND]
 

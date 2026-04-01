@@ -278,12 +278,12 @@ impl OutputFormatter for TranslateReport {
     ]
 )]
 impl NormalizeService {
-    /// View a node in the codebase tree, or navigate symbol relationships
+    /// Browse code structure and symbol relationships. Use to read files, explore types, or trace dependencies.
     pub fn view(&self) -> &view::ViewService {
         &self.view
     }
 
-    /// Search for text patterns across the codebase using ripgrep regex syntax.
+    /// Find code by text pattern. Use when you know what the code looks like but not where it is.
     ///
     /// Accepts a regex `pattern`, optional positional `path` (or `--root`) for directory scoping,
     /// `only` (include glob), `exclude` (exclude glob), and `limit` flags. Returns a `GrepReport`
@@ -339,7 +339,7 @@ impl NormalizeService {
         }
     }
 
-    /// List filter aliases (used by --exclude/--only)
+    /// List filter aliases. Use to see available shorthand names for --exclude/--only globs.
     ///
     /// Examples:
     ///   normalize aliases                      # list all filter aliases
@@ -362,7 +362,7 @@ impl NormalizeService {
         Ok(AliasesReport::build(&config, &languages))
     }
 
-    /// Resolve contextual text from .normalize/context/ hierarchy
+    /// Inject project context into LLM prompts. Use to provide per-project instructions to agents.
     ///
     /// Walks .normalize/context/ directories bottom-up from the working directory
     /// (project-specific first, global ~/.normalize/context/ last). Each .md file
@@ -423,7 +423,7 @@ impl NormalizeService {
         Ok(ContextKindReport::Full(ContextReport::new(blocks)))
     }
 
-    /// Initialize normalize in current directory
+    /// Set up normalize in a new project. Run once after cloning to create .normalize/ config.
     ///
     /// Examples:
     ///   normalize init                         # create .normalize/ config directory
@@ -564,7 +564,7 @@ impl NormalizeService {
         })
     }
 
-    /// Check for and install updates
+    /// Check for and install newer versions of normalize.
     ///
     /// Examples:
     ///   normalize update                       # check for and install updates
@@ -694,7 +694,7 @@ impl NormalizeService {
         })
     }
 
-    /// Translate code between programming languages
+    /// Convert code between programming languages. Use for porting or understanding unfamiliar syntax.
     ///
     /// Examples:
     ///   normalize translate src/main.py --to rust    # translate Python to Rust
@@ -790,97 +790,97 @@ impl NormalizeService {
         }
     }
 
-    /// Manage the global normalize daemon
+    /// Control the background daemon that keeps the index fresh automatically.
     pub fn daemon(&self) -> &daemon::DaemonService {
         &self.daemon
     }
 
-    /// Manage tree-sitter grammars for parsing
+    /// Install and list tree-sitter grammars. Run after install or when parsing fails for a language.
     pub fn grammars(&self) -> &grammars::GrammarService {
         &self.grammars
     }
 
-    /// Workflow guides with examples
+    /// Step-by-step workflow guides. Use when learning normalize or onboarding a new codebase.
     pub fn guide(&self) -> &guide::GuideService {
         &self.guide
     }
 
-    /// Generate code from API spec
+    /// Generate code from an API spec. Use to scaffold clients or types from OpenAPI definitions.
     pub fn generate(&self) -> &generate::GenerateService {
         &self.generate
     }
 
-    /// Manage the structural index (symbols, imports, calls)
+    /// Build and query the code index. Run `structure rebuild` after cloning or when cross-file commands return stale results.
     pub fn structure(&self) -> &facts::FactsService {
         &self.structure
     }
 
-    /// AST inspection and syntax rules
+    /// Inspect parsed syntax trees and test queries. Use to debug grammars or develop tree-sitter patterns.
     pub fn syntax(&self) -> &syntax::SyntaxService {
         &self.syntax
     }
 
-    /// Package management: info, list, tree, outdated
+    /// Query package metadata and dependencies. Use to check versions, find outdated deps, or view dep trees.
     pub fn package(&self) -> &package::PackageService {
         &self.package
     }
 
-    /// Analyze agent session logs (Claude Code, Codex, Gemini)
+    /// Review AI agent session logs. Use to check cost, duration, and tool usage across coding sessions.
     pub fn sessions(&self) -> &sessions::SessionsService {
         &self.sessions
     }
 
-    /// External ecosystem tools (linters, formatters, test runners)
+    /// Run linters, formatters, and test runners. Unified interface to external ecosystem tools.
     pub fn tools(&self) -> &tools::ToolsService {
         &self.tools
     }
 
-    /// Structural editing of code symbols
+    /// Edit code by symbol name. Use for batch renames, signature changes, or pattern-based rewrites.
     pub fn edit(&self) -> &edit::EditService {
         &self.edit
     }
 
-    /// Analyze codebase (health, complexity, security, duplicates, docs)
+    /// Assess codebase quality. Use for health checks, finding duplicates, security scanning, and architecture analysis.
     pub fn analyze(&self) -> &analyze::AnalyzeService {
         &self.analyze
     }
 
-    /// Rank code by metrics (complexity, size, coupling, duplicates, and more)
+    /// Rank files and functions by metrics. Use to find the most complex, longest, or most coupled code.
     pub fn rank(&self) -> &rank::RankService {
         &self.rank
     }
 
-    /// Track health metrics (complexity, length, test ratio, density) over git history
+    /// Plot metrics over git history. Use to see if complexity, size, or test coverage is trending up or down.
     pub fn trend(&self) -> &trend::TrendService {
         &self.trend
     }
 
-    /// Track diff-based budgets (limits on how much things can change)
+    /// Enforce diff budgets on PRs. Use to cap how much complexity or size can grow per change.
     pub fn budget(&self) -> &normalize_budget::service::BudgetService {
         &self.budget
     }
 
-    /// Track metric regressions with a ratchet baseline
+    /// Prevent metric regressions. Records a baseline and fails CI if metrics get worse.
     pub fn ratchet(&self) -> &normalize_ratchet::service::RatchetService {
         &self.ratchet
     }
 
-    /// Manage and run syntax/fact rules
+    /// Configure and run lint rules. Use to enable/disable checks or see what rules are available.
     pub fn rules(&self) -> &normalize_rules::RulesService {
         &self.rules
     }
 
-    /// Inspect and validate config files using JSON Schema
+    /// Inspect and validate .normalize/config.toml. Use to debug config issues or see available options.
     pub fn config(&self) -> &config::ConfigService {
         &self.config
     }
 
-    /// Start a normalize server (MCP, HTTP, LSP)
+    /// Start a normalize server. Use to expose normalize over MCP, HTTP, or LSP for editor integration.
     pub fn serve(&self) -> &serve::ServeService {
         &self.serve
     }
 
-    /// Run all configured quality checks and exit non-zero if any errors are found.
+    /// Run all quality checks in one pass. Use in CI pipelines or before committing to catch violations.
     ///
     /// Runs the syntax rules engine (tree-sitter queries), native rules engine (stale-summary,
     /// ratchet, budget), and fact rules engine in sequence. Returns a `CiReport` with grouped

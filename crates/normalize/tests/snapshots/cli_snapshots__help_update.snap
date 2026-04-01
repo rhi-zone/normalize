@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"update\"])"
 ---
-Check for and install updates
+Check for and install newer versions of normalize.
 
 Usage: normalize update [OPTIONS]
 

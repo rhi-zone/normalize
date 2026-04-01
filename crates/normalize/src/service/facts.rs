@@ -845,7 +845,7 @@ async fn packages_data(
 
 #[cli(
     name = "structure",
-    description = "Manage the structural index (symbols, imports, calls)"
+    description = "Build and query the code index. Run `structure rebuild` after cloning or when cross-file commands return stale results."
 )]
 impl FactsService {
     /// Rebuild the structural index (symbols, calls, imports, and file tree)

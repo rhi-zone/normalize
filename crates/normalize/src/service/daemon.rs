@@ -139,7 +139,10 @@ impl DaemonService {
     }
 }
 
-#[cli(name = "daemon", description = "Manage the global normalize daemon")]
+#[cli(
+    name = "daemon",
+    description = "Control the background daemon that keeps the index fresh automatically."
+)]
 impl DaemonService {
     /// Show daemon status
     ///

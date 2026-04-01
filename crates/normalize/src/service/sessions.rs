@@ -61,7 +61,7 @@ impl SessionsService {
 
 #[cli(
     name = "sessions",
-    description = "Analyze agent session logs (Claude Code, Codex, Gemini)",
+    description = "Review AI agent session logs. Use to check cost, duration, and tool usage across coding sessions.",
     global = [
         pretty = "Human-friendly output with colors and formatting",
         compact = "Compact output without colors (overrides TTY detection)",

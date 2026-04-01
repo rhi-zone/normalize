@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"serve\"])"
 ---
-Start a normalize server (MCP, HTTP, LSP)
+Start a normalize server. Use to expose normalize over MCP, HTTP, or LSP for editor integration.
 
 Usage: normalize serve [OPTIONS] [COMMAND]
 

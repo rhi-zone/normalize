@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"aliases\"])"
 ---
-List filter aliases (used by --exclude/--only)
+List filter aliases. Use to see available shorthand names for --exclude/--only globs.
 
 Usage: normalize aliases [OPTIONS]
 

@@ -39,7 +39,7 @@ fn discover_repos(dir: &str, depth: usize) -> Result<Vec<PathBuf>, String> {
 
 #[cli(
     name = "tools",
-    description = "Run linters, formatters, and test runners"
+    description = "Run linters, formatters, and test runners. Unified interface to external ecosystem tools."
 )]
 impl ToolsService {
     /// Run linters, formatters, and type checkers

@@ -47,7 +47,7 @@ impl TrendService {
 
 #[cli(
     name = "trend",
-    description = "Track health metrics (complexity, length, test ratio, density) over git history",
+    description = "Plot metrics over git history. Use to see if complexity, size, or test coverage is trending up or down.",
     global = [
         pretty = "Human-friendly output with colors and formatting",
         compact = "Compact output without colors (overrides TTY detection)",

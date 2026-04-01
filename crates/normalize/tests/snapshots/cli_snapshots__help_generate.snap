@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"generate\"])"
 ---
-Generate code from API spec
+Generate code from an API spec. Use to scaffold clients or types from OpenAPI definitions.
 
 Usage: normalize generate [OPTIONS] [COMMAND]
 

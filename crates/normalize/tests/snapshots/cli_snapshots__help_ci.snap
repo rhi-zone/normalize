@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"ci\"])"
 ---
-Run all configured quality checks and exit non-zero if any errors are found.
+Run all quality checks in one pass. Use in CI pipelines or before committing to catch violations.
 
 Usage: normalize ci [OPTIONS]
 

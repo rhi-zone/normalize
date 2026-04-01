@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"view\"])"
 ---
-View a node in the codebase tree, or navigate symbol relationships
+Browse code structure and symbol relationships. Use to read files, explore types, or trace dependencies.
 
 Usage: normalize view [OPTIONS] [target] [COMMAND]
 

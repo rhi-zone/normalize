@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"tools\"])"
 ---
-External ecosystem tools (linters, formatters, test runners)
+Run linters, formatters, and test runners. Unified interface to external ecosystem tools.
 
 Usage: normalize tools [OPTIONS] [COMMAND]
 

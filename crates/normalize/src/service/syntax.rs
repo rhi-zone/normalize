@@ -77,7 +77,7 @@ fn truncate_text(s: &str, max_chars: usize) -> String {
 
 #[cli(
     name = "syntax",
-    description = "Tree-sitter AST inspection and query tools"
+    description = "Inspect parsed syntax trees and test queries. Use to debug grammars or develop tree-sitter patterns."
 )]
 impl SyntaxService {
     /// Show AST structure for a file

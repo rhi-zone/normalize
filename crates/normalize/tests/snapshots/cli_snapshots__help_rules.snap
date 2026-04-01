@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"rules\"])"
 ---
-Manage and run syntax/fact rules
+Configure and run lint rules. Use to enable/disable checks or see what rules are available.
 
 Usage: normalize rules [OPTIONS] [COMMAND]
 

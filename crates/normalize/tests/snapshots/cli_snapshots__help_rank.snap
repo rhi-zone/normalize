@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"rank\"])"
 ---
-Rank code by metrics (complexity, size, coupling, duplicates, and more)
+Rank files and functions by metrics. Use to find the most complex, longest, or most coupled code.
 
 Usage: normalize rank [OPTIONS]
 

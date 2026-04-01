@@ -1,9 +1,8 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 52
 expression: "snapshot_help(&[\"init\"])"
 ---
-Initialize normalize in current directory
+Set up normalize in a new project. Run once after cloning to create .normalize/ config.
 
 Usage: normalize init [OPTIONS]
 

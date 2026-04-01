@@ -929,7 +929,10 @@ pub struct EditService {
     pub(crate) history: HistoryService,
 }
 
-#[cli(name = "edit", description = "Structural editing of code symbols")]
+#[cli(
+    name = "edit",
+    description = "Edit code by symbol name. Use for batch renames, signature changes, or pattern-based rewrites."
+)]
 impl EditService {
     /// Delete a symbol.
     ///

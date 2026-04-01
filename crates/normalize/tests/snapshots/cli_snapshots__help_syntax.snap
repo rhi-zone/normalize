@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"syntax\"])"
 ---
-AST inspection and syntax rules
+Inspect parsed syntax trees and test queries. Use to debug grammars or develop tree-sitter patterns.
 
 Usage: normalize syntax [OPTIONS] [COMMAND]
 

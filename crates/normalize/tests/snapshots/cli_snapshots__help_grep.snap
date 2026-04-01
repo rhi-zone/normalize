@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"grep\"])"
 ---
-Search for text patterns across the codebase using ripgrep regex syntax.
+Find code by text pattern. Use when you know what the code looks like but not where it is.
 
 Usage: normalize grep [OPTIONS] [pattern] [path]
 

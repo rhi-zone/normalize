@@ -75,7 +75,7 @@ impl OutputFormatter for GrammarInstallReport {
 
 #[cli(
     name = "grammars",
-    description = "Manage tree-sitter grammars for parsing"
+    description = "Install and list tree-sitter grammars. Run after install or when parsing fails for a language."
 )]
 impl GrammarService {
     /// List installed grammars

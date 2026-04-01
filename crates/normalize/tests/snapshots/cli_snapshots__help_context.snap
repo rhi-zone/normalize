@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"context\"])"
 ---
-Resolve contextual text from .normalize/context/ hierarchy
+Inject project context into LLM prompts. Use to provide per-project instructions to agents.
 
 Usage: normalize context [OPTIONS]
 

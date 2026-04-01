@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"structure\"])"
 ---
-Manage the structural index (symbols, imports, calls)
+Build and query the code index. Run `structure rebuild` after cloning or when cross-file commands return stale results.
 
 Usage: normalize structure [OPTIONS] [COMMAND]
 

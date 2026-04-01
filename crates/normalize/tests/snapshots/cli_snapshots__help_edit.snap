@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"edit\"])"
 ---
-Structural editing of code symbols
+Edit code by symbol name. Use for batch renames, signature changes, or pattern-based rewrites.
 
 Usage: normalize edit [OPTIONS] [COMMAND]
 

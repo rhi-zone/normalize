@@ -39,7 +39,10 @@ impl GenerateService {
     }
 }
 
-#[cli(name = "generate", description = "Generate code from API spec")]
+#[cli(
+    name = "generate",
+    description = "Generate code from an API spec. Use to scaffold clients or types from OpenAPI definitions."
+)]
 impl GenerateService {
     /// Generate API client from OpenAPI spec
     ///

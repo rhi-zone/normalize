@@ -28,7 +28,10 @@ impl GuideService {
     }
 }
 
-#[cli(name = "guide", description = "Workflow guides with examples")]
+#[cli(
+    name = "guide",
+    description = "Step-by-step workflow guides. Use when learning normalize or onboarding a new codebase."
+)]
 impl GuideService {
     /// Writing and testing syntax rules
     #[cli(display_with = "display_output")]

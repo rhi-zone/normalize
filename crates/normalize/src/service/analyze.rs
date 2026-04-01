@@ -106,7 +106,7 @@ impl AnalyzeService {
 
 #[cli(
     name = "analyze",
-    description = "Analyze codebase (health, complexity, security, duplicates, docs)",
+    description = "Assess codebase quality. Use for health checks, finding duplicates, security scanning, and architecture analysis.",
     global = [
         pretty = "Human-friendly output with colors and formatting",
         compact = "Compact output without colors (overrides TTY detection)",

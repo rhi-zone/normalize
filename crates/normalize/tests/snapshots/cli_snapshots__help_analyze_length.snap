@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"analyze\", \"length\"])"
 ---
-Analyze codebase (health, complexity, security, duplicates, docs)
+Assess codebase quality. Use for health checks, finding duplicates, security scanning, and architecture analysis.
 
 Usage: normalize analyze [OPTIONS] [target]
 

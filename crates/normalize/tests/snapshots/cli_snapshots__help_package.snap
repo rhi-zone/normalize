@@ -2,7 +2,7 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"package\"])"
 ---
-Package management: info, list, tree, outdated
+Query package metadata and dependencies. Use to check versions, find outdated deps, or view dep trees.
 
 Usage: normalize package [OPTIONS] [COMMAND]
 

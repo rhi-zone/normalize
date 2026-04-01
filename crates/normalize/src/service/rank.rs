@@ -191,7 +191,7 @@ impl RankService {
 
 #[cli(
     name = "rank",
-    description = "Rank code by metrics (complexity, size, coupling, duplicates, and more)",
+    description = "Rank files and functions by metrics. Use to find the most complex, longest, or most coupled code.",
     global = [
         pretty = "Human-friendly output with colors and formatting",
         compact = "Compact output without colors (overrides TTY detection)",

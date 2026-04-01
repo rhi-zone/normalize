@@ -220,7 +220,7 @@ impl OutputFormatter for PackageAuditReport {
 
 #[cli(
     name = "package",
-    description = "Package management: info, list, tree, outdated",
+    description = "Query package metadata and dependencies. Use to check versions, find outdated deps, or view dep trees.",
     global = [
         pretty = "Human-friendly output with colors and formatting",
         compact = "Compact output without colors (overrides TTY detection)",
