@@ -472,6 +472,7 @@ impl RulesService {
         // All checks are independent — run them in parallel.
         // Skip when daemon already served cached native results.
         if run_native && !report.daemon_cached {
+            let native_timings_start = std::time::Instant::now();
             let native_root = effective_root.clone();
             let native_config = load_rules_config(&native_root);
             let threshold = 10;
@@ -558,46 +559,81 @@ impl RulesService {
                     let root = native_root.clone();
                     let wc = native_config.walk.clone();
                     move || {
-                        normalize_native_rules::build_missing_summary_report(
+                        let t = std::time::Instant::now();
+                        let r = normalize_native_rules::build_missing_summary_report(
                             &root,
                             threshold,
                             &missing_summary_filenames,
                             &missing_summary_paths,
                             &wc,
-                        )
+                        );
+                        tracing::debug!("[timings] missing-summary: {:.1?}", t.elapsed());
+                        r
                     }
                 }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
                     let wc = native_config.walk.clone();
                     move || {
-                        normalize_native_rules::build_stale_summary_report(
+                        let t = std::time::Instant::now();
+                        let r = normalize_native_rules::build_stale_summary_report(
                             &root,
                             threshold,
                             &stale_summary_filenames,
                             &stale_summary_paths,
                             &wc,
-                        )
+                        );
+                        tracing::debug!("[timings] stale-summary: {:.1?}", t.elapsed());
+                        r
                     }
                 }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
                     let wc = native_config.walk.clone();
-                    move || normalize_native_rules::build_stale_docs_report(&root, &wc)
+                    move || {
+                        let t = std::time::Instant::now();
+                        let r = normalize_native_rules::build_stale_docs_report(&root, &wc);
+                        tracing::debug!("[timings] stale-docs: {:.1?}", t.elapsed());
+                        r
+                    }
                 }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
                     let wc = native_config.walk.clone();
-                    move || normalize_native_rules::build_check_examples_report(&root, &wc)
+                    move || {
+                        let t = std::time::Instant::now();
+                        let r = normalize_native_rules::build_check_examples_report(&root, &wc);
+                        tracing::debug!("[timings] check-examples: {:.1?}", t.elapsed());
+                        r
+                    }
                 }),
-                normalize_native_rules::build_check_refs_report(&native_root, &native_config.walk),
+                async {
+                    let t = std::time::Instant::now();
+                    let r = normalize_native_rules::build_check_refs_report(
+                        &native_root,
+                        &native_config.walk,
+                    )
+                    .await;
+                    tracing::debug!("[timings] check-refs: {:.1?}", t.elapsed());
+                    r
+                },
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
-                    move || normalize_native_rules::build_ratchet_report(&root)
+                    move || {
+                        let t = std::time::Instant::now();
+                        let r = normalize_native_rules::build_ratchet_report(&root);
+                        tracing::debug!("[timings] ratchet: {:.1?}", t.elapsed());
+                        r
+                    }
                 }),
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
-                    move || normalize_native_rules::build_budget_report(&root)
+                    move || {
+                        let t = std::time::Instant::now();
+                        let r = normalize_native_rules::build_budget_report(&root);
+                        tracing::debug!("[timings] budget: {:.1?}", t.elapsed());
+                        r
+                    }
                 }),
             );
 
@@ -672,7 +708,8 @@ impl RulesService {
                     let threshold = long_file_threshold;
                     let ef = effective_files.clone();
                     let wc = native_config.walk.clone();
-                    tokio::task::spawn_blocking(move || {
+                    let t = std::time::Instant::now();
+                    let r = tokio::task::spawn_blocking(move || {
                         normalize_native_rules::build_long_file_report(
                             &root,
                             threshold,
@@ -681,7 +718,9 @@ impl RulesService {
                         )
                     })
                     .await
-                    .ok()
+                    .ok();
+                    tracing::debug!("[timings] long-file: {:.1?}", t.elapsed());
+                    r
                 },
                 async {
                     if !run_high_complexity {
@@ -691,7 +730,8 @@ impl RulesService {
                     let threshold = high_complexity_threshold;
                     let ef = effective_files.clone();
                     let wc = native_config.walk.clone();
-                    tokio::task::spawn_blocking(move || {
+                    let t = std::time::Instant::now();
+                    let r = tokio::task::spawn_blocking(move || {
                         normalize_native_rules::build_high_complexity_report(
                             &root,
                             threshold,
@@ -700,7 +740,9 @@ impl RulesService {
                         )
                     })
                     .await
-                    .ok()
+                    .ok();
+                    tracing::debug!("[timings] high-complexity: {:.1?}", t.elapsed());
+                    r
                 },
                 async {
                     if !run_long_function {
@@ -710,7 +752,8 @@ impl RulesService {
                     let threshold = long_function_threshold;
                     let ef = effective_files.clone();
                     let wc = native_config.walk.clone();
-                    tokio::task::spawn_blocking(move || {
+                    let t = std::time::Instant::now();
+                    let r = tokio::task::spawn_blocking(move || {
                         normalize_native_rules::build_long_function_report(
                             &root,
                             threshold,
@@ -719,7 +762,9 @@ impl RulesService {
                         )
                     })
                     .await
-                    .ok()
+                    .ok();
+                    tracing::debug!("[timings] long-function: {:.1?}", t.elapsed());
+                    r
                 },
                 async {
                     if !run_stale_doc {
@@ -728,11 +773,14 @@ impl RulesService {
                     let root = native_root.clone();
                     let cfg = stale_doc_cfg;
                     let ef = effective_files.clone();
-                    tokio::task::spawn_blocking(move || {
+                    let t = std::time::Instant::now();
+                    let r = tokio::task::spawn_blocking(move || {
                         normalize_native_rules::build_stale_doc_report(&root, cfg, ef.as_deref())
                     })
                     .await
-                    .ok()
+                    .ok();
+                    tracing::debug!("[timings] stale-doc: {:.1?}", t.elapsed());
+                    r
                 },
             );
 
@@ -770,6 +818,10 @@ impl RulesService {
                 });
             }
             apply_native_rules_config(&mut report, &native_config.rules);
+            tracing::debug!(
+                "[timings] total native: {:.1?}",
+                native_timings_start.elapsed()
+            );
             report.sources_run.push("native".into());
         }
 

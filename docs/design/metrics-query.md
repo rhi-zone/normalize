@@ -48,6 +48,66 @@ numeric aggregation and time series. Wrong paradigm for this.
   commands become presets (canned queries with nice formatting). The primitive is
   the real command; the presets are aliases.
 
+## Type safety (critical concern)
+
+Library consumers need typed query results without runtime HashMap overhead.
+Returning `Vec<HashMap<String, Value>>` for arbitrary queries is unacceptable
+for hot paths.
+
+### Options explored
+
+1. **Presets only** — current 37 subcommands stay as typed structs. Safe but
+   doesn't extend to custom queries.
+
+2. **Columnar storage** — columns stored contiguously with a schema header.
+   No per-row allocation but no compile-time type safety either.
+
+3. **Registered views** — pair SQL with a Rust struct via derive macro. The view
+   is the typed contract. Compile-time checked against the schema. Library
+   consumers define views; the macro validates them.
+
+4. **sqlx** — the obvious answer. `query_as!` gives compile-time SQL checking
+   against the real schema. Zero runtime overhead. The industry standard.
+   **Problem**: sqlx doesn't support libsql as a backend, and we use libsql
+   for the entire index (facts, semantic, rules, daemon). Switching to vanilla
+   SQLite would lose libsql's built-in vector search and replication. Running
+   both is messy (two connection pools to the same DB).
+
+### Resolution: libsql `from_row` with serde
+
+libsql already has `libsql::de::from_row<T: Deserialize>(&Row) -> Result<T>`.
+This gives typed deserialization without switching to sqlx:
+
+```rust
+#[derive(Deserialize)]
+struct FileComplexity {
+    file: String,
+    avg_complexity: f64,
+    count: i64,
+}
+
+let mut rows = conn.query("SELECT file, AVG(complexity) as avg_complexity, 
+    COUNT(*) as count FROM symbols GROUP BY file", ()).await?;
+while let Some(row) = rows.next().await? {
+    let result: FileComplexity = libsql::de::from_row(&row)?;
+}
+```
+
+No HashMap, no runtime type guessing, serde handles the column→field mapping.
+The struct is the schema contract. Library consumers define their own result
+structs with `#[derive(Deserialize)]` and pass them to `from_row`.
+
+**What we get**: typed deserialization at runtime, zero per-row allocation
+overhead, stays on libsql (no migration needed), works for both presets and
+custom queries.
+
+**What we don't get**: compile-time SQL validation (sqlx's killer feature).
+The SQL string is still unchecked — a typo in a column name is a runtime error,
+not a compile error. Acceptable tradeoff: we can add integration tests for
+preset queries, and custom queries are the user's responsibility.
+
+This unblocks the design. The query primitive can proceed on libsql.
+
 ## Non-goals
 
 - Not a BI tool. The queries are over code metrics, not arbitrary data.

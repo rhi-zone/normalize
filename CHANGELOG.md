@@ -12,6 +12,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Performance
 
+- **Native rule timing diagnostics** — `RUST_LOG=debug normalize rules run --type native` now logs per-rule and total elapsed time to stderr via `tracing::debug!`, making it easy to identify slow rules without adding a new CLI flag.
 - **Embedding rebuild ~100x fewer SQL queries** — `populate_embeddings` now bulk-loads callers, callees, and doc comments in 3 queries total instead of 3 per symbol (175k round-trips → 3 for a 58k-symbol codebase).
 
 ### Added
