@@ -4,36 +4,7 @@ expression: "snapshot_help(&[])"
 ---
 normalize - Structural code intelligence: index symbols and calls, enforce rules, track complexity.
 
-Usage: normalize [OPTIONS] [COMMAND]
-
-Commands:
-  grep       Find code by text pattern. Use when you know what the code looks like but not where it is.
-  aliases    List filter aliases. Use to see available shorthand names for --exclude/--only globs.
-  context    Inject project context into LLM prompts. Use to provide per-project instructions to agents.
-  init       Set up normalize in a new project. Run once after cloning to create .normalize/ config.
-  update     Check for and install newer versions of normalize.
-  translate  Convert code between programming languages. Use for porting or understanding unfamiliar syntax.
-  ci         Run all quality checks in one pass. Use in CI pipelines or before committing to catch violations.
-  view       Browse code structure and symbol relationships. Use to read files, explore types, or trace dependencies.
-  daemon     Control the background daemon that keeps the index fresh automatically.
-  grammars   Install and list tree-sitter grammars. Run after install or when parsing fails for a language.
-  guide      Step-by-step workflow guides. Use when learning normalize or onboarding a new codebase.
-  generate   Generate code from an API spec. Use to scaffold clients or types from OpenAPI definitions.
-  structure  Build and query the code index. Run `structure rebuild` after cloning or when cross-file commands return stale results.
-  syntax     Inspect parsed syntax trees and test queries. Use to debug grammars or develop tree-sitter patterns.
-  package    Query package metadata and dependencies. Use to check versions, find outdated deps, or view dep trees.
-  sessions   Review AI agent session logs. Use to check cost, duration, and tool usage across coding sessions.
-  tools      Run linters, formatters, and test runners. Unified interface to external ecosystem tools.
-  edit       Edit code by symbol name. Use for batch renames, signature changes, or pattern-based rewrites.
-  analyze    Assess codebase quality. Use for health checks, finding duplicates, security scanning, and architecture analysis.
-  rank       Rank files and functions by metrics. Use to find the most complex, longest, or most coupled code.
-  trend      Plot metrics over git history. Use to see if complexity, size, or test coverage is trending up or down.
-  budget     Enforce diff budgets on PRs. Use to cap how much complexity or size can grow per change.
-  ratchet    Prevent metric regressions. Records a baseline and fails CI if metrics get worse.
-  rules      Configure and run lint rules. Use to enable/disable checks or see what rules are available.
-  config     Inspect and validate .normalize/config.toml. Use to debug config issues or see available options.
-  serve      Start a normalize server. Use to expose normalize over MCP, HTTP, or LSP for editor integration.
-  help       Print this message or the help of the given subcommand(s)
+Usage: normalize [OPTIONS]
 
 Options:
       --pretty                     Human-friendly output with colors and formatting
@@ -46,3 +17,37 @@ Options:
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
   -V, --version                    Print version
+
+Core:
+  grep       Find code by text pattern. Use when you know what the code looks like but not where it is.
+  init       Set up normalize in a new project. Run once after cloning to create .normalize/ config.
+  view       Browse code structure and symbol relationships. Use to read files, explore types, or trace dependencies.
+  structure  Build and query the code index. Run `structure rebuild` after cloning or when cross-file commands return stale results.
+  edit       Edit code by symbol name. Use for batch renames, signature changes, or pattern-based rewrites.
+  rules      Configure and run lint rules. Use to enable/disable checks or see what rules are available.
+
+Analysis:
+  ci         Run all quality checks in one pass. Use in CI pipelines or before committing to catch violations.
+  analyze    Assess codebase quality. Use for health checks, finding duplicates, security scanning, and architecture analysis.
+  rank       Rank files and functions by metrics. Use to find the most complex, longest, or most coupled code.
+  trend      Plot metrics over git history. Use to see if complexity, size, or test coverage is trending up or down.
+  budget     Enforce diff budgets on PRs. Use to cap how much complexity or size can grow per change.
+  ratchet    Prevent metric regressions. Records a baseline and fails CI if metrics get worse.
+
+Utilities:
+  aliases    List filter aliases. Use to see available shorthand names for --exclude/--only globs.
+  context    Inject project context into LLM prompts. Use to provide per-project instructions to agents.
+  translate  Convert code between programming languages. Use for porting or understanding unfamiliar syntax.
+  guide      Step-by-step workflow guides. Use when learning normalize or onboarding a new codebase.
+  generate   Generate code from an API spec. Use to scaffold clients or types from OpenAPI definitions.
+  package    Query package metadata and dependencies. Use to check versions, find outdated deps, or view dep trees.
+  sessions   Review AI agent session logs. Use to check cost, duration, and tool usage across coding sessions.
+
+Infrastructure:
+  update     Check for and install newer versions of normalize.
+  daemon     Control the background daemon that keeps the index fresh automatically.
+  grammars   Install and list tree-sitter grammars. Run after install or when parsing fails for a language.
+  syntax     Inspect parsed syntax trees and test queries. Use to debug grammars or develop tree-sitter patterns.
+  tools      Run linters, formatters, and test runners. Unified interface to external ecosystem tools.
+  config     Inspect and validate .normalize/config.toml. Use to debug config issues or see available options.
+  serve      Start a normalize server. Use to expose normalize over MCP, HTTP, or LSP for editor integration.

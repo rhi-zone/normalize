@@ -1,38 +1,46 @@
 # CLI Design
 
-## Command Structure (21 top-level commands)
+## Command Structure
 
-### Core Operations
+`normalize --help` organizes commands into four tiered groups using `#[server(groups(...))]`. Core commands appear first; everything else is grouped by domain.
+
+### Core
+The essential daily-driver commands:
 - `view` - View directory/file/symbol structure
 - `grep` - Fast ripgrep-based text search
 - `edit` - Structural code modifications (delete, replace, swap, insert, undo, redo, goto, batch, history)
-- `analyze` - Codebase analysis (45 subcommands)
-- `syntax` - AST inspection (ast, query, node-types)
 - `rules` - Manage and run analysis rules (syntax + fact)
-
-### Infrastructure
 - `structure` - Manage the structural index (symbols, imports, calls)
-- `config` - Inspect and validate config files using JSON Schema
-- `daemon` - Background process management
-- `grammars` - Tree-sitter grammar management
 - `init` - Initialize normalize in a directory
-- `update` - Check for and install updates
 
-### Ecosystem Integration
-- `sessions` - Agent session logs (Claude Code, Codex, Gemini)
-  - `list`, `show`, `stats`, `messages`, `plans`
-- `package` - Package management (info, list, tree, why, outdated, audit)
-- `tools` - External tool orchestration
-  - `lint` - Linters, formatters, type checkers
-  - `test` - Test runners
-- `serve` - Server protocols (mcp, http, lsp)
-- `generate` - Code generation from API spec
-- `translate` - Translate code between languages
-- `guide` - Workflow guides with examples
+### Analysis
+Assessment, metrics, and quality gates:
+- `analyze` - Codebase analysis (45 subcommands)
+- `rank` - Rank files/functions by metrics
+- `trend` - Track metrics over git history
+- `ci` - Run all quality checks in one pass
+- `budget` - Enforce diff budgets on PRs
+- `ratchet` - Prevent metric regressions
 
-### Utility
+### Utilities
+Specialized tools and integrations:
 - `aliases` - List filter aliases (used by --exclude/--only)
 - `context` - Show directory context (.context.md files)
+- `translate` - Translate code between languages
+- `guide` - Workflow guides with examples
+- `generate` - Code generation from API spec
+- `package` - Package management (info, list, tree, why, outdated, audit)
+- `sessions` - Agent session logs (Claude Code, Codex, Gemini)
+
+### Infrastructure
+Setup, configuration, and plumbing:
+- `update` - Check for and install updates
+- `daemon` - Background process management
+- `grammars` - Tree-sitter grammar management
+- `syntax` - AST inspection (ast, query, node-types)
+- `tools` - External tool orchestration (lint, test)
+- `config` - Inspect and validate config files using JSON Schema
+- `serve` - Server protocols (mcp, http, lsp)
 
 ## Design Principles
 

@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Tiered help output** — `normalize --help` now groups commands into four sections (Core, Analysis, Utilities, Infrastructure) instead of a flat alphabetical list. Core commands (view, grep, edit, rules, structure, init) appear first. Uses server-less `#[server(groups(...))]` support extended to work with mounted subcommands.
+
 ### Added
 
 - **`normalize structure search <query>`** — semantic search over the codebase by meaning, not name. Queries a vector embedding index built from symbol chunks (name + signature + doc comment + callers/callees + co-change neighbors). Disabled by default; enable with `embeddings.enabled = true` in `.normalize/config.toml`. Embeddings are generated during `normalize structure rebuild` using fastembed (ONNX, no server or API key required). Default model: `nomic-embed-text-v1.5` (768 dims). Results are ranked by cosine similarity with a staleness penalty applied at query time. `--json` and `--jq` work like every other command. `SearchReport.ann_used` indicates whether the ANN index was used.

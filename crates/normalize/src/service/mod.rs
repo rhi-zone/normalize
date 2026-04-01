@@ -277,8 +277,15 @@ impl OutputFormatter for TranslateReport {
         compact = "Compact output without colors (overrides TTY detection)",
     ]
 )]
+#[server(groups(
+    core = "Core",
+    analysis = "Analysis",
+    utilities = "Utilities",
+    infrastructure = "Infrastructure",
+))]
 impl NormalizeService {
     /// Browse code structure and symbol relationships. Use to read files, explore types, or trace dependencies.
+    #[server(group = "core")]
     pub fn view(&self) -> &view::ViewService {
         &self.view
     }
@@ -294,6 +301,7 @@ impl NormalizeService {
     ///   normalize grep "TODO" --only "*.rs"    # search Rust files for TODO
     ///   normalize grep "fn main" src/          # search in specific directory
     ///   normalize grep "class \w+" --only "*.py" --json   # JSON output
+    #[server(group = "core")]
     #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn grep(
@@ -343,6 +351,7 @@ impl NormalizeService {
     ///
     /// Examples:
     ///   normalize aliases                      # list all filter aliases
+    #[server(group = "utilities")]
     #[cli(display_with = "display_output")]
     pub fn aliases(
         &self,
@@ -377,6 +386,7 @@ impl NormalizeService {
     ///   normalize context --match claudecode.hook=UserPromptSubmit # nested dot-path
     ///   echo '{"hook":"X"}' | normalize context --stdin --prefix claudecode
     ///   normalize context --all --list                            # list all source files
+    #[server(group = "utilities")]
     #[cli(display_with = "display_context")]
     #[allow(clippy::too_many_arguments)]
     pub fn context(
@@ -428,6 +438,7 @@ impl NormalizeService {
     /// Examples:
     ///   normalize init                         # create .normalize/ config directory
     ///   normalize init --setup                 # interactive rule setup wizard
+    #[server(group = "core")]
     #[cli(display_with = "display_output")]
     pub async fn init(
         &self,
@@ -568,6 +579,7 @@ impl NormalizeService {
     ///
     /// Examples:
     ///   normalize update                       # check for and install updates
+    #[server(group = "infrastructure")]
     #[cli(display_with = "display_output")]
     pub fn update(
         &self,
@@ -699,6 +711,7 @@ impl NormalizeService {
     /// Examples:
     ///   normalize translate src/main.py --to rust    # translate Python to Rust
     ///   normalize translate lib.rs --to typescript    # translate Rust to TypeScript
+    #[server(group = "utilities")]
     #[cli(display_with = "display_translate")]
     pub fn translate(
         &self,
@@ -791,91 +804,109 @@ impl NormalizeService {
     }
 
     /// Control the background daemon that keeps the index fresh automatically.
+    #[server(group = "infrastructure")]
     pub fn daemon(&self) -> &daemon::DaemonService {
         &self.daemon
     }
 
     /// Install and list tree-sitter grammars. Run after install or when parsing fails for a language.
+    #[server(group = "infrastructure")]
     pub fn grammars(&self) -> &grammars::GrammarService {
         &self.grammars
     }
 
     /// Step-by-step workflow guides. Use when learning normalize or onboarding a new codebase.
+    #[server(group = "utilities")]
     pub fn guide(&self) -> &guide::GuideService {
         &self.guide
     }
 
     /// Generate code from an API spec. Use to scaffold clients or types from OpenAPI definitions.
+    #[server(group = "utilities")]
     pub fn generate(&self) -> &generate::GenerateService {
         &self.generate
     }
 
     /// Build and query the code index. Run `structure rebuild` after cloning or when cross-file commands return stale results.
+    #[server(group = "core")]
     pub fn structure(&self) -> &facts::FactsService {
         &self.structure
     }
 
     /// Inspect parsed syntax trees and test queries. Use to debug grammars or develop tree-sitter patterns.
+    #[server(group = "infrastructure")]
     pub fn syntax(&self) -> &syntax::SyntaxService {
         &self.syntax
     }
 
     /// Query package metadata and dependencies. Use to check versions, find outdated deps, or view dep trees.
+    #[server(group = "utilities")]
     pub fn package(&self) -> &package::PackageService {
         &self.package
     }
 
     /// Review AI agent session logs. Use to check cost, duration, and tool usage across coding sessions.
+    #[server(group = "utilities")]
     pub fn sessions(&self) -> &sessions::SessionsService {
         &self.sessions
     }
 
     /// Run linters, formatters, and test runners. Unified interface to external ecosystem tools.
+    #[server(group = "infrastructure")]
     pub fn tools(&self) -> &tools::ToolsService {
         &self.tools
     }
 
     /// Edit code by symbol name. Use for batch renames, signature changes, or pattern-based rewrites.
+    #[server(group = "core")]
     pub fn edit(&self) -> &edit::EditService {
         &self.edit
     }
 
     /// Assess codebase quality. Use for health checks, finding duplicates, security scanning, and architecture analysis.
+    #[server(group = "analysis")]
     pub fn analyze(&self) -> &analyze::AnalyzeService {
         &self.analyze
     }
 
     /// Rank files and functions by metrics. Use to find the most complex, longest, or most coupled code.
+    #[server(group = "analysis")]
     pub fn rank(&self) -> &rank::RankService {
         &self.rank
     }
 
     /// Plot metrics over git history. Use to see if complexity, size, or test coverage is trending up or down.
+    #[server(group = "analysis")]
     pub fn trend(&self) -> &trend::TrendService {
         &self.trend
     }
 
     /// Enforce diff budgets on PRs. Use to cap how much complexity or size can grow per change.
+    #[server(group = "analysis")]
     pub fn budget(&self) -> &normalize_budget::service::BudgetService {
         &self.budget
     }
 
     /// Prevent metric regressions. Records a baseline and fails CI if metrics get worse.
+    #[server(group = "analysis")]
     pub fn ratchet(&self) -> &normalize_ratchet::service::RatchetService {
         &self.ratchet
     }
 
     /// Configure and run lint rules. Use to enable/disable checks or see what rules are available.
+    #[server(group = "core")]
     pub fn rules(&self) -> &normalize_rules::RulesService {
         &self.rules
     }
 
     /// Inspect and validate .normalize/config.toml. Use to debug config issues or see available options.
+    #[server(group = "infrastructure")]
     pub fn config(&self) -> &config::ConfigService {
         &self.config
     }
 
     /// Start a normalize server. Use to expose normalize over MCP, HTTP, or LSP for editor integration.
+    #[server(group = "infrastructure")]
     pub fn serve(&self) -> &serve::ServeService {
         &self.serve
     }
@@ -896,6 +927,7 @@ impl NormalizeService {
     ///   normalize ci --strict                  # treat warnings as errors
     ///   normalize ci --sarif                   # SARIF output for GitHub Actions annotations
     ///   normalize ci --json                    # structured JSON output
+    #[server(group = "analysis")]
     #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub async fn ci(

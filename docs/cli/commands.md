@@ -2,42 +2,49 @@
 
 ## Command Structure
 
-Normalize has 22 top-level commands organized by domain:
+`normalize --help` groups commands into four sections. This matches the actual help output.
 
-### Core Operations
+### Core
 | Command | Description |
 |---------|-------------|
 | `view` | View directory/file/symbol structure |
 | `grep` | Fast ripgrep-based text search |
 | `edit` | Structural code modifications (delete, replace, swap, insert, undo, redo, history) |
-| `analyze` | Codebase analysis (~42 subcommands) |
-| `syntax` | Tree-sitter AST inspection and query tools |
 | `rules` | Manage and run analysis rules (syntax + fact) |
-
-### Infrastructure
-| Command | Description |
-|---------|-------------|
 | `structure` | Manage structural index (symbols, imports, calls) |
-| `daemon` | Background process management |
-| `grammars` | Tree-sitter grammar management |
 | `init` | Initialize normalize in a directory |
-| `update` | Check for and install updates |
 
-### Ecosystem Integration
+### Analysis
 | Command | Description |
 |---------|-------------|
-| `sessions` | Agent session logs (Claude Code, Codex, Gemini, Normalize) |
-| `package` | Package management (info, list, tree, outdated) |
-| `tools` | External tool orchestration (lint, test) |
-| `serve` | Server protocols (mcp, http, lsp) |
-| `generate` | Code generation from API spec |
-| `translate` | Translate code between programming languages |
+| `analyze` | Codebase analysis (~45 subcommands) |
+| `rank` | Rank files/functions by metrics |
+| `trend` | Track metrics over git history |
+| `ci` | Run all quality checks in one pass |
+| `budget` | Enforce diff budgets on PRs |
+| `ratchet` | Prevent metric regressions |
 
-### Utility
+### Utilities
 | Command | Description |
 |---------|-------------|
 | `aliases` | List filter aliases |
 | `context` | Show directory context (.context.md files) |
+| `translate` | Translate code between programming languages |
+| `guide` | Workflow guides with examples |
+| `generate` | Code generation from API spec |
+| `package` | Package management (info, list, tree, outdated) |
+| `sessions` | Agent session logs (Claude Code, Codex, Gemini, Normalize) |
+
+### Infrastructure
+| Command | Description |
+|---------|-------------|
+| `update` | Check for and install updates |
+| `daemon` | Background process management |
+| `grammars` | Tree-sitter grammar management |
+| `syntax` | Tree-sitter AST inspection and query tools |
+| `tools` | External tool orchestration (lint, test) |
+| `config` | Inspect and validate config files using JSON Schema |
+| `serve` | Server protocols (mcp, http, lsp) |
 
 ## Design Principles
 

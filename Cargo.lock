@@ -2302,7 +2302,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6371,7 +6371,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash 2.1.1",
  "rustls 0.23.37",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -6408,9 +6408,9 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -7140,9 +7140,9 @@ dependencies = [
 
 [[package]]
 name = "server-less"
-version = "0.4.8"
+version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ca9aa86aee60c45090fe34699518a190d9f51782aeaeb86b647f1698227396c"
+checksum = "dc03ccb0065e279d565f363c6a2e4f70873dbab1d24c5a467b796643edc4e2a5"
 dependencies = [
  "clap",
  "serde",
@@ -7154,9 +7154,9 @@ dependencies = [
 
 [[package]]
 name = "server-less-core"
-version = "0.4.8"
+version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9cf9389147b5440d23717aff7b6f278957b401cb66f3211c11a8bfeba842f30"
+checksum = "ed43ad64c2234ef837a948c5421f1db1c8c16c96ce968a7d83448e74a95559a1"
 dependencies = [
  "clap",
  "futures-core",
@@ -7173,9 +7173,9 @@ dependencies = [
 
 [[package]]
 name = "server-less-macros"
-version = "0.4.8"
+version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ce09676717b4f0125140d7b8aa3bb8d66b300aaa4fc015bf20e2a9da91a9f29"
+checksum = "386cbb81664449f411696096669eae071cec3ed90099dc82394764865859fa1f"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -7187,9 +7187,9 @@ dependencies = [
 
 [[package]]
 name = "server-less-parse"
-version = "0.4.8"
+version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "abe75d4511deb8b5bd739593122e2bc83fdbc97a5a2f40a61f9e57f64f47e045"
+checksum = "c377086ee88baed06e91e4cf632a18470e8a6dfa73bdd9b55e5a9e4c3b1326e5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7198,9 +7198,9 @@ dependencies = [
 
 [[package]]
 name = "server-less-rpc"
-version = "0.4.8"
+version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "600aeb45b1c2bb76bb3deb1ec1b7d771112f3db70faa78965a0924d2a5407db5"
+checksum = "c54a9ae7729caf87bd5ddd26c6bf2d980a4f6e20ea077d178504ad5f45c3071d"
 dependencies = [
  "proc-macro2",
  "quote",
