@@ -109,3 +109,18 @@ All filters on `list` and `run` compose (see principle #8). `enable`/`disable` a
 
 Commands with no subcommands (positional/flag-based):
 - `view`, `grep`, `aliases`, `context`, `init`, `update`
+
+## Command Aliases
+
+Users from other tools often try familiar names. These aliases are rewritten transparently in `main.rs` before server-less dispatch:
+
+| Alias | Canonical Command | Rationale |
+|-------|-------------------|-----------|
+| `search` | `grep` | Most tools call it "search" |
+| `find` | `grep` | Common alternative for text search |
+| `lint` | `rules run` | Standard linter invocation |
+| `check` | `ci` | Common CI/check command name |
+| `index` | `structure rebuild` | Indexing is the primary use of `structure` |
+| `refactor` | `edit` | Refactoring tools use this name |
+
+Aliases are invisible — they don't appear in `--help` output. The canonical name is always what's shown.

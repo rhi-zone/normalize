@@ -138,6 +138,10 @@ normalize ci --no-native           # skip ratchet/budget/stale-summary
 normalize ci --sarif               # SARIF output for GitHub Actions
 ```
 
+## Command Aliases
+
+Familiar names work: `search`/`find` → `grep`, `lint` → `rules run`, `check` → `ci`, `index` → `structure rebuild`, `refactor` → `edit`.
+
 ## Key Insights
 
 - `normalize view` is the primary navigation command - works on dirs, files, and symbols

@@ -23,6 +23,40 @@ fn should_skip_daemon_autostart(argv: &[std::ffi::OsString]) -> bool {
     })
 }
 
+/// Rewrite well-known command aliases to their canonical forms.
+///
+/// Users from other tools often try `normalize search`, `normalize lint`, etc.
+/// This rewrites argv so the expected names work transparently:
+/// - `search`, `find` → `grep`
+/// - `lint` → `rules run`
+/// - `check` → `ci`
+/// - `index` → `structure rebuild`
+/// - `refactor` → `edit`
+fn rewrite_aliases(mut argv: Vec<std::ffi::OsString>) -> Vec<std::ffi::OsString> {
+    let subcmd = argv.get(1).and_then(|s| s.to_str()).map(str::to_owned);
+    match subcmd.as_deref() {
+        // Simple 1:1 aliases — replace argv[1] in place.
+        Some("search" | "find") => {
+            argv[1] = "grep".into();
+        }
+        Some("check") => {
+            argv[1] = "ci".into();
+        }
+        Some("refactor") => {
+            argv[1] = "edit".into();
+        }
+        // Compound aliases — one alias word expands to two subcommand words.
+        Some("lint") => {
+            argv.splice(1..2, ["rules".into(), "run".into()]);
+        }
+        Some("index") => {
+            argv.splice(1..2, ["structure".into(), "rebuild".into()]);
+        }
+        _ => {}
+    }
+    argv
+}
+
 /// Help output styling is now handled by server-less.
 /// Schema flag support for Nursery integration.
 fn handle_schema_flag() -> bool {
@@ -123,8 +157,12 @@ async fn main() -> std::process::ExitCode {
         normalize::daemon::maybe_start_daemon(&root);
     }
 
+    // Rewrite command aliases so users from other tools find what they expect.
+    // Simple aliases map one name to another; compound aliases expand to two subcommands.
+    let argv = rewrite_aliases(argv);
+
     let service = normalize::service::NormalizeService::new();
-    match service.cli_run_async().await {
+    match service.cli_run_with_async(argv).await {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("{}", e);

@@ -1,6 +1,6 @@
 # src (normalize crate source root)
 
-Root of the normalize library and binary. `main.rs` handles argv[0] dispatch (symlink-as-drop-in for `rg`, `jq`, `sg`), auto-starts the daemon in the background on every command invocation (skipping `daemon`, `serve`, and informational flags), and delegates to the server-less service layer. `lib.rs` declares all top-level modules.
+Root of the normalize library and binary. `main.rs` handles argv[0] dispatch (symlink-as-drop-in for `rg`, `jq`, `sg`), auto-starts the daemon in the background on every command invocation (skipping `daemon`, `serve`, and informational flags), rewrites command aliases (`search`/`find` → `grep`, `lint` → `rules run`, `check` → `ci`, `index` → `structure rebuild`, `refactor` → `edit`), and delegates to the server-less service layer. `lib.rs` declares all top-level modules.
 
 **Key infrastructure:** `config.rs` (NormalizeConfig/TOML), `output.rs` (OutputFormatter trait + format dispatch), `diagnostic_convert.rs` (Finding/ABI diagnostic → Issue), `runtime.rs` (async helpers: `block_on`/`try_block_on` using `block_in_place` inside tokio, new runtime outside), `index.rs`, `symbols.rs`, `parsers.rs`, `extract.rs`, `skeleton.rs`, `tree.rs`.
 

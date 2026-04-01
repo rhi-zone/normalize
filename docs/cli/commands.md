@@ -58,6 +58,19 @@ Normalize has 22 top-level commands organized by domain:
 ### Positional args for primary targets
 - `normalize view src/main.rs` not `normalize view --file src/main.rs`
 
+## Command Aliases
+
+Familiar names from other tools are rewritten transparently:
+
+| You type | Runs |
+|----------|------|
+| `normalize search` | `normalize grep` |
+| `normalize find` | `normalize grep` |
+| `normalize lint` | `normalize rules run` |
+| `normalize check` | `normalize ci` |
+| `normalize index` | `normalize structure rebuild` |
+| `normalize refactor` | `normalize edit` |
+
 ## Output Formats
 
 All commands support these global flags:

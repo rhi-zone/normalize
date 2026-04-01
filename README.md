@@ -204,6 +204,19 @@ normalize sessions patterns          # Tool call sequence analysis (Markov chain
 normalize sessions plans             # View agent plans
 ```
 
+## Command Aliases
+
+Familiar names from other tools work transparently:
+
+| You type | Runs |
+|----------|------|
+| `normalize search` | `normalize grep` |
+| `normalize find` | `normalize grep` |
+| `normalize lint` | `normalize rules run` |
+| `normalize check` | `normalize ci` |
+| `normalize index` | `normalize structure rebuild` |
+| `normalize refactor` | `normalize edit` |
+
 ## CI Integration
 
 Run all configured checks in a single command:
