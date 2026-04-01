@@ -283,7 +283,7 @@ fn build_co_change_edges(root: &Path, files: &HashSet<String>) -> Vec<Provenance
 
 async fn build_import_edges(root: &Path, files: &HashSet<String>) -> Vec<ProvenanceEdge> {
     {
-        let idx = match crate::index::open_if_enabled(root).await {
+        let idx = match crate::index::ensure_ready_or_warn(root).await {
             Some(idx) => idx,
             None => return Vec::new(),
         };
@@ -317,7 +317,7 @@ async fn build_import_edges(root: &Path, files: &HashSet<String>) -> Vec<Provena
 
 async fn build_call_edges(root: &Path) -> Vec<(ProvenanceEdge, ProvenanceNode, ProvenanceNode)> {
     {
-        let idx = match crate::index::open_if_enabled(root).await {
+        let idx = match crate::index::ensure_ready_or_warn(root).await {
             Some(idx) => idx,
             None => return Vec::new(),
         };

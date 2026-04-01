@@ -283,7 +283,7 @@ async fn try_load_edges_from_index(
     root: &Path,
     min_commits: usize,
 ) -> Option<Vec<(String, String, usize)>> {
-    let idx = crate::index::open_if_enabled(root).await?;
+    let idx = crate::index::ensure_ready_or_warn(root).await?;
     match idx.query_co_change_edges(min_commits).await {
         Ok(edges) => edges,
         Err(e) => {

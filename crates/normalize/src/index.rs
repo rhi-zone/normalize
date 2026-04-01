@@ -86,3 +86,19 @@ pub async fn ensure_ready(root: &Path) -> Result<FileIndex, String> {
 
     Ok(idx)
 }
+
+/// Like [`ensure_ready`] but returns `Option` instead of `Result`.
+///
+/// When the index is unavailable (disabled, can't be opened, build fails),
+/// prints a clear hint to stderr and returns `None` rather than failing the
+/// whole command.  Use this for commands where the index *enriches* results
+/// but isn't strictly required.
+pub async fn ensure_ready_or_warn(root: &Path) -> Option<FileIndex> {
+    match ensure_ready(root).await {
+        Ok(idx) => Some(idx),
+        Err(msg) => {
+            eprintln!("hint: {msg}");
+            None
+        }
+    }
+}

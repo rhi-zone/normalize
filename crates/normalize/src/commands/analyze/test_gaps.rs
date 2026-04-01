@@ -42,36 +42,34 @@ pub async fn analyze_test_gaps(
     filter: Option<&Filter>,
     allowlist: &[String],
 ) -> TestGapsReport {
-    // Step 1: Open index for call graph data
-    let index = crate::index::open(root).await.ok();
+    // Step 1: Open index for call graph data (auto-builds if empty)
+    let index = match crate::index::ensure_ready(root).await {
+        Ok(idx) => Some(idx),
+        Err(e) => {
+            eprintln!("Warning: {e}");
+            eprintln!("Results will show 0 callers for all functions.");
+            None
+        }
+    };
 
     // Step 2: Load all call edges into HashMap<callee_name, Vec<(caller_file, caller_symbol)>>
     let callee_to_callers: HashMap<String, Vec<(String, String)>> = if let Some(ref idx) = index {
-        let stats = idx.call_graph_stats().await.unwrap_or_default();
-        if stats.calls == 0 {
-            eprintln!("Warning: Call graph empty or not indexed. Run: normalize structure rebuild");
-            eprintln!("Results will show 0 callers for all functions.");
-            HashMap::new()
-        } else {
-            match idx.all_call_edges().await {
-                Ok(edges) => {
-                    let mut map: HashMap<String, Vec<(String, String)>> = HashMap::new();
-                    for (caller_file, caller_symbol, callee_name) in edges {
-                        map.entry(callee_name)
-                            .or_default()
-                            .push((caller_file, caller_symbol));
-                    }
-                    map
+        match idx.all_call_edges().await {
+            Ok(edges) => {
+                let mut map: HashMap<String, Vec<(String, String)>> = HashMap::new();
+                for (caller_file, caller_symbol, callee_name) in edges {
+                    map.entry(callee_name)
+                        .or_default()
+                        .push((caller_file, caller_symbol));
                 }
-                Err(e) => {
-                    eprintln!("Warning: Failed to load call graph: {}", e);
-                    HashMap::new()
-                }
+                map
+            }
+            Err(e) => {
+                eprintln!("Warning: Failed to load call graph: {}", e);
+                HashMap::new()
             }
         }
     } else {
-        eprintln!("Warning: Index not available. Run: normalize structure rebuild");
-        eprintln!("Results will show 0 callers for all functions.");
         HashMap::new()
     };
 

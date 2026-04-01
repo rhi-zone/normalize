@@ -27,36 +27,28 @@ pub async fn search_symbols(query: &str, root: &Path) -> Vec<index::SymbolMatch>
 async fn search_symbols_async(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
     let parsed = parse_symbol_query(query);
 
-    // Try index first - if enabled, use it (or build it if empty)
-    if let Some(mut idx) = index::open_if_enabled(root).await {
-        let stats = idx.call_graph_stats().await.unwrap_or_default();
-        if stats.symbols == 0 {
-            eprintln!("Building symbol index...");
-            if let Err(e) = idx.refresh_call_graph().await {
-                eprintln!("Warning: failed to build index: {}", e);
-                return search_symbols_unindexed(query, root);
-            }
+    // Try index first - if enabled, use it (auto-builds if empty)
+    if let Some(idx) = index::ensure_ready_or_warn(root).await
+        && let Ok(mut symbols) = idx.find_symbols(&parsed.symbol_name, None, true, 50).await
+    {
+        // Filter by parent hint if provided
+        if let Some(ref parent) = parsed.parent_hint {
+            let parent_lower = parent.to_lowercase();
+            symbols.retain(|s| {
+                s.parent
+                    .as_ref()
+                    .map(|p| p.to_lowercase().contains(&parent_lower))
+                    .unwrap_or(false)
+            });
         }
-        if let Ok(mut symbols) = idx.find_symbols(&parsed.symbol_name, None, true, 50).await {
-            // Filter by parent hint if provided
-            if let Some(ref parent) = parsed.parent_hint {
-                let parent_lower = parent.to_lowercase();
-                symbols.retain(|s| {
-                    s.parent
-                        .as_ref()
-                        .map(|p| p.to_lowercase().contains(&parent_lower))
-                        .unwrap_or(false)
-                });
-            }
-            // Filter by file hint if provided
-            if let Some(ref file) = parsed.file_hint {
-                let file_lower = file.to_lowercase();
-                symbols.retain(|s| s.file.to_lowercase().contains(&file_lower));
-            }
-            if !symbols.is_empty() {
-                symbols.truncate(10);
-                return symbols;
-            }
+        // Filter by file hint if provided
+        if let Some(ref file) = parsed.file_hint {
+            let file_lower = file.to_lowercase();
+            symbols.retain(|s| s.file.to_lowercase().contains(&file_lower));
+        }
+        if !symbols.is_empty() {
+            symbols.truncate(10);
+            return symbols;
         }
     }
 
