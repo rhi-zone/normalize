@@ -622,12 +622,14 @@ async fn rebuild_data(
             // use None to let populate handle it via the last_commit comparison).
             None
         };
+        let db_path = root.join(".normalize").join("index.sqlite");
         match normalize_semantic::populate_embeddings(
             idx.connection(),
             &embeddings_config,
             changed.as_deref(),
             head_commit.as_deref(),
             Some(&root),
+            Some(&db_path),
         )
         .await
         {

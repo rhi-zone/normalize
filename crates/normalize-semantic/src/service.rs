@@ -8,7 +8,7 @@
 use crate::config::EmbeddingsConfig;
 use crate::search::SearchHit;
 use crate::store;
-use crate::vec_ext::register_vec_extension;
+use crate::vec_ext::VecConnection;
 use normalize_output::OutputFormatter;
 use serde::{Deserialize, Serialize};
 
@@ -132,16 +132,15 @@ pub async fn run_search(
         return Err("Semantic search not enabled.".to_string());
     }
 
-    // Register sqlite-vec as an auto-extension so the `vec_embeddings` virtual
-    // table is available on the connection we're about to open.  This is a
-    // no-op after the first call (guarded by OnceLock inside the function).
-    register_vec_extension();
-
     let idx = crate::open_index(root)
         .await
         .map_err(|e| format!("Failed to open index: {e}"))?;
 
     let conn = idx.connection();
+
+    // Open a parallel raw connection with sqlite-vec registered for ANN operations.
+    let db_path = root.join(".normalize").join("index.sqlite");
+    let vec_conn: Option<VecConnection> = VecConnection::open(&db_path);
 
     store::ensure_schema(conn)
         .await
@@ -150,7 +149,7 @@ pub async fn run_search(
     // Try to create the ANN virtual table.  The dimension count comes from the
     // embedder config; default 768 matches nomic-embed-text-v1.5.
     let dims = crate::embedder::dims_for_model(&config.model).unwrap_or(768);
-    store::ensure_vec_schema(conn, dims).await;
+    store::ensure_vec_schema(conn, dims, vec_conn.as_ref()).await;
 
     let total = store::count_embeddings(conn, &config.model)
         .await
@@ -190,8 +189,14 @@ pub async fn run_search(
     let query_bytes = crate::embedder::encode_vector(&query_vec);
     let ann_candidate_count = std::cmp::max(store::ANN_CANDIDATE_COUNT, top_k);
 
-    let (candidates, ann_used) = if let Some(ann_results) =
-        store::ann_search(conn, &config.model, &query_bytes, ann_candidate_count).await
+    let (candidates, ann_used) = if let Some(ann_results) = store::ann_search(
+        conn,
+        &config.model,
+        &query_bytes,
+        ann_candidate_count,
+        vec_conn.as_ref(),
+    )
+    .await
     {
         (ann_results, true)
     } else {

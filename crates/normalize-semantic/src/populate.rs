@@ -8,9 +8,10 @@ use crate::config::EmbeddingsConfig;
 use crate::embedder::{Embedder, encode_vector};
 use crate::git_staleness::compute_staleness_batch;
 use crate::store;
-use crate::vec_ext::register_vec_extension;
+use crate::vec_ext::VecConnection;
 use libsql::Connection;
 use std::collections::HashMap;
+use std::path::Path;
 use std::time::Instant;
 use tracing::{info, warn};
 
@@ -30,24 +31,28 @@ const EMBED_BATCH_SIZE: usize = 64;
 ///
 /// If `incremental` is true and `changed_paths` is provided, only symbols from
 /// those files are re-embedded. Otherwise all symbols are re-embedded.
+///
+/// `db_path` is the path to the SQLite database file, used to open a parallel
+/// raw connection with sqlite-vec registered for ANN virtual table operations.
 pub async fn populate_embeddings(
     conn: &Connection,
     config: &EmbeddingsConfig,
     changed_paths: Option<&[String]>,
     head_commit: Option<&str>,
     repo_root: Option<&std::path::Path>,
+    db_path: Option<&Path>,
 ) -> anyhow::Result<PopulateStats> {
     let started = Instant::now();
     let is_full_rebuild = changed_paths.is_none();
 
-    // Register sqlite-vec before touching the connection so that the
-    // `vec_embeddings` virtual table is available for subsequent operations.
-    register_vec_extension();
+    // Open a parallel raw connection with sqlite-vec registered for ANN
+    // virtual table operations (CREATE VIRTUAL TABLE, INSERT, DELETE).
+    let vec_conn: Option<VecConnection> = db_path.and_then(VecConnection::open);
 
     // For a full rebuild, drop and recreate tables instead of per-row deletes.
     // This avoids leaving massive dead pages in SQLite.
     if is_full_rebuild {
-        store::drop_embedding_tables(conn).await?;
+        store::drop_embedding_tables(conn, vec_conn.as_ref()).await?;
     }
 
     store::ensure_schema(conn).await?;
@@ -61,7 +66,7 @@ pub async fn populate_embeddings(
     );
 
     // Create the ANN virtual table now that we know the model's dimension count.
-    store::ensure_vec_schema(conn, embedder.dimensions).await;
+    store::ensure_vec_schema(conn, embedder.dimensions, vec_conn.as_ref()).await;
 
     let mut stats = PopulateStats::default();
 
@@ -79,7 +84,7 @@ pub async fn populate_embeddings(
     // If incremental, delete old embeddings for changed paths first
     if let Some(paths) = changed_paths {
         for path in paths {
-            store::delete_embeddings_for_path(conn, path).await?;
+            store::delete_embeddings_for_path(conn, path, vec_conn.as_ref()).await?;
         }
     }
 
@@ -129,6 +134,7 @@ pub async fn populate_embeddings(
                 head_commit,
                 &config.model,
                 &mut stats,
+                vec_conn.as_ref(),
             )
             .await;
             done += batch_symbols.len();
@@ -150,6 +156,7 @@ pub async fn populate_embeddings(
             head_commit,
             &config.model,
             &mut stats,
+            vec_conn.as_ref(),
         )
         .await;
         done += batch_symbols.len();
@@ -185,6 +192,7 @@ async fn flush_batch(
     head_commit: Option<&str>,
     model_name: &str,
     stats: &mut PopulateStats,
+    vec_conn: Option<&VecConnection>,
 ) {
     let text_refs: Vec<&str> = texts.iter().map(String::as_str).collect();
     match embedder.embed_batch(&text_refs) {
@@ -211,6 +219,7 @@ async fn flush_batch(
                     sym_staleness,
                     text,
                     &blob,
+                    vec_conn,
                 )
                 .await
                 {

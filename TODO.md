@@ -1130,7 +1130,7 @@ Config: `[embeddings] enabled = true` in `.normalize/config.toml`.
 - [x] Replace heuristic `strip_doc_markers()` with tree-sitter-based extraction: `FlatSymbol.docstring` now carries clean text from `Language::extract_docstring`; stored as `doc:<text>` in `symbol_attributes`; `populate.rs` uses it directly without post-processing
 - [ ] Daemon incremental: queue re-embedding on file change (follow-up)
 - [x] Staleness computation from git history: `git_staleness.rs` walks commits per-file (cached by path); formula `min(1.0, commits_before_last_touch / 50.0)` wired into `populate_embeddings` via new `repo_root` param
-- [x] ANN search via sqlite-vec: `vec_embeddings` virtual table (`vec0`) created alongside `embeddings`; `upsert_embedding` and deletes sync both tables; `run_search` tries ANN first (top-50 candidates), falls back to brute-force if extension unavailable; `SearchReport.ann_used` indicates which path was taken; extension registered via `sqlite3_auto_extension` transmute in `vec_ext.rs`
+- [x] ANN search via sqlite-vec: `vec_embeddings` virtual table (`vec0`) created alongside `embeddings`; `upsert_embedding` and deletes sync both tables; `run_search` tries ANN first (top-50 candidates), falls back to brute-force if extension unavailable; `SearchReport.ann_used` indicates which path was taken; extension registered per-connection via `VecConnection` (raw FFI handle with `sqlite3_vec_init` called directly, avoids `sqlite3_auto_extension` / libsql init conflict)
 - [ ] Embed markdown docs (SUMMARY.md, CLAUDE.md, ADRs) as additional source types (follow-up)
 - [ ] Embed commit messages as source type (follow-up)
 
