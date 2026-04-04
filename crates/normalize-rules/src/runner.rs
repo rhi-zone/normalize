@@ -1581,6 +1581,7 @@ pub fn run_rules_report(
         engine,
         RuleKind::All | RuleKind::Syntax | RuleKind::Fact | RuleKind::Native
     );
+    let daemon_start = std::time::Instant::now();
     let daemon_result = if daemon_covers_request {
         try_rules_via_daemon(
             project_root,
@@ -1593,6 +1594,7 @@ pub fn run_rules_report(
     };
 
     if let Some(daemon_issues) = daemon_result {
+        eprintln!("[timings] daemon-cache: {:.1?}", daemon_start.elapsed());
         for issue in daemon_issues {
             report.issues.push(issue);
         }
@@ -1606,6 +1608,7 @@ pub fn run_rules_report(
         if matches!(engine, RuleKind::All | RuleKind::Native) {
             report.sources_run.push("native".into());
         }
+        // TODO: daemon doesn't return files_checked — report.files_checked stays 0.
         report.daemon_cached = true;
     } else {
         // Fall back to local evaluation for each engine.
