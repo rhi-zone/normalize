@@ -1,6 +1,12 @@
 # Normalize configuration
 # See: https://github.com/rhi-zone/normalize
 
+[walk]
+# Exclude Claude Code's working directory (worktrees, settings) from all rules.
+# This is also covered by .gitignore but the explicit entry ensures walker exclusion
+# even when gitignore processing is disabled.
+exclude = [".git", ".claude"]
+
 [daemon]
 # enabled = true
 # auto_start = true

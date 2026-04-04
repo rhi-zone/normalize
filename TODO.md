@@ -853,8 +853,13 @@ the default path.
   the running daemon and get the pre-warmed Datalog cache instead of cold-evaluating. If no
   daemon is running, fall back to cold eval transparently.
 - [x] **Incremental syntax rules** — mtime-based per-file cache in `.normalize/syntax-cache.json`; nanosecond precision; invalidates on rule set change. Done in `crates/normalize-syntax-rules/src/runner.rs`.
-- [ ] **Incremental native rules** — stale-summary, broken-ref, ratchet, budget checks should
-  skip files whose content and deps haven't changed.
+- [x] **stale/missing-summary cold-cache batch pass** — replaced per-directory O(dirs × history) git
+  walks with a single O(history) pass in `git_batch_commit_stats`. Cold-cache run: 128s → 3.4s.
+  Warm-cache (cached HEAD) run: already fast at ~2.2s. Root cause of 5+ min runs was `.claude/`
+  worktrees (5190 dirs) not excluded from walker — fixed by `.gitignore` + `[walk] exclude`.
+- [ ] **Incremental native rules** — stale-summary cache invalidates on every new commit (keyed by
+  HEAD hash). Could be smarter: only recompute dirs touched since the previous HEAD. Would make
+  post-commit `normalize rules run --type native` fast even with a warm cache miss.
 - [ ] **Persistent query cache** — store per-file tree-sitter query results in the SQLite index
   so repeated `normalize view`, `normalize rank`, etc. don't re-parse unchanged files.
 

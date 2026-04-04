@@ -567,7 +567,7 @@ impl RulesService {
                             &missing_summary_paths,
                             &wc,
                         );
-                        tracing::debug!("[timings] missing-summary: {:.1?}", t.elapsed());
+                        eprintln!("[timings] missing-summary: {:.1?}", t.elapsed());
                         r
                     }
                 }),
@@ -583,7 +583,7 @@ impl RulesService {
                             &stale_summary_paths,
                             &wc,
                         );
-                        tracing::debug!("[timings] stale-summary: {:.1?}", t.elapsed());
+                        eprintln!("[timings] stale-summary: {:.1?}", t.elapsed());
                         r
                     }
                 }),
@@ -593,7 +593,7 @@ impl RulesService {
                     move || {
                         let t = std::time::Instant::now();
                         let r = normalize_native_rules::build_stale_docs_report(&root, &wc);
-                        tracing::debug!("[timings] stale-docs: {:.1?}", t.elapsed());
+                        eprintln!("[timings] stale-docs: {:.1?}", t.elapsed());
                         r
                     }
                 }),
@@ -603,7 +603,7 @@ impl RulesService {
                     move || {
                         let t = std::time::Instant::now();
                         let r = normalize_native_rules::build_check_examples_report(&root, &wc);
-                        tracing::debug!("[timings] check-examples: {:.1?}", t.elapsed());
+                        eprintln!("[timings] check-examples: {:.1?}", t.elapsed());
                         r
                     }
                 }),
@@ -614,7 +614,7 @@ impl RulesService {
                         &native_config.walk,
                     )
                     .await;
-                    tracing::debug!("[timings] check-refs: {:.1?}", t.elapsed());
+                    eprintln!("[timings] check-refs: {:.1?}", t.elapsed());
                     r
                 },
                 tokio::task::spawn_blocking({
@@ -622,7 +622,7 @@ impl RulesService {
                     move || {
                         let t = std::time::Instant::now();
                         let r = normalize_native_rules::build_ratchet_report(&root);
-                        tracing::debug!("[timings] ratchet: {:.1?}", t.elapsed());
+                        eprintln!("[timings] ratchet: {:.1?}", t.elapsed());
                         r
                     }
                 }),
@@ -631,7 +631,7 @@ impl RulesService {
                     move || {
                         let t = std::time::Instant::now();
                         let r = normalize_native_rules::build_budget_report(&root);
-                        tracing::debug!("[timings] budget: {:.1?}", t.elapsed());
+                        eprintln!("[timings] budget: {:.1?}", t.elapsed());
                         r
                     }
                 }),
@@ -719,7 +719,7 @@ impl RulesService {
                     })
                     .await
                     .ok();
-                    tracing::debug!("[timings] long-file: {:.1?}", t.elapsed());
+                    eprintln!("[timings] long-file: {:.1?}", t.elapsed());
                     r
                 },
                 async {
@@ -741,7 +741,7 @@ impl RulesService {
                     })
                     .await
                     .ok();
-                    tracing::debug!("[timings] high-complexity: {:.1?}", t.elapsed());
+                    eprintln!("[timings] high-complexity: {:.1?}", t.elapsed());
                     r
                 },
                 async {
@@ -763,7 +763,7 @@ impl RulesService {
                     })
                     .await
                     .ok();
-                    tracing::debug!("[timings] long-function: {:.1?}", t.elapsed());
+                    eprintln!("[timings] long-function: {:.1?}", t.elapsed());
                     r
                 },
                 async {
@@ -779,7 +779,7 @@ impl RulesService {
                     })
                     .await
                     .ok();
-                    tracing::debug!("[timings] stale-doc: {:.1?}", t.elapsed());
+                    eprintln!("[timings] stale-doc: {:.1?}", t.elapsed());
                     r
                 },
             );

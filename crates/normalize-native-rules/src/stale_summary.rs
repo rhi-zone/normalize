@@ -169,66 +169,29 @@ fn git_head(root: &Path) -> Option<String> {
     if s.is_empty() { None } else { Some(s) }
 }
 
-/// Returns the commit hash of the last commit touching `rel_path`, or None.
+/// Compute summary freshness for all directories in a single git history pass.
 ///
-/// Walks the commit history and diffs each commit against its first parent.
-fn git_last_commit(root: &Path, rel_path: &str) -> Option<String> {
-    let repo = gix_open(root)?;
-    let head_id = repo.head_id().ok()?;
-    let walk = head_id
-        .ancestors()
-        .sorting(gix::revision::walk::Sorting::ByCommitTime(
-            gix::traverse::commit::simple::CommitTimeOrder::NewestFirst,
-        ))
-        .all()
-        .ok()?;
-
-    for info in walk {
-        let Ok(info) = info else { continue };
-        let Ok(commit) = info.object() else { continue };
-        let Ok(tree) = commit.tree() else { continue };
-        let parent_tree = info
-            .parent_ids()
-            .next()
-            .and_then(|pid| pid.object().ok())
-            .and_then(|obj| obj.into_commit().tree().ok());
-        let changes = match repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), None) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-        let touches = changes.iter().any(|change| {
-            use gix::object::tree::diff::ChangeDetached;
-            let loc = match change {
-                ChangeDetached::Addition { location, .. }
-                | ChangeDetached::Deletion { location, .. }
-                | ChangeDetached::Modification { location, .. } => location.as_slice(),
-                ChangeDetached::Rewrite {
-                    source_location, ..
-                } => source_location.as_slice(),
-            };
-            loc == rel_path.as_bytes()
-        });
-        if touches {
-            return Some(info.id.to_hex().to_string());
-        }
-    }
-    None
-}
-
-/// Counts commits touching `rel_dir` since `since_commit` (exclusive).
-/// If `since_commit` is None, counts all commits touching `rel_dir`.
-fn git_commit_count(root: &Path, since_commit: Option<&str>, rel_dir: &str) -> usize {
+/// For each directory label in `dirs`, computes:
+/// - `last_doc_commit`: the most recent commit hash that touched any doc file in that dir
+/// - `commits_count`: the number of commits touching that dir since `last_doc_commit`
+///   (or all commits touching that dir if no doc file has ever been committed)
+///
+/// This replaces the per-directory `git_last_commit` + `git_commit_count` approach,
+/// which required O(dirs × history_length) git tree diffs. A single pass is O(history_length).
+///
+/// `doc_filenames` is the set of doc file basenames (e.g. `["SUMMARY.md", "CLAUDE.md"]`).
+/// `dirs` maps dir_label → (dir_path, is_root) for all directories to track.
+fn git_batch_commit_stats(
+    root: &Path,
+    dirs: &HashMap<String, (String, bool)>,
+    doc_filenames: &[&str],
+) -> HashMap<String, CacheEntry> {
     let Some(repo) = gix_open(root) else {
-        return 0;
+        return HashMap::new();
     };
     let Ok(head_id) = repo.head_id() else {
-        return 0;
+        return HashMap::new();
     };
-    // Resolve the stop-commit (exclusive) if provided.
-    let stop_id: Option<gix::hash::ObjectId> = since_commit.and_then(|h| {
-        let spec: &gix::bstr::BStr = h.as_bytes().into();
-        repo.rev_parse_single(spec).ok().map(|id| id.detach())
-    });
     let Ok(walk) = head_id
         .ancestors()
         .sorting(gix::revision::walk::Sorting::ByCommitTime(
@@ -236,15 +199,40 @@ fn git_commit_count(root: &Path, since_commit: Option<&str>, rel_dir: &str) -> u
         ))
         .all()
     else {
-        return 0;
+        return HashMap::new();
     };
 
-    let mut count = 0;
+    // Per-dir state: (last_doc_commit, commits_since_doc, found_doc)
+    // We count commits touching the dir BEFORE we've found the last doc commit.
+    // Once we find the doc commit (walking newest-first), we stop counting for that dir.
+    struct DirState {
+        last_doc_commit: Option<String>,
+        commits_since_doc: usize, // commits touching dir before doc commit found
+        doc_found: bool,
+    }
+
+    let mut states: HashMap<&str, DirState> = dirs
+        .keys()
+        .map(|label| {
+            (
+                label.as_str(),
+                DirState {
+                    last_doc_commit: None,
+                    commits_since_doc: 0,
+                    doc_found: false,
+                },
+            )
+        })
+        .collect();
+
+    // Build lookup: dir_label → (rel_dir_prefix, is_root)
+    let dir_info: Vec<(&str, &str, bool)> = dirs
+        .iter()
+        .map(|(label, (rel_dir, is_root))| (label.as_str(), rel_dir.as_str(), *is_root))
+        .collect();
+
     for info in walk {
         let Ok(info) = info else { continue };
-        if stop_id.is_some_and(|stop| info.id == stop) {
-            break;
-        }
         let Ok(commit) = info.object() else { continue };
         let Ok(tree) = commit.tree() else { continue };
         let parent_tree = info
@@ -256,13 +244,13 @@ fn git_commit_count(root: &Path, since_commit: Option<&str>, rel_dir: &str) -> u
             Ok(c) => c,
             Err(_) => continue,
         };
-        let is_root = rel_dir == ".";
-        let touches = if is_root {
-            !changes.is_empty()
-        } else {
-            changes.iter().any(|change| {
+
+        // Collect changed paths from this commit once.
+        let changed_paths: Vec<Vec<u8>> = changes
+            .iter()
+            .map(|change| {
                 use gix::object::tree::diff::ChangeDetached;
-                let loc = match change {
+                let loc: &[u8] = match &change {
                     ChangeDetached::Addition { location, .. }
                     | ChangeDetached::Deletion { location, .. }
                     | ChangeDetached::Modification { location, .. } => location.as_slice(),
@@ -270,14 +258,72 @@ fn git_commit_count(root: &Path, since_commit: Option<&str>, rel_dir: &str) -> u
                         source_location, ..
                     } => source_location.as_slice(),
                 };
-                loc.starts_with(rel_dir.as_bytes())
+                loc.to_vec()
             })
-        };
-        if touches {
-            count += 1;
+            .collect();
+
+        let commit_sha = info.id.to_hex().to_string();
+
+        for (label, rel_dir, is_root) in &dir_info {
+            let state = states.get_mut(*label).unwrap();
+            if state.doc_found {
+                continue; // already resolved this dir
+            }
+
+            // Check if this commit touches the directory.
+            let touches_dir = if *is_root {
+                !changed_paths.is_empty()
+            } else {
+                changed_paths.iter().any(|loc| {
+                    // loc starts with "rel_dir/" (include the slash to avoid false prefix matches)
+                    let prefix = rel_dir.as_bytes();
+                    loc.starts_with(prefix)
+                        && (loc.len() == prefix.len() || loc.get(prefix.len()) == Some(&b'/'))
+                })
+            };
+
+            if !touches_dir {
+                continue;
+            }
+
+            // Check if this commit touches a doc file in this directory.
+            let touches_doc = changed_paths.iter().any(|loc| {
+                let loc_str = std::str::from_utf8(loc).unwrap_or("");
+                doc_filenames.iter().any(|doc| {
+                    if *is_root {
+                        loc_str == *doc
+                    } else {
+                        let expected = format!("{}/{}", rel_dir, doc);
+                        loc_str == expected
+                    }
+                })
+            });
+
+            if touches_doc {
+                // This is the most recent doc commit for this dir.
+                state.last_doc_commit = Some(commit_sha.clone());
+                state.doc_found = true;
+                // commits_since_doc is already the count before this commit — correct.
+            } else {
+                // Commit touches dir but not a doc file — counts as a "stale" commit.
+                state.commits_since_doc += 1;
+            }
         }
     }
-    count
+
+    // Convert to CacheEntry format.
+    states
+        .into_iter()
+        .map(|(label, state)| {
+            (
+                label.to_string(),
+                CacheEntry {
+                    last_summary_commit: state.last_doc_commit,
+                    commits_count: state.commits_since_doc,
+                },
+            )
+        })
+        .collect()
 }
 
 /// Returns true if `rel_path` has a staged change (index differs from HEAD).
@@ -493,6 +539,37 @@ pub fn build_missing_summary_report(
 
     let dirs = walk_dirs(root, walk_config);
 
+    // Identify directories not covered by the cache — compute their stats in a single
+    // git history pass rather than one per directory.
+    let uncached_dirs: HashMap<String, (String, bool)> = dirs
+        .iter()
+        .filter(|(_, dir_label)| {
+            dir_matches_paths(dir_label, paths)
+                && cache
+                    .as_ref()
+                    .is_none_or(|c| !c.dirs.contains_key(dir_label))
+        })
+        .map(|(dir_path, dir_label)| {
+            let rel = dir_path
+                .strip_prefix(root)
+                .unwrap_or(dir_path)
+                .to_string_lossy();
+            let rel_dir = if rel.is_empty() {
+                ".".to_string()
+            } else {
+                rel.to_string()
+            };
+            let is_root = rel_dir == ".";
+            (dir_label.clone(), (rel_dir, is_root))
+        })
+        .collect();
+
+    let batch_results = if uncached_dirs.is_empty() {
+        HashMap::new()
+    } else {
+        git_batch_commit_stats(root, &uncached_dirs, &filenames)
+    };
+
     for (dir_path, dir_label) in &dirs {
         // Apply paths filter: skip directories that don't match any configured glob.
         if !dir_matches_paths(dir_label, paths) {
@@ -533,34 +610,14 @@ pub fn build_missing_summary_report(
             continue;
         }
 
-        let cached = cache.as_ref().and_then(|c| c.dirs.get(dir_label));
-        let (last_summary_commit, commits_count) = if let Some(entry) = cached {
-            (entry.last_summary_commit.clone(), entry.commits_count)
-        } else {
-            let mut best: Option<(String, usize)> = None;
-            for doc_path in &candidate_paths {
-                if let Some(last) = git_last_commit(root, doc_path) {
-                    let count = git_commit_count(root, Some(&last), &rel_dir_git);
-                    best = Some(match best {
-                        None => (last, count),
-                        Some((prev_hash, prev_count)) => {
-                            if count <= prev_count {
-                                (last, count)
-                            } else {
-                                (prev_hash, prev_count)
-                            }
-                        }
-                    });
-                }
-            }
-            match best {
-                Some((hash, count)) => (Some(hash), count),
-                None => {
-                    let count = git_commit_count(root, None, &rel_dir_git);
-                    (None, count)
-                }
-            }
-        };
+        let (last_summary_commit, commits_count) =
+            if let Some(entry) = cache.as_ref().and_then(|c| c.dirs.get(dir_label)) {
+                (entry.last_summary_commit.clone(), entry.commits_count)
+            } else if let Some(entry) = batch_results.get(dir_label) {
+                (entry.last_summary_commit.clone(), entry.commits_count)
+            } else {
+                (None, 0)
+            };
 
         updated_dirs.insert(
             dir_label.clone(),
@@ -647,6 +704,37 @@ pub fn build_stale_summary_report(
 
     let dirs = walk_dirs(root, walk_config);
 
+    // Identify directories not covered by the cache — compute their stats in a single
+    // git history pass rather than one per directory.
+    let uncached_dirs: HashMap<String, (String, bool)> = dirs
+        .iter()
+        .filter(|(_, dir_label)| {
+            dir_matches_paths(dir_label, paths)
+                && cache
+                    .as_ref()
+                    .is_none_or(|c| !c.dirs.contains_key(dir_label))
+        })
+        .map(|(dir_path, dir_label)| {
+            let rel = dir_path
+                .strip_prefix(root)
+                .unwrap_or(dir_path)
+                .to_string_lossy();
+            let rel_dir = if rel.is_empty() {
+                ".".to_string()
+            } else {
+                rel.to_string()
+            };
+            let is_root = rel_dir == ".";
+            (dir_label.clone(), (rel_dir, is_root))
+        })
+        .collect();
+
+    let batch_results = if uncached_dirs.is_empty() {
+        HashMap::new()
+    } else {
+        git_batch_commit_stats(root, &uncached_dirs, &filenames)
+    };
+
     for (dir_path, dir_label) in &dirs {
         // Apply paths filter: skip directories that don't match any configured glob.
         if !dir_matches_paths(dir_label, paths) {
@@ -696,37 +784,14 @@ pub fn build_stale_summary_report(
         // the directory is treated as missing — skip it here (handled by missing-summary).
         //
         // Cache key: dir_label — we store the best result across all candidates.
-        let cached = cache.as_ref().and_then(|c| c.dirs.get(dir_label));
-        let (last_summary_commit, commits_count) = if let Some(entry) = cached {
-            (entry.last_summary_commit.clone(), entry.commits_count)
-        } else {
-            // Try each candidate filename; pick the one with the fewest commits
-            // since its last update (i.e. the freshest doc file).
-            let mut best: Option<(String, usize)> = None; // (commit_hash, count)
-            for doc_path in &candidate_paths {
-                if let Some(last) = git_last_commit(root, doc_path) {
-                    let count = git_commit_count(root, Some(&last), &rel_dir_git);
-                    best = Some(match best {
-                        None => (last, count),
-                        Some((prev_hash, prev_count)) => {
-                            if count <= prev_count {
-                                (last, count)
-                            } else {
-                                (prev_hash, prev_count)
-                            }
-                        }
-                    });
-                }
-            }
-            match best {
-                Some((hash, count)) => (Some(hash), count),
-                None => {
-                    // No doc file has ever been committed — not our concern (missing-summary handles it).
-                    let count = git_commit_count(root, None, &rel_dir_git);
-                    (None, count)
-                }
-            }
-        };
+        let (last_summary_commit, commits_count) =
+            if let Some(entry) = cache.as_ref().and_then(|c| c.dirs.get(dir_label)) {
+                (entry.last_summary_commit.clone(), entry.commits_count)
+            } else if let Some(entry) = batch_results.get(dir_label) {
+                (entry.last_summary_commit.clone(), entry.commits_count)
+            } else {
+                (None, 0)
+            };
 
         // Store result for cache write.
         updated_dirs.insert(
