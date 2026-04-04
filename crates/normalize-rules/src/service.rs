@@ -546,6 +546,43 @@ impl RulesService {
                 .map(|r| r.rule_config())
                 .unwrap_or_default();
 
+            // Compute effective_files concurrently with group-1 rules so advisory
+            // rules (group 2) can start immediately after group 1 finishes rather
+            // than waiting for a sequential file walk.
+            let effective_files_future = {
+                let root = native_root.clone();
+                let pf = path_filter.clone();
+                let ef = explicit_files.clone();
+                let wc = native_config.walk.clone();
+                tokio::task::spawn_blocking(move || -> Option<Vec<std::path::PathBuf>> {
+                    if !pf.is_empty() {
+                        if let Some(ef) = ef {
+                            Some(
+                                ef.into_iter()
+                                    .filter(|p| {
+                                        let rel = p.strip_prefix(&root).unwrap_or(p);
+                                        pf.matches_path(rel)
+                                    })
+                                    .collect(),
+                            )
+                        } else {
+                            // Walk once, filtering by PathFilter, and share the list
+                            // across all advisory rules.
+                            Some(
+                                normalize_native_rules::walk::filtered_gitignore_walk(
+                                    &root, &pf, &wc,
+                                )
+                                .filter(|e| e.path().is_file())
+                                .map(|e| e.path().to_path_buf())
+                                .collect(),
+                            )
+                        }
+                    } else {
+                        None
+                    }
+                })
+            };
+
             let (
                 missing_res,
                 summary_res,
@@ -554,6 +591,7 @@ impl RulesService {
                 refs_res,
                 ratchet_res,
                 budget_res,
+                effective_files_res,
             ) = tokio::join!(
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
@@ -635,7 +673,14 @@ impl RulesService {
                         r
                     }
                 }),
+                effective_files_future,
             );
+
+            // Unwrap effective_files; fall back to explicit_files if the walk task failed.
+            let effective_files: Option<Vec<std::path::PathBuf>> = effective_files_res
+                .ok()
+                .flatten()
+                .or_else(|| explicit_files.clone());
 
             // Track how many issues existed before adding native results so
             // global_allow filtering only touches the newly added native issues.
@@ -662,39 +707,6 @@ impl RulesService {
             if let Ok(r) = budget_res {
                 report.merge(r.into());
             }
-
-            // When --only/--exclude is active but no --files given, merge the
-            // path filter into explicit_files so advisory rules skip non-matching
-            // files before parsing.  When --files *is* given, the filter refines
-            // the explicit list.
-            let effective_files: Option<Vec<std::path::PathBuf>> = if !path_filter.is_empty() {
-                if let Some(ref ef) = explicit_files {
-                    Some(
-                        ef.iter()
-                            .filter(|p| {
-                                let rel = p.strip_prefix(&native_root).unwrap_or(p);
-                                path_filter.matches_path(rel)
-                            })
-                            .cloned()
-                            .collect(),
-                    )
-                } else {
-                    // Walk once, filtering by PathFilter, and share the list
-                    // across all advisory rules.
-                    Some(
-                        normalize_native_rules::walk::filtered_gitignore_walk(
-                            &native_root,
-                            &path_filter,
-                            &native_config.walk,
-                        )
-                        .filter(|e| e.path().is_file())
-                        .map(|e| e.path().to_path_buf())
-                        .collect(),
-                    )
-                }
-            } else {
-                explicit_files.clone()
-            };
 
             // Advisory rules (default disabled — only run when explicitly enabled).
             // long-file / high-complexity / long-function are tree-sitter-heavy.
