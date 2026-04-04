@@ -1,7 +1,7 @@
 use normalize_output::OutputFormatter;
 use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::path::Path;
 
@@ -485,117 +485,97 @@ fn git_incremental_commit_stats(
     }
 }
 
-/// Returns true if `rel_path` has a staged change (index differs from HEAD).
-fn is_staged(repo: &gix::Repository, rel_path: &str) -> bool {
-    (|| -> Option<bool> {
-        let head_id = repo.head_id().ok()?;
-        let head_commit = head_id.object().ok()?.into_commit();
-        let head_tree = head_commit.tree().ok()?;
-        let entry_in_head = head_tree.lookup_entry_by_path(rel_path).ok().flatten();
-        let head_blob_id = entry_in_head.map(|e| e.id().detach());
-        let index = repo.index_or_empty().ok()?;
-        let rel_bstr: &gix::bstr::BStr = rel_path.as_bytes().into();
-        let index_blob_id = index.entry_by_path(rel_bstr).map(|e| e.id);
-        Some(index_blob_id != head_blob_id)
-    })()
-    .unwrap_or(false)
-}
-
-/// Returns true if `rel_path` has an unstaged change (worktree differs from index).
-fn is_unstaged(repo: &gix::Repository, rel_path: &str) -> bool {
-    let pattern: gix::bstr::BString = rel_path.into();
-    let platform = match repo.status(gix::progress::Discard) {
-        Ok(p) => p.index_worktree_options_mut(|opts| {
-            opts.dirwalk_options = None;
-        }),
-        Err(_) => return false,
-    };
-    let mut iter = match platform.into_index_worktree_iter(vec![pattern]) {
-        Ok(it) => it,
-        Err(_) => return false,
-    };
-    iter.any(|item| item.is_ok())
-}
-
-/// Returns true if `rel_dir` has uncommitted changes (staged or unstaged) that are
-/// NOT limited to doc files themselves (i.e., real content changes needing documentation).
+/// All paths with uncommitted changes (staged or unstaged), collected once for the whole repo.
 ///
-/// `doc_paths` lists the relative paths of doc files to exclude from the signal
-/// (e.g. `["SUMMARY.md", "src/SUMMARY.md"]`).
-fn git_has_uncommitted_content_changes(root: &Path, rel_dir: &str, doc_paths: &[String]) -> bool {
-    let Some(repo) = gix_open(root) else {
-        return false;
-    };
-    // Check staged changes (index vs HEAD) under rel_dir, excluding doc_paths.
-    let has_staged = (|| -> Option<bool> {
-        let head_id = repo.head_id().ok()?;
-        let head_commit = head_id.object().ok()?.into_commit();
-        let head_tree = head_commit.tree().ok()?;
-        let index = repo.index_or_empty().ok()?;
-        use gix::bstr::ByteSlice;
-        let is_root = rel_dir == ".";
-        for entry in index.entries() {
-            let rela = entry.path(&index);
-            let rela_str = rela.to_str_lossy();
-            if !is_root && !rela_str.starts_with(rel_dir) {
-                continue;
-            }
-            if doc_paths.iter().any(|dp| dp.as_str() == rela_str.as_ref()) {
-                continue;
-            }
-            let head_blob_id = head_tree
-                .lookup_entry_by_path(rela_str.as_ref())
-                .ok()
-                .flatten()
-                .map(|e| e.id().detach());
-            if head_blob_id.as_ref() != Some(&entry.id) {
-                return Some(true);
-            }
-        }
-        Some(false)
-    })()
-    .unwrap_or(false);
-
-    if has_staged {
-        return true;
-    }
-
-    // Check unstaged changes (index vs worktree) under rel_dir, excluding doc_paths.
-    let pattern: gix::bstr::BString = rel_dir.into();
-    let patterns = if rel_dir == "." {
-        Vec::new()
-    } else {
-        vec![pattern]
-    };
-    let platform = match repo.status(gix::progress::Discard) {
-        Ok(p) => p.index_worktree_options_mut(|opts| {
-            opts.dirwalk_options = None;
-        }),
-        Err(_) => return false,
-    };
-    let mut iter = match platform.into_index_worktree_iter(patterns) {
-        Ok(it) => it,
-        Err(_) => return false,
-    };
-    iter.any(|item| {
-        let Ok(item) = item else { return false };
-        use gix::bstr::ByteSlice;
-        let rela = item.rela_path().to_str_lossy();
-        !doc_paths.iter().any(|dp| dp.as_str() == rela.as_ref())
-    })
+/// Built once before the directory loop in both report builders; all per-directory checks
+/// then become pure in-memory prefix/membership tests — no further git I/O per directory.
+struct UncommittedChanges {
+    /// Paths (relative to repo root) with staged changes (index differs from HEAD).
+    staged: HashSet<String>,
+    /// Paths (relative to repo root) with unstaged changes (worktree differs from index).
+    unstaged: HashSet<String>,
 }
 
-/// Returns true if SUMMARY.md for `rel_dir` has uncommitted changes (it's being updated).
-fn git_summary_has_uncommitted_changes(root: &Path, summary_path: &str) -> bool {
-    let Some(repo) = gix_open(root) else {
-        return false;
-    };
-    // Check staged first (index vs HEAD).
-    if is_staged(&repo, summary_path) {
-        return true;
+impl UncommittedChanges {
+    /// Build once for the whole repo.  Opens the repository, reads the index and HEAD tree
+    /// for staged changes, then runs a single worktree status walk for unstaged changes.
+    fn load(root: &Path) -> Self {
+        let Some(repo) = gix_open(root) else {
+            return Self {
+                staged: HashSet::new(),
+                unstaged: HashSet::new(),
+            };
+        };
+
+        // Staged: collect all index entries that differ from HEAD.
+        let staged = (|| -> Option<HashSet<String>> {
+            use gix::bstr::ByteSlice;
+            let head_id = repo.head_id().ok()?;
+            let head_commit = head_id.object().ok()?.into_commit();
+            let head_tree = head_commit.tree().ok()?;
+            let index = repo.index_or_empty().ok()?;
+            let mut set = HashSet::new();
+            for entry in index.entries() {
+                let rela = entry.path(&index);
+                let rela_str = rela.to_str_lossy();
+                let head_blob_id = head_tree
+                    .lookup_entry_by_path(rela_str.as_ref())
+                    .ok()
+                    .flatten()
+                    .map(|e| e.id().detach());
+                // Present in index but not HEAD (new file), or different blob id = staged change.
+                if head_blob_id.as_ref() != Some(&entry.id) {
+                    set.insert(rela_str.into_owned());
+                }
+            }
+            Some(set)
+        })()
+        .unwrap_or_default();
+
+        // Unstaged: single status walk over the whole worktree with no path patterns.
+        let unstaged = (|| -> Option<HashSet<String>> {
+            use gix::bstr::ByteSlice;
+            let platform = repo
+                .status(gix::progress::Discard)
+                .ok()?
+                .index_worktree_options_mut(|opts| {
+                    opts.dirwalk_options = None;
+                });
+            let iter = platform
+                .into_index_worktree_iter(Vec::<gix::bstr::BString>::new())
+                .ok()?;
+            let mut set = HashSet::new();
+            for item in iter.flatten() {
+                let rela = item.rela_path().to_str_lossy();
+                set.insert(rela.into_owned());
+            }
+            Some(set)
+        })()
+        .unwrap_or_default();
+
+        Self { staged, unstaged }
     }
-    // Check unstaged (index vs worktree).
-    is_unstaged(&repo, summary_path)
+
+    /// Returns true if any changed file under `rel_dir` (excluding `doc_paths`) exists.
+    ///
+    /// Used to detect content changes that should trigger a doc-freshness warning.
+    fn has_content_changes(&self, rel_dir: &str, doc_paths: &[String]) -> bool {
+        let is_root = rel_dir == ".";
+        let check = |path: &str| -> bool {
+            if !is_root && !path.starts_with(rel_dir) {
+                return false;
+            }
+            !doc_paths.iter().any(|dp| dp.as_str() == path)
+        };
+        self.staged.iter().any(|p| check(p)) || self.unstaged.iter().any(|p| check(p))
+    }
+
+    /// Returns true if the given doc file path itself has uncommitted changes.
+    ///
+    /// Used to skip stale/missing reporting when the doc is already being updated.
+    fn summary_has_changes(&self, summary_path: &str) -> bool {
+        self.staged.contains(summary_path) || self.unstaged.contains(summary_path)
+    }
 }
 
 /// Default filenames checked by `stale-summary` and `missing-summary` when none are configured.
@@ -757,6 +737,9 @@ pub fn build_missing_summary_report(
         git_batch_commit_stats(root, &uncached_dirs, &filenames)
     };
 
+    // Collect all uncommitted changes once before the loop to avoid per-directory git I/O.
+    let uncommitted = UncommittedChanges::load(root);
+
     for (dir_path, dir_label) in &dirs {
         // Apply paths filter: skip directories that don't match any configured glob.
         if !dir_matches_paths(dir_label, paths) {
@@ -785,14 +768,13 @@ pub fn build_missing_summary_report(
             })
             .collect();
 
-        // git status is cheap — always re-check for uncommitted changes.
-        let content_dirty =
-            git_has_uncommitted_content_changes(root, &rel_dir_git, &candidate_paths);
+        // Always re-check for uncommitted content changes (in-memory after the batched load).
+        let content_dirty = uncommitted.has_content_changes(&rel_dir_git, &candidate_paths);
 
         // If ANY candidate doc file is staged (about to be committed), skip the check.
         let any_doc_dirty = candidate_paths
             .iter()
-            .any(|p| git_summary_has_uncommitted_changes(root, p));
+            .any(|p| uncommitted.summary_has_changes(p));
         if any_doc_dirty {
             continue;
         }
@@ -948,6 +930,9 @@ pub fn build_stale_summary_report(
         git_batch_commit_stats(root, &uncached_dirs, &filenames)
     };
 
+    // Collect all uncommitted changes once before the loop to avoid per-directory git I/O.
+    let uncommitted = UncommittedChanges::load(root);
+
     for (dir_path, dir_label) in &dirs {
         // Apply paths filter: skip directories that don't match any configured glob.
         if !dir_matches_paths(dir_label, paths) {
@@ -978,16 +963,15 @@ pub fn build_stale_summary_report(
             })
             .collect();
 
-        // git status is cheap — always re-check for uncommitted changes.
+        // Always re-check for uncommitted content changes (in-memory after the batched load).
         // "content_dirty" excludes all candidate doc files from the signal.
-        let content_dirty =
-            git_has_uncommitted_content_changes(root, &rel_dir_git, &candidate_paths);
+        let content_dirty = uncommitted.has_content_changes(&rel_dir_git, &candidate_paths);
 
         // If ANY candidate doc file is staged (about to be committed), skip the
         // staleness check: the pending commit will fix it.
         let any_doc_dirty = candidate_paths
             .iter()
-            .any(|p| git_summary_has_uncommitted_changes(root, p));
+            .any(|p| uncommitted.summary_has_changes(p));
         if any_doc_dirty {
             continue;
         }

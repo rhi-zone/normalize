@@ -93,8 +93,24 @@ fn reset_sigpipe() {
 #[cfg(not(unix))]
 fn reset_sigpipe() {}
 
+/// Ensure SQLite is initialized in serialized threading mode before any connections open.
+///
+/// Both `libsql` (used by normalize-facts) and `rusqlite` (used by normalize-native-rules
+/// and normalize-syntax-rules) link against the same SQLite build. `libsql` requires
+/// serialized mode and panics if `sqlite3_config(SQLITE_CONFIG_SERIALIZED)` fails — which
+/// happens when SQLite is already initialized (rusqlite opens first during syntax rules).
+///
+/// Fix: open a throw-away libsql in-memory database here, which triggers libsql's
+/// `LIBSQL_INIT.call_once()` that sets serialized mode *before* any rusqlite connection
+/// opens. The `call_once` is no-op on subsequent calls, so later libsql opens are safe.
+#[allow(deprecated)] // open_in_memory is deprecated in favour of Builder::new_local (async)
+fn init_sqlite_serialized() {
+    let _ = libsql::Database::open_in_memory();
+}
+
 #[tokio::main]
 async fn main() -> std::process::ExitCode {
+    init_sqlite_serialized();
     reset_sigpipe();
 
     let argv: Vec<std::ffi::OsString> = std::env::args_os().collect();
