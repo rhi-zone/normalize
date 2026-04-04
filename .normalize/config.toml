@@ -340,3 +340,5 @@ command = ["sh", "{root}/scripts/validate-calls-scm.sh", "{root}"]
 
 [aliases]
 todo = ["TODO.md"]
+[embeddings]
+enabled = true
