@@ -17,7 +17,9 @@ pub mod stale_docs;
 pub mod stale_summary;
 pub mod walk;
 
-pub use cache::{FindingsCache, file_mtime_nanos as cache_file_mtime_nanos};
+pub use cache::{
+    FileRule, FindingsCache, file_mtime_nanos as cache_file_mtime_nanos, run_file_rule,
+};
 
 pub use budget::{BudgetRulesReport, build_budget_report};
 pub use check_examples::build_check_examples_report;

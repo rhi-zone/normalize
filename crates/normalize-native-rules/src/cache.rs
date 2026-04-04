@@ -99,3 +99,111 @@ pub fn file_mtime_nanos(path: &Path) -> u64 {
         })
         .unwrap_or(0)
 }
+
+/// Trait for native rules that check individual files.
+///
+/// Implementing this trait gives automatic SQLite caching and parallel execution.
+/// Rule authors implement `check_file()` and `to_diagnostics()` — the framework handles the rest.
+pub trait FileRule: Send + Sync {
+    /// Serializable per-file finding type.
+    type Finding: serde::Serialize + serde::de::DeserializeOwned + Send;
+
+    /// Unique engine name for cache keying (e.g. "long-function", "high-complexity").
+    fn engine_name(&self) -> &str;
+
+    /// Config hash for cache invalidation (e.g. threshold.to_string()).
+    fn config_hash(&self) -> String;
+
+    /// Check a single file. Returns findings for that file.
+    /// `path` is absolute, `root` is the project root for computing relative paths.
+    fn check_file(&self, path: &Path, root: &Path) -> Vec<Self::Finding>;
+
+    /// Convert collected findings into a DiagnosticsReport.
+    /// `findings` maps file path to that file's findings.
+    /// `files_checked` is the total number of files examined (cached + fresh).
+    fn to_diagnostics(
+        &self,
+        findings: Vec<(std::path::PathBuf, Vec<Self::Finding>)>,
+        root: &Path,
+        files_checked: usize,
+    ) -> normalize_output::diagnostics::DiagnosticsReport;
+}
+
+/// Run a `FileRule` against a set of files with automatic caching and parallel execution.
+///
+/// 1. Walk files (or use `explicit_files`)
+/// 2. Check cache for each file (sequential — fast DB lookups)
+/// 3. Compute cache misses in parallel (rayon `par_iter`)
+/// 4. Store new results in cache
+/// 5. Merge cached + fresh findings and call `to_diagnostics()`
+pub fn run_file_rule<R: FileRule>(
+    rule: &R,
+    root: &Path,
+    explicit_files: Option<&[std::path::PathBuf]>,
+    walk_config: &normalize_rules_config::WalkConfig,
+) -> normalize_output::diagnostics::DiagnosticsReport {
+    let files: Vec<std::path::PathBuf> = if let Some(ef) = explicit_files {
+        ef.iter()
+            .filter(|p| p.is_file())
+            .filter(|p| normalize_languages::support_for_path(p).is_some())
+            .cloned()
+            .collect()
+    } else {
+        super::walk::gitignore_walk(root, walk_config)
+            .filter(|e| e.path().is_file())
+            .filter(|e| normalize_languages::support_for_path(e.path()).is_some())
+            .map(|e| e.path().to_path_buf())
+            .collect()
+    };
+
+    let files_checked = files.len();
+    let cache = FindingsCache::open(root);
+    let config_hash = rule.config_hash();
+    let engine = rule.engine_name();
+
+    // Phase 1: separate cache hits from misses (sequential, fast DB lookups).
+    let mut cached_findings: Vec<(std::path::PathBuf, Vec<R::Finding>)> = Vec::new();
+    let mut cache_misses: Vec<std::path::PathBuf> = Vec::new();
+
+    for file in &files {
+        let path_key = file.to_string_lossy().to_string();
+        let mtime = file_mtime_nanos(file);
+        if mtime > 0
+            && let Some(json) = cache.get(&path_key, mtime, &config_hash, engine)
+            && let Ok(findings) = serde_json::from_str::<Vec<R::Finding>>(&json)
+        {
+            cached_findings.push((file.clone(), findings));
+            continue;
+        }
+        cache_misses.push(file.clone());
+    }
+
+    // Phase 2: compute misses in parallel.
+    use rayon::prelude::*;
+    let fresh_findings: Vec<(std::path::PathBuf, Vec<R::Finding>)> = cache_misses
+        .par_iter()
+        .map(|path| {
+            let findings = rule.check_file(path, root);
+            (path.clone(), findings)
+        })
+        .collect();
+
+    // Phase 3: store fresh results in cache.
+    for (path, findings) in &fresh_findings {
+        let path_key = path.to_string_lossy().to_string();
+        let mtime = file_mtime_nanos(path);
+        if mtime > 0
+            && let Ok(json) = serde_json::to_string(findings)
+        {
+            cache.put(&path_key, mtime, &config_hash, engine, &json);
+        }
+    }
+
+    cache.flush();
+
+    // Phase 4: merge and build report.
+    let mut all_findings: Vec<(std::path::PathBuf, Vec<R::Finding>)> = cached_findings;
+    all_findings.extend(fresh_findings);
+
+    rule.to_diagnostics(all_findings, root, files_checked)
+}

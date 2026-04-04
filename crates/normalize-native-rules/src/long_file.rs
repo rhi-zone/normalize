@@ -5,15 +5,14 @@
 use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 use std::path::Path;
 
-use crate::cache::{FindingsCache, file_mtime_nanos};
-use crate::walk::gitignore_walk;
+use crate::cache::{FileRule, run_file_rule};
 use normalize_rules_config::WalkConfig;
 
-/// Serializable entry for the long-file findings cache.
-/// Stores the line count; `None` means the file was checked and was under threshold.
+/// Serializable per-file finding for the long-file rule.
 #[derive(serde::Serialize, serde::Deserialize)]
-struct CachedEntry {
-    line_count: Option<usize>,
+pub struct LongFileFinding {
+    rel_path: String,
+    line_count: usize,
 }
 
 /// Well-known lock files that should never be flagged as large.
@@ -63,44 +62,34 @@ fn load_allow_patterns(root: &Path) -> Vec<glob::Pattern> {
         .collect()
 }
 
-/// Build a `DiagnosticsReport` for the `long-file` rule.
-///
-/// Walks all source files under `root`, counts lines, and emits an issue for
-/// each file exceeding the threshold. Lock files and allowlisted paths are
-/// skipped.
-pub fn build_long_file_report(
-    root: &Path,
-    threshold: usize,
-    files: Option<&[std::path::PathBuf]>,
-    walk_config: &WalkConfig,
-) -> DiagnosticsReport {
-    let allow_patterns = load_allow_patterns(root);
-    let cache = FindingsCache::open(root);
-    let config_hash = threshold.to_string();
-    const ENGINE: &str = "long-file";
+/// Rule that flags source files exceeding a line count threshold.
+pub struct LongFileRule {
+    pub threshold: usize,
+    allow_patterns: Vec<glob::Pattern>,
+}
 
-    let mut issues = Vec::new();
-    let mut files_checked = 0usize;
+impl LongFileRule {
+    /// Create a new `LongFileRule`, loading allowlist patterns from the project root.
+    pub fn new(threshold: usize, root: &Path) -> Self {
+        Self {
+            threshold,
+            allow_patterns: load_allow_patterns(root),
+        }
+    }
+}
 
-    let walked_files: Vec<std::path::PathBuf>;
-    let file_paths: Box<dyn Iterator<Item = &std::path::Path>> = if let Some(explicit) = files {
-        Box::new(
-            explicit
-                .iter()
-                .filter(|p| p.is_file())
-                .filter(|p| normalize_languages::support_for_path(p).is_some())
-                .map(|p| p.as_path()),
-        )
-    } else {
-        walked_files = gitignore_walk(root, walk_config)
-            .filter(|e| e.path().is_file())
-            .filter(|e| normalize_languages::support_for_path(e.path()).is_some())
-            .map(|e| e.path().to_path_buf())
-            .collect();
-        Box::new(walked_files.iter().map(|p| p.as_path()))
-    };
+impl FileRule for LongFileRule {
+    type Finding = LongFileFinding;
 
-    for path in file_paths {
+    fn engine_name(&self) -> &str {
+        "long-file"
+    }
+
+    fn config_hash(&self) -> String {
+        self.threshold.to_string()
+    }
+
+    fn check_file(&self, path: &Path, root: &Path) -> Vec<Self::Finding> {
         let rel_path = path
             .strip_prefix(root)
             .unwrap_or(path)
@@ -113,103 +102,93 @@ pub fn build_long_file_report(
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_default();
         if is_lockfile(&file_name) {
-            continue;
+            return Vec::new();
         }
 
         // Skip allowlisted paths.
-        if allow_patterns.iter().any(|p| p.matches(&rel_path)) {
-            continue;
-        }
-
-        files_checked += 1;
-
-        let path_key = path.to_string_lossy().to_string();
-        let mtime = file_mtime_nanos(path);
-
-        // Cache hit: emit the previously computed line count.
-        if mtime > 0
-            && let Some(json) = cache.get(&path_key, mtime, &config_hash, ENGINE)
-            && let Ok(entry) = serde_json::from_str::<CachedEntry>(&json)
-        {
-            if let Some(lines) = entry.line_count {
-                issues.push(Issue {
-                    file: rel_path,
-                    line: None,
-                    column: None,
-                    end_line: None,
-                    end_column: None,
-                    rule_id: "long-file".into(),
-                    message: format!("{lines} lines (threshold: {threshold})"),
-                    severity: Severity::Warning,
-                    source: "long-file".into(),
-                    related: vec![],
-                    suggestion: Some("consider splitting into smaller, focused modules".into()),
-                });
-            }
-            continue;
+        if self.allow_patterns.iter().any(|p| p.matches(&rel_path)) {
+            return Vec::new();
         }
 
         let lines = match std::fs::read_to_string(path) {
             Ok(content) => content.lines().count(),
-            Err(_) => continue,
+            Err(_) => return Vec::new(),
         };
 
-        // Store result in cache (even if under threshold, so we skip the read next time).
-        if mtime > 0 {
-            let entry = CachedEntry {
-                line_count: if lines >= threshold {
-                    Some(lines)
-                } else {
-                    None
-                },
-            };
-            if let Ok(json) = serde_json::to_string(&entry) {
-                cache.put(&path_key, mtime, &config_hash, ENGINE, &json);
-            }
+        if lines >= self.threshold {
+            vec![LongFileFinding {
+                rel_path,
+                line_count: lines,
+            }]
+        } else {
+            Vec::new()
         }
+    }
 
-        if lines >= threshold {
-            issues.push(Issue {
-                file: rel_path,
+    fn to_diagnostics(
+        &self,
+        findings: Vec<(std::path::PathBuf, Vec<Self::Finding>)>,
+        _root: &Path,
+        files_checked: usize,
+    ) -> DiagnosticsReport {
+        let threshold = self.threshold;
+
+        let mut issues: Vec<Issue> = findings
+            .into_iter()
+            .flat_map(|(_path, file_findings)| file_findings)
+            .map(|f| Issue {
+                file: f.rel_path,
                 line: None,
                 column: None,
                 end_line: None,
                 end_column: None,
                 rule_id: "long-file".into(),
-                message: format!("{lines} lines (threshold: {threshold})"),
+                message: format!("{} lines (threshold: {threshold})", f.line_count),
                 severity: Severity::Warning,
                 source: "long-file".into(),
                 related: vec![],
                 suggestion: Some("consider splitting into smaller, focused modules".into()),
-            });
+            })
+            .collect();
+
+        // Sort by line count descending.
+        issues.sort_by(|a, b| {
+            let a_lines: usize = a
+                .message
+                .split(' ')
+                .next()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            let b_lines: usize = b
+                .message
+                .split(' ')
+                .next()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            b_lines.cmp(&a_lines)
+        });
+
+        DiagnosticsReport {
+            issues,
+            files_checked,
+            sources_run: vec!["long-file".into()],
+            tool_errors: vec![],
+            daemon_cached: false,
         }
     }
+}
 
-    cache.flush();
-
-    // Sort by line count descending.
-    issues.sort_by(|a, b| {
-        // Extract line count from message for sorting.
-        let a_lines: usize = a
-            .message
-            .split(' ')
-            .next()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0);
-        let b_lines: usize = b
-            .message
-            .split(' ')
-            .next()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0);
-        b_lines.cmp(&a_lines)
-    });
-
-    DiagnosticsReport {
-        issues,
-        files_checked,
-        sources_run: vec!["long-file".into()],
-        tool_errors: vec![],
-        daemon_cached: false,
-    }
+/// Build a `DiagnosticsReport` for the `long-file` rule.
+///
+/// Walks all source files under `root`, counts lines, and emits an issue for
+/// each file exceeding the threshold. Lock files and allowlisted paths are
+/// skipped.
+pub fn build_long_file_report(
+    root: &Path,
+    threshold: usize,
+    files: Option<&[std::path::PathBuf]>,
+    walk_config: &WalkConfig,
+) -> DiagnosticsReport {
+    let rule = LongFileRule::new(threshold, root);
+    run_file_rule(&rule, root, files, walk_config)
 }

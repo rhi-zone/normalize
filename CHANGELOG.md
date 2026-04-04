@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **`FileRule` trait for native file-based rules** — `long-function`, `high-complexity`, and `long-file` now implement a `FileRule` trait that provides automatic SQLite caching and parallel execution. New file-based rules get caching for free by implementing `check_file()` and `to_diagnostics()`.
 - **Tiered help output** — `normalize --help` now groups commands into four sections (Core, Analysis, Utilities, Infrastructure) instead of a flat alphabetical list. Core commands (view, grep, edit, rules, structure, init) appear first. Uses server-less `#[server(groups(...))]` support extended to work with mounted subcommands.
 
 ### Performance
