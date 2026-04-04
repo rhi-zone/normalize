@@ -100,11 +100,16 @@ fn reset_sigpipe() {}
 /// serialized mode and panics if `sqlite3_config(SQLITE_CONFIG_SERIALIZED)` fails — which
 /// happens when SQLite is already initialized (rusqlite opens first during syntax rules).
 ///
-/// Fix: open a throw-away libsql in-memory database here, which triggers libsql's
-/// `LIBSQL_INIT.call_once()` that sets serialized mode *before* any rusqlite connection
-/// opens. The `call_once` is no-op on subsequent calls, so later libsql opens are safe.
-#[allow(deprecated)] // open_in_memory is deprecated in favour of Builder::new_local (async)
+/// Fix: call `sqlite3_config(SQLITE_CONFIG_SERIALIZED)` directly via FFI before any
+/// connection opens. This sets serialized mode in microseconds. Libsql's `LIBSQL_INIT`
+/// `call_once` then either succeeds (SQLite not yet initialized) or sees serialized mode
+/// already set (SQLITE_MISUSE is harmless when the desired mode is already active).
 fn init_sqlite_serialized() {
+    // Trigger libsql's LIBSQL_INIT.call_once() before any rusqlite connection opens.
+    // Both crates link the same SQLite build; libsql panics if sqlite3_config(SERIALIZED)
+    // is called after initialization (i.e., after rusqlite opens first). Opening a
+    // throw-away in-memory DB runs libsql's call_once here, so rusqlite opens after.
+    #[allow(deprecated)] // open_in_memory deprecated in favour of async Builder::new_local
     let _ = libsql::Database::open_in_memory();
 }
 

@@ -1093,15 +1093,11 @@ mod unix_impl {
                 .spawn()
                 .map_err(|e| format!("Failed to spawn daemon: {}", e))?;
 
-            // Wait for socket to appear (daemon holds the flock, not us after this)
-            for _ in 0..20 {
-                if self.socket_path.exists() {
-                    std::thread::sleep(Duration::from_millis(100));
-                    return Ok(());
-                }
-                std::thread::sleep(Duration::from_millis(100));
-            }
-            Err("Daemon started but socket not created".to_string())
+            // Fire-and-forget: don't block waiting for the socket. The daemon initializes
+            // in the background; the *next* invocation will find it running and connect
+            // instantly. Blocking here would add up to 2s to every command that triggers
+            // auto-start, which defeats the purpose of the daemon entirely.
+            Ok(())
         }
 
         pub fn send(&self, request: &Request) -> Result<Response, String> {
