@@ -68,42 +68,63 @@ impl From<CachedFinding> for Finding {
     }
 }
 
-/// Per-file cache entry: mtime + findings from the last successful run.
-#[derive(serde::Serialize, serde::Deserialize)]
-struct FileCacheEntry {
-    /// Nanoseconds since UNIX epoch (subsecond precision avoids false hits within the same second).
-    mtime_nanos: u128,
-    findings: Vec<CachedFinding>,
-}
-
-/// On-disk cache for syntax-rule findings, keyed by file path.
+/// SQLite-backed per-file findings cache for the syntax engine.
 ///
-/// Stored at `.normalize/syntax-cache.json` inside the project root.
-/// Invalidated in full when the active rule set changes.
-#[derive(Default, serde::Serialize, serde::Deserialize)]
-struct SyntaxCache {
-    /// Hash of the active rule IDs + their query source, used for global invalidation.
-    rules_hash: String,
-    files: HashMap<String, FileCacheEntry>,
+/// Stored at `<project_root>/.normalize/findings-cache.sqlite`.
+/// This is a private duplicate of the `FindingsCache` in `normalize-native-rules`
+/// to avoid a heavy cross-crate dependency for a small utility.
+struct FindingsCache {
+    conn: rusqlite::Connection,
 }
 
-impl SyntaxCache {
-    fn load(project_root: &Path) -> Self {
-        let path = project_root.join(".normalize/syntax-cache.json");
-        if let Ok(data) = std::fs::read_to_string(&path) {
-            serde_json::from_str(&data).unwrap_or_default()
-        } else {
-            Self::default()
-        }
-    }
-
-    fn save(&self, project_root: &Path) {
+impl FindingsCache {
+    fn open(project_root: &Path) -> Self {
         let dir = project_root.join(".normalize");
         let _ = std::fs::create_dir_all(&dir);
-        let path = dir.join("syntax-cache.json");
-        if let Ok(json) = serde_json::to_string(self) {
-            let _ = std::fs::write(path, json);
-        }
+        let db_path = dir.join("findings-cache.sqlite");
+        let conn = rusqlite::Connection::open(&db_path)
+            .or_else(|_| rusqlite::Connection::open_in_memory())
+            .expect("failed to open in-memory SQLite connection");
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS findings_cache (
+                path TEXT NOT NULL,
+                engine TEXT NOT NULL,
+                mtime_nanos INTEGER NOT NULL,
+                config_hash TEXT NOT NULL,
+                findings_json TEXT NOT NULL,
+                PRIMARY KEY (path, engine)
+            );",
+        )
+        .ok();
+        Self { conn }
+    }
+
+    fn get(&self, path: &str, mtime_nanos: u64, config_hash: &str, engine: &str) -> Option<String> {
+        self.conn
+            .query_row(
+                "SELECT findings_json FROM findings_cache
+                 WHERE path = ?1 AND engine = ?2 AND mtime_nanos = ?3 AND config_hash = ?4",
+                rusqlite::params![path, engine, mtime_nanos as i64, config_hash],
+                |row| row.get::<_, String>(0),
+            )
+            .ok()
+    }
+
+    fn put(
+        &self,
+        path: &str,
+        mtime_nanos: u64,
+        config_hash: &str,
+        engine: &str,
+        findings_json: &str,
+    ) {
+        self.conn
+            .execute(
+                "INSERT OR REPLACE INTO findings_cache (path, engine, mtime_nanos, config_hash, findings_json)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                rusqlite::params![path, engine, mtime_nanos as i64, config_hash, findings_json],
+            )
+            .ok();
     }
 }
 
@@ -119,17 +140,17 @@ fn compute_rules_hash(rules: &[&Rule]) -> String {
     format!("{:x}", hasher.finish())
 }
 
-/// Get the mtime of a file in nanoseconds since UNIX epoch, or 0 on failure.
+/// Get the mtime of a file in nanoseconds since UNIX epoch cast to `u64`, or 0 on failure.
 ///
 /// Nanosecond precision is used to avoid false cache hits when a file is
 /// modified within the same second (e.g. during multi-pass fix application in
-/// tests and CI).
-fn file_mtime_nanos(path: &Path) -> u128 {
+/// tests and CI). `u64` fits in SQLite's 64-bit signed INTEGER.
+fn file_mtime_nanos(path: &Path) -> u64 {
     path.metadata()
         .and_then(|m| m.modified())
         .map(|t| {
             t.duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
+                .map(|d| d.as_nanos() as u64)
                 .unwrap_or(0)
         })
         .unwrap_or(0)
@@ -546,13 +567,10 @@ pub fn run_rules(
         return findings;
     }
 
-    // Load the on-disk cache and invalidate if the rule set changed.
-    let mut cache = SyntaxCache::load(&abs_project_root);
+    // Open the SQLite findings cache.
+    let cache = FindingsCache::open(&abs_project_root);
     let rules_hash = compute_rules_hash(&active_rules);
-    if cache.rules_hash != rules_hash {
-        cache.files.clear();
-        cache.rules_hash = rules_hash;
-    }
+    const ENGINE: &str = "syntax";
 
     let files = if let Some(explicit) = files {
         // Use the provided file list, filtering to supported languages.
@@ -619,10 +637,10 @@ pub fn run_rules(
 
             // Cache hit: file is unchanged since the last run.
             if mtime_nanos > 0
-                && let Some(entry) = cache.files.get(&file_key)
-                && entry.mtime_nanos == mtime_nanos
+                && let Some(json) = cache.get(&file_key, mtime_nanos, &rules_hash, ENGINE)
             {
-                findings.extend(entry.findings.iter().cloned().map(Finding::from));
+                let cached: Vec<CachedFinding> = serde_json::from_str(&json).unwrap_or_default();
+                findings.extend(cached.into_iter().map(Finding::from));
                 continue;
             }
 
@@ -654,17 +672,16 @@ pub fn run_rules(
             process_file_matches(&file_ctx, &tree, combined, &mut file_findings);
 
             // Update cache entry for this file.
-            cache.files.insert(
-                file_key,
-                FileCacheEntry {
-                    mtime_nanos,
-                    findings: file_findings
-                        .iter()
-                        .cloned()
-                        .map(CachedFinding::from)
-                        .collect(),
-                },
-            );
+            if mtime_nanos > 0 {
+                let cached: Vec<CachedFinding> = file_findings
+                    .iter()
+                    .cloned()
+                    .map(CachedFinding::from)
+                    .collect();
+                if let Ok(json) = serde_json::to_string(&cached) {
+                    cache.put(&file_key, mtime_nanos, &rules_hash, ENGINE, &json);
+                }
+            }
 
             findings.extend(file_findings);
         }
@@ -678,8 +695,6 @@ pub fn run_rules(
         );
         eprintln!("[timing] total: {:?}", start.elapsed());
     }
-
-    cache.save(&abs_project_root);
 
     findings
 }

@@ -5,8 +5,16 @@
 use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 use std::path::Path;
 
+use crate::cache::{FindingsCache, file_mtime_nanos};
 use crate::walk::gitignore_walk;
 use normalize_rules_config::WalkConfig;
+
+/// Serializable entry for the long-file findings cache.
+/// Stores the line count; `None` means the file was checked and was under threshold.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CachedEntry {
+    line_count: Option<usize>,
+}
 
 /// Well-known lock files that should never be flagged as large.
 fn is_lockfile(name: &str) -> bool {
@@ -67,6 +75,9 @@ pub fn build_long_file_report(
     walk_config: &WalkConfig,
 ) -> DiagnosticsReport {
     let allow_patterns = load_allow_patterns(root);
+    let cache = FindingsCache::open(root);
+    let config_hash = threshold.to_string();
+    const ENGINE: &str = "long-file";
 
     let mut issues = Vec::new();
     let mut files_checked = 0usize;
@@ -112,10 +123,50 @@ pub fn build_long_file_report(
 
         files_checked += 1;
 
+        let path_key = path.to_string_lossy().to_string();
+        let mtime = file_mtime_nanos(path);
+
+        // Cache hit: emit the previously computed line count.
+        if mtime > 0
+            && let Some(json) = cache.get(&path_key, mtime, &config_hash, ENGINE)
+            && let Ok(entry) = serde_json::from_str::<CachedEntry>(&json)
+        {
+            if let Some(lines) = entry.line_count {
+                issues.push(Issue {
+                    file: rel_path,
+                    line: None,
+                    column: None,
+                    end_line: None,
+                    end_column: None,
+                    rule_id: "long-file".into(),
+                    message: format!("{lines} lines (threshold: {threshold})"),
+                    severity: Severity::Warning,
+                    source: "long-file".into(),
+                    related: vec![],
+                    suggestion: Some("consider splitting into smaller, focused modules".into()),
+                });
+            }
+            continue;
+        }
+
         let lines = match std::fs::read_to_string(path) {
             Ok(content) => content.lines().count(),
             Err(_) => continue,
         };
+
+        // Store result in cache (even if under threshold, so we skip the read next time).
+        if mtime > 0 {
+            let entry = CachedEntry {
+                line_count: if lines >= threshold {
+                    Some(lines)
+                } else {
+                    None
+                },
+            };
+            if let Ok(json) = serde_json::to_string(&entry) {
+                cache.put(&path_key, mtime, &config_hash, ENGINE, &json);
+            }
+        }
 
         if lines >= threshold {
             issues.push(Issue {
@@ -133,6 +184,8 @@ pub fn build_long_file_report(
             });
         }
     }
+
+    cache.flush();
 
     // Sort by line count descending.
     issues.sort_by(|a, b| {

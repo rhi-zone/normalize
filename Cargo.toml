@@ -70,6 +70,7 @@ axum = "0.8"
 
 # Database
 libsql = "0.9"
+rusqlite = "0.32"
 
 # File system
 walkdir = "2"

@@ -5,6 +5,7 @@
 //! "native engine" checks invoked by `normalize rules run --engine native`.
 
 pub mod budget;
+pub mod cache;
 pub mod check_examples;
 pub mod check_refs;
 pub mod high_complexity;
@@ -15,6 +16,8 @@ pub mod stale_doc;
 pub mod stale_docs;
 pub mod stale_summary;
 pub mod walk;
+
+pub use cache::{FindingsCache, file_mtime_nanos as cache_file_mtime_nanos};
 
 pub use budget::{BudgetRulesReport, build_budget_report};
 pub use check_examples::build_check_examples_report;

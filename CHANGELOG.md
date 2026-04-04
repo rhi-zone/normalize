@@ -12,6 +12,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Performance
 
+- **SQLite findings cache for native and syntax rules** — warm runs of `long-file`, `high-complexity`, and `long-function` now skip unchanged files entirely using a SQLite-backed per-file cache stored at `.normalize/findings-cache.sqlite`. The syntax rules engine migrates from the JSON `syntax-cache.json` to the same SQLite store. Cache keys include `(path, mtime_nanos, config_hash, engine)`; changing the threshold or rule set invalidates only the affected entries. Cold runs are unaffected; warm runs on large codebases are significantly faster (the 5+ second re-parse cost per native rule drops to near-zero for unchanged files).
 - **Native rule timing diagnostics** — `RUST_LOG=debug normalize rules run --type native` now logs per-rule and total elapsed time to stderr via `tracing::debug!`, making it easy to identify slow rules without adding a new CLI flag.
 - **Embedding rebuild ~100x fewer SQL queries** — `populate_embeddings` now bulk-loads callers, callees, and doc comments in 3 queries total instead of 3 per symbol (175k round-trips → 3 for a 58k-symbol codebase).
 
