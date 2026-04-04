@@ -372,16 +372,26 @@ The current architecture is batch-oriented: commands scan the whole workspace, p
 - [x] Per-file syntax rule evaluation in LSP (run rules only on saved file)
 - [x] Two-tier LSP diagnostics: immediate syntax, debounced fact rules
 - [x] Daemon calls `incremental_call_graph_refresh()` after detecting changes
+- [x] SQLite findings cache for native + syntax rules (replaces JSON; per-file mtime-keyed)
+- [x] `FileRule` trait — new native rules get caching/parallelization/file-walking automatically
+- [x] Incremental git walk for stale/missing-summary (walk only new commits, not full history)
+- [x] Batched uncommitted-changes check (one gix status walk, not per-directory)
+- [x] Daemon fire-and-forget spawn (no 2s socket wait blocking every command)
+- [x] `rules run` wired to try daemon cache before local computation (`try_rules_via_daemon()`)
 
 **Remaining:**
+- **Daemon nested-runtime panic**: `daemon run` creates a tokio runtime inside `#[tokio::main]` — panics with "Cannot start a runtime from within a runtime". Must fix before daemon path is usable.
 - Syntax rules load and compile all tree-sitter queries on every invocation
 - **Fact rules**: incremental Datalog. When facts for one file change, re-derive only affected conclusions. This is hard — may need semi-naive evaluation with change tracking.
 - **Watch mode**: `normalize watch` that keeps the index live and re-runs checks on file changes (inotify/fsevents). The LSP server is one consumer; a TUI dashboard could be another.
+- **`SymbolIndex` trait**: injected API for symbol resolution (daemon → index → parse-on-miss). See `docs/design/daemon-as-kernel.md`.
 
 **Next incremental steps:**
-1. Persistent `GrammarLoader` in LSP (don't re-create `SkeletonExtractor` per request)
-2. File-level dependency tracking for diagnostic invalidation
-3. Incremental fact rule evaluation (long-term, research needed)
+1. Fix daemon nested-runtime panic (prerequisite for daemon-cached rules)
+2. Persistent `GrammarLoader` in LSP (don't re-create `SkeletonExtractor` per request)
+3. File-level dependency tracking for diagnostic invalidation
+4. `SymbolIndex` trait — wire view/edit/analyze through injected API
+5. Incremental fact rule evaluation (long-term, research needed)
 
 ### Lint / Analysis Architecture
 
