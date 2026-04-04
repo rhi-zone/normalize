@@ -2,10 +2,9 @@
 # See: https://github.com/rhi-zone/normalize
 
 [walk]
-# Exclude Claude Code's working directory (worktrees, settings) from all rules.
-# This is also covered by .gitignore but the explicit entry ensures walker exclusion
-# even when gitignore processing is disabled.
-exclude = [".git", ".claude"]
+# Exclude Claude Code agent worktrees from all rules (temporary working dirs).
+# .claude/ itself (settings, hooks, memory) is part of the project and intentionally included.
+exclude = [".git", "worktrees"]
 
 [daemon]
 # enabled = true
@@ -46,7 +45,7 @@ exclude = [
 # Per-rule configuration: { "rule-id" = { severity = "...", enabled = true/false } }
 # Global allow: skip violations in test fixture files for all rules.
 [rules]
-global-allow = ["**/tests/fixtures/**", "**/fixtures/**", ".claude/**"]
+global-allow = ["**/tests/fixtures/**", "**/fixtures/**"]
 
 # Disable println-debug for CLI tools (we use println for output)
 [rules."rust/println-debug"]
