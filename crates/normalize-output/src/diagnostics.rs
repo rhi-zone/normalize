@@ -92,9 +92,9 @@ pub struct Issue {
     pub severity: Severity,
     /// Which engine/check produced this issue.
     pub source: String,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub related: Vec<RelatedLocation>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suggestion: Option<String>,
 }
 

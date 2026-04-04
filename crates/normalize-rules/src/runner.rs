@@ -1480,8 +1480,12 @@ pub fn try_rules_via_daemon(
     }
 
     let mut stream = UnixStream::connect(&socket_path).ok()?;
-    // First request may trigger a full cache prime — generous timeout.
-    stream.set_read_timeout(Some(Duration::from_secs(300))).ok();
+    // Short timeout: only use daemon if it has warm cached results.
+    // If the daemon is still priming (cold start), fall back to local computation
+    // which is faster than waiting for the prime to finish.
+    stream
+        .set_read_timeout(Some(Duration::from_millis(500)))
+        .ok();
     stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
 
     let filter_ids_vec: Option<Vec<String>> = filter_ids.map(|ids| ids.iter().cloned().collect());
@@ -1503,7 +1507,6 @@ pub fn try_rules_via_daemon(
 
     let resp: serde_json::Value = serde_json::from_str(&line).ok()?;
     if !resp.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
-        tracing::debug!("daemon run_rules returned error: {:?}", resp.get("error"));
         return None;
     }
 

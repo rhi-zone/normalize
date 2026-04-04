@@ -236,10 +236,13 @@ mod unix_impl {
         /// Broadcast channel for file-change and index-refresh events.
         /// Subscribers call `event_tx.subscribe()` to get a `broadcast::Receiver`.
         event_tx: broadcast::Sender<Event>,
+        /// Handle to the tokio runtime, used to run async code from non-tokio threads
+        /// (e.g. the refresh handler thread).
+        runtime_handle: tokio::runtime::Handle,
     }
 
     impl DaemonServer {
-        fn new(refresh_tx: Sender<PathBuf>) -> Self {
+        fn new(refresh_tx: Sender<PathBuf>, runtime_handle: tokio::runtime::Handle) -> Self {
             // Capacity 1024: if a subscriber falls behind by more than 1024 events
             // it receives a RecvError::Lagged and we log the drop.
             let (event_tx, _) = broadcast::channel(1024);
@@ -249,12 +252,12 @@ mod unix_impl {
                 refresh_tx,
                 start_time: Instant::now(),
                 event_tx,
+                runtime_handle,
             }
         }
 
         fn add_root(&self, root: PathBuf) -> Response {
-            // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error (thread panicked while holding lock)
-            let mut roots = self.roots.lock().unwrap();
+            let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
 
             if roots.contains_key(&root) {
                 return Response::ok(
@@ -269,19 +272,27 @@ mod unix_impl {
             }
 
             // Initial index refresh and reverse-dep graph population
-            // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
-            let rt = tokio::runtime::Runtime::new().unwrap();
             let mut rev_deps: HashMap<PathBuf, HashSet<PathBuf>> = HashMap::new();
-            match rt.block_on(crate::index::open(&root)) {
+            match tokio::task::block_in_place(|| {
+                self.runtime_handle.block_on(crate::index::open(&root))
+            }) {
                 Ok(mut idx) => {
-                    if let Err(e) = rt.block_on(idx.refresh()) {
+                    if let Err(e) =
+                        tokio::task::block_in_place(|| self.runtime_handle.block_on(idx.refresh()))
+                    {
                         return Response::err(&format!("Failed to index: {}", e));
                     }
-                    if let Err(e) = rt.block_on(idx.incremental_call_graph_refresh()) {
+                    if let Err(e) = tokio::task::block_in_place(|| {
+                        self.runtime_handle
+                            .block_on(idx.incremental_call_graph_refresh())
+                    }) {
                         eprintln!("Warning: call graph refresh failed: {}", e);
                     }
                     // Build reverse-dep graph from all resolved imports
-                    match rt.block_on(idx.all_resolved_import_edges()) {
+                    match tokio::task::block_in_place(|| {
+                        self.runtime_handle
+                            .block_on(idx.all_resolved_import_edges())
+                    }) {
                         Ok(edges) => {
                             for (importer_rel, imported_rel) in edges {
                                 let importer = root.join(&importer_rel);
@@ -360,8 +371,7 @@ mod unix_impl {
         }
 
         fn remove_root(&self, root: &Path) -> Response {
-            // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error (thread panicked while holding lock)
-            let mut roots = self.roots.lock().unwrap();
+            let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
             if roots.remove(root).is_some() {
                 Response::ok(serde_json::json!({"removed": true}))
             } else {
@@ -370,15 +380,13 @@ mod unix_impl {
         }
 
         fn list_roots(&self) -> Response {
-            // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error (thread panicked while holding lock)
-            let roots = self.roots.lock().unwrap();
+            let roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
             let list: Vec<&PathBuf> = roots.keys().collect();
             Response::ok(serde_json::json!(list))
         }
 
         fn status(&self) -> Response {
-            // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error (thread panicked while holding lock)
-            let roots = self.roots.lock().unwrap();
+            let roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
             Response::ok(serde_json::json!({
                 "uptime_secs": self.start_time.elapsed().as_secs(),
                 "roots_watched": roots.len(),
@@ -414,8 +422,7 @@ mod unix_impl {
             filter_rule: Option<String>,
             engine: Option<String>,
         ) -> Response {
-            // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error (thread panicked while holding lock)
-            let mut roots = self.roots.lock().unwrap();
+            let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
             let watched = match roots.get_mut(&root) {
                 Some(w) => w,
                 None => return Response::err("root not watched"),
@@ -425,7 +432,7 @@ mod unix_impl {
             if !watched.diagnostics.primed {
                 drop(roots); // release lock during expensive evaluation
                 self.prime_diagnostics_cache(&root);
-                roots = self.roots.lock().unwrap();
+                roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
             }
 
             let watched = match roots.get(&root) {
@@ -474,12 +481,12 @@ mod unix_impl {
             let fact_issues: Vec<normalize_output::diagnostics::Issue> = {
                 let root_owned = root.to_path_buf();
                 let rules = config.rules.clone();
+                let handle = self.runtime_handle.clone();
                 std::thread::Builder::new()
                     .stack_size(64 * 1024 * 1024)
                     .spawn(move || {
-                        let rt = tokio::runtime::Runtime::new().unwrap();
                         let diagnostics =
-                            rt.block_on(normalize_rules::collect_fact_diagnostics_incremental(
+                            handle.block_on(normalize_rules::collect_fact_diagnostics_incremental(
                                 &root_owned,
                                 &rules,
                                 None,
@@ -533,11 +540,11 @@ mod unix_impl {
                 let root_owned = root.to_path_buf();
                 let rules_config = config.rules.clone();
                 let walk_config = config.walk.clone();
+                let handle = self.runtime_handle.clone();
                 std::thread::Builder::new()
                     .stack_size(64 * 1024 * 1024)
                     .spawn(move || {
-                        let rt = tokio::runtime::Runtime::new().unwrap();
-                        rt.block_on(Self::run_native_rules(
+                        handle.block_on(Self::run_native_rules(
                             &root_owned,
                             &rules_config,
                             &walk_config,
@@ -556,8 +563,7 @@ mod unix_impl {
                 "diagnostics cache fully primed"
             );
 
-            // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error
-            let mut roots = self.roots.lock().unwrap();
+            let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(watched) = roots.get_mut(root) {
                 watched.diagnostics.syntax_issues = syntax_issues;
                 watched.diagnostics.fact_issues = fact_issues;
@@ -684,16 +690,16 @@ mod unix_impl {
         }
 
         fn refresh_root(&self, root: &Path) {
-            // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison = programmer error (thread panicked while holding lock)
-            let mut roots = self.roots.lock().unwrap();
+            let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(watched) = roots.get_mut(root) {
-                // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
-                let rt = tokio::runtime::Runtime::new().unwrap();
-                match rt.block_on(crate::index::open(root)) {
+                match self.runtime_handle.block_on(crate::index::open(root)) {
                     Ok(mut idx) => {
-                        match rt.block_on(idx.incremental_refresh()) {
+                        match self.runtime_handle.block_on(idx.incremental_refresh()) {
                             Ok(changed) if !changed.is_empty() => {
-                                if let Err(e) = rt.block_on(idx.incremental_call_graph_refresh()) {
+                                if let Err(e) = self
+                                    .runtime_handle
+                                    .block_on(idx.incremental_call_graph_refresh())
+                                {
                                     eprintln!("Call graph refresh error for {:?}: {}", root, e);
                                 }
 
@@ -724,8 +730,9 @@ mod unix_impl {
                                     // Re-query and add new outgoing edges for this file
                                     if let Ok(rel) = abs_path.strip_prefix(root) {
                                         let rel_str = rel.to_string_lossy();
-                                        if let Ok(new_targets) =
-                                            rt.block_on(idx.resolved_imports_for_file(&rel_str))
+                                        if let Ok(new_targets) = self
+                                            .runtime_handle
+                                            .block_on(idx.resolved_imports_for_file(&rel_str))
                                         {
                                             for target_rel in new_targets {
                                                 let target_abs = root.join(&target_rel);
@@ -769,7 +776,7 @@ mod unix_impl {
                                     let config = NormalizeConfig::load(root);
 
                                     // --- Fact rules (incremental via ENGINE_CACHE) ---
-                                    let fact_diagnostics = rt.block_on(
+                                    let fact_diagnostics = self.runtime_handle.block_on(
                                         normalize_rules::collect_fact_diagnostics_incremental(
                                             root,
                                             &config.rules,
@@ -853,13 +860,13 @@ mod unix_impl {
                                         let root_owned = root.to_path_buf();
                                         let rules_config = config.rules.clone();
                                         let walk_config = config.walk.clone();
+                                        let handle = self.runtime_handle.clone();
                                         let new_native_issues: Vec<
                                             normalize_output::diagnostics::Issue,
                                         > = std::thread::Builder::new()
                                             .stack_size(64 * 1024 * 1024)
                                             .spawn(move || {
-                                                let rt = tokio::runtime::Runtime::new().unwrap();
-                                                rt.block_on(Self::run_native_rules(
+                                                handle.block_on(Self::run_native_rules(
                                                     &root_owned,
                                                     &rules_config,
                                                     &walk_config,
@@ -903,10 +910,6 @@ mod unix_impl {
     }
 
     /// Run the global daemon server.
-    ///
-    /// Must be called from within a tokio runtime (the main binary uses `#[tokio::main]`).
-    /// Previously had its own `#[tokio::main]` which caused "Cannot start a runtime from
-    /// within a runtime" panics when invoked from the CLI dispatch path.
     pub async fn run_daemon() -> Result<i32, Box<dyn std::error::Error>> {
         let socket_path = global_socket_path();
 
@@ -930,7 +933,10 @@ mod unix_impl {
         // Channel for refresh requests from watchers
         let (refresh_tx, refresh_rx) = channel::<PathBuf>();
 
-        let server = Arc::new(DaemonServer::new(refresh_tx));
+        let server = Arc::new(DaemonServer::new(
+            refresh_tx,
+            tokio::runtime::Handle::current(),
+        ));
 
         // Spawn refresh handler
         let server_refresh = server.clone();
@@ -1164,8 +1170,11 @@ mod unix_impl {
             let mut stream = UnixStream::connect(&self.socket_path)
                 .map_err(|e| format!("Failed to connect: {}", e))?;
 
-            // First request may trigger a full cache prime — use generous timeout.
-            stream.set_read_timeout(Some(Duration::from_secs(300))).ok();
+            // Short timeout: only use daemon if it has warm cached results.
+            // If still priming, the caller falls back to local computation.
+            stream
+                .set_read_timeout(Some(Duration::from_millis(500)))
+                .ok();
             stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
 
             let request = Request::RunRules {
@@ -1283,7 +1292,7 @@ pub fn global_socket_path() -> PathBuf {
 }
 
 #[cfg(not(unix))]
-pub fn run_daemon() -> Result<i32, Box<dyn std::error::Error>> {
+pub async fn run_daemon() -> Result<i32, Box<dyn std::error::Error>> {
     Err("normalize daemon is not supported on Windows".into())
 }
 
