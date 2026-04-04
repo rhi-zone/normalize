@@ -234,8 +234,8 @@ impl DaemonService {
     /// Examples:
     ///   normalize daemon run                 # run daemon in foreground with log output
     #[cli(display_with = "display_output")]
-    pub fn run(&self) -> Result<DaemonRunReport, String> {
-        match daemon::run_daemon() {
+    pub async fn run(&self) -> Result<DaemonRunReport, String> {
+        match daemon::run_daemon().await {
             Ok(code) => {
                 if code == 0 {
                     Ok(DaemonRunReport {

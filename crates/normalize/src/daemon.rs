@@ -903,7 +903,10 @@ mod unix_impl {
     }
 
     /// Run the global daemon server.
-    #[tokio::main]
+    ///
+    /// Must be called from within a tokio runtime (the main binary uses `#[tokio::main]`).
+    /// Previously had its own `#[tokio::main]` which caused "Cannot start a runtime from
+    /// within a runtime" panics when invoked from the CLI dispatch path.
     pub async fn run_daemon() -> Result<i32, Box<dyn std::error::Error>> {
         let socket_path = global_socket_path();
 
