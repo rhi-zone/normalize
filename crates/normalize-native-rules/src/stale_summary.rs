@@ -326,6 +326,165 @@ fn git_batch_commit_stats(
         .collect()
 }
 
+/// Update `existing` cache entries in-place by walking only the commits between
+/// `since_sha` (exclusive) and the repository HEAD (inclusive).
+///
+/// This avoids re-walking all of git history on every pre-commit run after the first commit
+/// that follows a cache build. Only the new commits are traversed; existing entries are
+/// updated by incrementing `commits_count` for content commits and resetting it for doc commits.
+///
+/// Walking is newest-first (same order as `git_batch_commit_stats`). The stop condition is
+/// reaching `since_sha`. For each directory touched by a new commit:
+/// - If a doc file is touched and no doc commit has been recorded in this incremental walk yet:
+///   set `last_summary_commit` to this commit, reset `commits_count` to 0. This is the newest
+///   doc commit for this directory in the new range.
+/// - If a doc file is touched but a newer doc commit was already recorded in this walk: ignore
+///   (this is an older doc commit, already superseded).
+/// - If only content is touched and no doc commit has been recorded in this walk yet:
+///   increment `commits_count` (this content commit is newer than the last doc commit).
+/// - If only content is touched and a doc commit was already recorded in this walk: ignore
+///   (this commit is older than the new doc commit and its count is already captured in the
+///   existing `commits_count` from the previous full walk).
+///
+/// **Key invariant**: after an incremental update, `CacheEntry.commits_count` is the number
+/// of content commits since `last_summary_commit` — the same semantics as a full walk.
+fn git_incremental_commit_stats(
+    root: &Path,
+    since_sha: &str,
+    existing: &mut HashMap<String, CacheEntry>,
+    dirs: &HashMap<String, (String, bool)>,
+    doc_filenames: &[&str],
+) {
+    let Some(repo) = gix_open(root) else {
+        return;
+    };
+    let Ok(head_id) = repo.head_id() else {
+        return;
+    };
+    let Ok(walk) = head_id
+        .ancestors()
+        .sorting(gix::revision::walk::Sorting::ByCommitTime(
+            gix::traverse::commit::simple::CommitTimeOrder::NewestFirst,
+        ))
+        .all()
+    else {
+        return;
+    };
+
+    // Per-dir incremental state: did we already see a new doc commit for this dir?
+    // `new_doc_found` is set the first time we encounter a doc commit in the new range.
+    struct IncrState {
+        new_doc_found: bool,
+    }
+    let mut inc_states: HashMap<&str, IncrState> = dirs
+        .keys()
+        .map(|label| {
+            (
+                label.as_str(),
+                IncrState {
+                    new_doc_found: false,
+                },
+            )
+        })
+        .collect();
+
+    // Build lookup: dir_label → (rel_dir_prefix, is_root)
+    let dir_info: Vec<(&str, &str, bool)> = dirs
+        .iter()
+        .map(|(label, (rel_dir, is_root))| (label.as_str(), rel_dir.as_str(), *is_root))
+        .collect();
+
+    for info in walk {
+        let Ok(info) = info else { continue };
+
+        let commit_sha = info.id.to_hex().to_string();
+        // Stop when we reach the previously cached HEAD (exclusive lower bound).
+        if commit_sha == since_sha {
+            break;
+        }
+
+        let Ok(commit) = info.object() else { continue };
+        let Ok(tree) = commit.tree() else { continue };
+        let parent_tree = info
+            .parent_ids()
+            .next()
+            .and_then(|pid| pid.object().ok())
+            .and_then(|obj| obj.into_commit().tree().ok());
+        let changes = match repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), None) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let changed_paths: Vec<Vec<u8>> = changes
+            .iter()
+            .map(|change| {
+                use gix::object::tree::diff::ChangeDetached;
+                let loc: &[u8] = match &change {
+                    ChangeDetached::Addition { location, .. }
+                    | ChangeDetached::Deletion { location, .. }
+                    | ChangeDetached::Modification { location, .. } => location.as_slice(),
+                    ChangeDetached::Rewrite {
+                        source_location, ..
+                    } => source_location.as_slice(),
+                };
+                loc.to_vec()
+            })
+            .collect();
+
+        for (label, rel_dir, is_root) in &dir_info {
+            let inc = inc_states.get_mut(*label).unwrap();
+
+            // Check if this commit touches the directory.
+            let touches_dir = if *is_root {
+                !changed_paths.is_empty()
+            } else {
+                changed_paths.iter().any(|loc| {
+                    let prefix = rel_dir.as_bytes();
+                    loc.starts_with(prefix)
+                        && (loc.len() == prefix.len() || loc.get(prefix.len()) == Some(&b'/'))
+                })
+            };
+
+            if !touches_dir {
+                continue;
+            }
+
+            // Check if this commit touches a doc file in this directory.
+            let touches_doc = changed_paths.iter().any(|loc| {
+                let loc_str = std::str::from_utf8(loc).unwrap_or("");
+                doc_filenames.iter().any(|doc| {
+                    if *is_root {
+                        loc_str == *doc
+                    } else {
+                        let expected = format!("{}/{}", rel_dir, doc);
+                        loc_str == expected
+                    }
+                })
+            });
+
+            if touches_doc && !inc.new_doc_found {
+                // Newest doc commit in the new range: reset the entry.
+                inc.new_doc_found = true;
+                let entry = existing.entry(label.to_string()).or_insert(CacheEntry {
+                    last_summary_commit: None,
+                    commits_count: 0,
+                });
+                entry.last_summary_commit = Some(commit_sha.clone());
+                entry.commits_count = 0;
+            } else if !touches_doc && !inc.new_doc_found {
+                // Content commit newer than any new doc commit: increment counter.
+                let entry = existing.entry(label.to_string()).or_insert(CacheEntry {
+                    last_summary_commit: None,
+                    commits_count: 0,
+                });
+                entry.commits_count += 1;
+            }
+            // touches_doc && inc.new_doc_found → older doc commit, ignore.
+            // !touches_doc && inc.new_doc_found → older content commit, ignore.
+        }
+    }
+}
+
 /// Returns true if `rel_path` has a staged change (index differs from HEAD).
 fn is_staged(repo: &gix::Repository, rel_path: &str) -> bool {
     (|| -> Option<bool> {
@@ -532,9 +691,37 @@ pub fn build_missing_summary_report(
 
     // Load incremental cache (shared with stale-summary to avoid redundant git calls).
     let head = git_head(root);
-    let mut cache = head
-        .as_deref()
-        .and_then(|h| load_cache(root).filter(|c| c.head == h));
+    let mut cache = load_cache(root);
+
+    // If the cache exists but HEAD has moved, walk only the new commits and update in-place.
+    if let (Some(c), Some(current_head)) = (&mut cache, &head)
+        && c.head != *current_head
+    {
+        // Build the full dirs map (all directories, not just uncached ones) so the
+        // incremental walk can update any entry that was touched by the new commits.
+        let all_dirs: HashMap<String, (String, bool)> = {
+            let dirs_snapshot = walk_dirs(root, walk_config);
+            dirs_snapshot
+                .iter()
+                .map(|(dir_path, dir_label)| {
+                    let rel = dir_path
+                        .strip_prefix(root)
+                        .unwrap_or(dir_path)
+                        .to_string_lossy();
+                    let rel_dir = if rel.is_empty() {
+                        ".".to_string()
+                    } else {
+                        rel.to_string()
+                    };
+                    let is_root = rel_dir == ".";
+                    (dir_label.clone(), (rel_dir, is_root))
+                })
+                .collect()
+        };
+        git_incremental_commit_stats(root, &c.head, &mut c.dirs, &all_dirs, &filenames);
+        c.head = current_head.clone();
+    }
+
     let mut updated_dirs: HashMap<String, CacheEntry> = HashMap::new();
 
     let dirs = walk_dirs(root, walk_config);
@@ -695,11 +882,37 @@ pub fn build_stale_summary_report(
     let mut stale = Vec::new();
     let mut dirs_checked = 0;
 
-    // Load incremental cache: keyed by HEAD commit, avoids per-dir `git log` on repeat runs.
+    // Load incremental cache: if HEAD has moved since the last run, walk only the new commits
+    // and update the cached entries in-place rather than re-walking all of history.
     let head = git_head(root);
-    let mut cache = head
-        .as_deref()
-        .and_then(|h| load_cache(root).filter(|c| c.head == h));
+    let mut cache = load_cache(root);
+
+    if let (Some(c), Some(current_head)) = (&mut cache, &head)
+        && c.head != *current_head
+    {
+        let all_dirs: HashMap<String, (String, bool)> = {
+            let dirs_snapshot = walk_dirs(root, walk_config);
+            dirs_snapshot
+                .iter()
+                .map(|(dir_path, dir_label)| {
+                    let rel = dir_path
+                        .strip_prefix(root)
+                        .unwrap_or(dir_path)
+                        .to_string_lossy();
+                    let rel_dir = if rel.is_empty() {
+                        ".".to_string()
+                    } else {
+                        rel.to_string()
+                    };
+                    let is_root = rel_dir == ".";
+                    (dir_label.clone(), (rel_dir, is_root))
+                })
+                .collect()
+        };
+        git_incremental_commit_stats(root, &c.head, &mut c.dirs, &all_dirs, &filenames);
+        c.head = current_head.clone();
+    }
+
     let mut updated_dirs: HashMap<String, CacheEntry> = HashMap::new();
 
     let dirs = walk_dirs(root, walk_config);
