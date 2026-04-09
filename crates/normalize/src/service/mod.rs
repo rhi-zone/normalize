@@ -851,6 +851,199 @@ impl NormalizeService {
         &self.sessions
     }
 
+    /// Copy a project and its session metadata to a destination for portability.
+    ///
+    /// Copies the project directory (excluding `target/`, `node_modules/`, `.git/objects/`,
+    /// `.normalize/findings-cache.sqlite`, `.fastembed_cache/`) and any associated AI agent
+    /// session metadata to `<dest>`. After copying, rewrites absolute paths in the index DB
+    /// so the copy works from its new location.
+    ///
+    /// Examples:
+    ///   normalize sync /backup/myproject               # copy project to new location
+    ///   normalize sync /backup/myproject --dry-run     # preview what would be copied
+    ///   normalize sync /backup/myproject --verbose     # show each file as it's copied
+    ///   normalize sync /backup --all                   # copy all known projects
+    ///   normalize sync /backup --all --active 30       # only projects active in last 30 days
+    ///   normalize sync /backup --all --repo "*/rhizone/*"  # filter by path glob
+    #[server(group = "utilities")]
+    #[cli(display_with = "display_output")]
+    #[allow(clippy::too_many_arguments)]
+    pub async fn sync(
+        &self,
+        #[param(positional, help = "Destination directory")] dest: Option<String>,
+        #[param(help = "Copy all known projects (discovered via session metadata)")] all: bool,
+        #[param(
+            short = 'r',
+            help = "Source project root (defaults to current directory)"
+        )]
+        root: Option<String>,
+        #[param(help = "Dry run — show what would be copied without writing anything")]
+        dry_run: bool,
+        #[param(short = 'v', help = "Print each file as it is copied")] verbose: bool,
+        #[param(
+            help = "Only sync projects with activity in the last N days (--all only, default 30)"
+        )]
+        active: Option<u32>,
+        #[param(help = "Only sync projects whose path matches this glob (--all only)")]
+        repo: Option<String>,
+        #[param(help = "Exclude projects whose path matches this glob (--all only)")]
+        exclude: Option<String>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<commands::sync::SyncReport, String> {
+        use commands::sync::{
+            SyncFileItem, SyncReport, common_prefix, copy_tree, list_all_known_project_roots,
+            rewrite_index_paths, session_metadata_roots,
+        };
+        use std::time::{Duration, SystemTime};
+
+        let dest_str = dest.ok_or_else(|| {
+            "Destination required. Usage: normalize sync <dest> [--all]".to_string()
+        })?;
+        let dest_root = PathBuf::from(&dest_str);
+
+        let root_path = root
+            .map(PathBuf::from)
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+
+        self.resolve_format(pretty, compact, &root_path);
+
+        // Determine the list of project roots to sync.
+        let project_roots: Vec<PathBuf> = if all {
+            let mut roots = list_all_known_project_roots();
+
+            // --active N: filter by last activity within N days
+            if let Some(days) = active.or(Some(30)) {
+                let cutoff = SystemTime::now() - Duration::from_secs(days as u64 * 86400);
+                roots.retain(|p| {
+                    // Check mtime of the project dir itself; also scan .normalize/
+                    let normalize_dir = p.join(".normalize");
+                    let check_dir = if normalize_dir.exists() {
+                        &normalize_dir
+                    } else {
+                        p
+                    };
+                    std::fs::metadata(check_dir)
+                        .and_then(|m| m.modified())
+                        .map(|mtime| mtime >= cutoff)
+                        .unwrap_or(false)
+                });
+            }
+
+            // --repo glob filter
+            if let Some(ref glob_pat) = repo {
+                roots.retain(|p| {
+                    glob::Pattern::new(glob_pat)
+                        .map(|pat| pat.matches(&p.to_string_lossy()))
+                        .unwrap_or(false)
+                });
+            }
+
+            // --exclude glob filter
+            if let Some(ref exc_pat) = exclude {
+                roots.retain(|p| {
+                    glob::Pattern::new(exc_pat)
+                        .map(|pat| !pat.matches(&p.to_string_lossy()))
+                        .unwrap_or(true)
+                });
+            }
+
+            if roots.is_empty() {
+                eprintln!(
+                    "warning: no projects found matching the given filters; syncing current directory"
+                );
+                vec![root_path.clone()]
+            } else {
+                roots
+            }
+        } else {
+            vec![root_path.clone()]
+        };
+
+        // For multi-project sync: strip common prefix to get relative dest structure.
+        let prefix = if project_roots.len() > 1 {
+            common_prefix(&project_roots)
+        } else {
+            None
+        };
+
+        let mut total_files = 0usize;
+        let mut total_sessions = 0usize;
+        let mut all_file_items: Vec<SyncFileItem> = Vec::new();
+        let mut all_warnings: Vec<String> = Vec::new();
+        let mut index_rewritten = false;
+
+        for proj_root in &project_roots {
+            // Compute the destination for this project.
+            let proj_dest = if let Some(ref pfx) = prefix {
+                let rel = proj_root.strip_prefix(pfx).unwrap_or(proj_root);
+                dest_root.join(rel)
+            } else {
+                dest_root.clone()
+            };
+
+            // 1. Copy project tree.
+            let (n, items) = copy_tree(proj_root, &proj_dest, dry_run, verbose, &mut all_warnings);
+            total_files += n;
+            all_file_items.extend(items);
+
+            // 2. Copy session metadata.
+            for meta_root in session_metadata_roots(proj_root) {
+                let format_name = meta_root
+                    .parent()
+                    .and_then(|p| p.file_name())
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("sessions");
+                let sessions_dest = proj_dest
+                    .join(".sessions")
+                    .join(format_name)
+                    .join(meta_root.file_name().unwrap_or_default());
+                let (sn, sitems) = copy_tree(
+                    &meta_root,
+                    &sessions_dest,
+                    dry_run,
+                    verbose,
+                    &mut all_warnings,
+                );
+                total_sessions += sn;
+                all_file_items.extend(sitems);
+            }
+
+            // 3. Rewrite index paths.
+            if !dry_run {
+                let dest_db = proj_dest.join(".normalize").join("index.sqlite");
+                if dest_db.exists() {
+                    let old_root = proj_root.to_string_lossy().into_owned();
+                    let new_root = proj_dest.to_string_lossy().into_owned();
+                    if let Err(e) = rewrite_index_paths(&dest_db, &old_root, &new_root).await {
+                        all_warnings.push(format!("index path rewrite: {}", e));
+                    } else {
+                        index_rewritten = true;
+                    }
+                }
+            }
+        }
+
+        let source = if project_roots.len() == 1 {
+            project_roots[0].to_string_lossy().into_owned()
+        } else {
+            format!("{} projects", project_roots.len())
+        };
+
+        Ok(SyncReport {
+            dest: dest_str,
+            source,
+            files_copied: total_files,
+            sessions_copied: total_sessions,
+            index_paths_rewritten: index_rewritten,
+            dry_run,
+            files: all_file_items,
+            warnings: all_warnings,
+        })
+    }
+
     /// Run linters, formatters, and test runners. Unified interface to external ecosystem tools.
     #[server(group = "infrastructure")]
     pub fn tools(&self) -> &tools::ToolsService {

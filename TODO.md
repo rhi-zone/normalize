@@ -1185,6 +1185,14 @@ ways worth questioning. Candidates to review: catch_unwind in FFI (does it hide
 real bugs?), load_rules_config merge (was the old behavior intentional?),
 find_cycles_dfs iterative conversion (was stack depth ever actually a problem?).
 
+### `normalize sync` — project + session portability
+
+- [x] **Single-project sync (done)**: `normalize sync <dest>` copies project tree (excludes target/, node_modules/, .git/objects/, .normalize/findings-cache.sqlite, .fastembed_cache/), session metadata, rewrites index DB paths. `--dry-run`, `--verbose`, `--all`, `--active N`, `--repo <glob>`, `--exclude <glob>`.
+- [ ] **Incremental sync**: track what was copied in a lockfile; only copy changed files on subsequent syncs (useful for large projects or slow network destinations).
+- [ ] **Session format detection**: currently only copies Claude Code `~/.claude/projects/<mangled>/` dirs. Extend `session_metadata_roots()` to use the `normalize_chat_sessions` format registry for multi-format coverage (Codex, Gemini, etc.).
+
+---
+
 ## Deferred
 
 - `normalize jq` multi-format support (YAML/CBOR/TOML/XML via `jaq-all` with `formats` feature): currently using `jaq-core/std/json` directly to avoid `jaq-fmts` bloat. Low priority — vanilla jq is JSON-only anyway.
