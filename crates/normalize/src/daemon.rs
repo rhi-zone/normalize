@@ -217,6 +217,8 @@ mod unix_impl {
     struct WatchedRoot {
         #[allow(dead_code)] // Watcher must be kept alive
         watcher: RecommendedWatcher,
+        #[allow(dead_code)] // Watcher must be kept alive; None when .git/index doesn't exist
+        git_index_watcher: Option<RecommendedWatcher>,
         last_refresh: Instant,
         /// Reverse-dependency graph: file → set of files that import it.
         /// Keys and values are absolute paths. Populated on root add, updated incrementally.
@@ -232,6 +234,8 @@ mod unix_impl {
     struct DaemonServer {
         roots: Mutex<HashMap<PathBuf, WatchedRoot>>,
         refresh_tx: Sender<PathBuf>,
+        /// Sender for native-rules-only refresh requests (triggered by .git/index changes).
+        native_refresh_tx: Sender<PathBuf>,
         start_time: Instant,
         /// Broadcast channel for file-change and index-refresh events.
         /// Subscribers call `event_tx.subscribe()` to get a `broadcast::Receiver`.
@@ -242,7 +246,11 @@ mod unix_impl {
     }
 
     impl DaemonServer {
-        fn new(refresh_tx: Sender<PathBuf>, runtime_handle: tokio::runtime::Handle) -> Self {
+        fn new(
+            refresh_tx: Sender<PathBuf>,
+            native_refresh_tx: Sender<PathBuf>,
+            runtime_handle: tokio::runtime::Handle,
+        ) -> Self {
             // Capacity 1024: if a subscriber falls behind by more than 1024 events
             // it receives a RecvError::Lagged and we log the drop.
             let (event_tx, _) = broadcast::channel(1024);
@@ -250,6 +258,7 @@ mod unix_impl {
             Self {
                 roots: Mutex::new(HashMap::new()),
                 refresh_tx,
+                native_refresh_tx,
                 start_time: Instant::now(),
                 event_tx,
                 runtime_handle,
@@ -356,10 +365,62 @@ mod unix_impl {
                 }
             });
 
+            // Set up a dedicated watcher for .git/index so that `git add` (which
+            // changes staged state but not source files) triggers a native-rules
+            // re-run.  Native rules (e.g. stale-summary) read staged state via
+            // UncommittedChanges::load(), so they must re-run whenever .git/index
+            // changes even though get_changed_files() correctly skips .git/.
+            let git_index_path = root.join(".git").join("index");
+            let git_index_watcher = if git_index_path.exists() {
+                let native_tx = self.native_refresh_tx.clone();
+                let root_for_native = root.clone();
+                let (git_notify_tx, git_notify_rx) = channel();
+                match RecommendedWatcher::new(git_notify_tx, Config::default()) {
+                    Ok(mut git_watcher) => {
+                        match git_watcher.watch(&git_index_path, RecursiveMode::NonRecursive) {
+                            Ok(()) => {
+                                std::thread::spawn(move || {
+                                    let debounce = Duration::from_millis(200);
+                                    let mut last_event = Instant::now();
+                                    for _event in git_notify_rx.into_iter().flatten() {
+                                        if last_event.elapsed() >= debounce {
+                                            tracing::debug!(
+                                                root = ?root_for_native,
+                                                ".git/index changed — scheduling native rules refresh"
+                                            );
+                                            let _ = native_tx.send(root_for_native.clone());
+                                            last_event = Instant::now();
+                                        }
+                                    }
+                                });
+                                Some(git_watcher)
+                            }
+                            Err(e) => {
+                                eprintln!(
+                                    "Warning: failed to watch .git/index for {:?}: {}",
+                                    root, e
+                                );
+                                None
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "Warning: failed to create .git/index watcher for {:?}: {}",
+                            root, e
+                        );
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
             roots.insert(
                 root.clone(),
                 WatchedRoot {
                     watcher,
+                    git_index_watcher,
                     last_refresh: Instant::now(),
                     rev_deps,
                     last_affected: Vec::new(),
@@ -907,6 +968,42 @@ mod unix_impl {
                 }
             }
         }
+
+        /// Re-run only native rules for a root and update the diagnostics cache.
+        /// Called when `.git/index` changes (e.g. after `git add`) so that rules
+        /// that read staged state (stale-summary, etc.) see fresh results without
+        /// triggering a full index rebuild.
+        fn refresh_native_rules(&self, root: &Path) {
+            let config = NormalizeConfig::load(root);
+            let root_owned = root.to_path_buf();
+            let rules_config = config.rules.clone();
+            let walk_config = config.walk.clone();
+            let handle = self.runtime_handle.clone();
+
+            let new_native_issues: Vec<normalize_output::diagnostics::Issue> =
+                std::thread::Builder::new()
+                    .stack_size(64 * 1024 * 1024)
+                    .spawn(move || {
+                        handle.block_on(Self::run_native_rules(
+                            &root_owned,
+                            &rules_config,
+                            &walk_config,
+                        ))
+                    })
+                    .expect("failed to spawn native-rules refresh thread")
+                    .join()
+                    .expect("native-rules refresh thread panicked");
+
+            let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(watched) = roots.get_mut(root) {
+                watched.diagnostics.native_issues = new_native_issues;
+                tracing::info!(
+                    root = ?root,
+                    native = watched.diagnostics.native_issues.len(),
+                    ".git/index refresh: native rules cache updated"
+                );
+            }
+        }
     }
 
     /// Run the global daemon server.
@@ -930,19 +1027,30 @@ mod unix_impl {
         // Safe to remove socket now -- we hold the lock
         let _ = std::fs::remove_file(&socket_path);
 
-        // Channel for refresh requests from watchers
+        // Channel for full refresh requests from file watchers
         let (refresh_tx, refresh_rx) = channel::<PathBuf>();
+        // Channel for native-rules-only refresh requests triggered by .git/index changes
+        let (native_refresh_tx, native_refresh_rx) = channel::<PathBuf>();
 
         let server = Arc::new(DaemonServer::new(
             refresh_tx,
+            native_refresh_tx,
             tokio::runtime::Handle::current(),
         ));
 
-        // Spawn refresh handler
+        // Spawn full-refresh handler
         let server_refresh = server.clone();
         std::thread::spawn(move || {
             for root in refresh_rx {
                 server_refresh.refresh_root(&root);
+            }
+        });
+
+        // Spawn native-rules-only refresh handler (for .git/index changes)
+        let server_native = server.clone();
+        std::thread::spawn(move || {
+            for root in native_refresh_rx {
+                server_native.refresh_native_rules(&root);
             }
         });
 
