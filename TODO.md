@@ -46,6 +46,7 @@ extract, inline, move — correct, without LSPs, without false positives.
 - [x] `normalize watch` CLI (expose daemon file-watching with TUI output)
 - [x] Progress reporting for `structure rebuild` (indicatif bars for file scan, symbol parsing, index storage)
 - [x] Progress reporting for `analyze duplicates`, `analyze architecture`, `analyze duplicate-types` (indicatif bars for file processing, spinners for architecture phases)
+- [x] Native rules published to LSP clients (missing-summary, stale-summary, check-refs, etc.) — debounced workspace-wide, re-triggered on `.git/index` changes (git add events)
 
 ---
 

@@ -28,6 +28,10 @@ struct NormalizeBackend {
     fact_diagnostics_generation: Arc<std::sync::atomic::AtomicU64>,
     /// Debounce interval for fact diagnostics in milliseconds.
     fact_debounce_ms: std::sync::atomic::AtomicU64,
+    /// Files with native rule diagnostics in the last workspace-wide run.
+    native_diagnosed_files: Arc<Mutex<HashSet<Url>>>,
+    /// Generation counter for debouncing native diagnostic runs.
+    native_diagnostics_generation: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl NormalizeBackend {
@@ -43,6 +47,8 @@ impl NormalizeBackend {
             fact_debounce_ms: std::sync::atomic::AtomicU64::new(
                 super::ServeConfig::default().fact_debounce_ms(),
             ),
+            native_diagnosed_files: Arc::new(Mutex::new(HashSet::new())),
+            native_diagnostics_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
     }
 
@@ -65,7 +71,7 @@ impl NormalizeBackend {
         self.schedule_all_diagnostics().await;
     }
 
-    /// Schedule all diagnostics (syntax + fact) for initial load.
+    /// Schedule all diagnostics (syntax + fact + native) for initial load.
     async fn schedule_all_diagnostics(&self) {
         let root = self.root.lock().await.clone();
         let Some(root) = root else { return };
@@ -73,6 +79,7 @@ impl NormalizeBackend {
         let client = self.client.clone();
         let syntax_diagnosed = Arc::clone(&self.syntax_diagnosed_files);
         let fact_diagnosed = Arc::clone(&self.fact_diagnosed_files);
+        let native_diagnosed = Arc::clone(&self.native_diagnosed_files);
 
         tokio::spawn(async move {
             run_and_publish_diagnostics(
@@ -87,6 +94,13 @@ impl NormalizeBackend {
                 &root,
                 &normalize_rules::RuleKind::Fact,
                 &fact_diagnosed,
+            )
+            .await;
+            run_and_publish_diagnostics(
+                &client,
+                &root,
+                &normalize_rules::RuleKind::Native,
+                &native_diagnosed,
             )
             .await;
         });
@@ -218,6 +232,42 @@ impl NormalizeBackend {
         });
     }
 
+    /// Schedule debounced native diagnostics (workspace-wide).
+    /// Native rules (missing-summary, stale-summary, check-refs, etc.) are workspace-level checks.
+    async fn schedule_native_diagnostics(&self) {
+        let generation = self
+            .native_diagnostics_generation
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+            + 1;
+
+        let root = self.root.lock().await.clone();
+        let Some(root) = root else { return };
+
+        let client = self.client.clone();
+        let native_diagnosed = Arc::clone(&self.native_diagnosed_files);
+        let gen_ref = Arc::clone(&self.native_diagnostics_generation);
+        let debounce_ms = self
+            .fact_debounce_ms
+            .load(std::sync::atomic::Ordering::Relaxed);
+
+        tokio::spawn(async move {
+            // Debounce: wait configured interval, then check if we're still the latest request
+            tokio::time::sleep(std::time::Duration::from_millis(debounce_ms)).await;
+            let current = gen_ref.load(std::sync::atomic::Ordering::SeqCst);
+            if current != generation {
+                return; // superseded by a newer request
+            }
+
+            run_and_publish_diagnostics(
+                &client,
+                &root,
+                &normalize_rules::RuleKind::Native,
+                &native_diagnosed,
+            )
+            .await;
+        });
+    }
+
     /// Convert normalize symbol kind to LSP SymbolKind.
     fn to_lsp_symbol_kind(kind: &str) -> SymbolKind {
         match kind {
@@ -296,8 +346,27 @@ impl LanguageServer for NormalizeBackend {
         let uri = &params.text_document.uri;
         // Fast: per-file syntax diagnostics (immediate)
         self.run_syntax_diagnostics_for_file(uri).await;
-        // Slow: workspace-wide fact diagnostics (debounced 1500ms)
+        // Slow: workspace-wide fact diagnostics (debounced)
         self.schedule_fact_diagnostics(uri).await;
+        // Slow: workspace-wide native rule diagnostics (debounced)
+        self.schedule_native_diagnostics().await;
+    }
+
+    async fn did_change_watched_files(&self, params: DidChangeWatchedFilesParams) {
+        // Re-run native rules when .git/index changes (i.e. after `git add`).
+        // Native rules like stale-summary check git-tracked state, so staging
+        // changes affects their results.
+        let is_git_index = params.changes.iter().any(|change| {
+            change
+                .uri
+                .to_file_path()
+                .ok()
+                .map(|p| p.ends_with(".git/index"))
+                .unwrap_or(false)
+        });
+        if is_git_index {
+            self.schedule_native_diagnostics().await;
+        }
     }
 
     async fn document_symbol(
