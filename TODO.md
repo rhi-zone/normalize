@@ -700,21 +700,12 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 - Better `--compact` format: key:value pairs, no tables, all info preserved
 - Better `--pretty` format: bar charts for tools, progress bar for success rate
 - `normalize sessions mark <id>`: mark as reviewed (store in `.normalize/sessions-reviewed`)
-- **Project sync / portability** (`normalize sync <dest>`): use `fast_rsync` (not shell `rsync`) to
-  copy the project dir (default excludes: `target/`, `node_modules/`, `.git/objects/`, etc.) + copy
-  session metadata root(s) alongside it so session logs travel with the code. Post-copy: rewrite
-  absolute paths in `.normalize/normalize.db` via `UPDATE ... SET path = replace(path, old_root, new_root)`.
-  Value over plain rsync: knows where all associated metadata lives and moves it as a unit.
-  - **Session path discovery MUST go through `normalize-sessions`** — do not duplicate the
-    `~/.claude/projects/<mangled-path>/` location logic. ~~First refactor `normalize-sessions` to expose
-    a `fn project_metadata_roots(project_root: &Path) -> Vec<PathBuf>` (or similar), then use that.~~
-    Done: `project_metadata_roots` is now a public free function in `normalize-chat-sessions`; the
-    duplicate `get_sessions_dir` in `normalize/src/commands/sessions/mod.rs` has been removed.
-  - `normalize sync --all <dest>`: sync every known project, preserving relative path structure
-    (`/home/me/git/foo` → `<dest>/git/foo`). Project list comes from `normalize sessions list`;
-    if that returns nothing, fall back to current directory only (with a message — not silent).
-  - Filter flags: `--active [N]` (projects with sessions in last N days, default 30), `--repo <glob>`,
-    `--exclude <glob>`.
+- [x] **Project sync / portability** (`normalize sync <dest>`): implemented. Uses `walkdir` +
+  `std::fs::copy` (note: `fast_rsync` is a delta algorithm library, not a file copier).
+  Copies project dir + session metadata via `project_metadata_roots`, rewrites index paths
+  post-copy via libsql. `--dry-run`, `--verbose`, `--all`, `--active N`, `--repo`/`--exclude` done.
+  - [ ] Follow-up: incremental sync (skip unchanged files via mtime/checksum)
+  - [ ] Follow-up: multi-format session discovery (currently Claude Code only)
 - Agent habit analysis: study session logs to identify builtin vs learned behaviors
   - Example: "git status before commit" - is this hardcoded or from CLAUDE.md guidance?
   - Test methodology: fresh/empty repo without project instructions
