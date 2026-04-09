@@ -700,11 +700,10 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 - Better `--compact` format: key:value pairs, no tables, all info preserved
 - Better `--pretty` format: bar charts for tools, progress bar for success rate
 - `normalize sessions mark <id>`: mark as reviewed (store in `.normalize/sessions-reviewed`)
-- **Project + session portability**: `normalize sessions export <project>` bundles the structural
-  index + session logs into a portable archive; `normalize sessions import` restores on a new machine.
-  Useful for: moving a project to a new machine, sharing a session with a teammate, backup/restore.
-  Needs to handle absolute paths in the index (rewrite on import), and decide what to do with
-  `.normalize/` cache (probably rebuild on import rather than bundle).
+- **Project + session portability**: rsync/copy of the project dir (including `.normalize/` and
+  session logs) should be sufficient transport — no special archive format needed. The real problem
+  is absolute paths baked into the structural index; need a `normalize structure rebase <old-root> <new-root>`
+  command (or auto-detect on next `structure rebuild`) to fix them up after a move/copy.
 - Agent habit analysis: study session logs to identify builtin vs learned behaviors
   - Example: "git status before commit" - is this hardcoded or from CLAUDE.md guidance?
   - Test methodology: fresh/empty repo without project instructions
