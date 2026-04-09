@@ -700,10 +700,12 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 - Better `--compact` format: key:value pairs, no tables, all info preserved
 - Better `--pretty` format: bar charts for tools, progress bar for success rate
 - `normalize sessions mark <id>`: mark as reviewed (store in `.normalize/sessions-reviewed`)
-- **Project + session portability**: rsync/copy of the project dir (including `.normalize/` and
-  session logs) should be sufficient transport — no special archive format needed. The real problem
-  is absolute paths baked into the structural index; need a `normalize structure rebase <old-root> <new-root>`
-  command (or auto-detect on next `structure rebuild`) to fix them up after a move/copy.
+- **Project sync / portability** (`normalize sync <dest>`): rsync the project dir (default excludes:
+  `target/`, `node_modules/`, `.git/objects/`, etc.) + rsync `~/.claude/projects/<this-project>/`
+  alongside it so session logs travel with the code. On the receiving end: `normalize structure rebase`
+  to fix absolute paths in the index, re-link sessions to the new path. Value over plain rsync: knows
+  where all associated metadata lives (`.normalize/`, `~/.claude/projects/`, etc.) and moves it as a unit.
+  Also useful for backups.
 - Agent habit analysis: study session logs to identify builtin vs learned behaviors
   - Example: "git status before commit" - is this hardcoded or from CLAUDE.md guidance?
   - Test methodology: fresh/empty repo without project instructions
