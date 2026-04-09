@@ -15,7 +15,15 @@ ARCH="$(uname -m)"
 case "$OS" in
     Linux)
         case "$ARCH" in
-            x86_64) TARGET="x86_64-unknown-linux-gnu" ;;
+            x86_64)
+                # NixOS and other non-standard glibc environments lack the dynamic linker
+                # at the conventional path. Fall back to the musl static binary.
+                if [ -f /etc/NIXOS ] || ! [ -e /lib64/ld-linux-x86-64.so.2 ]; then
+                    TARGET="x86_64-unknown-linux-musl"
+                else
+                    TARGET="x86_64-unknown-linux-gnu"
+                fi
+                ;;
             aarch64|arm64) TARGET="aarch64-unknown-linux-gnu" ;;
             *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
         esac
