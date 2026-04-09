@@ -427,6 +427,15 @@ Rules (custom enforcement, future):
 - [ ] Threshold rules ("fan-out > 20 is error")
 - [ ] Dependency path queries ("what's between A and B?")
 
+**Rule unit testing (`normalize rules test`):**
+- [ ] Inline marker format (fourslash-style): source file with `// ^error rule-id` annotations at the
+      offending line, similar to TypeScript's fourslash test format. `normalize rules test <file>` runs
+      all enabled rules against the file and asserts the annotated lines match actual diagnostics.
+- [ ] Fixture format alternative: `test.input.<ext>` + `test.expected.json` for cases where inline
+      markers are awkward (multi-file rules, fact rules over a whole project).
+- The syntax-rules fixture runner already exists as prior art — extend it rather than build from scratch.
+- `normalize rules test` as a standalone command (not just a CI check) so rule authors can iterate fast.
+
 **Facts & Rules Architecture:**
 - [x] `normalize rules compile <rules.dl>` — validates syntax + checks all relation names against declared/built-in set; exits 1 on errors; CI-friendly
 - [x] ~~Self-install builtin dylib~~ — no longer applicable; builtins are embedded `.dl` files in `normalize-facts-rules-interpret/src/builtin_dl/`, no dylib or copy step needed.
@@ -691,6 +700,11 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 - Better `--compact` format: key:value pairs, no tables, all info preserved
 - Better `--pretty` format: bar charts for tools, progress bar for success rate
 - `normalize sessions mark <id>`: mark as reviewed (store in `.normalize/sessions-reviewed`)
+- **Project + session portability**: `normalize sessions export <project>` bundles the structural
+  index + session logs into a portable archive; `normalize sessions import` restores on a new machine.
+  Useful for: moving a project to a new machine, sharing a session with a teammate, backup/restore.
+  Needs to handle absolute paths in the index (rewrite on import), and decide what to do with
+  `.normalize/` cache (probably rebuild on import rather than bundle).
 - Agent habit analysis: study session logs to identify builtin vs learned behaviors
   - Example: "git status before commit" - is this hardcoded or from CLAUDE.md guidance?
   - Test methodology: fresh/empty repo without project instructions
