@@ -124,6 +124,16 @@ pub trait LogFormat: Send + Sync {
         Vec::new()
     }
 
+    /// Returns external directories (outside the project root) that belong to this format's
+    /// session metadata for the given project. Used by `normalize sync` to copy metadata
+    /// alongside the project.
+    ///
+    /// Default implementation delegates to `sessions_dir`. Override only if your format
+    /// stores metadata in multiple locations.
+    fn metadata_roots(&self, project: Option<&Path>) -> Vec<PathBuf> {
+        vec![self.sessions_dir(project)]
+    }
+
     /// Check if this format can parse the given file.
     /// Returns a confidence score 0.0-1.0.
     fn detect(&self, path: &Path) -> f64;
@@ -164,6 +174,22 @@ pub fn list_formats() -> Vec<&'static str> {
     init_builtin();
     // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
     FORMATS.read().unwrap().iter().map(|f| f.name()).collect()
+}
+
+/// Returns all external metadata directories for the given project across all known formats.
+///
+/// Only directories that actually exist on disk are returned. Used by `normalize sync` to
+/// discover what session metadata to copy alongside the project directory.
+pub fn project_metadata_roots(project: &Path) -> Vec<PathBuf> {
+    init_builtin();
+    // normalize-syntax-allow: rust/unwrap-in-impl - mutex poison on a global registry is unrecoverable
+    FORMATS
+        .read()
+        .unwrap()
+        .iter()
+        .flat_map(|f| f.metadata_roots(Some(project)))
+        .filter(|p| p.exists())
+        .collect()
 }
 
 /// Default implementation: list .jsonl files in a directory.

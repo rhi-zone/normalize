@@ -1,6 +1,7 @@
 //! Web server for session viewing.
 
-use super::{format_age, get_sessions_dir, resolve_session_paths};
+use super::{format_age, resolve_session_paths};
+use crate::sessions::{ClaudeCodeFormat, LogFormat};
 use axum::{
     Router,
     extract::{Path as AxumPath, State},
@@ -87,12 +88,12 @@ async fn spa_css() -> impl IntoResponse {
 
 /// API: list all sessions as JSON.
 async fn api_sessions(State(state): State<Arc<SessionsState>>) -> axum::response::Response {
-    let sessions_dir = get_sessions_dir(state.project.as_deref());
+    let sessions_dir = ClaudeCodeFormat.sessions_dir(state.project.as_deref());
 
     let mut sessions: Vec<serde_json::Value> = Vec::new();
 
-    if let Some(dir) = &sessions_dir
-        && let Ok(entries) = std::fs::read_dir(dir)
+    if sessions_dir.exists()
+        && let Ok(entries) = std::fs::read_dir(&sessions_dir)
     {
         for entry in entries.filter_map(|e| e.ok()) {
             let path = entry.path();

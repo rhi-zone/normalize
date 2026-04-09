@@ -706,8 +706,10 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
   absolute paths in `.normalize/normalize.db` via `UPDATE ... SET path = replace(path, old_root, new_root)`.
   Value over plain rsync: knows where all associated metadata lives and moves it as a unit.
   - **Session path discovery MUST go through `normalize-sessions`** — do not duplicate the
-    `~/.claude/projects/<mangled-path>/` location logic. First refactor `normalize-sessions` to expose
-    a `fn project_metadata_roots(project_root: &Path) -> Vec<PathBuf>` (or similar), then use that.
+    `~/.claude/projects/<mangled-path>/` location logic. ~~First refactor `normalize-sessions` to expose
+    a `fn project_metadata_roots(project_root: &Path) -> Vec<PathBuf>` (or similar), then use that.~~
+    Done: `project_metadata_roots` is now a public free function in `normalize-chat-sessions`; the
+    duplicate `get_sessions_dir` in `normalize/src/commands/sessions/mod.rs` has been removed.
   - `normalize sync --all <dest>`: sync every known project, preserving relative path structure
     (`/home/me/git/foo` → `<dest>/git/foo`). Project list comes from `normalize sessions list`;
     if that returns nothing, fall back to current directory only (with a message — not silent).
