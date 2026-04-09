@@ -708,7 +708,7 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
   Also useful for backups.
   - `normalize sync --all <dest>`: sync every known project at once (discovered from sessions index or
     config), preserving relative path structure (`/home/me/git/foo` → `<dest>/git/foo`).
-  - Filter flags: `--since <date>`, `--active` (sessions in last N days), `--repo <glob>`,
+  - Filter flags: `--active [N]` (projects with sessions in last N days, default 30), `--repo <glob>`,
     `--exclude <glob>`. Useful for "sync everything I've touched this week" or "backup only work repos".
 - Agent habit analysis: study session logs to identify builtin vs learned behaviors
   - Example: "git status before commit" - is this hardcoded or from CLAUDE.md guidance?
