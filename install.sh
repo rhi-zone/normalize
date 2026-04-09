@@ -1,6 +1,10 @@
 #!/bin/bash
 # Normalize CLI installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/rhi-zone/normalize/master/install.sh | sh
+# NOTE: The canonical version of this script is in the rhi.zone repo:
+#   https://github.com/rhi-zone/rhi.zone/blob/master/normalize/install.sh
+# This copy may be out of date. Keep them in sync when making changes.
+#
+# Usage: curl -fsSL https://rhi.zone/normalize/install.sh | sh
 # Version pinning: NORMALIZE_VERSION=0.2.0 curl -fsSL ... | sh
 
 set -e
