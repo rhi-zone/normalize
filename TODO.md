@@ -700,16 +700,19 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 - Better `--compact` format: key:value pairs, no tables, all info preserved
 - Better `--pretty` format: bar charts for tools, progress bar for success rate
 - `normalize sessions mark <id>`: mark as reviewed (store in `.normalize/sessions-reviewed`)
-- **Project sync / portability** (`normalize sync <dest>`): rsync the project dir (default excludes:
-  `target/`, `node_modules/`, `.git/objects/`, etc.) + rsync `~/.claude/projects/<this-project>/`
-  alongside it so session logs travel with the code. On the receiving end: `normalize structure rebase`
-  to fix absolute paths in the index, re-link sessions to the new path. Value over plain rsync: knows
-  where all associated metadata lives (`.normalize/`, `~/.claude/projects/`, etc.) and moves it as a unit.
-  Also useful for backups.
-  - `normalize sync --all <dest>`: sync every known project at once (discovered from sessions index or
-    config), preserving relative path structure (`/home/me/git/foo` → `<dest>/git/foo`).
+- **Project sync / portability** (`normalize sync <dest>`): use `fast_rsync` (not shell `rsync`) to
+  copy the project dir (default excludes: `target/`, `node_modules/`, `.git/objects/`, etc.) + copy
+  session metadata root(s) alongside it so session logs travel with the code. Post-copy: rewrite
+  absolute paths in `.normalize/normalize.db` via `UPDATE ... SET path = replace(path, old_root, new_root)`.
+  Value over plain rsync: knows where all associated metadata lives and moves it as a unit.
+  - **Session path discovery MUST go through `normalize-sessions`** — do not duplicate the
+    `~/.claude/projects/<mangled-path>/` location logic. First refactor `normalize-sessions` to expose
+    a `fn project_metadata_roots(project_root: &Path) -> Vec<PathBuf>` (or similar), then use that.
+  - `normalize sync --all <dest>`: sync every known project, preserving relative path structure
+    (`/home/me/git/foo` → `<dest>/git/foo`). Project list comes from `normalize sessions list`;
+    if that returns nothing, fall back to current directory only (with a message — not silent).
   - Filter flags: `--active [N]` (projects with sessions in last N days, default 30), `--repo <glob>`,
-    `--exclude <glob>`. Useful for "sync everything I've touched this week" or "backup only work repos".
+    `--exclude <glob>`.
 - Agent habit analysis: study session logs to identify builtin vs learned behaviors
   - Example: "git status before commit" - is this hardcoded or from CLAUDE.md guidance?
   - Test methodology: fresh/empty repo without project instructions

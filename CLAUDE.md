@@ -157,6 +157,11 @@ Do not:
 - Put node classification in Rust when a `.scm` query file fits — `*.calls.scm`, `*.complexity.scm` etc. Extraction (getting names/fields from identified nodes) stays in Rust.
 - Use path dependencies in Cargo.toml — causes clippy to stash changes across repos
 - Use `--no-verify` — fix the issue or fix the hook
+- Shell out to external tools when a crate exists — use `fast_rsync` not `rsync`, `git2` not `git`,
+  `zip` not `unzip`, etc. Shelling out adds a runtime dependency, breaks on systems where the tool
+  is absent or has a different version, and loses structured error handling. Exceptions: tools that
+  are genuinely part of the user's workflow and whose absence should be surfaced (e.g. a user-configured
+  linter), or where the crate equivalent doesn't exist.
 
 ## LLM-Driven Workflows
 
