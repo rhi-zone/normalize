@@ -128,8 +128,18 @@ mod tests {
     use normalize_facts_core::SymbolKind;
     use std::path::PathBuf;
 
+    /// Returns true if external grammars are loadable by the global loader.
+    /// Tests that require grammars should skip (return early) when this is false.
+    /// To enable: run `cargo xtask build-grammars` and set `NORMALIZE_GRAMMAR_PATH=target/grammars`.
+    fn grammars_available() -> bool {
+        normalize_facts::parse_with_grammar("python", "x = 1").is_some()
+    }
+
     #[test]
     fn test_python_skeleton() {
+        if !grammars_available() {
+            return;
+        }
         let extractor = SkeletonExtractor::new();
         let content = r#"
 def foo(x: int) -> str:
@@ -161,6 +171,9 @@ class Bar:
 
     #[test]
     fn test_rust_skeleton() {
+        if !grammars_available() {
+            return;
+        }
         let extractor = SkeletonExtractor::new();
         let content = r#"
 /// A simple struct
@@ -187,6 +200,9 @@ impl Foo {
 
     #[test]
     fn test_to_view_node() {
+        if !grammars_available() {
+            return;
+        }
         let extractor = SkeletonExtractor::new();
         let content = r#"
 def greet(name: str) -> str:
@@ -210,6 +226,9 @@ def greet(name: str) -> str:
 
     #[test]
     fn test_markdown_skeleton() {
+        if !grammars_available() {
+            return;
+        }
         let extractor = SkeletonExtractor::new();
         let content = r#"# Title
 
@@ -256,6 +275,9 @@ More content.
 
     #[test]
     fn test_javascript_skeleton() {
+        if !grammars_available() {
+            return;
+        }
         let extractor = SkeletonExtractor::new();
         let content = r#"function greet(name) {
   console.log("Hello, " + name);
@@ -290,6 +312,9 @@ class Greeter {
 
     #[test]
     fn test_filter_types() {
+        if !grammars_available() {
+            return;
+        }
         let extractor = SkeletonExtractor::new();
         let content = r#"
 def helper():
@@ -320,6 +345,9 @@ class AnotherClass:
 
     #[test]
     fn test_filter_types_rust() {
+        if !grammars_available() {
+            return;
+        }
         let extractor = SkeletonExtractor::new();
         let content = r#"
 fn helper() {}
@@ -357,6 +385,9 @@ fn another_function() {}
 
     #[test]
     fn test_filter_types_typescript() {
+        if !grammars_available() {
+            return;
+        }
         let extractor = SkeletonExtractor::new();
         let content = r#"
 function helper() {}
@@ -393,6 +424,9 @@ const arrow = () => {};
 
     #[test]
     fn test_filter_types_go() {
+        if !grammars_available() {
+            return;
+        }
         let extractor = SkeletonExtractor::new();
         let content = r#"
 package main
@@ -422,6 +456,9 @@ type MyInterface interface {
 
     #[test]
     fn test_filter_types_java() {
+        if !grammars_available() {
+            return;
+        }
         let extractor = SkeletonExtractor::new();
         let content = r#"
 public class MyClass {
@@ -448,6 +485,9 @@ enum MyEnum {
 
     #[test]
     fn test_filter_types_ruby() {
+        if !grammars_available() {
+            return;
+        }
         let extractor = SkeletonExtractor::new();
         let content = r#"
 def helper
@@ -476,6 +516,9 @@ end
 
     #[test]
     fn test_scala_skeleton() {
+        if !grammars_available() {
+            return;
+        }
         let extractor = SkeletonExtractor::new();
         let content = r#"
 object Main {
@@ -553,6 +596,9 @@ div { color: red; }
 
     #[test]
     fn test_filter_types_scala() {
+        if !grammars_available() {
+            return;
+        }
         let extractor = SkeletonExtractor::new();
         let content = r#"
 def helper(): Unit = {}
@@ -583,6 +629,9 @@ trait MyTrait {
 
     #[test]
     fn test_python_trait_extraction() {
+        if !grammars_available() {
+            return;
+        }
         // Test that trait-based extraction works for Python
         let extractor = SkeletonExtractor::new();
         let content = r#"
