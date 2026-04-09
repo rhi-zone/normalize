@@ -706,6 +706,10 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
   to fix absolute paths in the index, re-link sessions to the new path. Value over plain rsync: knows
   where all associated metadata lives (`.normalize/`, `~/.claude/projects/`, etc.) and moves it as a unit.
   Also useful for backups.
+  - `normalize sync --all <dest>`: sync every known project at once (discovered from sessions index or
+    config), preserving relative path structure (`/home/me/git/foo` → `<dest>/git/foo`).
+  - Filter flags: `--since <date>`, `--active` (sessions in last N days), `--repo <glob>`,
+    `--exclude <glob>`. Useful for "sync everything I've touched this week" or "backup only work repos".
 - Agent habit analysis: study session logs to identify builtin vs learned behaviors
   - Example: "git status before commit" - is this hardcoded or from CLAUDE.md guidance?
   - Test methodology: fresh/empty repo without project instructions
