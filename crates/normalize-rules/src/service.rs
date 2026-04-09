@@ -182,6 +182,73 @@ impl OutputFormatter for RulesValidateReport {
     }
 }
 
+/// One mismatch found during `normalize rules test`.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct TestMismatch {
+    /// 1-based line number.
+    pub line: usize,
+    /// Rule ID involved in the mismatch.
+    pub rule_id: String,
+    /// "expected finding missing" or "unexpected finding"
+    pub kind: String,
+}
+
+/// Report returned by `normalize rules test`.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct RulesTestReport {
+    /// Path to the file that was tested.
+    pub file: String,
+    /// `true` if all assertions passed.
+    pub passed: bool,
+    /// Number of `// error[...]` annotations found in the file.
+    pub annotations: usize,
+    /// Number of findings from rule execution.
+    pub findings: usize,
+    /// List of mismatches (empty when passed = true).
+    pub mismatches: Vec<TestMismatch>,
+}
+
+impl OutputFormatter for RulesTestReport {
+    fn format_text(&self) -> String {
+        if self.passed {
+            format!(
+                "PASS {} ({} annotation(s), {} finding(s))\n",
+                self.file, self.annotations, self.findings
+            )
+        } else {
+            let mut out = format!("FAIL {}:\n", self.file);
+            for m in &self.mismatches {
+                out.push_str(&format!("  line {}: {} — {}\n", m.line, m.rule_id, m.kind));
+            }
+            out
+        }
+    }
+
+    fn format_pretty(&self) -> String {
+        use nu_ansi_term::Color;
+        if self.passed {
+            format!(
+                "{} {} ({} annotation(s), {} finding(s))\n",
+                Color::Green.bold().paint("PASS"),
+                self.file,
+                self.annotations,
+                self.findings
+            )
+        } else {
+            let mut out = format!("{} {}:\n", Color::Red.bold().paint("FAIL"), self.file);
+            for m in &self.mismatches {
+                out.push_str(&format!(
+                    "  line {}: {} — {}\n",
+                    m.line,
+                    Color::Yellow.paint(&m.rule_id),
+                    m.kind
+                ));
+            }
+            out
+        }
+    }
+}
+
 /// Rules management sub-service.
 pub struct RulesService {
     pretty: Cell<bool>,
@@ -1223,6 +1290,148 @@ impl RulesService {
             // Signal failure to the CLI via Err so the process exits with status 1.
             // The formatted output is passed as the error string so it appears on stderr.
             Err(self.display_output(&report))
+        }
+    }
+
+    /// Test a source file against inline `// error[rule-id]` annotations.
+    ///
+    /// Runs all enabled syntax rules against the file and checks that:
+    ///   - Every `// error[rule-id]` annotation has a matching finding on that line
+    ///   - Every finding has a corresponding annotation
+    ///
+    /// Exits with code 1 if any assertion fails.
+    ///
+    /// Examples:
+    ///   normalize rules test src/lib.rs          # test a file
+    ///   normalize rules test tests/fixture.rs    # test a fixture file
+    #[cli(display_with = "display_output")]
+    pub fn test(
+        &self,
+        #[param(positional, help = "Path to the source file to test")] file: String,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<RulesTestReport, String> {
+        self.resolve_format(pretty, compact);
+
+        let effective_root = root
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+
+        let file_path = if std::path::Path::new(&file).is_absolute() {
+            std::path::PathBuf::from(&file)
+        } else {
+            effective_root.join(&file)
+        };
+
+        let content = std::fs::read_to_string(&file_path)
+            .map_err(|e| format!("Failed to read '{}': {e}", file_path.display()))?;
+
+        // Parse inline annotations: scan for `error[rule-id]` patterns (language-agnostic).
+        // Collect (line_number, rule_id) pairs; line numbers are 1-based.
+        let mut annotations: Vec<(usize, String)> = Vec::new();
+        for (idx, line) in content.lines().enumerate() {
+            let line_no = idx + 1;
+            let mut search = line;
+            loop {
+                let Some(pos) = search.find("error[") else {
+                    break;
+                };
+                let after = &search[pos + "error[".len()..];
+                let Some(end) = after.find(']') else {
+                    break;
+                };
+                let rule_id = &after[..end];
+                if !rule_id.is_empty() {
+                    annotations.push((line_no, rule_id.to_string()));
+                }
+                // Advance past this match to find further annotations on the same line.
+                search = &search[pos + "error[".len() + end + 1..];
+            }
+        }
+
+        let config = load_rules_config(&effective_root);
+        let debug_flags = normalize_syntax_rules::DebugFlags::default();
+        let path_filter = normalize_rules_config::PathFilter::new(&[], &[]);
+        let findings = run_syntax_rules(
+            &effective_root,
+            &effective_root,
+            None,
+            None,
+            None,
+            &config.rules,
+            &debug_flags,
+            Some(std::slice::from_ref(&file_path)),
+            &path_filter,
+            &config.walk,
+        );
+
+        let annotation_count = annotations.len();
+        let finding_count = findings.len();
+
+        // Build sets for bidirectional comparison.
+        // Key: (line, rule_id)
+        let annotation_set: std::collections::HashSet<(usize, String)> =
+            annotations.into_iter().collect();
+        let finding_set: std::collections::HashSet<(usize, String)> = findings
+            .iter()
+            .map(|f| (f.start_line, f.rule_id.clone()))
+            .collect();
+
+        let mut mismatches: Vec<TestMismatch> = Vec::new();
+
+        // Findings without a matching annotation → "unexpected finding"
+        let mut unexpected: Vec<(usize, String)> = finding_set
+            .iter()
+            .filter(|k| !annotation_set.contains(*k))
+            .cloned()
+            .collect();
+        unexpected.sort();
+        for (line, rule_id) in unexpected {
+            mismatches.push(TestMismatch {
+                line,
+                rule_id,
+                kind: "unexpected finding".to_string(),
+            });
+        }
+
+        // Annotations without a matching finding → "expected finding missing"
+        let mut missing: Vec<(usize, String)> = annotation_set
+            .iter()
+            .filter(|k| !finding_set.contains(*k))
+            .cloned()
+            .collect();
+        missing.sort();
+        for (line, rule_id) in missing {
+            mismatches.push(TestMismatch {
+                line,
+                rule_id,
+                kind: "expected finding missing".to_string(),
+            });
+        }
+
+        mismatches.sort_by_key(|m| (m.line, m.rule_id.clone()));
+
+        let passed = mismatches.is_empty();
+        let report = RulesTestReport {
+            file,
+            passed,
+            annotations: annotation_count,
+            findings: finding_count,
+            mismatches,
+        };
+
+        if passed {
+            Ok(report)
+        } else {
+            let n = report.mismatches.len();
+            let detail = self.display_output(&report);
+            Err(format!("{detail}\n{n} test failure(s)"))
         }
     }
 }

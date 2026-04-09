@@ -32,5 +32,5 @@ pub use loader::format_diagnostic;
 #[cfg(feature = "cli")]
 pub use service::{
     CompileError, CompileWarning, RuleShowReport, RulesCompileReport, RulesService,
-    RulesValidateReport, load_rules_config,
+    RulesTestReport, RulesValidateReport, load_rules_config,
 };

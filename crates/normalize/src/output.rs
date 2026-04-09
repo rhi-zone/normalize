@@ -179,10 +179,13 @@ mod tests {
         use crate::health::HealthReport;
         assert_output_formatter::<HealthReport>();
 
-        use normalize_rules::{RulesCompileReport, RulesListReport, RulesValidateReport};
+        use normalize_rules::{
+            RulesCompileReport, RulesListReport, RulesTestReport, RulesValidateReport,
+        };
         assert_output_formatter::<RulesListReport>();
         assert_output_formatter::<RulesValidateReport>();
         assert_output_formatter::<RulesCompileReport>();
+        assert_output_formatter::<RulesTestReport>();
 
         use normalize_native_rules::check_examples::CheckExamplesReport;
         use normalize_native_rules::check_refs::CheckRefsReport;

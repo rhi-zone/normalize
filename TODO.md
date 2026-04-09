@@ -428,9 +428,10 @@ Rules (custom enforcement, future):
 - [ ] Dependency path queries ("what's between A and B?")
 
 **Rule unit testing (`normalize rules test`):**
-- [ ] Inline marker format (fourslash-style): source file with `// ^error rule-id` annotations at the
-      offending line, similar to TypeScript's fourslash test format. `normalize rules test <file>` runs
-      all enabled rules against the file and asserts the annotated lines match actual diagnostics.
+- [x] Inline marker format (fourslash-style): `normalize rules test <file>` runs all enabled syntax
+      rules against a source file and asserts annotated lines (`// error[rule-id]`) match actual
+      diagnostics. Language-agnostic; multiple annotations per line supported. Implemented in
+      `crates/normalize-rules/src/service.rs`.
 - [ ] Fixture format alternative: `test.input.<ext>` + `test.expected.json` for cases where inline
       markers are awkward (multi-file rules, fact rules over a whole project).
 - The syntax-rules fixture runner already exists as prior art — extend it rather than build from scratch.
