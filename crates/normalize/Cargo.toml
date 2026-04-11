@@ -55,6 +55,7 @@ normalize-semantic = { path = "../normalize-semantic", version = "0.2.0", featur
 normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.2.0" }
 normalize-facts-rules-interpret = { path = "../normalize-facts-rules-interpret", version = "0.2.0" }
 tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 normalize-languages = { path = "../normalize-languages", version = "0.2.0" }
 normalize-local-deps = { path = "../normalize-local-deps", version = "0.2.0" }
 normalize-typegen = { path = "../normalize-typegen", version = "0.2.0", features = ["input-typescript"] }

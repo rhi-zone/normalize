@@ -521,19 +521,9 @@ impl NormalizeService {
         }
 
         if !dry_run {
-            // 5. Report changes
-            if changes.is_empty() {
-                println!("Already initialized.");
-            } else {
-                println!("Initialized normalize:");
-                for change in &changes {
-                    println!("  {}", change);
-                }
-            }
-
             // 6. Optionally index
             if index {
-                println!("\nIndexing codebase...");
+                tracing::info!("indexing codebase...");
                 let mut idx = crate::index::open(&root)
                     .await
                     .map_err(|e| format!("Failed to open index: {}", e))?;
@@ -541,7 +531,7 @@ impl NormalizeService {
                     .refresh()
                     .await
                     .map_err(|e| format!("Failed to index: {}", e))?;
-                println!("Indexed {} files.", count);
+                tracing::info!("indexed {} files", count);
             }
 
             // 7. Optionally run setup wizard
@@ -550,8 +540,8 @@ impl NormalizeService {
             }
 
             // 8. Suggest enabling semantic search (CTA)
-            println!(
-                "\nSemantic search available. Enable with `embeddings.enabled = true` in .normalize/config.toml"
+            tracing::info!(
+                "semantic search available — enable with `embeddings.enabled = true` in .normalize/config.toml"
             );
         } else {
             if index {
@@ -627,7 +617,7 @@ impl NormalizeService {
         }
 
         // Perform the update
-        eprintln!("Downloading update...");
+        tracing::info!("downloading update...");
 
         let target = commands::update::get_target_triple();
         let asset_name = commands::update::get_asset_name(&target);
@@ -641,7 +631,7 @@ impl NormalizeService {
             })
             .ok_or_else(|| format!("No binary available for your platform: {}", target))?;
 
-        eprintln!("  Downloading {}...", asset_name);
+        tracing::info!("  downloading {}...", asset_name);
         let archive_response = client
             .get(asset_url)
             .call()
@@ -661,7 +651,7 @@ impl NormalizeService {
         });
 
         if let Some(checksum_url) = checksum_url {
-            eprintln!("  Verifying checksum...");
+            tracing::info!("  verifying checksum...");
             if let Ok(resp) = client.get(checksum_url).call()
                 && let Ok(checksums) = resp.into_string()
             {
@@ -683,7 +673,7 @@ impl NormalizeService {
         }
 
         // Extract binary
-        eprintln!("  Extracting...");
+        tracing::info!("  extracting...");
         let binary_data = if asset_name.ends_with(".tar.gz") {
             commands::update::extract_tar_gz(&archive_data)
         } else if asset_name.ends_with(".zip") {
@@ -693,7 +683,7 @@ impl NormalizeService {
         }?;
 
         // Replace current binary
-        eprintln!("  Installing...");
+        tracing::info!("  installing...");
         commands::update::self_replace(&binary_data)?;
 
         Ok(UpdateReport {
@@ -784,7 +774,7 @@ impl NormalizeService {
 
         if let Some(ref path) = output {
             std::fs::write(path, &code).map_err(|e| format!("Failed to write {}: {}", path, e))?;
-            eprintln!("Translated {} -> {} ({})", input, path, target_lang);
+            tracing::info!("translated {} -> {} ({})", input, path, target_lang);
             Ok(TranslateReport {
                 code,
                 source_language: source_lang.to_string(),
@@ -951,8 +941,8 @@ impl NormalizeService {
             }
 
             if roots.is_empty() {
-                eprintln!(
-                    "warning: no projects found matching the given filters; syncing current directory"
+                tracing::warn!(
+                    "no projects found matching the given filters; syncing current directory"
                 );
                 vec![root_path.clone()]
             } else {
@@ -1373,8 +1363,13 @@ impl OutputFormatter for InitReport {
                     let _ = writeln!(out, "  {}", change);
                 }
             }
-        } else {
+        } else if self.changes.is_empty() {
             let _ = write!(out, "{}", self.message);
+        } else {
+            let _ = writeln!(out, "Initialized normalize:");
+            for change in &self.changes {
+                let _ = writeln!(out, "  {}", change);
+            }
         }
         out
     }

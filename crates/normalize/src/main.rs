@@ -118,6 +118,16 @@ async fn main() -> std::process::ExitCode {
     init_sqlite_serialized();
     reset_sigpipe();
 
+    tracing_subscriber::fmt()
+        .without_time()
+        .with_target(false)
+        .with_level(false)
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+
     let argv: Vec<std::ffi::OsString> = std::env::args_os().collect();
 
     let argv0 = argv
