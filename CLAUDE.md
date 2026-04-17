@@ -109,15 +109,6 @@ When unsure of syntax: `normalize <cmd> --help`. Fall back to Read only for exac
 
 **Maintain CHANGELOG.md.** User-facing changes go in `CHANGELOG.md` (Keep a Changelog format) as they land — not in a batch at release time. Add entries under `## [Unreleased]` when committing the feature. At release, rename `[Unreleased]` to the version and add a new empty `[Unreleased]` section. The release workflow body should link to or excerpt the changelog rather than duplicating install instructions as the primary content.
 
-## Session Handoff
-
-Use `/handoff` to end a session and leave context for the next one. It updates TODO.md with open threads — the next session reads TODO.md as advisory context, not instructions.
-
-If the next session needs a structured execution plan, use plan mode after reading TODO.md — that plan is built fresh from current state, not inherited from a previous session.
-
-**Initiate a handoff after a significant mid-session correction.** When a correction happens after substantial wrong-path work, the wrong reasoning is still in context and keeps pulling. Writing down the invariant and starting fresh beats continuing with poisoned context — the next session loads the invariant from turn 1 before any wrong reasoning exists.
-
-**TODO.md is the lossless record.** Anything worth preserving belongs in CLAUDE.md or TODO.md — not in memory files.
 ## Context Management
 
 **Use subagents to protect the main context window.** When a task requires broad
