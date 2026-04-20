@@ -23,6 +23,23 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ~~**Bug: `Turn::token_usage` only captures the last API call per turn.**~~ Already fixed in claude_code.rs — `turn_request_ids: Vec<String>` accumulates all request IDs and `sum_turn_tokens` sums them on flush.
 
+### ~~Daemon memory leak — 2.3GB resident after 10 days~~ FIXED
+
+~~The daemon (`normalize daemon run`) accumulates ~2.3GB resident memory over time. Root cause:
+`WatchedRoot` holds `DiagnosticsCache` (all syntax/fact/native issues) and `rev_deps`
+(`HashMap<PathBuf, HashSet<PathBuf>>`) **in memory forever** — no eviction.~~
+
+Fixed: `DiagnosticsCache` removed from `WatchedRoot` — diagnostics are now serialized to JSON
+and persisted to the `daemon_diagnostics` table in the SQLite index, then dropped from heap
+immediately after each refresh. `rev_deps` removed — reverse-dep graph is now derived
+transiently from the SQLite `imports` table on each refresh cycle and discarded after use.
+`last_affected` was already transient (local to the refresh). `WatchedRoot` now holds only
+watcher handles and a `primed: bool` flag — near-zero steady-state memory footprint.
+
+Remaining (not blocking the memory fix):
+- Grammar/tree lifetime: parse → extract → **drop tree before returning** — scope
+  `GrammarLoader` to the indexing task, not the daemon lifetime
+
 ### LSP diagnostics improvements
 
 - [x] Per-file syntax rules (only re-run on the saved file, not the whole workspace)

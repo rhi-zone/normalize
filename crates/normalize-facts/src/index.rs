@@ -514,6 +514,17 @@ impl FileIndex {
         )
         .await?;
 
+        // Daemon diagnostics cache: persisted issue blobs, one row per engine.
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS daemon_diagnostics (
+                engine TEXT PRIMARY KEY,
+                issues_json TEXT NOT NULL,
+                updated_at INTEGER NOT NULL
+            )",
+            (),
+        )
+        .await?;
+
         Ok(Self {
             conn,
             db,
@@ -2651,6 +2662,51 @@ impl FileIndex {
             .ok()?;
         let row = rows.next().await.ok()??;
         row.get(0).ok()
+    }
+
+    // -------------------------------------------------------------------------
+    // Diagnostics cache (daemon use only)
+    // -------------------------------------------------------------------------
+
+    /// Persist serialized diagnostics JSON for one engine ("syntax", "fact", "native").
+    /// Replaces any previous value for that engine.
+    pub async fn save_diagnostics_json(
+        &self,
+        engine: &str,
+        issues_json: &str,
+    ) -> Result<(), libsql::Error> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        self.conn
+            .execute(
+                "INSERT OR REPLACE INTO daemon_diagnostics (engine, issues_json, updated_at)
+                 VALUES (?1, ?2, ?3)",
+                params![engine.to_string(), issues_json.to_string(), now],
+            )
+            .await?;
+        Ok(())
+    }
+
+    /// Load serialized diagnostics JSON for one engine.
+    /// Returns `None` if no data has been saved for that engine yet.
+    pub async fn load_diagnostics_json(
+        &self,
+        engine: &str,
+    ) -> Result<Option<String>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT issues_json FROM daemon_diagnostics WHERE engine = ?1",
+                params![engine.to_string()],
+            )
+            .await?;
+        if let Some(row) = rows.next().await? {
+            Ok(Some(row.get(0)?))
+        } else {
+            Ok(None)
+        }
     }
 }
 
