@@ -134,6 +134,55 @@ pub fn parse_match_pairs(pairs: &[String]) -> Result<CallerContext, String> {
     Ok(map)
 }
 
+/// Read a structured file and merge into caller context under `prefix`.
+///
+/// Dispatches on file extension:
+/// - `.json`  → JSON
+/// - `.toml`  → TOML
+/// - `.yaml` / `.yml` → YAML
+/// - `.ini` / `.kdl` / `.hcl` → not yet implemented
+///
+/// The parsed value is flattened into dot-path key-value pairs under `prefix`.
+pub fn read_file_context(prefix: &str, path: &str) -> Result<CallerContext, String> {
+    let ext = std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("Failed to read file {path:?}: {e}"))?;
+
+    let value: serde_json::Value = match ext.as_str() {
+        "json" => serde_json::from_str(&content)
+            .map_err(|e| format!("{path:?} is not valid JSON: {e}"))?,
+        "toml" => {
+            let toml_value: toml::Value =
+                toml::from_str(&content).map_err(|e| format!("{path:?} is not valid TOML: {e}"))?;
+            serde_json::to_value(toml_value)
+                .map_err(|e| format!("Failed to convert TOML to JSON value: {e}"))?
+        }
+        "yaml" | "yml" => serde_yaml::from_str(&content)
+            .map_err(|e| format!("{path:?} is not valid YAML: {e}"))?,
+        "ini" | "kdl" | "hcl" => {
+            return Err(format!(
+                "File format {ext:?} is not yet implemented for --file"
+            ));
+        }
+        other => {
+            return Err(format!(
+                "Unrecognized file extension {other:?} for --file; \
+                 supported: .json, .toml, .yaml, .yml"
+            ));
+        }
+    };
+
+    let nested = serde_json::json!({ prefix: value });
+    let mut map = CallerContext::new();
+    flatten_json(&nested, "", &mut map);
+    Ok(map)
+}
+
 /// Read JSON from stdin and merge into caller context, optionally under `prefix`.
 pub fn read_stdin_context(prefix: Option<&str>) -> Result<CallerContext, String> {
     let mut buf = String::new();

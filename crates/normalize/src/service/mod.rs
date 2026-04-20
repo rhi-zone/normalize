@@ -42,7 +42,7 @@ use crate::commands;
 use crate::commands::aliases::{AliasesReport, detect_project_languages};
 use crate::commands::context::{
     CallerContext, ContextBlock, ContextListReport, ContextReport, collect_new_context_files,
-    parse_match_pairs, read_stdin_context, resolve_context, yaml_to_json,
+    parse_match_pairs, read_file_context, read_stdin_context, resolve_context, yaml_to_json,
 };
 use crate::config::NormalizeConfig;
 use crate::output::OutputFormatter;
@@ -386,6 +386,7 @@ impl NormalizeService {
     ///   normalize context --match claudecode.hook=UserPromptSubmit # nested dot-path
     ///   echo '{"hook":"X"}' | normalize context --stdin --prefix claudecode
     ///   normalize context --all --list                            # list all source files
+    ///   normalize context --file cfg=config.toml                  # load file under prefix
     #[server(group = "utilities")]
     #[cli(display_with = "display_context")]
     #[allow(clippy::too_many_arguments)]
@@ -399,6 +400,10 @@ impl NormalizeService {
         #[param(help = "Context directory name inside .normalize/ (default: context)")]
         from: Option<String>,
         #[param(help = "Show source file paths only, not content")] list: bool,
+        #[param(
+            help = "Load a structured file into caller context as PREFIX=PATH (repeatable; supports .json, .toml, .yaml/.yml)"
+        )]
+        file: Vec<String>,
     ) -> Result<ContextKindReport, String> {
         let root_path = root
             .map(PathBuf::from)
@@ -413,11 +418,21 @@ impl NormalizeService {
             return Ok(ContextKindReport::List(ContextListReport::new(files)));
         }
 
-        // Build caller context from --match pairs and optionally --stdin.
+        // Build caller context from --match pairs, optionally --stdin, and --file entries.
         let mut caller_ctx: CallerContext = parse_match_pairs(&r#match)?;
         if stdin {
             let stdin_ctx = read_stdin_context(prefix.as_deref())?;
             caller_ctx.extend(stdin_ctx);
+        }
+        for entry in &file {
+            if let Some((pfx, path)) = entry.split_once('=') {
+                let file_ctx = read_file_context(pfx, path)?;
+                caller_ctx.extend(file_ctx);
+            } else {
+                return Err(format!(
+                    "--file argument must be PREFIX=PATH, got: {entry:?}"
+                ));
+            }
         }
 
         let raw = resolve_context(&root_path, dir_name, &caller_ctx, all);
