@@ -68,7 +68,7 @@ impl normalize_output::OutputFormatter for ContextListReport {
 impl normalize_output::OutputFormatter for ContextReport {
     fn format_text(&self) -> String {
         if self.blocks.is_empty() {
-            return "No context found.".to_string();
+            return String::new();
         }
         self.blocks
             .iter()
@@ -79,7 +79,7 @@ impl normalize_output::OutputFormatter for ContextReport {
 
     fn format_pretty(&self) -> String {
         if self.blocks.is_empty() {
-            return "No context found.".to_string();
+            return String::new();
         }
         let mut out = String::new();
         for block in &self.blocks {
