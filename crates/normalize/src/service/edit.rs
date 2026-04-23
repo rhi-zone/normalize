@@ -1188,6 +1188,42 @@ impl EditService {
         .await
     }
 
+    /// Extract a selected code range into a new function.
+    ///
+    /// Replaces the selected code with a call to the new function, and inserts
+    /// the new function definition immediately after the enclosing function.
+    /// Parameters are inferred from free variables in the selection (best-effort).
+    ///
+    /// The range is specified as a byte range: `--start <byte>` and `--end <byte>`.
+    /// You can obtain byte offsets with `normalize syntax ast <file>` or by counting
+    /// characters from the start of the file.
+    ///
+    /// Examples:
+    ///   normalize edit extract-function src/lib.rs --start 120 --end 180 --name compute_total
+    ///   normalize edit extract-function src/lib.rs --start 120 --end 180 --name compute_total --dry-run
+    #[allow(clippy::too_many_arguments)]
+    pub async fn extract_function(
+        &self,
+        #[param(positional, help = "File to extract from (path)")] target: String,
+        #[param(help = "Start byte of the selection (inclusive)")] start: usize,
+        #[param(help = "End byte of the selection (exclusive)")] end: usize,
+        #[param(short = 'n', help = "Name for the extracted function")] name: String,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
+        #[param(short = 'm', help = "Message for shadow history")] message: Option<String>,
+        #[param(short = 'r', help = "Root directory")] root: Option<String>,
+    ) -> Result<EditResult, String> {
+        do_extract_function(
+            &target,
+            start,
+            end,
+            &name,
+            root.as_deref().map(Path::new),
+            dry_run,
+            message.as_deref(),
+        )
+        .await
+    }
+
     /// Undo the last N edits
     ///
     /// Examples:
@@ -1355,6 +1391,79 @@ impl EditService {
     pub fn history(&self) -> &HistoryService {
         &self.history
     }
+}
+
+/// Extract a code range into a new function.
+async fn do_extract_function(
+    target: &str,
+    start_byte: usize,
+    end_byte: usize,
+    new_name: &str,
+    root: Option<&Path>,
+    dry_run: bool,
+    message: Option<&str>,
+) -> Result<EditResult, String> {
+    let root = root
+        .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+
+    let config = NormalizeConfig::load(&root);
+    let shadow_enabled = config.shadow.enabled();
+
+    let unified = path_resolve::resolve_unified(target, &root)
+        .ok_or_else(|| format!("No matches for: {}", target))?;
+
+    if unified.is_directory {
+        return Err(format!("Cannot extract from a directory: {}", target));
+    }
+
+    let file_path = root.join(&unified.file_path);
+
+    let ctx = normalize_refactor::RefactoringContext {
+        root: root.clone(),
+        editor: edit::Editor::new(),
+        index: None,
+        loader: normalize_languages::GrammarLoader::new(),
+    };
+
+    let params = normalize_refactor::extract::ExtractFunctionParams {
+        file: &file_path,
+        start_byte,
+        end_byte,
+        new_name,
+    };
+
+    let plan = normalize_refactor::extract::plan_extract_function(&ctx, &params)?;
+
+    // Print warnings
+    for warning in &plan.warnings {
+        eprintln!("warning: {}", warning);
+    }
+
+    let executor = normalize_refactor::RefactoringExecutor {
+        root: root.clone(),
+        dry_run,
+        shadow_enabled,
+        message: message.map(String::from),
+    };
+
+    let modified = executor.apply(&plan)?;
+
+    Ok(EditResult {
+        success: true,
+        operation: "extract_function".to_string(),
+        file: Some(unified.file_path),
+        symbol: Some(new_name.to_string()),
+        dry_run,
+        new_content: if dry_run {
+            plan.edits.into_iter().next().map(|e| e.new_content)
+        } else {
+            None
+        },
+        changes: vec![],
+        files: modified,
+    })
 }
 
 /// Rename a symbol across its definition, all call sites, and all import statements.

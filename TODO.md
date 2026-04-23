@@ -69,6 +69,27 @@ Remaining (not blocking the memory fix):
 
 ## P1 — Short-term Improvements (coherence / usability)
 
+### Refactoring recipe ecosystem (high priority)
+
+The goal says "rename, find-references, extract, inline, move" but only `rename` exists as a
+high-level recipe. `normalize-refactor/src/lib.rs` explicitly lists `move.rs` and `extract.rs`
+as future work — they don't exist.
+
+This matters beyond CLI usability: normalize is meant to be the substrate for agent-driven
+code editing (e.g. nanites). Without a recipe library, every agent reinvents the same
+transformations incorrectly from the Editor primitives. The recipes are the shared correct
+implementation nobody should have to re-derive.
+
+Target recipes (in rough priority order):
+- [x] `extract_function` — extract selected code into a new function, rewrite callsite (`normalize edit extract-function <file> --start <byte> --end <byte> --name <name> [--dry-run]`)
+- [ ] `inline_variable` / `inline_function` — inverse of extract
+- [ ] `move_item` — move function/struct/type to another file, fix imports
+- [ ] `add_parameter` / `change_signature` — update function signature + all callsites
+- [ ] `introduce_variable` — extract expression into a named binding
+
+Each recipe should be language-agnostic where possible (via the Language trait + .scm queries)
+with language-specific overrides for things the generic tree-sitter model can't express.
+
 ### ~~Eliminate remaining git shell-outs (budget metrics worktrees + ratchet ref-based check/measure)~~ DONE
 
 All budget metrics now use gix in-memory blob reads — no filesystem checkout, no `git` binary
@@ -372,6 +393,19 @@ once all entries are in config.
 ---
 
 ## P2 — Structural Improvements / Larger Refactors
+
+### Actually test normalize-semantic
+
+`normalize-semantic` exists (fastembed + sqlite-vec, rich chunks: symbol + sig + doc + callers/callees
++ co-change neighbors) but has never been evaluated. We don't know if retrieval quality is good,
+mediocre, or garbage in practice.
+
+- [ ] Run representative natural-language queries against a real codebase (normalize itself is a good candidate)
+- [ ] Manually assess top-5 results for relevance — is it returning the right symbols?
+- [ ] Identify whether failures are chunk design problems, model choice problems, or retrieval problems
+- [ ] Based on results: decide whether cross-encoder reranking is needed or the chunk richness is sufficient
+
+Don't invest in reranking before knowing the baseline is broken.
 
 ### Rules Unification — remaining threads
 
