@@ -46,6 +46,7 @@ members = [
     "crates/normalize-refactor",
     "crates/normalize-context",
     "crates/normalize-semantic",
+    "crates/normalize-ca-cache",
     "xtask",
     "benches",
 ]
@@ -59,6 +60,8 @@ repository = "https://github.com/rhi-zone/normalize"
 [workspace.dependencies]
 # Core
 clap = { version = "4", features = ["derive", "color"] }
+blake3 = "1"
+bincode = "1"
 rkyv = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

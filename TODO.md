@@ -76,7 +76,7 @@ Remaining (not blocking the memory fix):
 
 ## P1 — Short-term Improvements (coherence / usability)
 
-### Content-addressed indexer (CA store)
+### Content-addressed indexer (CA store) [IN PROGRESS]
 
 Today the daemon holds a separate in-memory index per watched root. With multiple git
 worktrees of the same repo registered, this explodes: 60+ busiless worktrees = 6GB+ RSS,
@@ -87,11 +87,14 @@ calls) keyed by content hash. Aggregate per-root structures (resolved import gra
 graph) remain per-root but become functions over the CA cache. Sharing across worktrees,
 time (reverts), and vendored-duplicate files falls out automatically.
 
-Scoping questions to answer before committing:
-- Is the existing `normalize-facts` SQLite schema path-keyed or does it already have a
-  content-hash column we can lift?
-- Do we build the query/invalidation framework ourselves or pull in salsa-2022?
-- Granularity: per-file is easy; cross-file aggregates need real incremental invalidation.
+**Step 1 done:** `normalize-ca-cache` crate added — SQLite-backed CA cache keyed by
+`(blake3(bytes), extractor_version, grammar)` with LRU eviction and stale-version GC.
+
+**Step 2 pending:** Integrate into `normalize-facts` `refresh_call_graph` /
+`reindex_files` to skip extraction on CA hits.
+
+**Step 3 pending:** Consolidate daemon watchers onto a single shared thread (saves
+~220 OS threads at 74 roots).
 
 Short-term mitigations already landed: skip auto-add of git worktrees in
 `maybe_start_daemon`; GC dead roots on daemon startup. These stop the bleeding but don't
