@@ -9,6 +9,22 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+/// Detect whether a path is a linked git worktree (as opposed to the main repo).
+///
+/// In a main repo, `.git` is a directory. In a linked worktree (created via
+/// `git worktree add`), `.git` is a regular file containing a `gitdir:` pointer
+/// to the worktree's state inside the main repo's `.git/worktrees/<name>/`.
+///
+/// Returns `false` for non-git paths and for main repos. Returns `true` only
+/// when `.git` exists and is a file.
+pub fn is_git_worktree(root: &Path) -> bool {
+    let dot_git = root.join(".git");
+    match std::fs::symlink_metadata(&dot_git) {
+        Ok(md) => md.file_type().is_file(),
+        Err(_) => false,
+    }
+}
+
 /// An event broadcast to all subscribers when files change or the index refreshes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -251,6 +267,18 @@ mod unix_impl {
         }
 
         fn add_root(&self, root: PathBuf) -> Response {
+            // Reject dead paths up front — avoids accumulating watchers on
+            // worktrees/directories that have been deleted. This also covers
+            // the case where a client re-sends a stale root after daemon
+            // restart (there is no on-disk root persistence today).
+            if !root.exists() {
+                eprintln!(
+                    "Rejecting add_root for non-existent path: {}",
+                    root.display()
+                );
+                return Response::err(&format!("path does not exist: {}", root.display()));
+            }
+
             let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
 
             if roots.contains_key(&root) {
@@ -395,6 +423,26 @@ mod unix_impl {
             );
 
             Response::ok(serde_json::json!({"added": true, "root": root}))
+        }
+
+        /// Drop any watched roots whose path no longer exists on disk.
+        /// Called at daemon startup and available for future periodic sweeps.
+        /// Logs each dropped root so disappearance is visible in daemon stderr.
+        ///
+        /// Note: the current daemon holds roots only in memory for the lifetime
+        /// of the process, so at startup this is a no-op. It exists so that if
+        /// on-disk root persistence is added later, GC wiring is already in
+        /// place and callers don't have to remember to add it.
+        fn gc_dead_roots(&self) {
+            let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+            let dead: Vec<PathBuf> = roots.keys().filter(|p| !p.exists()).cloned().collect();
+            for path in dead {
+                eprintln!(
+                    "Dropping watched root (path no longer exists): {}",
+                    path.display()
+                );
+                roots.remove(&path);
+            }
         }
 
         fn remove_root(&self, root: &Path) -> Response {
@@ -1076,6 +1124,11 @@ mod unix_impl {
             tokio::runtime::Handle::current(),
         ));
 
+        // GC any roots whose path has disappeared since last run. No-op today
+        // (roots aren't persisted across restarts) but preserves the invariant
+        // that the daemon never holds watchers for non-existent paths.
+        server.gc_dead_roots();
+
         // Spawn full-refresh handler
         let server_refresh = server.clone();
         std::thread::spawn(move || {
@@ -1414,6 +1467,15 @@ pub fn maybe_start_daemon(root: &Path) {
             return;
         }
 
+        // Skip auto-add for linked git worktrees. Each root holds its own
+        // in-memory index, and worktrees of the same repo are near-duplicates —
+        // auto-registering every `.claude/worktrees/agent-*` invocation caused
+        // the daemon to balloon to many GB. Users can still explicitly register
+        // a worktree with `normalize daemon add <path>` if they want.
+        if is_git_worktree(root) {
+            return;
+        }
+
         let client = DaemonClient::new();
         if client.ensure_running() {
             // Add this root to the daemon
@@ -1506,5 +1568,30 @@ impl DaemonClient {
 impl Default for DaemonClient {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn is_git_worktree_detects_file_vs_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+
+        // No .git at all — not a worktree.
+        assert!(!is_git_worktree(root));
+
+        // .git is a directory (main repo) — not a worktree.
+        let dot_git = root.join(".git");
+        fs::create_dir(&dot_git).unwrap();
+        assert!(!is_git_worktree(root));
+
+        // .git is a file (linked worktree) — is a worktree.
+        fs::remove_dir(&dot_git).unwrap();
+        fs::write(&dot_git, "gitdir: /tmp/some/main/repo/.git/worktrees/x\n").unwrap();
+        assert!(is_git_worktree(root));
     }
 }

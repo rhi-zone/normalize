@@ -40,6 +40,9 @@ transiently from the SQLite `imports` table on each refresh cycle and discarded 
 `last_affected` was already transient (local to the refresh). `WatchedRoot` now holds only
 watcher handles and a `primed: bool` flag — near-zero steady-state memory footprint.
 
+Accumulation of per-root indexes is the next chapter — see the P1 "Content-addressed indexer
+(CA store)" entry below.
+
 Remaining (not blocking the memory fix):
 - Grammar/tree lifetime: parse → extract → **drop tree before returning** — scope
   `GrammarLoader` to the indexing task, not the daemon lifetime
@@ -72,6 +75,30 @@ Remaining (not blocking the memory fix):
 ---
 
 ## P1 — Short-term Improvements (coherence / usability)
+
+### Content-addressed indexer (CA store)
+
+Today the daemon holds a separate in-memory index per watched root. With multiple git
+worktrees of the same repo registered, this explodes: 60+ busiless worktrees = 6GB+ RSS,
+each holding a near-duplicate index of mostly-identical file content.
+
+Right architecture: memoize derived per-file data (parsed CST, extracted symbols, imports,
+calls) keyed by content hash. Aggregate per-root structures (resolved import graph, call
+graph) remain per-root but become functions over the CA cache. Sharing across worktrees,
+time (reverts), and vendored-duplicate files falls out automatically.
+
+Scoping questions to answer before committing:
+- Is the existing `normalize-facts` SQLite schema path-keyed or does it already have a
+  content-hash column we can lift?
+- Do we build the query/invalidation framework ourselves or pull in salsa-2022?
+- Granularity: per-file is easy; cross-file aggregates need real incremental invalidation.
+
+Short-term mitigations already landed: skip auto-add of git worktrees in
+`maybe_start_daemon`; GC dead roots on daemon startup. These stop the bleeding but don't
+fix the underlying duplication.
+
+Related: P3 candidate "TTL/LRU eviction for idle roots" — general hygiene, lower priority
+once CA store exists.
 
 ### Refactoring recipe ecosystem (high priority)
 
