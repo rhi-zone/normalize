@@ -46,6 +46,10 @@ rayon.workspace = true
 # Progress reporting
 indicatif.workspace = true
 
+# Content-addressed extraction cache
+normalize-ca-cache = { path = "../normalize-ca-cache", version = "0.2.0" }
+blake3.workspace = true
+
 # Observability
 tracing = "0.1"
 

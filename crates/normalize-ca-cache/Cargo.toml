@@ -9,7 +9,7 @@ description = "Content-addressed extraction cache for normalize"
 [dependencies]
 bincode = "1"
 blake3 = "1"
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite.workspace = true
 serde = { workspace = true }
 dirs = "5"
 tracing = "0.1"

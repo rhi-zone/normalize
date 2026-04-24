@@ -90,8 +90,8 @@ time (reverts), and vendored-duplicate files falls out automatically.
 **Step 1 done:** `normalize-ca-cache` crate added — SQLite-backed CA cache keyed by
 `(blake3(bytes), extractor_version, grammar)` with LRU eviction and stale-version GC.
 
-**Step 2 pending:** Integrate into `normalize-facts` `refresh_call_graph` /
-`reindex_files` to skip extraction on CA hits.
+**Step 2 done:** CA cache integrated into `normalize-facts`: `refresh_call_graph` does a
+serial CA pre-pass before rayon par-iter; `reindex_files` checks CA cache per file.
 
 **Step 3 pending:** Consolidate daemon watchers onto a single shared thread (saves
 ~220 OS threads at 74 roots).

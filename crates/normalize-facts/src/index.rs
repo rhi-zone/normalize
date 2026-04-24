@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// A parsed symbol ready for database insertion.
+#[derive(serde::Serialize, serde::Deserialize)]
 struct ParsedSymbol {
     name: String,
     kind: String,
@@ -39,8 +40,22 @@ struct ParsedFileData {
     type_refs: Vec<TypeRef>,
 }
 
+/// CA-cache payload: all extracted data for a single file, keyed by content hash.
+/// Does not include `file_path` — that is the lookup key, not part of the payload.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CachedFileData {
+    symbols: Vec<ParsedSymbol>,
+    calls: Vec<CallEntry>,
+    imports: Vec<FlatImport>,
+    type_methods: Vec<(String, String)>,
+    type_refs: Vec<TypeRef>,
+}
+
 // Not yet public - just delete .normalize/index.sqlite on schema changes
 const SCHEMA_VERSION: i64 = 8;
+
+/// Bump when extraction logic changes to invalidate cached results.
+const EXTRACTOR_VERSION: &str = "1";
 
 /// Check if a file path has a supported source extension.
 fn is_source_file(path: &str) -> bool {
@@ -96,6 +111,8 @@ pub struct FileIndex {
     db: Database,
     root: PathBuf,
     progress: bool,
+    /// Content-addressed extraction cache (optional; best-effort).
+    ca_cache: Option<normalize_ca_cache::CaCache>,
 }
 
 impl FileIndex {
@@ -525,11 +542,30 @@ impl FileIndex {
         )
         .await?;
 
+        // Open CA cache (best-effort — a failure here is non-fatal)
+        let ca_cache = match normalize_ca_cache::CaCache::open(
+            &normalize_ca_cache::CaCache::default_path(),
+            1024 * 1024 * 1024, // 1 GiB limit
+        ) {
+            Ok(c) => {
+                // GC stale versions at startup (best-effort)
+                if let Err(e) = c.gc_stale_versions(EXTRACTOR_VERSION) {
+                    tracing::warn!("normalize-facts: CA cache GC error: {}", e);
+                }
+                Some(c)
+            }
+            Err(e) => {
+                tracing::warn!("normalize-facts: failed to open CA cache: {}", e);
+                None
+            }
+        };
+
         Ok(Self {
             conn,
             db,
             root: root.to_path_buf(),
             progress: false,
+            ca_cache,
         })
     }
 
@@ -1957,8 +1993,54 @@ impl FileIndex {
         // Parse all files in parallel
         // Each thread gets its own SymbolParser (tree-sitter parsers have mutable state)
         let root = self.root.clone();
+
+        // Pre-pass: check CA cache for all files (serial, fast disk reads)
+        let mut cached_data: Vec<ParsedFileData> = Vec::new();
+        let mut uncached_files: Vec<String> = Vec::new();
+
+        for file_path in &files {
+            let full_path = root.join(file_path);
+            let bytes = match std::fs::read(&full_path) {
+                Ok(b) => b,
+                Err(_) => {
+                    uncached_files.push(file_path.clone());
+                    continue;
+                }
+            };
+            let grammar = match support_for_path(&full_path) {
+                Some(s) => s.grammar_name().to_string(),
+                None => {
+                    uncached_files.push(file_path.clone());
+                    continue;
+                }
+            };
+            let hash = blake3::hash(&bytes);
+            if let Some(ca) = &self.ca_cache {
+                match ca.get::<CachedFileData>(hash.as_bytes(), EXTRACTOR_VERSION, &grammar) {
+                    Ok(Some(cached)) => {
+                        cached_data.push(ParsedFileData {
+                            file_path: file_path.clone(),
+                            symbols: cached.symbols,
+                            calls: cached.calls,
+                            imports: cached.imports,
+                            type_methods: cached.type_methods,
+                            type_refs: cached.type_refs,
+                        });
+                        continue;
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        tracing::warn!("normalize-facts: CA cache get error: {}", e);
+                    }
+                }
+            }
+            uncached_files.push(file_path.clone());
+        }
+
+        let ca_cache_for_rayon = self.ca_cache.clone();
+
         let pb = if self.progress && std::io::IsTerminal::is_terminal(&std::io::stderr()) {
-            let pb = ProgressBar::new(files.len() as u64);
+            let pb = ProgressBar::new(uncached_files.len() as u64);
             pb.set_style(
                 ProgressStyle::with_template(
                     "{spinner:.cyan} Parsing symbols... [{bar:30.cyan/dim}] {pos}/{len} files [{elapsed_precise}]",
@@ -1970,12 +2052,18 @@ impl FileIndex {
         } else {
             ProgressBar::hidden()
         };
-        let parsed_data: Vec<ParsedFileData> = files
+        let mut parsed_data: Vec<ParsedFileData> = uncached_files
             .par_iter()
             .progress_with(pb.clone())
             .filter_map(|file_path| {
                 let full_path = root.join(file_path);
-                let content = std::fs::read_to_string(&full_path).ok()?;
+                let bytes = std::fs::read(&full_path).ok()?;
+                let content = String::from_utf8_lossy(&bytes).into_owned();
+
+                let grammar = support_for_path(&full_path)
+                    .map(|s| s.grammar_name().to_string())
+                    .unwrap_or_default();
+                let hash = blake3::hash(&bytes);
 
                 // Each thread creates its own parser
                 let mut parser = SymbolParser::new();
@@ -2045,6 +2133,36 @@ impl FileIndex {
                 // Extract type references using tree-sitter queries
                 let type_refs = parser.find_type_refs(&full_path, &content);
 
+                // Store result in CA cache (best-effort)
+                if !grammar.is_empty()
+                    && let Some(ca) = &ca_cache_for_rayon
+                {
+                    let cached = CachedFileData {
+                        symbols: sym_data
+                            .iter()
+                            .map(|s| ParsedSymbol {
+                                name: s.name.clone(),
+                                kind: s.kind.clone(),
+                                start_line: s.start_line,
+                                end_line: s.end_line,
+                                parent: s.parent.clone(),
+                                visibility: s.visibility.clone(),
+                                attributes: s.attributes.clone(),
+                                is_interface_impl: s.is_interface_impl,
+                                implements: s.implements.clone(),
+                                docstring: s.docstring.clone(),
+                            })
+                            .collect(),
+                        calls: call_data.clone(),
+                        imports: imports.clone(),
+                        type_methods: type_methods.clone(),
+                        type_refs: type_refs.clone(),
+                    };
+                    if let Err(e) = ca.put(hash.as_bytes(), EXTRACTOR_VERSION, &grammar, &cached) {
+                        tracing::warn!("normalize-facts: CA cache put error: {}", e);
+                    }
+                }
+
                 Some(ParsedFileData {
                     file_path: file_path.clone(),
                     symbols: sym_data,
@@ -2055,6 +2173,9 @@ impl FileIndex {
                 })
             })
             .collect();
+
+        // Merge CA-cached results
+        parsed_data.extend(cached_data);
 
         pb.finish_and_clear();
 
@@ -2222,17 +2343,109 @@ impl FileIndex {
         // Parse changed files
         for file_path in changed_files {
             let full_path = self.root.join(file_path);
-            let content = match std::fs::read_to_string(&full_path) {
-                Ok(c) => c,
+            let bytes = match std::fs::read(&full_path) {
+                Ok(b) => b,
                 Err(_) => continue,
             };
 
-            let symbols = parser.parse_file(&full_path, &content);
+            let grammar = support_for_path(&full_path)
+                .map(|s| s.grammar_name().to_string())
+                .unwrap_or_default();
+            let hash = blake3::hash(&bytes);
 
-            for sym in &symbols {
+            // Try CA cache first (best-effort)
+            let cached: Option<CachedFileData> = if !grammar.is_empty() {
+                self.ca_cache.as_ref().and_then(|ca| {
+                    ca.get::<CachedFileData>(hash.as_bytes(), EXTRACTOR_VERSION, &grammar)
+                        .unwrap_or_else(|e| {
+                            tracing::warn!("normalize-facts: CA cache get error: {}", e);
+                            None
+                        })
+                })
+            } else {
+                None
+            };
+
+            let (sym_data, call_data, imports, type_refs) = if let Some(c) = cached {
+                (c.symbols, c.calls, c.imports, c.type_refs)
+            } else {
+                let content = String::from_utf8_lossy(&bytes).into_owned();
+
+                let symbols = parser.parse_file(&full_path, &content);
+                let mut sym_data = Vec::with_capacity(symbols.len());
+                let mut call_data_local: Vec<CallEntry> = Vec::new();
+
+                for sym in &symbols {
+                    sym_data.push(ParsedSymbol {
+                        name: sym.name.clone(),
+                        kind: sym.kind.as_str().to_string(),
+                        start_line: sym.start_line,
+                        end_line: sym.end_line,
+                        parent: sym.parent.clone(),
+                        visibility: sym.visibility.as_str().to_string(),
+                        attributes: sym.attributes.clone(),
+                        is_interface_impl: sym.is_interface_impl,
+                        implements: sym.implements.clone(),
+                        docstring: sym.docstring.clone(),
+                    });
+                    let kind = sym.kind.as_str();
+                    if kind == "function" || kind == "method" {
+                        let calls = parser.find_callees_for_symbol(&full_path, &content, sym);
+                        for (callee_name, line, qualifier, access) in calls {
+                            call_data_local.push((
+                                sym.name.clone(),
+                                callee_name,
+                                qualifier,
+                                access,
+                                line,
+                            ));
+                        }
+                    }
+                }
+
+                let imports = parser.parse_imports(&full_path, &content);
+                let type_refs = parser.find_type_refs(&full_path, &content);
+
+                // Store in CA cache (best-effort)
+                if !grammar.is_empty()
+                    && let Some(ca) = &self.ca_cache
+                {
+                    let cached_store = CachedFileData {
+                        symbols: sym_data
+                            .iter()
+                            .map(|s| ParsedSymbol {
+                                name: s.name.clone(),
+                                kind: s.kind.clone(),
+                                start_line: s.start_line,
+                                end_line: s.end_line,
+                                parent: s.parent.clone(),
+                                visibility: s.visibility.clone(),
+                                attributes: s.attributes.clone(),
+                                is_interface_impl: s.is_interface_impl,
+                                implements: s.implements.clone(),
+                                docstring: s.docstring.clone(),
+                            })
+                            .collect(),
+                        calls: call_data_local.clone(),
+                        imports: imports.clone(),
+                        type_methods: Vec::new(), // type_methods not extracted in incremental path
+                        type_refs: type_refs.clone(),
+                    };
+                    if let Err(e) =
+                        ca.put(hash.as_bytes(), EXTRACTOR_VERSION, &grammar, &cached_store)
+                    {
+                        tracing::warn!("normalize-facts: CA cache put error: {}", e);
+                    }
+                }
+
+                (sym_data, call_data_local, imports, type_refs)
+            };
+
+            // Insert symbols
+            for sym in &sym_data {
                 self.conn.execute(
                     "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, visibility, is_impl) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                    params![file_path.clone(), sym.name.clone(), sym.kind.as_str(), sym.start_line as i64, sym.end_line as i64, sym.parent.clone(), sym.visibility.as_str(), sym.is_interface_impl as i64],
+                    params![file_path.clone(), sym.name.clone(), sym.kind.clone(), sym.start_line as i64, sym.end_line as i64, sym.parent.clone(), sym.visibility.clone(), sym.is_interface_impl as i64],
                 ).await?;
                 for attr in &sym.attributes {
                     self.conn.execute(
@@ -2253,36 +2466,31 @@ impl FileIndex {
                     ).await?;
                 }
                 symbol_count += 1;
-
-                let kind = sym.kind.as_str();
-                if kind == "function" || kind == "method" {
-                    let calls = parser.find_callees_for_symbol(&full_path, &content, sym);
-                    for (callee_name, line, qualifier, access) in calls {
-                        self.conn.execute(
-                            "INSERT INTO calls (caller_file, caller_symbol, callee_name, callee_qualifier, access, line) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                            params![file_path.clone(), sym.name.clone(), callee_name, qualifier, access, line as i64],
-                        ).await?;
-                        call_count += 1;
-                    }
-                }
             }
 
-            // Parse imports using trait-based extraction (works for all supported languages)
-            let imports = parser.parse_imports(&full_path, &content);
-            for imp in imports {
+            // Insert calls
+            for (caller_symbol, callee_name, qualifier, access, line) in &call_data {
+                self.conn.execute(
+                    "INSERT INTO calls (caller_file, caller_symbol, callee_name, callee_qualifier, access, line) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![file_path.clone(), caller_symbol.clone(), callee_name.clone(), qualifier.clone(), access.clone(), *line as i64],
+                ).await?;
+                call_count += 1;
+            }
+
+            // Insert imports
+            for imp in &imports {
                 self.conn.execute(
                     "INSERT INTO imports (file, module, name, alias, line) VALUES (?1, ?2, ?3, ?4, ?5)",
-                    params![file_path.clone(), imp.module, imp.name, imp.alias, imp.line as i64],
+                    params![file_path.clone(), imp.module.clone(), imp.name.clone(), imp.alias.clone(), imp.line as i64],
                 ).await?;
                 import_count += 1;
             }
 
-            // Extract type references
-            let type_refs = parser.find_type_refs(&full_path, &content);
-            for tr in type_refs {
+            // Insert type references
+            for tr in &type_refs {
                 self.conn.execute(
                     "INSERT INTO type_refs (file, source_symbol, target_type, kind, line) VALUES (?1, ?2, ?3, ?4, ?5)",
-                    params![file_path.clone(), tr.source_symbol, tr.target_type, tr.kind.as_str(), tr.line as i64],
+                    params![file_path.clone(), tr.source_symbol.clone(), tr.target_type.clone(), tr.kind.as_str(), tr.line as i64],
                 ).await?;
             }
         }
