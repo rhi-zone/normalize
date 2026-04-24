@@ -6,7 +6,6 @@
 //! - **Executor** (`RefactoringExecutor`): Shared apply/dry-run/shadow logic
 
 pub mod actions;
-pub mod extract;
 pub mod rename;
 
 use std::path::PathBuf;

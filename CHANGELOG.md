@@ -25,8 +25,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- **`normalize edit extract-function`** — new refactoring command to extract a selected byte range into a named function. The selection is replaced with a call to the new function; the new function is inserted after the enclosing function. Free variables in the selection are inferred as parameters (best-effort, via tree-sitter). Supports `--dry-run`. Language-aware signature syntax for Rust, Python, Go, Ruby, Java-family, and JS/TS. Wired through `normalize-refactor::extract::plan_extract_function`.
-
 - **`normalize sync`** — new command to copy a project (and its AI agent session metadata) to a destination for portability. Excludes `target/`, `node_modules/`, `.git/objects/`, `.normalize/findings-cache.sqlite`, `.fastembed_cache/` by default. After copying, rewrites absolute paths in the index DB so the copy works from its new location. Supports `--dry-run`, `--verbose`, `--all` (sync all known projects), `--active N` (only projects with activity in last N days), `--repo <glob>`, `--exclude <glob>`.
 
 - **Configurable walker exclusions** — new `[walk]` section in `.normalize/config.toml` controls directory walking. `ignore_files` configures which gitignore-format files are respected (default: `[".gitignore"]`; set to `[]` to disable). `exclude` configures directory names to always skip (default: `[".git"]`; add `node_modules`, `.cache`, etc.). Configuration is threaded through all file walkers: native rules, syntax rules, the unified rules runner, the daemon, and the LSP server.

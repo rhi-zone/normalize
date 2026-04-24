@@ -81,7 +81,7 @@ transformations incorrectly from the Editor primitives. The recipes are the shar
 implementation nobody should have to re-derive.
 
 Target recipes (in rough priority order):
-- [~] `extract_function` — **first attempt (commit `ed9d3b63`, unmerged) is wrong.** Tree-sitter identifier sweep + heuristic parameter inference; no return-value detection, no real scope analysis, no type awareness. Silently generates broken code. Do not merge. Needs the semantic foundation below before it can be done correctly.
+- [~] `extract_function` — **first attempt (commit `ed9d3b63`, reverted) is wrong.** Tree-sitter identifier sweep + heuristic parameter inference; no return-value detection, no real scope analysis, no type awareness. Silently generates broken code. Do not merge. Needs the semantic foundation below before it can be done correctly.
 - [ ] `inline_variable` / `inline_function` — inverse of extract
 - [ ] `move_item` — move function/struct/type to another file, fix imports
 - [ ] `add_parameter` / `change_signature` — update function signature + all callsites
@@ -414,19 +414,6 @@ once all entries are in config.
 ---
 
 ## P2 — Structural Improvements / Larger Refactors
-
-### Actually test normalize-semantic
-
-`normalize-semantic` exists (fastembed + sqlite-vec, rich chunks: symbol + sig + doc + callers/callees
-+ co-change neighbors) but has never been evaluated. We don't know if retrieval quality is good,
-mediocre, or garbage in practice.
-
-- [ ] Run representative natural-language queries against a real codebase (normalize itself is a good candidate)
-- [ ] Manually assess top-5 results for relevance — is it returning the right symbols?
-- [ ] Identify whether failures are chunk design problems, model choice problems, or retrieval problems
-- [ ] Based on results: decide whether cross-encoder reranking is needed or the chunk richness is sufficient
-
-Don't invest in reranking before knowing the baseline is broken.
 
 ### Rules Unification — remaining threads
 

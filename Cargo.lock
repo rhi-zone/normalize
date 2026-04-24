@@ -5662,7 +5662,6 @@ dependencies = [
  "normalize-languages",
  "normalize-shadow",
  "tempfile",
- "tree-sitter",
 ]
 
 [[package]]
