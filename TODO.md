@@ -81,7 +81,7 @@ transformations incorrectly from the Editor primitives. The recipes are the shar
 implementation nobody should have to re-derive.
 
 Target recipes (in rough priority order):
-- [x] `extract_function` — extract selected code into a new function, rewrite callsite (`normalize edit extract-function <file> --start <byte> --end <byte> --name <name> [--dry-run]`)
+- [~] `extract_function` — **first attempt (commit `ed9d3b63`, unmerged) is wrong.** Tree-sitter identifier sweep + heuristic parameter inference; no return-value detection, no real scope analysis, no type awareness. Silently generates broken code. Do not merge. Needs the semantic foundation below before it can be done correctly.
 - [ ] `inline_variable` / `inline_function` — inverse of extract
 - [ ] `move_item` — move function/struct/type to another file, fix imports
 - [ ] `add_parameter` / `change_signature` — update function signature + all callsites
@@ -89,6 +89,27 @@ Target recipes (in rough priority order):
 
 Each recipe should be language-agnostic where possible (via the Language trait + .scm queries)
 with language-specific overrides for things the generic tree-sitter model can't express.
+
+#### Semantic foundation needed
+
+Correct recipes (especially extract/inline) need semantic infrastructure normalize doesn't have:
+
+1. **Name resolution** — ~80% there via `locals.scm`. Gap: cross-file module-level resolution. Builds on the facts index. Tractable.
+2. **Control flow graph** — absent. Per-language `.cfg.scm` queries identifying basic blocks + edges, then mechanical CFG construction. Tractable, language-independent after the query.
+3. **Liveness analysis** — standard dataflow over CFG + name resolution. Natural fit for Datalog / ascent-interpreter once incremental eval lands. Tractable after 1+2.
+4. **Effect/mutation tracking** — conservative approximation via call graph ("does this call any function") is easy. Precise tracking (Rust `&mut` vs `&`) probably needs compiler integration; accept conservative approximation as the ceiling.
+5. **Type information** — tiered strategy:
+   - **Tier A (in-house):** Syntactic extraction from declarations (struct fields, function signatures, typed lets). Mechanical.
+   - **Tier B (in-house):** Type-flow across the call graph — `let x = foo()` resolves to `foo`'s declared return type. Datalog-friendly once Tier A exists.
+   - **Tier C (LSP delegation):** Query language servers for type-at-position when tiers A+B can't resolve. Pragmatic; not ideological. Accepts runtime dependency on LSPs for the hard cases.
+   - **Tier D (warnings/placeholders):** When even LSP fails, emit placeholders (`_` in Rust, `any` in TS) and surface warnings.
+
+Per-language difficulty:
+- **Tractable in-house (tiers A+B sufficient):** Go, Java, C, dynamically-typed langs (Python/Ruby/JS — no types needed)
+- **Full HM languages (OCaml, Haskell-minus-extensions, Rust's core type system):** HM is well-trodden literature; implementable in-house if we commit to it
+- **Research-grade hard (LSP delegation recommended):** TypeScript (conditional/mapped/template-literal types), C++ (templates, SFINAE, concepts), Scala (implicits, path-dependent types), Rust trait resolution under generics (the machinery, not the types)
+
+This is an epic, not a drive-by. Do the tractable recipes (`move_item`, `add_parameter`, `inline_variable`) first — they expose less of the semantic gap — then build the foundation (1→2→3→5), then revisit extract/inline with real scope and type info.
 
 ### ~~Eliminate remaining git shell-outs (budget metrics worktrees + ratchet ref-based check/measure)~~ DONE
 
