@@ -1,1 +1,0 @@
-Content-addressed extraction cache backed by SQLite. `CaCache` stores serialized extraction results keyed by `(blake3_hash, extractor_version, grammar)` so identical file content is never extracted twice. Supports LRU eviction and stale-version GC.

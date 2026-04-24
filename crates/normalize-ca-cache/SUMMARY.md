@@ -1,1 +1,0 @@
-The `normalize-ca-cache` crate provides a content-addressed extraction cache. Extraction results are keyed by `(blake3(file_bytes), extractor_version, grammar)` and stored in a SQLite database at `~/.config/normalize/ca-cache.sqlite`. Used by `normalize-facts` to skip redundant extraction of identical file content across worktrees.

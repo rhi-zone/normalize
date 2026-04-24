@@ -87,8 +87,10 @@ calls) keyed by content hash. Aggregate per-root structures (resolved import gra
 graph) remain per-root but become functions over the CA cache. Sharing across worktrees,
 time (reverts), and vendored-duplicate files falls out automatically.
 
-**Step 1 done:** `normalize-ca-cache` crate added — SQLite-backed CA cache keyed by
+**Step 1 done:** CA cache implementation added — SQLite-backed, keyed by
 `(blake3(bytes), extractor_version, grammar)` with LRU eviction and stale-version GC.
+(Originally a separate `normalize-ca-cache` crate; inlined into `normalize-facts/src/ca_cache.rs`
+since it had only one dependent and no standalone value.)
 
 **Step 2 done:** CA cache integrated into `normalize-facts`: `refresh_call_graph` does a
 serial CA pre-pass before rayon par-iter; `reindex_files` checks CA cache per file.

@@ -7,6 +7,7 @@
 //! - Fact storage (`FileIndex`)
 //! - Trait definitions for fact extraction
 
+mod ca_cache;
 pub mod extract;
 mod index;
 mod parsers;

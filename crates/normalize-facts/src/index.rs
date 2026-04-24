@@ -112,7 +112,7 @@ pub struct FileIndex {
     root: PathBuf,
     progress: bool,
     /// Content-addressed extraction cache (optional; best-effort).
-    ca_cache: Option<normalize_ca_cache::CaCache>,
+    ca_cache: Option<crate::ca_cache::CaCache>,
 }
 
 impl FileIndex {
@@ -543,8 +543,8 @@ impl FileIndex {
         .await?;
 
         // Open CA cache (best-effort — a failure here is non-fatal)
-        let ca_cache = match normalize_ca_cache::CaCache::open(
-            &normalize_ca_cache::CaCache::default_path(),
+        let ca_cache = match crate::ca_cache::CaCache::open(
+            &crate::ca_cache::CaCache::default_path(),
             1024 * 1024 * 1024, // 1 GiB limit
         ) {
             Ok(c) => {

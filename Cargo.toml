@@ -46,7 +46,6 @@ members = [
     "crates/normalize-refactor",
     "crates/normalize-context",
     "crates/normalize-semantic",
-    "crates/normalize-ca-cache",
     "xtask",
     "benches",
 ]

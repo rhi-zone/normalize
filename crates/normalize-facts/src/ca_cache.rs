@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
-pub struct Error(String);
+pub(crate) struct Error(String);
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -29,14 +29,14 @@ impl From<bincode::Error> for Error {
 /// Content-addressed extraction cache. Keyed by `(blake3_hash, extractor_version, grammar)`.
 /// One shared DB across the whole daemon process; safe to clone and share across threads.
 #[derive(Clone)]
-pub struct CaCache {
+pub(crate) struct CaCache {
     conn: Arc<Mutex<Connection>>,
     max_size_bytes: u64,
 }
 
 impl CaCache {
     /// Open (or create) the CA cache at the given path. Creates parent directories.
-    pub fn open(path: &Path, max_size_bytes: u64) -> Result<Self, Error> {
+    pub(crate) fn open(path: &Path, max_size_bytes: u64) -> Result<Self, Error> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| Error(format!("create_dir_all: {e}")))?;
         }
@@ -60,7 +60,7 @@ impl CaCache {
     }
 
     /// Default path: `~/.config/normalize/ca-cache.sqlite`.
-    pub fn default_path() -> PathBuf {
+    pub(crate) fn default_path() -> PathBuf {
         dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join("normalize")
@@ -68,7 +68,7 @@ impl CaCache {
     }
 
     /// Look up a cached payload. Returns `None` on miss or version mismatch.
-    pub fn get<T: DeserializeOwned>(
+    pub(crate) fn get<T: DeserializeOwned>(
         &self,
         hash: &[u8],
         extr_ver: &str,
@@ -96,7 +96,7 @@ impl CaCache {
     }
 
     /// Store a payload. Silently overwrites existing entries with the same key.
-    pub fn put<T: Serialize>(
+    pub(crate) fn put<T: Serialize>(
         &self,
         hash: &[u8],
         extr_ver: &str,
@@ -115,7 +115,7 @@ impl CaCache {
     }
 
     /// Remove entries for outdated extractor versions. Call once at startup.
-    pub fn gc_stale_versions(&self, current_extr_ver: &str) -> Result<usize, Error> {
+    pub(crate) fn gc_stale_versions(&self, current_extr_ver: &str) -> Result<usize, Error> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let deleted = conn.execute(
             "DELETE FROM ca_entries WHERE extr_ver != ?1",
@@ -126,7 +126,8 @@ impl CaCache {
 
     /// Evict oldest-accessed entries until DB file size is under `max_size_bytes`.
     /// Uses page_count * page_size as the size estimate; runs VACUUM after deletion.
-    pub fn evict_if_over_limit(&self) -> Result<(), Error> {
+    #[allow(dead_code)] // not yet wired into the refresh path; retained for future use
+    pub(crate) fn evict_if_over_limit(&self) -> Result<(), Error> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let size: u64 = conn
             .query_row(

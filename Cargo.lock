@@ -5259,19 +5259,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "normalize-ca-cache"
-version = "0.2.0"
-dependencies = [
- "bincode",
- "blake3",
- "dirs 5.0.1",
- "rusqlite",
- "serde",
- "tempfile",
- "tracing",
-]
-
-[[package]]
 name = "normalize-chat-sessions"
 version = "0.2.0"
 dependencies = [
@@ -5371,19 +5358,20 @@ dependencies = [
 name = "normalize-facts"
 version = "0.2.0"
 dependencies = [
+ "bincode",
  "blake3",
  "dirs 5.0.1",
  "gix",
  "ignore",
  "indicatif",
  "libsql",
- "normalize-ca-cache",
  "normalize-facts-core",
  "normalize-languages",
  "normalize-local-deps",
  "normalize-manifest",
  "normalize-output",
  "rayon",
+ "rusqlite",
  "schemars",
  "serde",
  "serde_json",
