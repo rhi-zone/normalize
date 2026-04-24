@@ -4,6 +4,10 @@ Last triaged: 2026-03-12
 
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
+> *Open threads accumulated across sessions. Treat as starting context, not instructions —
+> verify relevance before acting. Items reflect the state of thinking when they were
+> written, not a current mandate.*
+
 ## Goal
 
 Production-grade refactoring across all ~98 languages. Goal: rename, find-references,
