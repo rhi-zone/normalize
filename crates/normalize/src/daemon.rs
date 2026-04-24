@@ -218,17 +218,17 @@ mod unix_impl {
             .join("daemon.sock")
     }
 
-    /// A watched root with its file watcher.
+    /// A watched root. The shared watcher is owned by `DaemonServer`; this struct
+    /// tracks per-root metadata only.
     struct WatchedRoot {
-        #[allow(dead_code)] // Watcher must be kept alive
-        watcher: RecommendedWatcher,
-        #[allow(dead_code)] // Watcher must be kept alive; None when .git/index doesn't exist
-        git_index_watcher: Option<RecommendedWatcher>,
         last_refresh: Instant,
         /// Whether the diagnostics cache has been fully primed (first run completed).
         /// Diagnostics are persisted to SQLite; this flag just tracks prime state in memory
         /// so the daemon knows when to prime lazily on the first `RunRules` request.
         primed: bool,
+        /// Whether the .git/index path was registered with the shared watcher.
+        /// Tracked so we can unwatch it when the root is removed.
+        has_git_index: bool,
     }
 
     /// Global daemon server managing multiple roots.
@@ -244,6 +244,9 @@ mod unix_impl {
         /// Handle to the tokio runtime, used to run async code from non-tokio threads
         /// (e.g. the refresh handler thread).
         runtime_handle: tokio::runtime::Handle,
+        /// Single shared file watcher for all roots. Consolidating onto one watcher
+        /// saves ~3 OS threads per root vs the previous per-root pair of watchers.
+        watcher: Mutex<RecommendedWatcher>,
     }
 
     impl DaemonServer {
@@ -251,6 +254,7 @@ mod unix_impl {
             refresh_tx: Sender<PathBuf>,
             native_refresh_tx: Sender<PathBuf>,
             runtime_handle: tokio::runtime::Handle,
+            watcher: RecommendedWatcher,
         ) -> Self {
             // Capacity 1024: if a subscriber falls behind by more than 1024 events
             // it receives a RecvError::Lagged and we log the drop.
@@ -263,6 +267,7 @@ mod unix_impl {
                 start_time: Instant::now(),
                 event_tx,
                 runtime_handle,
+                watcher: Mutex::new(watcher),
             }
         }
 
@@ -314,111 +319,28 @@ mod unix_impl {
                 Err(e) => return Response::err(&format!("Failed to open index: {}", e)),
             }
 
-            // Set up file watcher
-            let tx = self.refresh_tx.clone();
-            let event_tx = self.event_tx.clone();
-            let root_clone = root.clone();
-            let root_for_events = root.clone();
-            let (notify_tx, notify_rx) = channel();
-
-            let mut watcher = match RecommendedWatcher::new(notify_tx, Config::default()) {
-                Ok(w) => w,
-                Err(e) => return Response::err(&format!("Failed to create watcher: {}", e)),
-            };
-
-            if let Err(e) = watcher.watch(&root, RecursiveMode::Recursive) {
-                return Response::err(&format!("Failed to watch: {}", e));
-            }
-
-            // Spawn thread to handle file events
-            std::thread::spawn(move || {
-                let debounce = Duration::from_millis(500);
-                let mut last_event = Instant::now();
-
-                for event in notify_rx.into_iter().flatten() {
-                    // Skip .normalize directory
-                    if event
-                        .paths
-                        .iter()
-                        .all(|p| p.to_string_lossy().contains(".normalize"))
-                    {
-                        continue;
-                    }
-
-                    // Broadcast individual file-change events (un-debounced).
-                    // SendError means no subscribers -- that is fine.
-                    for path in &event.paths {
-                        let _ = event_tx.send(Event::FileChanged {
-                            path: path.clone(),
-                            root: root_for_events.clone(),
-                        });
-                    }
-
-                    if last_event.elapsed() >= debounce {
-                        let _ = tx.send(root_clone.clone());
-                        last_event = Instant::now();
-                    }
-                }
-            });
-
-            // Set up a dedicated watcher for .git/index so that `git add` (which
-            // changes staged state but not source files) triggers a native-rules
-            // re-run.  Native rules (e.g. stale-summary) read staged state via
-            // UncommittedChanges::load(), so they must re-run whenever .git/index
-            // changes even though get_changed_files() correctly skips .git/.
+            // Register the root with the shared watcher
             let git_index_path = root.join(".git").join("index");
-            let git_index_watcher = if git_index_path.exists() {
-                let native_tx = self.native_refresh_tx.clone();
-                let root_for_native = root.clone();
-                let (git_notify_tx, git_notify_rx) = channel();
-                match RecommendedWatcher::new(git_notify_tx, Config::default()) {
-                    Ok(mut git_watcher) => {
-                        match git_watcher.watch(&git_index_path, RecursiveMode::NonRecursive) {
-                            Ok(()) => {
-                                std::thread::spawn(move || {
-                                    let debounce = Duration::from_millis(200);
-                                    let mut last_event = Instant::now();
-                                    for _event in git_notify_rx.into_iter().flatten() {
-                                        if last_event.elapsed() >= debounce {
-                                            tracing::debug!(
-                                                root = ?root_for_native,
-                                                ".git/index changed — scheduling native rules refresh"
-                                            );
-                                            let _ = native_tx.send(root_for_native.clone());
-                                            last_event = Instant::now();
-                                        }
-                                    }
-                                });
-                                Some(git_watcher)
-                            }
-                            Err(e) => {
-                                eprintln!(
-                                    "Warning: failed to watch .git/index for {:?}: {}",
-                                    root, e
-                                );
-                                None
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!(
-                            "Warning: failed to create .git/index watcher for {:?}: {}",
-                            root, e
-                        );
-                        None
-                    }
+            let has_git_index = git_index_path.exists();
+            {
+                let mut watcher = self.watcher.lock().unwrap_or_else(|e| e.into_inner());
+                if let Err(e) = watcher.watch(&root, RecursiveMode::Recursive) {
+                    return Response::err(&format!("Failed to watch: {}", e));
                 }
-            } else {
-                None
-            };
+                // Also watch .git/index if it exists so `git add` triggers a native-rules refresh.
+                if has_git_index
+                    && let Err(e) = watcher.watch(&git_index_path, RecursiveMode::NonRecursive)
+                {
+                    eprintln!("Warning: failed to watch .git/index for {:?}: {}", root, e);
+                }
+            }
 
             roots.insert(
                 root.clone(),
                 WatchedRoot {
-                    watcher,
-                    git_index_watcher,
                     last_refresh: Instant::now(),
                     primed: false,
+                    has_git_index,
                 },
             );
 
@@ -447,7 +369,13 @@ mod unix_impl {
 
         fn remove_root(&self, root: &Path) -> Response {
             let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
-            if roots.remove(root).is_some() {
+            if let Some(watched) = roots.remove(root) {
+                let mut watcher = self.watcher.lock().unwrap_or_else(|e| e.into_inner());
+                let _ = watcher.unwatch(root);
+                if watched.has_git_index {
+                    let git_index = root.join(".git").join("index");
+                    let _ = watcher.unwatch(&git_index);
+                }
                 Response::ok(serde_json::json!({"removed": true}))
             } else {
                 Response::ok(serde_json::json!({"removed": false, "reason": "not watching"}))
@@ -1118,16 +1046,104 @@ mod unix_impl {
         // Channel for native-rules-only refresh requests triggered by .git/index changes
         let (native_refresh_tx, native_refresh_rx) = channel::<PathBuf>();
 
+        // Create shared file watcher that handles events for all roots
+        let (notify_tx, notify_rx) = channel::<notify::Result<notify::Event>>();
+        let shared_watcher = RecommendedWatcher::new(notify_tx, Config::default())
+            .expect("failed to create shared file watcher");
+
         let server = Arc::new(DaemonServer::new(
             refresh_tx,
             native_refresh_tx,
             tokio::runtime::Handle::current(),
+            shared_watcher,
         ));
 
         // GC any roots whose path has disappeared since last run. No-op today
         // (roots aren't persisted across restarts) but preserves the invariant
         // that the daemon never holds watchers for non-existent paths.
         server.gc_dead_roots();
+
+        // Spawn single dispatch thread to handle all file-watcher events across all roots.
+        // This replaces the previous per-root pair of watcher threads, saving ~3 OS threads
+        // per root.
+        let server_dispatch = server.clone();
+        std::thread::spawn(move || {
+            let debounce = Duration::from_millis(500);
+            let git_debounce = Duration::from_millis(200);
+            let mut last_refresh: HashMap<PathBuf, Instant> = HashMap::new();
+            let mut last_native: HashMap<PathBuf, Instant> = HashMap::new();
+
+            for result in notify_rx {
+                let event = match result {
+                    Ok(e) => e,
+                    Err(e) => {
+                        tracing::warn!("notify error: {}", e);
+                        continue;
+                    }
+                };
+
+                // Skip .normalize directory changes
+                if event
+                    .paths
+                    .iter()
+                    .all(|p| p.to_string_lossy().contains(".normalize"))
+                {
+                    continue;
+                }
+
+                // Collect dispatch targets under a brief lock, then release before sending
+                let mut to_event: Vec<(PathBuf, PathBuf)> = Vec::new(); // (path, root)
+                let mut to_refresh: Vec<PathBuf> = Vec::new();
+                let mut to_native: Vec<PathBuf> = Vec::new();
+
+                {
+                    let roots = server_dispatch
+                        .roots
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner());
+                    for path in &event.paths {
+                        // Find the root this path belongs to
+                        let root = roots.keys().find(|r| path.starts_with(r.as_path()));
+                        if let Some(root) = root {
+                            to_event.push((path.clone(), root.clone()));
+
+                            // Check if this is a .git/index change (triggers native-rules refresh)
+                            let git_index = root.join(".git").join("index");
+                            if path == &git_index {
+                                let last = last_native
+                                    .entry(root.clone())
+                                    .or_insert(Instant::now() - git_debounce * 2);
+                                if last.elapsed() >= git_debounce {
+                                    to_native.push(root.clone());
+                                    *last = Instant::now();
+                                }
+                            } else {
+                                let last = last_refresh
+                                    .entry(root.clone())
+                                    .or_insert(Instant::now() - debounce * 2);
+                                if last.elapsed() >= debounce {
+                                    to_refresh.push(root.clone());
+                                    *last = Instant::now();
+                                }
+                            }
+                        }
+                    }
+                } // lock released before sending
+
+                // Broadcast un-debounced file-change events
+                for (path, root) in to_event {
+                    let _ = server_dispatch
+                        .event_tx
+                        .send(Event::FileChanged { path, root });
+                }
+                for root in to_refresh {
+                    let _ = server_dispatch.refresh_tx.send(root);
+                }
+                for root in to_native {
+                    let _ = server_dispatch.native_refresh_tx.send(root);
+                }
+            }
+        });
 
         // Spawn full-refresh handler
         let server_refresh = server.clone();

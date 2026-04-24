@@ -93,8 +93,9 @@ time (reverts), and vendored-duplicate files falls out automatically.
 **Step 2 done:** CA cache integrated into `normalize-facts`: `refresh_call_graph` does a
 serial CA pre-pass before rayon par-iter; `reindex_files` checks CA cache per file.
 
-**Step 3 pending:** Consolidate daemon watchers onto a single shared thread (saves
-~220 OS threads at 74 roots).
+**Step 3 done:** Daemon watchers consolidated — single `RecommendedWatcher` + one
+dispatch thread in `DaemonServer`; `WatchedRoot` no longer holds watcher handles;
+`add_root`/`remove_root` watch/unwatch via the shared watcher.
 
 Short-term mitigations already landed: skip auto-add of git worktrees in
 `maybe_start_daemon`; GC dead roots on daemon startup. These stop the bleeding but don't
