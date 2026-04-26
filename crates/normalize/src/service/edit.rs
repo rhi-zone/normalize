@@ -5,9 +5,12 @@ use std::path::{Path, PathBuf};
 use crate::commands::edit::{EditAction, EditChange, EditResult, Position};
 use crate::config::NormalizeConfig;
 use crate::edit::EditorExt;
+use crate::output::OutputFormatter;
 use crate::service::history::HistoryService;
 use crate::shadow::{EditInfo, Shadow};
 use crate::{edit, path_resolve};
+use schemars::JsonSchema;
+use serde::Serialize;
 use server_less::cli;
 
 // ── Internal output types (not exposed) ──────────────────────────────
@@ -929,6 +932,12 @@ pub struct EditService {
     pub(crate) history: HistoryService,
 }
 
+impl EditService {
+    fn display_move(&self, report: &MoveReport) -> String {
+        report.format_text()
+    }
+}
+
 #[cli(
     name = "edit",
     description = "Edit code by symbol name. Use for batch renames, signature changes, or pattern-based rewrites."
@@ -1347,6 +1356,43 @@ impl EditService {
         })
     }
 
+    /// Move a symbol's definition to another file and rewrite import sites.
+    ///
+    /// Locates the symbol via the facts index (or in-place extraction when no index
+    /// is available), appends its definition to the destination file, removes it from
+    /// the source, and rewrites import statements in every file that imported it.
+    ///
+    /// Per-language import rewriting is best-effort: where the new module path can be
+    /// derived (Python, Go, JS/TS), import sites are updated. Where it can't (Rust
+    /// `use crate::…`, JS module-resolution overrides), affected sites are reported
+    /// as skipped and a warning is emitted — `move` will not fabricate wrong paths.
+    ///
+    /// Examples:
+    ///   normalize edit move src/foo.py/MyClass src/lib/foo.py
+    ///   normalize edit move crates/x/src/foo.rs/MyStruct crates/y/src/lib.rs --dry-run
+    ///   normalize edit move src/foo.py/MyClass src/lib/foo.py --reexport
+    #[cli(name = "move", display_with = "display_move")]
+    #[allow(clippy::too_many_arguments)]
+    pub async fn move_item(
+        &self,
+        #[param(positional, help = "Target symbol (path/Symbol)")] target: String,
+        #[param(positional, help = "Destination file path")] destination: String,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
+        #[param(help = "Leave a re-export at the source location")] reexport: bool,
+        #[param(short = 'm', help = "Message for shadow history")] message: Option<String>,
+        #[param(short = 'r', help = "Root directory")] root: Option<String>,
+    ) -> Result<MoveReport, String> {
+        do_move(
+            &target,
+            &destination,
+            root.as_deref().map(Path::new),
+            dry_run,
+            reexport,
+            message.as_deref(),
+        )
+        .await
+    }
+
     /// View shadow git edit history
     ///
     /// Examples:
@@ -1443,5 +1489,186 @@ async fn do_rename(
         new_content: None,
         changes: vec![],
         files: modified,
+    })
+}
+
+// ── move ─────────────────────────────────────────────────────────────────────
+
+/// Report returned by `normalize edit move`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct MoveReport {
+    /// The symbol that was (or would be) moved.
+    pub symbol: String,
+    /// Source file (relative path).
+    pub from_file: String,
+    /// Destination file (relative path).
+    pub to_file: String,
+    /// Whether the definition was relocated (false if dry-run aborted, etc.).
+    pub definition_moved: bool,
+    /// Number of import sites successfully rewritten.
+    pub import_sites_updated: usize,
+    /// Number of import sites that could not be rewritten confidently.
+    pub import_sites_skipped: usize,
+    /// Whether a re-export stub was left at the source location.
+    pub reexport_added: bool,
+    /// Whether this was a dry run (no files written).
+    pub dry_run: bool,
+    /// Files modified (or that would be modified on dry-run).
+    pub files: Vec<String>,
+    /// Warnings emitted during planning (e.g. unsupported re-export language,
+    /// import sites skipped because the new module path could not be derived).
+    pub warnings: Vec<String>,
+}
+
+impl OutputFormatter for MoveReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let verb = if self.dry_run { "Would move" } else { "Moved" };
+        let _ = writeln!(
+            out,
+            "{} '{}' from {} to {}",
+            verb, self.symbol, self.from_file, self.to_file
+        );
+        let _ = writeln!(
+            out,
+            "  imports: {} updated, {} skipped",
+            self.import_sites_updated, self.import_sites_skipped
+        );
+        if self.reexport_added {
+            let _ = writeln!(out, "  re-export left at {}", self.from_file);
+        }
+        if !self.files.is_empty() {
+            let _ = writeln!(out, "  files: {}", self.files.join(", "));
+        }
+        for w in &self.warnings {
+            let _ = writeln!(out, "  warning: {}", w);
+        }
+        out
+    }
+
+    fn format_pretty(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let verb = if self.dry_run {
+            "\x1b[1;33mWould move\x1b[0m"
+        } else {
+            "\x1b[1;32mMoved\x1b[0m"
+        };
+        let _ = writeln!(
+            out,
+            "{} '\x1b[1m{}\x1b[0m' from \x1b[2m{}\x1b[0m to \x1b[2m{}\x1b[0m",
+            verb, self.symbol, self.from_file, self.to_file
+        );
+        let _ = writeln!(
+            out,
+            "  imports: \x1b[1;32m{}\x1b[0m updated, \x1b[1;33m{}\x1b[0m skipped",
+            self.import_sites_updated, self.import_sites_skipped
+        );
+        if self.reexport_added {
+            let _ = writeln!(out, "  re-export left at \x1b[2m{}\x1b[0m", self.from_file);
+        }
+        if !self.files.is_empty() {
+            let _ = writeln!(out, "  files: {}", self.files.join(", "));
+        }
+        for w in &self.warnings {
+            let _ = writeln!(out, "  \x1b[0;33mwarning\x1b[0m: {}", w);
+        }
+        out
+    }
+}
+
+async fn do_move(
+    target: &str,
+    destination: &str,
+    root: Option<&Path>,
+    dry_run: bool,
+    reexport: bool,
+    message: Option<&str>,
+) -> Result<MoveReport, String> {
+    let root = root
+        .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+
+    let config = NormalizeConfig::load(&root);
+    let shadow_enabled = config.shadow.enabled();
+
+    // Resolve the target → file + symbol name.
+    let unified = path_resolve::resolve_unified(target, &root)
+        .ok_or_else(|| format!("No matches for: {}", target))?;
+    if unified.symbol_path.is_empty() {
+        return Err(format!(
+            "Target must include a symbol name (e.g. path/SymbolName), got: {}",
+            target
+        ));
+    }
+    let from_rel_path = unified.file_path.clone();
+    // normalize-syntax-allow: rust/unwrap-in-impl - symbol_path is non-empty (checked above)
+    let symbol_name = unified.symbol_path.last().unwrap().clone();
+
+    // Normalise destination to a path relative to root (accept absolute paths too).
+    let dest_input = Path::new(destination);
+    let to_rel_path = if dest_input.is_absolute() {
+        dest_input
+            .strip_prefix(&root)
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| destination.to_string())
+    } else {
+        destination.to_string()
+    };
+
+    // Build refactoring context.
+    let index = match crate::index::ensure_ready(&root).await {
+        Ok(idx) => Some(idx),
+        Err(e) => {
+            eprintln!(
+                "warning: index not available ({}); moving definition only",
+                e
+            );
+            None
+        }
+    };
+
+    let ctx = normalize_refactor::RefactoringContext {
+        root: root.clone(),
+        editor: edit::Editor::new(),
+        index,
+        loader: normalize_languages::GrammarLoader::new(),
+    };
+
+    let outcome = normalize_refactor::move_item::plan_move(
+        &ctx,
+        &from_rel_path,
+        &to_rel_path,
+        &symbol_name,
+        reexport,
+    )
+    .await?;
+
+    for w in &outcome.plan.warnings {
+        eprintln!("warning: {}", w);
+    }
+
+    let executor = normalize_refactor::RefactoringExecutor {
+        root: root.clone(),
+        dry_run,
+        shadow_enabled,
+        message: message.map(String::from),
+    };
+
+    let modified = executor.apply(&outcome.plan)?;
+
+    Ok(MoveReport {
+        symbol: outcome.symbol,
+        from_file: outcome.from_file,
+        to_file: outcome.to_file,
+        definition_moved: outcome.definition_moved,
+        import_sites_updated: outcome.import_sites_updated,
+        import_sites_skipped: outcome.import_sites_skipped,
+        reexport_added: outcome.reexport_added,
+        dry_run,
+        files: modified,
+        warnings: outcome.plan.warnings,
     })
 }

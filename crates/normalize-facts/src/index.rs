@@ -1930,6 +1930,34 @@ impl FileIndex {
         Ok(importers)
     }
 
+    /// Find files that import a specific symbol by name, including the module path.
+    /// Returns: (file, imported_name, alias, line, module)
+    /// Useful for `move`: the recipe needs the original module string so it can rewrite
+    /// it to the new path verbatim, rather than guessing where the path begins/ends.
+    pub async fn find_symbol_importers_with_module(
+        &self,
+        symbol_name: &str,
+    ) -> Result<Vec<(String, String, Option<String>, usize, Option<String>)>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT file, name, alias, line, module FROM imports WHERE name = ?1",
+                params![symbol_name],
+            )
+            .await?;
+        let mut importers = Vec::new();
+        while let Some(row) = rows.next().await? {
+            importers.push((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                u64::try_from(row.get::<i64>(3)?).unwrap_or(0) as usize,
+                row.get(4)?,
+            ));
+        }
+        Ok(importers)
+    }
+
     /// Get method names for a type (interface/class) in a specific file.
     /// Used for cross-file interface implementation detection.
     pub async fn get_type_methods(

@@ -120,7 +120,7 @@ implementation nobody should have to re-derive.
 Target recipes (in rough priority order):
 - [~] `extract_function` — **first attempt (commit `ed9d3b63`, reverted) is wrong.** Tree-sitter identifier sweep + heuristic parameter inference; no return-value detection, no real scope analysis, no type awareness. Silently generates broken code. Do not merge. Needs the semantic foundation below before it can be done correctly.
 - [ ] `inline_variable` / `inline_function` — inverse of extract
-- [ ] `move_item` — move function/struct/type to another file, fix imports
+- [x] `move_item` — move function/struct/type to another file, fix imports (`normalize edit move`, recipe at `crates/normalize-refactor/src/move_item.rs`). Best-effort import rewriting for Python/Go/JS/TS; Rust and unsupported cases emit warnings rather than fabricate paths. `--reexport` available for Python.
 - [ ] `add_parameter` / `change_signature` — update function signature + all callsites
 - [ ] `introduce_variable` — extract expression into a named binding
 
@@ -310,8 +310,7 @@ Fixes:
 - [x] **`normalize config validate`** — deep validation of config.toml: TOML syntax (duplicate
   keys), JSON Schema compliance, serde deserialization, and rules config parsing. Checks both
   project and global config. Exits non-zero on errors for CI/hook use.
-- [ ] **Validate on `rules run`** — emit a one-line warning at the start of `rules run`
-  if config failed to parse, so the user sees it in CI output too.
+- [x] **Validate on `rules run`** — `load_rules_config` already emits `eprintln!` warnings when config parse fails (added in the config validation work); warning appears in CI output via stderr.
 
 ### Configuration system
 
@@ -979,9 +978,7 @@ the default path.
   walks with a single O(history) pass in `git_batch_commit_stats`. Cold-cache run: 128s → 3.4s.
   Warm-cache (cached HEAD) run: already fast at ~2.2s. Root cause of 5+ min runs was `.claude/`
   worktrees (5190 dirs) not excluded from walker — fixed by `.gitignore` + `[walk] exclude`.
-- [ ] **Incremental native rules** — stale-summary cache invalidates on every new commit (keyed by
-  HEAD hash). Could be smarter: only recompute dirs touched since the previous HEAD. Would make
-  post-commit `normalize rules run --type native` fast even with a warm cache miss.
+- [x] **Incremental native rules** — stale-summary already does this: when HEAD moves, `git_incremental_commit_stats` walks only new commits and updates only dirs touched in those commits (`stale_summary.rs` L676-701).
 - [ ] **Persistent query cache** — store per-file tree-sitter query results in the SQLite index
   so repeated `normalize view`, `normalize rank`, etc. don't re-parse unchanged files.
 

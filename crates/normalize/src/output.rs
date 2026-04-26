@@ -241,6 +241,9 @@ mod tests {
         use crate::service::rename::RenameReport;
         assert_output_formatter::<RenameReport>();
 
+        use crate::service::edit::MoveReport;
+        assert_output_formatter::<MoveReport>();
+
         use normalize_rules::{RuleInfoReport, RuleShowReport, RulesTagsReport};
         assert_output_formatter::<RuleShowReport>();
         assert_output_formatter::<RuleInfoReport>();
