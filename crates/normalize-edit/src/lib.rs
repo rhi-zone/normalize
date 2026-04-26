@@ -124,13 +124,11 @@ impl Editor {
     pub fn delete_symbol(&self, content: &str, loc: &SymbolLocation) -> String {
         let mut result = String::new();
 
-        // Find the start of the line containing the symbol, then walk back to include
-        // any preceding doc comments and attributes/decorators.
-        let raw_line_start = content[..loc.start_byte]
+        // Find the start of the line containing the symbol
+        let line_start = content[..loc.start_byte]
             .rfind('\n')
             .map(|i| i + 1)
             .unwrap_or(0);
-        let line_start = extend_to_decorations(content, raw_line_start);
 
         // Find the end of the line containing the symbol end (include trailing newline)
         let mut end_byte = loc.end_byte;
@@ -561,79 +559,6 @@ fn find_container_body_via_tags(
     }
 
     None
-}
-
-/// Walk backwards from `line_start` to include any preceding doc comments, attributes,
-/// or decorators that belong to the symbol at that position.
-///
-/// Recognises the following line prefixes (after trimming whitespace):
-/// - `///`, `//!`, `/**`, `/*` — Rust/C/Java/JS/TS doc comments
-/// - `//` — any line comment
-/// - `#[` — Rust attributes
-/// - `#` — Python/Ruby/Bash comments and decorators
-/// - `@` — Python/Java/JS/TS/Zig decorators / annotations
-/// - `--` — Lua/SQL/Haskell line comments
-/// - blank lines immediately adjacent to the decoration block (up to one blank line)
-///
-/// Stops when a line is none of the above (ordinary code, another symbol definition).
-/// This is purely textual — no tree-sitter, no language detection.
-pub fn extend_to_decorations(content: &str, line_start: usize) -> usize {
-    if line_start == 0 {
-        return 0;
-    }
-
-    let mut result = line_start;
-    // Allow one blank line between the decoration block and the item itself.
-    let mut blank_allowance: u8 = 1;
-
-    // `pos` starts just before the '\n' that ends the line above `line_start`.
-    let mut pos = line_start.saturating_sub(1);
-    if pos == 0 {
-        return result;
-    }
-
-    loop {
-        let prev_line_start = content[..pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let line = content[prev_line_start..pos].trim();
-
-        if line.is_empty() {
-            if blank_allowance > 0 {
-                blank_allowance -= 1;
-                result = prev_line_start;
-                if prev_line_start == 0 {
-                    break;
-                }
-                pos = prev_line_start.saturating_sub(1);
-                continue;
-            } else {
-                break;
-            }
-        }
-
-        let is_decoration = line.starts_with("///")
-            || line.starts_with("//!")
-            || line.starts_with("/**")
-            || line.starts_with("/*")
-            || line.starts_with("//")
-            || line.starts_with("#[")
-            || line.starts_with('#')
-            || line.starts_with('@')
-            || line.starts_with("--");
-
-        if is_decoration {
-            // Reset blank allowance — we found another decoration line above.
-            blank_allowance = 1;
-            result = prev_line_start;
-            if prev_line_start == 0 {
-                break;
-            }
-            pos = prev_line_start.saturating_sub(1);
-        } else {
-            break;
-        }
-    }
-
-    result
 }
 
 #[cfg(test)]

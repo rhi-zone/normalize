@@ -11,8 +11,6 @@
 
 use std::path::{Path, PathBuf};
 
-use normalize_edit::extend_to_decorations;
-
 use crate::actions;
 use crate::{PlannedEdit, RefactoringContext, RefactoringPlan};
 
@@ -58,13 +56,11 @@ pub async fn plan_move(
     let loc = actions::locate_symbol(ctx, &from_abs, &from_content, symbol_name)
         .ok_or_else(|| format!("Symbol '{}' not found in {}", symbol_name, from_rel_path))?;
 
-    // 2. Extract definition text (whole-line span of the symbol, including preceding
-    //    doc comments and attributes/decorators).
-    let raw_line_start = from_content[..loc.start_byte]
+    // 2. Extract definition text (whole-line span of the symbol).
+    let line_start = from_content[..loc.start_byte]
         .rfind('\n')
         .map(|i| i + 1)
         .unwrap_or(0);
-    let line_start = extend_to_decorations(&from_content, raw_line_start);
     let mut def_end = loc.end_byte;
     if def_end < from_content.len() && from_content.as_bytes()[def_end] == b'\n' {
         def_end += 1;
@@ -399,46 +395,5 @@ mod tests {
         let dest = Path::new("src/lib/foo.ts");
         let out = derive_js_relative(importer, dest).unwrap();
         assert_eq!(out, "./lib/foo");
-    }
-
-    // ── extend_to_decorations tests ──────────────────────────────────────
-
-    #[test]
-    fn rust_struct_with_derive_and_doc() {
-        // The symbol's `start_byte` lands on the `pub struct` line.
-        // extend_to_decorations should walk back to include `#[derive(Debug)]` and `/// doc`.
-        let content = "/// A great type\n#[derive(Debug)]\npub struct Foo {}\n";
-        // line_start of `pub struct Foo {}` is at byte 33 (after the two preceding lines).
-        let struct_line_start = content.find("pub struct").unwrap();
-        let extended = extend_to_decorations(content, struct_line_start);
-        assert_eq!(extended, 0, "should walk all the way to start of file");
-        let extracted = &content[extended..];
-        assert!(extracted.contains("/// A great type"));
-        assert!(extracted.contains("#[derive(Debug)]"));
-        assert!(extracted.contains("pub struct Foo"));
-    }
-
-    #[test]
-    fn python_class_with_decorator() {
-        let content = "x = 1\n\n@dataclass\nclass Point:\n    x: int\n";
-        // line_start of `class Point:` is right after `@dataclass\n`.
-        let class_line_start = content.find("class Point").unwrap();
-        let extended = extend_to_decorations(content, class_line_start);
-        let extracted = &content[extended..];
-        // The decorator is included; there may be a leading blank line (the blank line
-        // between `x = 1` and `@dataclass` is within the one-blank-line allowance).
-        assert!(extracted.contains("@dataclass"));
-        assert!(extracted.contains("class Point"));
-        // The preceding code line `x = 1` should not be included.
-        assert!(!extracted.contains("x = 1"));
-    }
-
-    #[test]
-    fn plain_symbol_no_decoration() {
-        // A symbol with no preceding decorations — line_start should be unchanged.
-        let content = "fn other() {}\nfn plain() {}\n";
-        let plain_start = content.find("fn plain").unwrap();
-        let extended = extend_to_decorations(content, plain_start);
-        assert_eq!(extended, plain_start);
     }
 }
