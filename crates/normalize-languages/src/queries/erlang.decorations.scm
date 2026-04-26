@@ -1,0 +1,3 @@
+(attribute) @decoration
+
+(comment) @decoration

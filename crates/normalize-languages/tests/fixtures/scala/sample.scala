@@ -30,6 +30,7 @@ class Stack[T] {
   def size: Int = items.length
 }
 
+// Classify a number
 def classify(n: Int): String = {
   if (n < 0) "negative"
   else if (n == 0) "zero"

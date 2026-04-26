@@ -36,6 +36,8 @@ namespace SampleApp
         public int Count => items.Count;
     }
 
+    /// <summary>Utility math functions.</summary>
+    [Obsolete("Use MathHelper instead")]
     public static class MathUtils
     {
         public static string Classify(int n)

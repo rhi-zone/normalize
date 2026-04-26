@@ -33,6 +33,10 @@ class Stack {
     }
 }
 
+/**
+ * Classify a number as negative, zero, or positive.
+ */
+#[Pure]
 function classify(int $n): string {
     if ($n < 0) {
         return "negative";

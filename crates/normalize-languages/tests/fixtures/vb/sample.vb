@@ -50,6 +50,7 @@ Class Circle
         Me.Radius = radius
     End Sub
 
+    <Obsolete("Use AreaV2 instead")>
     Public Overrides Function Area() As Double
         Return Math.PI * Radius * Radius
     End Function

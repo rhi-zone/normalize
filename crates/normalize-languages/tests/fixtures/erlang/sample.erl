@@ -8,6 +8,7 @@
 
 -type coordinate() :: {integer(), integer()}.
 
+-spec classify(integer()) -> negative | zero | positive.
 %% Classify a number as negative, zero, or positive
 classify(N) when N < 0 ->
     negative;

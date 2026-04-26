@@ -1,6 +1,7 @@
 (import (scheme base)
         (scheme write))
 
+; A point in 2D space
 (define-record-type <point>
   (make-point x y)
   point?

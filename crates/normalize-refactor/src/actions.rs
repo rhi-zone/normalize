@@ -3,11 +3,13 @@
 //! **Query actions** return data without side effects.
 //! **Mutation actions** produce `PlannedEdit`s without touching the filesystem.
 
+use std::collections::HashSet;
 use std::path::Path;
 
 use normalize_edit::SymbolLocation;
-use normalize_languages::parsers::parse_with_grammar;
+use normalize_languages::parsers::{grammar_loader, parse_with_grammar};
 use normalize_languages::support_for_path;
+use tree_sitter::StreamingIterator as _;
 
 use crate::{CallerRef, ImportRef, PlannedEdit, RefactoringContext, References};
 
@@ -107,11 +109,35 @@ pub fn decoration_extended_start(
         }
     }
 
+    // Build the set of decoration node IDs using the decorations query when
+    // available, falling back to the hardcoded kind list otherwise.
+    let loader = grammar_loader();
+    let decoration_ids: Option<HashSet<usize>> = loader.get_decorations(grammar).and_then(|q| {
+        let compiled = loader.get_compiled_query(grammar, "decorations", &q)?;
+        let mut qcursor = tree_sitter::QueryCursor::new();
+        let mut matches = qcursor.matches(&compiled, root, content.as_bytes());
+        let mut ids = HashSet::new();
+        while let Some(m) = matches.next() {
+            for capture in m.captures {
+                ids.insert(capture.node.id());
+            }
+        }
+        Some(ids)
+    });
+
+    let is_decoration = |n: tree_sitter::Node<'_>| -> bool {
+        if let Some(ref ids) = decoration_ids {
+            ids.contains(&n.id())
+        } else {
+            is_decoration_kind(n.kind())
+        }
+    };
+
     // Walk preceding named siblings while they classify as decorations.
     let mut earliest_start = node.start_byte();
     let mut cursor = node;
     while let Some(prev) = cursor.prev_named_sibling() {
-        if !is_decoration_kind(prev.kind()) {
+        if !is_decoration(prev) {
             break;
         }
         // Only include if the gap between `prev` and the decoration block we've

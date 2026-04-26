@@ -25,6 +25,7 @@ sub multiply {
 
 package main;
 
+# Classify a number as negative, zero, or positive
 sub classify {
     my ($n) = @_;
     if ($n < 0) {

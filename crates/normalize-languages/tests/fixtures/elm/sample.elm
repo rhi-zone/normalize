@@ -13,6 +13,7 @@ type alias Point =
     , y : Float
     }
 
+-- Square a number
 square : Float -> Float
 square n =
     n * n

@@ -39,6 +39,8 @@ class Stack<T> {
     }
 }
 
+/// Classify a number as negative, zero, or positive.
+@discardableResult
 func classify(_ n: Int) -> String {
     if n < 0 {
         return "negative"

@@ -32,7 +32,8 @@ let rec insert x = function
       else if x > y then Node (y, left, insert x right)
       else Node (y, left, right)
 
-(* Classify a number *)
+(** Classify a number as negative, zero, or positive. *)
+[@inline]
 let classify n =
   if n < 0 then "negative"
   else if n = 0 then "zero"

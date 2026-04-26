@@ -10,6 +10,7 @@ def distance (p1 p2 : Point) : Float :=
   let dy := p2.y - p1.y
   Float.sqrt (dx * dx + dy * dy)
 
+@[inline]
 def classify (n : Int) : String :=
   if n < 0 then "negative"
   else if n == 0 then "zero"

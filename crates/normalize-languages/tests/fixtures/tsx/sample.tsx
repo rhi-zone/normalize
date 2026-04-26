@@ -42,6 +42,7 @@ const Counter: FC<CounterProps> = ({ initialCount, step = 1, label }) => {
     );
 };
 
+// Classify a number as negative, zero, or positive
 function classify(n: number): string {
     if (n < 0) {
         return 'negative';

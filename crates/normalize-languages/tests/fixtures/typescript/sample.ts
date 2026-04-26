@@ -6,6 +6,8 @@ export interface Logger {
     error(message: string): void;
 }
 
+// Logs to a file
+@Injectable()
 export class FileLogger implements Logger {
     private prefix: string;
 

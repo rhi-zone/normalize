@@ -13,6 +13,7 @@ docs/prior-art.md
 
 # Test data
 *_tests.rs
+**/tests/query_fixtures.rs
 
 # Language node mappings - inherently large
 **/normalize-languages/src/python.rs

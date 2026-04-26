@@ -1,6 +1,8 @@
+"""A scalar representing a date and time value."""
 scalar DateTime
 scalar UUID
 
+# Node interface for objects with a unique ID
 interface Node {
   id: ID!
 }
@@ -10,6 +12,7 @@ interface Timestamped {
   updatedAt: DateTime!
 }
 
+"""A registered user in the system."""
 type User implements Node & Timestamped {
   id: ID!
   name: String!

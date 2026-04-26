@@ -2,6 +2,8 @@ import { EventEmitter } from 'events';
 import path from 'path';
 import { readFileSync, writeFileSync } from 'fs';
 
+// A stack data structure
+@sealed
 class Stack extends EventEmitter {
     #items = [];
 

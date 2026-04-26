@@ -24,6 +24,8 @@ let area = (s: shape) =>
   | Rectangle(w, h) => w *. h
   }
 
+/** Classify a number as negative, zero, or positive. */
+@inline
 let classify = (n: int) =>
   if n < 0 {
     "negative"

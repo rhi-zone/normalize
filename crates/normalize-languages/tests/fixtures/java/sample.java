@@ -26,6 +26,8 @@ public class TaskQueue {
         return tasks.remove(0);
     }
 
+    // Returns the size
+    @Override
     public int size() {
         return tasks.size();
     }

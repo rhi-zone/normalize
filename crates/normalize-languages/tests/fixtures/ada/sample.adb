@@ -3,6 +3,7 @@ with Ada.Integer_Text_IO;
 
 package body Calculator is
 
+   -- Add two integers and return the result
    function Add(A : Integer; B : Integer) return Integer is
    begin
       return A + B;

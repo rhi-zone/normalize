@@ -35,6 +35,8 @@ class Stack<T> {
   int get length => _items.length;
 }
 
+/// Classify a number as negative, zero, or positive.
+@pragma('vm:prefer-inline')
 String classify(int n) {
   if (n < 0) {
     return 'negative';

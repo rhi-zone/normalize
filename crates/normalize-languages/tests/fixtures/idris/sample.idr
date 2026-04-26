@@ -12,6 +12,7 @@ record Point where
   x : Double
   y : Double
 
+-- Compute Euclidean distance between two points
 distance : Point -> Point -> Double
 distance p1 p2 =
   let dx = p2.x - p1.x

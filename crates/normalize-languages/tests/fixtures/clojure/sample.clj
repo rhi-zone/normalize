@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [clojure.set :as cset]))
 
+; A point in 2D space with x and y coordinates
 (defrecord Point [x y])
 
 (defn distance

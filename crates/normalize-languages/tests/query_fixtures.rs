@@ -6353,3 +6353,543 @@ fn kotlin_tags_live() {
         "local 'total' should not appear in tags, got: {names:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Decorations tests
+// ---------------------------------------------------------------------------
+
+fn assert_decorations(loader: &GrammarLoader, grammar: &str, sample: &str) {
+    let Some(lang) = loader.get(grammar).ok() else {
+        eprintln!("Skipping {grammar}_decorations: grammar .so not found");
+        return;
+    };
+    let query_str = loader
+        .get_decorations(grammar)
+        .unwrap_or_else(|| panic!("{grammar} decorations query missing"));
+    let captures = collect_captures(&lang, sample, &query_str, "decoration");
+    assert!(
+        !captures.is_empty(),
+        "expected at least one @decoration capture for {grammar}, got none"
+    );
+}
+
+#[test]
+fn rust_decorations_finds_attribute_and_doc_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping rust_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "rust", RUST_SAMPLE);
+}
+
+#[test]
+fn python_decorations_finds_decorator_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping python_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "python",
+        PYTHON_SAMPLE,
+    );
+}
+
+#[test]
+fn javascript_decorations_finds_decorator_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping javascript_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "javascript",
+        JAVASCRIPT_SAMPLE,
+    );
+}
+
+#[test]
+fn typescript_decorations_finds_decorator_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping typescript_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "typescript",
+        TS_SAMPLE,
+    );
+}
+
+#[test]
+fn tsx_decorations_finds_decorator_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping tsx_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "tsx", TSX_SAMPLE);
+}
+
+#[test]
+fn java_decorations_finds_annotation_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping java_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "java", JAVA_SAMPLE);
+}
+
+#[test]
+fn kotlin_decorations_finds_annotation_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping kotlin_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "kotlin",
+        KOTLIN_SAMPLE,
+    );
+}
+
+#[test]
+fn scala_decorations_finds_annotation_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping scala_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "scala",
+        SCALA_SAMPLE,
+    );
+}
+
+#[test]
+fn csharp_decorations_finds_attribute_list() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping csharp_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "c-sharp",
+        CSHARP_SAMPLE,
+    );
+}
+
+#[test]
+fn php_decorations_finds_attribute_list() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping php_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "php", PHP_SAMPLE);
+}
+
+#[test]
+fn swift_decorations_finds_attribute_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping swift_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "swift",
+        SWIFT_SAMPLE,
+    );
+}
+
+#[test]
+fn dart_decorations_finds_annotation_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping dart_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "dart", DART_SAMPLE);
+}
+
+const OCAML_SAMPLE: &str = include_str!("fixtures/ocaml/sample.ml");
+
+#[test]
+fn ocaml_decorations_finds_attribute_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping ocaml_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "ocaml",
+        OCAML_SAMPLE,
+    );
+}
+
+#[test]
+fn rescript_decorations_finds_decorator_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping rescript_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "rescript",
+        RESCRIPT_SAMPLE,
+    );
+}
+
+const FSHARP_SAMPLE: &str = include_str!("fixtures/fsharp/sample.fs");
+
+#[test]
+fn fsharp_decorations_finds_attribute_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping fsharp_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "fsharp",
+        FSHARP_SAMPLE,
+    );
+}
+
+#[test]
+fn elixir_decorations_finds_module_attribute_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping elixir_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "elixir",
+        ELIXIR_SAMPLE,
+    );
+}
+
+const ERLANG_SAMPLE: &str = include_str!("fixtures/erlang/sample.erl");
+
+#[test]
+fn erlang_decorations_finds_attribute_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping erlang_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "erlang",
+        ERLANG_SAMPLE,
+    );
+}
+
+const GLEAM_SAMPLE: &str = include_str!("fixtures/gleam/sample.gleam");
+
+#[test]
+fn gleam_decorations_finds_doc_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping gleam_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "gleam",
+        GLEAM_SAMPLE,
+    );
+}
+
+#[test]
+fn lean_decorations_finds_attribute_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping lean_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "lean", LEAN_SAMPLE);
+}
+
+#[test]
+fn groovy_decorations_finds_annotation_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping groovy_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "groovy",
+        GROOVY_SAMPLE,
+    );
+}
+
+#[test]
+fn vb_decorations_finds_attribute_list_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping vb_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "vb", VB_SAMPLE);
+}
+
+#[test]
+fn haskell_decorations_finds_pragma_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping haskell_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "haskell",
+        HASKELL_SAMPLE,
+    );
+}
+
+#[test]
+fn go_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping go_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "go", GO_SAMPLE);
+}
+
+#[test]
+fn c_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping c_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "c", C_SAMPLE);
+}
+
+#[test]
+fn cpp_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping cpp_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "cpp", CPP_SAMPLE);
+}
+
+#[test]
+fn objc_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping objc_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "objc", OBJC_SAMPLE);
+}
+
+#[test]
+fn ruby_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping ruby_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "ruby", RUBY_SAMPLE);
+}
+
+const R_SAMPLE: &str = include_str!("fixtures/r/sample.r");
+
+#[test]
+fn r_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping r_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "r", R_SAMPLE);
+}
+
+const LUA_SAMPLE: &str = include_str!("fixtures/lua/sample.lua");
+
+#[test]
+fn lua_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping lua_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "lua", LUA_SAMPLE);
+}
+
+#[test]
+fn zig_decorations_finds_doc_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping zig_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "zig", ZIG_SAMPLE);
+}
+
+#[test]
+fn idris_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping idris_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "idris",
+        IDRIS_SAMPLE,
+    );
+}
+
+#[test]
+fn agda_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping agda_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "agda", AGDA_SAMPLE);
+}
+
+#[test]
+fn elm_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping elm_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "elm", ELM_SAMPLE);
+}
+
+const JULIA_SAMPLE: &str = include_str!("fixtures/julia/sample.jl");
+
+#[test]
+fn julia_decorations_finds_comment_and_macro() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping julia_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "julia",
+        JULIA_SAMPLE,
+    );
+}
+
+#[test]
+fn perl_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping perl_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "perl", PERL_SAMPLE);
+}
+
+#[test]
+fn verilog_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping verilog_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "verilog",
+        VERILOG_SAMPLE,
+    );
+}
+
+#[test]
+fn vhdl_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping vhdl_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "vhdl", VHDL_SAMPLE);
+}
+
+#[test]
+fn ada_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping ada_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "ada", ADA_SAMPLE);
+}
+
+const CAPNP_SAMPLE: &str = include_str!("fixtures/capnp/sample.capnp");
+
+#[test]
+fn capnp_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping capnp_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "capnp",
+        CAPNP_SAMPLE,
+    );
+}
+
+const THRIFT_SAMPLE: &str = include_str!("fixtures/thrift/sample.thrift");
+
+#[test]
+fn thrift_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping thrift_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "thrift",
+        THRIFT_SAMPLE,
+    );
+}
+
+#[test]
+fn graphql_decorations_finds_description_and_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping graphql_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "graphql",
+        GRAPHQL_SAMPLE,
+    );
+}
+
+const WIT_SAMPLE: &str = include_str!("fixtures/wit/sample.wit");
+
+#[test]
+fn wit_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping wit_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(&GrammarLoader::with_paths(vec![gdir]), "wit", WIT_SAMPLE);
+}
+
+#[test]
+fn clojure_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping clojure_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "clojure",
+        CLOJURE_SAMPLE,
+    );
+}
+
+#[test]
+fn scheme_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping scheme_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "scheme",
+        SCHEME_SAMPLE,
+    );
+}
+
+#[test]
+fn prolog_decorations_finds_comment() {
+    let Some(gdir) = grammar_dir() else {
+        eprintln!("Skipping prolog_decorations: run `cargo xtask build-grammars` first");
+        return;
+    };
+    assert_decorations(
+        &GrammarLoader::with_paths(vec![gdir]),
+        "prolog",
+        PROLOG_SAMPLE,
+    );
+}

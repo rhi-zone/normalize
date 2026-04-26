@@ -14,7 +14,7 @@ pub type Name = String
 // Constant
 pub const max_size = 100
 
-// Classify a number
+/// Classify a number as negative, zero, or positive.
 pub fn classify(n: Int) -> String {
   case n {
     _ if n < 0 -> "negative"

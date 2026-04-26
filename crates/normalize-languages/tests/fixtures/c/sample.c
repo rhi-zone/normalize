@@ -8,6 +8,7 @@ typedef struct {
     int capacity;
 } Stack;
 
+/* Creates a new stack with the given capacity. */
 Stack *stack_new(int capacity) {
     Stack *s = malloc(sizeof(Stack));
     s->data = malloc(sizeof(int) * capacity);

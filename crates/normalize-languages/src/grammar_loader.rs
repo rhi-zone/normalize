@@ -97,6 +97,8 @@ pub struct GrammarLoader {
     tags_cache: RwLock<HashMap<String, Arc<String>>>,
     /// Cached imports queries.
     imports_cache: RwLock<HashMap<String, Arc<String>>>,
+    /// Cached decorations queries.
+    decorations_cache: RwLock<HashMap<String, Arc<String>>>,
     /// Cached compiled tree-sitter queries (keyed by "grammar:query_type").
     compiled_query_cache: RwLock<HashMap<String, Arc<tree_sitter::Query>>>,
 }
@@ -135,6 +137,7 @@ impl GrammarLoader {
             types_cache: RwLock::new(HashMap::new()),
             tags_cache: RwLock::new(HashMap::new()),
             imports_cache: RwLock::new(HashMap::new()),
+            decorations_cache: RwLock::new(HashMap::new()),
             compiled_query_cache: RwLock::new(HashMap::new()),
         }
     }
@@ -152,6 +155,7 @@ impl GrammarLoader {
             types_cache: RwLock::new(HashMap::new()),
             tags_cache: RwLock::new(HashMap::new()),
             imports_cache: RwLock::new(HashMap::new()),
+            decorations_cache: RwLock::new(HashMap::new()),
             compiled_query_cache: RwLock::new(HashMap::new()),
         }
     }
@@ -382,6 +386,38 @@ impl GrammarLoader {
         let bundled = bundled_imports_query(name)?;
         let query = Arc::new(bundled.to_string());
         self.imports_cache
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(name.to_string(), Arc::clone(&query));
+        Some(query)
+    }
+
+    /// Get the decorations query for a grammar.
+    ///
+    /// Returns the bundled query for supported languages, or an external file if one
+    /// exists at `{name}.decorations.scm` in the grammar search paths (external wins).
+    /// Uses `@decoration` captures for doc comments, attributes, decorators, and
+    /// annotations that immediately precede a definition.
+    pub fn get_decorations(&self, name: &str) -> Option<Arc<String>> {
+        // Check cache first
+        if let Some(query) = self
+            .decorations_cache
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+        {
+            return Some(Arc::clone(query));
+        }
+
+        // External file takes priority over bundled
+        if let Some(q) = self.load_query(name, "decorations", &self.decorations_cache) {
+            return Some(q);
+        }
+
+        // Fall back to bundled query
+        let bundled = bundled_decorations_query(name)?;
+        let query = Arc::new(bundled.to_string());
+        self.decorations_cache
             .write()
             .unwrap_or_else(|e| e.into_inner())
             .insert(name.to_string(), Arc::clone(&query));
@@ -999,6 +1035,61 @@ fn bundled_imports_query(name: &str) -> Option<&'static str> {
         "verilog" => Some(include_str!("queries/verilog.imports.scm")),
         "vhdl" => Some(include_str!("queries/vhdl.imports.scm")),
         "wit" => Some(include_str!("queries/wit.imports.scm")),
+        _ => None,
+    }
+}
+
+/// Return a bundled decorations query for a grammar, if available.
+///
+/// Uses `@decoration` captures for doc comments, attributes, decorators,
+/// and annotations that immediately precede a definition.
+fn bundled_decorations_query(name: &str) -> Option<&'static str> {
+    match name {
+        "rust" => Some(include_str!("queries/rust.decorations.scm")),
+        "python" => Some(include_str!("queries/python.decorations.scm")),
+        "javascript" => Some(include_str!("queries/javascript.decorations.scm")),
+        "typescript" => Some(include_str!("queries/typescript.decorations.scm")),
+        "tsx" => Some(include_str!("queries/tsx.decorations.scm")),
+        "java" => Some(include_str!("queries/java.decorations.scm")),
+        "kotlin" => Some(include_str!("queries/kotlin.decorations.scm")),
+        "scala" => Some(include_str!("queries/scala.decorations.scm")),
+        "c-sharp" => Some(include_str!("queries/c-sharp.decorations.scm")),
+        "php" => Some(include_str!("queries/php.decorations.scm")),
+        "swift" => Some(include_str!("queries/swift.decorations.scm")),
+        "dart" => Some(include_str!("queries/dart.decorations.scm")),
+        "ocaml" => Some(include_str!("queries/ocaml.decorations.scm")),
+        "rescript" => Some(include_str!("queries/rescript.decorations.scm")),
+        "fsharp" => Some(include_str!("queries/fsharp.decorations.scm")),
+        "elixir" => Some(include_str!("queries/elixir.decorations.scm")),
+        "erlang" => Some(include_str!("queries/erlang.decorations.scm")),
+        "gleam" => Some(include_str!("queries/gleam.decorations.scm")),
+        "lean" => Some(include_str!("queries/lean.decorations.scm")),
+        "groovy" => Some(include_str!("queries/groovy.decorations.scm")),
+        "vb" => Some(include_str!("queries/vb.decorations.scm")),
+        "haskell" => Some(include_str!("queries/haskell.decorations.scm")),
+        "go" => Some(include_str!("queries/go.decorations.scm")),
+        "c" => Some(include_str!("queries/c.decorations.scm")),
+        "cpp" => Some(include_str!("queries/cpp.decorations.scm")),
+        "objc" => Some(include_str!("queries/objc.decorations.scm")),
+        "ruby" => Some(include_str!("queries/ruby.decorations.scm")),
+        "r" => Some(include_str!("queries/r.decorations.scm")),
+        "lua" => Some(include_str!("queries/lua.decorations.scm")),
+        "zig" => Some(include_str!("queries/zig.decorations.scm")),
+        "idris" => Some(include_str!("queries/idris.decorations.scm")),
+        "agda" => Some(include_str!("queries/agda.decorations.scm")),
+        "elm" => Some(include_str!("queries/elm.decorations.scm")),
+        "julia" => Some(include_str!("queries/julia.decorations.scm")),
+        "perl" => Some(include_str!("queries/perl.decorations.scm")),
+        "verilog" => Some(include_str!("queries/verilog.decorations.scm")),
+        "vhdl" => Some(include_str!("queries/vhdl.decorations.scm")),
+        "ada" => Some(include_str!("queries/ada.decorations.scm")),
+        "capnp" => Some(include_str!("queries/capnp.decorations.scm")),
+        "thrift" => Some(include_str!("queries/thrift.decorations.scm")),
+        "graphql" => Some(include_str!("queries/graphql.decorations.scm")),
+        "wit" => Some(include_str!("queries/wit.decorations.scm")),
+        "clojure" => Some(include_str!("queries/clojure.decorations.scm")),
+        "scheme" => Some(include_str!("queries/scheme.decorations.scm")),
+        "prolog" => Some(include_str!("queries/prolog.decorations.scm")),
         _ => None,
     }
 }

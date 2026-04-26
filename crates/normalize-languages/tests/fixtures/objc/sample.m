@@ -8,6 +8,7 @@
 @end
 
 @implementation Point
+// Initializes a Point with x and y coordinates.
 - (instancetype)initWithX:(double)x y:(double)y {
     self = [super init];
     if (self) {

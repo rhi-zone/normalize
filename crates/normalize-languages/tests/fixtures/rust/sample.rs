@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::{self, Display};
 
+#[derive(Debug)]
 pub struct Counter {
     counts: HashMap<String, usize>,
 }
@@ -31,6 +32,7 @@ impl Display for Counter {
     }
 }
 
+/// Classify a number
 pub fn classify(n: i32) -> &'static str {
     if n < 0 {
         "negative"

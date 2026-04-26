@@ -1,0 +1,43 @@
+package example:sample@0.1.0;
+
+/// Types and functions for working with text
+interface types {
+  /// A handle to an open resource
+  type resource-handle = u32;
+
+  /// Status of an operation
+  enum status {
+    ok,
+    error,
+    pending,
+  }
+
+  /// A result carrying a value or an error message
+  record result-value {
+    /// Whether the operation succeeded
+    ok: bool,
+    /// The value if successful
+    value: option<string>,
+    /// Error message if failed
+    message: option<string>,
+  }
+}
+
+/// Core operations for the sample world
+interface operations {
+  use types.{resource-handle, status, result-value};
+
+  /// Open a resource by name
+  open: func(name: string) -> resource-handle;
+
+  /// Close a previously opened resource
+  close: func(handle: resource-handle) -> status;
+
+  /// Process a resource and return a result
+  process: func(handle: resource-handle) -> result-value;
+}
+
+world sample {
+  import types;
+  export operations;
+}

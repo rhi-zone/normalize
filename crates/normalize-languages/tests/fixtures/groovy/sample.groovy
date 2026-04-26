@@ -6,6 +6,7 @@ class Point {
     int x
     int y
 
+    @Override
     double distanceTo(Point other) {
         Math.sqrt(Math.pow(other.x - x, 2) + Math.pow(other.y - y, 2))
     }

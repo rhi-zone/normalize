@@ -1,0 +1,3 @@
+(pragma) @decoration
+
+(comment) @decoration

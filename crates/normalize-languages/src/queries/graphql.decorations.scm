@@ -1,0 +1,3 @@
+(description) @decoration
+
+(comment) @decoration

@@ -13,6 +13,8 @@ class DataProcessor:
     def add(self, item: str) -> None:
         self.items.append(item)
 
+    # Process all items
+    @property
     def process(self) -> List[str]:
         result = []
         for item in self.items:

@@ -5,6 +5,7 @@
 template <typename T>
 class Stack {
 public:
+    // Pushes an item onto the stack.
     void push(const T& item) {
         items.push_back(item);
     }

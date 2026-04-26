@@ -25,6 +25,8 @@ class Queue<T> {
     val size: Int get() = items.size
 }
 
+// Classify a number
+@JvmStatic
 fun classify(n: Int): String {
     return when {
         n < 0 -> "negative"
