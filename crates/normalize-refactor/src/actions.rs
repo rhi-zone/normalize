@@ -50,18 +50,40 @@ fn is_decoration_kind(kind: &str) -> bool {
 
 /// Walk backward from the symbol's node through preceding named siblings,
 /// collecting decoration nodes (doc comments, attributes, decorators, etc.).
-/// Returns the byte offset of the line-start of the earliest decoration, or
-/// `loc.start_byte` if there are no decorations or no grammar is available.
+/// Returns `(byte_offset, warning)` where:
+/// - `byte_offset` is the line-start of the earliest decoration found, or
+///   `loc.start_byte` if there are no decorations or no grammar is available.
+/// - `warning` is `Some(msg)` when the function fell back because the grammar
+///   was unavailable; `None` when the grammar was used (even if no decorations
+///   were found).
 ///
 /// Classification is by `node.kind()` from the grammar — never by source text.
-pub fn decoration_extended_start(file: &Path, content: &str, loc: &SymbolLocation) -> usize {
+pub fn decoration_extended_start(
+    file: &Path,
+    content: &str,
+    loc: &SymbolLocation,
+) -> (usize, Option<String>) {
     let fallback = loc.start_byte;
     let Some(support) = support_for_path(file) else {
-        return fallback;
+        let ext = file
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("<unknown>");
+        return (
+            fallback,
+            Some(format!(
+                "No language support for {ext}: doc comments and attributes will not be included with the moved symbol"
+            )),
+        );
     };
     let grammar = support.grammar_name();
     let Some(tree) = parse_with_grammar(grammar, content) else {
-        return fallback;
+        return (
+            fallback,
+            Some(format!(
+                "Grammar for {grammar} not loaded: doc comments and attributes will not be included. Install grammars with `normalize grammars install`."
+            )),
+        );
     };
 
     let root = tree.root_node();
@@ -70,7 +92,7 @@ pub fn decoration_extended_start(file: &Path, content: &str, loc: &SymbolLocatio
     let sym_start = loc.start_byte.min(content.len());
     let sym_end = loc.end_byte.min(content.len()).max(sym_start);
     let Some(mut node) = root.descendant_for_byte_range(sym_start, sym_end) else {
-        return fallback;
+        return (fallback, None);
     };
 
     // descendant_for_byte_range may return a small inner node (e.g. an identifier)
@@ -103,16 +125,17 @@ pub fn decoration_extended_start(file: &Path, content: &str, loc: &SymbolLocatio
     }
 
     if earliest_start == node.start_byte() {
-        return fallback;
+        return (fallback, None);
     }
 
     // Snap to the start of the line containing earliest_start so we capture
     // any indentation on that line (consistent with `delete_symbol`'s line
     // semantics).
-    content[..earliest_start]
+    let snapped = content[..earliest_start]
         .rfind('\n')
         .map(|i| i + 1)
-        .unwrap_or(0)
+        .unwrap_or(0);
+    (snapped, None)
 }
 
 /// Find all cross-file references to a symbol (callers + importers).
@@ -399,7 +422,8 @@ def my_func():
         let loc = editor
             .find_symbol(&file, content, "my_func", false)
             .expect("locate");
-        let start = decoration_extended_start(&file, content, &loc);
+        let (start, warning) = decoration_extended_start(&file, content, &loc);
+        assert!(warning.is_none(), "unexpected warning: {:?}", warning);
         let slice = &content[start..];
         assert!(
             slice.starts_with("# Leading comment line 1.\n"),
@@ -424,7 +448,8 @@ def my_func():
         let loc = editor
             .find_symbol(&file, content, "alone", false)
             .expect("locate");
-        let start = decoration_extended_start(&file, content, &loc);
+        let (start, warning) = decoration_extended_start(&file, content, &loc);
+        assert!(warning.is_none(), "unexpected warning: {:?}", warning);
         assert_eq!(start, loc.start_byte);
     }
 
@@ -448,7 +473,8 @@ class Wrapper {
         let loc = editor
             .find_symbol(&file, content, "myMethod", false)
             .expect("locate");
-        let start = decoration_extended_start(&file, content, &loc);
+        let (start, warning) = decoration_extended_start(&file, content, &loc);
+        assert!(warning.is_none(), "unexpected warning: {:?}", warning);
         // The decorator and the line above (whitespace-only indent) must be included.
         let slice = &content[start..];
         assert!(
@@ -472,8 +498,16 @@ class Wrapper {
             end_line: 1,
             indent: String::new(),
         };
-        let start = decoration_extended_start(&file, content, &loc);
+        let (start, warning) = decoration_extended_start(&file, content, &loc);
         assert_eq!(start, 5);
+        assert!(
+            warning.is_some(),
+            "expected a warning for unsupported language"
+        );
+        assert!(
+            warning.unwrap().contains("unknown_ext_xyz"),
+            "warning should mention the extension"
+        );
     }
 
     #[test]

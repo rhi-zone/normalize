@@ -59,7 +59,8 @@ pub async fn plan_move(
     // Extend the start backward to include leading decorations (doc comments,
     // attributes, decorators) identified via tree-sitter `node.kind()`. Falls
     // back to `loc.start_byte` for languages without a grammar.
-    let extended_start = actions::decoration_extended_start(&from_abs, &from_content, &loc);
+    let (extended_start, decoration_warning) =
+        actions::decoration_extended_start(&from_abs, &from_content, &loc);
     loc.start_byte = extended_start;
 
     // 2. Extract definition text (whole-line span of the symbol).
@@ -75,6 +76,9 @@ pub async fn plan_move(
 
     let mut edits: Vec<PlannedEdit> = Vec::new();
     let mut warnings: Vec<String> = Vec::new();
+    if let Some(w) = decoration_warning {
+        warnings.push(w);
+    }
 
     // 3. Append the definition to the destination file (creating it if absent).
     let dest_original = std::fs::read_to_string(&to_abs).unwrap_or_default();
