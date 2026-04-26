@@ -33,7 +33,7 @@ private:
     std::vector<T> items;
 };
 
-std::string classify(int n) {
+[[nodiscard]] std::string classify(int n) {
     if (n < 0) {
         return "negative";
     } else if (n == 0) {

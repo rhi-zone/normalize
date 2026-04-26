@@ -16,6 +16,7 @@ pub const Point = struct {
     }
 };
 
+/// Classify a number as negative, zero, or positive.
 pub fn classify(n: i32) []const u8 {
     if (n < 0) {
         return "negative";
