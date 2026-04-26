@@ -926,10 +926,9 @@ to depend on. The LSP is useful day-to-day.
   with `Some(&watched.last_affected)` to warm the `ENGINE_CACHE` — next `normalize ci` or
   `normalize rules run` in the same process uses the incremental path automatically.
   **Remaining:** fix JIT string comparison bug in ascent-interpreter to make eval fast.
-- [ ] Fix JIT string comparison bug in ascent-interpreter and re-enable `SharedJitCompiler`
-  in `run_rules_source` / `run_rules_batch`. **Release blocker: ascent-interpreter is our own
-  project — this is fixable on our timeline. Incremental eval reduces re-derivation scope;
-  JIT makes the derivation itself fast. Both are needed for CI performance on large repos.**
+- [x] Fix JIT string comparison bug in ascent-interpreter and re-enable `SharedJitCompiler`
+  in `run_rules_source` / `run_rules_batch`. Fixed in ascent-interpreter 0.2.0-alpha.1;
+  JIT re-enabled in normalize-facts-rules-interpret default features (2026-04-26).
 
 *CLI surface (from P1):*
 - [x] `view` refactor phase 1: graph navigation + history as subcommands — done 2026-03-16
@@ -1011,7 +1010,7 @@ crash in the pre-commit hook is a warning sign.
   `layering-violation`, `long-function`, and more. Semantic rules infrastructure is mature.
 - ~~`normalize-facts-rules-builtins/src/circular_deps.rs`~~ (removed 2026-03-27) — the entire `normalize-facts-rules-builtins` crate was orphaned (no workspace members entry, no dependents). The Datalog version in `builtin_dl/circular_deps.dl` is what runs.
 - Incremental evaluation API (`run_rules_source_incremental`) is implemented but not wired
-  into any CLI call path. JIT disabled pending upstream string comparison bug fix.
+  into any CLI call path. JIT re-enabled (fixed in ascent-interpreter 0.2.0-alpha.1).
 
 **Pillar 1 — `analyze` dissolution**
 

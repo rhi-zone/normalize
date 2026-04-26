@@ -8,12 +8,11 @@ description = "Interpreted Datalog rule evaluation for normalize code facts"
 
 [features]
 # Enable JIT compilation in ascent-interpreter (x86_64-only).
-# ascent-interpreter 0.1.4 properly guards the JIT asm module with
+# ascent-interpreter properly guards the JIT asm module with
 # #[cfg(target_arch = "x86_64")] so enabling this on all platforms is safe;
 # the JIT call sites in lib.rs are also gated on cfg(target_arch = "x86_64").
-default = []
-# JIT disabled: ascent-interpreter 0.1.5 has a packed-tuple arity mismatch bug
-# in specialized.rs that causes abort on non-trivial relations. Re-enable once fixed.
+# The packed-tuple arity mismatch bug (present in 0.1.5) was fixed in 0.2.0-alpha.1.
+default = ["jit"]
 jit = ["ascent-interpreter/jit-asm"]
 
 [dependencies]

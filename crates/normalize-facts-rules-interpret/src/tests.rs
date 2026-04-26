@@ -671,33 +671,6 @@ fn test_god_class_no_fire() {
 }
 
 #[test]
-fn test_long_function_fires() {
-    let mut relations = Relations::new();
-    relations.add_symbol("a.py", "huge_func", "function", 1);
-    relations.add_symbol_range("a.py", "huge_func", 1, 150);
-    relations.add_symbol("a.py", "tiny_func", "function", 200);
-    relations.add_symbol_range("a.py", "tiny_func", 200, 210);
-
-    let mut rule = find_builtin("long-function");
-    rule.enabled = true;
-    let result = run_rule(&rule, &relations).unwrap();
-    assert_eq!(result.len(), 1);
-    assert_eq!(result[0].message.as_str(), "huge_func");
-}
-
-#[test]
-fn test_long_function_no_fire() {
-    let mut relations = Relations::new();
-    relations.add_symbol("a.py", "short_func", "function", 1);
-    relations.add_symbol_range("a.py", "short_func", 1, 50);
-
-    let mut rule = find_builtin("long-function");
-    rule.enabled = true;
-    let result = run_rule(&rule, &relations).unwrap();
-    assert!(result.is_empty());
-}
-
-#[test]
 fn test_dead_api_fires() {
     let mut relations = Relations::new();
     // Public function defined in a.py, never called from another file
@@ -964,7 +937,7 @@ fn test_new_builtins_parse() {
         "bidirectional-deps",
         "deep-nesting",
         "god-class",
-        "long-function",
+        // long-function was removed from builtins in favor of the configurable native rule
     ] {
         let rule = find_builtin(id);
         assert!(rule.enabled, "{} should be enabled by default", id);

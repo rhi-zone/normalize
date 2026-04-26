@@ -14,6 +14,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Performance
 
+- **JIT compilation re-enabled for Datalog rules** — `ascent-interpreter` upgraded to 0.2.0-alpha.1, which fixes the packed-tuple arity mismatch bug that caused aborts on non-trivial relations. JIT is now active by default in `normalize-facts-rules-interpret` on x86_64; aarch64 continues to use interpreted evaluation.
+
 - **Daemon memory leak fixed** — `WatchedRoot` no longer holds diagnostics or the reverse-dep graph in memory. After each refresh, issues are serialized to JSON and persisted to the `daemon_diagnostics` table in the SQLite index, then immediately dropped from heap. The reverse-dep graph is now derived transiently from the `imports` table on each refresh and discarded after use. `WatchedRoot` now holds only watcher handles and a `primed: bool` flag, reducing steady-state daemon RSS from ~2.3 GB (after 10 days) to near-zero.
 
 - **Batched uncommitted-changes check for stale/missing-summary** — `stale-summary` and `missing-summary` now open the git repository once and collect all changed paths into a `HashSet` before the directory loop, replacing hundreds of per-directory gix calls. Warm pre-commit runs drop from ~2.2 s per rule to ~170 ms.
