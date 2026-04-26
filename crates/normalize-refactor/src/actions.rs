@@ -6,6 +6,8 @@
 use std::path::Path;
 
 use normalize_edit::SymbolLocation;
+use normalize_languages::parsers::parse_with_grammar;
+use normalize_languages::support_for_path;
 
 use crate::{CallerRef, ImportRef, PlannedEdit, RefactoringContext, References};
 
@@ -19,6 +21,98 @@ pub fn locate_symbol(
     name: &str,
 ) -> Option<SymbolLocation> {
     ctx.editor.find_symbol(file, content, name, false)
+}
+
+/// Tree-sitter node `kind` values that count as a leading decoration
+/// (doc comment, attribute, decorator, annotation, pragma) for any language.
+///
+/// Comment kinds are matched separately by substring: any kind containing
+/// `"comment"` is treated as a decoration. Listed here are the non-comment
+/// kinds across the grammars normalize supports.
+const DECORATION_KINDS: &[&str] = &[
+    "attribute_item",       // Rust outer attribute `#[...]`
+    "inner_attribute_item", // Rust inner attribute `#![...]`
+    "meta_item",            // Rust attribute body
+    "attribute",            // C#, generic
+    "attribute_list",       // C#
+    "decorator",            // Python, JS/TS (TypeScript decorators)
+    "decorator_list",       // grouped decorators
+    "annotation",           // Java, Kotlin
+    "marker_annotation",    // Java
+    "modifiers",            // Java/Kotlin annotations live under `modifiers`
+    "pragma",               // C/C++
+    "preproc_call",         // C/C++ preprocessor lines like `#pragma`
+];
+
+fn is_decoration_kind(kind: &str) -> bool {
+    kind.contains("comment") || DECORATION_KINDS.contains(&kind)
+}
+
+/// Walk backward from the symbol's node through preceding named siblings,
+/// collecting decoration nodes (doc comments, attributes, decorators, etc.).
+/// Returns the byte offset of the line-start of the earliest decoration, or
+/// `loc.start_byte` if there are no decorations or no grammar is available.
+///
+/// Classification is by `node.kind()` from the grammar — never by source text.
+pub fn decoration_extended_start(file: &Path, content: &str, loc: &SymbolLocation) -> usize {
+    let fallback = loc.start_byte;
+    let Some(support) = support_for_path(file) else {
+        return fallback;
+    };
+    let grammar = support.grammar_name();
+    let Some(tree) = parse_with_grammar(grammar, content) else {
+        return fallback;
+    };
+
+    let root = tree.root_node();
+    // The symbol's def node — descendant_for_byte_range expects start <= end and
+    // both within the tree. Use the line-start of the symbol as the anchor.
+    let sym_start = loc.start_byte.min(content.len());
+    let sym_end = loc.end_byte.min(content.len()).max(sym_start);
+    let Some(mut node) = root.descendant_for_byte_range(sym_start, sym_end) else {
+        return fallback;
+    };
+
+    // descendant_for_byte_range may return a small inner node (e.g. an identifier)
+    // when the symbol's start byte is line-aligned. Walk up to the outermost
+    // ancestor whose start_byte equals the matched node's start_byte — this is
+    // the def/declaration node we want preceding-sibling info for.
+    while let Some(parent) = node.parent() {
+        if parent.start_byte() == node.start_byte() && parent.id() != root.id() {
+            node = parent;
+        } else {
+            break;
+        }
+    }
+
+    // Walk preceding named siblings while they classify as decorations.
+    let mut earliest_start = node.start_byte();
+    let mut cursor = node;
+    while let Some(prev) = cursor.prev_named_sibling() {
+        if !is_decoration_kind(prev.kind()) {
+            break;
+        }
+        // Only include if the gap between `prev` and the decoration block we've
+        // already accepted is whitespace-only (no intervening code/punctuation).
+        let gap = &content.as_bytes()[prev.end_byte()..earliest_start];
+        if !gap.iter().all(|b| b.is_ascii_whitespace()) {
+            break;
+        }
+        earliest_start = prev.start_byte();
+        cursor = prev;
+    }
+
+    if earliest_start == node.start_byte() {
+        return fallback;
+    }
+
+    // Snap to the start of the line containing earliest_start so we capture
+    // any indentation on that line (consistent with `delete_symbol`'s line
+    // semantics).
+    content[..earliest_start]
+        .rfind('\n')
+        .map(|i| i + 1)
+        .unwrap_or(0)
 }
 
 /// Find all cross-file references to a symbol (callers + importers).
@@ -273,6 +367,113 @@ mod tests {
         let loc = locate_symbol(&ctx, &file, "fn my_func() {}\n", "my_func");
         assert!(loc.is_some());
         assert_eq!(loc.unwrap().name, "my_func");
+    }
+
+    /// Returns true if the named external grammar can be loaded; tests that need
+    /// a grammar should `return` early when this is false to avoid spurious failures
+    /// in environments without `NORMALIZE_GRAMMAR_PATH` configured.
+    fn grammar_available(name: &str) -> bool {
+        normalize_languages::parsers::parser_for(name).is_some()
+    }
+
+    #[test]
+    fn decoration_python_decorator_and_comment() {
+        if !grammar_available("python") {
+            eprintln!("skipping: python grammar not available");
+            return;
+        }
+        let content = "\
+import x
+
+# Leading comment line 1.
+# Leading comment line 2.
+@decorator
+@other_decorator
+def my_func():
+    pass
+";
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("test.py");
+        let editor = normalize_edit::Editor::new();
+        std::fs::write(&file, content).unwrap();
+        let loc = editor
+            .find_symbol(&file, content, "my_func", false)
+            .expect("locate");
+        let start = decoration_extended_start(&file, content, &loc);
+        let slice = &content[start..];
+        assert!(
+            slice.starts_with("# Leading comment line 1.\n"),
+            "expected leading comments + decorators included; got: {:?}",
+            slice
+        );
+        assert!(slice.contains("@decorator\n"));
+        assert!(slice.contains("@other_decorator\n"));
+    }
+
+    #[test]
+    fn decoration_python_no_decoration_returns_original() {
+        if !grammar_available("python") {
+            eprintln!("skipping: python grammar not available");
+            return;
+        }
+        let content = "def alone():\n    pass\n";
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("test.py");
+        std::fs::write(&file, content).unwrap();
+        let editor = normalize_edit::Editor::new();
+        let loc = editor
+            .find_symbol(&file, content, "alone", false)
+            .expect("locate");
+        let start = decoration_extended_start(&file, content, &loc);
+        assert_eq!(start, loc.start_byte);
+    }
+
+    #[test]
+    fn decoration_javascript_decorator() {
+        if !grammar_available("javascript") {
+            eprintln!("skipping: javascript grammar not available");
+            return;
+        }
+        let content = "\
+// Leading comment.
+class Wrapper {
+  @log
+  myMethod() {}
+}
+";
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("test.js");
+        std::fs::write(&file, content).unwrap();
+        let editor = normalize_edit::Editor::new();
+        let loc = editor
+            .find_symbol(&file, content, "myMethod", false)
+            .expect("locate");
+        let start = decoration_extended_start(&file, content, &loc);
+        // The decorator and the line above (whitespace-only indent) must be included.
+        let slice = &content[start..];
+        assert!(
+            slice.trim_start().starts_with("@log"),
+            "expected @log decorator included; got: {:?}",
+            slice
+        );
+    }
+
+    #[test]
+    fn decoration_unsupported_language_falls_back() {
+        // Path with no registered grammar — should return loc.start_byte unchanged.
+        let content = "anything here";
+        let file = std::path::PathBuf::from("test.unknown_ext_xyz");
+        let loc = SymbolLocation {
+            name: "x".to_string(),
+            kind: "function".to_string(),
+            start_byte: 5,
+            end_byte: 10,
+            start_line: 1,
+            end_line: 1,
+            indent: String::new(),
+        };
+        let start = decoration_extended_start(&file, content, &loc);
+        assert_eq!(start, 5);
     }
 
     #[test]

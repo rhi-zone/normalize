@@ -53,8 +53,14 @@ pub async fn plan_move(
         .map_err(|e| format!("Error reading {}: {}", from_rel_path, e))?;
 
     // 1. Locate the symbol in the source.
-    let loc = actions::locate_symbol(ctx, &from_abs, &from_content, symbol_name)
+    let mut loc = actions::locate_symbol(ctx, &from_abs, &from_content, symbol_name)
         .ok_or_else(|| format!("Symbol '{}' not found in {}", symbol_name, from_rel_path))?;
+
+    // Extend the start backward to include leading decorations (doc comments,
+    // attributes, decorators) identified via tree-sitter `node.kind()`. Falls
+    // back to `loc.start_byte` for languages without a grammar.
+    let extended_start = actions::decoration_extended_start(&from_abs, &from_content, &loc);
+    loc.start_byte = extended_start;
 
     // 2. Extract definition text (whole-line span of the symbol).
     let line_start = from_content[..loc.start_byte]
@@ -387,6 +393,83 @@ mod tests {
         let target = Path::new("a/b/c.ts");
         let base = Path::new("a/b");
         assert_eq!(pathdiff(target, base).unwrap(), PathBuf::from("./c.ts"));
+    }
+
+    #[tokio::test]
+    async fn plan_move_includes_python_decorator_and_comment() {
+        if normalize_languages::parsers::parser_for("python").is_none() {
+            eprintln!("skipping: python grammar not available");
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let from_path = dir.path().join("src.py");
+        let to_path = dir.path().join("dest.py");
+        let from_content = "\
+import os
+
+# Important note about my_func.
+@decorator
+def my_func():
+    return 1
+
+def other():
+    return 2
+";
+        std::fs::write(&from_path, from_content).unwrap();
+        std::fs::write(&to_path, "").unwrap();
+
+        let ctx = RefactoringContext {
+            root: dir.path().to_path_buf(),
+            editor: normalize_edit::Editor::new(),
+            index: None,
+            loader: normalize_languages::GrammarLoader::new(),
+        };
+
+        let outcome = plan_move(&ctx, "src.py", "dest.py", "my_func", false)
+            .await
+            .expect("plan_move");
+
+        // The destination file edit should contain the leading comment and decorator.
+        let dest_edit = outcome
+            .plan
+            .edits
+            .iter()
+            .find(|e| e.file == to_path)
+            .expect("dest edit");
+        assert!(
+            dest_edit
+                .new_content
+                .contains("# Important note about my_func."),
+            "dest missing leading comment; got: {:?}",
+            dest_edit.new_content
+        );
+        assert!(
+            dest_edit.new_content.contains("@decorator"),
+            "dest missing decorator; got: {:?}",
+            dest_edit.new_content
+        );
+
+        // The source file edit should have removed the comment and decorator.
+        let src_edit = outcome
+            .plan
+            .edits
+            .iter()
+            .find(|e| e.file == from_path)
+            .expect("src edit");
+        assert!(
+            !src_edit.new_content.contains("@decorator"),
+            "src still contains decorator; got: {:?}",
+            src_edit.new_content
+        );
+        assert!(
+            !src_edit
+                .new_content
+                .contains("# Important note about my_func."),
+            "src still contains leading comment; got: {:?}",
+            src_edit.new_content
+        );
+        // `other` should remain.
+        assert!(src_edit.new_content.contains("def other():"));
     }
 
     #[test]
