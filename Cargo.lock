@@ -5177,6 +5177,7 @@ dependencies = [
  "nucleo-matcher",
  "rayon",
  "regex",
+ "rkyv",
  "rmcp",
  "schemars",
  "serde",
@@ -5641,6 +5642,7 @@ version = "0.2.0"
 dependencies = [
  "normalize-core",
  "nu-ansi-term",
+ "rkyv",
  "schemars",
  "serde",
  "serde_json",
@@ -5731,6 +5733,7 @@ dependencies = [
  "normalize-rules-config",
  "normalize-syntax-rules",
  "nu-ansi-term",
+ "rkyv",
  "schemars",
  "serde",
  "serde_json",

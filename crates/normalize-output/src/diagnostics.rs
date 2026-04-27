@@ -20,7 +20,11 @@ use serde::{Deserialize, Serialize};
     Serialize,
     Deserialize,
     schemars::JsonSchema,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
 )]
+#[rkyv(derive(Debug))]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
     Hint,
@@ -72,7 +76,17 @@ impl Severity {
 }
 
 /// A secondary location related to an issue (e.g., the other file in a circular dep).
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+)]
+#[rkyv(derive(Debug))]
 pub struct RelatedLocation {
     pub file: String,
     pub line: Option<usize>,
@@ -80,7 +94,17 @@ pub struct RelatedLocation {
 }
 
 /// A single diagnostic issue found during a check.
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+)]
+#[rkyv(derive(Debug))]
 pub struct Issue {
     pub file: String,
     pub line: Option<usize>,

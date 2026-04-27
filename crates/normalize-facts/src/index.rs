@@ -75,7 +75,7 @@ struct CachedFileData {
 }
 
 // Not yet public - just delete .normalize/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 8;
+const SCHEMA_VERSION: i64 = 9;
 
 /// Bump when extraction logic changes to invalidate cached results.
 /// Bumped to "2" (2026-04-27): purge CA cache entries that may have been poisoned
@@ -560,7 +560,7 @@ impl FileIndex {
         conn.execute(
             "CREATE TABLE IF NOT EXISTS daemon_diagnostics (
                 engine TEXT PRIMARY KEY,
-                issues_json TEXT NOT NULL,
+                issues_blob BLOB NOT NULL,
                 updated_at INTEGER NOT NULL
             )",
             (),
@@ -2951,12 +2951,12 @@ impl FileIndex {
     // Diagnostics cache (daemon use only)
     // -------------------------------------------------------------------------
 
-    /// Persist serialized diagnostics JSON for one engine ("syntax", "fact", "native").
+    /// Persist rkyv-serialized diagnostics blob for one engine ("syntax", "fact", "native", "all").
     /// Replaces any previous value for that engine.
-    pub async fn save_diagnostics_json(
+    pub async fn save_diagnostics_blob(
         &self,
         engine: &str,
-        issues_json: &str,
+        blob: &[u8],
     ) -> Result<(), libsql::Error> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -2964,24 +2964,24 @@ impl FileIndex {
             .as_secs() as i64;
         self.conn
             .execute(
-                "INSERT OR REPLACE INTO daemon_diagnostics (engine, issues_json, updated_at)
+                "INSERT OR REPLACE INTO daemon_diagnostics (engine, issues_blob, updated_at)
                  VALUES (?1, ?2, ?3)",
-                params![engine.to_string(), issues_json.to_string(), now],
+                params![engine.to_string(), blob.to_vec(), now],
             )
             .await?;
         Ok(())
     }
 
-    /// Load serialized diagnostics JSON for one engine.
+    /// Load rkyv-serialized diagnostics blob for one engine.
     /// Returns `None` if no data has been saved for that engine yet.
-    pub async fn load_diagnostics_json(
+    pub async fn load_diagnostics_blob(
         &self,
         engine: &str,
-    ) -> Result<Option<String>, libsql::Error> {
+    ) -> Result<Option<Vec<u8>>, libsql::Error> {
         let mut rows = self
             .conn
             .query(
-                "SELECT issues_json FROM daemon_diagnostics WHERE engine = ?1",
+                "SELECT issues_blob FROM daemon_diagnostics WHERE engine = ?1",
                 params![engine.to_string()],
             )
             .await?;

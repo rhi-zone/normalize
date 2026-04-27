@@ -149,7 +149,7 @@ mod unix_impl {
     use std::sync::mpsc::{Sender, channel};
     use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant};
-    use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+    use tokio::io::{AsyncBufReadExt, AsyncReadExt};
     use tokio::net::UnixListener;
     use tokio::sync::broadcast;
 
@@ -247,6 +247,14 @@ mod unix_impl {
         /// Single shared file watcher for all roots. Consolidating onto one watcher
         /// saves ~3 OS threads per root vs the previous per-root pair of watchers.
         watcher: Mutex<RecommendedWatcher>,
+    }
+
+    /// Response type for binary rkyv IPC.
+    enum RawResponse {
+        /// Serialized rkyv payload.
+        Frame(Vec<u8>),
+        /// Error message (returned as JSON error frame to client).
+        Error(String),
     }
 
     impl DaemonServer {
@@ -462,12 +470,14 @@ mod unix_impl {
             let mut issues: Vec<normalize_output::diagnostics::Issue> = Vec::new();
             for eng in engines_to_load {
                 match tokio::task::block_in_place(|| {
-                    self.runtime_handle.block_on(idx.load_diagnostics_json(eng))
+                    self.runtime_handle.block_on(idx.load_diagnostics_blob(eng))
                 }) {
-                    Ok(Some(json)) => {
-                        match serde_json::from_str::<Vec<normalize_output::diagnostics::Issue>>(
-                            &json,
-                        ) {
+                    Ok(Some(blob)) => {
+                        match rkyv::from_bytes::<
+                            Vec<normalize_output::diagnostics::Issue>,
+                            rkyv::rancor::Error,
+                        >(&blob)
+                        {
                             Ok(eng_issues) => issues.extend(eng_issues),
                             Err(e) => {
                                 tracing::warn!(
@@ -496,6 +506,102 @@ mod unix_impl {
             match serde_json::to_value(&issues) {
                 Ok(v) => Response::ok(serde_json::json!({ "issues": v })),
                 Err(e) => Response::err(&format!("failed to serialize issues: {}", e)),
+            }
+        }
+
+        /// Binary rkyv variant of `run_rules`.  Returns a raw `RawResponse` rather
+        /// than a JSON `Response` so the socket handler can write a binary frame.
+        fn run_rules_raw(
+            &self,
+            root: PathBuf,
+            filter_ids: Option<Vec<String>>,
+            filter_rule: Option<String>,
+            engine: Option<String>,
+        ) -> RawResponse {
+            let needs_prime = {
+                let roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+                match roots.get(&root) {
+                    Some(w) => !w.primed,
+                    None => return RawResponse::Error("root not watched".into()),
+                }
+            };
+
+            if needs_prime {
+                self.prime_diagnostics_cache(&root);
+            }
+
+            let idx = match tokio::task::block_in_place(|| {
+                self.runtime_handle.block_on(crate::index::open(&root))
+            }) {
+                Ok(idx) => idx,
+                Err(e) => return RawResponse::Error(format!("failed to open index: {e}")),
+            };
+
+            // Fast path: no filter and no engine filter → serve "all" blob directly.
+            if filter_ids.is_none() && filter_rule.is_none() && engine.is_none() {
+                match tokio::task::block_in_place(|| {
+                    self.runtime_handle
+                        .block_on(idx.load_diagnostics_blob("all"))
+                }) {
+                    Ok(Some(blob)) => return RawResponse::Frame(blob),
+                    Ok(None) => return RawResponse::Error("not primed".into()),
+                    Err(e) => {
+                        return RawResponse::Error(format!("failed to load diagnostics: {e}"));
+                    }
+                }
+            }
+
+            // Slow path: filter or engine-specific → load appropriate blobs, filter, re-serialize.
+            let include_syntax = engine.as_deref().is_none() || engine.as_deref() == Some("syntax");
+            let include_fact = engine.as_deref().is_none() || engine.as_deref() == Some("fact");
+            let include_native = engine.as_deref().is_none() || engine.as_deref() == Some("native");
+
+            let engines_to_load: Vec<&str> = [
+                include_syntax.then_some("syntax"),
+                include_fact.then_some("fact"),
+                include_native.then_some("native"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
+
+            let mut issues: Vec<normalize_output::diagnostics::Issue> = Vec::new();
+            for eng in engines_to_load {
+                match tokio::task::block_in_place(|| {
+                    self.runtime_handle.block_on(idx.load_diagnostics_blob(eng))
+                }) {
+                    Ok(Some(blob)) => {
+                        match rkyv::from_bytes::<
+                            Vec<normalize_output::diagnostics::Issue>,
+                            rkyv::rancor::Error,
+                        >(&blob)
+                        {
+                            Ok(eng_issues) => issues.extend(eng_issues),
+                            Err(e) => {
+                                tracing::warn!(engine = eng, "failed to deserialize blob: {}", e)
+                            }
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        tracing::warn!(engine = eng, "failed to load diagnostics blob: {}", e)
+                    }
+                }
+            }
+
+            // Apply filters.
+            let filter_ids_set: Option<std::collections::HashSet<String>> =
+                filter_ids.map(|ids| ids.into_iter().collect());
+            if let Some(ref ids) = filter_ids_set {
+                issues.retain(|i| ids.contains(&i.rule_id));
+            }
+            if let Some(ref rule) = filter_rule {
+                issues.retain(|i| i.rule_id == rule.as_str());
+            }
+
+            match rkyv::to_bytes::<rkyv::rancor::Error>(&issues) {
+                Ok(b) => RawResponse::Frame(b.to_vec()),
+                Err(e) => RawResponse::Error(format!("failed to serialize filtered issues: {e}")),
             }
         }
 
@@ -595,6 +701,8 @@ mod unix_impl {
             self.save_diagnostics_to_index(root, "syntax", &syntax_issues);
             self.save_diagnostics_to_index(root, "fact", &fact_issues);
             self.save_diagnostics_to_index(root, "native", &native_issues);
+            // Build "all" combined blob for fast no-filter hot path.
+            self.save_all_blob(root, &syntax_issues, &fact_issues, &native_issues);
             drop(syntax_issues);
             drop(fact_issues);
             drop(native_issues);
@@ -605,7 +713,7 @@ mod unix_impl {
             }
         }
 
-        /// Serialize issues to JSON and write them to the `daemon_diagnostics` table.
+        /// Serialize issues to rkyv and write them to the `daemon_diagnostics` table.
         /// Failures are logged as warnings; they do not abort the refresh.
         fn save_diagnostics_to_index(
             &self,
@@ -613,10 +721,11 @@ mod unix_impl {
             engine: &str,
             issues: &[normalize_output::diagnostics::Issue],
         ) {
-            let json = match serde_json::to_string(issues) {
-                Ok(j) => j,
+            let issues_vec: Vec<normalize_output::diagnostics::Issue> = issues.to_vec();
+            let blob = match rkyv::to_bytes::<rkyv::rancor::Error>(&issues_vec) {
+                Ok(b) => b,
                 Err(e) => {
-                    tracing::warn!(engine, "failed to serialize diagnostics: {}", e);
+                    tracing::warn!(engine, "failed to serialize diagnostics to rkyv: {}", e);
                     return;
                 }
             };
@@ -631,10 +740,54 @@ mod unix_impl {
             };
             if let Err(e) = tokio::task::block_in_place(|| {
                 self.runtime_handle
-                    .block_on(idx.save_diagnostics_json(engine, &json))
+                    .block_on(idx.save_diagnostics_blob(engine, &blob))
             }) {
                 tracing::warn!(engine, "failed to write diagnostics to SQLite: {}", e);
             }
+        }
+
+        /// Build the combined "all" blob from three engine slices and persist it.
+        fn save_all_blob(
+            &self,
+            root: &Path,
+            syntax: &[normalize_output::diagnostics::Issue],
+            fact: &[normalize_output::diagnostics::Issue],
+            native: &[normalize_output::diagnostics::Issue],
+        ) {
+            let mut all: Vec<normalize_output::diagnostics::Issue> =
+                Vec::with_capacity(syntax.len() + fact.len() + native.len());
+            all.extend_from_slice(syntax);
+            all.extend_from_slice(fact);
+            all.extend_from_slice(native);
+            self.save_diagnostics_to_index(root, "all", &all);
+        }
+
+        /// Reload the three per-engine blobs from SQLite, merge them, and
+        /// re-persist the "all" blob.  Used when only one engine is refreshed
+        /// (e.g. `refresh_native_rules`) so the "all" blob stays coherent.
+        fn rebuild_all_blob(&self, root: &Path) {
+            let idx = match tokio::task::block_in_place(|| {
+                self.runtime_handle.block_on(crate::index::open(root))
+            }) {
+                Ok(idx) => idx,
+                Err(e) => {
+                    tracing::warn!("failed to open index to rebuild all blob: {}", e);
+                    return;
+                }
+            };
+            let mut all: Vec<normalize_output::diagnostics::Issue> = Vec::new();
+            for eng in &["syntax", "fact", "native"] {
+                if let Ok(Some(blob)) = tokio::task::block_in_place(|| {
+                    self.runtime_handle.block_on(idx.load_diagnostics_blob(eng))
+                }) && let Ok(issues) = rkyv::from_bytes::<
+                    Vec<normalize_output::diagnostics::Issue>,
+                    rkyv::rancor::Error,
+                >(&blob)
+                {
+                    all.extend(issues);
+                }
+            }
+            self.save_diagnostics_to_index(root, "all", &all);
         }
 
         /// Run all native rules and return unified Issues.
@@ -901,10 +1054,14 @@ mod unix_impl {
                                 let mut merged: Vec<normalize_output::diagnostics::Issue> =
                                     match self
                                         .runtime_handle
-                                        .block_on(idx.load_diagnostics_json("syntax"))
+                                        .block_on(idx.load_diagnostics_blob("syntax"))
                                     {
-                                        Ok(Some(json)) => {
-                                            serde_json::from_str(&json).unwrap_or_default()
+                                        Ok(Some(blob)) => {
+                                            rkyv::from_bytes::<
+                                                Vec<normalize_output::diagnostics::Issue>,
+                                                rkyv::rancor::Error,
+                                            >(&blob)
+                                            .unwrap_or_default()
                                         }
                                         _ => Vec::new(),
                                     };
@@ -946,6 +1103,8 @@ mod unix_impl {
                             self.save_diagnostics_to_index(root, "syntax", &syntax_issues);
                             self.save_diagnostics_to_index(root, "fact", &fact_issues);
                             self.save_diagnostics_to_index(root, "native", &native_issues);
+                            // Build "all" combined blob for fast no-filter hot path.
+                            self.save_all_blob(root, &syntax_issues, &fact_issues, &native_issues);
                             drop(syntax_issues);
                             drop(fact_issues);
                             drop(native_issues);
@@ -1017,6 +1176,8 @@ mod unix_impl {
             // Persist to SQLite and drop immediately.
             self.save_diagnostics_to_index(root, "native", &new_native_issues);
             drop(new_native_issues);
+            // Rebuild "all" blob from existing per-engine blobs.
+            self.rebuild_all_blob(root);
         }
     }
 
@@ -1172,69 +1333,144 @@ mod unix_impl {
             tokio::spawn(async move {
                 let (reader, mut writer) = stream.into_split();
                 let mut reader = tokio::io::BufReader::new(reader);
+
+                // Detect protocol by peeking at the first byte.
+                // 0x01 (SOH) = rkyv binary mode; anything else = JSON mode.
+                let mut first = [0u8; 1];
+                if reader.read_exact(&mut first).await.is_err() {
+                    return;
+                }
+
+                if first[0] == 0x01 {
+                    handle_rkyv_connection(&server, &mut reader, &mut writer).await;
+                    return;
+                }
+
+                // JSON mode: reconstruct the first line from the already-read byte.
                 let mut line = String::new();
+                if first[0] != b'\n' {
+                    line.push(first[0] as char);
+                    // Read the rest of the first line.
+                    reader.read_line(&mut line).await.unwrap_or(0);
+                }
+                if !line.trim().is_empty() {
+                    handle_json_line(&server, &line, &mut writer).await;
+                }
+                line.clear();
 
                 while reader.read_line(&mut line).await.unwrap_or(0) > 0 {
-                    match serde_json::from_str::<Request>(&line) {
-                        Ok(Request::Shutdown) => {
-                            let resp = server.handle_request(Request::Shutdown);
-                            // normalize-syntax-allow: rust/unwrap-in-impl - Response is always JSON-serializable
-                            let resp_str = serde_json::to_string(&resp).unwrap();
-                            let _ = writer.write_all(resp_str.as_bytes()).await;
-                            let _ = writer.write_all(b"\n").await;
-                            std::process::exit(0);
-                        }
-                        Ok(Request::Subscribe { root }) => {
-                            // Ensure the root is being watched (add if not already).
-                            if let Some(r) = root {
-                                server.add_root(r);
-                            }
-                            // Subscribe to the broadcast channel and stream events
-                            // until the client disconnects or the daemon shuts down.
-                            let mut rx = server.event_tx.subscribe();
-                            loop {
-                                match rx.recv().await {
-                                    Ok(event) => {
-                                        // normalize-syntax-allow: rust/unwrap-in-impl - Event is always JSON-serializable
-                                        let json = serde_json::to_string(&event).unwrap();
-                                        if writer.write_all(json.as_bytes()).await.is_err()
-                                            || writer.write_all(b"\n").await.is_err()
-                                        {
-                                            // Client disconnected
-                                            return;
-                                        }
-                                    }
-                                    Err(broadcast::error::RecvError::Lagged(n)) => {
-                                        // Subscriber fell behind -- log and continue.
-                                        eprintln!("Subscriber lagged, dropped {} events", n);
-                                    }
-                                    Err(broadcast::error::RecvError::Closed) => {
-                                        // Daemon is shutting down
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-                        Ok(req) => {
-                            let response = server.handle_request(req);
-                            // normalize-syntax-allow: rust/unwrap-in-impl - Response is always JSON-serializable
-                            let resp_str = serde_json::to_string(&response).unwrap();
-                            let _ = writer.write_all(resp_str.as_bytes()).await;
-                            let _ = writer.write_all(b"\n").await;
-                        }
-                        Err(e) => {
-                            let response = Response::err(&format!("Invalid request: {}", e));
-                            // normalize-syntax-allow: rust/unwrap-in-impl - Response is always JSON-serializable
-                            let resp_str = serde_json::to_string(&response).unwrap();
-                            let _ = writer.write_all(resp_str.as_bytes()).await;
-                            let _ = writer.write_all(b"\n").await;
-                        }
-                    };
-
+                    if !line.trim().is_empty() {
+                        handle_json_line(&server, &line, &mut writer).await;
+                    }
                     line.clear();
                 }
             });
         }
+    }
+
+    /// Handle one JSON request line in the legacy JSON IPC protocol.
+    async fn handle_json_line(
+        server: &Arc<DaemonServer>,
+        line: &str,
+        writer: &mut tokio::net::unix::OwnedWriteHalf,
+    ) {
+        use tokio::io::AsyncWriteExt;
+        match serde_json::from_str::<Request>(line) {
+            Ok(Request::Shutdown) => {
+                let resp = server.handle_request(Request::Shutdown);
+                // normalize-syntax-allow: rust/unwrap-in-impl - Response is always JSON-serializable
+                let resp_str = serde_json::to_string(&resp).unwrap();
+                let _ = writer.write_all(resp_str.as_bytes()).await;
+                let _ = writer.write_all(b"\n").await;
+                std::process::exit(0);
+            }
+            Ok(Request::Subscribe { root }) => {
+                // Ensure the root is being watched (add if not already).
+                if let Some(r) = root {
+                    server.add_root(r);
+                }
+                // Subscribe to the broadcast channel and stream events
+                // until the client disconnects or the daemon shuts down.
+                let mut rx = server.event_tx.subscribe();
+                loop {
+                    match rx.recv().await {
+                        Ok(event) => {
+                            // normalize-syntax-allow: rust/unwrap-in-impl - Event is always JSON-serializable
+                            let json = serde_json::to_string(&event).unwrap();
+                            if writer.write_all(json.as_bytes()).await.is_err()
+                                || writer.write_all(b"\n").await.is_err()
+                            {
+                                // Client disconnected
+                                return;
+                            }
+                        }
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            // Subscriber fell behind -- log and continue.
+                            eprintln!("Subscriber lagged, dropped {} events", n);
+                        }
+                        Err(broadcast::error::RecvError::Closed) => {
+                            // Daemon is shutting down
+                            return;
+                        }
+                    }
+                }
+            }
+            Ok(req) => {
+                let response = server.handle_request(req);
+                // normalize-syntax-allow: rust/unwrap-in-impl - Response is always JSON-serializable
+                let resp_str = serde_json::to_string(&response).unwrap();
+                let _ = writer.write_all(resp_str.as_bytes()).await;
+                let _ = writer.write_all(b"\n").await;
+            }
+            Err(e) => {
+                let response = Response::err(&format!("Invalid request: {}", e));
+                // normalize-syntax-allow: rust/unwrap-in-impl - Response is always JSON-serializable
+                let resp_str = serde_json::to_string(&response).unwrap();
+                let _ = writer.write_all(resp_str.as_bytes()).await;
+                let _ = writer.write_all(b"\n").await;
+            }
+        }
+    }
+
+    /// Handle one connection in rkyv binary IPC mode.
+    ///
+    /// Protocol: client sends `[0x01][json_request_bytes][\n]` (magic byte already
+    /// consumed by the caller).  Daemon responds with `[type_byte][4-byte LE len][payload]`
+    /// where `type_byte` is `0x01` (rkyv payload) or `0x00` (JSON error string).
+    async fn handle_rkyv_connection(
+        server: &Arc<DaemonServer>,
+        reader: &mut tokio::io::BufReader<tokio::net::unix::OwnedReadHalf>,
+        writer: &mut tokio::net::unix::OwnedWriteHalf,
+    ) {
+        use tokio::io::AsyncWriteExt;
+
+        let mut line = String::new();
+        if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+            return;
+        }
+
+        // Parse JSON request (same schema as the JSON protocol).
+        let raw_response = match serde_json::from_str::<Request>(&line) {
+            Ok(Request::RunRules {
+                root,
+                filter_ids,
+                filter_rule,
+                engine,
+            }) => server.run_rules_raw(root, filter_ids, filter_rule, engine),
+            Ok(_) => RawResponse::Error("rkyv mode only supports run_rules".into()),
+            Err(e) => RawResponse::Error(format!("invalid request: {e}")),
+        };
+
+        let (type_byte, payload): (u8, Vec<u8>) = match raw_response {
+            RawResponse::Frame(b) => (0x01, b),
+            RawResponse::Error(msg) => (0x00, msg.into_bytes()),
+        };
+
+        let _ = writer.write_all(&[type_byte]).await;
+        let _ = writer
+            .write_all(&(payload.len() as u32).to_le_bytes())
+            .await;
+        let _ = writer.write_all(&payload).await;
     }
 
     /// Client for communicating with the global daemon.

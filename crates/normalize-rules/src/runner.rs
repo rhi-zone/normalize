@@ -1466,7 +1466,7 @@ pub fn try_rules_via_daemon(
     filter_rule: Option<&str>,
     engine: Option<&str>,
 ) -> Option<Vec<normalize_output::diagnostics::Issue>> {
-    use std::io::{BufRead, BufReader, Write};
+    use std::io::{Read, Write};
     use std::os::unix::net::UnixStream;
     use std::time::Duration;
 
@@ -1498,26 +1498,37 @@ pub fn try_rules_via_daemon(
         "engine": engine,
     });
     let json = serde_json::to_string(&request).ok()?;
+
+    // Send rkyv-mode request: magic byte + JSON body + newline.
+    stream.write_all(&[0x01]).ok()?;
     stream.write_all(json.as_bytes()).ok()?;
     stream.write_all(b"\n").ok()?;
 
-    let mut reader = BufReader::new(&stream);
-    let mut line = String::new();
-    reader.read_line(&mut line).ok()?;
-
-    let resp: serde_json::Value = serde_json::from_str(&line).ok()?;
-    if !resp.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+    // Read binary frame header: [type_byte(1)][len(4 LE)]
+    let mut hdr = [0u8; 5];
+    stream.read_exact(&mut hdr).ok()?;
+    if hdr[0] != 0x01 {
+        // Error frame — daemon returned an error message.
         return None;
     }
+    let len = u32::from_le_bytes([hdr[1], hdr[2], hdr[3], hdr[4]]) as usize;
 
-    let issues: Vec<normalize_output::diagnostics::Issue> =
-        serde_json::from_value(resp["data"]["issues"].clone()).ok()?;
+    // Read payload into AlignedVec for rkyv (alignment requirement).
+    let mut aligned = rkyv::util::AlignedVec::<16>::with_capacity(len);
+    aligned.resize(len, 0);
+    stream.read_exact(&mut aligned[..]).ok()?;
+
+    let issues =
+        rkyv::from_bytes::<Vec<normalize_output::diagnostics::Issue>, rkyv::rancor::Error>(
+            &aligned,
+        )
+        .ok()?;
 
     tracing::info!(
         root = ?root,
         issues = issues.len(),
         engine = ?engine,
-        "rules served from daemon cache"
+        "rules served from daemon cache (rkyv binary)"
     );
     Some(issues)
 }

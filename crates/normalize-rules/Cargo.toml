@@ -14,6 +14,7 @@ cli = ["dep:server-less"]
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
+rkyv = { workspace = true }
 tokio = { workspace = true }
 server-less = { workspace = true, optional = true }
 normalize-core = { path = "../normalize-core", version = "0.2.0" }
