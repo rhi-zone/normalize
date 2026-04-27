@@ -26,7 +26,7 @@ fn fallback_parse_symbol(
     };
 
     let parser = crate::symbols::SymbolParser::new();
-    let symbols = parser.parse_file(&full_path, &content);
+    let symbols = parser.parse_file(&full_path, &content).unwrap_or_default();
     symbols
         .into_iter()
         .filter(|s| {

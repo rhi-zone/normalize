@@ -112,7 +112,7 @@ fn extract_symbols_json(project_dir: &Path) -> Value {
 
     for path in collect_source_files(project_dir) {
         let content = std::fs::read_to_string(&path).unwrap_or_default();
-        let symbols = parser.parse_file(&path, &content);
+        let symbols = parser.parse_file(&path, &content).unwrap_or_default();
         let rel = path.strip_prefix(project_dir).unwrap().to_slash_lossy();
         for sym in symbols {
             rows.push(json!({

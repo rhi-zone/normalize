@@ -6,8 +6,31 @@ pub use normalize_facts_core::IndexedFile;
 use normalize_facts_core::{FlatImport, FlatSymbol, TypeRef};
 use normalize_languages::support_for_path;
 use rayon::prelude::*;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Tracks which grammar names have already triggered an "unavailable" warning so we
+/// only log once per grammar per process lifetime.
+static WARNED_GRAMMARS: std::sync::OnceLock<Mutex<HashSet<String>>> = std::sync::OnceLock::new();
+
+/// Emit a `tracing::warn!` for a missing grammar, but only the first time.
+/// Returns `true` if the warning was newly emitted, `false` if already seen.
+fn warn_grammar_unavailable_once(grammar: &str) -> bool {
+    let warned = WARNED_GRAMMARS.get_or_init(|| Mutex::new(HashSet::new()));
+    let mut set = warned.lock().unwrap_or_else(|e| e.into_inner());
+    if set.insert(grammar.to_string()) {
+        tracing::warn!(
+            grammar,
+            "normalize-facts: grammar .so not loaded — files of this type will be skipped \
+             until the grammar is available (run `normalize grammars install` to install it)"
+        );
+        true
+    } else {
+        false
+    }
+}
 
 /// A parsed symbol ready for database insertion.
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -2097,7 +2120,16 @@ impl FileIndex {
 
                 // Each thread creates its own parser
                 let mut parser = SymbolParser::new();
-                let symbols = parser.parse_file(&full_path, &content);
+
+                // parse_file returns None when the grammar .so is unavailable.
+                // In that case, skip the file entirely — don't index it as empty.
+                let symbols = match parser.parse_file(&full_path, &content) {
+                    Some(s) => s,
+                    None => {
+                        warn_grammar_unavailable_once(&grammar);
+                        return None;
+                    }
+                };
 
                 let mut sym_data = Vec::with_capacity(symbols.len());
                 let mut call_data = Vec::new();
@@ -2164,11 +2196,9 @@ impl FileIndex {
                 let type_refs = parser.find_type_refs(&full_path, &content);
 
                 // Store result in CA cache (best-effort).
-                // Only cache when the grammar is actually loaded — if the grammar .so is
-                // absent, parse_file returns empty results that must NOT be cached or they
-                // will poison the cache for future runs when the grammar is available.
+                // Grammar availability is already guaranteed above (parse_file returned Some),
+                // so empty results here are legitimate and safe to cache.
                 if !grammar.is_empty()
-                    && normalize_languages::parsers::parser_for(&grammar).is_some()
                     && let Some(ca) = &ca_cache_for_rayon
                 {
                     let cached = CachedFileData {
@@ -2405,7 +2435,16 @@ impl FileIndex {
             } else {
                 let content = String::from_utf8_lossy(&bytes).into_owned();
 
-                let symbols = parser.parse_file(&full_path, &content);
+                // parse_file returns None when the grammar .so is unavailable.
+                // Skip the file entirely — don't index it as empty.
+                let symbols = match parser.parse_file(&full_path, &content) {
+                    Some(s) => s,
+                    None => {
+                        warn_grammar_unavailable_once(&grammar);
+                        continue;
+                    }
+                };
+
                 let mut sym_data = Vec::with_capacity(symbols.len());
                 let mut call_data_local: Vec<CallEntry> = Vec::new();
 
@@ -2441,9 +2480,9 @@ impl FileIndex {
                 let type_refs = parser.find_type_refs(&full_path, &content);
 
                 // Store in CA cache (best-effort).
-                // Only cache when the grammar is actually loaded to prevent poisoning.
+                // Grammar availability is already guaranteed above (parse_file returned Some),
+                // so empty results here are legitimate and safe to cache.
                 if !grammar.is_empty()
-                    && normalize_languages::parsers::parser_for(&grammar).is_some()
                     && let Some(ca) = &self.ca_cache
                 {
                     let cached_store = CachedFileData {

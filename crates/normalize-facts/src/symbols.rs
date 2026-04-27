@@ -29,9 +29,25 @@ impl SymbolParser {
         }
     }
 
-    pub fn parse_file(&self, path: &Path, content: &str) -> Vec<FlatSymbol> {
-        if support_for_path(path).is_none() {
-            return Vec::new();
+    /// Parse symbols from a file.
+    ///
+    /// Returns `None` when the language is recognized but the grammar shared library
+    /// could not be loaded (grammar unavailable at runtime). This is distinct from
+    /// returning `Some(vec![])` which means the grammar loaded successfully but the
+    /// file contains no indexable symbols.
+    ///
+    /// Returns `Some(vec![])` (empty) for files whose language is not recognized.
+    pub fn parse_file(&self, path: &Path, content: &str) -> Option<Vec<FlatSymbol>> {
+        let support = match support_for_path(path) {
+            Some(s) => s,
+            None => return Some(Vec::new()), // unknown language → skip silently
+        };
+
+        // Check that the grammar .so is actually loadable before attempting extraction.
+        // If not, return None so callers can warn and skip rather than caching empty results.
+        let loader = normalize_languages::parsers::grammar_loader();
+        if loader.get(support.grammar_name()).is_err() {
+            return None; // grammar known but .so unavailable
         }
 
         // Use shared extractor for symbol extraction
@@ -42,7 +58,7 @@ impl SymbolParser {
         for sym in &result.symbols {
             Self::flatten_symbol(sym, None, &mut symbols);
         }
-        symbols
+        Some(symbols)
     }
 
     /// Flatten a nested symbol into the flat list with parent references
@@ -222,7 +238,7 @@ impl SymbolParser {
 
     /// Find a symbol by name in a file
     pub fn find_symbol(&mut self, path: &Path, content: &str, name: &str) -> Option<FlatSymbol> {
-        let symbols = self.parse_file(path, content);
+        let symbols = self.parse_file(path, content)?;
         symbols.into_iter().find(|s| s.name == name)
     }
 
@@ -3086,7 +3102,10 @@ impl SymbolParser {
                 Err(_) => continue,
             };
 
-            let symbols = self.parse_file(&full_path, &content);
+            let symbols = match self.parse_file(&full_path, &content) {
+                Some(s) => s,
+                None => continue, // grammar unavailable — caller logged elsewhere
+            };
             for symbol in symbols {
                 let callees = self.find_callees_for_symbol(&full_path, &content, &symbol);
                 // Check if any callee matches, considering qualifiers
@@ -3132,7 +3151,9 @@ def foo():
 def bar(x):
     return x
 "#;
-        let symbols = parser.parse_file(&PathBuf::from("test.py"), content);
+        let symbols = parser
+            .parse_file(&PathBuf::from("test.py"), content)
+            .unwrap();
         assert_eq!(symbols.len(), 2);
         assert_eq!(symbols[0].name, "foo");
         assert_eq!(symbols[0].kind, SymbolKind::Function);
@@ -3147,7 +3168,9 @@ class Foo:
     def method(self):
         pass
 "#;
-        let symbols = parser.parse_file(&PathBuf::from("test.py"), content);
+        let symbols = parser
+            .parse_file(&PathBuf::from("test.py"), content)
+            .unwrap();
         assert_eq!(symbols.len(), 2);
         assert_eq!(symbols[0].name, "Foo");
         assert_eq!(symbols[0].kind, SymbolKind::Class);
@@ -3166,7 +3189,9 @@ fn bar(x: i32) -> i32 {
     x
 }
 "#;
-        let symbols = parser.parse_file(&PathBuf::from("test.rs"), content);
+        let symbols = parser
+            .parse_file(&PathBuf::from("test.rs"), content)
+            .unwrap();
         assert_eq!(symbols.len(), 2);
         assert_eq!(symbols[0].name, "foo");
         assert_eq!(symbols[0].kind, SymbolKind::Function);

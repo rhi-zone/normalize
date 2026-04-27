@@ -200,7 +200,7 @@ fn add_symbol_context(matches: &mut [GrepMatch], root: &Path) {
             Err(_) => continue,
         };
 
-        let symbols = parser.parse_file(&path, &content);
+        let symbols = parser.parse_file(&path, &content).unwrap_or_default();
         if symbols.is_empty() {
             continue;
         }

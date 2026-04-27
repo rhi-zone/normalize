@@ -408,7 +408,7 @@ fn extract_call_edges(
     use normalize_facts::SymbolParser;
     use normalize_facts_core::SymbolKind;
     let mut parser = SymbolParser::new();
-    let symbols = parser.parse_file(abs_path, content);
+    let symbols = parser.parse_file(abs_path, content).unwrap_or_default();
     let mut edges = Vec::new();
     for sym in &symbols {
         if sym.kind != SymbolKind::Function && sym.kind != SymbolKind::Method {

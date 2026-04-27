@@ -180,7 +180,7 @@ pub fn build_view_filtered_service(
             .to_string_lossy()
             .to_string();
 
-        let syms = parser.parse_file(&file_path, &content);
+        let syms = parser.parse_file(&file_path, &content).unwrap_or_default();
         for sym in syms {
             let sym_kind = sym.kind.as_str();
             if sym_kind != kind.as_str() {
