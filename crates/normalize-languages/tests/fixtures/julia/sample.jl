@@ -4,7 +4,7 @@ import Statistics
 using LinearAlgebra: norm, dot
 
 # Classify a number
-function classify(n::Int)::String
+@inline function classify(n::Int)::String
     if n < 0
         return "negative"
     elseif n == 0

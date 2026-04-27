@@ -6735,16 +6735,18 @@ fn go_decorations_finds_comment() {
 }
 
 #[test]
-fn c_decorations_finds_preproc_and_comment() {
+fn c_decorations_finds_comment() {
     let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping c_decorations: run `cargo xtask build-grammars` first");
         return;
     };
+    // #include is preproc_include, not preproc_call — the query captures comments and
+    // generic preproc_call directives (#pragma etc.) but not #include or #define.
     assert_decorations_contains(
         &GrammarLoader::with_paths(vec![gdir]),
         "c",
         C_SAMPLE,
-        &["#include <stdio.h>"],
+        &["/* Creates a new stack with the given capacity. */"],
     );
 }
 
@@ -6763,18 +6765,20 @@ fn cpp_decorations_finds_attribute_declaration_and_comment() {
 }
 
 #[test]
-fn objc_decorations_finds_preproc_and_comment() {
+fn objc_decorations_finds_preproc_include_and_comment() {
     let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping objc_decorations: run `cargo xtask build-grammars` first");
         return;
     };
+    // In the ObjC grammar, #import is aliased into preproc_include (same rule handles both
+    // #include and #import directives).
     assert_decorations_contains(
         &GrammarLoader::with_paths(vec![gdir]),
         "objc",
         OBJC_SAMPLE,
         &[
             "#import <Foundation/Foundation.h>",
-            "// Initializes a Point",
+            "// Initializes a Point with x and y coordinates.",
         ],
     );
 }
@@ -6840,11 +6844,13 @@ fn zig_decorations_finds_doc_comment() {
 }
 
 #[test]
-fn idris_decorations_finds_doc_comment() {
+fn idris_decorations_finds_comment() {
     let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping idris_decorations: run `cargo xtask build-grammars` first");
         return;
     };
+    // In tree-sitter-idris, ||| doc comments are parsed as (comment) by the external scanner —
+    // there is no separate doc_comment node type.
     assert_decorations_contains(
         &GrammarLoader::with_paths(vec![gdir]),
         "idris",
@@ -6884,44 +6890,54 @@ fn elm_decorations_finds_comment() {
 const JULIA_SAMPLE: &str = include_str!("fixtures/julia/sample.jl");
 
 #[test]
-fn julia_decorations_finds_comment() {
+fn julia_decorations_finds_macrocall_and_comment() {
     let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping julia_decorations: run `cargo xtask build-grammars` first");
         return;
     };
+    // In tree-sitter-julia, macro applications are macrocall_expression nodes.
+    // @inline function classify(...) ... end parses as a macrocall_expression.
     assert_decorations_contains(
         &GrammarLoader::with_paths(vec![gdir]),
         "julia",
         JULIA_SAMPLE,
-        &["# Classify a number"],
+        &["# Classify a number", "@inline"],
     );
 }
 
 #[test]
-fn perl_decorations_finds_comment() {
+fn perl_decorations_finds_pod_and_comment() {
     let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping perl_decorations: run `cargo xtask build-grammars` first");
         return;
     };
+    // In tree-sitter-perl, POD documentation blocks (=head1 ... =cut) are pod nodes (not pod_statement).
     assert_decorations_contains(
         &GrammarLoader::with_paths(vec![gdir]),
         "perl",
         PERL_SAMPLE,
-        &["# Classify a number as negative, zero, or positive"],
+        &[
+            "=head1 NAME",
+            "# Classify a number as negative, zero, or positive",
+        ],
     );
 }
 
 #[test]
-fn verilog_decorations_finds_comment() {
+fn verilog_decorations_finds_attribute_instance_and_comment() {
     let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping verilog_decorations: run `cargo xtask build-grammars` first");
         return;
     };
+    // attribute_instance is the verified node name for (* ... *) attributes in tree-sitter-verilog.
     assert_decorations_contains(
         &GrammarLoader::with_paths(vec![gdir]),
         "verilog",
         VERILOG_SAMPLE,
-        &["// ALU module with basic arithmetic and logic operations"],
+        &[
+            "(* synthesis, keep *)",
+            "// ALU module with basic arithmetic and logic operations",
+        ],
     );
 }
 
@@ -6940,16 +6956,20 @@ fn vhdl_decorations_finds_comment() {
 }
 
 #[test]
-fn ada_decorations_finds_comment() {
+fn ada_decorations_finds_pragma_and_comment() {
     let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping ada_decorations: run `cargo xtask build-grammars` first");
         return;
     };
+    // pragma_g is the verified node name for Ada pragmas in tree-sitter-ada (RM 2.8).
     assert_decorations_contains(
         &GrammarLoader::with_paths(vec![gdir]),
         "ada",
         ADA_SAMPLE,
-        &["-- Add two integers and return the result"],
+        &[
+            "pragma Inline(Add);",
+            "-- Add two integers and return the result",
+        ],
     );
 }
 
@@ -7022,16 +7042,20 @@ fn wit_decorations_finds_doc_comment_and_comment() {
 }
 
 #[test]
-fn clojure_decorations_finds_comment() {
+fn clojure_decorations_finds_metadata_and_comment() {
     let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping clojure_decorations: run `cargo xtask build-grammars` first");
         return;
     };
+    // meta_lit is the verified node name for ^:keyword reader metadata in tree-sitter-clojure.
     assert_decorations_contains(
         &GrammarLoader::with_paths(vec![gdir]),
         "clojure",
         CLOJURE_SAMPLE,
-        &["; A point in 2D space with x and y coordinates"],
+        &[
+            "^:deprecated",
+            "; A point in 2D space with x and y coordinates",
+        ],
     );
 }
 

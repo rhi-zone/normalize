@@ -21,6 +21,7 @@
     (and (neg? (:x p)) (neg? (:y p))) :q3
     :else :q4))
 
+^:deprecated
 (defn sum-evens
   "Sum all even numbers in a collection."
   [coll]

@@ -1,4 +1,5 @@
 // ALU module with basic arithmetic and logic operations
+(* synthesis, keep *)
 module alu #(
     parameter WIDTH = 32
 ) (

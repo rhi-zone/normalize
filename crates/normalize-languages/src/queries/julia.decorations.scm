@@ -1,3 +1,4 @@
-(macro_expression) @decoration ;; NOTE: unverified node type — @inline, @noinline, @doc etc. above functions
+;; In tree-sitter-julia, macro applications are macrocall_expression nodes (e.g. @inline, @noinline, @doc above a function).
+(macrocall_expression) @decoration
 
 (comment) @decoration

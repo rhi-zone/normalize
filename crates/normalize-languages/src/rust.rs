@@ -372,6 +372,37 @@ fn extract_attributes(node: &Node, content: &str) -> Vec<String> {
     attrs
 }
 
+/// Extract the module-level doc comment from Rust source.
+///
+/// Collects consecutive `//!` inner-doc comment lines from the top of the file,
+/// stopping at the first line that is not a `//!` comment (ignoring blank lines).
+fn extract_rust_module_doc(src: &str) -> Option<String> {
+    let mut lines = Vec::new();
+    for line in src.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("//!") {
+            let text = trimmed.strip_prefix("//!").unwrap_or("").trim_start();
+            lines.push(text.to_string());
+        } else if trimmed.is_empty() && lines.is_empty() {
+            // skip leading blank lines
+        } else {
+            break;
+        }
+    }
+    if lines.is_empty() {
+        return None;
+    }
+    // Strip trailing empty lines from the collected doc
+    while lines.last().map(|l: &String| l.is_empty()).unwrap_or(false) {
+        lines.pop();
+    }
+    if lines.is_empty() {
+        None
+    } else {
+        Some(lines.join("\n"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -508,36 +539,5 @@ mod tests {
 
         validate_unused_kinds_audit(&Rust, documented_unused)
             .expect("Rust unused node kinds audit failed");
-    }
-}
-
-/// Extract the module-level doc comment from Rust source.
-///
-/// Collects consecutive `//!` inner-doc comment lines from the top of the file,
-/// stopping at the first line that is not a `//!` comment (ignoring blank lines).
-fn extract_rust_module_doc(src: &str) -> Option<String> {
-    let mut lines = Vec::new();
-    for line in src.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("//!") {
-            let text = trimmed.strip_prefix("//!").unwrap_or("").trim_start();
-            lines.push(text.to_string());
-        } else if trimmed.is_empty() && lines.is_empty() {
-            // skip leading blank lines
-        } else {
-            break;
-        }
-    }
-    if lines.is_empty() {
-        return None;
-    }
-    // Strip trailing empty lines from the collected doc
-    while lines.last().map(|l: &String| l.is_empty()).unwrap_or(false) {
-        lines.pop();
-    }
-    if lines.is_empty() {
-        None
-    } else {
-        Some(lines.join("\n"))
     }
 }
