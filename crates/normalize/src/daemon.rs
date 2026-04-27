@@ -229,6 +229,13 @@ mod unix_impl {
         /// Whether the .git/index path was registered with the shared watcher.
         /// Tracked so we can unwatch it when the root is removed.
         has_git_index: bool,
+        /// Persistent index connection for this root.
+        ///
+        /// Opened once in `add_root` and reused for all subsequent reads and writes.
+        /// Eliminates the per-write open/close cycle and the SQLite "database is locked"
+        /// races that occurred when a new connection was opened while the client held
+        /// the same file open for reading.
+        index: Arc<std::sync::Mutex<crate::index::FileIndex>>,
     }
 
     /// Global daemon server managing multiple roots.
@@ -308,7 +315,10 @@ mod unix_impl {
 
             // Initial index refresh. Reverse-dep graph is no longer held in memory;
             // it is derived from the SQLite imports table on demand during refresh.
-            match tokio::task::block_in_place(|| {
+            //
+            // The opened FileIndex is stored in WatchedRoot and reused for all
+            // subsequent reads/writes, eliminating per-write open/close races.
+            let index = match tokio::task::block_in_place(|| {
                 self.runtime_handle.block_on(crate::index::open(&root))
             }) {
                 Ok(mut idx) => {
@@ -323,9 +333,10 @@ mod unix_impl {
                     }) {
                         eprintln!("Warning: call graph refresh failed: {}", e);
                     }
+                    Arc::new(std::sync::Mutex::new(idx))
                 }
                 Err(e) => return Response::err(&format!("Failed to open index: {}", e)),
-            }
+            };
 
             // Register the root with the shared watcher
             let git_index_path = root.join(".git").join("index");
@@ -349,6 +360,7 @@ mod unix_impl {
                     last_refresh: Instant::now(),
                     primed: false,
                     has_git_index,
+                    index,
                 },
             );
 
@@ -405,6 +417,18 @@ mod unix_impl {
             }))
         }
 
+        /// Retrieve the persistent index for a watched root, or `None` if not watched.
+        ///
+        /// Callers must release the `roots` lock before calling any async code with the
+        /// returned `Arc` to avoid holding both the roots lock and the index lock at once.
+        fn get_root_index(
+            &self,
+            root: &Path,
+        ) -> Option<Arc<std::sync::Mutex<crate::index::FileIndex>>> {
+            let roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+            roots.get(root).map(|w| w.index.clone())
+        }
+
         fn handle_request(&self, req: Request) -> Response {
             match req {
                 Request::Add { root } => self.add_root(root),
@@ -446,12 +470,10 @@ mod unix_impl {
                 self.prime_diagnostics_cache(&root);
             }
 
-            // Load issues from SQLite for requested engines.
-            let idx = match tokio::task::block_in_place(|| {
-                self.runtime_handle.block_on(crate::index::open(&root))
-            }) {
-                Ok(idx) => idx,
-                Err(e) => return Response::err(&format!("failed to open index: {}", e)),
+            // Load issues from SQLite for requested engines using the persistent index.
+            let idx_arc = match self.get_root_index(&root) {
+                Some(a) => a,
+                None => return Response::err("root not watched"),
             };
 
             let include_syntax = engine.as_deref().is_none() || engine.as_deref() == Some("syntax");
@@ -469,6 +491,7 @@ mod unix_impl {
 
             let mut issues: Vec<normalize_output::diagnostics::Issue> = Vec::new();
             for eng in engines_to_load {
+                let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
                 match tokio::task::block_in_place(|| {
                     self.runtime_handle.block_on(idx.load_diagnostics_blob(eng))
                 }) {
@@ -530,15 +553,14 @@ mod unix_impl {
                 self.prime_diagnostics_cache(&root);
             }
 
-            let idx = match tokio::task::block_in_place(|| {
-                self.runtime_handle.block_on(crate::index::open(&root))
-            }) {
-                Ok(idx) => idx,
-                Err(e) => return RawResponse::Error(format!("failed to open index: {e}")),
+            let idx_arc = match self.get_root_index(&root) {
+                Some(a) => a,
+                None => return RawResponse::Error("root not watched".into()),
             };
 
             // Fast path: no filter and no engine filter → serve "all" blob directly.
             if filter_ids.is_none() && filter_rule.is_none() && engine.is_none() {
+                let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
                 match tokio::task::block_in_place(|| {
                     self.runtime_handle
                         .block_on(idx.load_diagnostics_blob("all"))
@@ -567,6 +589,7 @@ mod unix_impl {
 
             let mut issues: Vec<normalize_output::diagnostics::Issue> = Vec::new();
             for eng in engines_to_load {
+                let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
                 match tokio::task::block_in_place(|| {
                     self.runtime_handle.block_on(idx.load_diagnostics_blob(eng))
                 }) {
@@ -715,6 +738,9 @@ mod unix_impl {
 
         /// Serialize issues to rkyv and write them to the `daemon_diagnostics` table.
         /// Failures are logged as warnings; they do not abort the refresh.
+        ///
+        /// Uses the persistent index connection stored in `WatchedRoot` to avoid the
+        /// per-write open/close cycle that caused "database is locked" races.
         fn save_diagnostics_to_index(
             &self,
             root: &Path,
@@ -729,15 +755,14 @@ mod unix_impl {
                     return;
                 }
             };
-            let idx = match tokio::task::block_in_place(|| {
-                self.runtime_handle.block_on(crate::index::open(root))
-            }) {
-                Ok(idx) => idx,
-                Err(e) => {
-                    tracing::warn!(engine, "failed to open index to save diagnostics: {}", e);
+            let idx_arc = match self.get_root_index(root) {
+                Some(a) => a,
+                None => {
+                    tracing::warn!(engine, "failed to save diagnostics: root not watched");
                     return;
                 }
             };
+            let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
             if let Err(e) = tokio::task::block_in_place(|| {
                 self.runtime_handle
                     .block_on(idx.save_diagnostics_blob(engine, &blob))
@@ -766,17 +791,16 @@ mod unix_impl {
         /// re-persist the "all" blob.  Used when only one engine is refreshed
         /// (e.g. `refresh_native_rules`) so the "all" blob stays coherent.
         fn rebuild_all_blob(&self, root: &Path) {
-            let idx = match tokio::task::block_in_place(|| {
-                self.runtime_handle.block_on(crate::index::open(root))
-            }) {
-                Ok(idx) => idx,
-                Err(e) => {
-                    tracing::warn!("failed to open index to rebuild all blob: {}", e);
+            let idx_arc = match self.get_root_index(root) {
+                Some(a) => a,
+                None => {
+                    tracing::warn!("failed to rebuild all blob: root not watched");
                     return;
                 }
             };
             let mut all: Vec<normalize_output::diagnostics::Issue> = Vec::new();
             for eng in &["syntax", "fact", "native"] {
+                let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
                 if let Ok(Some(blob)) = tokio::task::block_in_place(|| {
                     self.runtime_handle.block_on(idx.load_diagnostics_blob(eng))
                 }) && let Ok(issues) = rkyv::from_bytes::<
@@ -908,238 +932,228 @@ mod unix_impl {
         }
 
         fn refresh_root(&self, root: &Path) {
-            // Check root is still watched before doing expensive work.
-            {
+            // Check root is still watched and retrieve the persistent index.
+            let idx_arc = {
                 let roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
-                if !roots.contains_key(root) {
-                    return;
+                match roots.get(root) {
+                    Some(w) => w.index.clone(),
+                    None => return,
                 }
-            }
+            };
 
-            match self.runtime_handle.block_on(crate::index::open(root)) {
-                Ok(mut idx) => {
-                    match self.runtime_handle.block_on(idx.incremental_refresh()) {
-                        Ok(changed) if !changed.is_empty() => {
-                            if let Err(e) = self
+            {
+                let mut idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
+                match self.runtime_handle.block_on(idx.incremental_refresh()) {
+                    Ok(changed) if !changed.is_empty() => {
+                        if let Err(e) = self
+                            .runtime_handle
+                            .block_on(idx.incremental_call_graph_refresh())
+                        {
+                            eprintln!("Call graph refresh error for {:?}: {}", root, e);
+                        }
+
+                        // Compute reverse dependents from SQLite imports table.
+                        // This avoids keeping a full HashMap in memory; we query
+                        // for just the affected files' reverse deps on each refresh.
+                        let affected_vec: Vec<PathBuf> = {
+                            let changed_set: HashSet<&PathBuf> = changed.iter().collect();
+                            let mut affected: HashSet<PathBuf> = changed.iter().cloned().collect();
+
+                            // Build a transient reverse-dep lookup from current SQLite data.
+                            match self
                                 .runtime_handle
-                                .block_on(idx.incremental_call_graph_refresh())
+                                .block_on(idx.all_resolved_import_edges())
                             {
-                                eprintln!("Call graph refresh error for {:?}: {}", root, e);
-                            }
-
-                            // Compute reverse dependents from SQLite imports table.
-                            // This avoids keeping a full HashMap in memory; we query
-                            // for just the affected files' reverse deps on each refresh.
-                            let affected_vec: Vec<PathBuf> = {
-                                let changed_set: HashSet<&PathBuf> = changed.iter().collect();
-                                let mut affected: HashSet<PathBuf> =
-                                    changed.iter().cloned().collect();
-
-                                // Build a transient reverse-dep lookup from current SQLite data.
-                                match self
-                                    .runtime_handle
-                                    .block_on(idx.all_resolved_import_edges())
-                                {
-                                    Ok(edges) => {
-                                        // edges: (importer_rel, imported_rel)
-                                        // Build imported_abs -> {importer_abs} map for changed files only.
-                                        let mut rev_deps: HashMap<PathBuf, Vec<PathBuf>> =
-                                            HashMap::new();
-                                        for (importer_rel, imported_rel) in edges {
-                                            let imported_abs = root.join(&imported_rel);
-                                            if changed_set.contains(&imported_abs) {
-                                                let importer_abs = root.join(&importer_rel);
-                                                rev_deps
-                                                    .entry(imported_abs)
-                                                    .or_default()
-                                                    .push(importer_abs);
-                                            }
+                                Ok(edges) => {
+                                    // edges: (importer_rel, imported_rel)
+                                    // Build imported_abs -> {importer_abs} map for changed files only.
+                                    let mut rev_deps: HashMap<PathBuf, Vec<PathBuf>> =
+                                        HashMap::new();
+                                    for (importer_rel, imported_rel) in edges {
+                                        let imported_abs = root.join(&imported_rel);
+                                        if changed_set.contains(&imported_abs) {
+                                            let importer_abs = root.join(&importer_rel);
+                                            rev_deps
+                                                .entry(imported_abs)
+                                                .or_default()
+                                                .push(importer_abs);
                                         }
-                                        for changed_file in &changed {
-                                            if let Some(dependents) = rev_deps.get(changed_file) {
-                                                for dep in dependents {
-                                                    if !changed_set.contains(dep) {
-                                                        affected.insert(dep.clone());
-                                                    }
+                                    }
+                                    for changed_file in &changed {
+                                        if let Some(dependents) = rev_deps.get(changed_file) {
+                                            for dep in dependents {
+                                                if !changed_set.contains(dep) {
+                                                    affected.insert(dep.clone());
                                                 }
                                             }
                                         }
                                     }
-                                    Err(e) => tracing::warn!(
-                                        root = ?root,
-                                        "failed to query import edges for rev-dep: {}",
-                                        e
-                                    ),
                                 }
+                                Err(e) => tracing::warn!(
+                                    root = ?root,
+                                    "failed to query import edges for rev-dep: {}",
+                                    e
+                                ),
+                            }
 
-                                affected.into_iter().collect()
-                            };
+                            affected.into_iter().collect()
+                        };
 
-                            tracing::info!(
-                                changed = changed.len(),
-                                affected = affected_vec.len(),
-                                root = ?root,
-                                "index refreshed"
+                        tracing::info!(
+                            changed = changed.len(),
+                            affected = affected_vec.len(),
+                            root = ?root,
+                            "index refreshed"
+                        );
+
+                        let config = NormalizeConfig::load(root);
+
+                        // --- Fact rules (incremental via ENGINE_CACHE) ---
+                        let fact_issues: Vec<normalize_output::diagnostics::Issue> = {
+                            let diagnostics = self.runtime_handle.block_on(
+                                normalize_rules::collect_fact_diagnostics_incremental(
+                                    root,
+                                    &config.rules,
+                                    None,
+                                    None,
+                                    Some(&affected_vec),
+                                ),
                             );
+                            diagnostics
+                                .iter()
+                                .map(normalize_rules::abi_diagnostic_to_issue)
+                                .collect()
+                        };
 
-                            let config = NormalizeConfig::load(root);
-
-                            // --- Fact rules (incremental via ENGINE_CACHE) ---
-                            let fact_issues: Vec<normalize_output::diagnostics::Issue> = {
-                                let diagnostics = self.runtime_handle.block_on(
-                                    normalize_rules::collect_fact_diagnostics_incremental(
-                                        root,
-                                        &config.rules,
-                                        None,
-                                        None,
-                                        Some(&affected_vec),
-                                    ),
-                                );
-                                diagnostics
-                                    .iter()
-                                    .map(normalize_rules::abi_diagnostic_to_issue)
-                                    .collect()
-                            };
-
-                            // --- Syntax rules (re-run on affected files, merge into cache) ---
-                            let syntax_issues: Vec<normalize_output::diagnostics::Issue> = {
-                                let root_owned = root.to_path_buf();
-                                let rules_config = config.rules.clone();
-                                let walk_config = config.walk.clone();
-                                let affected_for_syntax = affected_vec.clone();
-                                let new_syntax_issues: Vec<normalize_output::diagnostics::Issue> =
-                                    std::thread::Builder::new()
-                                        .stack_size(64 * 1024 * 1024)
-                                        .spawn(move || {
-                                            let debug_flags =
-                                                normalize_syntax_rules::DebugFlags::default();
-                                            let path_filter =
-                                                normalize_rules_config::PathFilter::default();
-                                            let findings =
-                                                normalize_rules::cmd_rules::run_syntax_rules(
-                                                    &root_owned,
-                                                    &root_owned,
-                                                    None,
-                                                    None,
-                                                    None,
-                                                    &rules_config,
-                                                    &debug_flags,
-                                                    Some(&affected_for_syntax),
-                                                    &path_filter,
-                                                    &walk_config,
-                                                );
-                                            findings
-                                                .iter()
-                                                .map(|f| {
-                                                    normalize_rules::finding_to_issue(
-                                                        f,
-                                                        &root_owned,
-                                                    )
-                                                })
-                                                .collect()
-                                        })
-                                        .expect("failed to spawn syntax refresh thread")
-                                        .join()
-                                        .expect("syntax refresh thread panicked");
-
-                                // Merge: load existing syntax issues, remove stale, add new.
-                                let affected_rel: HashSet<String> = affected_vec
-                                    .iter()
-                                    .filter_map(|p| {
-                                        p.strip_prefix(root)
-                                            .ok()
-                                            .map(|r| r.to_string_lossy().to_string())
-                                    })
-                                    .collect();
-                                let mut merged: Vec<normalize_output::diagnostics::Issue> =
-                                    match self
-                                        .runtime_handle
-                                        .block_on(idx.load_diagnostics_blob("syntax"))
-                                    {
-                                        Ok(Some(blob)) => {
-                                            rkyv::from_bytes::<
-                                                Vec<normalize_output::diagnostics::Issue>,
-                                                rkyv::rancor::Error,
-                                            >(&blob)
-                                            .unwrap_or_default()
-                                        }
-                                        _ => Vec::new(),
-                                    };
-                                merged.retain(|i| !affected_rel.contains(&i.file));
-                                merged.extend(new_syntax_issues);
-                                merged
-                            };
-
-                            // --- Native rules (full re-run, replace cache) ---
-                            let native_issues: Vec<normalize_output::diagnostics::Issue> = {
-                                let root_owned = root.to_path_buf();
-                                let rules_config = config.rules.clone();
-                                let walk_config = config.walk.clone();
-                                let handle = self.runtime_handle.clone();
+                        // --- Syntax rules (re-run on affected files, merge into cache) ---
+                        let syntax_issues: Vec<normalize_output::diagnostics::Issue> = {
+                            let root_owned = root.to_path_buf();
+                            let rules_config = config.rules.clone();
+                            let walk_config = config.walk.clone();
+                            let affected_for_syntax = affected_vec.clone();
+                            let new_syntax_issues: Vec<normalize_output::diagnostics::Issue> =
                                 std::thread::Builder::new()
                                     .stack_size(64 * 1024 * 1024)
                                     .spawn(move || {
-                                        handle.block_on(Self::run_native_rules(
+                                        let debug_flags =
+                                            normalize_syntax_rules::DebugFlags::default();
+                                        let path_filter =
+                                            normalize_rules_config::PathFilter::default();
+                                        let findings = normalize_rules::cmd_rules::run_syntax_rules(
                                             &root_owned,
+                                            &root_owned,
+                                            None,
+                                            None,
+                                            None,
                                             &rules_config,
+                                            &debug_flags,
+                                            Some(&affected_for_syntax),
+                                            &path_filter,
                                             &walk_config,
-                                        ))
+                                        );
+                                        findings
+                                            .iter()
+                                            .map(|f| {
+                                                normalize_rules::finding_to_issue(f, &root_owned)
+                                            })
+                                            .collect()
                                     })
-                                    .expect("failed to spawn native refresh thread")
+                                    .expect("failed to spawn syntax refresh thread")
                                     .join()
-                                    .expect("native refresh thread panicked")
-                            };
+                                    .expect("syntax refresh thread panicked");
 
-                            tracing::info!(
-                                root = ?root,
-                                syntax = syntax_issues.len(),
-                                fact = fact_issues.len(),
-                                native = native_issues.len(),
-                                affected = affected_vec.len(),
-                                "incremental diagnostics cache update complete"
-                            );
-
-                            // Persist to SQLite and drop Vecs immediately.
-                            self.save_diagnostics_to_index(root, "syntax", &syntax_issues);
-                            self.save_diagnostics_to_index(root, "fact", &fact_issues);
-                            self.save_diagnostics_to_index(root, "native", &native_issues);
-                            // Build "all" combined blob for fast no-filter hot path.
-                            self.save_all_blob(root, &syntax_issues, &fact_issues, &native_issues);
-                            drop(syntax_issues);
-                            drop(fact_issues);
-                            drop(native_issues);
-                            drop(affected_vec);
-
+                            // Merge: load existing syntax issues, remove stale, add new.
+                            let affected_rel: HashSet<String> = affected_vec
+                                .iter()
+                                .filter_map(|p| {
+                                    p.strip_prefix(root)
+                                        .ok()
+                                        .map(|r| r.to_string_lossy().to_string())
+                                })
+                                .collect();
+                            let mut merged: Vec<normalize_output::diagnostics::Issue> = match self
+                                .runtime_handle
+                                .block_on(idx.load_diagnostics_blob("syntax"))
                             {
-                                let mut roots =
-                                    self.roots.lock().unwrap_or_else(|e| e.into_inner());
-                                if let Some(watched) = roots.get_mut(root) {
-                                    watched.primed = true;
-                                    watched.last_refresh = Instant::now();
-                                }
-                            }
+                                Ok(Some(blob)) => rkyv::from_bytes::<
+                                    Vec<normalize_output::diagnostics::Issue>,
+                                    rkyv::rancor::Error,
+                                >(&blob)
+                                .unwrap_or_default(),
+                                _ => Vec::new(),
+                            };
+                            merged.retain(|i| !affected_rel.contains(&i.file));
+                            merged.extend(new_syntax_issues);
+                            merged
+                        };
 
-                            // Broadcast index-refresh event. SendError means no
-                            // active subscribers -- that is fine.
-                            let _ = self.event_tx.send(Event::IndexRefreshed {
-                                root: root.to_path_buf(),
-                                files: changed.len(),
-                            });
-                        }
-                        Ok(_changed) => {
-                            // No files changed — just update last_refresh timestamp.
+                        // --- Native rules (full re-run, replace cache) ---
+                        let native_issues: Vec<normalize_output::diagnostics::Issue> = {
+                            let root_owned = root.to_path_buf();
+                            let rules_config = config.rules.clone();
+                            let walk_config = config.walk.clone();
+                            let handle = self.runtime_handle.clone();
+                            std::thread::Builder::new()
+                                .stack_size(64 * 1024 * 1024)
+                                .spawn(move || {
+                                    handle.block_on(Self::run_native_rules(
+                                        &root_owned,
+                                        &rules_config,
+                                        &walk_config,
+                                    ))
+                                })
+                                .expect("failed to spawn native refresh thread")
+                                .join()
+                                .expect("native refresh thread panicked")
+                        };
+
+                        tracing::info!(
+                            root = ?root,
+                            syntax = syntax_issues.len(),
+                            fact = fact_issues.len(),
+                            native = native_issues.len(),
+                            affected = affected_vec.len(),
+                            "incremental diagnostics cache update complete"
+                        );
+
+                        // Persist to SQLite and drop Vecs immediately.
+                        self.save_diagnostics_to_index(root, "syntax", &syntax_issues);
+                        self.save_diagnostics_to_index(root, "fact", &fact_issues);
+                        self.save_diagnostics_to_index(root, "native", &native_issues);
+                        // Build "all" combined blob for fast no-filter hot path.
+                        self.save_all_blob(root, &syntax_issues, &fact_issues, &native_issues);
+                        drop(syntax_issues);
+                        drop(fact_issues);
+                        drop(native_issues);
+                        drop(affected_vec);
+
+                        {
                             let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
                             if let Some(watched) = roots.get_mut(root) {
+                                watched.primed = true;
                                 watched.last_refresh = Instant::now();
                             }
                         }
-                        Err(e) => {
-                            eprintln!("Refresh error for {:?}: {}", root, e);
+
+                        // Broadcast index-refresh event. SendError means no
+                        // active subscribers -- that is fine.
+                        let _ = self.event_tx.send(Event::IndexRefreshed {
+                            root: root.to_path_buf(),
+                            files: changed.len(),
+                        });
+                    }
+                    Ok(_changed) => {
+                        // No files changed — just update last_refresh timestamp.
+                        let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+                        if let Some(watched) = roots.get_mut(root) {
+                            watched.last_refresh = Instant::now();
                         }
                     }
+                    Err(e) => {
+                        eprintln!("Refresh error for {:?}: {}", root, e);
+                    }
                 }
-                Err(e) => eprintln!("Failed to open index for {:?}: {}", root, e),
-            }
+            } // idx lock released here — save_diagnostics_to_index may re-lock below
         }
 
         /// Re-run only native rules for a root and persist the results to SQLite.
