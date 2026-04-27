@@ -31,7 +31,9 @@ impl FindingsCache {
             .expect("failed to open in-memory SQLite connection");
 
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS findings_cache (
+            "PRAGMA journal_mode=WAL;
+             PRAGMA synchronous=NORMAL;
+             CREATE TABLE IF NOT EXISTS findings_cache (
                 path TEXT NOT NULL,
                 engine TEXT NOT NULL,
                 mtime_nanos INTEGER NOT NULL,
@@ -81,7 +83,15 @@ impl FindingsCache {
             .ok();
     }
 
-    /// No-op — SQLite writes are immediate. Exists for API symmetry.
+    pub fn begin(&self) {
+        self.conn.execute_batch("BEGIN;").ok();
+    }
+
+    pub fn commit(&self) {
+        self.conn.execute_batch("COMMIT;").ok();
+    }
+
+    /// No-op — retained for API symmetry; callers should use begin/commit.
     pub fn flush(&self) {}
 }
 
@@ -188,7 +198,8 @@ pub fn run_file_rule<R: FileRule>(
         })
         .collect();
 
-    // Phase 3: store fresh results in cache.
+    // Phase 3: store fresh results in cache (single transaction).
+    cache.begin();
     for (path, findings) in &fresh_findings {
         let path_key = path.to_string_lossy().to_string();
         let mtime = file_mtime_nanos(path);
@@ -198,8 +209,7 @@ pub fn run_file_rule<R: FileRule>(
             cache.put(&path_key, mtime, &config_hash, engine, &json);
         }
     }
-
-    cache.flush();
+    cache.commit();
 
     // Phase 4: merge and build report.
     let mut all_findings: Vec<(std::path::PathBuf, Vec<R::Finding>)> = cached_findings;

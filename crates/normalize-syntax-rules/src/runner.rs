@@ -86,7 +86,9 @@ impl FindingsCache {
             .or_else(|_| rusqlite::Connection::open_in_memory())
             .expect("failed to open in-memory SQLite connection");
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS findings_cache (
+            "PRAGMA journal_mode=WAL;
+             PRAGMA synchronous=NORMAL;
+             CREATE TABLE IF NOT EXISTS findings_cache (
                 path TEXT NOT NULL,
                 engine TEXT NOT NULL,
                 mtime_nanos INTEGER NOT NULL,
@@ -97,6 +99,14 @@ impl FindingsCache {
         )
         .ok();
         Self { conn }
+    }
+
+    fn begin(&self) {
+        self.conn.execute_batch("BEGIN;").ok();
+    }
+
+    fn commit(&self) {
+        self.conn.execute_batch("COMMIT;").ok();
     }
 
     fn get(&self, path: &str, mtime_nanos: u64, config_hash: &str, engine: &str) -> Option<String> {
@@ -619,6 +629,7 @@ pub fn run_rules(
     }
     let process_start = std::time::Instant::now();
 
+    cache.begin();
     for (grammar_name, files) in &files_by_grammar {
         let Some(combined) = combined_by_grammar.get(grammar_name) else {
             continue;
@@ -686,6 +697,8 @@ pub fn run_rules(
             findings.extend(file_findings);
         }
     }
+
+    cache.commit();
 
     if debug.timing {
         eprintln!(
