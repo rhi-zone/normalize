@@ -68,6 +68,16 @@ Remaining (not blocking the memory fix):
 - [x] Persistent `SkeletonExtractor` in LSP backend (avoids recreating per request)
 - [x] Compiled query caching in `GrammarLoader` (tags, imports, calls, complexity)
 - [x] Configurable debounce interval (`[serve] fact_debounce_ms`, default 1500)
+- **Per-file daemon storage shape**: split `daemon_diagnostics` into per-engine "all" blobs
+  (existing) plus a per-file table `daemon_diagnostics_per_file (path, issues_blob, updated_at)`.
+  "No row = file is clean" — only files with issues consume rows. Each access pattern hits a
+  fast path matching its query: pull "all" → existing zero-copy; pull one/N files → per-file
+  table zero-copy concat; rule-id filter → existing slow path on "all". Add `filter_files`
+  to `RunRules` request. Daemon write cycle: group by path, upsert changed rows, delete
+  rows for paths that became clean, rebuild "all" from the union — single transaction.
+  Also write `.normalize/diagnostics.json` (keyed by path) atomically (write+rename) for
+  ephemeral consumers (shell scripts, post-daemon-exit reads). LSP can either subscribe for
+  push or inotify-watch the file.
 - **Daemon-push diagnostics for LSP**: replace LSP's poll-after-subscribe with a push model.
   The daemon currently broadcasts `IndexRefreshed { root, files }` — no diagnostic data. The LSP
   has to turn around and pull, which blocks on IPC. The correct model:
