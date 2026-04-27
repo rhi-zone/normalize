@@ -610,8 +610,15 @@ pub fn run_rules(
 
     let mut combined_by_grammar: HashMap<String, CombinedQuery> = HashMap::new();
     for grammar_name in files_by_grammar.keys() {
-        let Some(grammar) = loader.get(grammar_name).ok() else {
-            continue;
+        let grammar = match loader.get(grammar_name) {
+            Ok(g) => g,
+            Err(e) => {
+                let n = files_by_grammar[grammar_name].len();
+                eprintln!(
+                    "warning: no grammar for {grammar_name} — {n} file(s) skipped by syntax rules ({e}). Run `normalize grammars install` to fix."
+                );
+                continue;
+            }
         };
         if let Some(cq) =
             build_combined_query(grammar_name, &grammar, &specific_rules, &global_rules)

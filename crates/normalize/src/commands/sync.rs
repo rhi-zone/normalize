@@ -105,6 +105,7 @@ pub fn copy_tree(
     dry_run: bool,
     verbose: bool,
     warnings: &mut Vec<String>,
+    // normalize-syntax-allow: rust/tuple-return
 ) -> (usize, Vec<SyncFileItem>) {
     let mut count = 0usize;
     let mut items = Vec::new();

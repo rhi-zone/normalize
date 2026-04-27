@@ -65,6 +65,7 @@ pub fn decoration_extended_start(
     file: &Path,
     content: &str,
     loc: &SymbolLocation,
+    // normalize-syntax-allow: rust/tuple-return
 ) -> (usize, Option<String>) {
     let fallback = loc.start_byte;
     let Some(support) = support_for_path(file) else {
