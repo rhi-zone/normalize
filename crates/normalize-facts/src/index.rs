@@ -471,6 +471,11 @@ impl FileIndex {
             conn.execute("DELETE FROM meta WHERE key = 'co_change_last_commit'", ())
                 .await
                 .ok();
+            // daemon_diagnostics: drop and recreate so the column type change
+            // (issues_json TEXT → issues_blob BLOB) takes effect.
+            conn.execute("DROP TABLE IF EXISTS daemon_diagnostics", ())
+                .await
+                .ok();
             conn.execute(
                 "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?1)",
                 params![SCHEMA_VERSION.to_string()],
