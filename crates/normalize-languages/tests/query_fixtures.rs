@@ -31,6 +31,20 @@ fn grammar_dir() -> Option<PathBuf> {
     if dir.exists() { Some(dir) } else { None }
 }
 
+/// Like [`grammar_dir`], but panics when `NORMALIZE_REQUIRE_GRAMMARS` is set and
+/// the grammar directory is missing.  Use in decoration tests (and other new tests)
+/// so that CI — which sets the env var — catches silent skips.
+fn require_grammar_dir() -> Option<PathBuf> {
+    let dir = grammar_dir();
+    if dir.is_none() && std::env::var("NORMALIZE_REQUIRE_GRAMMARS").is_ok() {
+        panic!(
+            "NORMALIZE_REQUIRE_GRAMMARS is set but target/grammars/ does not exist \
+             — run `cargo xtask build-grammars` first"
+        );
+    }
+    dir
+}
+
 /// Parse `source` with `lang`, run `query_str` against it, and collect all
 /// captures whose name starts with `capture_prefix` into a `Vec<String>`.
 fn collect_captures(
@@ -6365,6 +6379,12 @@ fn assert_decorations_contains(
     expected: &[&str],
 ) {
     let Some(lang) = loader.get(grammar).ok() else {
+        if std::env::var("NORMALIZE_REQUIRE_GRAMMARS").is_ok() {
+            panic!(
+                "{grammar}_decorations: grammar .so not found \
+                 — set NORMALIZE_REQUIRE_GRAMMARS only when grammars are built"
+            );
+        }
         eprintln!("Skipping {grammar}_decorations: grammar .so not found");
         return;
     };
@@ -6386,7 +6406,7 @@ fn assert_decorations_contains(
 
 #[test]
 fn rust_decorations_finds_attribute_and_doc_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping rust_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6400,7 +6420,7 @@ fn rust_decorations_finds_attribute_and_doc_comment() {
 
 #[test]
 fn python_decorations_finds_decorator_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping python_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6414,7 +6434,7 @@ fn python_decorations_finds_decorator_and_comment() {
 
 #[test]
 fn javascript_decorations_finds_decorator_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping javascript_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6428,7 +6448,7 @@ fn javascript_decorations_finds_decorator_and_comment() {
 
 #[test]
 fn typescript_decorations_finds_decorator_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping typescript_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6442,7 +6462,7 @@ fn typescript_decorations_finds_decorator_and_comment() {
 
 #[test]
 fn tsx_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping tsx_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6456,7 +6476,7 @@ fn tsx_decorations_finds_comment() {
 
 #[test]
 fn java_decorations_finds_annotation_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping java_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6470,7 +6490,7 @@ fn java_decorations_finds_annotation_and_comment() {
 
 #[test]
 fn kotlin_decorations_finds_annotation_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping kotlin_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6484,7 +6504,7 @@ fn kotlin_decorations_finds_annotation_and_comment() {
 
 #[test]
 fn scala_decorations_finds_annotation_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping scala_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6498,7 +6518,7 @@ fn scala_decorations_finds_annotation_and_comment() {
 
 #[test]
 fn csharp_decorations_finds_attribute_list_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping csharp_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6512,7 +6532,7 @@ fn csharp_decorations_finds_attribute_list_and_comment() {
 
 #[test]
 fn php_decorations_finds_attribute_list_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping php_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6526,7 +6546,7 @@ fn php_decorations_finds_attribute_list_and_comment() {
 
 #[test]
 fn swift_decorations_finds_attribute_and_doc_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping swift_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6540,7 +6560,7 @@ fn swift_decorations_finds_attribute_and_doc_comment() {
 
 #[test]
 fn dart_decorations_finds_annotation_and_doc_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping dart_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6556,7 +6576,7 @@ const OCAML_SAMPLE: &str = include_str!("fixtures/ocaml/sample.ml");
 
 #[test]
 fn ocaml_decorations_finds_attribute_and_doc_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping ocaml_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6570,7 +6590,7 @@ fn ocaml_decorations_finds_attribute_and_doc_comment() {
 
 #[test]
 fn rescript_decorations_finds_decorator_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping rescript_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6586,7 +6606,7 @@ const FSHARP_SAMPLE: &str = include_str!("fixtures/fsharp/sample.fs");
 
 #[test]
 fn fsharp_decorations_finds_attribute_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping fsharp_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6600,7 +6620,7 @@ fn fsharp_decorations_finds_attribute_and_comment() {
 
 #[test]
 fn elixir_decorations_finds_module_attribute_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping elixir_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6616,7 +6636,7 @@ const ERLANG_SAMPLE: &str = include_str!("fixtures/erlang/sample.erl");
 
 #[test]
 fn erlang_decorations_finds_attribute_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping erlang_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6632,7 +6652,7 @@ const GLEAM_SAMPLE: &str = include_str!("fixtures/gleam/sample.gleam");
 
 #[test]
 fn gleam_decorations_finds_doc_comment_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping gleam_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6646,7 +6666,7 @@ fn gleam_decorations_finds_doc_comment_and_comment() {
 
 #[test]
 fn lean_decorations_finds_attribute_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping lean_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6660,7 +6680,7 @@ fn lean_decorations_finds_attribute_and_comment() {
 
 #[test]
 fn groovy_decorations_finds_annotation_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping groovy_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6674,7 +6694,7 @@ fn groovy_decorations_finds_annotation_and_comment() {
 
 #[test]
 fn vb_decorations_finds_attribute_list_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping vb_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6688,7 +6708,7 @@ fn vb_decorations_finds_attribute_list_and_comment() {
 
 #[test]
 fn haskell_decorations_finds_pragma_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping haskell_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6702,7 +6722,7 @@ fn haskell_decorations_finds_pragma_and_comment() {
 
 #[test]
 fn go_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping go_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6716,7 +6736,7 @@ fn go_decorations_finds_comment() {
 
 #[test]
 fn c_decorations_finds_preproc_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping c_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6730,7 +6750,7 @@ fn c_decorations_finds_preproc_and_comment() {
 
 #[test]
 fn cpp_decorations_finds_attribute_declaration_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping cpp_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6744,7 +6764,7 @@ fn cpp_decorations_finds_attribute_declaration_and_comment() {
 
 #[test]
 fn objc_decorations_finds_preproc_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping objc_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6761,7 +6781,7 @@ fn objc_decorations_finds_preproc_and_comment() {
 
 #[test]
 fn ruby_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping ruby_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6777,7 +6797,7 @@ const R_SAMPLE: &str = include_str!("fixtures/r/sample.r");
 
 #[test]
 fn r_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping r_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6793,7 +6813,7 @@ const LUA_SAMPLE: &str = include_str!("fixtures/lua/sample.lua");
 
 #[test]
 fn lua_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping lua_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6807,7 +6827,7 @@ fn lua_decorations_finds_comment() {
 
 #[test]
 fn zig_decorations_finds_doc_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping zig_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6821,7 +6841,7 @@ fn zig_decorations_finds_doc_comment() {
 
 #[test]
 fn idris_decorations_finds_doc_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping idris_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6835,7 +6855,7 @@ fn idris_decorations_finds_doc_comment() {
 
 #[test]
 fn agda_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping agda_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6849,7 +6869,7 @@ fn agda_decorations_finds_comment() {
 
 #[test]
 fn elm_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping elm_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6865,7 +6885,7 @@ const JULIA_SAMPLE: &str = include_str!("fixtures/julia/sample.jl");
 
 #[test]
 fn julia_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping julia_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6879,7 +6899,7 @@ fn julia_decorations_finds_comment() {
 
 #[test]
 fn perl_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping perl_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6893,7 +6913,7 @@ fn perl_decorations_finds_comment() {
 
 #[test]
 fn verilog_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping verilog_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6907,7 +6927,7 @@ fn verilog_decorations_finds_comment() {
 
 #[test]
 fn vhdl_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping vhdl_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6921,7 +6941,7 @@ fn vhdl_decorations_finds_comment() {
 
 #[test]
 fn ada_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping ada_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6937,7 +6957,7 @@ const CAPNP_SAMPLE: &str = include_str!("fixtures/capnp/sample.capnp");
 
 #[test]
 fn capnp_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping capnp_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6953,7 +6973,7 @@ const THRIFT_SAMPLE: &str = include_str!("fixtures/thrift/sample.thrift");
 
 #[test]
 fn thrift_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping thrift_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6967,7 +6987,7 @@ fn thrift_decorations_finds_comment() {
 
 #[test]
 fn graphql_decorations_finds_description_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping graphql_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -6986,7 +7006,7 @@ const WIT_SAMPLE: &str = include_str!("fixtures/wit/sample.wit");
 
 #[test]
 fn wit_decorations_finds_doc_comment_and_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping wit_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -7003,7 +7023,7 @@ fn wit_decorations_finds_doc_comment_and_comment() {
 
 #[test]
 fn clojure_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping clojure_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -7017,7 +7037,7 @@ fn clojure_decorations_finds_comment() {
 
 #[test]
 fn scheme_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping scheme_decorations: run `cargo xtask build-grammars` first");
         return;
     };
@@ -7031,7 +7051,7 @@ fn scheme_decorations_finds_comment() {
 
 #[test]
 fn prolog_decorations_finds_comment() {
-    let Some(gdir) = grammar_dir() else {
+    let Some(gdir) = require_grammar_dir() else {
         eprintln!("Skipping prolog_decorations: run `cargo xtask build-grammars` first");
         return;
     };

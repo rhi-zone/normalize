@@ -230,7 +230,7 @@ Crate split is correct. All 38 published crates justified. No reusable logic tra
 ### Language implementation depth
 
 - [x] Audit (2026-03-12): 47/84 languages at 100% .scm coverage. Full gap list below.
-- [x] Decoration tests (2026-04-27): All 45 `decorations.scm` tests upgraded from smoke tests to `assert_decorations_contains` with expected fragments. Fixed `lean.decorations.scm` (`(attributes)` → `(attribute)`). Removed `; NOTE: verify node type` comments from gleam and lean queries. Added `///` doc comment to zig fixture, `[[nodiscard]]` to cpp fixture, `|||` doc comment to idris fixture.
+- [x] Decoration tests (2026-04-27): All 45 `decorations.scm` tests upgraded from smoke tests to `assert_decorations_contains` with expected fragments. Fixed `lean.decorations.scm` (`(attributes)` → `(attribute)`). Removed `; NOTE: verify node type` comments from gleam and lean queries. Added `///` doc comment to zig fixture, `[[nodiscard]]` to cpp fixture, `|||` doc comment to idris fixture. CI enforcement via `NORMALIZE_REQUIRE_GRAMMARS=1` env var: decoration tests panic instead of silently skip when the env var is set but grammars are absent — prevents the "310 passed with zero assertions" false-positive under `cargo test -q`.
 
 **Feasible gaps (grammar supports it, .scm not written):**
 
