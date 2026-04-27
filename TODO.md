@@ -68,6 +68,19 @@ Remaining (not blocking the memory fix):
 - [x] Persistent `SkeletonExtractor` in LSP backend (avoids recreating per request)
 - [x] Compiled query caching in `GrammarLoader` (tags, imports, calls, complexity)
 - [x] Configurable debounce interval (`[serve] fact_debounce_ms`, default 1500)
+- **Daemon-push diagnostics for LSP**: replace LSP's poll-after-subscribe with a push model.
+  The daemon currently broadcasts `IndexRefreshed { root, files }` — no diagnostic data. The LSP
+  has to turn around and pull, which blocks on IPC. The correct model:
+  1. After every prime/incremental refresh, daemon broadcasts one `DiagnosticsUpdated` event
+     containing only the changed files' issues: `updates: Vec<(String, Vec<Issue>)>` — one entry
+     per affected file, empty Vec = file is now clean. Batched at the refresh boundary (one message
+     per refresh event, not one per file).
+  2. Subscribe connections use the same `0x01` magic-byte binary framing as `run_rules`: daemon
+     streams length-prefixed rkyv frames. No JSON on the hot path.
+  3. LSP maintains `HashMap<file, Vec<Issue>>`, applies each pushed batch atomically. Diagnostics
+     arrive asynchronously in a background thread — zero frame-budget impact.
+  4. On initial subscribe, daemon replays the current per-file state (files with issues only).
+  Do NOT send the full "all" blob on each update — delta only, proportional to what changed.
 - Incremental Datalog for fact rules — **blocked on ascent-interpreter upstream** (ask user for status periodically)
   Agreed roadmap (with ascent-interpreter maintainer):
   1. String interning (makes most values u32)
