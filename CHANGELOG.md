@@ -18,6 +18,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Performance
 
+- **Mtime-based cache for SARIF tools** — `[[rules.sarif-tools]]` entries now support an optional `watch` field (list of glob patterns). When set, `normalize rules run` skips re-invoking the tool on warm runs where no watched file's mtime has changed, serving findings from the existing SQLite findings cache instead. The `validate-calls-scm` tool is configured with `watch = ["**/*.calls.scm"]`, eliminating its ~762 ms shell invocation on warm runs. Warm run total time drops from ~1.8 s to ~0.66 s.
+
 - **Parallel fact rule evaluation** — `run_rules_batch` now evaluates all enabled Datalog rules in parallel using rayon (one thread per rule, each with its own interpreter engine). On a typical 8-core machine with 7 enabled rules, `normalize rules run --type fact` drops from ~5.5 s to ~2.5 s wall time. JIT is not used in the parallel path: the ascent-interpreter JIT internals are not thread-safe under concurrent engine initialization (panic in `jit_recent_indices` for sink relations). The sequential JIT path is still used for the incremental/daemon-cached path via `run_rule_with_cache`.
 - **Syntax and native rules findings cache: WAL mode + single transaction** — the per-file SQLite findings cache used by syntax rules and native rules (long-file, high-complexity, long-function) now opens with `PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;` and wraps all cache-write operations in a single `BEGIN`/`COMMIT` transaction per run. Previously each `INSERT OR REPLACE` was an individual autocommit, causing one fsync per file — ~19 s for a 4000-file cold run. After this fix: cold run ~1.6 s, warm run ~0.84 s total for all rule types.
 

@@ -1712,6 +1712,26 @@ pub fn run_rules_report(
 /// Run external SARIF tools and merge their output into a DiagnosticsReport.
 /// Each tool's command is run with `{root}` replaced by the project root path.
 /// Tools must emit SARIF 2.1.0 JSON to stdout.
+/// Compute the maximum mtime (nanoseconds since UNIX epoch) across all files
+/// matching the given glob patterns relative to `root`. Returns `None` if no
+/// files are matched or mtimes cannot be read.
+fn sarif_watch_mtime(root: &Path, patterns: &[String]) -> Option<u64> {
+    let mut max_mtime: Option<u64> = None;
+    for pattern in patterns {
+        let full_pattern = root.join(pattern);
+        let pattern_str = full_pattern.to_string_lossy();
+        if let Ok(paths) = glob::glob(&pattern_str) {
+            for entry in paths.flatten() {
+                let mtime = normalize_native_rules::cache_file_mtime_nanos(&entry);
+                if mtime > 0 {
+                    max_mtime = Some(max_mtime.map_or(mtime, |prev| prev.max(mtime)));
+                }
+            }
+        }
+    }
+    max_mtime
+}
+
 pub fn run_sarif_tools(
     root: &Path,
     tools: &[SarifTool],
@@ -1725,6 +1745,57 @@ pub fn run_sarif_tools(
         if tool.command.is_empty() {
             continue;
         }
+
+        // Mtime-based cache: if `watch` patterns are set, check whether the tool's
+        // output is already cached for the current max mtime of watched files.
+        //
+        // `cache_store` is Some((cache, mtime)) when the tool must run AND results
+        // should be stored afterwards. It is None either because watch is empty
+        // (no caching configured) or because we had a cache hit (skip the tool).
+        enum CacheDecision {
+            /// Tool must run; no caching (watch is empty or no files matched).
+            Run,
+            /// Cache hit: issues already added; skip running the tool.
+            Hit,
+            /// Cache miss: run the tool and store results at this mtime.
+            Miss(normalize_native_rules::FindingsCache, u64),
+        }
+
+        let cache_decision = if tool.watch.is_empty() {
+            CacheDecision::Run
+        } else {
+            match sarif_watch_mtime(root, &tool.watch) {
+                None => CacheDecision::Run, // No watched files found — run uncached
+                Some(max_mtime) => {
+                    let cache = normalize_native_rules::FindingsCache::open(root);
+                    let cache_path = format!("sarif:{}", tool.name);
+                    if let Some(json) = cache.get(&cache_path, max_mtime, "", "sarif") {
+                        // Cache hit: deserialize and inject issues.
+                        if let Ok(issues) = serde_json::from_str::<Vec<Issue>>(&json) {
+                            for issue in issues {
+                                let source = issue.source.clone();
+                                if !report.sources_run.contains(&source) {
+                                    report.sources_run.push(source);
+                                }
+                                report.issues.push(issue);
+                            }
+                        }
+                        CacheDecision::Hit
+                    } else {
+                        CacheDecision::Miss(cache, max_mtime)
+                    }
+                }
+            }
+        };
+
+        if matches!(cache_decision, CacheDecision::Hit) {
+            continue;
+        }
+
+        // Record how many issues existed before this tool runs, so we can
+        // identify the slice it adds (needed for accurate cache storage).
+        let issues_start = report.issues.len();
+
         let args: Vec<String> = tool
             .command
             .iter()
@@ -1845,6 +1916,15 @@ pub fn run_sarif_tools(
             }
 
             report.sources_run.push(source);
+        }
+
+        // Cache miss path: store this tool's fresh results keyed by max watched-file mtime.
+        if let CacheDecision::Miss(cache, max_mtime) = cache_decision {
+            let cache_path = format!("sarif:{}", tool.name);
+            let tool_issues = &report.issues[issues_start..];
+            if let Ok(json) = serde_json::to_string(tool_issues) {
+                cache.put(&cache_path, max_mtime, "", "sarif", &json);
+            }
         }
     }
 

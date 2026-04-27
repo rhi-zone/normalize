@@ -342,6 +342,7 @@ enabled = false
 [[rules.sarif-tools]]
 name = "validate-calls-scm"
 command = ["sh", "{root}/scripts/validate-calls-scm.sh", "{root}"]
+watch = ["**/*.calls.scm"]
 
 [aliases]
 todo = ["TODO.md"]
