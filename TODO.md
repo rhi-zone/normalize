@@ -17,13 +17,13 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ## 0.3.0 readiness
 
-Not yet assessed. Previous session noted this as the next focus. Open questions:
-- What's the stated scope of 0.3.0? Check CHANGELOG.md `[Unreleased]` and any milestone notes.
-- Are there P0/blocking items that must land before a release? (See below.)
-- Is `normalize edit move` (shipped in this session's commits) the headline feature, or is there more?
-- The daemon nested-runtime panic (P2, "Incremental-first architecture") may be worth fixing before release if daemon is part of 0.3.0's story.
+**Assessed 2026-04-27.** CHANGELOG `[Unreleased]` has a very large feature set — enough for a release. No P0 blockers found. The daemon nested-runtime panic may already be resolved (daemon now uses `Handle::current()`; needs verification before the release commit). Headline features: `normalize edit move`, `normalize sync`, daemon memory leak fix, parallel fact rule evaluation (~2× speedup).
 
-Worth doing a pass over CHANGELOG.md `[Unreleased]` and the P0 section before deciding scope.
+**Pre-release checklist:**
+- [ ] Verify daemon nested-runtime panic is gone (smoke-test `normalize daemon run`)
+- [ ] Bump EXTRACTOR_VERSION to "2" in normalize-facts/src/index.rs to purge CA cache entries that may have been poisoned by old binaries without grammars
+- [ ] Run `normalize structure rebuild --full` on a fresh checkout to verify 0.3.0 extraction quality
+- [ ] Tag v0.3.0 and update CHANGELOG `[Unreleased]` → `[0.3.0]`
 
 ---
 
@@ -492,17 +492,21 @@ The current architecture is batch-oriented: commands scan the whole workspace, p
 
 **Remaining:**
 - **Daemon nested-runtime panic**: `daemon run` creates a tokio runtime inside `#[tokio::main]` — panics with "Cannot start a runtime from within a runtime". Must fix before daemon path is usable.
+  - Note 2026-04-27: the daemon code now uses `Handle::current()` (no nested runtime). This may already be fixed — needs verification.
+- [x] **Parallel fact rule evaluation** (2026-04-27): `run_rules_batch` now runs each rule on a separate rayon thread. ~2.2× wall-time speedup (5.5s → 2.5s on this codebase). JIT disabled in parallel path: `jit_recent_indices` panics for sink relations when two JIT engines initialize concurrently — upstream ascent-interpreter bug, see next item.
+- **JIT threading bug in ascent-interpreter** (2026-04-27): `engine.run()` with JIT enabled panics with `index out of bounds: len is 0, index is 0` in `jit_stratum_advance_s4_inner` (packed_helpers.rs line 872) when two JIT engines run concurrently. Root cause: `jit_recent_indices` Vec is empty for `jit_is_sink = true` relations; the concurrent access exposes an otherwise latent issue. Fix in ascent-interpreter needed before JIT can be re-enabled in the parallel `run_rules_batch`.
 - Syntax rules load and compile all tree-sitter queries on every invocation
 - **Fact rules**: incremental Datalog. When facts for one file change, re-derive only affected conclusions. This is hard — may need semi-naive evaluation with change tracking.
 - **Watch mode**: `normalize watch` that keeps the index live and re-runs checks on file changes (inotify/fsevents). The LSP server is one consumer; a TUI dashboard could be another.
 - **`SymbolIndex` trait**: injected API for symbol resolution (daemon → index → parse-on-miss). See `docs/design/daemon-as-kernel.md`.
 
 **Next incremental steps:**
-1. Fix daemon nested-runtime panic (prerequisite for daemon-cached rules)
-2. Persistent `GrammarLoader` in LSP (don't re-create `SkeletonExtractor` per request)
-3. File-level dependency tracking for diagnostic invalidation
-4. `SymbolIndex` trait — wire view/edit/analyze through injected API
-5. Incremental fact rule evaluation (long-term, research needed)
+1. Fix JIT threading in ascent-interpreter (then re-enable JIT in `run_rules_batch` parallel path for ~4× speedup vs current interpreted parallel)
+2. Verify daemon nested-runtime panic is gone (use `Handle::current()` — may already be fixed)
+3. Persistent `GrammarLoader` in LSP (don't re-create `SkeletonExtractor` per request)
+4. File-level dependency tracking for diagnostic invalidation
+5. `SymbolIndex` trait — wire view/edit/analyze through injected API
+6. Incremental fact rule evaluation (long-term, research needed)
 
 ### Lint / Analysis Architecture
 

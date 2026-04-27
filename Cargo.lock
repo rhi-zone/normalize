@@ -5409,6 +5409,7 @@ dependencies = [
  "normalize-core",
  "normalize-facts-rules-api",
  "normalize-rules-config",
+ "rayon",
  "schemars",
  "serde",
  "serde_json",

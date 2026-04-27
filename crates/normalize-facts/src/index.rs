@@ -55,7 +55,9 @@ struct CachedFileData {
 const SCHEMA_VERSION: i64 = 8;
 
 /// Bump when extraction logic changes to invalidate cached results.
-const EXTRACTOR_VERSION: &str = "1";
+/// Bumped to "2" (2026-04-27): purge CA cache entries that may have been poisoned
+/// by the old bug where rebuilds without grammars loaded cached empty results.
+const EXTRACTOR_VERSION: &str = "2";
 
 /// Check if a file path has a supported source extension.
 fn is_source_file(path: &str) -> bool {
@@ -2161,8 +2163,12 @@ impl FileIndex {
                 // Extract type references using tree-sitter queries
                 let type_refs = parser.find_type_refs(&full_path, &content);
 
-                // Store result in CA cache (best-effort)
+                // Store result in CA cache (best-effort).
+                // Only cache when the grammar is actually loaded — if the grammar .so is
+                // absent, parse_file returns empty results that must NOT be cached or they
+                // will poison the cache for future runs when the grammar is available.
                 if !grammar.is_empty()
+                    && normalize_languages::parsers::parser_for(&grammar).is_some()
                     && let Some(ca) = &ca_cache_for_rayon
                 {
                     let cached = CachedFileData {
@@ -2434,8 +2440,10 @@ impl FileIndex {
                 let imports = parser.parse_imports(&full_path, &content);
                 let type_refs = parser.find_type_refs(&full_path, &content);
 
-                // Store in CA cache (best-effort)
+                // Store in CA cache (best-effort).
+                // Only cache when the grammar is actually loaded to prevent poisoning.
                 if !grammar.is_empty()
+                    && normalize_languages::parsers::parser_for(&grammar).is_some()
                     && let Some(ca) = &self.ca_cache
                 {
                     let cached_store = CachedFileData {

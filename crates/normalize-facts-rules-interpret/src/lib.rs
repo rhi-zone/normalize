@@ -38,13 +38,12 @@
 //! - `diagnostic(severity, rule_id, file, line, message)` — severity = "warning"/"error"/"info"/"hint";
 //!   file = "" for no location; line = 0 when the source has no line info.
 
-#[cfg(all(feature = "jit", target_arch = "x86_64"))]
-use ascent_interpreter::eval::SharedJitCompiler;
 use ascent_interpreter::eval::{Engine, SourceId, Value};
 use ascent_interpreter::ir::Program;
 use ascent_interpreter::syntax::AscentProgram;
 use glob::Pattern;
 use normalize_facts_rules_api::{Diagnostic, DiagnosticLevel, Relations};
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -983,8 +982,7 @@ pub fn run_rule_with_cache(
 /// across all subsequent engine instances — avoiding repeated JIT compilation of
 /// identical rule bodies.
 ///
-/// JIT compiler sharing is active: the first rule is compiled with JIT enabled, and
-/// subsequent rules reuse the shared compiled state via `set_jit_compiler`.
+/// Runs each rule in parallel (rayon). Each rule gets its own engine and JIT compiler.
 ///
 /// Applies per-rule allow patterns and severity promotion, identical to `run_rule`.
 /// Returns all diagnostics from all rules combined.
@@ -996,72 +994,66 @@ pub fn run_rules_batch(
         return Ok(Vec::new());
     }
 
-    #[cfg(all(target_arch = "x86_64", feature = "jit"))]
-    let mut shared_jit: Option<SharedJitCompiler> = None;
-    let mut all_diagnostics = Vec::new();
+    let results: Vec<Result<Vec<Diagnostic>, InterpretError>> = rules
+        .par_iter()
+        .map(|rule| {
+            let full_source = format!("{}\n{}", PREAMBLE, &rule.source);
+            let ast: AscentProgram =
+                syn::parse_str(&full_source).map_err(|e| InterpretError::Parse(e.to_string()))?;
+            let program = Program::from_ast(ast).map_err(InterpretError::Parse)?;
 
-    for rule in rules {
-        let full_source = format!("{}\n{}", PREAMBLE, &rule.source);
-        let ast: AscentProgram =
-            syn::parse_str(&full_source).map_err(|e| InterpretError::Parse(e.to_string()))?;
-        let program = Program::from_ast(ast).map_err(InterpretError::Parse)?;
+            let mut engine = Engine::new(program);
+            // JIT is not enabled here: the JIT internals are not safe for concurrent
+            // use across multiple threads (jit_recent_indices uninitialized for sink
+            // relations when engines run in parallel). Interpreted evaluation runs in
+            // parallel instead; on multi-core machines this offsets the per-rule JIT
+            // speedup. Enable JIT per-rule once ascent-interpreter threading is fixed.
+            populate_facts(&mut engine, relations)?;
+            engine
+                .run()
+                .map_err(|e| InterpretError::Eval(e.to_string()))?;
+            engine.materialize();
 
-        let mut engine = Engine::new(program);
+            let mut diagnostics = extract_diagnostics(&engine);
 
-        #[cfg(all(target_arch = "x86_64", feature = "jit"))]
-        match shared_jit.take() {
-            Some(jit) => engine.set_jit_compiler(jit),
-            None => engine
-                .enable_jit()
-                .map_err(|e| InterpretError::Parse(e.to_string()))?,
-        }
-
-        populate_facts(&mut engine, relations)?;
-        engine
-            .run()
-            .map_err(|e| InterpretError::Eval(e.to_string()))?;
-        engine.materialize();
-
-        #[cfg(all(target_arch = "x86_64", feature = "jit"))]
-        {
-            shared_jit = engine.share_jit_compiler();
-        }
-
-        let mut diagnostics = extract_diagnostics(&engine);
-
-        // Apply per-rule allow patterns.
-        if !rule.allow.is_empty() {
-            diagnostics.retain(|d| {
-                let match_str = match d.location.as_ref() {
-                    Some(loc) => loc.file.as_str(),
-                    None => d.message.as_str(),
-                };
-                !rule.allow.iter().any(|p| p.matches(match_str))
-            });
-        }
-
-        // Apply per-rule severity.
-        match rule.severity {
-            Severity::Error => {
-                for d in &mut diagnostics {
-                    d.level = DiagnosticLevel::Error;
-                }
+            // Apply per-rule allow patterns.
+            if !rule.allow.is_empty() {
+                diagnostics.retain(|d| {
+                    let match_str = match d.location.as_ref() {
+                        Some(loc) => loc.file.as_str(),
+                        None => d.message.as_str(),
+                    };
+                    !rule.allow.iter().any(|p| p.matches(match_str))
+                });
             }
-            Severity::Info | Severity::Hint => {
-                // `DiagnosticLevel` has no `Info` variant; `Hint` is the closest
-                // available level. See the same comment in `run_rule` for details.
-                for d in &mut diagnostics {
-                    if d.level == DiagnosticLevel::Warning {
-                        d.level = DiagnosticLevel::Hint;
+
+            // Apply per-rule severity.
+            match rule.severity {
+                Severity::Error => {
+                    for d in &mut diagnostics {
+                        d.level = DiagnosticLevel::Error;
                     }
                 }
+                Severity::Info | Severity::Hint => {
+                    // `DiagnosticLevel` has no `Info` variant; `Hint` is the closest
+                    // available level. See the same comment in `run_rule` for details.
+                    for d in &mut diagnostics {
+                        if d.level == DiagnosticLevel::Warning {
+                            d.level = DiagnosticLevel::Hint;
+                        }
+                    }
+                }
+                Severity::Warning => {}
             }
-            Severity::Warning => {}
-        }
 
-        all_diagnostics.extend(diagnostics);
+            Ok(diagnostics)
+        })
+        .collect();
+
+    let mut all_diagnostics = Vec::new();
+    for result in results {
+        all_diagnostics.extend(result?);
     }
-
     Ok(all_diagnostics)
 }
 
