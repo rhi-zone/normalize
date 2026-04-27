@@ -13,6 +13,17 @@ cargo clippy --all-targets --all-features -- -D warnings 2>/dev/null || {
     echo "  Warning: clippy check failed or not available (non-critical)"
 }
 
+echo "Validating .calls.scm capture names..."
+bad=$(grep -roh "@[A-Za-z0-9_.]*" --include="*.calls.scm" . 2>/dev/null \
+      | grep -oP "@\K.*" \
+      | grep -vxE "call|call\.write|call\.qualifier" \
+      | sort -u)
+if [ -n "$bad" ]; then
+    echo "error: invalid capture names in .calls.scm files:"
+    echo "$bad" | sed 's/^/  @/'
+    exit 1
+fi
+
 # Run normalize checks if binary exists.
 # Prefer debug (always current); release may be stale during active development.
 if [ -x "./target/debug/normalize" ] || [ -x "./target/release/normalize" ]; then

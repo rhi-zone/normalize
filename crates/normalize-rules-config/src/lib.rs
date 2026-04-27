@@ -56,17 +56,6 @@ pub struct SarifTool {
     /// Command to run. `{root}` is replaced with the project root path.
     /// Example: `["npx", "eslint", "--format", "json", "{root}"]`
     pub command: Vec<String>,
-    /// Glob patterns (relative to project root) for files this tool watches.
-    ///
-    /// When set, `normalize rules run` caches this tool's SARIF output keyed by the
-    /// maximum mtime of all matching files. On warm runs where no watched file has
-    /// changed, the tool is skipped and results are served from cache.
-    ///
-    /// If empty (the default), the tool always re-runs (no caching).
-    ///
-    /// Example: `["**/*.calls.scm"]`
-    #[serde(default)]
-    pub watch: Vec<String>,
 }
 
 /// Common per-rule configuration fields shared across all rule engines.
