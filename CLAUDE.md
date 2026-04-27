@@ -139,6 +139,7 @@ Do not:
 - Ship mutating commands without `--dry-run`
 - Do half measures — when introducing a new abstraction, replace all existing ad-hoc code with it. "We'll clean it up later" means it never gets cleaned up.
 - Defer cleanup that should happen now — if something doesn't meet the bar (crate with one dependent and no standalone value, dead code, stale doc), remove it immediately. Don't wait for a "maintenance burden" to materialise.
+- Delete infrastructure because its only current *consumer* was removed — YAGNI governs *adding* new abstractions, not *deleting* existing ones. If infrastructure was added to solve a real category of problem (not a hypothetical), removing the one misconfigured consumer doesn't make it "hypothetical." Ask: does this solve a real problem class, or was it speculative from the start?
 - "Unify" commands by wrapping N report types in an enum — real consolidation means one report struct with shared fields. If reports have nothing in common, they shouldn't be forced under one command.
 - Write stub implementations — `None`/empty is only correct when the concept genuinely doesn't exist in that language
 - Put node classification in Rust when a `.scm` query file fits — `*.calls.scm`, `*.complexity.scm` etc. Extraction (getting names/fields from identified nodes) stays in Rust.
