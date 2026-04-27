@@ -8,6 +8,7 @@ use std::path::Path;
 
 use normalize_edit::SymbolLocation;
 use normalize_languages::parsers::{grammar_loader, parse_with_grammar};
+use normalize_languages::satisfies_predicates;
 use normalize_languages::support_for_path;
 use tree_sitter::StreamingIterator as _;
 
@@ -117,7 +118,11 @@ pub fn decoration_extended_start(
         let mut qcursor = tree_sitter::QueryCursor::new();
         let mut matches = qcursor.matches(&compiled, root, content.as_bytes());
         let mut ids = HashSet::new();
+        let source_bytes = content.as_bytes();
         while let Some(m) = matches.next() {
+            if !satisfies_predicates(&compiled, m, source_bytes) {
+                continue;
+            }
             for capture in m.captures {
                 ids.insert(capture.node.id());
             }

@@ -64,6 +64,9 @@ fn collect_captures(
     let mut results = Vec::new();
     let mut matches = cursor.matches(&query, tree.root_node(), source_bytes);
     while let Some(m) = matches.next() {
+        if !normalize_languages::satisfies_predicates(&query, m, source_bytes) {
+            continue;
+        }
         for cap in m.captures {
             let cap_name = query.capture_names()[cap.index as usize];
             if cap_name.starts_with(capture_prefix) {

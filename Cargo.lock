@@ -5567,6 +5567,7 @@ dependencies = [
  "log",
  "normalize-facts-core",
  "normalize-language-meta",
+ "regex",
  "serde_json",
  "thiserror 2.0.18",
  "tokio",

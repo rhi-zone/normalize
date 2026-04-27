@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`#match?`/`#eq?` predicate evaluation for tree-sitter queries** — `normalize_languages::satisfies_predicates` now evaluates the standard tree-sitter predicates (`#match?`, `#not-match?`, `#eq?`, `#not-eq?`) so `.scm` query authors can filter captures by text content or equality. Unknown predicates continue to pass (forward-compatible). Predicate filtering is active in the decoration query runner used by `normalize refactor move`.
+
 ### Changed
 
 - **Daemon-cache timing diagnostic** — `normalize rules run` now prints `[timings] daemon-cache: ...` to stderr when diagnostics are served from the daemon's pre-warmed cache, making it visible that the fast path was taken.

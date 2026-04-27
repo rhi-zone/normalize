@@ -182,6 +182,7 @@ thiserror = "2"
 ast-grep-core = "0.40.5"
 normalize-facts-core = { path = "../normalize-facts-core" }
 normalize-language-meta = { path = "../normalize-language-meta" }
+regex = "1"
 
 [dev-dependencies]
 tokio = { workspace = true }
