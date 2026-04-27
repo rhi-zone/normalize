@@ -1,6 +1,6 @@
 # Normalize Roadmap
 
-Last triaged: 2026-03-12
+Last triaged: 2026-04-27
 
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
@@ -12,6 +12,18 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 Production-grade refactoring across all ~98 languages. Goal: rename, find-references,
 extract, inline, move — correct, without LSPs, without false positives.
+
+---
+
+## 0.3.0 readiness
+
+Not yet assessed. Previous session noted this as the next focus. Open questions:
+- What's the stated scope of 0.3.0? Check CHANGELOG.md `[Unreleased]` and any milestone notes.
+- Are there P0/blocking items that must land before a release? (See below.)
+- Is `normalize edit move` (shipped in this session's commits) the headline feature, or is there more?
+- The daemon nested-runtime panic (P2, "Incremental-first architecture") may be worth fixing before release if daemon is part of 0.3.0's story.
+
+Worth doing a pass over CHANGELOG.md `[Unreleased]` and the P0 section before deciding scope.
 
 ---
 
