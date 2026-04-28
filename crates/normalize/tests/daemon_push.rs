@@ -14,6 +14,11 @@
 //! a git repo, real grammars, native rules to fire) — the unit tests cover the
 //! delta-and-broadcast logic directly so the round-trip surface here only has
 //! to confirm the wire format.
+//!
+//! Each test gets its own isolated socket directory and constructs its
+//! `DaemonClient` via `DaemonClient::with_socket_path`, so tests can run in
+//! parallel — there is no shared `NORMALIZE_DAEMON_CONFIG_DIR` env-var state
+//! between client constructions.
 
 #![cfg(unix)]
 
@@ -26,7 +31,7 @@ use std::time::{Duration, Instant};
 struct DaemonGuard {
     child: Child,
     _config_dir: tempfile::TempDir,
-    config_dir_path: std::path::PathBuf,
+    socket_path: std::path::PathBuf,
 }
 
 impl DaemonGuard {
@@ -34,7 +39,13 @@ impl DaemonGuard {
     fn start() -> Self {
         let config_dir = tempfile::tempdir().unwrap();
         let config_path = config_dir.path().to_path_buf();
+        let socket_path = config_path.join("daemon.sock");
 
+        // The daemon child process reads NORMALIZE_DAEMON_CONFIG_DIR at
+        // startup to know where to listen — that's a startup parameter set
+        // before spawn, not a runtime global. Clients in this process target
+        // the same socket via `DaemonClient::with_socket_path` so we never
+        // touch our own env vars.
         let mut child = Command::cargo_bin("normalize")
             .expect("cargo bin")
             .arg("daemon")
@@ -47,18 +58,17 @@ impl DaemonGuard {
             .expect("spawn daemon");
 
         // Wait for the socket to appear (daemon is async; ~2s max).
-        let socket = config_path.join("daemon.sock");
         let deadline = Instant::now() + Duration::from_secs(10);
         while Instant::now() < deadline {
-            if socket.exists() {
+            if socket_path.exists() {
                 // Briefly wait for the listener to be accepting connections.
                 std::thread::sleep(Duration::from_millis(50));
-                let client = with_env(&config_path, DaemonClient::new);
+                let client = DaemonClient::with_socket_path(socket_path.clone());
                 if client.status().is_ok() {
                     return Self {
                         child,
                         _config_dir: config_dir,
-                        config_dir_path: config_path,
+                        socket_path,
                     };
                 }
             }
@@ -70,12 +80,12 @@ impl DaemonGuard {
         panic!("daemon failed to start within 10s");
     }
 
-    fn config_dir(&self) -> &std::path::Path {
-        &self.config_dir_path
+    fn socket_path(&self) -> &std::path::Path {
+        &self.socket_path
     }
 
     fn client(&self) -> DaemonClient {
-        with_env(&self.config_dir_path, DaemonClient::new)
+        DaemonClient::with_socket_path(self.socket_path.clone())
     }
 }
 
@@ -87,19 +97,6 @@ impl Drop for DaemonGuard {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
-}
-
-/// `DaemonClient::new()` reads the env var lazily inside `global_socket_path()`,
-/// but the env var is process-global. Tests that spawn a daemon and use the
-/// client must serialize via `#[serial_test::serial]` so the env var value
-/// stays valid across the daemon spawn and the client construction.
-fn with_env<R>(config_dir: &std::path::Path, f: impl FnOnce() -> R) -> R {
-    // SAFETY: callers are serialized via `#[serial_test::serial]`, so no other
-    // test in this crate is reading or writing this env var concurrently.
-    unsafe {
-        std::env::set_var("NORMALIZE_DAEMON_CONFIG_DIR", config_dir);
-    }
-    f()
 }
 
 /// Wait for the first event matching `pred`, or time out.
@@ -123,7 +120,6 @@ fn wait_for_event(
 }
 
 #[test]
-#[serial_test::serial]
 fn json_subscribe_delivers_file_changed_event() {
     let daemon = DaemonGuard::start();
     let project = tempfile::tempdir().unwrap();
@@ -132,10 +128,17 @@ fn json_subscribe_delivers_file_changed_event() {
     // Subscribe in a background thread and forward events to a channel.
     let (tx, rx) = mpsc::channel::<Event>();
     let project_path = project.path().to_path_buf();
-    let config_path = daemon.config_dir().to_path_buf();
+    let socket_path = daemon.socket_path().to_path_buf();
+    // Register the root explicitly *before* subscribing so we know the
+    // watcher is fully wired up. Doing it inside `Subscribe` works too, but
+    // it interleaves the (possibly slow) `add_root` work with the broadcast
+    // attach — racy under parallel test load. Doing it eagerly removes the
+    // race entirely.
+    DaemonClient::with_socket_path(socket_path.clone())
+        .add_root(&project_path)
+        .expect("add_root");
     let handle = std::thread::spawn(move || {
-        let client = with_env(&config_path, DaemonClient::new);
-        // Subscribe + auto-add the root.
+        let client = DaemonClient::with_socket_path(socket_path);
         let _ = client.watch_events(Some(&project_path), |ev| {
             let stop = matches!(ev, Event::FileChanged { .. });
             let _ = tx.send(ev);
@@ -160,7 +163,6 @@ fn json_subscribe_delivers_file_changed_event() {
 }
 
 #[test]
-#[serial_test::serial]
 fn binary_subscribe_delivers_file_changed_event() {
     let daemon = DaemonGuard::start();
     let project = tempfile::tempdir().unwrap();
@@ -168,9 +170,12 @@ fn binary_subscribe_delivers_file_changed_event() {
 
     let (tx, rx) = mpsc::channel::<Event>();
     let project_path = project.path().to_path_buf();
-    let config_path = daemon.config_dir().to_path_buf();
+    let socket_path = daemon.socket_path().to_path_buf();
+    DaemonClient::with_socket_path(socket_path.clone())
+        .add_root(&project_path)
+        .expect("add_root");
     let handle = std::thread::spawn(move || {
-        let client = with_env(&config_path, DaemonClient::new);
+        let client = DaemonClient::with_socket_path(socket_path);
         let _ = client.watch_events_binary(Some(&project_path), |ev| {
             let stop = matches!(ev, Event::FileChanged { .. });
             let _ = tx.send(ev);
@@ -195,7 +200,6 @@ fn binary_subscribe_delivers_file_changed_event() {
 /// requests via the same isolated path — this catches broken socket-path
 /// override wiring.
 #[test]
-#[serial_test::serial]
 fn isolated_socket_path_routes_to_isolated_daemon() {
     let daemon = DaemonGuard::start();
     let resp = daemon.client().status().expect("status reply");
@@ -214,7 +218,6 @@ fn isolated_socket_path_routes_to_isolated_daemon() {
 /// `DiagnosticsUpdated`) was ever broadcast. The daemon now uses
 /// `incremental_refresh_force()` which bypasses the gate.
 #[test]
-#[serial_test::serial]
 fn json_subscribe_delivers_index_refreshed_event() {
     let daemon = DaemonGuard::start();
     let project = tempfile::tempdir().unwrap();
@@ -223,9 +226,12 @@ fn json_subscribe_delivers_index_refreshed_event() {
 
     let (tx, rx) = mpsc::channel::<Event>();
     let project_path = project.path().to_path_buf();
-    let config_path = daemon.config_dir().to_path_buf();
+    let socket_path = daemon.socket_path().to_path_buf();
+    DaemonClient::with_socket_path(socket_path.clone())
+        .add_root(&project_path)
+        .expect("add_root");
     let handle = std::thread::spawn(move || {
-        let client = with_env(&config_path, DaemonClient::new);
+        let client = DaemonClient::with_socket_path(socket_path);
         let _ = client.watch_events(Some(&project_path), |ev| {
             let stop = matches!(ev, Event::IndexRefreshed { .. });
             let _ = tx.send(ev);

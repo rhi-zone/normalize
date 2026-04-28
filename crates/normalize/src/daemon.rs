@@ -1837,10 +1837,25 @@ mod unix_impl {
     }
 
     impl DaemonClient {
+        /// Construct a client using the default socket path.
+        ///
+        /// Resolves `NORMALIZE_DAEMON_CONFIG_DIR` (via [`global_socket_path`])
+        /// **once** at construction and stores the result. Subsequent method
+        /// calls use the captured path, so changing the env var afterwards has
+        /// no effect on this client. This makes the client safe to use across
+        /// threads, in tests, in the LSP, and in library embedders without
+        /// racing on a process-global env var.
         pub fn new() -> Self {
-            Self {
-                socket_path: global_socket_path(),
-            }
+            Self::with_socket_path(global_socket_path())
+        }
+
+        /// Construct a client with an explicit socket path.
+        ///
+        /// Useful for tests, LSPs talking to multiple workspaces, and library
+        /// embedders that want full control over which daemon they target —
+        /// no env-var read involved.
+        pub fn with_socket_path(socket_path: PathBuf) -> Self {
+            Self { socket_path }
         }
 
         pub fn is_available(&self) -> bool {
@@ -2510,6 +2525,12 @@ pub struct DaemonClient;
 #[cfg(not(unix))]
 impl DaemonClient {
     pub fn new() -> Self {
+        Self
+    }
+
+    /// Stub for parity with the Unix impl. The Windows daemon is not
+    /// supported, so the socket path is ignored.
+    pub fn with_socket_path(_socket_path: PathBuf) -> Self {
         Self
     }
 

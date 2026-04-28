@@ -139,7 +139,6 @@ libc = "0.2"
 tempfile = "3"
 insta = "1"
 assert_cmd = "2"
-serial_test = "3"
 
 [build-dependencies]
 flate2 = "1"

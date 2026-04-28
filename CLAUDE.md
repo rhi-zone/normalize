@@ -145,6 +145,15 @@ Do not:
 - Put node classification in Rust when a `.scm` query file fits — `*.calls.scm`, `*.complexity.scm` etc. Extraction (getting names/fields from identified nodes) stays in Rust.
 - Use path dependencies in Cargo.toml — causes clippy to stash changes across repos
 - Use `--no-verify` — fix the issue or fix the hook
+- Read mutable globals (env vars, `lazy_static`, `OnceLock` of writable state) at call sites
+  for things that should be construction-time config. Pass dependencies in. A `Client::new()`
+  that pulls a socket path from `std::env::var(...)` on every invocation looks fine until
+  two threads do it with different values, or a long-lived process (LSP, IDE plugin, library
+  embedding) needs to talk to two daemons concurrently. Pattern: capture the env var **once**
+  in a default-resolver, expose a `Client::with_X(x)` constructor that takes the resolved
+  value, and have `Client::new()` delegate to it. Tests then construct with explicit values
+  — no `serial_test`, no env-var serialization, no race. The general rule: configuration
+  flows in via constructors, not out via globals at call sites.
 - Shell out to external tools when a crate exists — use `fast_rsync` not `rsync`, `git2` not `git`,
   `zip` not `unzip`, etc. Shelling out adds a runtime dependency, breaks on systems where the tool
   is absent or has a different version, and loses structured error handling. Exceptions: tools that
