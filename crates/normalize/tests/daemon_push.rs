@@ -205,16 +205,16 @@ fn isolated_socket_path_routes_to_isolated_daemon() {
 /// Reproduces the original manual-test bug report: the daemon emits
 /// `FileChanged` but does it ever emit `IndexRefreshed` after a real edit?
 ///
-/// FAILS: `incremental_refresh()` short-circuits via `needs_refresh()` whose
-/// 60-second staleness gate suppresses file-watcher-driven refreshes within
-/// the first minute after `add_root`. The notify event arrives, the dispatch
-/// thread sends to `refresh_tx`, the handler calls `incremental_refresh`,
-/// which returns `Ok(Vec::new())` because the gate is closed — so no
-/// `IndexRefreshed` (or `DiagnosticsUpdated`) is ever broadcast. See
-/// `TODO.md` "Daemon refresh path suppressed by `needs_refresh()` 60s gate".
+/// Regression test: previously the daemon's `refresh_root` called
+/// `incremental_refresh()`, whose 60-second `needs_refresh()` staleness gate
+/// suppressed file-watcher-driven refreshes within the first minute after
+/// `add_root`. The notify event arrived, the dispatch thread sent to
+/// `refresh_tx`, the handler called `incremental_refresh`, which returned
+/// `Ok(Vec::new())` because the gate was closed — so no `IndexRefreshed` (or
+/// `DiagnosticsUpdated`) was ever broadcast. The daemon now uses
+/// `incremental_refresh_force()` which bypasses the gate.
 #[test]
 #[serial_test::serial]
-#[ignore = "FAILS: needs_refresh 60s gate suppresses daemon refresh — see TODO.md"]
 fn json_subscribe_delivers_index_refreshed_event() {
     let daemon = DaemonGuard::start();
     let project = tempfile::tempdir().unwrap();

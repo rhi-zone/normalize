@@ -1229,7 +1229,10 @@ mod unix_impl {
 
             {
                 let mut idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
-                match self.runtime_handle.block_on(idx.incremental_refresh()) {
+                match self
+                    .runtime_handle
+                    .block_on(idx.incremental_refresh_force())
+                {
                     Ok(changed) if !changed.is_empty() => {
                         if let Err(e) = self
                             .runtime_handle
@@ -1372,6 +1375,12 @@ mod unix_impl {
                             merged.extend(new_syntax_issues);
                             merged
                         };
+
+                        // Release the FileIndex lock before calling save_*
+                        // helpers below — they re-acquire it via
+                        // `get_root_index(root)`, which would deadlock on the
+                        // std::sync::Mutex held by `idx` here.
+                        drop(idx);
 
                         // --- Native rules (full re-run, replace cache) ---
                         let native_issues: Vec<normalize_output::diagnostics::Issue> = {

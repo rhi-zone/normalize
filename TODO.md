@@ -29,25 +29,6 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ## P0 — Blocking / Broken / Incoherent
 
-### Daemon refresh path suppressed by `needs_refresh()` 60s gate
-
-`crates/normalize-facts/src/index.rs::needs_refresh()` returns `false` when
-`now - last_indexed < 60`. The daemon's `refresh_root` calls
-`incremental_refresh()`, which short-circuits to `Ok(Vec::new())` when
-`needs_refresh()` is false — so file-watcher-driven refreshes within the first
-60 seconds after `add_root` (the prime refresh) are silently dropped. As a
-result, no `IndexRefreshed` or `DiagnosticsUpdated` event is broadcast for
-real file edits during that window. Reproduction:
-`crates/normalize/tests/daemon_push.rs::json_subscribe_delivers_index_refreshed_event`
-(currently `#[ignore]` with a `// FAILS:` comment).
-
-Likely fix: bypass the staleness gate when called from the daemon refresh
-handler — the gate exists for cold CLI calls, not for an event-driven daemon
-that has already received a notify event. Either:
-  1. Add `incremental_refresh_force()` that skips `needs_refresh()`, or
-  2. In the daemon path, call `invalidate_last_indexed()` before
-     `incremental_refresh()`.
-
 ### server-less UX issues — ~~all fixed~~ (server-less commit 9c294b2)
 
 1. ~~**`name` attribute ignored for nested services**~~: Fixed — `#[cli(name = "...")]` now works on individual methods (leaf and mount). `get_cli_name()` helper added.

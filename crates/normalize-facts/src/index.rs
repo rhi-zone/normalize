@@ -808,7 +808,19 @@ impl FileIndex {
         if !self.needs_refresh().await {
             return Ok(Vec::new());
         }
+        self.incremental_refresh_force().await
+    }
 
+    /// Refresh only files that have changed, bypassing the `needs_refresh()`
+    /// staleness gate.
+    ///
+    /// `incremental_refresh()` short-circuits if the index was refreshed within
+    /// the last 60 seconds and no top-level mtime changes are visible — a cheap
+    /// "probably nothing changed" heuristic for cold-CLI callers running many
+    /// commands in quick succession. For an event-driven daemon, the watcher
+    /// firing **is** the signal that something changed, so the gate is wrong.
+    /// Daemons should call this variant.
+    pub async fn incremental_refresh_force(&mut self) -> Result<Vec<PathBuf>, libsql::Error> {
         let changed = self.get_changed_files().await?;
         let total_changes = changed.added.len() + changed.modified.len() + changed.deleted.len();
 
