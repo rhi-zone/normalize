@@ -99,6 +99,8 @@ pub struct GrammarLoader {
     imports_cache: RwLock<HashMap<String, Arc<String>>>,
     /// Cached decorations queries.
     decorations_cache: RwLock<HashMap<String, Arc<String>>>,
+    /// Cached test-regions queries.
+    test_regions_cache: RwLock<HashMap<String, Arc<String>>>,
     /// Cached compiled tree-sitter queries (keyed by "grammar:query_type").
     compiled_query_cache: RwLock<HashMap<String, Arc<tree_sitter::Query>>>,
 }
@@ -138,6 +140,7 @@ impl GrammarLoader {
             tags_cache: RwLock::new(HashMap::new()),
             imports_cache: RwLock::new(HashMap::new()),
             decorations_cache: RwLock::new(HashMap::new()),
+            test_regions_cache: RwLock::new(HashMap::new()),
             compiled_query_cache: RwLock::new(HashMap::new()),
         }
     }
@@ -156,6 +159,7 @@ impl GrammarLoader {
             tags_cache: RwLock::new(HashMap::new()),
             imports_cache: RwLock::new(HashMap::new()),
             decorations_cache: RwLock::new(HashMap::new()),
+            test_regions_cache: RwLock::new(HashMap::new()),
             compiled_query_cache: RwLock::new(HashMap::new()),
         }
     }
@@ -418,6 +422,42 @@ impl GrammarLoader {
         let bundled = bundled_decorations_query(name)?;
         let query = Arc::new(bundled.to_string());
         self.decorations_cache
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(name.to_string(), Arc::clone(&query));
+        Some(query)
+    }
+
+    /// Get the test-regions query for a grammar.
+    ///
+    /// Returns None if no test-regions query exists for the grammar.
+    /// Query files are `{name}.test_regions.scm` in the grammar search paths.
+    /// Uses `@test_region` captures for byte ranges of test-only code that
+    /// rules may opt to skip (via `applies_in_tests = false`, the default).
+    ///
+    /// Languages without a `.test_regions.scm` simply have no AST-based test
+    /// detection — path-based excludes (e.g. `**/tests/**` or `*_test.go`)
+    /// remain the way to scope rules in those cases.
+    pub fn get_test_regions(&self, name: &str) -> Option<Arc<String>> {
+        // Check cache first
+        if let Some(query) = self
+            .test_regions_cache
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+        {
+            return Some(Arc::clone(query));
+        }
+
+        // External file takes priority over bundled
+        if let Some(q) = self.load_query(name, "test_regions", &self.test_regions_cache) {
+            return Some(q);
+        }
+
+        // Fall back to bundled query
+        let bundled = bundled_test_regions_query(name)?;
+        let query = Arc::new(bundled.to_string());
+        self.test_regions_cache
             .write()
             .unwrap_or_else(|e| e.into_inner())
             .insert(name.to_string(), Arc::clone(&query));
@@ -1090,6 +1130,20 @@ fn bundled_decorations_query(name: &str) -> Option<&'static str> {
         "clojure" => Some(include_str!("queries/clojure.decorations.scm")),
         "scheme" => Some(include_str!("queries/scheme.decorations.scm")),
         "prolog" => Some(include_str!("queries/prolog.decorations.scm")),
+        _ => None,
+    }
+}
+
+/// Return a bundled test-regions query for a grammar, if available.
+///
+/// Captures `@test_region` for byte ranges of test-only source regions
+/// (e.g. inline `#[cfg(test)] mod ...` blocks in Rust). Languages whose
+/// test conventions are filename-based (e.g. Go's `*_test.go`) or where
+/// no AST-level distinction exists return None and rely on path-based
+/// excludes instead.
+fn bundled_test_regions_query(name: &str) -> Option<&'static str> {
+    match name {
+        "rust" => Some(include_str!("queries/rust.test_regions.scm")),
         _ => None,
     }
 }

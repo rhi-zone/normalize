@@ -265,6 +265,11 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
+    let applies_in_tests = frontmatter
+        .get("applies_in_tests")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
     Some(Rule {
         id,
         query_str: query_str.trim().to_string(),
@@ -281,6 +286,7 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         tags,
         doc,
         recommended,
+        applies_in_tests,
     })
 }
 

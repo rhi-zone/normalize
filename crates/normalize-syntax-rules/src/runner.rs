@@ -235,42 +235,31 @@ fn line_has_allow_comment(line: &str, rule_id: &str) -> bool {
     false
 }
 
-/// Tree-sitter query that captures Rust `mod_item` nodes annotated with
-/// `#[cfg(test)]`. Used to skip findings inside inline test modules — the
-/// dominant Rust convention for unit tests, which path-based `**/tests/**`
-/// allow globs do not catch.
-const RUST_CFG_TEST_MOD_QUERY: &str = r#"
-(mod_item
-  (attributes
-    (attribute_item
-      (attribute
-        (identifier) @_attr_name
-        (token_tree (identifier) @_arg)
-        (#eq? @_attr_name "cfg")
-        (#eq? @_arg "test"))))) @cfg_test_mod
-"#;
-
-/// Compute the byte ranges of `#[cfg(test)] mod ... { ... }` items in a Rust
-/// source file, so findings inside them can be filtered out.
+/// Compute the byte ranges of test-only regions in a source file, using the
+/// per-language `*.test_regions.scm` query loaded via `GrammarLoader`.
 ///
-/// Returns an empty vector for non-Rust grammars or if the query fails to
-/// compile (which would be a bug, since the query string is a constant).
-fn cfg_test_module_ranges(
+/// Returns an empty vector for grammars without a test-regions query (which
+/// is correct: path-based excludes like `**/tests/**` or `*_test.go` remain
+/// the only test-detection mechanism for those languages).
+///
+/// The runner has no language-specific knowledge — what counts as a "test
+/// region" is entirely defined by the language's `.scm` query file.
+fn test_region_ranges(
     grammar_name: &str,
-    grammar: &tree_sitter::Language,
     tree: &tree_sitter::Tree,
     source: &[u8],
+    loader: &GrammarLoader,
 ) -> Vec<(usize, usize)> {
-    if grammar_name != "rust" {
+    let Some(query_str) = loader.get_test_regions(grammar_name) else {
         return Vec::new();
-    }
-    let Ok(query) = tree_sitter::Query::new(grammar, RUST_CFG_TEST_MOD_QUERY) else {
+    };
+    let Some(query) = loader.get_compiled_query(grammar_name, "test_regions", &query_str) else {
         return Vec::new();
     };
     let Some(capture_idx) = query
         .capture_names()
         .iter()
-        .position(|n| *n == "cfg_test_mod")
+        .position(|n| *n == "test_region")
     else {
         return Vec::new();
     };
@@ -520,8 +509,10 @@ struct FileContext<'a> {
     source_registry: &'a SourceRegistry,
     source_ctx: SourceContext<'a>,
     allow_path_str: &'a str,
-    /// Byte ranges of `#[cfg(test)]`-attributed modules in this file. Findings
-    /// whose location falls inside any of these ranges are dropped.
+    /// Byte ranges of test-only regions in this file (e.g. Rust
+    /// `#[cfg(test)] mod ...` blocks), as captured by the language's
+    /// `*.test_regions.scm` query. Findings inside these ranges are dropped
+    /// for rules where `applies_in_tests = false` (the default).
     skip_ranges: &'a [(usize, usize)],
 }
 
@@ -569,7 +560,9 @@ fn process_file_matches(
             continue;
         };
 
-        if in_any_range(cap.node.start_byte(), cap.node.end_byte(), ctx.skip_ranges) {
+        if !rule.applies_in_tests
+            && in_any_range(cap.node.start_byte(), cap.node.end_byte(), ctx.skip_ranges)
+        {
             continue;
         }
 
@@ -738,8 +731,7 @@ pub fn run_rules(
                 continue;
             };
 
-            let skip_ranges =
-                cfg_test_module_ranges(grammar_name, &grammar, &tree, content.as_bytes());
+            let skip_ranges = test_region_ranges(grammar_name, &tree, content.as_bytes(), loader);
 
             let file_ctx = FileContext {
                 file,
@@ -1249,7 +1241,7 @@ fn main() {
     }
 
     #[test]
-    fn test_cfg_test_module_ranges_skips_inline_test_module() {
+    fn test_test_region_ranges_skips_inline_cfg_test_module() {
         let loader = loader();
         let grammar = loader.get("rust").expect("rust grammar");
         let source = r#"
@@ -1283,7 +1275,7 @@ mod regular_mod {
         let mut parser = tree_sitter::Parser::new();
         assert!(parser.set_language(&grammar).is_ok());
         let tree = parser.parse(source, None).expect("parse");
-        let ranges = cfg_test_module_ranges("rust", &grammar, &tree, source.as_bytes());
+        let ranges = test_region_ranges("rust", &tree, source.as_bytes(), &loader);
         assert_eq!(
             ranges.len(),
             2,
@@ -1331,6 +1323,91 @@ mod regular_mod {
             inside.len(),
             2,
             "expected 2 unwraps inside cfg(test), got {classifications:?}"
+        );
+    }
+
+    /// `applies_in_tests = false` (default) drops findings inside test regions;
+    /// `applies_in_tests = true` keeps them. Same file content, two rules with
+    /// the same query but different opt-in.
+    #[test]
+    fn test_applies_in_tests_per_rule_opt_in() {
+        let loader = loader();
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let file_path = tmp.path().join("lib.rs");
+        std::fs::write(
+            &file_path,
+            r#"fn outer() {
+    let x: Option<i32> = None;
+    x.unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    fn inner() {
+        let y: Option<i32> = None;
+        y.unwrap();
+    }
+}
+"#,
+        )
+        .expect("write fixture");
+
+        let query_str = r#"((call_expression
+  function: (field_expression field: (field_identifier) @_m)
+  (#eq? @_m "unwrap")) @match)"#;
+
+        let make_rule = |id: &str, applies_in_tests: bool| {
+            let frontmatter = format!(
+                "# ---\n# id = \"{id}\"\n# severity = \"warning\"\n# message = \"unwrap\"\n# languages = [\"rust\"]\n# applies_in_tests = {applies_in_tests}\n# ---\n\n{query_str}\n"
+            );
+            crate::parse_rule_content(&frontmatter, id, false).expect("parse rule")
+        };
+
+        let path_filter = normalize_rules_config::PathFilter::default();
+        let walk_config = normalize_rules_config::WalkConfig::default();
+        let debug = DebugFlags::default();
+
+        // Rule with applies_in_tests = false (default): only the outer unwrap.
+        let rules_default = vec![make_rule("test/unwrap-default", false)];
+        let findings = run_rules(
+            &rules_default,
+            tmp.path(),
+            tmp.path(),
+            &loader,
+            None,
+            None,
+            None,
+            &debug,
+            None,
+            &path_filter,
+            &walk_config,
+        );
+        assert_eq!(
+            findings.len(),
+            1,
+            "applies_in_tests=false should drop the cfg(test) finding, got {findings:?}"
+        );
+        assert_eq!(findings[0].start_line, 3, "outer unwrap is on line 3");
+
+        // Rule with applies_in_tests = true: both unwraps.
+        let rules_optin = vec![make_rule("test/unwrap-in-tests", true)];
+        let findings = run_rules(
+            &rules_optin,
+            tmp.path(),
+            tmp.path(),
+            &loader,
+            None,
+            None,
+            None,
+            &debug,
+            None,
+            &path_filter,
+            &walk_config,
+        );
+        assert_eq!(
+            findings.len(),
+            2,
+            "applies_in_tests=true should keep both unwraps, got {findings:?}"
         );
     }
 

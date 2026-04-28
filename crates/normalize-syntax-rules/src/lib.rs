@@ -94,6 +94,18 @@ pub struct Rule {
     pub doc: Option<String>,
     /// Whether this rule is recommended for most projects (catches real bugs, not style).
     pub recommended: bool,
+    /// Whether this rule should fire inside language-specific test regions
+    /// (e.g. Rust `#[cfg(test)] mod ...` blocks). Defaults to `false`, meaning
+    /// findings inside those regions are dropped — appropriate for rules like
+    /// `unwrap-in-impl` or `dbg-macro` where panics/debug calls are expected
+    /// in test code. Style rules, complexity ratchets, and tag-convention
+    /// rules that should fire in tests can opt in by setting this to `true`.
+    ///
+    /// Test-region detection is per-language and lives in
+    /// `{lang}.test_regions.scm` query files. Languages without such a file
+    /// have no AST-based test detection — path-based excludes (e.g.
+    /// `**/tests/**` or `*_test.go`) remain the only mechanism there.
+    pub applies_in_tests: bool,
 }
 
 /// A builtin rule definition (id, content).

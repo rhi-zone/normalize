@@ -57,6 +57,20 @@ Rules are `.scm` files with TOML frontmatter in comment blocks:
 | `enabled` | No | `true` | Set to `false` to disable a builtin rule |
 | `requires` | No | `{}` | Conditional execution (see [Conditionals](#conditionals)) |
 | `fix` | No | - | Auto-fix template (see [Auto-fix](#auto-fix)) |
+| `applies_in_tests` | No | `false` | Whether the rule fires inside language-specific test regions (e.g. Rust `#[cfg(test)] mod ...`). See [Test regions](#test-regions). |
+
+## Test regions
+
+Most syntax rules target production code: a `.unwrap()` or `dbg!` is fine in a `#[test]` but a real bug elsewhere. By default, findings inside language-specific *test regions* are dropped. A rule that should also fire in test code (style, complexity ratchets, tag conventions, etc.) opts in by setting `applies_in_tests = true` in its frontmatter.
+
+Test-region detection is per-language and lives in `{lang}.test_regions.scm` query files (alongside `.tags.scm`, `.complexity.scm`, etc.) under `crates/normalize-languages/src/queries/`. A query captures one or more `@test_region` nodes per match; their byte ranges define the test regions in that file.
+
+| Language | What counts as a test region |
+|----------|------------------------------|
+| Rust     | Inline `#[cfg(test)] mod ...` blocks |
+| (others) | None yet — path-based excludes (`**/tests/**`, `*_test.go`) remain the only mechanism |
+
+Languages without a `.test_regions.scm` are unaffected by `applies_in_tests` — every finding is kept regardless. Adding test-region detection for a new language is purely additive: drop in a `{lang}.test_regions.scm` and existing rules pick it up.
 
 ## Tree-sitter Queries
 
