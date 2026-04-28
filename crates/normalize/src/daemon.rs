@@ -178,22 +178,30 @@ mod unix_impl {
     use tokio::net::UnixListener;
     use tokio::sync::broadcast;
 
-    /// Get the daemon lock file path (~/.config/normalize/daemon.lock)
-    /// Used by the daemon process to ensure only one instance runs.
-    fn daemon_lock_path() -> PathBuf {
+    /// Resolve the directory used for daemon lock + socket files.
+    ///
+    /// In production this is `~/.config/normalize`. Tests can set
+    /// `NORMALIZE_DAEMON_CONFIG_DIR` to use an isolated directory so multiple
+    /// daemons can coexist without contending on the user's running daemon.
+    fn daemon_config_dir() -> PathBuf {
+        if let Some(p) = std::env::var_os("NORMALIZE_DAEMON_CONFIG_DIR") {
+            return PathBuf::from(p);
+        }
         dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join("normalize")
-            .join("daemon.lock")
+    }
+
+    /// Get the daemon lock file path (~/.config/normalize/daemon.lock)
+    /// Used by the daemon process to ensure only one instance runs.
+    fn daemon_lock_path() -> PathBuf {
+        daemon_config_dir().join("daemon.lock")
     }
 
     /// Get the spawn lock file path (~/.config/normalize/daemon-spawn.lock)
     /// Used by clients to serialize daemon spawn attempts.
     fn spawn_lock_path() -> PathBuf {
-        dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("normalize")
-            .join("daemon-spawn.lock")
+        daemon_config_dir().join("daemon-spawn.lock")
     }
 
     /// Try to acquire an exclusive non-blocking flock on the given path.
@@ -235,12 +243,12 @@ mod unix_impl {
         Ok(file)
     }
 
-    /// Get global daemon socket path (~/.config/normalize/daemon.sock)
+    /// Get global daemon socket path (~/.config/normalize/daemon.sock).
+    ///
+    /// Tests can override the parent directory by setting
+    /// `NORMALIZE_DAEMON_CONFIG_DIR`.
     pub fn global_socket_path() -> PathBuf {
-        dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("normalize")
-            .join("daemon.sock")
+        daemon_config_dir().join("daemon.sock")
     }
 
     /// A watched root. The shared watcher is owned by `DaemonServer`; this struct
@@ -2100,6 +2108,335 @@ mod unix_impl {
     impl Default for DaemonClient {
         fn default() -> Self {
             Self::new()
+        }
+    }
+
+    // =========================================================================
+    // Tests for per-file diagnostics + JSON mirror.
+    //
+    // These live inside `unix_impl` so they can construct a minimal
+    // `DaemonServer` (with no real watchers/runtime) and exercise the
+    // per-file storage + delta logic directly.
+    // =========================================================================
+    #[cfg(test)]
+    mod per_file_tests {
+        use super::*;
+        use normalize_output::diagnostics::{Issue, Severity};
+
+        fn issue(file: &str, line: usize, msg: &str) -> Issue {
+            Issue {
+                file: file.to_string(),
+                line: Some(line),
+                column: Some(1),
+                end_line: None,
+                end_column: None,
+                rule_id: "test/rule".to_string(),
+                message: msg.to_string(),
+                severity: Severity::Warning,
+                source: "test".to_string(),
+                related: Vec::new(),
+                suggestion: None,
+            }
+        }
+
+        /// Construct a minimal `DaemonServer` whose only working state is the
+        /// SQLite-backed `WatchedRoot.index`. Watchers/channels are wired but
+        /// unused — these tests never trigger refreshes or file events.
+        async fn make_test_server(root: &Path) -> Arc<DaemonServer> {
+            let (refresh_tx, _refresh_rx) = std::sync::mpsc::channel::<PathBuf>();
+            let (native_tx, _native_rx) = std::sync::mpsc::channel::<PathBuf>();
+            let (notify_tx, _notify_rx) =
+                std::sync::mpsc::channel::<notify::Result<notify::Event>>();
+            let watcher = RecommendedWatcher::new(notify_tx, Config::default()).unwrap();
+            let server = Arc::new(DaemonServer::new(
+                refresh_tx,
+                native_tx,
+                tokio::runtime::Handle::current(),
+                watcher,
+            ));
+
+            // Open a real index for this root and register it directly without
+            // running the full add_root flow (which triggers a refresh and
+            // call-graph build we don't want here).
+            let idx = crate::index::open(root).await.unwrap();
+            let mut roots = server.roots.lock().unwrap();
+            roots.insert(
+                root.to_path_buf(),
+                WatchedRoot {
+                    last_refresh: Instant::now(),
+                    primed: true,
+                    has_git_index: false,
+                    index: Arc::new(std::sync::Mutex::new(idx)),
+                },
+            );
+            drop(roots);
+            server
+        }
+
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn save_per_file_delta_first_call_lists_all_dirty_files() {
+            let dir = tempfile::tempdir().unwrap();
+            let server = make_test_server(dir.path()).await;
+
+            let syntax = vec![issue("a.rs", 1, "x"), issue("b.rs", 2, "y")];
+            let delta = tokio::task::spawn_blocking({
+                let server = server.clone();
+                let root = dir.path().to_path_buf();
+                move || server.save_per_file_diagnostics(&root, &syntax, &[], &[])
+            })
+            .await
+            .unwrap();
+
+            let mut paths: Vec<&String> = delta.iter().map(|(p, _)| p).collect();
+            paths.sort();
+            assert_eq!(paths, vec!["a.rs", "b.rs"]);
+            // No empty issue vec on first call.
+            assert!(delta.iter().all(|(_, v)| !v.is_empty()));
+        }
+
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn save_per_file_delta_unchanged_call_is_empty() {
+            let dir = tempfile::tempdir().unwrap();
+            let server = make_test_server(dir.path()).await;
+            let syntax = vec![issue("a.rs", 1, "x")];
+
+            let _first = tokio::task::spawn_blocking({
+                let server = server.clone();
+                let root = dir.path().to_path_buf();
+                let s = syntax.clone();
+                move || server.save_per_file_diagnostics(&root, &s, &[], &[])
+            })
+            .await
+            .unwrap();
+
+            let second = tokio::task::spawn_blocking({
+                let server = server.clone();
+                let root = dir.path().to_path_buf();
+                move || server.save_per_file_diagnostics(&root, &syntax, &[], &[])
+            })
+            .await
+            .unwrap();
+            assert!(
+                second.is_empty(),
+                "unchanged content should produce no delta, got {:?}",
+                second
+            );
+        }
+
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn save_per_file_delta_changed_file_only() {
+            let dir = tempfile::tempdir().unwrap();
+            let server = make_test_server(dir.path()).await;
+            let syntax_v1 = vec![issue("a.rs", 1, "x"), issue("b.rs", 2, "y")];
+
+            let _first = tokio::task::spawn_blocking({
+                let server = server.clone();
+                let root = dir.path().to_path_buf();
+                let s = syntax_v1.clone();
+                move || server.save_per_file_diagnostics(&root, &s, &[], &[])
+            })
+            .await
+            .unwrap();
+
+            // Only a.rs's issue text changes.
+            let syntax_v2 = vec![issue("a.rs", 1, "DIFFERENT"), issue("b.rs", 2, "y")];
+            let delta = tokio::task::spawn_blocking({
+                let server = server.clone();
+                let root = dir.path().to_path_buf();
+                move || server.save_per_file_diagnostics(&root, &syntax_v2, &[], &[])
+            })
+            .await
+            .unwrap();
+
+            assert_eq!(
+                delta.len(),
+                1,
+                "delta should contain only a.rs: {:?}",
+                delta
+            );
+            assert_eq!(delta[0].0, "a.rs");
+            assert_eq!(delta[0].1.len(), 1);
+            assert_eq!(delta[0].1[0].message, "DIFFERENT");
+        }
+
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn save_per_file_delta_clean_file_emits_empty_vec() {
+            let dir = tempfile::tempdir().unwrap();
+            let server = make_test_server(dir.path()).await;
+            let syntax_v1 = vec![issue("a.rs", 1, "x"), issue("b.rs", 2, "y")];
+
+            let _first = tokio::task::spawn_blocking({
+                let server = server.clone();
+                let root = dir.path().to_path_buf();
+                let s = syntax_v1.clone();
+                move || server.save_per_file_diagnostics(&root, &s, &[], &[])
+            })
+            .await
+            .unwrap();
+
+            // b.rs becomes clean (no longer present in the input).
+            let syntax_v2 = vec![issue("a.rs", 1, "x")];
+            let delta = tokio::task::spawn_blocking({
+                let server = server.clone();
+                let root = dir.path().to_path_buf();
+                move || server.save_per_file_diagnostics(&root, &syntax_v2, &[], &[])
+            })
+            .await
+            .unwrap();
+
+            let b_entry = delta
+                .iter()
+                .find(|(p, _)| p == "b.rs")
+                .expect("b.rs should be in delta");
+            assert!(
+                b_entry.1.is_empty(),
+                "deleted file must have empty Vec: {:?}",
+                b_entry
+            );
+            // a.rs unchanged so must NOT be in the delta.
+            assert!(
+                delta.iter().all(|(p, _)| p != "a.rs"),
+                "unchanged a.rs leaked into delta: {:?}",
+                delta
+            );
+        }
+
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn write_json_mirror_produces_deterministic_keyed_output() {
+            let dir = tempfile::tempdir().unwrap();
+            let server = make_test_server(dir.path()).await;
+
+            let syntax = vec![issue("zzz.rs", 1, "z")];
+            let fact = vec![issue("aaa.rs", 2, "a")];
+            let native = vec![issue("mmm.rs", 3, "m")];
+
+            tokio::task::spawn_blocking({
+                let server = server.clone();
+                let root = dir.path().to_path_buf();
+                move || server.write_json_mirror(&root, &syntax, &fact, &native)
+            })
+            .await
+            .unwrap();
+
+            let path = dir.path().join(".normalize/diagnostics.json");
+            assert!(path.exists());
+            let body = std::fs::read_to_string(&path).unwrap();
+            // Must be valid JSON.
+            let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
+            let obj = parsed.as_object().unwrap();
+            // Only files-with-issues are present.
+            let mut keys: Vec<&String> = obj.keys().collect();
+            assert_eq!(
+                keys.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
+                vec!["aaa.rs", "mmm.rs", "zzz.rs"],
+                "BTreeMap key order must be deterministic / sorted"
+            );
+            keys.sort();
+            // Tmp file should not survive an atomic rename.
+            assert!(!dir.path().join(".normalize/diagnostics.json.tmp").exists());
+        }
+
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn write_json_mirror_omits_files_without_issues() {
+            let dir = tempfile::tempdir().unwrap();
+            let server = make_test_server(dir.path()).await;
+            tokio::task::spawn_blocking({
+                let server = server.clone();
+                let root = dir.path().to_path_buf();
+                move || server.write_json_mirror(&root, &[], &[], &[])
+            })
+            .await
+            .unwrap();
+            let body =
+                std::fs::read_to_string(dir.path().join(".normalize/diagnostics.json")).unwrap();
+            let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
+            assert_eq!(parsed.as_object().unwrap().len(), 0);
+        }
+
+        /// Regression: a non-empty delta returned by `save_per_file_diagnostics`
+        /// must actually be broadcast on `event_tx`, otherwise no subscriber will
+        /// ever receive `Event::DiagnosticsUpdated`.
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn diagnostics_delta_is_broadcast_to_subscribers() {
+            let dir = tempfile::tempdir().unwrap();
+            let server = make_test_server(dir.path()).await;
+            let mut rx = server.event_tx.subscribe();
+
+            let syntax = vec![issue("a.rs", 1, "x")];
+            let server_clone = server.clone();
+            let root = dir.path().to_path_buf();
+            tokio::task::spawn_blocking(move || {
+                let delta = server_clone.save_per_file_diagnostics(&root, &syntax, &[], &[]);
+                server_clone.broadcast_diagnostics_delta(&root, delta);
+            })
+            .await
+            .unwrap();
+
+            let event = tokio::time::timeout(std::time::Duration::from_secs(2), rx.recv())
+                .await
+                .expect("timeout waiting for DiagnosticsUpdated")
+                .expect("broadcast channel closed");
+            match event {
+                Event::DiagnosticsUpdated { updates, .. } => {
+                    assert_eq!(updates.len(), 1);
+                    assert_eq!(updates[0].0, "a.rs");
+                }
+                other => panic!("expected DiagnosticsUpdated, got {:?}", other),
+            }
+        }
+
+        /// And the inverse: no broadcast for an empty delta (steady-state
+        /// optimization) — otherwise every refresh would wake every subscriber
+        /// even when nothing changed.
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn empty_delta_not_broadcast() {
+            let dir = tempfile::tempdir().unwrap();
+            let server = make_test_server(dir.path()).await;
+            let mut rx = server.event_tx.subscribe();
+            server.broadcast_diagnostics_delta(dir.path(), Vec::new());
+            // No event should arrive within a short window.
+            let res = tokio::time::timeout(std::time::Duration::from_millis(200), rx.recv()).await;
+            assert!(
+                res.is_err(),
+                "empty delta must not broadcast, got {:?}",
+                res
+            );
+        }
+
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn save_per_file_writes_actually_persist_to_table() {
+            let dir = tempfile::tempdir().unwrap();
+            let server = make_test_server(dir.path()).await;
+            let syntax = vec![issue("a.rs", 1, "x"), issue("a.rs", 2, "y")];
+            tokio::task::spawn_blocking({
+                let server = server.clone();
+                let root = dir.path().to_path_buf();
+                move || server.save_per_file_diagnostics(&root, &syntax, &[], &[])
+            })
+            .await
+            .unwrap();
+
+            // Verify per-file table row count == files-with-issues count (=1).
+            let idx_arc = server.get_root_index(dir.path()).unwrap();
+            let (paths, blob) = tokio::task::spawn_blocking({
+                let idx_arc = idx_arc.clone();
+                let handle = tokio::runtime::Handle::current();
+                move || {
+                    let idx = idx_arc.lock().unwrap();
+                    let paths = handle.block_on(idx.list_diagnostic_paths()).unwrap();
+                    let blob = handle
+                        .block_on(idx.load_diagnostics_for_file("a.rs"))
+                        .unwrap()
+                        .unwrap();
+                    (paths, blob)
+                }
+            })
+            .await
+            .unwrap();
+            assert_eq!(paths, vec!["a.rs"]);
+            let issues: Vec<Issue> =
+                rkyv::from_bytes::<Vec<Issue>, rkyv::rancor::Error>(&blob).expect("rkyv decode");
+            assert_eq!(issues.len(), 2);
         }
     }
 }

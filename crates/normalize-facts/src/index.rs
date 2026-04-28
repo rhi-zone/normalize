@@ -789,6 +789,18 @@ impl FileIndex {
         false
     }
 
+    /// Test/maintenance helper: clear the `last_indexed` meta value so the next
+    /// `needs_refresh()` returns `true` regardless of the 60-second debounce.
+    ///
+    /// Used by integration tests that need to force refresh after each file
+    /// edit without waiting for the staleness window.
+    pub async fn invalidate_last_indexed(&self) -> Result<(), libsql::Error> {
+        self.conn
+            .execute("DELETE FROM meta WHERE key = 'last_indexed'", ())
+            .await?;
+        Ok(())
+    }
+
     /// Refresh only files that have changed (faster than full refresh).
     /// Returns the list of changed file paths (absolute) that were added, modified, or deleted.
     /// The count can be derived from `.len()`.
@@ -3525,5 +3537,173 @@ class MyClass:
                 caller_files
             );
         }
+    }
+
+    // =====================================================================
+    // Per-file diagnostics storage tests
+    // =====================================================================
+
+    /// Build a FileIndex on an empty tempdir for diagnostics-table tests.
+    async fn empty_index(dir: &std::path::Path) -> FileIndex {
+        FileIndex::open(&dir.join("index.sqlite"), dir)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn per_file_save_upsert_and_delete_roundtrip() {
+        let dir = tempdir().unwrap();
+        let index = empty_index(dir.path()).await;
+
+        let upserts = vec![
+            ("a.rs".to_string(), vec![1u8, 2, 3]),
+            ("b.rs".to_string(), vec![4, 5, 6]),
+        ];
+        index
+            .save_diagnostics_per_file(&upserts, &[])
+            .await
+            .unwrap();
+
+        let a = index.load_diagnostics_for_file("a.rs").await.unwrap();
+        let b = index.load_diagnostics_for_file("b.rs").await.unwrap();
+        assert_eq!(a, Some(vec![1, 2, 3]));
+        assert_eq!(b, Some(vec![4, 5, 6]));
+
+        // Now delete a.rs and update b.rs in the same call.
+        let upserts2 = vec![("b.rs".to_string(), vec![9, 9])];
+        let deletes2 = vec!["a.rs".to_string()];
+        index
+            .save_diagnostics_per_file(&upserts2, &deletes2)
+            .await
+            .unwrap();
+
+        assert_eq!(index.load_diagnostics_for_file("a.rs").await.unwrap(), None);
+        assert_eq!(
+            index.load_diagnostics_for_file("b.rs").await.unwrap(),
+            Some(vec![9, 9])
+        );
+    }
+
+    #[tokio::test]
+    async fn per_file_save_empty_inputs_is_noop() {
+        let dir = tempdir().unwrap();
+        let index = empty_index(dir.path()).await;
+        // No-op call should succeed and leave the table empty.
+        index.save_diagnostics_per_file(&[], &[]).await.unwrap();
+        assert!(index.list_diagnostic_paths().await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn load_diagnostics_for_file_missing_returns_none() {
+        let dir = tempdir().unwrap();
+        let index = empty_index(dir.path()).await;
+        assert_eq!(
+            index.load_diagnostics_for_file("nope.rs").await.unwrap(),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn load_diagnostics_for_files_skips_missing() {
+        let dir = tempdir().unwrap();
+        let index = empty_index(dir.path()).await;
+        let upserts = vec![("a.rs".to_string(), vec![1]), ("c.rs".to_string(), vec![3])];
+        index
+            .save_diagnostics_per_file(&upserts, &[])
+            .await
+            .unwrap();
+
+        // Mix present + missing, in a non-canonical order.
+        let query = vec![
+            "c.rs".to_string(),
+            "missing.rs".to_string(),
+            "a.rs".to_string(),
+        ];
+        let mut got: Vec<(String, Vec<u8>)> =
+            index.load_diagnostics_for_files(&query).await.unwrap();
+        got.sort_by(|x, y| x.0.cmp(&y.0));
+        assert_eq!(
+            got,
+            vec![("a.rs".to_string(), vec![1]), ("c.rs".to_string(), vec![3]),]
+        );
+    }
+
+    #[tokio::test]
+    async fn list_diagnostic_paths_returns_all() {
+        let dir = tempdir().unwrap();
+        let index = empty_index(dir.path()).await;
+        let upserts = vec![
+            ("x".to_string(), vec![0]),
+            ("y".to_string(), vec![0]),
+            ("z".to_string(), vec![0]),
+        ];
+        index
+            .save_diagnostics_per_file(&upserts, &[])
+            .await
+            .unwrap();
+        let mut paths = index.list_diagnostic_paths().await.unwrap();
+        paths.sort();
+        assert_eq!(paths, vec!["x", "y", "z"]);
+    }
+
+    /// Smoke test: a fresh open creates the per-file diagnostics table with the
+    /// BLOB column type required by `save_diagnostics_per_file`. (A row inserted
+    /// with the wrong column type by an older schema version would fail this
+    /// roundtrip — the schema_version != SCHEMA_VERSION migration block at
+    /// `FileIndex::open` is responsible for `DROP TABLE IF EXISTS
+    /// daemon_diagnostics_per_file` so the new shape is created cleanly.)
+    #[tokio::test]
+    async fn fresh_open_per_file_table_accepts_blob_roundtrip() {
+        let dir = tempdir().unwrap();
+        let index = FileIndex::open(&dir.path().join("index.sqlite"), dir.path())
+            .await
+            .unwrap();
+        // The CREATE statement at FileIndex::open declares issues_blob BLOB NOT NULL.
+        // Confirm the column type via PRAGMA table_info.
+        let mut rows = index
+            .conn
+            .query("PRAGMA table_info(daemon_diagnostics_per_file)", ())
+            .await
+            .unwrap();
+        let mut col_types: Vec<(String, String)> = Vec::new();
+        while let Some(row) = rows.next().await.unwrap() {
+            let name: String = row.get(1).unwrap();
+            let ty: String = row.get(2).unwrap();
+            col_types.push((name, ty));
+        }
+        let blob_col = col_types
+            .iter()
+            .find(|(n, _)| n == "issues_blob")
+            .expect("issues_blob column missing");
+        assert_eq!(
+            blob_col.1.to_uppercase(),
+            "BLOB",
+            "issues_blob must be BLOB, got {:?}",
+            blob_col.1
+        );
+
+        // And the BLOB roundtrip itself works.
+        index
+            .save_diagnostics_per_file(&[("a".to_string(), vec![1, 2, 3])], &[])
+            .await
+            .unwrap();
+        assert_eq!(
+            index.load_diagnostics_for_file("a").await.unwrap(),
+            Some(vec![1, 2, 3])
+        );
+    }
+
+    #[tokio::test]
+    async fn invalidate_last_indexed_resets_needs_refresh_gate() {
+        let dir = tempdir().unwrap();
+        std::fs::write(dir.path().join("a.txt"), "x").unwrap();
+        let mut index = FileIndex::open(&dir.path().join("index.sqlite"), dir.path())
+            .await
+            .unwrap();
+        index.refresh().await.unwrap();
+        // Just-after-refresh, the 60-second gate suppresses needs_refresh.
+        assert!(!index.needs_refresh().await);
+        index.invalidate_last_indexed().await.unwrap();
+        assert!(index.needs_refresh().await);
     }
 }

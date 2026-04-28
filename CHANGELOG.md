@@ -14,6 +14,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **`NORMALIZE_DAEMON_CONFIG_DIR` test override** — when set, this env var redirects the daemon's `daemon.sock`, `daemon.lock`, and `daemon-spawn.lock` to the named directory. Lets integration tests spawn isolated daemons without contending with the user's running instance. Production behavior is unchanged when the variable is unset.
 - **Daemon-cache timing diagnostic** — `normalize rules run` now prints `[timings] daemon-cache: ...` to stderr when diagnostics are served from the daemon's pre-warmed cache, making it visible that the fast path was taken.
 - **`FileRule` trait for native file-based rules** — `long-function`, `high-complexity`, and `long-file` now implement a `FileRule` trait that provides automatic SQLite caching and parallel execution. New file-based rules get caching for free by implementing `check_file()` and `to_diagnostics()`.
 - **`validate-calls-scm` moved out of SARIF tools** — the internal `.calls.scm` capture-name validation is no longer a `[[rules.sarif-tools]]` entry (which ran a slow shell script on every `normalize rules run`). It is now a direct step in `scripts/pre-commit` using a single `grep` invocation (~5 ms vs ~762 ms). The `sarif-tools` entry and `scripts/validate-calls-scm.sh` are removed.
