@@ -434,8 +434,14 @@ impl RulesService {
         let project_root = effective_root.clone();
 
         // Resolve --files to absolute paths (relative to effective_root).
+        // When `target` is a single file, treat it as an explicit file too so the
+        // daemon can hit the per-file fast path instead of walking from `target_root`.
         let explicit_files: Option<Vec<std::path::PathBuf>> = if files.is_empty() {
-            None
+            if target_root.is_file() {
+                Some(vec![target_root.clone()])
+            } else {
+                None
+            }
         } else {
             Some(
                 files
