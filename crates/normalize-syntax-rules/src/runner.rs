@@ -235,6 +235,63 @@ fn line_has_allow_comment(line: &str, rule_id: &str) -> bool {
     false
 }
 
+/// Tree-sitter query that captures Rust `mod_item` nodes annotated with
+/// `#[cfg(test)]`. Used to skip findings inside inline test modules — the
+/// dominant Rust convention for unit tests, which path-based `**/tests/**`
+/// allow globs do not catch.
+const RUST_CFG_TEST_MOD_QUERY: &str = r#"
+(mod_item
+  (attributes
+    (attribute_item
+      (attribute
+        (identifier) @_attr_name
+        (token_tree (identifier) @_arg)
+        (#eq? @_attr_name "cfg")
+        (#eq? @_arg "test"))))) @cfg_test_mod
+"#;
+
+/// Compute the byte ranges of `#[cfg(test)] mod ... { ... }` items in a Rust
+/// source file, so findings inside them can be filtered out.
+///
+/// Returns an empty vector for non-Rust grammars or if the query fails to
+/// compile (which would be a bug, since the query string is a constant).
+fn cfg_test_module_ranges(
+    grammar_name: &str,
+    grammar: &tree_sitter::Language,
+    tree: &tree_sitter::Tree,
+    source: &[u8],
+) -> Vec<(usize, usize)> {
+    if grammar_name != "rust" {
+        return Vec::new();
+    }
+    let Ok(query) = tree_sitter::Query::new(grammar, RUST_CFG_TEST_MOD_QUERY) else {
+        return Vec::new();
+    };
+    let Some(capture_idx) = query
+        .capture_names()
+        .iter()
+        .position(|n| *n == "cfg_test_mod")
+    else {
+        return Vec::new();
+    };
+    let mut cursor = tree_sitter::QueryCursor::new();
+    let mut matches = cursor.matches(&query, tree.root_node(), source);
+    let mut ranges = Vec::new();
+    while let Some(m) = matches.next() {
+        for cap in m.captures {
+            if cap.index as usize == capture_idx {
+                ranges.push((cap.node.start_byte(), cap.node.end_byte()));
+            }
+        }
+    }
+    ranges
+}
+
+/// Check if a byte range falls inside any of the given (start, end) ranges.
+fn in_any_range(start: usize, end: usize, ranges: &[(usize, usize)]) -> bool {
+    ranges.iter().any(|&(s, e)| start >= s && end <= e)
+}
+
 /// Check if a finding should be allowed based on inline comments.
 /// Checks the line of the finding and up to 2 lines before (to handle
 /// multi-line expressions like `let x =\n    expr.unwrap()`).
@@ -463,6 +520,9 @@ struct FileContext<'a> {
     source_registry: &'a SourceRegistry,
     source_ctx: SourceContext<'a>,
     allow_path_str: &'a str,
+    /// Byte ranges of `#[cfg(test)]`-attributed modules in this file. Findings
+    /// whose location falls inside any of these ranges are dropped.
+    skip_ranges: &'a [(usize, usize)],
 }
 
 /// Process all query matches for a single file and append findings.
@@ -508,6 +568,10 @@ fn process_file_matches(
         let Some(cap) = m.captures.iter().find(|c| c.index as usize == *match_idx) else {
             continue;
         };
+
+        if in_any_range(cap.node.start_byte(), cap.node.end_byte(), ctx.skip_ranges) {
+            continue;
+        }
 
         let start_line = cap.node.start_position().row + 1;
         if is_allowed_by_comment(ctx.content, start_line, &rule.id) {
@@ -674,6 +738,9 @@ pub fn run_rules(
                 continue;
             };
 
+            let skip_ranges =
+                cfg_test_module_ranges(grammar_name, &grammar, &tree, content.as_bytes());
+
             let file_ctx = FileContext {
                 file,
                 content: &content,
@@ -684,6 +751,7 @@ pub fn run_rules(
                     project_root: &abs_project_root,
                 },
                 allow_path_str: &allow_path.display,
+                skip_ranges: &skip_ranges,
             };
 
             let mut file_findings: Vec<Finding> = Vec::new();
@@ -1178,6 +1246,92 @@ fn main() {
             "should match pattern 0 (unwrap)"
         );
         assert!(pattern_indices.contains(&1), "should match pattern 1 (dbg)");
+    }
+
+    #[test]
+    fn test_cfg_test_module_ranges_skips_inline_test_module() {
+        let loader = loader();
+        let grammar = loader.get("rust").expect("rust grammar");
+        let source = r#"
+fn outer() {
+    let x: Option<i32> = None;
+    x.unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    fn inner() {
+        let y: Option<i32> = None;
+        y.unwrap();
+    }
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+mod more_tests {
+    fn inner2() {
+        None::<i32>.unwrap();
+    }
+}
+
+mod regular_mod {
+    fn other() {
+        None::<i32>.unwrap();
+    }
+}
+"#;
+        let mut parser = tree_sitter::Parser::new();
+        assert!(parser.set_language(&grammar).is_ok());
+        let tree = parser.parse(source, None).expect("parse");
+        let ranges = cfg_test_module_ranges("rust", &grammar, &tree, source.as_bytes());
+        assert_eq!(
+            ranges.len(),
+            2,
+            "expected two cfg(test) modules, got {ranges:?}"
+        );
+
+        // Find each `unwrap()` call and check classification.
+        let unwrap_query = tree_sitter::Query::new(
+            &grammar,
+            r#"((call_expression function: (field_expression field: (field_identifier) @m)) @call (#eq? @m "unwrap"))"#,
+        )
+        .expect("compile");
+        let call_idx = unwrap_query
+            .capture_names()
+            .iter()
+            .position(|n| *n == "call")
+            .unwrap_or(0);
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&unwrap_query, tree.root_node(), source.as_bytes());
+        let mut classifications: Vec<(usize, bool)> = Vec::new();
+        while let Some(m) = matches.next() {
+            for cap in m.captures {
+                if cap.index as usize == call_idx {
+                    let line = cap.node.start_position().row + 1;
+                    let in_test = in_any_range(cap.node.start_byte(), cap.node.end_byte(), &ranges);
+                    classifications.push((line, in_test));
+                }
+            }
+        }
+        // Lines: 4 (outer, NOT in test), 11 (in test), 19 (in test), 26 (NOT in test)
+        let outside: Vec<usize> = classifications
+            .iter()
+            .filter_map(|(l, t)| if !*t { Some(*l) } else { None })
+            .collect();
+        let inside: Vec<usize> = classifications
+            .iter()
+            .filter_map(|(l, t)| if *t { Some(*l) } else { None })
+            .collect();
+        assert_eq!(
+            outside.len(),
+            2,
+            "expected 2 unwraps outside cfg(test), got {classifications:?}"
+        );
+        assert_eq!(
+            inside.len(),
+            2,
+            "expected 2 unwraps inside cfg(test), got {classifications:?}"
+        );
     }
 
     #[test]
