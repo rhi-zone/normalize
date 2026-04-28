@@ -406,10 +406,13 @@ impl DaemonService {
 
             match &event {
                 Event::FileChanged { path, .. } => {
-                    println!("{} modified {}", ts, path.display());
+                    println!("{} modified {}", ts, path);
                 }
                 Event::IndexRefreshed { files, .. } => {
                     println!("{} index refreshed ({} files)", ts, files);
+                }
+                Event::DiagnosticsUpdated { updates, .. } => {
+                    println!("{} diagnostics updated ({} files)", ts, updates.len());
                 }
             }
 

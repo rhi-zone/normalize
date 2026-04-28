@@ -26,22 +26,42 @@ pub fn is_git_worktree(root: &Path) -> bool {
 }
 
 /// An event broadcast to all subscribers when files change or the index refreshes.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// Path fields use `String` (rather than `PathBuf`) so the enum can be rkyv-serialized
+/// for binary subscribe frames. The wire format does not need typed paths.
+#[derive(
+    Debug, Clone, Serialize, Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
+)]
+#[rkyv(derive(Debug))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Event {
     /// A file was modified, created, or deleted.
     FileChanged {
         /// Canonical path of the file that changed.
-        path: PathBuf,
+        path: String,
         /// The watched root that owns this file.
-        root: PathBuf,
+        root: String,
     },
     /// The index was refreshed after file changes.
     IndexRefreshed {
         /// The root whose index was refreshed.
-        root: PathBuf,
+        root: String,
         /// Number of files reindexed.
-        files: usize,
+        files: u64,
+    },
+    /// Per-file diagnostic deltas from the most recent prime/refresh.
+    ///
+    /// One event is broadcast per refresh and contains only the files whose
+    /// issues actually changed since the last refresh. Subscribers can apply
+    /// these directly without re-pulling the full diagnostic set.
+    DiagnosticsUpdated {
+        /// Watched root these updates belong to.
+        root: String,
+        /// Per-file deltas. Each entry is `(relative_path, issues_for_that_file)`.
+        /// An empty `issues` Vec means the file is now clean (was previously
+        /// dirty, now no issues). Files not in this list have unchanged
+        /// diagnostics (or never had any).
+        updates: Vec<(String, Vec<normalize_output::diagnostics::Issue>)>,
     },
 }
 
@@ -786,16 +806,35 @@ mod unix_impl {
             // Build "all" combined blob for fast no-filter hot path.
             self.save_all_blob(root, &syntax_issues, &fact_issues, &native_issues);
             // Per-file table + JSON mirror for ephemeral consumers.
-            self.save_per_file_diagnostics(root, &syntax_issues, &fact_issues, &native_issues);
+            let delta =
+                self.save_per_file_diagnostics(root, &syntax_issues, &fact_issues, &native_issues);
             self.write_json_mirror(root, &syntax_issues, &fact_issues, &native_issues);
             drop(syntax_issues);
             drop(fact_issues);
             drop(native_issues);
 
+            self.broadcast_diagnostics_delta(root, delta);
+
             let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(watched) = roots.get_mut(root) {
                 watched.primed = true;
             }
+        }
+
+        /// Broadcast a per-file diagnostic delta to subscribers. SendError
+        /// from broadcast = no active subscribers, which is fine.
+        fn broadcast_diagnostics_delta(
+            &self,
+            root: &Path,
+            delta: Vec<(String, Vec<normalize_output::diagnostics::Issue>)>,
+        ) {
+            if delta.is_empty() {
+                return;
+            }
+            let _ = self.event_tx.send(Event::DiagnosticsUpdated {
+                root: root.to_string_lossy().into_owned(),
+                updates: delta,
+            });
         }
 
         /// Serialize issues to rkyv and write them to the `daemon_diagnostics` table.
@@ -879,13 +918,23 @@ mod unix_impl {
         /// Group all current issues by path and reconcile per-file storage.
         /// Called after every prime or incremental refresh so the per-file
         /// table reflects the same state as the per-engine "all" blob.
+        ///
+        /// Returns the per-file delta — one entry per path whose diagnostics
+        /// actually changed since the last refresh. Each entry is
+        /// `(relative_path, issues_for_that_file)`. An empty `issues` Vec
+        /// means the file is now clean (had a row, now does not). The caller
+        /// broadcasts this delta as `Event::DiagnosticsUpdated`.
+        ///
+        /// Files whose blob did not change are *not* in the delta — without
+        /// this filter, every refresh would emit every file with issues
+        /// regardless of whether its issues changed.
         fn save_per_file_diagnostics(
             &self,
             root: &Path,
             syntax: &[normalize_output::diagnostics::Issue],
             fact: &[normalize_output::diagnostics::Issue],
             native: &[normalize_output::diagnostics::Issue],
-        ) {
+        ) -> Vec<(String, Vec<normalize_output::diagnostics::Issue>)> {
             // Group all issues by path.
             let mut by_path: HashMap<String, Vec<normalize_output::diagnostics::Issue>> =
                 HashMap::new();
@@ -897,7 +946,7 @@ mod unix_impl {
             }
 
             let Some(idx_arc) = self.get_root_index(root) else {
-                return;
+                return Vec::new();
             };
             let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
 
@@ -908,22 +957,54 @@ mod unix_impl {
                 Ok(v) => v,
                 Err(e) => {
                     tracing::warn!("failed to list diagnostic paths: {}", e);
-                    return;
+                    return Vec::new();
                 }
             };
             let new_paths: HashSet<&String> = by_path.keys().collect();
             let deletes: Vec<String> = existing_paths
-                .into_iter()
-                .filter(|p| !new_paths.contains(p))
+                .iter()
+                .filter(|p| !new_paths.contains(*p))
+                .cloned()
                 .collect();
 
-            // Serialize each file's issues to rkyv.
-            let mut upserts: Vec<(String, Vec<u8>)> = Vec::with_capacity(by_path.len());
-            for (path, issues) in by_path {
-                match rkyv::to_bytes::<rkyv::rancor::Error>(&issues) {
-                    Ok(b) => upserts.push((path, b.to_vec())),
-                    Err(e) => tracing::warn!("rkyv serialize per-file diagnostics: {}", e),
+            // Load existing blobs for the paths we are about to upsert so we
+            // can skip rows whose serialized bytes are identical -- otherwise
+            // every refresh would mark every file with issues as "updated".
+            let candidate_paths: Vec<String> = by_path.keys().cloned().collect();
+            let existing_blobs: HashMap<String, Vec<u8>> = match tokio::task::block_in_place(|| {
+                self.runtime_handle
+                    .block_on(idx.load_diagnostics_for_files(&candidate_paths))
+            }) {
+                Ok(rows) => rows.into_iter().collect(),
+                Err(e) => {
+                    tracing::warn!("failed to load existing per-file blobs: {}", e);
+                    HashMap::new()
                 }
+            };
+
+            // Serialize each file's issues to rkyv, comparing against the
+            // existing blob to elide unchanged rows from both the write batch
+            // and the broadcast delta.
+            let mut upserts: Vec<(String, Vec<u8>)> = Vec::with_capacity(by_path.len());
+            let mut delta: Vec<(String, Vec<normalize_output::diagnostics::Issue>)> =
+                Vec::with_capacity(by_path.len() + deletes.len());
+            for (path, issues) in by_path {
+                let bytes = match rkyv::to_bytes::<rkyv::rancor::Error>(&issues) {
+                    Ok(b) => b.to_vec(),
+                    Err(e) => {
+                        tracing::warn!("rkyv serialize per-file diagnostics: {}", e);
+                        continue;
+                    }
+                };
+                if existing_blobs.get(&path).is_some_and(|prev| prev == &bytes) {
+                    // Unchanged -- skip both write and broadcast.
+                    continue;
+                }
+                delta.push((path.clone(), issues));
+                upserts.push((path, bytes));
+            }
+            for path in &deletes {
+                delta.push((path.clone(), Vec::new()));
             }
 
             if let Err(e) = tokio::task::block_in_place(|| {
@@ -932,6 +1013,8 @@ mod unix_impl {
             }) {
                 tracing::warn!("failed to save per-file diagnostics: {}", e);
             }
+
+            delta
         }
 
         /// Rebuild the per-file diagnostics table by reading the three per-engine
@@ -960,8 +1043,9 @@ mod unix_impl {
                     *sink = issues;
                 }
             }
-            self.save_per_file_diagnostics(root, &syntax, &fact, &native);
+            let delta = self.save_per_file_diagnostics(root, &syntax, &fact, &native);
             self.write_json_mirror(root, &syntax, &fact, &native);
+            self.broadcast_diagnostics_delta(root, delta);
         }
 
         /// Write `.normalize/diagnostics.json` atomically.
@@ -1317,7 +1401,7 @@ mod unix_impl {
                         // Build "all" combined blob for fast no-filter hot path.
                         self.save_all_blob(root, &syntax_issues, &fact_issues, &native_issues);
                         // Per-file table + JSON mirror for ephemeral consumers.
-                        self.save_per_file_diagnostics(
+                        let delta = self.save_per_file_diagnostics(
                             root,
                             &syntax_issues,
                             &fact_issues,
@@ -1328,6 +1412,8 @@ mod unix_impl {
                         drop(fact_issues);
                         drop(native_issues);
                         drop(affected_vec);
+
+                        self.broadcast_diagnostics_delta(root, delta);
 
                         {
                             let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
@@ -1340,8 +1426,8 @@ mod unix_impl {
                         // Broadcast index-refresh event. SendError means no
                         // active subscribers -- that is fine.
                         let _ = self.event_tx.send(Event::IndexRefreshed {
-                            root: root.to_path_buf(),
-                            files: changed.len(),
+                            root: root.to_string_lossy().into_owned(),
+                            files: changed.len() as u64,
                         });
                     }
                     Ok(_changed) => {
@@ -1511,9 +1597,10 @@ mod unix_impl {
 
                 // Broadcast un-debounced file-change events
                 for (path, root) in to_event {
-                    let _ = server_dispatch
-                        .event_tx
-                        .send(Event::FileChanged { path, root });
+                    let _ = server_dispatch.event_tx.send(Event::FileChanged {
+                        path: path.to_string_lossy().into_owned(),
+                        root: root.to_string_lossy().into_owned(),
+                    });
                 }
                 for root in to_refresh {
                     let _ = server_dispatch.refresh_tx.send(root);
@@ -1676,7 +1763,42 @@ mod unix_impl {
                 engine,
                 filter_files,
             }) => server.run_rules_raw(root, filter_ids, filter_rule, engine, filter_files),
-            Ok(_) => RawResponse::Error("rkyv mode only supports run_rules".into()),
+            Ok(Request::Subscribe { root }) => {
+                // Binary subscribe: stream rkyv-encoded events as
+                // [type_byte=0x01][4-byte LE len][rkyv payload] frames until
+                // the client disconnects.
+                if let Some(r) = root {
+                    server.add_root(r);
+                }
+                let mut rx = server.event_tx.subscribe();
+                loop {
+                    match rx.recv().await {
+                        Ok(event) => {
+                            let blob = match rkyv::to_bytes::<rkyv::rancor::Error>(&event) {
+                                Ok(b) => b,
+                                Err(e) => {
+                                    tracing::warn!("rkyv serialize Event: {}", e);
+                                    continue;
+                                }
+                            };
+                            if writer.write_all(&[0x01]).await.is_err()
+                                || writer
+                                    .write_all(&(blob.len() as u32).to_le_bytes())
+                                    .await
+                                    .is_err()
+                                || writer.write_all(&blob).await.is_err()
+                            {
+                                return;
+                            }
+                        }
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            eprintln!("Subscriber lagged, dropped {} events", n);
+                        }
+                        Err(broadcast::error::RecvError::Closed) => return,
+                    }
+                }
+            }
+            Ok(_) => RawResponse::Error("rkyv mode only supports run_rules and subscribe".into()),
             Err(e) => RawResponse::Error(format!("invalid request: {e}")),
         };
 
@@ -1914,6 +2036,65 @@ mod unix_impl {
 
             Ok(())
         }
+
+        /// Subscribe with binary framing. Calls `on_event` for each pushed
+        /// event, deserialized from rkyv length-prefixed frames.
+        ///
+        /// Returns when the connection closes or `on_event` returns `false`.
+        /// Compared to [`watch_events`](Self::watch_events) (JSON-line), the
+        /// binary path can carry the full `Event::DiagnosticsUpdated` payload
+        /// (an arbitrarily large per-file delta) without per-event JSON
+        /// encode/decode cost.
+        pub fn watch_events_binary(
+            &self,
+            root: Option<&Path>,
+            mut on_event: impl FnMut(Event) -> bool,
+        ) -> Result<(), String> {
+            use std::io::{Read, Write};
+            let mut stream = UnixStream::connect(&self.socket_path)
+                .map_err(|e| format!("Failed to connect: {}", e))?;
+            stream.set_read_timeout(None).ok();
+            stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
+
+            // Magic byte = rkyv binary mode.
+            stream.write_all(&[0x01]).map_err(|e| e.to_string())?;
+            let req = Request::Subscribe {
+                root: root.map(|p| p.to_path_buf()),
+            };
+            let json = serde_json::to_string(&req).map_err(|e| e.to_string())?;
+            stream
+                .write_all(json.as_bytes())
+                .map_err(|e| e.to_string())?;
+            stream.write_all(b"\n").map_err(|e| e.to_string())?;
+
+            loop {
+                let mut hdr = [0u8; 5];
+                if stream.read_exact(&mut hdr).is_err() {
+                    break;
+                }
+                if hdr[0] != 0x01 {
+                    // 0x00 = JSON error string from the daemon -- drain and stop.
+                    break;
+                }
+                let len = u32::from_le_bytes([hdr[1], hdr[2], hdr[3], hdr[4]]) as usize;
+                let mut aligned = rkyv::util::AlignedVec::<16>::with_capacity(len);
+                aligned.resize(len, 0);
+                if stream.read_exact(&mut aligned[..]).is_err() {
+                    break;
+                }
+                let event = match rkyv::from_bytes::<Event, rkyv::rancor::Error>(&aligned) {
+                    Ok(e) => e,
+                    Err(e) => {
+                        eprintln!("rkyv deserialize Event: {}", e);
+                        continue;
+                    }
+                };
+                if !on_event(event) {
+                    break;
+                }
+            }
+            Ok(())
+        }
     }
 
     impl Default for DaemonClient {
@@ -2030,6 +2211,14 @@ impl DaemonClient {
     }
 
     pub fn watch_events(
+        &self,
+        _root: Option<&Path>,
+        _on_event: impl FnMut(Event) -> bool,
+    ) -> Result<(), String> {
+        Err("normalize daemon is not supported on Windows".to_string())
+    }
+
+    pub fn watch_events_binary(
         &self,
         _root: Option<&Path>,
         _on_event: impl FnMut(Event) -> bool,
