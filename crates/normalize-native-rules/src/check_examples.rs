@@ -57,8 +57,10 @@ pub fn build_check_examples_report(
 ) -> CheckExamplesReport {
     use std::collections::HashSet;
 
+    // normalize-syntax-allow: rust/unwrap-in-impl - compile-time-known-valid regex
     let marker_start_re =
         MARKER_START_RE.get_or_init(|| regex::Regex::new(r"//\s*\[example:\s*([^\]]+)\]").unwrap());
+    // normalize-syntax-allow: rust/unwrap-in-impl - compile-time-known-valid regex
     let ref_re = REF_RE.get_or_init(|| regex::Regex::new(r"\{\{example:\s*([^}]+)\}\}").unwrap());
 
     let mut defined_examples: HashSet<String> = HashSet::new();

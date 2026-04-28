@@ -966,6 +966,7 @@ pub fn run_rule_with_cache(
     }
 
     // Warm path: incremental re-evaluation.
+    // normalize-syntax-allow: rust/unwrap-in-impl - just primed/checked is_none above on cold path
     let cached = cached_engine.as_mut().unwrap();
     tracing::debug!(
         rule_id = %rule.id,

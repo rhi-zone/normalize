@@ -265,6 +265,7 @@ fn git_batch_commit_stats(
         let commit_sha = info.id.to_hex().to_string();
 
         for (label, rel_dir, is_root) in &dir_info {
+            // normalize-syntax-allow: rust/unwrap-in-impl - label is from dirs.keys(); states is keyed by same set
             let state = states.get_mut(*label).unwrap();
             if state.doc_found {
                 continue; // already resolved this dir
@@ -432,6 +433,7 @@ fn git_incremental_commit_stats(
             .collect();
 
         for (label, rel_dir, is_root) in &dir_info {
+            // normalize-syntax-allow: rust/unwrap-in-impl - label is from dirs.keys(); inc_states is keyed by same set
             let inc = inc_states.get_mut(*label).unwrap();
 
             // Check if this commit touches the directory.

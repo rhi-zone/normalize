@@ -117,6 +117,7 @@ pub async fn build_check_refs_report(
 
     // Regex for code references: `identifier` or `Module::method` or `Module.method`
     let code_ref_re = CODE_REF_RE.get_or_init(|| {
+        // normalize-syntax-allow: rust/unwrap-in-impl - compile-time-known-valid regex
         regex::Regex::new(r"`([A-Z][a-zA-Z0-9_]*(?:[:\.][a-zA-Z_][a-zA-Z0-9_]*)*)`").unwrap()
     });
 
