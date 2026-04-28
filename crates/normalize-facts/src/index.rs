@@ -75,7 +75,7 @@ struct CachedFileData {
 }
 
 // Not yet public - just delete .normalize/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 9;
+const SCHEMA_VERSION: i64 = 10;
 
 /// Bump when extraction logic changes to invalidate cached results.
 /// Bumped to "2" (2026-04-27): purge CA cache entries that may have been poisoned
@@ -476,6 +476,10 @@ impl FileIndex {
             conn.execute("DROP TABLE IF EXISTS daemon_diagnostics", ())
                 .await
                 .ok();
+            // Per-file diagnostics: drop and recreate cleanly on schema bump.
+            conn.execute("DROP TABLE IF EXISTS daemon_diagnostics_per_file", ())
+                .await
+                .ok();
             conn.execute(
                 "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?1)",
                 params![SCHEMA_VERSION.to_string()],
@@ -565,6 +569,20 @@ impl FileIndex {
         conn.execute(
             "CREATE TABLE IF NOT EXISTS daemon_diagnostics (
                 engine TEXT PRIMARY KEY,
+                issues_blob BLOB NOT NULL,
+                updated_at INTEGER NOT NULL
+            )",
+            (),
+        )
+        .await?;
+
+        // Per-file diagnostics cache: one row per file that currently has issues.
+        // "No row" semantics — files with zero issues are absent from the table.
+        // Used by the daemon to serve per-file `RunRules` queries directly without
+        // touching the "all" blob.
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS daemon_diagnostics_per_file (
+                path TEXT PRIMARY KEY,
                 issues_blob BLOB NOT NULL,
                 updated_at INTEGER NOT NULL
             )",
@@ -2995,6 +3013,113 @@ impl FileIndex {
         } else {
             Ok(None)
         }
+    }
+
+    /// Replace per-file diagnostics blobs in a single transaction.
+    ///
+    /// `upserts`: `(relative_path, rkyv_blob)` — files that have issues.
+    /// `deletes`: relative paths that became clean (had a row, now don't).
+    ///
+    /// All upserts and deletes commit atomically so readers never see a
+    /// partially-updated state.
+    pub async fn save_diagnostics_per_file(
+        &self,
+        upserts: &[(String, Vec<u8>)],
+        deletes: &[String],
+    ) -> Result<(), libsql::Error> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        self.conn.execute("BEGIN", ()).await?;
+        let result: Result<(), libsql::Error> = async {
+            for (path, blob) in upserts {
+                self.conn
+                    .execute(
+                        "INSERT OR REPLACE INTO daemon_diagnostics_per_file
+                         (path, issues_blob, updated_at) VALUES (?1, ?2, ?3)",
+                        params![path.clone(), blob.clone(), now],
+                    )
+                    .await?;
+            }
+            for path in deletes {
+                self.conn
+                    .execute(
+                        "DELETE FROM daemon_diagnostics_per_file WHERE path = ?1",
+                        params![path.clone()],
+                    )
+                    .await?;
+            }
+            Ok(())
+        }
+        .await;
+        match result {
+            Ok(()) => {
+                self.conn.execute("COMMIT", ()).await?;
+                Ok(())
+            }
+            Err(e) => {
+                let _ = self.conn.execute("ROLLBACK", ()).await;
+                Err(e)
+            }
+        }
+    }
+
+    /// Load the rkyv blob for one file. `None` = no row (file is clean).
+    pub async fn load_diagnostics_for_file(
+        &self,
+        path: &str,
+    ) -> Result<Option<Vec<u8>>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT issues_blob FROM daemon_diagnostics_per_file WHERE path = ?1",
+                params![path.to_string()],
+            )
+            .await?;
+        if let Some(row) = rows.next().await? {
+            Ok(Some(row.get(0)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Load blobs for many files. Skips files with no row.
+    /// Returns `(path, blob)` pairs in arbitrary order.
+    pub async fn load_diagnostics_for_files(
+        &self,
+        paths: &[String],
+    ) -> Result<Vec<(String, Vec<u8>)>, libsql::Error> {
+        let mut out = Vec::new();
+        for path in paths {
+            let mut rows = self
+                .conn
+                .query(
+                    "SELECT path, issues_blob FROM daemon_diagnostics_per_file WHERE path = ?1",
+                    params![path.clone()],
+                )
+                .await?;
+            if let Some(row) = rows.next().await? {
+                let p: String = row.get(0)?;
+                let b: Vec<u8> = row.get(1)?;
+                out.push((p, b));
+            }
+        }
+        Ok(out)
+    }
+
+    /// Return all paths that currently have a per-file diagnostics row.
+    /// Used by the daemon refresh diff to detect files that became clean.
+    pub async fn list_diagnostic_paths(&self) -> Result<Vec<String>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query("SELECT path FROM daemon_diagnostics_per_file", ())
+            .await?;
+        let mut out = Vec::new();
+        while let Some(row) = rows.next().await? {
+            out.push(row.get(0)?);
+        }
+        Ok(out)
     }
 }
 

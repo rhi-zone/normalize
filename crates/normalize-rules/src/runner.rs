@@ -1465,6 +1465,7 @@ pub fn try_rules_via_daemon(
     filter_ids: Option<&HashSet<String>>,
     filter_rule: Option<&str>,
     engine: Option<&str>,
+    filter_files: Option<&[String]>,
 ) -> Option<Vec<normalize_output::diagnostics::Issue>> {
     use std::io::{Read, Write};
     use std::os::unix::net::UnixStream;
@@ -1489,6 +1490,7 @@ pub fn try_rules_via_daemon(
     stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
 
     let filter_ids_vec: Option<Vec<String>> = filter_ids.map(|ids| ids.iter().cloned().collect());
+    let filter_files_vec: Option<Vec<String>> = filter_files.map(|fs| fs.to_vec());
 
     let request = serde_json::json!({
         "cmd": "run_rules",
@@ -1496,6 +1498,7 @@ pub fn try_rules_via_daemon(
         "filter_ids": filter_ids_vec,
         "filter_rule": filter_rule,
         "engine": engine,
+        "filter_files": filter_files_vec,
     });
     let json = serde_json::to_string(&request).ok()?;
 
@@ -1539,6 +1542,7 @@ pub fn try_rules_via_daemon(
     _filter_ids: Option<&HashSet<String>>,
     _filter_rule: Option<&str>,
     _engine: Option<&str>,
+    _filter_files: Option<&[String]>,
 ) -> Option<Vec<normalize_output::diagnostics::Issue>> {
     None
 }
@@ -1595,6 +1599,21 @@ pub fn run_rules_report(
         engine,
         RuleKind::All | RuleKind::Syntax | RuleKind::Fact | RuleKind::Native
     );
+    // Compute relative paths for `--files` so the daemon can hit the per-file
+    // table directly. If any target is outside the project root, fall back to
+    // sending None (slow path / full eval).
+    let filter_files_rel: Option<Vec<String>> = files.and_then(|fs| {
+        let mut out = Vec::with_capacity(fs.len());
+        for f in fs {
+            let rel = if f.is_absolute() {
+                f.strip_prefix(project_root).ok()?.to_path_buf()
+            } else {
+                f.clone()
+            };
+            out.push(rel.to_string_lossy().into_owned());
+        }
+        Some(out)
+    });
     let daemon_start = std::time::Instant::now();
     let daemon_result = if daemon_covers_request {
         try_rules_via_daemon(
@@ -1602,6 +1621,7 @@ pub fn run_rules_report(
             filter_ids.as_ref(),
             filter_rule,
             daemon_engine,
+            filter_files_rel.as_deref(),
         )
     } else {
         None

@@ -106,6 +106,11 @@ pub enum Request {
         filter_rule: Option<String>,
         /// Which engine(s) to return results for: "syntax", "fact", "native", or None for all.
         engine: Option<String>,
+        /// Filter results to specific files (relative paths). When provided
+        /// without other filters/engine, the daemon serves directly from the
+        /// per-file diagnostics table.
+        #[serde(default)]
+        filter_files: Option<Vec<String>>,
     },
 }
 
@@ -446,7 +451,8 @@ mod unix_impl {
                     filter_ids,
                     filter_rule,
                     engine,
-                } => self.run_rules(root, filter_ids, filter_rule, engine),
+                    filter_files,
+                } => self.run_rules(root, filter_ids, filter_rule, engine, filter_files),
             }
         }
 
@@ -456,6 +462,7 @@ mod unix_impl {
             filter_ids: Option<Vec<String>>,
             filter_rule: Option<String>,
             engine: Option<String>,
+            filter_files: Option<Vec<String>>,
         ) -> Response {
             let needs_prime = {
                 let roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
@@ -525,6 +532,10 @@ mod unix_impl {
             if let Some(ref rule) = filter_rule {
                 issues.retain(|i| i.rule_id == rule.as_str());
             }
+            if let Some(files) = filter_files.as_ref() {
+                let files_set: HashSet<&String> = files.iter().collect();
+                issues.retain(|i| files_set.contains(&i.file));
+            }
 
             match serde_json::to_value(&issues) {
                 Ok(v) => Response::ok(serde_json::json!({ "issues": v })),
@@ -540,6 +551,7 @@ mod unix_impl {
             filter_ids: Option<Vec<String>>,
             filter_rule: Option<String>,
             engine: Option<String>,
+            filter_files: Option<Vec<String>>,
         ) -> RawResponse {
             let needs_prime = {
                 let roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
@@ -558,8 +570,12 @@ mod unix_impl {
                 None => return RawResponse::Error("root not watched".into()),
             };
 
-            // Fast path: no filter and no engine filter → serve "all" blob directly.
-            if filter_ids.is_none() && filter_rule.is_none() && engine.is_none() {
+            // Fast path A: no filter and no engine filter → serve "all" blob directly.
+            if filter_ids.is_none()
+                && filter_rule.is_none()
+                && engine.is_none()
+                && filter_files.is_none()
+            {
                 let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
                 match tokio::task::block_in_place(|| {
                     self.runtime_handle
@@ -571,6 +587,45 @@ mod unix_impl {
                         return RawResponse::Error(format!("failed to load diagnostics: {e}"));
                     }
                 }
+            }
+
+            // Fast path B: only `filter_files` is set → serve directly from the
+            // per-file diagnostics table without touching the "all" blob.
+            if let Some(ref files) = filter_files
+                && filter_ids.is_none()
+                && filter_rule.is_none()
+                && engine.is_none()
+            {
+                let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
+                let blobs = match tokio::task::block_in_place(|| {
+                    self.runtime_handle
+                        .block_on(idx.load_diagnostics_for_files(files))
+                }) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return RawResponse::Error(format!("load_diagnostics_for_files: {e}"));
+                    }
+                };
+                let mut all: Vec<normalize_output::diagnostics::Issue> = Vec::new();
+                for (_path, blob) in blobs {
+                    match rkyv::from_bytes::<
+                        Vec<normalize_output::diagnostics::Issue>,
+                        rkyv::rancor::Error,
+                    >(&blob)
+                    {
+                        Ok(v) => all.extend(v),
+                        Err(e) => tracing::warn!("rkyv from_bytes per-file: {}", e),
+                    }
+                }
+                tracing::debug!(
+                    files = files.len(),
+                    issues = all.len(),
+                    "served run_rules from per-file table"
+                );
+                return match rkyv::to_bytes::<rkyv::rancor::Error>(&all) {
+                    Ok(b) => RawResponse::Frame(b.to_vec()),
+                    Err(e) => RawResponse::Error(format!("rkyv to_bytes: {e}")),
+                };
             }
 
             // Slow path: filter or engine-specific → load appropriate blobs, filter, re-serialize.
@@ -620,6 +675,10 @@ mod unix_impl {
             }
             if let Some(ref rule) = filter_rule {
                 issues.retain(|i| i.rule_id == rule.as_str());
+            }
+            if let Some(files) = filter_files.as_ref() {
+                let files_set: std::collections::HashSet<&String> = files.iter().collect();
+                issues.retain(|i| files_set.contains(&i.file));
             }
 
             match rkyv::to_bytes::<rkyv::rancor::Error>(&issues) {
@@ -726,6 +785,9 @@ mod unix_impl {
             self.save_diagnostics_to_index(root, "native", &native_issues);
             // Build "all" combined blob for fast no-filter hot path.
             self.save_all_blob(root, &syntax_issues, &fact_issues, &native_issues);
+            // Per-file table + JSON mirror for ephemeral consumers.
+            self.save_per_file_diagnostics(root, &syntax_issues, &fact_issues, &native_issues);
+            self.write_json_mirror(root, &syntax_issues, &fact_issues, &native_issues);
             drop(syntax_issues);
             drop(fact_issues);
             drop(native_issues);
@@ -812,6 +874,138 @@ mod unix_impl {
                 }
             }
             self.save_diagnostics_to_index(root, "all", &all);
+        }
+
+        /// Group all current issues by path and reconcile per-file storage.
+        /// Called after every prime or incremental refresh so the per-file
+        /// table reflects the same state as the per-engine "all" blob.
+        fn save_per_file_diagnostics(
+            &self,
+            root: &Path,
+            syntax: &[normalize_output::diagnostics::Issue],
+            fact: &[normalize_output::diagnostics::Issue],
+            native: &[normalize_output::diagnostics::Issue],
+        ) {
+            // Group all issues by path.
+            let mut by_path: HashMap<String, Vec<normalize_output::diagnostics::Issue>> =
+                HashMap::new();
+            for issue in syntax.iter().chain(fact.iter()).chain(native.iter()) {
+                by_path
+                    .entry(issue.file.clone())
+                    .or_default()
+                    .push(issue.clone());
+            }
+
+            let Some(idx_arc) = self.get_root_index(root) else {
+                return;
+            };
+            let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
+
+            // Files currently in the table that no longer have issues -> delete.
+            let existing_paths: Vec<String> = match tokio::task::block_in_place(|| {
+                self.runtime_handle.block_on(idx.list_diagnostic_paths())
+            }) {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::warn!("failed to list diagnostic paths: {}", e);
+                    return;
+                }
+            };
+            let new_paths: HashSet<&String> = by_path.keys().collect();
+            let deletes: Vec<String> = existing_paths
+                .into_iter()
+                .filter(|p| !new_paths.contains(p))
+                .collect();
+
+            // Serialize each file's issues to rkyv.
+            let mut upserts: Vec<(String, Vec<u8>)> = Vec::with_capacity(by_path.len());
+            for (path, issues) in by_path {
+                match rkyv::to_bytes::<rkyv::rancor::Error>(&issues) {
+                    Ok(b) => upserts.push((path, b.to_vec())),
+                    Err(e) => tracing::warn!("rkyv serialize per-file diagnostics: {}", e),
+                }
+            }
+
+            if let Err(e) = tokio::task::block_in_place(|| {
+                self.runtime_handle
+                    .block_on(idx.save_diagnostics_per_file(&upserts, &deletes))
+            }) {
+                tracing::warn!("failed to save per-file diagnostics: {}", e);
+            }
+        }
+
+        /// Rebuild the per-file diagnostics table by reading the three per-engine
+        /// blobs from SQLite. Used when only one engine has been refreshed
+        /// (e.g. `refresh_native_rules`).
+        fn rebuild_per_file_diagnostics(&self, root: &Path) {
+            let Some(idx_arc) = self.get_root_index(root) else {
+                return;
+            };
+            let mut syntax: Vec<normalize_output::diagnostics::Issue> = Vec::new();
+            let mut fact: Vec<normalize_output::diagnostics::Issue> = Vec::new();
+            let mut native: Vec<normalize_output::diagnostics::Issue> = Vec::new();
+            for (eng, sink) in [
+                ("syntax", &mut syntax),
+                ("fact", &mut fact),
+                ("native", &mut native),
+            ] {
+                let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
+                if let Ok(Some(blob)) = tokio::task::block_in_place(|| {
+                    self.runtime_handle.block_on(idx.load_diagnostics_blob(eng))
+                }) && let Ok(issues) = rkyv::from_bytes::<
+                    Vec<normalize_output::diagnostics::Issue>,
+                    rkyv::rancor::Error,
+                >(&blob)
+                {
+                    *sink = issues;
+                }
+            }
+            self.save_per_file_diagnostics(root, &syntax, &fact, &native);
+            self.write_json_mirror(root, &syntax, &fact, &native);
+        }
+
+        /// Write `.normalize/diagnostics.json` atomically.
+        /// File is keyed by relative path; value is `Vec<Issue>`. Files with
+        /// no issues are omitted. `BTreeMap` ensures deterministic key order.
+        fn write_json_mirror(
+            &self,
+            root: &Path,
+            syntax: &[normalize_output::diagnostics::Issue],
+            fact: &[normalize_output::diagnostics::Issue],
+            native: &[normalize_output::diagnostics::Issue],
+        ) {
+            use std::collections::BTreeMap;
+
+            let mut by_path: BTreeMap<String, Vec<&normalize_output::diagnostics::Issue>> =
+                BTreeMap::new();
+            for issue in syntax.iter().chain(fact.iter()).chain(native.iter()) {
+                by_path.entry(issue.file.clone()).or_default().push(issue);
+            }
+
+            let dir = root.join(".normalize");
+            if let Err(e) = std::fs::create_dir_all(&dir) {
+                tracing::warn!("failed to create .normalize dir: {}", e);
+                return;
+            }
+
+            let final_path = dir.join("diagnostics.json");
+            let tmp_path = dir.join("diagnostics.json.tmp");
+
+            let json = match serde_json::to_vec_pretty(&by_path) {
+                Ok(b) => b,
+                Err(e) => {
+                    tracing::warn!("failed to serialize diagnostics.json: {}", e);
+                    return;
+                }
+            };
+
+            if let Err(e) = std::fs::write(&tmp_path, &json) {
+                tracing::warn!("failed to write diagnostics.json.tmp: {}", e);
+                return;
+            }
+            if let Err(e) = std::fs::rename(&tmp_path, &final_path) {
+                tracing::warn!("failed to rename diagnostics.json: {}", e);
+            }
         }
 
         /// Run all native rules and return unified Issues.
@@ -1122,6 +1316,14 @@ mod unix_impl {
                         self.save_diagnostics_to_index(root, "native", &native_issues);
                         // Build "all" combined blob for fast no-filter hot path.
                         self.save_all_blob(root, &syntax_issues, &fact_issues, &native_issues);
+                        // Per-file table + JSON mirror for ephemeral consumers.
+                        self.save_per_file_diagnostics(
+                            root,
+                            &syntax_issues,
+                            &fact_issues,
+                            &native_issues,
+                        );
+                        self.write_json_mirror(root, &syntax_issues, &fact_issues, &native_issues);
                         drop(syntax_issues);
                         drop(fact_issues);
                         drop(native_issues);
@@ -1192,6 +1394,8 @@ mod unix_impl {
             drop(new_native_issues);
             // Rebuild "all" blob from existing per-engine blobs.
             self.rebuild_all_blob(root);
+            // Rebuild per-file table + JSON mirror from per-engine blobs.
+            self.rebuild_per_file_diagnostics(root);
         }
     }
 
@@ -1470,7 +1674,8 @@ mod unix_impl {
                 filter_ids,
                 filter_rule,
                 engine,
-            }) => server.run_rules_raw(root, filter_ids, filter_rule, engine),
+                filter_files,
+            }) => server.run_rules_raw(root, filter_ids, filter_rule, engine, filter_files),
             Ok(_) => RawResponse::Error("rkyv mode only supports run_rules".into()),
             Err(e) => RawResponse::Error(format!("invalid request: {e}")),
         };
@@ -1630,6 +1835,7 @@ mod unix_impl {
             filter_ids: Option<Vec<String>>,
             filter_rule: Option<String>,
             engine: Option<String>,
+            filter_files: Option<Vec<String>>,
         ) -> Result<Response, String> {
             use std::io::{BufRead, BufReader, Write};
             let mut stream = UnixStream::connect(&self.socket_path)
@@ -1647,6 +1853,7 @@ mod unix_impl {
                 filter_ids,
                 filter_rule,
                 engine,
+                filter_files,
             };
             let json = serde_json::to_string(&request).map_err(|e| e.to_string())?;
             stream
@@ -1817,6 +2024,7 @@ impl DaemonClient {
         _filter_ids: Option<Vec<String>>,
         _filter_rule: Option<String>,
         _engine: Option<String>,
+        _filter_files: Option<Vec<String>>,
     ) -> Result<Response, String> {
         Err("normalize daemon is not supported on Windows".to_string())
     }

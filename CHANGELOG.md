@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Per-file diagnostic storage in the daemon + JSON mirror** — schema bump v9→v10 adds a `daemon_diagnostics_per_file` table (path PRIMARY KEY, rkyv `Vec<Issue>` blob) populated on every prime/refresh. Per-file pulls (e.g. `normalize rules run path/to/file.rs`) hit this table directly via a new `filter_files` field on `RunRules` instead of fetching and filtering the whole "all" blob. The daemon also writes `.normalize/diagnostics.json` atomically on every prime/refresh as a canonical-state artifact for ephemeral consumers (shell scripts, LSPs that prefer inotify-watch over socket subscribe). The existing per-engine "all" blob fast path is unchanged.
 - **`#match?`/`#eq?` predicate evaluation for tree-sitter queries** — `normalize_languages::satisfies_predicates` now evaluates the standard tree-sitter predicates (`#match?`, `#not-match?`, `#eq?`, `#not-eq?`) so `.scm` query authors can filter captures by text content or equality. Unknown predicates continue to pass (forward-compatible). Predicate filtering is active in the decoration query runner used by `normalize refactor move`.
 
 ### Changed
