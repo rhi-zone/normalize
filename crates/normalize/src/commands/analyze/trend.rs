@@ -252,6 +252,7 @@ where
     }
 
     let span_days = if points.len() >= 2 {
+        // normalize-syntax-allow: rust/unwrap-in-impl - len >= 2 implies last() is Some
         ((points.last().unwrap().timestamp - points[0].timestamp) / 86400) as u64
     } else {
         0

@@ -287,6 +287,7 @@ fn format_schema_annotated(
 
         if is_set {
             // SAFETY: `is_set` is true only when `current` was found to be `Some` above.
+            // normalize-syntax-allow: rust/unwrap-in-impl - guarded by is_set above
             let v = current.unwrap();
             // Render as TOML key = value
             let toml_str = json_to_toml_string(&serde_json::json!({ key: v }));
@@ -599,6 +600,7 @@ fn set_dotted_key(
     }
 
     // Navigate into nested tables
+    // normalize-syntax-allow: rust/unwrap-in-impl - len==1 case returned above; keys non-empty here
     let (head, tail) = keys.split_first().unwrap();
     if !doc.contains_key(head) {
         let mut t = toml_edit::Table::new();
@@ -622,6 +624,7 @@ fn set_in_table(
         table[key] = toml_edit::value(value);
         return Ok(old);
     }
+    // normalize-syntax-allow: rust/unwrap-in-impl - len==1 case returned above; keys non-empty here
     let (head, tail) = keys.split_first().unwrap();
     if !table.contains_key(head) {
         let mut t = toml_edit::Table::new();

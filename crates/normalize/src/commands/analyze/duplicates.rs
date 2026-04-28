@@ -23,6 +23,7 @@ fn file_progress_bar(count: u64, msg: &str) -> ProgressBar {
         return ProgressBar::hidden();
     }
     let pb = ProgressBar::new(count);
+    // normalize-syntax-allow: rust/unwrap-in-impl - compile-time-known-valid template
     pb.set_style(
         ProgressStyle::with_template(&format!(
             "{{spinner:.cyan}} {} [{{bar:30.cyan/dim}}] {{pos}}/{{len}} files [{{elapsed_precise}}]",

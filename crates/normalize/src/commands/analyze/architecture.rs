@@ -272,6 +272,7 @@ pub async fn analyze_architecture(idx: &FileIndex) -> Result<ArchitectureReport,
     let pb = if std::io::IsTerminal::is_terminal(&std::io::stderr()) {
         let pb = ProgressBar::new_spinner();
         pb.set_style(
+            // normalize-syntax-allow: rust/unwrap-in-impl - compile-time-known-valid template
             ProgressStyle::with_template("{spinner:.cyan} {msg} [{elapsed_precise}]").unwrap(),
         );
         pb.set_message("Building import graph...");
