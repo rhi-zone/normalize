@@ -90,16 +90,12 @@ impl Drop for DaemonGuard {
 }
 
 /// `DaemonClient::new()` reads the env var lazily inside `global_socket_path()`,
-/// but the env var is process-global. Set/restore around the call so tests
-/// running in parallel don't trample each other.
-///
-/// Tests that spawn a daemon and use the client must serialize via the
-/// `serial_test`-style mutex in `with_env`. We use a simple Mutex here.
+/// but the env var is process-global. Tests that spawn a daemon and use the
+/// client must serialize via `#[serial_test::serial]` so the env var value
+/// stays valid across the daemon spawn and the client construction.
 fn with_env<R>(config_dir: &std::path::Path, f: impl FnOnce() -> R) -> R {
-    use std::sync::Mutex;
-    static LOCK: Mutex<()> = Mutex::new(());
-    let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    // SAFETY: protected by LOCK across all callers in this test crate.
+    // SAFETY: callers are serialized via `#[serial_test::serial]`, so no other
+    // test in this crate is reading or writing this env var concurrently.
     unsafe {
         std::env::set_var("NORMALIZE_DAEMON_CONFIG_DIR", config_dir);
     }
@@ -127,6 +123,7 @@ fn wait_for_event(
 }
 
 #[test]
+#[serial_test::serial]
 fn json_subscribe_delivers_file_changed_event() {
     let daemon = DaemonGuard::start();
     let project = tempfile::tempdir().unwrap();
@@ -163,6 +160,7 @@ fn json_subscribe_delivers_file_changed_event() {
 }
 
 #[test]
+#[serial_test::serial]
 fn binary_subscribe_delivers_file_changed_event() {
     let daemon = DaemonGuard::start();
     let project = tempfile::tempdir().unwrap();
@@ -197,6 +195,7 @@ fn binary_subscribe_delivers_file_changed_event() {
 /// requests via the same isolated path — this catches broken socket-path
 /// override wiring.
 #[test]
+#[serial_test::serial]
 fn isolated_socket_path_routes_to_isolated_daemon() {
     let daemon = DaemonGuard::start();
     let resp = daemon.client().status().expect("status reply");
@@ -214,6 +213,7 @@ fn isolated_socket_path_routes_to_isolated_daemon() {
 /// `IndexRefreshed` (or `DiagnosticsUpdated`) is ever broadcast. See
 /// `TODO.md` "Daemon refresh path suppressed by `needs_refresh()` 60s gate".
 #[test]
+#[serial_test::serial]
 #[ignore = "FAILS: needs_refresh 60s gate suppresses daemon refresh — see TODO.md"]
 fn json_subscribe_delivers_index_refreshed_event() {
     let daemon = DaemonGuard::start();
