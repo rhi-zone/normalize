@@ -75,7 +75,7 @@ struct CachedFileData {
 }
 
 // Not yet public - just delete .normalize/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 10;
+const SCHEMA_VERSION: i64 = 11;
 
 /// Bump when extraction logic changes to invalidate cached results.
 /// Bumped to "2" (2026-04-27): purge CA cache entries that may have been poisoned
@@ -471,12 +471,11 @@ impl FileIndex {
             conn.execute("DELETE FROM meta WHERE key = 'co_change_last_commit'", ())
                 .await
                 .ok();
-            // daemon_diagnostics: drop and recreate so the column type change
-            // (issues_json TEXT → issues_blob BLOB) takes effect.
+            // Both diagnostic tables get dropped + recreated on every schema bump
+            // (column shape has changed in past bumps and may again — simplest path).
             conn.execute("DROP TABLE IF EXISTS daemon_diagnostics", ())
                 .await
                 .ok();
-            // Per-file diagnostics: drop and recreate cleanly on schema bump.
             conn.execute("DROP TABLE IF EXISTS daemon_diagnostics_per_file", ())
                 .await
                 .ok();
@@ -565,11 +564,12 @@ impl FileIndex {
         )
         .await?;
 
-        // Daemon diagnostics cache: persisted issue blobs, one row per engine.
+        // Daemon diagnostics cache: one row per engine. `config_hash` mismatch on load = cache miss.
         conn.execute(
             "CREATE TABLE IF NOT EXISTS daemon_diagnostics (
                 engine TEXT PRIMARY KEY,
                 issues_blob BLOB NOT NULL,
+                config_hash TEXT NOT NULL,
                 updated_at INTEGER NOT NULL
             )",
             (),
@@ -584,6 +584,7 @@ impl FileIndex {
             "CREATE TABLE IF NOT EXISTS daemon_diagnostics_per_file (
                 path TEXT PRIMARY KEY,
                 issues_blob BLOB NOT NULL,
+                config_hash TEXT NOT NULL,
                 updated_at INTEGER NOT NULL
             )",
             (),
@@ -3000,10 +3001,15 @@ impl FileIndex {
 
     /// Persist rkyv-serialized diagnostics blob for one engine ("syntax", "fact", "native", "all").
     /// Replaces any previous value for that engine.
+    ///
+    /// `config_hash` is stamped on the row so callers can detect blobs produced
+    /// under a different config (cross-daemon-restart staleness). See
+    /// `load_diagnostics_blob` for the matching read side.
     pub async fn save_diagnostics_blob(
         &self,
         engine: &str,
         blob: &[u8],
+        config_hash: &str,
     ) -> Result<(), libsql::Error> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -3011,29 +3017,40 @@ impl FileIndex {
             .as_secs() as i64;
         self.conn
             .execute(
-                "INSERT OR REPLACE INTO daemon_diagnostics (engine, issues_blob, updated_at)
-                 VALUES (?1, ?2, ?3)",
-                params![engine.to_string(), blob.to_vec(), now],
+                "INSERT OR REPLACE INTO daemon_diagnostics (engine, issues_blob, config_hash, updated_at)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![engine.to_string(), blob.to_vec(), config_hash.to_string(), now],
             )
             .await?;
         Ok(())
     }
 
     /// Load rkyv-serialized diagnostics blob for one engine.
-    /// Returns `None` if no data has been saved for that engine yet.
+    ///
+    /// Returns `None` if no row exists *or* the row's `config_hash` does not
+    /// match `expected_hash`. The mismatch case is treated as a cache miss so
+    /// the caller will reprime under the current config rather than serving a
+    /// blob from a previous daemon session.
     pub async fn load_diagnostics_blob(
         &self,
         engine: &str,
+        expected_hash: &str,
     ) -> Result<Option<Vec<u8>>, libsql::Error> {
         let mut rows = self
             .conn
             .query(
-                "SELECT issues_blob FROM daemon_diagnostics WHERE engine = ?1",
+                "SELECT issues_blob, config_hash FROM daemon_diagnostics WHERE engine = ?1",
                 params![engine.to_string()],
             )
             .await?;
         if let Some(row) = rows.next().await? {
-            Ok(Some(row.get(0)?))
+            let blob: Vec<u8> = row.get(0)?;
+            let stored_hash: String = row.get(1)?;
+            if stored_hash == expected_hash {
+                Ok(Some(blob))
+            } else {
+                Ok(None)
+            }
         } else {
             Ok(None)
         }
@@ -3050,6 +3067,7 @@ impl FileIndex {
         &self,
         upserts: &[(String, Vec<u8>)],
         deletes: &[String],
+        config_hash: &str,
     ) -> Result<(), libsql::Error> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -3061,8 +3079,8 @@ impl FileIndex {
                 self.conn
                     .execute(
                         "INSERT OR REPLACE INTO daemon_diagnostics_per_file
-                         (path, issues_blob, updated_at) VALUES (?1, ?2, ?3)",
-                        params![path.clone(), blob.clone(), now],
+                         (path, issues_blob, config_hash, updated_at) VALUES (?1, ?2, ?3, ?4)",
+                        params![path.clone(), blob.clone(), config_hash.to_string(), now],
                     )
                     .await?;
             }
@@ -3089,44 +3107,58 @@ impl FileIndex {
         }
     }
 
-    /// Load the rkyv blob for one file. `None` = no row (file is clean).
+    /// Load the rkyv blob for one file. `None` = no row (file is clean) or the
+    /// row's `config_hash` doesn't match `expected_hash` (stale across config
+    /// change).
     pub async fn load_diagnostics_for_file(
         &self,
         path: &str,
+        expected_hash: &str,
     ) -> Result<Option<Vec<u8>>, libsql::Error> {
         let mut rows = self
             .conn
             .query(
-                "SELECT issues_blob FROM daemon_diagnostics_per_file WHERE path = ?1",
+                "SELECT issues_blob, config_hash FROM daemon_diagnostics_per_file WHERE path = ?1",
                 params![path.to_string()],
             )
             .await?;
         if let Some(row) = rows.next().await? {
-            Ok(Some(row.get(0)?))
+            let blob: Vec<u8> = row.get(0)?;
+            let stored_hash: String = row.get(1)?;
+            if stored_hash == expected_hash {
+                Ok(Some(blob))
+            } else {
+                Ok(None)
+            }
         } else {
             Ok(None)
         }
     }
 
-    /// Load blobs for many files. Skips files with no row.
+    /// Load blobs for many files. Skips files with no row or whose stored
+    /// `config_hash` doesn't match `expected_hash`.
     /// Returns `(path, blob)` pairs in arbitrary order.
     pub async fn load_diagnostics_for_files(
         &self,
         paths: &[String],
+        expected_hash: &str,
     ) -> Result<Vec<(String, Vec<u8>)>, libsql::Error> {
         let mut out = Vec::new();
         for path in paths {
             let mut rows = self
                 .conn
                 .query(
-                    "SELECT path, issues_blob FROM daemon_diagnostics_per_file WHERE path = ?1",
+                    "SELECT path, issues_blob, config_hash FROM daemon_diagnostics_per_file WHERE path = ?1",
                     params![path.clone()],
                 )
                 .await?;
             if let Some(row) = rows.next().await? {
                 let p: String = row.get(0)?;
                 let b: Vec<u8> = row.get(1)?;
-                out.push((p, b));
+                let stored_hash: String = row.get(2)?;
+                if stored_hash == expected_hash {
+                    out.push((p, b));
+                }
             }
         }
         Ok(out)
@@ -3588,12 +3620,12 @@ class MyClass:
             ("b.rs".to_string(), vec![4, 5, 6]),
         ];
         index
-            .save_diagnostics_per_file(&upserts, &[])
+            .save_diagnostics_per_file(&upserts, &[], "h1")
             .await
             .unwrap();
 
-        let a = index.load_diagnostics_for_file("a.rs").await.unwrap();
-        let b = index.load_diagnostics_for_file("b.rs").await.unwrap();
+        let a = index.load_diagnostics_for_file("a.rs", "h1").await.unwrap();
+        let b = index.load_diagnostics_for_file("b.rs", "h1").await.unwrap();
         assert_eq!(a, Some(vec![1, 2, 3]));
         assert_eq!(b, Some(vec![4, 5, 6]));
 
@@ -3601,13 +3633,16 @@ class MyClass:
         let upserts2 = vec![("b.rs".to_string(), vec![9, 9])];
         let deletes2 = vec!["a.rs".to_string()];
         index
-            .save_diagnostics_per_file(&upserts2, &deletes2)
+            .save_diagnostics_per_file(&upserts2, &deletes2, "h1")
             .await
             .unwrap();
 
-        assert_eq!(index.load_diagnostics_for_file("a.rs").await.unwrap(), None);
         assert_eq!(
-            index.load_diagnostics_for_file("b.rs").await.unwrap(),
+            index.load_diagnostics_for_file("a.rs", "h1").await.unwrap(),
+            None
+        );
+        assert_eq!(
+            index.load_diagnostics_for_file("b.rs", "h1").await.unwrap(),
             Some(vec![9, 9])
         );
     }
@@ -3617,7 +3652,10 @@ class MyClass:
         let dir = tempdir().unwrap();
         let index = empty_index(dir.path()).await;
         // No-op call should succeed and leave the table empty.
-        index.save_diagnostics_per_file(&[], &[]).await.unwrap();
+        index
+            .save_diagnostics_per_file(&[], &[], "h")
+            .await
+            .unwrap();
         assert!(index.list_diagnostic_paths().await.unwrap().is_empty());
     }
 
@@ -3626,7 +3664,63 @@ class MyClass:
         let dir = tempdir().unwrap();
         let index = empty_index(dir.path()).await;
         assert_eq!(
-            index.load_diagnostics_for_file("nope.rs").await.unwrap(),
+            index
+                .load_diagnostics_for_file("nope.rs", "h")
+                .await
+                .unwrap(),
+            None
+        );
+    }
+
+    /// A row written under one config_hash must be invisible to a load that
+    /// presents a different hash — this is what makes the cache safe across
+    /// daemon restarts after a config edit.
+    #[tokio::test]
+    async fn per_file_config_hash_mismatch_is_cache_miss() {
+        let dir = tempdir().unwrap();
+        let index = empty_index(dir.path()).await;
+        index
+            .save_diagnostics_per_file(&[("a.rs".to_string(), vec![1])], &[], "old")
+            .await
+            .unwrap();
+        // Same hash → hit.
+        assert_eq!(
+            index
+                .load_diagnostics_for_file("a.rs", "old")
+                .await
+                .unwrap(),
+            Some(vec![1])
+        );
+        // Different hash → miss.
+        assert_eq!(
+            index
+                .load_diagnostics_for_file("a.rs", "new")
+                .await
+                .unwrap(),
+            None
+        );
+        let multi = index
+            .load_diagnostics_for_files(&["a.rs".to_string()], "new")
+            .await
+            .unwrap();
+        assert!(multi.is_empty());
+    }
+
+    /// Same invariant for the per-engine `daemon_diagnostics` table.
+    #[tokio::test]
+    async fn engine_blob_config_hash_mismatch_is_cache_miss() {
+        let dir = tempdir().unwrap();
+        let index = empty_index(dir.path()).await;
+        index
+            .save_diagnostics_blob("syntax", &[7, 8, 9], "old")
+            .await
+            .unwrap();
+        assert_eq!(
+            index.load_diagnostics_blob("syntax", "old").await.unwrap(),
+            Some(vec![7, 8, 9])
+        );
+        assert_eq!(
+            index.load_diagnostics_blob("syntax", "new").await.unwrap(),
             None
         );
     }
@@ -3637,7 +3731,7 @@ class MyClass:
         let index = empty_index(dir.path()).await;
         let upserts = vec![("a.rs".to_string(), vec![1]), ("c.rs".to_string(), vec![3])];
         index
-            .save_diagnostics_per_file(&upserts, &[])
+            .save_diagnostics_per_file(&upserts, &[], "h1")
             .await
             .unwrap();
 
@@ -3647,8 +3741,10 @@ class MyClass:
             "missing.rs".to_string(),
             "a.rs".to_string(),
         ];
-        let mut got: Vec<(String, Vec<u8>)> =
-            index.load_diagnostics_for_files(&query).await.unwrap();
+        let mut got: Vec<(String, Vec<u8>)> = index
+            .load_diagnostics_for_files(&query, "h1")
+            .await
+            .unwrap();
         got.sort_by(|x, y| x.0.cmp(&y.0));
         assert_eq!(
             got,
@@ -3666,7 +3762,7 @@ class MyClass:
             ("z".to_string(), vec![0]),
         ];
         index
-            .save_diagnostics_per_file(&upserts, &[])
+            .save_diagnostics_per_file(&upserts, &[], "h")
             .await
             .unwrap();
         let mut paths = index.list_diagnostic_paths().await.unwrap();
@@ -3712,11 +3808,11 @@ class MyClass:
 
         // And the BLOB roundtrip itself works.
         index
-            .save_diagnostics_per_file(&[("a".to_string(), vec![1, 2, 3])], &[])
+            .save_diagnostics_per_file(&[("a".to_string(), vec![1, 2, 3])], &[], "h")
             .await
             .unwrap();
         assert_eq!(
-            index.load_diagnostics_for_file("a").await.unwrap(),
+            index.load_diagnostics_for_file("a", "h").await.unwrap(),
             Some(vec![1, 2, 3])
         );
     }

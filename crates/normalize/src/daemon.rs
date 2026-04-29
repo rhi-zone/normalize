@@ -178,6 +178,48 @@ mod unix_impl {
     use tokio::net::UnixListener;
     use tokio::sync::broadcast;
 
+    /// Hash of the inputs that produced cached diagnostic blobs, used to
+    /// invalidate blobs across daemon restarts when the on-disk config has
+    /// changed since they were written.
+    ///
+    /// Inputs (in order):
+    /// 1. `CARGO_PKG_VERSION` of the daemon binary — a normalize upgrade that
+    ///    changes rule semantics invalidates old blobs.
+    /// 2. `.normalize/config.toml` raw bytes (if present).
+    /// 3. Every regular file under `.normalize/rules/` (sorted by path),
+    ///    file name + bytes.
+    ///
+    /// This intentionally excludes source files and the index — those have
+    /// their own per-file mtime tracking inside the rules engine. Hashing them
+    /// here would defeat the cache on every source edit.
+    ///
+    /// blake3 is used over SHA-2 because it's already a workspace dep
+    /// (rkyv-related work pulled it in) and is faster on the small inputs we
+    /// hash here.
+    pub(super) fn compute_config_hash(root: &Path) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(env!("CARGO_PKG_VERSION").as_bytes());
+        if let Ok(content) = std::fs::read(root.join(".normalize/config.toml")) {
+            hasher.update(&content);
+        }
+        if let Ok(entries) = std::fs::read_dir(root.join(".normalize/rules")) {
+            let mut paths: Vec<PathBuf> = entries
+                .filter_map(|e| e.ok().map(|e| e.path()))
+                .filter(|p| p.is_file())
+                .collect();
+            paths.sort();
+            for p in paths {
+                if let Ok(content) = std::fs::read(&p) {
+                    if let Some(name) = p.file_name() {
+                        hasher.update(name.as_encoded_bytes());
+                    }
+                    hasher.update(&content);
+                }
+            }
+        }
+        hasher.finalize().to_hex().to_string()
+    }
+
     /// Resolve the directory used for daemon lock + socket files.
     ///
     /// In production this is `~/.config/normalize`. Tests can set
@@ -498,13 +540,18 @@ mod unix_impl {
             engine: Option<String>,
             filter_files: Option<Vec<String>>,
         ) -> Response {
+            // Compute current config hash up front so prime/load see the same
+            // value. If the on-disk config has changed since we last primed,
+            // the load below will miss and we'll fall through to a reprime.
+            let config_hash = compute_config_hash(&root);
+
             let needs_prime = {
                 let roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
                 match roots.get(&root) {
                     Some(w) => !w.primed,
                     None => return Response::err("root not watched"),
                 }
-            };
+            } || !self.cache_matches_current_config(&root, &config_hash);
 
             // If cache is not yet primed, do a full prime now (lazily on first request).
             if needs_prime {
@@ -534,7 +581,8 @@ mod unix_impl {
             for eng in engines_to_load {
                 let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
                 match tokio::task::block_in_place(|| {
-                    self.runtime_handle.block_on(idx.load_diagnostics_blob(eng))
+                    self.runtime_handle
+                        .block_on(idx.load_diagnostics_blob(eng, &config_hash))
                 }) {
                     Ok(Some(blob)) => {
                         match rkyv::from_bytes::<
@@ -587,13 +635,14 @@ mod unix_impl {
             engine: Option<String>,
             filter_files: Option<Vec<String>>,
         ) -> RawResponse {
+            let config_hash = compute_config_hash(&root);
             let needs_prime = {
                 let roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
                 match roots.get(&root) {
                     Some(w) => !w.primed,
                     None => return RawResponse::Error("root not watched".into()),
                 }
-            };
+            } || !self.cache_matches_current_config(&root, &config_hash);
 
             if needs_prime {
                 self.prime_diagnostics_cache(&root);
@@ -613,7 +662,7 @@ mod unix_impl {
                 let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
                 match tokio::task::block_in_place(|| {
                     self.runtime_handle
-                        .block_on(idx.load_diagnostics_blob("all"))
+                        .block_on(idx.load_diagnostics_blob("all", &config_hash))
                 }) {
                     Ok(Some(blob)) => return RawResponse::Frame(blob),
                     Ok(None) => return RawResponse::Error("not primed".into()),
@@ -633,7 +682,7 @@ mod unix_impl {
                 let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
                 let blobs = match tokio::task::block_in_place(|| {
                     self.runtime_handle
-                        .block_on(idx.load_diagnostics_for_files(files))
+                        .block_on(idx.load_diagnostics_for_files(files, &config_hash))
                 }) {
                     Ok(v) => v,
                     Err(e) => {
@@ -680,7 +729,8 @@ mod unix_impl {
             for eng in engines_to_load {
                 let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
                 match tokio::task::block_in_place(|| {
-                    self.runtime_handle.block_on(idx.load_diagnostics_blob(eng))
+                    self.runtime_handle
+                        .block_on(idx.load_diagnostics_blob(eng, &config_hash))
                 }) {
                     Ok(Some(blob)) => {
                         match rkyv::from_bytes::<
@@ -721,11 +771,36 @@ mod unix_impl {
             }
         }
 
+        /// Returns `true` if the daemon's persisted "all" blob was written under
+        /// the current config hash — i.e. cached results are still valid for
+        /// this config. Used to detect cross-daemon-restart staleness: a daemon
+        /// that was stopped, then had its config edited, then restarted will
+        /// see `false` here on the first `RunRules` and reprime.
+        ///
+        /// Returns `false` if the row is missing (un-primed) *or* the row's
+        /// stored hash differs from `current_hash`. Errors talking to SQLite
+        /// also return `false` (treat as "must reprime") rather than silently
+        /// serving an unverified cache.
+        fn cache_matches_current_config(&self, root: &Path, current_hash: &str) -> bool {
+            let Some(idx_arc) = self.get_root_index(root) else {
+                return false;
+            };
+            let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
+            matches!(
+                tokio::task::block_in_place(|| {
+                    self.runtime_handle
+                        .block_on(idx.load_diagnostics_blob("all", current_hash))
+                }),
+                Ok(Some(_))
+            )
+        }
+
         /// Prime the diagnostics cache for a root with a full evaluation of all engines.
         /// Results are persisted to the SQLite index and immediately dropped from heap.
         /// Called lazily on the first `RunRules` request or after config invalidation.
         fn prime_diagnostics_cache(&self, root: &Path) {
             let config = NormalizeConfig::load(root);
+            let config_hash = compute_config_hash(root);
 
             // --- Fact rules ---
             let fact_issues: Vec<normalize_output::diagnostics::Issue> = {
@@ -814,14 +889,25 @@ mod unix_impl {
             );
 
             // Persist to SQLite and drop the Vecs immediately.
-            self.save_diagnostics_to_index(root, "syntax", &syntax_issues);
-            self.save_diagnostics_to_index(root, "fact", &fact_issues);
-            self.save_diagnostics_to_index(root, "native", &native_issues);
+            self.save_diagnostics_to_index(root, "syntax", &syntax_issues, &config_hash);
+            self.save_diagnostics_to_index(root, "fact", &fact_issues, &config_hash);
+            self.save_diagnostics_to_index(root, "native", &native_issues, &config_hash);
             // Build "all" combined blob for fast no-filter hot path.
-            self.save_all_blob(root, &syntax_issues, &fact_issues, &native_issues);
+            self.save_all_blob(
+                root,
+                &syntax_issues,
+                &fact_issues,
+                &native_issues,
+                &config_hash,
+            );
             // Per-file table + JSON mirror for ephemeral consumers.
-            let delta =
-                self.save_per_file_diagnostics(root, &syntax_issues, &fact_issues, &native_issues);
+            let delta = self.save_per_file_diagnostics(
+                root,
+                &syntax_issues,
+                &fact_issues,
+                &native_issues,
+                &config_hash,
+            );
             self.write_json_mirror(root, &syntax_issues, &fact_issues, &native_issues);
             drop(syntax_issues);
             drop(fact_issues);
@@ -861,6 +947,7 @@ mod unix_impl {
             root: &Path,
             engine: &str,
             issues: &[normalize_output::diagnostics::Issue],
+            config_hash: &str,
         ) {
             let issues_vec: Vec<normalize_output::diagnostics::Issue> = issues.to_vec();
             let blob = match rkyv::to_bytes::<rkyv::rancor::Error>(&issues_vec) {
@@ -880,7 +967,7 @@ mod unix_impl {
             let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
             if let Err(e) = tokio::task::block_in_place(|| {
                 self.runtime_handle
-                    .block_on(idx.save_diagnostics_blob(engine, &blob))
+                    .block_on(idx.save_diagnostics_blob(engine, &blob, config_hash))
             }) {
                 tracing::warn!(engine, "failed to write diagnostics to SQLite: {}", e);
             }
@@ -893,13 +980,14 @@ mod unix_impl {
             syntax: &[normalize_output::diagnostics::Issue],
             fact: &[normalize_output::diagnostics::Issue],
             native: &[normalize_output::diagnostics::Issue],
+            config_hash: &str,
         ) {
             let mut all: Vec<normalize_output::diagnostics::Issue> =
                 Vec::with_capacity(syntax.len() + fact.len() + native.len());
             all.extend_from_slice(syntax);
             all.extend_from_slice(fact);
             all.extend_from_slice(native);
-            self.save_diagnostics_to_index(root, "all", &all);
+            self.save_diagnostics_to_index(root, "all", &all, config_hash);
         }
 
         /// Reload the three per-engine blobs from SQLite, merge them, and
@@ -913,11 +1001,13 @@ mod unix_impl {
                     return;
                 }
             };
+            let config_hash = compute_config_hash(root);
             let mut all: Vec<normalize_output::diagnostics::Issue> = Vec::new();
             for eng in &["syntax", "fact", "native"] {
                 let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
                 if let Ok(Some(blob)) = tokio::task::block_in_place(|| {
-                    self.runtime_handle.block_on(idx.load_diagnostics_blob(eng))
+                    self.runtime_handle
+                        .block_on(idx.load_diagnostics_blob(eng, &config_hash))
                 }) && let Ok(issues) = rkyv::from_bytes::<
                     Vec<normalize_output::diagnostics::Issue>,
                     rkyv::rancor::Error,
@@ -926,7 +1016,7 @@ mod unix_impl {
                     all.extend(issues);
                 }
             }
-            self.save_diagnostics_to_index(root, "all", &all);
+            self.save_diagnostics_to_index(root, "all", &all, &config_hash);
         }
 
         /// Group all current issues by path and reconcile per-file storage.
@@ -948,6 +1038,7 @@ mod unix_impl {
             syntax: &[normalize_output::diagnostics::Issue],
             fact: &[normalize_output::diagnostics::Issue],
             native: &[normalize_output::diagnostics::Issue],
+            config_hash: &str,
         ) -> Vec<(String, Vec<normalize_output::diagnostics::Issue>)> {
             // Group all issues by path.
             let mut by_path: HashMap<String, Vec<normalize_output::diagnostics::Issue>> =
@@ -987,7 +1078,7 @@ mod unix_impl {
             let candidate_paths: Vec<String> = by_path.keys().cloned().collect();
             let existing_blobs: HashMap<String, Vec<u8>> = match tokio::task::block_in_place(|| {
                 self.runtime_handle
-                    .block_on(idx.load_diagnostics_for_files(&candidate_paths))
+                    .block_on(idx.load_diagnostics_for_files(&candidate_paths, config_hash))
             }) {
                 Ok(rows) => rows.into_iter().collect(),
                 Err(e) => {
@@ -1022,8 +1113,11 @@ mod unix_impl {
             }
 
             if let Err(e) = tokio::task::block_in_place(|| {
-                self.runtime_handle
-                    .block_on(idx.save_diagnostics_per_file(&upserts, &deletes))
+                self.runtime_handle.block_on(idx.save_diagnostics_per_file(
+                    &upserts,
+                    &deletes,
+                    config_hash,
+                ))
             }) {
                 tracing::warn!("failed to save per-file diagnostics: {}", e);
             }
@@ -1038,6 +1132,7 @@ mod unix_impl {
             let Some(idx_arc) = self.get_root_index(root) else {
                 return;
             };
+            let config_hash = compute_config_hash(root);
             let mut syntax: Vec<normalize_output::diagnostics::Issue> = Vec::new();
             let mut fact: Vec<normalize_output::diagnostics::Issue> = Vec::new();
             let mut native: Vec<normalize_output::diagnostics::Issue> = Vec::new();
@@ -1048,7 +1143,8 @@ mod unix_impl {
             ] {
                 let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
                 if let Ok(Some(blob)) = tokio::task::block_in_place(|| {
-                    self.runtime_handle.block_on(idx.load_diagnostics_blob(eng))
+                    self.runtime_handle
+                        .block_on(idx.load_diagnostics_blob(eng, &config_hash))
                 }) && let Ok(issues) = rkyv::from_bytes::<
                     Vec<normalize_output::diagnostics::Issue>,
                     rkyv::rancor::Error,
@@ -1057,7 +1153,7 @@ mod unix_impl {
                     *sink = issues;
                 }
             }
-            let delta = self.save_per_file_diagnostics(root, &syntax, &fact, &native);
+            let delta = self.save_per_file_diagnostics(root, &syntax, &fact, &native, &config_hash);
             self.write_json_mirror(root, &syntax, &fact, &native);
             self.broadcast_diagnostics_delta(root, delta);
         }
@@ -1302,6 +1398,7 @@ mod unix_impl {
                         );
 
                         let config = NormalizeConfig::load(root);
+                        let config_hash = compute_config_hash(root);
 
                         // --- Fact rules (incremental via ENGINE_CACHE) ---
                         let fact_issues: Vec<normalize_output::diagnostics::Issue> = {
@@ -1368,7 +1465,7 @@ mod unix_impl {
                                 .collect();
                             let mut merged: Vec<normalize_output::diagnostics::Issue> = match self
                                 .runtime_handle
-                                .block_on(idx.load_diagnostics_blob("syntax"))
+                                .block_on(idx.load_diagnostics_blob("syntax", &config_hash))
                             {
                                 Ok(Some(blob)) => rkyv::from_bytes::<
                                     Vec<normalize_output::diagnostics::Issue>,
@@ -1418,17 +1515,34 @@ mod unix_impl {
                         );
 
                         // Persist to SQLite and drop Vecs immediately.
-                        self.save_diagnostics_to_index(root, "syntax", &syntax_issues);
-                        self.save_diagnostics_to_index(root, "fact", &fact_issues);
-                        self.save_diagnostics_to_index(root, "native", &native_issues);
+                        self.save_diagnostics_to_index(
+                            root,
+                            "syntax",
+                            &syntax_issues,
+                            &config_hash,
+                        );
+                        self.save_diagnostics_to_index(root, "fact", &fact_issues, &config_hash);
+                        self.save_diagnostics_to_index(
+                            root,
+                            "native",
+                            &native_issues,
+                            &config_hash,
+                        );
                         // Build "all" combined blob for fast no-filter hot path.
-                        self.save_all_blob(root, &syntax_issues, &fact_issues, &native_issues);
+                        self.save_all_blob(
+                            root,
+                            &syntax_issues,
+                            &fact_issues,
+                            &native_issues,
+                            &config_hash,
+                        );
                         // Per-file table + JSON mirror for ephemeral consumers.
                         let delta = self.save_per_file_diagnostics(
                             root,
                             &syntax_issues,
                             &fact_issues,
                             &native_issues,
+                            &config_hash,
                         );
                         self.write_json_mirror(root, &syntax_issues, &fact_issues, &native_issues);
                         drop(syntax_issues);
@@ -1499,7 +1613,8 @@ mod unix_impl {
             );
 
             // Persist to SQLite and drop immediately.
-            self.save_diagnostics_to_index(root, "native", &new_native_issues);
+            let config_hash = compute_config_hash(root);
+            self.save_diagnostics_to_index(root, "native", &new_native_issues, &config_hash);
             drop(new_native_issues);
             // Rebuild "all" blob from existing per-engine blobs.
             self.rebuild_all_blob(root);
@@ -2244,6 +2359,57 @@ mod unix_impl {
     // per-file storage + delta logic directly.
     // =========================================================================
     #[cfg(test)]
+    mod config_hash_tests {
+        use super::*;
+
+        /// Stable across calls when nothing on disk changes.
+        #[test]
+        fn stable_when_inputs_unchanged() {
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::create_dir_all(dir.path().join(".normalize")).unwrap();
+            std::fs::write(dir.path().join(".normalize/config.toml"), "x = 1\n").unwrap();
+            let h1 = compute_config_hash(dir.path());
+            let h2 = compute_config_hash(dir.path());
+            assert_eq!(h1, h2);
+        }
+
+        /// Editing config.toml flips the hash.
+        #[test]
+        fn changes_when_config_toml_changes() {
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::create_dir_all(dir.path().join(".normalize")).unwrap();
+            std::fs::write(dir.path().join(".normalize/config.toml"), "x = 1\n").unwrap();
+            let h1 = compute_config_hash(dir.path());
+            std::fs::write(dir.path().join(".normalize/config.toml"), "x = 2\n").unwrap();
+            let h2 = compute_config_hash(dir.path());
+            assert_ne!(h1, h2);
+        }
+
+        /// Adding a rule definition file flips the hash.
+        #[test]
+        fn changes_when_rules_dir_changes() {
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::create_dir_all(dir.path().join(".normalize/rules")).unwrap();
+            let h1 = compute_config_hash(dir.path());
+            std::fs::write(dir.path().join(".normalize/rules/foo.scm"), "(_)\n").unwrap();
+            let h2 = compute_config_hash(dir.path());
+            assert_ne!(h1, h2);
+        }
+
+        /// Empty project (no `.normalize/` at all) is still well-defined and
+        /// stable — the binary version always contributes.
+        #[test]
+        fn empty_project_is_stable() {
+            let dir = tempfile::tempdir().unwrap();
+            let h1 = compute_config_hash(dir.path());
+            let h2 = compute_config_hash(dir.path());
+            assert_eq!(h1, h2);
+            // Sanity: matches blake3 hex digest length (64 chars).
+            assert_eq!(h1.len(), 64);
+        }
+    }
+
+    #[cfg(test)]
     mod per_file_tests {
         use super::*;
         use normalize_output::diagnostics::{Issue, Severity};
@@ -2309,7 +2475,7 @@ mod unix_impl {
             let delta = tokio::task::spawn_blocking({
                 let server = server.clone();
                 let root = dir.path().to_path_buf();
-                move || server.save_per_file_diagnostics(&root, &syntax, &[], &[])
+                move || server.save_per_file_diagnostics(&root, &syntax, &[], &[], "h")
             })
             .await
             .unwrap();
@@ -2331,7 +2497,7 @@ mod unix_impl {
                 let server = server.clone();
                 let root = dir.path().to_path_buf();
                 let s = syntax.clone();
-                move || server.save_per_file_diagnostics(&root, &s, &[], &[])
+                move || server.save_per_file_diagnostics(&root, &s, &[], &[], "h")
             })
             .await
             .unwrap();
@@ -2339,7 +2505,7 @@ mod unix_impl {
             let second = tokio::task::spawn_blocking({
                 let server = server.clone();
                 let root = dir.path().to_path_buf();
-                move || server.save_per_file_diagnostics(&root, &syntax, &[], &[])
+                move || server.save_per_file_diagnostics(&root, &syntax, &[], &[], "h")
             })
             .await
             .unwrap();
@@ -2360,7 +2526,7 @@ mod unix_impl {
                 let server = server.clone();
                 let root = dir.path().to_path_buf();
                 let s = syntax_v1.clone();
-                move || server.save_per_file_diagnostics(&root, &s, &[], &[])
+                move || server.save_per_file_diagnostics(&root, &s, &[], &[], "h")
             })
             .await
             .unwrap();
@@ -2370,7 +2536,7 @@ mod unix_impl {
             let delta = tokio::task::spawn_blocking({
                 let server = server.clone();
                 let root = dir.path().to_path_buf();
-                move || server.save_per_file_diagnostics(&root, &syntax_v2, &[], &[])
+                move || server.save_per_file_diagnostics(&root, &syntax_v2, &[], &[], "h")
             })
             .await
             .unwrap();
@@ -2396,7 +2562,7 @@ mod unix_impl {
                 let server = server.clone();
                 let root = dir.path().to_path_buf();
                 let s = syntax_v1.clone();
-                move || server.save_per_file_diagnostics(&root, &s, &[], &[])
+                move || server.save_per_file_diagnostics(&root, &s, &[], &[], "h")
             })
             .await
             .unwrap();
@@ -2406,7 +2572,7 @@ mod unix_impl {
             let delta = tokio::task::spawn_blocking({
                 let server = server.clone();
                 let root = dir.path().to_path_buf();
-                move || server.save_per_file_diagnostics(&root, &syntax_v2, &[], &[])
+                move || server.save_per_file_diagnostics(&root, &syntax_v2, &[], &[], "h")
             })
             .await
             .unwrap();
@@ -2493,7 +2659,7 @@ mod unix_impl {
             let server_clone = server.clone();
             let root = dir.path().to_path_buf();
             tokio::task::spawn_blocking(move || {
-                let delta = server_clone.save_per_file_diagnostics(&root, &syntax, &[], &[]);
+                let delta = server_clone.save_per_file_diagnostics(&root, &syntax, &[], &[], "h");
                 server_clone.broadcast_diagnostics_delta(&root, delta);
             })
             .await
@@ -2538,7 +2704,7 @@ mod unix_impl {
             tokio::task::spawn_blocking({
                 let server = server.clone();
                 let root = dir.path().to_path_buf();
-                move || server.save_per_file_diagnostics(&root, &syntax, &[], &[])
+                move || server.save_per_file_diagnostics(&root, &syntax, &[], &[], "h")
             })
             .await
             .unwrap();
@@ -2552,7 +2718,7 @@ mod unix_impl {
                     let idx = idx_arc.lock().unwrap();
                     let paths = handle.block_on(idx.list_diagnostic_paths()).unwrap();
                     let blob = handle
-                        .block_on(idx.load_diagnostics_for_file("a.rs"))
+                        .block_on(idx.load_diagnostics_for_file("a.rs", "h"))
                         .unwrap()
                         .unwrap();
                     (paths, blob)

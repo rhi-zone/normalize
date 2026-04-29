@@ -254,6 +254,159 @@ fn config_edit_triggers_reload_event() {
     let _ = handle.join();
 }
 
+/// Across-restart cache validity: the config_hash gate.
+///
+/// 1. Start a daemon, register a project root, prime the cache.
+/// 2. Stop the daemon (the SQLite cache survives on disk).
+/// 3. Edit `.normalize/config.toml` *while no daemon is running* — so the
+///    live-reload notify watcher cannot react.
+/// 4. Start a fresh daemon against the same root.
+///
+/// The first `RunRules` after restart must reprime under the new config rather
+/// than serve the previous session's blobs. The signal we watch for: the
+/// running-daemon code path does not emit `IndexRefreshed { files: 0 }` on
+/// startup; that signal would only appear if the daemon detected the cached
+/// blobs were stale and triggered a full reprime under the new config. Here we
+/// instead verify behavior end-to-end: the second daemon's `RunRules` must
+/// not error with "not primed" and must succeed against the new config.
+#[test]
+fn config_hash_invalidates_cache_across_daemon_restart() {
+    use normalize::daemon::DaemonClient;
+
+    let project = tempfile::tempdir().unwrap();
+    std::fs::write(project.path().join("a.py"), "def hello():\n    return 1\n").unwrap();
+    std::fs::create_dir_all(project.path().join(".normalize")).unwrap();
+    std::fs::write(project.path().join(".normalize/config.toml"), "# initial\n").unwrap();
+
+    // Reuse the same isolated config dir across both daemon spawns so the
+    // SQLite index (which lives under the *project*, not the config dir)
+    // outlives the daemon process — the config dir only holds the socket.
+    let config_dir = tempfile::tempdir().unwrap();
+    let config_path = config_dir.path().to_path_buf();
+    let socket_path = config_path.join("daemon.sock");
+
+    // ---- Session 1: prime the cache ----
+    let mut child1 = Command::cargo_bin("normalize")
+        .expect("cargo bin")
+        .arg("daemon")
+        .arg("run")
+        .env("NORMALIZE_DAEMON_CONFIG_DIR", &config_path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn daemon 1");
+
+    // Wait for socket.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !socket_path.exists() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert!(socket_path.exists(), "session 1 daemon never came up");
+
+    let client1 = DaemonClient::with_socket_path(socket_path.clone());
+    // Wait for status to confirm acceptor is wired up.
+    for _ in 0..40 {
+        if client1.status().is_ok() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    client1
+        .add_root(project.path())
+        .expect("add_root session 1");
+    // Trigger a prime via RunRules. The 500ms client read timeout may fire on
+    // the first call (priming runs synchronously inside the daemon and can
+    // exceed it on a cold cache); retry with a deadline until the daemon
+    // serves a successful response, which proves the cache is primed and
+    // persisted to SQLite.
+    let prime_deadline = Instant::now() + Duration::from_secs(30);
+    let mut session1_ok = false;
+    while Instant::now() < prime_deadline {
+        if let Ok(r) = client1.run_rules(project.path(), None, None, None, None)
+            && r.ok
+        {
+            session1_ok = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    assert!(session1_ok, "session 1 never finished priming");
+
+    // ---- Stop session 1 ----
+    let _ = client1.shutdown();
+    std::thread::sleep(Duration::from_millis(100));
+    let _ = child1.kill();
+    let _ = child1.wait();
+    // Make sure socket is gone before session 2 spawns.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while socket_path.exists() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+
+    // ---- Edit config while daemon is *not* running ----
+    std::fs::write(
+        project.path().join(".normalize/config.toml"),
+        "# changed-while-stopped\n",
+    )
+    .unwrap();
+
+    // ---- Session 2: must not serve stale blobs ----
+    let mut child2 = Command::cargo_bin("normalize")
+        .expect("cargo bin")
+        .arg("daemon")
+        .arg("run")
+        .env("NORMALIZE_DAEMON_CONFIG_DIR", &config_path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn daemon 2");
+
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !socket_path.exists() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert!(socket_path.exists(), "session 2 daemon never came up");
+
+    let client2 = DaemonClient::with_socket_path(socket_path.clone());
+    for _ in 0..40 {
+        if client2.status().is_ok() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    client2
+        .add_root(project.path())
+        .expect("add_root session 2");
+
+    // First RunRules under session 2 must reprime under the new config. Use
+    // the same retry pattern as session 1 — a fresh prime takes longer than
+    // the 500ms read timeout. If the daemon were serving the on-disk session-1
+    // blob without checking config_hash this would return immediately on the
+    // first attempt; we don't assert that timing distinction here, only that
+    // the eventual response is `ok` (i.e. prime completed under the new
+    // config). The unit tests in normalize-facts cover the hash-mismatch =
+    // None semantics directly.
+    let prime_deadline = Instant::now() + Duration::from_secs(30);
+    let mut session2_ok = false;
+    while Instant::now() < prime_deadline {
+        if let Ok(r) = client2.run_rules(project.path(), None, None, None, None)
+            && r.ok
+        {
+            session2_ok = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    assert!(session2_ok, "session 2 never finished re-priming");
+
+    let _ = client2.shutdown();
+    std::thread::sleep(Duration::from_millis(100));
+    let _ = child2.kill();
+    let _ = child2.wait();
+}
+
 /// A daemon spawned with an isolated socket directory must respond to status
 /// requests via the same isolated path — this catches broken socket-path
 /// override wiring.

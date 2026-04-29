@@ -44,6 +44,7 @@ walkdir.workspace = true
 ignore.workspace = true
 nucleo-matcher.workspace = true
 libsql.workspace = true
+blake3.workspace = true
 tree-sitter = "0.26"
 streaming-iterator = "0.1"
 dirs = "5"

@@ -99,7 +99,7 @@ Remaining (not blocking the memory fix):
 - [x] Progress reporting for `analyze duplicates`, `analyze architecture`, `analyze duplicate-types` (indicatif bars for file processing, spinners for architecture phases)
 - [x] Native rules published to LSP clients (missing-summary, stale-summary, check-refs, etc.) — debounced workspace-wide, re-triggered on `.git/index` changes (git add events)
 - [x] **Live-reload `.normalize/config.toml` and `.normalize/rules/**`**: fourth dispatch route in the daemon notify loop; on edit, clear `daemon_diagnostics` + `daemon_diagnostics_per_file` and reprime. Subscribers get `IndexRefreshed { files: 0 }` then `DiagnosticsUpdated`.
-- **Cross-daemon-restart cache validity (config_hash gate)** — when SQLite blobs from a previous daemon session are loaded by a new daemon whose on-disk config has since changed, those blobs are stale but invisibly so (the live-reload path only fires on notify events that arrive *during* the daemon's lifetime). Fix: add a `config_hash` column to `daemon_diagnostics` / `daemon_diagnostics_per_file`, populated at write time. On daemon startup, hash the current `.normalize/config.toml` (+ `.normalize/rules/**`); rows whose `config_hash` doesn't match are dropped, forcing a fresh prime. Same hash also enables future per-rule cache hashing — a rule whose config slice didn't change keeps its cached findings; everything else re-runs.
+- [x] **Cross-daemon-restart cache validity (config_hash gate)** — `daemon_diagnostics` / `daemon_diagnostics_per_file` now carry a `config_hash` column (binary version + `.normalize/config.toml` + `.normalize/rules/**`). Mismatch on load = cache miss; daemon reprimes. Schema v10 → v11. Future per-rule cache hashing is unblocked but not yet wired up.
 
 ---
 
