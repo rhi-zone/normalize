@@ -251,12 +251,6 @@ ignore_files = [".gitignore"]       # gitignore-format files to respect (default
 exclude = [".git", "node_modules"]  # directory names to always skip
 ```
 
-In addition to `.gitignore`, normalize respects a project-scoped `.normalizeignore`
-file at the repository root using standard gitignore syntax. Use it to exclude
-paths from all normalize commands without polluting `.gitignore` (for example,
-third-party tool directories like `.claude/` or vendored code that should still
-be tracked by git).
-
 ### Custom Lint Tools
 
 Add custom tools in `.normalize/tools.toml`:

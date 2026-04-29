@@ -138,7 +138,6 @@ pub fn analyze_fragments(
         .git_ignore(true)
         .git_global(true)
         .git_exclude(true)
-        .add_custom_ignore_filename(".normalizeignore")
         .build()
         .filter_map(|e| e.ok())
         .filter(|e| {

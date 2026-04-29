@@ -5624,7 +5624,6 @@ dependencies = [
  "serde",
  "serde_json",
  "streaming-iterator",
- "tempfile",
  "tokio",
  "tracing",
  "tree-sitter",

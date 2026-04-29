@@ -652,7 +652,6 @@ impl FileIndex {
             .git_ignore(true)
             .git_global(true)
             .git_exclude(true)
-            .add_custom_ignore_filename(".normalizeignore")
             .build();
 
         let mut seen = std::collections::HashSet::new();
@@ -933,7 +932,6 @@ impl FileIndex {
             .git_ignore(true)
             .git_global(true)
             .git_exclude(true)
-            .add_custom_ignore_filename(".normalizeignore")
             .build();
 
         self.conn.execute("BEGIN", ()).await?;

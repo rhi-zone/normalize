@@ -71,7 +71,6 @@ pub fn grep(
     builder.git_ignore(true);
     builder.git_global(true);
     builder.git_exclude(true);
-    builder.add_custom_ignore_filename(".normalizeignore");
 
     let walker = builder.build_parallel();
 

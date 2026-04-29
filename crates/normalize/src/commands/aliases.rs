@@ -98,7 +98,6 @@ pub fn detect_project_languages(root: &Path) -> Vec<String> {
         .max_depth(Some(5))
         .hidden(false) // Include hidden directories
         .git_ignore(true)
-        .add_custom_ignore_filename(".normalizeignore")
         .build();
 
     for entry in walker.flatten() {

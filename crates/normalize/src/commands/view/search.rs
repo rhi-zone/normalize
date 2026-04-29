@@ -108,11 +108,7 @@ fn search_symbols_unindexed(query: &str, root: &Path) -> Vec<index::SymbolMatch>
     let mut matcher = Matcher::new(Config::DEFAULT);
     let mut matches = Vec::new();
 
-    let walker = WalkBuilder::new(root)
-        .hidden(true)
-        .git_ignore(true)
-        .add_custom_ignore_filename(".normalizeignore")
-        .build();
+    let walker = WalkBuilder::new(root).hidden(true).git_ignore(true).build();
     let extractor = skeleton::SkeletonExtractor::new();
 
     for entry in walker.flatten() {
@@ -194,11 +190,7 @@ pub fn suggest_symbols_trigram(
     }
 
     let mut scored: Vec<(index::SymbolMatch, f32)> = Vec::new();
-    let walker = WalkBuilder::new(root)
-        .hidden(true)
-        .git_ignore(true)
-        .add_custom_ignore_filename(".normalizeignore")
-        .build();
+    let walker = WalkBuilder::new(root).hidden(true).git_ignore(true).build();
     let extractor = skeleton::SkeletonExtractor::new();
 
     for entry in walker.flatten() {

@@ -1232,7 +1232,6 @@ pub fn generate_view_tree(root: &Path, options: &TreeOptions) -> ViewNode {
         .git_ignore(true)
         .git_global(true)
         .git_exclude(true)
-        .add_custom_ignore_filename(".normalizeignore")
         .build();
 
     let mut tree = InternalTreeNode {

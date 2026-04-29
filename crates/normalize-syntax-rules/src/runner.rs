@@ -993,8 +993,7 @@ fn collect_source_files(
         .hidden(false)
         .git_ignore(has_gitignore)
         .git_global(has_gitignore)
-        .git_exclude(has_gitignore)
-        .add_custom_ignore_filename(".normalizeignore");
+        .git_exclude(has_gitignore);
     // Add any non-.gitignore ignore files
     for file in &ignore_files {
         if *file != ".gitignore" {
