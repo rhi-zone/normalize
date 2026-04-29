@@ -2,9 +2,10 @@
 # See: https://github.com/rhi-zone/normalize
 
 [walk]
-# Exclude Claude Code agent worktrees from all rules (temporary working dirs).
-# .claude/ itself (settings, hooks, memory) is part of the project and intentionally included.
-exclude = [".git", "worktrees"]
+# Project-wide path exclusions (gitignore-style; affects walker AND index).
+# .claude/ is Claude Code's data directory (settings, command/agent definitions,
+# worktrees, memory) — none of it benefits from normalize linting.
+exclude = [".git", "worktrees", ".claude/"]
 
 [daemon]
 # enabled = true
@@ -285,8 +286,10 @@ enabled = true
 
 # CHANGELOG.md references types that have since been renamed or deleted.
 # These are historical records, not live code references.
+# CLAUDE.md / CONTEXT.md / POLISH.md contain notes referring to stdlib types
+# (OnceLock, FromStr, Display) and planning struct names — not live code.
 [rules.rule."broken-ref"]
-allow = ["CHANGELOG.md"]
+allow = ["CHANGELOG.md", "CLAUDE.md", "CONTEXT.md", "POLISH.md"]
 
 [rules.rule."long-file"]
 enabled = true
