@@ -5750,6 +5750,7 @@ name = "normalize-rules-config"
 version = "0.2.0"
 dependencies = [
  "glob",
+ "ignore",
  "normalize-core",
  "schemars",
  "serde",

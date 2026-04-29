@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **`[walk] exclude` now accepts gitignore-style glob patterns.** Previously each entry was matched only against directory entry basenames (so you could write `worktrees` but not `**/target/` or `crates/foo/build/`). Patterns are now compiled via a gitignore matcher anchored at the project root, so any pattern that works in `.gitignore` works here. Existing configs (e.g. `[".git", "worktrees"]`) keep working unchanged because gitignore patterns without slashes still match at any depth.
+
 ### Added
 
 - **Daemon push of diagnostic deltas via binary subscribe** — a new `Event::DiagnosticsUpdated { root, updates }` variant carries per-file deltas (only files whose issues changed since the last refresh; empty `issues` Vec = file became clean). Subscribe connections opened with the `0x01` magic byte stream events as length-prefixed rkyv binary frames; the existing JSON-line subscribe path is unchanged for backward compatibility. New `DaemonClient::watch_events_binary` decodes the binary frames. Eliminates the LSP poll-after-`IndexRefreshed` pattern: subscribers receive diagnostic content directly in a single batched frame per refresh, proportional to what actually changed. Wire schema change: `Event` path fields are now `String` (previously `PathBuf`) so the enum is rkyv-serializable.

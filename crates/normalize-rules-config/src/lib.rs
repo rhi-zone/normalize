@@ -238,8 +238,15 @@ pub struct WalkConfig {
     /// List of gitignore-format files to respect. Default: `[".gitignore"]`.
     /// Set to `[]` to disable gitignore-based exclusion entirely.
     pub ignore_files: Option<Vec<String>>,
-    /// Additional directory/file name patterns to always skip. Default: `[".git"]`.
-    /// Matched against directory entry file names (not full paths).
+    /// Additional gitignore-style patterns to always skip. Default: `[".git"]`.
+    ///
+    /// Patterns use the same syntax as `.gitignore`:
+    /// - A pattern with no slash (e.g. `node_modules`, `.git`) matches any
+    ///   directory or file with that basename, at any depth.
+    /// - A pattern with a slash (e.g. `crates/foo/build/`, `**/target/`) is
+    ///   anchored relative to the project root.
+    /// - Trailing `/` restricts the match to directories.
+    /// - `**` matches any number of path segments.
     pub exclude: Option<Vec<String>>,
 }
 
@@ -260,10 +267,30 @@ impl WalkConfig {
         }
     }
 
-    /// Check whether a directory entry's file name matches any exclude pattern.
-    pub fn is_excluded(&self, file_name: &std::ffi::OsStr) -> bool {
-        let name = file_name.to_string_lossy();
-        self.exclude().iter().any(|pat| *pat == name.as_ref())
+    /// Compile the configured `exclude` patterns into a gitignore matcher anchored at `root`.
+    ///
+    /// Returns an empty matcher if no patterns are configured. Invalid patterns
+    /// are silently dropped (consistent with how `.gitignore` itself behaves).
+    pub fn compiled_excludes(&self, root: &Path) -> ignore::gitignore::Gitignore {
+        let mut builder = ignore::gitignore::GitignoreBuilder::new(root);
+        for pat in self.exclude() {
+            // GitignoreBuilder::add_line silently no-ops on bad patterns.
+            let _ = builder.add_line(None, pat);
+        }
+        builder.build().unwrap_or_else(|_| {
+            // Fallback: empty matcher (matches nothing).
+            ignore::gitignore::Gitignore::empty()
+        })
+    }
+
+    /// Check whether a path (relative to `root`) matches any exclude pattern.
+    ///
+    /// `is_dir` distinguishes directories from files (relevant for trailing-`/` patterns).
+    /// For repeat queries, prefer building [`compiled_excludes`] once and querying
+    /// it directly; this method is a convenience for one-shot checks.
+    pub fn is_excluded_path(&self, root: &Path, rel_path: &Path, is_dir: bool) -> bool {
+        let gi = self.compiled_excludes(root);
+        gi.matched_path_or_any_parents(rel_path, is_dir).is_ignore()
     }
 }
 
@@ -397,8 +424,9 @@ allow = ["**/tests/**", "crates/*/tests/**", "**/normalize-scope/**"]
         let config = WalkConfig::default();
         assert_eq!(config.ignore_files(), vec![".gitignore"]);
         assert_eq!(config.exclude(), vec![".git"]);
-        assert!(config.is_excluded(std::ffi::OsStr::new(".git")));
-        assert!(!config.is_excluded(std::ffi::OsStr::new("src")));
+        let root = Path::new("/tmp/root");
+        assert!(config.is_excluded_path(root, Path::new(".git"), true));
+        assert!(!config.is_excluded_path(root, Path::new("src"), true));
     }
 
     #[test]
@@ -409,8 +437,9 @@ allow = ["**/tests/**", "crates/*/tests/**", "**/normalize-scope/**"]
         };
         assert_eq!(config.ignore_files(), vec![".gitignore", ".npmignore"]);
         assert_eq!(config.exclude(), vec![".git", "node_modules"]);
-        assert!(config.is_excluded(std::ffi::OsStr::new("node_modules")));
-        assert!(!config.is_excluded(std::ffi::OsStr::new("src")));
+        let root = Path::new("/tmp/root");
+        assert!(config.is_excluded_path(root, Path::new("node_modules"), true));
+        assert!(!config.is_excluded_path(root, Path::new("src"), true));
     }
 
     #[test]
@@ -421,7 +450,37 @@ allow = ["**/tests/**", "crates/*/tests/**", "**/normalize-scope/**"]
         };
         assert!(config.ignore_files().is_empty());
         assert!(config.exclude().is_empty());
-        assert!(!config.is_excluded(std::ffi::OsStr::new(".git")));
+        let root = Path::new("/tmp/root");
+        assert!(!config.is_excluded_path(root, Path::new(".git"), true));
+    }
+
+    #[test]
+    fn walk_config_excludes_basename_at_any_depth() {
+        // gitignore semantics: pattern with no slash matches at any depth.
+        let config = WalkConfig {
+            ignore_files: None,
+            exclude: Some(vec!["node_modules".into(), "worktrees".into()]),
+        };
+        let root = Path::new("/tmp/root");
+        // Top-level
+        assert!(config.is_excluded_path(root, Path::new("node_modules"), true));
+        // Nested
+        assert!(config.is_excluded_path(root, Path::new("crates/foo/node_modules"), true));
+        // .claude/worktrees nested
+        assert!(config.is_excluded_path(root, Path::new(".claude/worktrees"), true));
+    }
+
+    #[test]
+    fn walk_config_excludes_anchored_glob() {
+        let config = WalkConfig {
+            ignore_files: None,
+            exclude: Some(vec!["**/target/".into(), "path/to/specific.rs".into()]),
+        };
+        let root = Path::new("/tmp/root");
+        assert!(config.is_excluded_path(root, Path::new("crates/foo/target"), true));
+        assert!(config.is_excluded_path(root, Path::new("target"), true));
+        assert!(config.is_excluded_path(root, Path::new("path/to/specific.rs"), false));
+        assert!(!config.is_excluded_path(root, Path::new("path/to/other.rs"), false));
     }
 
     #[test]

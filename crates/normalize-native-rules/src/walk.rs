@@ -49,14 +49,20 @@ pub fn gitignore_walk(
 ) -> impl Iterator<Item = ignore::DirEntry> {
     let mut builder = ignore::WalkBuilder::new(root);
     configure_walk_builder(&mut builder, walk_config, root);
-    let excludes: Vec<String> = walk_config
-        .exclude()
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    // Compile gitignore-style exclude patterns once, anchored at root.
+    let excludes = walk_config.compiled_excludes(root);
+    let root_owned = root.to_path_buf();
     builder.filter_entry(move |e| {
-        let name = e.file_name().to_string_lossy();
-        !excludes.iter().any(|pat| pat == name.as_ref())
+        let path = e.path();
+        let rel = path.strip_prefix(&root_owned).unwrap_or(path);
+        // Empty rel (root itself) — never exclude.
+        if rel.as_os_str().is_empty() {
+            return true;
+        }
+        let is_dir = e.file_type().is_some_and(|ft| ft.is_dir());
+        !excludes
+            .matched_path_or_any_parents(rel, is_dir)
+            .is_ignore()
     });
     builder.build().filter_map(|e| e.ok())
 }
