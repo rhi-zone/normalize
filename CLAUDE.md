@@ -121,11 +121,13 @@ snapshot tests, and help output is the same scope as any other agent task. The t
 to do it inline is always wrong — inline work accumulates tool output in the main context
 and crowds out the actual conversation. If it needs a test run, it needs an agent.
 
-Rules of thumb:
-- Expect to search >5 files or run >3 rounds of grep/read → use a subagent
-- Codebase-wide analysis (architecture, patterns, cross-crate survey) → always subagent
-- Any edit that requires a `cargo test` or `cargo clippy` run → use an agent
-- Single targeted lookup (one file, one symbol) → inline is fine
+**Inline-vs-agent is not a rule of thumb. It's a hard rule:**
+- Any edit that requires `cargo test`, `cargo clippy`, or `cargo build` → **always** an agent. No exceptions for "this one's small". Building a single crate compiles the rest of the workspace and pollutes the main context with hundreds of lines of warnings; a `cargo test` failure produces dozens of test names. The cost is identical whether the edit was 10 lines or 1000.
+- Codebase-wide analysis (architecture, patterns, cross-crate survey) → always subagent.
+- Expect to search >5 files or run >3 rounds of grep/read → use a subagent.
+- Single targeted lookup (one file, one symbol) with no build step → inline is fine.
+
+The failure mode is "I'll just edit this one file and verify quickly" — which produces a 50-line clippy warning dump in the main context, then another 50 from the next inline edit, and within a few turns the conversation is unreadable. **If you find yourself about to run cargo, stop and delegate.**
 
 ## Commit Convention
 
@@ -144,6 +146,7 @@ Do not:
 - Write stub implementations — `None`/empty is only correct when the concept genuinely doesn't exist in that language
 - Put node classification in Rust when a `.scm` query file fits — `*.calls.scm`, `*.complexity.scm` etc. Extraction (getting names/fields from identified nodes) stays in Rust. **This applies to runner-level filters too**, not just to first-class language traits. If you find yourself writing `if grammar_name == "rust" { ... }`, a `RUST_FOO_QUERY: &str = "..."` constant, or any other language-specific branch in a language-agnostic crate (e.g. `normalize-syntax-rules`), stop. The query goes in `crates/normalize-languages/src/queries/<lang>.<purpose>.scm` and gets loaded via `GrammarLoader` the same way `*.complexity.scm` and `*.tags.scm` are. The runner stays generic.
 - Add runner-wide filters that override every rule's behavior. Filtering decisions belong on the rule, not the runner. If you're tempted to write `findings.retain(|f| !is_in_test_region(f))` in the runner, instead add a metadata field to the rule (`applies_in_tests: bool`, etc.) and have the runner consult it. The runner's job is to dispatch and collect; deciding what to ignore is the rule's call.
+- Hardcode third-party-tool conventions in normalize source. `.claude/`, `node_modules/`, `__pycache__/`, `target/`, `.venv/` etc. are conventions of *consumers* of normalize (Claude Code, npm, Python, Cargo). They belong in **project config** — `.normalize/config.toml`, `.normalizeignore`, or wherever the project declares its own scope — not as constants in `normalize-native-rules`, `normalize-syntax-rules`, or any other library crate. The general rule: normalize knows about source code, ASTs, git, and SQLite. It does not know what Claude Code, ESLint, Prettier, npm, or any other tool stores where. If the answer to "should we exclude this path?" depends on what tool the user is running alongside normalize, the answer is "configure it in the project's normalize config", not "hardcode the path in a Rust constant."
 - Use path dependencies in Cargo.toml — causes clippy to stash changes across repos
 - Use `--no-verify` — fix the issue or fix the hook
 - Read mutable globals (env vars, `lazy_static`, `OnceLock` of writable state) at call sites
