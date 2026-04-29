@@ -311,6 +311,26 @@ mod unix_impl {
         /// races that occurred when a new connection was opened while the client held
         /// the same file open for reading.
         index: Arc<std::sync::Mutex<crate::index::FileIndex>>,
+        /// Snapshot of the rules + walk config that was active when the cache
+        /// was last primed. Used by [`DaemonServer::reload_config`] to compute
+        /// a [`ConfigDiff`] and route filter-only changes to the cheap
+        /// re-filter-at-serve path instead of a full reprime.
+        ///
+        /// Replaced with the freshly-parsed config at the end of every prime
+        /// or successful reload. `Arc` so the serve paths can read it without
+        /// holding the `roots` mutex during the (potentially expensive)
+        /// per-issue filter loop.
+        cached_rules: Arc<normalize_rules_config::RulesConfig>,
+        cached_walk: Arc<normalize_rules_config::WalkConfig>,
+        /// Set to `true` when a Tier 1 (filter-only) config reload arrived
+        /// since the last prime. The serve paths apply
+        /// [`DaemonServer::apply_filter_at_serve`] when set so cached blobs
+        /// (still reflecting the *previous* config) are filtered to the new
+        /// config before being returned.
+        ///
+        /// Cleared at the end of every prime — a fresh prime persists blobs
+        /// under the current config, so no serve-time filtering is needed.
+        serve_filter_pending: bool,
     }
 
     /// Global daemon server managing multiple roots.
@@ -435,6 +455,10 @@ mod unix_impl {
                 }
             }
 
+            // Snapshot the current config so the first reload after add_root
+            // has something to diff against. The next prime will refresh this
+            // snapshot to reflect what was actually used to produce the cache.
+            let initial_config = NormalizeConfig::load(&root);
             roots.insert(
                 root.clone(),
                 WatchedRoot {
@@ -442,6 +466,9 @@ mod unix_impl {
                     primed: false,
                     has_git_index,
                     index,
+                    cached_rules: Arc::new(initial_config.rules.clone()),
+                    cached_walk: Arc::new(initial_config.walk.clone()),
+                    serve_filter_pending: false,
                 },
             );
 
@@ -605,6 +632,14 @@ mod unix_impl {
                 }
             }
 
+            // Apply pending Tier 1 (filter-only) config-reload changes to the
+            // cached blob before any user-supplied filters narrow further.
+            if let Some((rules_cfg, _walk_cfg, pending)) = self.get_cached_config(&root)
+                && pending
+            {
+                Self::apply_filter_at_serve(&mut issues, &rules_cfg);
+            }
+
             // Apply optional filters.
             let filter_ids_set: Option<HashSet<String>> =
                 filter_ids.map(|ids| ids.into_iter().collect());
@@ -653,6 +688,13 @@ mod unix_impl {
                 None => return RawResponse::Error("root not watched".into()),
             };
 
+            // Snapshot the current config + filter-pending flag. When pending,
+            // even the zero-deser fast paths must deserialize/filter/reserialize
+            // so cached blobs honor the Tier 1 reload before the client reads
+            // them.
+            let cfg_snapshot = self.get_cached_config(&root);
+            let serve_filter_pending = cfg_snapshot.as_ref().map(|(_, _, p)| *p).unwrap_or(false);
+
             // Fast path A: no filter and no engine filter → serve "all" blob directly.
             if filter_ids.is_none()
                 && filter_rule.is_none()
@@ -664,7 +706,29 @@ mod unix_impl {
                     self.runtime_handle
                         .block_on(idx.load_diagnostics_blob("all", &config_hash))
                 }) {
-                    Ok(Some(blob)) => return RawResponse::Frame(blob),
+                    Ok(Some(blob)) => {
+                        if !serve_filter_pending {
+                            return RawResponse::Frame(blob);
+                        }
+                        // Tier 1 reload pending — re-filter the cached blob.
+                        let rules_cfg = cfg_snapshot.as_ref().map(|(r, _, _)| r.clone());
+                        let mut issues: Vec<normalize_output::diagnostics::Issue> =
+                            match rkyv::from_bytes::<_, rkyv::rancor::Error>(&blob) {
+                                Ok(v) => v,
+                                Err(e) => {
+                                    return RawResponse::Error(format!(
+                                        "rkyv from_bytes (filter-at-serve): {e}"
+                                    ));
+                                }
+                            };
+                        if let Some(r) = rules_cfg {
+                            Self::apply_filter_at_serve(&mut issues, &r);
+                        }
+                        return match rkyv::to_bytes::<rkyv::rancor::Error>(&issues) {
+                            Ok(b) => RawResponse::Frame(b.to_vec()),
+                            Err(e) => RawResponse::Error(format!("rkyv to_bytes: {e}")),
+                        };
+                    }
                     Ok(None) => return RawResponse::Error("not primed".into()),
                     Err(e) => {
                         return RawResponse::Error(format!("failed to load diagnostics: {e}"));
@@ -699,6 +763,9 @@ mod unix_impl {
                         Ok(v) => all.extend(v),
                         Err(e) => tracing::warn!("rkyv from_bytes per-file: {}", e),
                     }
+                }
+                if serve_filter_pending && let Some((rules_cfg, _, _)) = cfg_snapshot.as_ref() {
+                    Self::apply_filter_at_serve(&mut all, rules_cfg);
                 }
                 tracing::debug!(
                     files = files.len(),
@@ -751,6 +818,13 @@ mod unix_impl {
                 }
             }
 
+            // Apply pending Tier 1 reload filter before user-supplied filters
+            // so allow/severity/enabled effects honor the latest config even
+            // though the cached blob was produced under the previous one.
+            if serve_filter_pending && let Some((rules_cfg, _, _)) = cfg_snapshot.as_ref() {
+                Self::apply_filter_at_serve(&mut issues, rules_cfg);
+            }
+
             // Apply filters.
             let filter_ids_set: Option<std::collections::HashSet<String>> =
                 filter_ids.map(|ids| ids.into_iter().collect());
@@ -793,6 +867,101 @@ mod unix_impl {
                 }),
                 Ok(Some(_))
             )
+        }
+
+        /// Read the cached `(RulesConfig, WalkConfig)` snapshot for a root,
+        /// plus whether a Tier 1 reload is pending (i.e. cached blobs need
+        /// re-filtering at serve time).
+        ///
+        /// Returns `None` if the root is not watched.
+        fn get_cached_config(
+            &self,
+            root: &Path,
+        ) -> Option<(
+            Arc<normalize_rules_config::RulesConfig>,
+            Arc<normalize_rules_config::WalkConfig>,
+            bool,
+        )> {
+            let roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+            roots.get(root).map(|w| {
+                (
+                    w.cached_rules.clone(),
+                    w.cached_walk.clone(),
+                    w.serve_filter_pending,
+                )
+            })
+        }
+
+        /// Apply the current rules config to a Vec of cached findings *at
+        /// serve time*. Filter-only config changes (severity / allow / `enabled
+        /// = false`) are honored without re-running the rule engines: we drop
+        /// disabled rules' findings, drop allow-matched paths, and override
+        /// severities from per-rule overrides.
+        ///
+        /// The cached blobs were produced under the previous config; this
+        /// function exists so a Tier 1 reload can take effect immediately
+        /// without paying for a full reprime.
+        fn apply_filter_at_serve(
+            issues: &mut Vec<normalize_output::diagnostics::Issue>,
+            rules: &normalize_rules_config::RulesConfig,
+        ) {
+            use normalize_output::diagnostics::Severity as OutSeverity;
+            // Pre-compile global-allow patterns once per call.
+            let global_allow: Vec<glob::Pattern> = rules
+                .global_allow
+                .iter()
+                .filter_map(|s| glob::Pattern::new(s).ok())
+                .collect();
+            // Pre-compile per-rule allow patterns and severity overrides.
+            let mut per_rule_allow: HashMap<&str, Vec<glob::Pattern>> = HashMap::new();
+            for (id, ovr) in &rules.rules {
+                if !ovr.allow.is_empty() {
+                    per_rule_allow.insert(
+                        id.as_str(),
+                        ovr.allow
+                            .iter()
+                            .filter_map(|s| glob::Pattern::new(s).ok())
+                            .collect(),
+                    );
+                }
+            }
+
+            issues.retain_mut(|issue| {
+                let ovr = rules.rules.get(&issue.rule_id);
+                // Drop findings for explicitly disabled rules.
+                if let Some(o) = ovr
+                    && o.enabled == Some(false)
+                {
+                    return false;
+                }
+                // Drop findings whose file matches any global-allow pattern.
+                if global_allow.iter().any(|p| p.matches(&issue.file)) {
+                    return false;
+                }
+                // Drop findings whose file matches a per-rule allow pattern.
+                if let Some(pats) = per_rule_allow.get(issue.rule_id.as_str())
+                    && pats.iter().any(|p| p.matches(&issue.file))
+                {
+                    return false;
+                }
+                // Override severity if the new config sets one. We only know
+                // how to map the four canonical severity strings; unknown
+                // strings leave the existing severity in place rather than
+                // silently downgrading to a default.
+                if let Some(sev_str) = ovr.and_then(|o| o.severity.as_deref()) {
+                    let new_sev = match sev_str.to_ascii_lowercase().as_str() {
+                        "error" => Some(OutSeverity::Error),
+                        "warning" | "warn" => Some(OutSeverity::Warning),
+                        "info" | "note" => Some(OutSeverity::Info),
+                        "hint" => Some(OutSeverity::Hint),
+                        _ => None,
+                    };
+                    if let Some(s) = new_sev {
+                        issue.severity = s;
+                    }
+                }
+                true
+            });
         }
 
         /// Prime the diagnostics cache for a root with a full evaluation of all engines.
@@ -918,6 +1087,14 @@ mod unix_impl {
             let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(watched) = roots.get_mut(root) {
                 watched.primed = true;
+                // Refresh the cached config snapshot so subsequent reload diffs
+                // are computed against what actually produced the persisted
+                // blobs.
+                watched.cached_rules = Arc::new(config.rules.clone());
+                watched.cached_walk = Arc::new(config.walk.clone());
+                // Persisted blobs now match the cached config — no serve-time
+                // filtering needed until the next config reload.
+                watched.serve_filter_pending = false;
             }
         }
 
@@ -1624,28 +1801,118 @@ mod unix_impl {
 
         /// Handle a `.normalize/config.toml` (or `.normalize/rules/**`) change.
         ///
-        /// `NormalizeConfig::load` has no in-memory cache — every prime/refresh
-        /// re-reads from disk — so there's no config state to invalidate here.
-        /// What *is* stale is the SQLite-cached diagnostic blobs: they were
-        /// produced under the previous config and may include findings that
-        /// the new config silences (or omit findings the new config now
-        /// emits). We clear them, then trigger a full reprime so subscribers
-        /// receive the new state via the existing `DiagnosticsUpdated` push.
+        /// Computes a [`ConfigDiff`] between the cached snapshot (what the
+        /// persisted blobs were produced under) and the freshly-loaded config,
+        /// then routes to the cheapest correct strategy:
+        ///
+        /// - **Filter-only diff** (severity / allow / `enabled = false`):
+        ///   update the cached config and set `serve_filter_pending` so the
+        ///   serve paths drop / re-severity cached findings on the next
+        ///   `RunRules`. No blob clear, no reprime. Broadcasts an
+        ///   `IndexRefreshed { files: 0 }` so subscribers know the view
+        ///   changed; a follow-up `DiagnosticsUpdated` is *not* emitted by
+        ///   this path because the per-file blobs on disk are unchanged —
+        ///   subscribers re-pull on their own.
+        /// - **No-op diff** (config bytes changed but no observable effect,
+        ///   e.g. only a comment): nothing to do.
+        /// - **Anything else** (per-rule re-eval needed, walk-exclude changed,
+        ///   sarif tools changed, or any future field): full reprime under the
+        ///   new config. This is also the conservative fallback for changes
+        ///   the diff doesn't yet model.
+        ///
+        /// Tier 2 (per-rule re-evaluation only) and Tier 3 (smart walk-exclude
+        /// partial) are tracked in TODO.md as follow-ups; they require
+        /// per-rule re-run hooks and a per-file walk-exclude diff that aren't
+        /// in place yet.
         fn reload_config_and_reprime(&self, root: &Path) {
-            // Mark the root as un-primed so a concurrent `RunRules` falls
-            // through to the synchronous prime path instead of returning a
-            // stale blob.
+            // Snapshot old config + load new config under the lock so the
+            // diff sees a consistent view.
+            let new_config = NormalizeConfig::load(root);
+            let new_rules = new_config.rules.clone();
+            let new_walk = new_config.walk.clone();
+
+            let (old_rules, old_walk) = {
+                let roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+                match roots.get(root) {
+                    Some(w) => (w.cached_rules.clone(), w.cached_walk.clone()),
+                    None => return, // root not watched — nothing to do
+                }
+            };
+
+            let diff = normalize_rules_config::ConfigDiff::compute(
+                &old_rules, &new_rules, &old_walk, &new_walk,
+            );
+
+            if diff.is_empty() {
+                // The config bytes changed (notify fired) but nothing the
+                // engines care about did (e.g. comment edit, whitespace).
+                // Refresh the snapshot in case the bytes-equal-but-not-eq
+                // case introduced ordering noise, then announce the reload
+                // so subscribers (LSPs, the daemon-push test) still see the
+                // signal that some `.normalize/config.toml` edit landed.
+                let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(w) = roots.get_mut(root) {
+                    w.cached_rules = Arc::new(new_rules);
+                    w.cached_walk = Arc::new(new_walk);
+                }
+                drop(roots);
+                tracing::debug!(root = ?root, "config reload: no observable change");
+                let _ = self.event_tx.send(Event::IndexRefreshed {
+                    root: root.to_string_lossy().into_owned(),
+                    files: 0,
+                });
+                return;
+            }
+
+            if diff.is_filter_only() {
+                tracing::info!(
+                    root = ?root,
+                    severities = diff.severities_changed,
+                    allow_lists = diff.allow_lists_changed,
+                    disabled = diff.rules_disabled.len(),
+                    "config reload: filter-only (no reprime)"
+                );
+                // Swap in the new cached config + flip the pending-filter
+                // flag. Subsequent `RunRules` calls will re-filter cached
+                // blobs at serve time.
+                {
+                    let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+                    if let Some(w) = roots.get_mut(root) {
+                        w.cached_rules = Arc::new(new_rules);
+                        w.cached_walk = Arc::new(new_walk);
+                        w.serve_filter_pending = true;
+                    }
+                }
+                // Announce the reload so subscribers re-pull. files: 0 keeps
+                // the existing test contract that this signal accompanies a
+                // config edit.
+                let _ = self.event_tx.send(Event::IndexRefreshed {
+                    root: root.to_string_lossy().into_owned(),
+                    files: 0,
+                });
+                return;
+            }
+
+            // Tier 3 (full reprime) fallback: any non-filter-only diff lands
+            // here today. Tier 2 surgical per-rule re-eval is a future
+            // optimization; see TODO.md.
+            tracing::info!(
+                root = ?root,
+                rerun = diff.rules_to_rerun.len(),
+                walk = diff.walk_exclude_changed,
+                "config reload: full reprime"
+            );
+
+            // Mark un-primed and drop cached blobs so a concurrent `RunRules`
+            // can't surface findings under the old config between now and
+            // reprime completion.
             {
                 let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
-                match roots.get_mut(root) {
-                    Some(w) => w.primed = false,
-                    None => return, // root not watched — nothing to do
+                if let Some(w) = roots.get_mut(root) {
+                    w.primed = false;
                 }
             }
 
-            // Drop every cached diagnostic row so a stale read between now and
-            // the reprime completion can't surface findings under the old
-            // config.
             if let Some(idx_arc) = self.get_root_index(root) {
                 let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
                 if let Err(e) = tokio::task::block_in_place(|| {
@@ -1660,19 +1927,11 @@ mod unix_impl {
                 drop(idx);
             }
 
-            tracing::info!(root = ?root, "config reload: re-priming diagnostics");
-
-            // IndexRefreshed broadcast announces the reload to subscribers
-            // before the (potentially slow) prime — clients can react
-            // immediately and `DiagnosticsUpdated` will follow when the prime
-            // commits.
             let _ = self.event_tx.send(Event::IndexRefreshed {
                 root: root.to_string_lossy().into_owned(),
                 files: 0,
             });
 
-            // Synchronous full reprime — already broadcasts
-            // `DiagnosticsUpdated` on completion.
             self.prime_diagnostics_cache(root);
         }
     }
@@ -2460,6 +2719,9 @@ mod unix_impl {
                     primed: true,
                     has_git_index: false,
                     index: Arc::new(std::sync::Mutex::new(idx)),
+                    cached_rules: Arc::new(normalize_rules_config::RulesConfig::default()),
+                    cached_walk: Arc::new(normalize_rules_config::WalkConfig::default()),
+                    serve_filter_pending: false,
                 },
             );
             drop(roots);
@@ -2730,6 +2992,112 @@ mod unix_impl {
             let issues: Vec<Issue> =
                 rkyv::from_bytes::<Vec<Issue>, rkyv::rancor::Error>(&blob).expect("rkyv decode");
             assert_eq!(issues.len(), 2);
+        }
+
+        // -- Tier 1 filter-at-serve --------------------------------------
+
+        fn issue_with(file: &str, rule: &str, sev: Severity) -> Issue {
+            Issue {
+                file: file.to_string(),
+                line: Some(1),
+                column: Some(1),
+                end_line: None,
+                end_column: None,
+                rule_id: rule.to_string(),
+                message: "msg".to_string(),
+                severity: sev,
+                source: "test".to_string(),
+                related: Vec::new(),
+                suggestion: None,
+            }
+        }
+
+        #[test]
+        fn apply_filter_at_serve_drops_disabled_rules() {
+            let mut issues = vec![
+                issue_with("a.rs", "rule.a", Severity::Warning),
+                issue_with("b.rs", "rule.b", Severity::Warning),
+            ];
+            let cfg = toml::from_str::<normalize_rules_config::RulesConfig>(
+                r#"
+[rule."rule.a"]
+enabled = false
+"#,
+            )
+            .unwrap();
+            DaemonServer::apply_filter_at_serve(&mut issues, &cfg);
+            assert_eq!(issues.len(), 1);
+            assert_eq!(issues[0].rule_id, "rule.b");
+        }
+
+        #[test]
+        fn apply_filter_at_serve_overrides_severity() {
+            let mut issues = vec![issue_with("a.rs", "rule.a", Severity::Warning)];
+            let cfg = toml::from_str::<normalize_rules_config::RulesConfig>(
+                r#"
+[rule."rule.a"]
+severity = "info"
+"#,
+            )
+            .unwrap();
+            DaemonServer::apply_filter_at_serve(&mut issues, &cfg);
+            assert_eq!(issues.len(), 1);
+            assert_eq!(issues[0].severity, Severity::Info);
+        }
+
+        #[test]
+        fn apply_filter_at_serve_drops_global_allowed_paths() {
+            let mut issues = vec![
+                issue_with("crates/foo/tests/it.rs", "rule.a", Severity::Warning),
+                issue_with("crates/foo/src/lib.rs", "rule.a", Severity::Warning),
+            ];
+            let cfg = toml::from_str::<normalize_rules_config::RulesConfig>(
+                r#"
+global-allow = ["**/tests/**"]
+"#,
+            )
+            .unwrap();
+            DaemonServer::apply_filter_at_serve(&mut issues, &cfg);
+            assert_eq!(issues.len(), 1);
+            assert_eq!(issues[0].file, "crates/foo/src/lib.rs");
+        }
+
+        #[test]
+        fn apply_filter_at_serve_drops_per_rule_allowed_paths() {
+            let mut issues = vec![
+                issue_with("a.rs", "rule.a", Severity::Warning),
+                issue_with("b.rs", "rule.a", Severity::Warning),
+                issue_with("a.rs", "rule.b", Severity::Warning),
+            ];
+            let cfg = toml::from_str::<normalize_rules_config::RulesConfig>(
+                r#"
+[rule."rule.a"]
+allow = ["a.rs"]
+"#,
+            )
+            .unwrap();
+            DaemonServer::apply_filter_at_serve(&mut issues, &cfg);
+            // rule.a@a.rs dropped (allow); other two remain.
+            assert_eq!(issues.len(), 2);
+            assert!(
+                issues
+                    .iter()
+                    .any(|i| i.rule_id == "rule.a" && i.file == "b.rs")
+            );
+            assert!(
+                issues
+                    .iter()
+                    .any(|i| i.rule_id == "rule.b" && i.file == "a.rs")
+            );
+        }
+
+        #[test]
+        fn apply_filter_at_serve_no_config_is_noop() {
+            let mut issues = vec![issue_with("a.rs", "rule.a", Severity::Warning)];
+            let cfg = normalize_rules_config::RulesConfig::default();
+            DaemonServer::apply_filter_at_serve(&mut issues, &cfg);
+            assert_eq!(issues.len(), 1);
+            assert_eq!(issues[0].severity, Severity::Warning);
         }
     }
 }
