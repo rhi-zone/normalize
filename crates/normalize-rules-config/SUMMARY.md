@@ -9,3 +9,7 @@ and `normalize-facts-rules-interpret` so all rule engines share a single definit
 `RuleOverride::merge` and `RulesConfig::merge` use a "right-wins" strategy: `other`'s
 present fields override `self`'s, but absent `Option` fields in `other` leave `self`'s
 values unchanged.
+
+Also exports `ConfigDiff` — a tiered change classifier used by the daemon to pick the
+cheapest correct cache-invalidation strategy (filter-only / per-rule re-run / full reprime)
+when `.normalize/config.toml` changes.

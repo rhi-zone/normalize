@@ -3,7 +3,7 @@
 //! Both syntax rules and fact rules use `RulesConfig` as their configuration type,
 //! loaded from `[rules]` in `.normalize/config.toml`.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 /// Severity level for rule findings.
@@ -432,6 +432,186 @@ impl PathFilter {
     }
 }
 
+/// Surgical-invalidation diff between two rule configurations.
+///
+/// Produced by [`ConfigDiff::compute`] to classify what changed between an old
+/// `(RulesConfig, WalkConfig)` snapshot and a new one. Consumers (the daemon's
+/// config-reload handler) use the classification to pick the cheapest correct
+/// invalidation strategy:
+///
+/// - **Tier 1 (filter-only):** severities, allow-lists, or `enabled = false`
+///   changed. The cached findings are still correct — applying the new config's
+///   filter at serve time is enough. No re-evaluation.
+/// - **Tier 2 (per-rule re-run):** specific rules' behavior changed (newly
+///   enabled, rule-specific config field, or backing `.scm` file edited).
+///   Only those rules need to be re-evaluated; everything else stays cached.
+/// - **Tier 3 (full reprime):** `[walk] exclude` changed (file set differs) or
+///   the diff doesn't fit the above. Conservative fallback.
+///
+/// `.scm` rule-definition file diffs are tracked outside this struct because
+/// this crate has no filesystem dependency; the daemon hashes
+/// `.normalize/rules/**` itself and unions its result into `rules_to_rerun`
+/// before consulting [`ConfigDiff::is_filter_only`] / [`ConfigDiff::requires_full_reprime`].
+#[derive(Debug, Default, Clone)]
+pub struct ConfigDiff {
+    /// Rules whose evaluation behavior changed (newly-enabled, rule-specific
+    /// config field, or `.scm` definition edited). These need to be re-run.
+    pub rules_to_rerun: HashSet<String>,
+    /// Rules that became disabled. Their cached findings should be dropped at
+    /// serve time (no re-run needed).
+    pub rules_disabled: HashSet<String>,
+    /// True if any allow-list (per-rule `allow` or top-level `global-allow`)
+    /// changed without a corresponding behavior change. Filter at serve time.
+    pub allow_lists_changed: bool,
+    /// True if any rule's severity changed without a corresponding behavior
+    /// change. Override severity at serve time.
+    pub severities_changed: bool,
+    /// True if `[walk] exclude` changed. Forces a full reprime (Tier 3) because
+    /// the file set may differ.
+    pub walk_exclude_changed: bool,
+}
+
+impl ConfigDiff {
+    /// Compute a diff describing what changed between `old` and `new`.
+    ///
+    /// The diff classifies each per-rule change into the cheapest tier that's
+    /// still correct. Adding/removing a rule entry that flips `enabled` from
+    /// the implicit default is treated the same as toggling it explicitly.
+    pub fn compute(
+        old_rules: &RulesConfig,
+        new_rules: &RulesConfig,
+        old_walk: &WalkConfig,
+        new_walk: &WalkConfig,
+    ) -> Self {
+        let mut diff = ConfigDiff::default();
+
+        // Walk-exclude changed → Tier 3.
+        if old_walk.exclude() != new_walk.exclude() {
+            diff.walk_exclude_changed = true;
+        }
+
+        // Global allow change → filter-only.
+        if old_rules.global_allow != new_rules.global_allow {
+            diff.allow_lists_changed = true;
+        }
+
+        // Walk every rule id present in either snapshot.
+        let ids: HashSet<&str> = old_rules
+            .rules
+            .keys()
+            .chain(new_rules.rules.keys())
+            .map(String::as_str)
+            .collect();
+
+        for id in ids {
+            let old = old_rules.rules.get(id);
+            let new = new_rules.rules.get(id);
+
+            // Enabled-state transitions. `None` ≡ default-enabled, so missing
+            // entry vs `enabled = Some(true)` is *not* a state change.
+            let was_enabled = old.is_none_or(|o| o.enabled.unwrap_or(true));
+            let is_enabled = new.is_none_or(|n| n.enabled.unwrap_or(true));
+            match (was_enabled, is_enabled) {
+                (true, false) => {
+                    diff.rules_disabled.insert(id.to_string());
+                }
+                (false, true) => {
+                    // Newly enabled — must re-evaluate.
+                    diff.rules_to_rerun.insert(id.to_string());
+                }
+                _ => {}
+            }
+
+            // Severity change is filter-only; only flag it when the rule is
+            // (and stays) enabled — otherwise the disabled/re-enabled paths
+            // already handle it.
+            if was_enabled && is_enabled {
+                let old_sev = old.and_then(|o| o.severity.as_deref());
+                let new_sev = new.and_then(|n| n.severity.as_deref());
+                if old_sev != new_sev {
+                    diff.severities_changed = true;
+                }
+
+                // Per-rule allow-list change is filter-only.
+                let old_allow = old.map(|o| o.allow.as_slice()).unwrap_or(&[]);
+                let new_allow = new.map(|n| n.allow.as_slice()).unwrap_or(&[]);
+                if old_allow != new_allow {
+                    diff.allow_lists_changed = true;
+                }
+
+                // Rule-specific config (the `extra` toml table) or `tags`
+                // changed → behavior changed → re-run the rule.
+                let old_extra = old.map(|o| &o.extra);
+                let new_extra = new.map(|n| &n.extra);
+                if old_extra != new_extra {
+                    diff.rules_to_rerun.insert(id.to_string());
+                }
+                let old_tags = old.map(|o| o.tags.as_slice()).unwrap_or(&[]);
+                let new_tags = new.map(|n| n.tags.as_slice()).unwrap_or(&[]);
+                if old_tags != new_tags {
+                    // Tags affect filter selection (`--tag`) but do not change
+                    // findings under a typical `rules run`. Treat as filter-only.
+                    diff.allow_lists_changed = true;
+                }
+            }
+        }
+
+        // sarif-tools change → conservatively force a re-run of every sarif
+        // tool by listing them in `rules_to_rerun` keyed by tool name. The
+        // daemon today doesn't run sarif tools through the per-rule re-eval
+        // path, so this surfaces as "non-filter-only" → full reprime, which
+        // is the conservative correct behavior.
+        if old_rules.sarif_tools.len() != new_rules.sarif_tools.len() {
+            diff.rules_to_rerun
+                .insert("__sarif_tools_changed__".to_string());
+        } else {
+            for (a, b) in old_rules
+                .sarif_tools
+                .iter()
+                .zip(new_rules.sarif_tools.iter())
+            {
+                if a.name != b.name || a.command != b.command || a.watch != b.watch {
+                    diff.rules_to_rerun
+                        .insert("__sarif_tools_changed__".to_string());
+                    break;
+                }
+            }
+        }
+
+        diff
+    }
+
+    /// True if this diff can be honored by re-filtering cached findings at
+    /// serve time, with no re-evaluation.
+    ///
+    /// Specifically: no rule needs re-running and `[walk] exclude` is
+    /// unchanged. Allow-list, severity, and `enabled = false` changes are all
+    /// filter-only because the cached findings are a superset of the new
+    /// answer — dropping disabled rules / allow-matched paths and overriding
+    /// severities at serve time produces the correct result.
+    pub fn is_filter_only(&self) -> bool {
+        self.rules_to_rerun.is_empty() && !self.walk_exclude_changed
+    }
+
+    /// True if this diff requires a full reprime (Tier 3).
+    ///
+    /// Today only `walk_exclude_changed` triggers this; future fields that
+    /// can't be expressed as either filter-only or per-rule re-run should
+    /// extend this check.
+    pub fn requires_full_reprime(&self) -> bool {
+        self.walk_exclude_changed
+    }
+
+    /// True if this diff has no observable effect.
+    pub fn is_empty(&self) -> bool {
+        self.rules_to_rerun.is_empty()
+            && self.rules_disabled.is_empty()
+            && !self.allow_lists_changed
+            && !self.severities_changed
+            && !self.walk_exclude_changed
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -662,5 +842,141 @@ exclude = [".git", "node_modules", ".cache"]
         let merged = a.merge(b);
         assert_eq!(merged.ignore_files(), vec![".npmignore"]);
         assert_eq!(merged.exclude(), vec![".git"]); // self's None → default
+    }
+
+    // -- ConfigDiff -----------------------------------------------------------
+
+    fn parse_rules(s: &str) -> RulesConfig {
+        toml::from_str(s).unwrap()
+    }
+
+    #[test]
+    fn config_diff_no_change_is_empty() {
+        let cfg = parse_rules(
+            r#"
+[rule."rust/dbg-macro"]
+severity = "error"
+"#,
+        );
+        let walk = WalkConfig::default();
+        let diff = ConfigDiff::compute(&cfg, &cfg, &walk, &walk);
+        assert!(diff.is_empty());
+        assert!(diff.is_filter_only());
+        assert!(!diff.requires_full_reprime());
+    }
+
+    #[test]
+    fn config_diff_severity_only_is_filter_only() {
+        let old = parse_rules(
+            r#"
+[rule."rust/dbg-macro"]
+severity = "error"
+"#,
+        );
+        let new = parse_rules(
+            r#"
+[rule."rust/dbg-macro"]
+severity = "info"
+"#,
+        );
+        let walk = WalkConfig::default();
+        let diff = ConfigDiff::compute(&old, &new, &walk, &walk);
+        assert!(diff.severities_changed);
+        assert!(diff.is_filter_only());
+        assert!(diff.rules_to_rerun.is_empty());
+    }
+
+    #[test]
+    fn config_diff_allow_change_is_filter_only() {
+        let old = parse_rules(
+            r#"
+global-allow = ["**/fixtures/**"]
+"#,
+        );
+        let new = parse_rules(
+            r#"
+global-allow = ["**/fixtures/**", "**/tests/**"]
+"#,
+        );
+        let walk = WalkConfig::default();
+        let diff = ConfigDiff::compute(&old, &new, &walk, &walk);
+        assert!(diff.allow_lists_changed);
+        assert!(diff.is_filter_only());
+    }
+
+    #[test]
+    fn config_diff_disable_is_filter_only() {
+        let old = parse_rules(
+            r#"
+[rule."rust/dbg-macro"]
+severity = "error"
+"#,
+        );
+        let new = parse_rules(
+            r#"
+[rule."rust/dbg-macro"]
+severity = "error"
+enabled = false
+"#,
+        );
+        let walk = WalkConfig::default();
+        let diff = ConfigDiff::compute(&old, &new, &walk, &walk);
+        assert!(diff.rules_disabled.contains("rust/dbg-macro"));
+        assert!(diff.rules_to_rerun.is_empty());
+        assert!(diff.is_filter_only());
+    }
+
+    #[test]
+    fn config_diff_enable_requires_rerun() {
+        let old = parse_rules(
+            r#"
+[rule."rust/dbg-macro"]
+enabled = false
+"#,
+        );
+        let new = parse_rules(
+            r#"
+[rule."rust/dbg-macro"]
+enabled = true
+"#,
+        );
+        let walk = WalkConfig::default();
+        let diff = ConfigDiff::compute(&old, &new, &walk, &walk);
+        assert!(diff.rules_to_rerun.contains("rust/dbg-macro"));
+        assert!(!diff.is_filter_only());
+        assert!(!diff.requires_full_reprime());
+    }
+
+    #[test]
+    fn config_diff_threshold_change_requires_rerun() {
+        let old = parse_rules(
+            r#"
+[rule."long-function"]
+threshold = 100
+"#,
+        );
+        let new = parse_rules(
+            r#"
+[rule."long-function"]
+threshold = 50
+"#,
+        );
+        let walk = WalkConfig::default();
+        let diff = ConfigDiff::compute(&old, &new, &walk, &walk);
+        assert!(diff.rules_to_rerun.contains("long-function"));
+    }
+
+    #[test]
+    fn config_diff_walk_exclude_change_requires_full_reprime() {
+        let cfg = RulesConfig::default();
+        let old_walk = WalkConfig::default();
+        let new_walk = WalkConfig {
+            ignore_files: None,
+            exclude: Some(vec![".git".into(), "node_modules".into()]),
+        };
+        let diff = ConfigDiff::compute(&cfg, &cfg, &old_walk, &new_walk);
+        assert!(diff.walk_exclude_changed);
+        assert!(diff.requires_full_reprime());
+        assert!(!diff.is_filter_only());
     }
 }
