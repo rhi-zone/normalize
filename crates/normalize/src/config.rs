@@ -44,7 +44,7 @@
 //! [rules]
 //! global-allow = ["**/tests/fixtures/**"]
 //!
-//! [rules."rust/unwrap-in-impl"]
+//! [rules.rule."rust/unwrap-in-impl"]
 //! severity = "error"
 //! allow = ["crates/*/src/lib.rs"]
 //!
@@ -130,7 +130,7 @@ pub struct NormalizeConfig {
     #[param(nested, serde)]
     pub analyze: AnalyzeConfig,
     /// Rules configuration: per-rule overrides, global-allow, and sarif-tools.
-    /// Configured via `[rules]`, `[rules."rule-id"]`, and `[[rules.sarif-tools]]`.
+    /// Configured via `[rules]`, `[rules.rule."rule-id"]`, and `[[rules.sarif-tools]]`.
     #[param(nested, serde)]
     pub rules: RulesConfig,
     #[serde(rename = "text-search")]

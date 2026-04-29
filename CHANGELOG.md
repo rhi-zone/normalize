@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Per-rule config moved to `[rules.rule."<id>"]`.** Previously `[rules]` hosted both engine-wide bare keys (e.g. `global-allow`, `sarif-tools`) and per-rule sub-tables (e.g. `[rules."rust/dbg-macro"]`) — a TOML namespace collision waiting to happen (a rule literally named `global-allow` would conflict irrecoverably). Per-rule overrides are now nested under a dedicated `rule` sub-table; the bare-key namespace under `[rules]` is reserved for engine-wide configuration. The legacy layout is still parsed for one release with a stderr deprecation warning. **Migration:** rename every `[rules."<id>"]` to `[rules.rule."<id>"]` in your `.normalize/config.toml`. Engine-wide keys (`global-allow`, `sarif-tools`) stay where they are.
 - **`[walk] exclude` now accepts gitignore-style glob patterns.** Previously each entry was matched only against directory entry basenames (so you could write `worktrees` but not `**/target/` or `crates/foo/build/`). Patterns are now compiled via a gitignore matcher anchored at the project root, so any pattern that works in `.gitignore` works here. Existing configs (e.g. `[".git", "worktrees"]`) keep working unchanged because gitignore patterns without slashes still match at any depth.
 
 ### Added

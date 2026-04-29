@@ -48,24 +48,24 @@ exclude = [
 global-allow = ["**/tests/fixtures/**", "**/fixtures/**"]
 
 # Disable println-debug for CLI tools (we use println for output)
-[rules."rust/println-debug"]
+[rules.rule."rust/println-debug"]
 enabled = false
 
 # dbg!/todo!/expect("") should never reach committed code.
-[rules."rust/dbg-macro"]
+[rules.rule."rust/dbg-macro"]
 severity = "error"
 allow = ["**/tests/fixtures/**"]
 
-[rules."rust/todo-macro"]
+[rules.rule."rust/todo-macro"]
 severity = "error"
 allow = ["**/tests/fixtures/**"]
 
-[rules."rust/expect-empty"]
+[rules.rule."rust/expect-empty"]
 severity = "error"
 allow = ["**/tests/fixtures/**"]
 
 # static mut is an unsafe footgun; always wrong outside of FFI/embedded.
-[rules."rust/static-mut"]
+[rules.rule."rust/static-mut"]
 severity = "error"
 enabled = true
 allow = ["**/tests/fixtures/**"]
@@ -74,13 +74,13 @@ allow = ["**/tests/fixtures/**"]
 
 # Enable numeric literal suffix rule (disabled by default).
 # Exclude rule fixtures: those files intentionally contain the bad pattern to test detection.
-[rules."rust/numeric-type-annotation"]
+[rules.rule."rust/numeric-type-annotation"]
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
 # Audit complete: all 1608 violations resolved (inline suppressed with reasons or allow-listed).
 # Production .unwrap() uses are annotated; test code in inline #[cfg(test)] modules allowed below.
-[rules."rust/unwrap-in-impl"]
+[rules.rule."rust/unwrap-in-impl"]
 severity = "warning"
 enabled = true
 allow = [
@@ -159,7 +159,7 @@ allow = [
     "crates/normalize/src/commands/update.rs",
 ]
 
-[rules."rust/unnecessary-let"]
+[rules.rule."rust/unnecessary-let"]
 severity = "warning"
 enabled = true
 # normalize-manifest parsers use let x = i; while i < ... (index-snapshot pattern:
@@ -171,42 +171,42 @@ allow = [
     "**/tests/fixtures/**",
 ]
 
-[rules."rust/unnecessary-type-alias"]
+[rules.rule."rust/unnecessary-type-alias"]
 severity = "warning"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
-[rules."rust/chained-if-let"]
+[rules.rule."rust/chained-if-let"]
 enabled = true
 
-[rules."js/console-log"]
+[rules.rule."js/console-log"]
 enabled = true
 # editors/vscode/: console.log is intentional lifecycle logging for VSCode extension host
 allow = ["**/fixtures/**", "editors/vscode/**"]
 
-[rules."js/unnecessary-const"]
+[rules.rule."js/unnecessary-const"]
 enabled = true
 
-[rules."python/print-debug"]
-enabled = true
-# cli-parser fixtures are example scripts showing what the parser handles, not production code
-allow = ["**/fixtures/**"]
-
-[rules."python/tuple-return"]
-enabled = true
-
-[rules."go/fmt-print"]
+[rules.rule."python/print-debug"]
 enabled = true
 # cli-parser fixtures are example scripts showing what the parser handles, not production code
 allow = ["**/fixtures/**"]
 
-[rules."go/many-returns"]
+[rules.rule."python/tuple-return"]
 enabled = true
 
-[rules."typescript/tuple-return"]
+[rules.rule."go/fmt-print"]
+enabled = true
+# cli-parser fixtures are example scripts showing what the parser handles, not production code
+allow = ["**/fixtures/**"]
+
+[rules.rule."go/many-returns"]
 enabled = true
 
-[rules."no-todo-comment"]
+[rules.rule."typescript/tuple-return"]
+enabled = true
+
+[rules.rule."no-todo-comment"]
 enabled = true
 # config.rs doc comment shows example config with "TODO.md" as a filename (not a work item).
 # ast_grep/ is vendored from upstream ast-grep — inherited TODO comments are not our work items.
@@ -218,77 +218,77 @@ allow = [
 # no-grammar-loader-new: allow in test modules and test files (tests may need custom loaders
 # with add_path() for isolated grammar directories, which requires GrammarLoader::new()).
 # normalize-scope/src/lib.rs test module uses add_path() which requires a mutable loader.
-[rules."no-grammar-loader-new"]
+[rules.rule."no-grammar-loader-new"]
 allow = ["**/tests/**", "crates/*/tests/**", "crates/normalize-scope/src/lib.rs"]
 
 # rust/tuple-return: rg/ is vendored from ripgrep (do not modify); fixtures intentionally
 # contain the bad pattern. All other violations must be fixed.
-[rules."rust/tuple-return"]
+[rules.rule."rust/tuple-return"]
 severity = "error"
 enabled = true
 allow = ["crates/normalize/src/rg/**", "**/tests/fixtures/**"]
 
 # SUMMARY.md freshness: currently at info severity (TODO: re-escalate to "error" once all
 # SUMMARY.md enforcement — severity=error blocks commits when SUMMARY.md is stale/missing.
-[rules."stale-summary"]
+[rules.rule."stale-summary"]
 severity = "error"
 
-[rules."missing-summary"]
+[rules.rule."missing-summary"]
 severity = "error"
 
 # Error-severity: genuine bugs / serious antipatterns — clean in current codebase.
-[rules."python/mutable-default-arg"]
+[rules.rule."python/mutable-default-arg"]
 severity = "error"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
-[rules."python/bare-except"]
+[rules.rule."python/bare-except"]
 severity = "error"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
-[rules."ruby/rescue-exception"]
+[rules.rule."ruby/rescue-exception"]
 severity = "error"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
-[rules."go/error-ignored"]
+[rules.rule."go/error-ignored"]
 severity = "error"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
 # Warning-severity: bad practice but sometimes intentional.
-[rules."js/var-declaration"]
+[rules.rule."js/var-declaration"]
 severity = "warning"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
-[rules."js/typeof-string"]
+[rules.rule."js/typeof-string"]
 severity = "warning"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
-[rules."ruby/puts-in-lib"]
+[rules.rule."ruby/puts-in-lib"]
 severity = "warning"
 enabled = true
 allow = ["**/tests/fixtures/**"]
 
 # Info-severity (already enabled).
-[rules."js/eq-null"]
+[rules.rule."js/eq-null"]
 enabled = true
 
-[rules."python/assert-in-non-test"]
+[rules.rule."python/assert-in-non-test"]
 enabled = true
 
-[rules."js/no-await-in-loop"]
+[rules.rule."js/no-await-in-loop"]
 enabled = true
 
 # CHANGELOG.md references types that have since been renamed or deleted.
 # These are historical records, not live code references.
-[rules."broken-ref"]
+[rules.rule."broken-ref"]
 allow = ["CHANGELOG.md"]
 
-[rules."long-file"]
+[rules.rule."long-file"]
 enabled = true
 severity = "error"
 threshold = 6400
@@ -299,7 +299,7 @@ allow = [
     "crates/normalize/src/rg/**",
 ]
 
-[rules."high-complexity"]
+[rules.rule."high-complexity"]
 enabled = true
 severity = "error"
 threshold = 91
@@ -312,7 +312,7 @@ allow = [
 
 # The native long-function rule supersedes the fact-engine long-function rule
 # (same check, but configurable threshold). Disable the fact variant.
-[rules."long-function"]
+[rules.rule."long-function"]
 enabled = true
 severity = "error"
 threshold = 430
@@ -330,13 +330,13 @@ allow = [
     "crates/normalize-rules/src/service.rs",
 ]
 
-[rules."go/context-todo"]
+[rules.rule."go/context-todo"]
 enabled = false
 
-[rules."typescript/no-non-null-assertion"]
+[rules.rule."typescript/no-non-null-assertion"]
 enabled = false
 
-[rules."ruby/string-concat"]
+[rules.rule."ruby/string-concat"]
 enabled = false
 
 [aliases]

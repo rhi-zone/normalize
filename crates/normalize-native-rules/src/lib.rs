@@ -36,7 +36,7 @@ pub use stale_summary::{build_missing_summary_report, build_stale_summary_report
 ///
 /// `default_severity` is the baked-in severity from the rule author. At runtime
 /// the actual severity may differ: `normalize rules run` applies any
-/// `[rules."rule-id"]` overrides from the project's `normalize.toml` via
+/// `[rules.rule."rule-id"]` overrides from the project's `normalize.toml` via
 /// `normalize_rules::apply_native_rules_config` before presenting findings to the user.
 pub struct NativeRuleDescriptor {
     /// Unique rule identifier (e.g. `"stale-summary"`).

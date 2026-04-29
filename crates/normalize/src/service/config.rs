@@ -305,7 +305,7 @@ fn format_schema_annotated(
     }
 
     // If the schema has additionalProperties, also enumerate content keys not in `properties`.
-    // This covers dynamic keys like per-rule overrides in [rules."rule-id"] sections.
+    // This covers dynamic keys like per-rule overrides in [rules.rule."rule-id"] sections.
     if let (Some(add_schema), Some(content_obj)) = (
         resolved.get("additionalProperties"),
         section_content.and_then(|c| c.as_object()),

@@ -787,8 +787,7 @@ pub fn enable_disable(
     let config_path = root.join(".normalize").join("config.toml");
 
     // Collect all changes to apply: (section, rule_id)
-    // syntax rules → [rules."id"]
-    // fact rules   → [rules."id"] (unified config section)
+    // All rules → [rules.rule."id"] (unified config section, nested under `rule`)
     let changes_syntax: Vec<&str> = matched_syntax
         .iter()
         .filter(|r| r.enabled != enable)
@@ -865,29 +864,41 @@ pub fn enable_disable(
             .to_string());
     }
 
-    // Apply syntax rule changes → [rules."id"]
-    if !changes_syntax.is_empty() {
+    // Ensure [rules.rule] sub-table exists for per-rule overrides.
+    {
         let rules_table = doc["rules"]
             .as_table_mut()
             .ok_or_else(|| "'rules' is not a TOML table".to_string())?;
-        for id in &changes_syntax {
-            if !rules_table.contains_key(id) {
-                rules_table[id] = toml_edit::Item::Table(toml_edit::Table::new());
-            }
-            rules_table[id]["enabled"] = toml_edit::value(enable);
+        if !rules_table.contains_key("rule") {
+            let mut t = toml_edit::Table::new();
+            t.set_implicit(true);
+            rules_table.insert("rule", toml_edit::Item::Table(t));
         }
     }
 
-    // Apply fact rule changes → [rules."id"] (same section as syntax rules)
-    if !changes_fact.is_empty() {
-        let rules_table = doc["rules"]
+    // Apply syntax rule changes → [rules.rule."id"]
+    if !changes_syntax.is_empty() {
+        let rule_table = doc["rules"]["rule"]
             .as_table_mut()
-            .ok_or_else(|| "'rules' is not a TOML table".to_string())?;
-        for id in &changes_fact {
-            if !rules_table.contains_key(id) {
-                rules_table[id] = toml_edit::Item::Table(toml_edit::Table::new());
+            .ok_or_else(|| "'rules.rule' is not a TOML table".to_string())?;
+        for id in &changes_syntax {
+            if !rule_table.contains_key(id) {
+                rule_table[id] = toml_edit::Item::Table(toml_edit::Table::new());
             }
-            rules_table[id]["enabled"] = toml_edit::value(enable);
+            rule_table[id]["enabled"] = toml_edit::value(enable);
+        }
+    }
+
+    // Apply fact rule changes → [rules.rule."id"] (same section as syntax rules)
+    if !changes_fact.is_empty() {
+        let rule_table = doc["rules"]["rule"]
+            .as_table_mut()
+            .ok_or_else(|| "'rules.rule' is not a TOML table".to_string())?;
+        for id in &changes_fact {
+            if !rule_table.contains_key(id) {
+                rule_table[id] = toml_edit::Item::Table(toml_edit::Table::new());
+            }
+            rule_table[id]["enabled"] = toml_edit::value(enable);
         }
     }
 
@@ -1409,7 +1420,7 @@ pub async fn collect_fact_diagnostics_incremental(
 
 /// Apply `RulesConfig` severity/enabled overrides to issues in a `DiagnosticsReport`.
 /// This lets native checks (stale-summary, missing-summary, check-refs, etc.) be
-/// configured via `[rules."rule-id"]` in normalize.toml, just like syntax rules.
+/// configured via `[rules.rule."rule-id"]` in normalize.toml, just like syntax rules.
 pub fn apply_native_rules_config(
     report: &mut normalize_output::diagnostics::DiagnosticsReport,
     config: &RulesConfig,

@@ -297,16 +297,16 @@ mod tests {
     #[test]
     fn test_rules_config_toml_deserialization() {
         // Keys with '/' must be quoted in TOML table headers.
-        // In normalize.toml this appears as [rules."rust/foo"].
+        // In normalize.toml this appears as [rules.rule."rust/foo"].
         let toml_str = r#"
 global-allow = ["**/tests/fixtures/**", "**/test/**"]
 
-["rust/foo"]
+[rule."rust/foo"]
 severity = "error"
 enabled = true
 allow = ["some/path/**"]
 
-["rust/bar"]
+[rule."rust/bar"]
 severity = "warning"
 "#;
         let config: RulesConfig = toml::from_str(toml_str).expect("failed to parse RulesConfig");
@@ -326,7 +326,7 @@ severity = "warning"
     #[test]
     fn test_rules_config_empty_global_allow() {
         let toml_str = r#"
-["rust/baz"]
+[rule."rust/baz"]
 enabled = false
 "#;
         let config: RulesConfig = toml::from_str(toml_str).expect("failed to parse RulesConfig");

@@ -13,7 +13,7 @@ Rules are loaded in this order (later overrides earlier by `id`):
 To disable a builtin, add to `.normalize/config.toml`:
 
 ```toml
-[rules."rust/println-debug"]
+[rules.rule."rust/println-debug"]
 enabled = false
 ```
 
@@ -44,7 +44,7 @@ Not all rules are appropriate for all project types:
 **CLI tools** legitimately use `println!` for output - disable `rust/println-debug`:
 
 ```toml
-[rules."rust/println-debug"]
+[rules.rule."rust/println-debug"]
 enabled = false
 ```
 
@@ -308,20 +308,20 @@ Flags `// FIXME` comments - known bugs that need fixing.
 ```toml
 # Default rules are appropriate
 # Optionally upgrade severity
-[rules."rust/unwrap-in-impl"]
+[rules.rule."rust/unwrap-in-impl"]
 severity = "warning"
 ```
 
 ### CLI Tool Project
 ```toml
 # Disable println-debug
-[rules."rust/println-debug"]
+[rules.rule."rust/println-debug"]
 enabled = false
 ```
 
 ### Per-Directory Exclusions
 ```toml
-[rules."rust/unwrap-in-impl"]
+[rules.rule."rust/unwrap-in-impl"]
 allow = ["**/generated/**", "**/proto/**"]
 ```
 

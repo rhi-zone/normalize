@@ -71,7 +71,7 @@ pub struct SarifTool {
 
 /// Common per-rule configuration fields shared across all rule engines.
 ///
-/// Used under `[rules."rule-id"]` in `.normalize/config.toml`. These fields
+/// Used under `[rules.rule."rule-id"]` in `.normalize/config.toml`. These fields
 /// apply to every rule regardless of engine. Rule-specific configuration
 /// (e.g. thresholds, filenames) is defined as typed structs owned by each
 /// rule and deserialized from the same TOML table via `#[serde(flatten)]`.
@@ -168,20 +168,106 @@ impl RuleOverride {
 
 /// Rules configuration covering all engines (syntax, fact, native, sarif).
 ///
-/// Deserialized from `[rules]` in `.normalize/config.toml`.
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, Default, schemars::JsonSchema)]
-#[serde(default)]
+/// Deserialized from `[rules]` in `.normalize/config.toml`. Per-rule overrides
+/// live under `[rules.rule."<id>"]`. Engine-wide settings live as bare keys
+/// directly under `[rules]` (e.g. `global-allow`, `sarif-tools`).
+///
+/// **Legacy layout** (`[rules."<id>"]` directly under `[rules]`) is still parsed
+/// for one release with a stderr deprecation warning. It is unsound in principle
+/// because a rule named `global-allow` would collide with the engine-wide key —
+/// the new nested layout removes the namespace collision.
+#[derive(Debug, Clone, serde::Serialize, Default, schemars::JsonSchema)]
 pub struct RulesConfig {
     /// Allow patterns applied to every rule (e.g. `["**/tests/fixtures/**"]`).
     /// Entries here skip violations in matching files across all rules.
-    #[serde(rename = "global-allow")]
+    #[serde(
+        rename = "global-allow",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub global_allow: Vec<String>,
     /// External tools that emit SARIF 2.1.0 output (the `sarif` engine).
-    #[serde(rename = "sarif-tools")]
+    #[serde(rename = "sarif-tools", default, skip_serializing_if = "Vec::is_empty")]
     pub sarif_tools: Vec<SarifTool>,
     /// Per-rule configuration overrides, keyed by rule ID.
-    #[serde(flatten)]
+    ///
+    /// Serialized under the `rule` sub-table (`[rules.rule."<id>"]`). On
+    /// deserialization, both the new nested layout and the legacy flat layout
+    /// (`[rules."<id>"]`) are accepted; the legacy form emits a stderr
+    /// deprecation warning.
+    #[serde(default, rename = "rule", skip_serializing_if = "HashMap::is_empty")]
     pub rules: HashMap<String, RuleOverride>,
+}
+
+/// Engine-wide bare keys reserved under `[rules]`. Anything else found at the
+/// top level of `[rules]` is interpreted as a legacy `[rules."<id>"]` per-rule
+/// override (and triggers a deprecation warning).
+const RULES_RESERVED_KEYS: &[&str] = &["global-allow", "sarif-tools", "rule"];
+
+impl<'de> serde::Deserialize<'de> for RulesConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        // Capture every entry as a generic toml::Value first so we can route bare
+        // engine keys, the new `rule` sub-table, and legacy per-rule entries
+        // (`[rules."<id>"]`) separately.
+        let raw: HashMap<String, toml::Value> = HashMap::deserialize(deserializer)?;
+
+        let mut global_allow: Vec<String> = Vec::new();
+        let mut sarif_tools: Vec<SarifTool> = Vec::new();
+        let mut rules: HashMap<String, RuleOverride> = HashMap::new();
+        let mut legacy_rule_ids: Vec<String> = Vec::new();
+
+        for (key, value) in raw {
+            match key.as_str() {
+                "global-allow" => {
+                    global_allow = value.try_into().map_err(serde::de::Error::custom)?;
+                }
+                "sarif-tools" => {
+                    sarif_tools = value.try_into().map_err(serde::de::Error::custom)?;
+                }
+                "rule" => {
+                    let nested: HashMap<String, RuleOverride> =
+                        value.try_into().map_err(serde::de::Error::custom)?;
+                    // Nested-layout entries take precedence over any legacy entries
+                    // with the same id (extend overwrites).
+                    rules.extend(nested);
+                }
+                _ => {
+                    // Legacy: bare key is a rule id ([rules."<id>"]).
+                    let override_: RuleOverride =
+                        value.try_into().map_err(serde::de::Error::custom)?;
+                    legacy_rule_ids.push(key.clone());
+                    // Don't overwrite a nested entry with the same id if one
+                    // already landed; nested wins.
+                    rules.entry(key).or_insert(override_);
+                }
+            }
+        }
+
+        if !legacy_rule_ids.is_empty() {
+            legacy_rule_ids.sort();
+            eprintln!(
+                "warning: deprecated [rules.\"<id>\"] layout in .normalize/config.toml — \
+                 migrate to [rules.rule.\"<id>\"] (affected rule ids: {}). \
+                 The legacy layout will be removed in a future release.",
+                legacy_rule_ids.join(", "),
+            );
+        }
+
+        // Sanity check: forbid any future engine key colliding with the
+        // reserved bare-key namespace from being interpreted as a rule.
+        // (Currently RULES_RESERVED_KEYS is only used for documentation /
+        // future-proofing — every reserved key is already handled above.)
+        let _ = RULES_RESERVED_KEYS;
+
+        Ok(RulesConfig {
+            global_allow,
+            sarif_tools,
+            rules,
+        })
+    }
 }
 
 impl normalize_core::Merge for RulesConfig {
@@ -355,7 +441,7 @@ mod tests {
         let toml_str = r#"
 global-allow = ["**/fixtures/**"]
 
-[no-grammar-loader-new]
+[rule."no-grammar-loader-new"]
 allow = ["**/tests/**", "src/lib.rs"]
 threshold = 42
 "#;
@@ -368,15 +454,15 @@ threshold = 42
 
     #[test]
     fn full_config_round_trip() {
-        // Simulate the actual config.toml structure
+        // Simulate the actual config.toml structure (new layout).
         let toml_str = r#"
 global-allow = ["**/tests/fixtures/**", "**/fixtures/**", ".claude/**"]
 
-["rust/dbg-macro"]
+[rule."rust/dbg-macro"]
 severity = "error"
 allow = ["**/tests/fixtures/**"]
 
-["no-grammar-loader-new"]
+[rule."no-grammar-loader-new"]
 allow = ["**/tests/**", "crates/*/tests/**", "**/normalize-scope/**"]
 "#;
         let config: RulesConfig = toml::from_str(toml_str).unwrap();
@@ -387,6 +473,58 @@ allow = ["**/tests/**", "crates/*/tests/**", "**/normalize-scope/**"]
         let ngl = config.rules.get("no-grammar-loader-new").unwrap();
         assert_eq!(ngl.allow.len(), 3);
         assert_eq!(ngl.allow[2], "**/normalize-scope/**");
+    }
+
+    #[test]
+    fn legacy_layout_still_parses() {
+        // Old layout: per-rule entries directly under [rules]. Should still load
+        // (with a stderr deprecation warning) for one release.
+        let toml_str = r#"
+global-allow = ["**/fixtures/**"]
+
+["rust/dbg-macro"]
+severity = "error"
+"#;
+        let config: RulesConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.global_allow, vec!["**/fixtures/**"]);
+        let dbg = config.rules.get("rust/dbg-macro").unwrap();
+        assert_eq!(dbg.severity.as_deref(), Some("error"));
+    }
+
+    #[test]
+    fn nested_layout_does_not_collide_with_engine_keys() {
+        // A rule literally named "global-allow" must coexist with the
+        // engine-wide global-allow value — only possible because per-rule
+        // configs live under the `rule` sub-table.
+        let toml_str = r#"
+global-allow = ["**/fixtures/**"]
+
+[rule."global-allow"]
+severity = "error"
+allow = ["legacy/**"]
+"#;
+        let config: RulesConfig = toml::from_str(toml_str).unwrap();
+        // Engine-wide value preserved
+        assert_eq!(config.global_allow, vec!["**/fixtures/**"]);
+        // Per-rule override for the (admittedly weird) rule named "global-allow"
+        let r = config.rules.get("global-allow").unwrap();
+        assert_eq!(r.severity.as_deref(), Some("error"));
+        assert_eq!(r.allow, vec!["legacy/**"]);
+    }
+
+    #[test]
+    fn nested_layout_wins_over_legacy_on_id_collision() {
+        // If both layouts define the same rule id, the new layout wins.
+        let toml_str = r#"
+[rule."rust/dbg-macro"]
+severity = "warning"
+
+["rust/dbg-macro"]
+severity = "error"
+"#;
+        let config: RulesConfig = toml::from_str(toml_str).unwrap();
+        let dbg = config.rules.get("rust/dbg-macro").unwrap();
+        assert_eq!(dbg.severity.as_deref(), Some("warning"));
     }
 
     #[test]

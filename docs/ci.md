@@ -141,13 +141,13 @@ To pin the version:
 Override rule severity in `.normalize/config.toml`:
 
 ```toml
-[rules."rust/unwrap-in-impl"]
+[rules.rule."rust/unwrap-in-impl"]
 severity = "warning"   # downgrade from error
 
-[rules."stale-summary"]
+[rules.rule."stale-summary"]
 severity = "error"     # upgrade to error (default is warning)
 
-[rules."python/bare-except"]
+[rules.rule."python/bare-except"]
 enabled = false        # disable entirely
 ```
 

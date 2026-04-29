@@ -345,7 +345,7 @@ Inline comments make sense here because:
 For **file pattern exclusions** on syntax rules:
 
 ```toml
-[rules."rust/unwrap-in-impl"]
+[rules.rule."rust/unwrap-in-impl"]
 allow = ["**/tests/**", "src/bin/**"]
 ```
 

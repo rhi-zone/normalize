@@ -44,7 +44,7 @@ normalize rules list --sources
 
 **rules.lock format:**
 ```toml
-[rules."no-dbg"]
+[rules.rule."no-dbg"]
 source = "https://raw.githubusercontent.com/user/rules/main/no-dbg.scm"
 sha256 = "abc123..."
 added = "2025-01-08"
