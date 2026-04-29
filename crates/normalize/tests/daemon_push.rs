@@ -196,6 +196,64 @@ fn binary_subscribe_delivers_file_changed_event() {
     let _ = handle.join();
 }
 
+/// Editing `.normalize/config.toml` must trigger a config-reload path: the
+/// daemon clears cached diagnostic blobs and re-primes against the freshly
+/// loaded config, broadcasting an `IndexRefreshed { files: 0 }` event when the
+/// reload starts. Without this the daemon would serve stale `RunRules` results
+/// (under the previous `[walk] exclude` / `[rules.rule.*] allow` config) until
+/// either a source file changed or the daemon was restarted.
+#[test]
+fn config_edit_triggers_reload_event() {
+    let daemon = DaemonGuard::start();
+    let project = tempfile::tempdir().unwrap();
+    // A source file so the prime has something to walk; not strictly
+    // required for the reload signal but keeps the prime path realistic.
+    std::fs::write(project.path().join("a.py"), "def hello():\n    return 1\n").unwrap();
+    std::fs::create_dir_all(project.path().join(".normalize")).unwrap();
+    std::fs::write(project.path().join(".normalize/config.toml"), "# initial\n").unwrap();
+
+    let (tx, rx) = mpsc::channel::<Event>();
+    let project_path = project.path().to_path_buf();
+    let socket_path = daemon.socket_path().to_path_buf();
+    DaemonClient::with_socket_path(socket_path.clone())
+        .add_root(&project_path)
+        .expect("add_root");
+    let handle = std::thread::spawn(move || {
+        let client = DaemonClient::with_socket_path(socket_path);
+        let _ = client.watch_events(Some(&project_path), |ev| {
+            // Stop after we see the config-reload signal — IndexRefreshed
+            // with files: 0 is what reload_config_and_reprime emits before
+            // it kicks off the (potentially slow) prime.
+            let stop = matches!(&ev, Event::IndexRefreshed { files: 0, .. });
+            let _ = tx.send(ev);
+            !stop
+        });
+    });
+
+    // Allow the subscriber + initial add_root refresh to settle. The startup
+    // refresh emits its own IndexRefreshed (with files > 0), which we must
+    // discard before triggering the config edit so we don't false-positive
+    // on it.
+    std::thread::sleep(Duration::from_millis(1500));
+    while rx.try_recv().is_ok() {}
+
+    // Edit the config to trigger a reload.
+    std::fs::write(
+        project.path().join(".normalize/config.toml"),
+        "# trigger reload\n",
+    )
+    .unwrap();
+
+    let event = wait_for_event(&rx, Duration::from_secs(15), |ev| {
+        matches!(ev, Event::IndexRefreshed { files: 0, .. })
+    });
+    assert!(
+        event.is_some(),
+        "no config-reload IndexRefreshed event after `.normalize/config.toml` edit"
+    );
+    let _ = handle.join();
+}
+
 /// A daemon spawned with an isolated socket directory must respond to status
 /// requests via the same isolated path — this catches broken socket-path
 /// override wiring.

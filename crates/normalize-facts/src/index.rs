@@ -3132,6 +3132,22 @@ impl FileIndex {
         Ok(out)
     }
 
+    /// Drop every cached diagnostic row (both per-engine blobs and the
+    /// per-file table). Used by the daemon when `.normalize/config.toml` or a
+    /// rule-definition file changes — the cached blobs reflect the *previous*
+    /// config, so they must be cleared before a full reprime to prevent stale
+    /// `RunRules` results being served between the config change and the
+    /// reprime completing.
+    pub async fn clear_all_diagnostics(&self) -> Result<(), libsql::Error> {
+        self.conn
+            .execute("DELETE FROM daemon_diagnostics", ())
+            .await?;
+        self.conn
+            .execute("DELETE FROM daemon_diagnostics_per_file", ())
+            .await?;
+        Ok(())
+    }
+
     /// Return all paths that currently have a per-file diagnostics row.
     /// Used by the daemon refresh diff to detect files that became clean.
     pub async fn list_diagnostic_paths(&self) -> Result<Vec<String>, libsql::Error> {

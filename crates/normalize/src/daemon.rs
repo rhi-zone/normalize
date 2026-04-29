@@ -277,6 +277,10 @@ mod unix_impl {
         refresh_tx: Sender<PathBuf>,
         /// Sender for native-rules-only refresh requests (triggered by .git/index changes).
         native_refresh_tx: Sender<PathBuf>,
+        /// Sender for config-reload requests (triggered by `.normalize/config.toml`
+        /// or `.normalize/rules/**` changes). Handled by clearing all cached
+        /// diagnostic blobs and triggering a full reprime.
+        config_reload_tx: Sender<PathBuf>,
         start_time: Instant,
         /// Broadcast channel for file-change and index-refresh events.
         /// Subscribers call `event_tx.subscribe()` to get a `broadcast::Receiver`.
@@ -301,6 +305,7 @@ mod unix_impl {
         fn new(
             refresh_tx: Sender<PathBuf>,
             native_refresh_tx: Sender<PathBuf>,
+            config_reload_tx: Sender<PathBuf>,
             runtime_handle: tokio::runtime::Handle,
             watcher: RecommendedWatcher,
         ) -> Self {
@@ -312,6 +317,7 @@ mod unix_impl {
                 roots: Mutex::new(HashMap::new()),
                 refresh_tx,
                 native_refresh_tx,
+                config_reload_tx,
                 start_time: Instant::now(),
                 event_tx,
                 runtime_handle,
@@ -1500,6 +1506,60 @@ mod unix_impl {
             // Rebuild per-file table + JSON mirror from per-engine blobs.
             self.rebuild_per_file_diagnostics(root);
         }
+
+        /// Handle a `.normalize/config.toml` (or `.normalize/rules/**`) change.
+        ///
+        /// `NormalizeConfig::load` has no in-memory cache — every prime/refresh
+        /// re-reads from disk — so there's no config state to invalidate here.
+        /// What *is* stale is the SQLite-cached diagnostic blobs: they were
+        /// produced under the previous config and may include findings that
+        /// the new config silences (or omit findings the new config now
+        /// emits). We clear them, then trigger a full reprime so subscribers
+        /// receive the new state via the existing `DiagnosticsUpdated` push.
+        fn reload_config_and_reprime(&self, root: &Path) {
+            // Mark the root as un-primed so a concurrent `RunRules` falls
+            // through to the synchronous prime path instead of returning a
+            // stale blob.
+            {
+                let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+                match roots.get_mut(root) {
+                    Some(w) => w.primed = false,
+                    None => return, // root not watched — nothing to do
+                }
+            }
+
+            // Drop every cached diagnostic row so a stale read between now and
+            // the reprime completion can't surface findings under the old
+            // config.
+            if let Some(idx_arc) = self.get_root_index(root) {
+                let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
+                if let Err(e) = tokio::task::block_in_place(|| {
+                    self.runtime_handle.block_on(idx.clear_all_diagnostics())
+                }) {
+                    tracing::warn!(
+                        root = ?root,
+                        "failed to clear diagnostics during config reload: {}",
+                        e
+                    );
+                }
+                drop(idx);
+            }
+
+            tracing::info!(root = ?root, "config reload: re-priming diagnostics");
+
+            // IndexRefreshed broadcast announces the reload to subscribers
+            // before the (potentially slow) prime — clients can react
+            // immediately and `DiagnosticsUpdated` will follow when the prime
+            // commits.
+            let _ = self.event_tx.send(Event::IndexRefreshed {
+                root: root.to_string_lossy().into_owned(),
+                files: 0,
+            });
+
+            // Synchronous full reprime — already broadcasts
+            // `DiagnosticsUpdated` on completion.
+            self.prime_diagnostics_cache(root);
+        }
     }
 
     /// Run the global daemon server.
@@ -1527,6 +1587,9 @@ mod unix_impl {
         let (refresh_tx, refresh_rx) = channel::<PathBuf>();
         // Channel for native-rules-only refresh requests triggered by .git/index changes
         let (native_refresh_tx, native_refresh_rx) = channel::<PathBuf>();
+        // Channel for config-reload requests triggered by `.normalize/config.toml`
+        // or `.normalize/rules/**` changes.
+        let (config_reload_tx, config_reload_rx) = channel::<PathBuf>();
 
         // Create shared file watcher that handles events for all roots
         let (notify_tx, notify_rx) = channel::<notify::Result<notify::Event>>();
@@ -1536,6 +1599,7 @@ mod unix_impl {
         let server = Arc::new(DaemonServer::new(
             refresh_tx,
             native_refresh_tx,
+            config_reload_tx,
             tokio::runtime::Handle::current(),
             shared_watcher,
         ));
@@ -1552,8 +1616,10 @@ mod unix_impl {
         std::thread::spawn(move || {
             let debounce = Duration::from_millis(500);
             let git_debounce = Duration::from_millis(200);
+            let config_debounce = Duration::from_millis(500);
             let mut last_refresh: HashMap<PathBuf, Instant> = HashMap::new();
             let mut last_native: HashMap<PathBuf, Instant> = HashMap::new();
+            let mut last_config_reload: HashMap<PathBuf, Instant> = HashMap::new();
 
             for result in notify_rx {
                 let event = match result {
@@ -1564,19 +1630,11 @@ mod unix_impl {
                     }
                 };
 
-                // Skip .normalize directory changes
-                if event
-                    .paths
-                    .iter()
-                    .all(|p| p.to_string_lossy().contains(".normalize"))
-                {
-                    continue;
-                }
-
                 // Collect dispatch targets under a brief lock, then release before sending
                 let mut to_event: Vec<(PathBuf, PathBuf)> = Vec::new(); // (path, root)
                 let mut to_refresh: Vec<PathBuf> = Vec::new();
                 let mut to_native: Vec<PathBuf> = Vec::new();
+                let mut to_config_reload: Vec<PathBuf> = Vec::new();
 
                 {
                     let roots = server_dispatch
@@ -1586,27 +1644,57 @@ mod unix_impl {
                     for path in &event.paths {
                         // Find the root this path belongs to
                         let root = roots.keys().find(|r| path.starts_with(r.as_path()));
-                        if let Some(root) = root {
-                            to_event.push((path.clone(), root.clone()));
+                        let Some(root) = root else { continue };
 
-                            // Check if this is a .git/index change (triggers native-rules refresh)
-                            let git_index = root.join(".git").join("index");
-                            if path == &git_index {
-                                let last = last_native
-                                    .entry(root.clone())
-                                    .or_insert(Instant::now() - git_debounce * 2);
-                                if last.elapsed() >= git_debounce {
-                                    to_native.push(root.clone());
-                                    *last = Instant::now();
-                                }
-                            } else {
-                                let last = last_refresh
-                                    .entry(root.clone())
-                                    .or_insert(Instant::now() - debounce * 2);
-                                if last.elapsed() >= debounce {
-                                    to_refresh.push(root.clone());
-                                    *last = Instant::now();
-                                }
+                        // Classify the path. Config and rule-definition paths
+                        // route to a config-reload (clear blobs + full reprime).
+                        // Other `.normalize/` internal paths (SQLite WAL,
+                        // diagnostics.json mirror, daemon socket dir) are
+                        // produced *by* the daemon and must be skipped to avoid
+                        // a feedback loop. Everything else is a source-file
+                        // change that drives the normal refresh path.
+                        let normalize_dir = root.join(".normalize");
+                        let config_path = normalize_dir.join("config.toml");
+                        let rules_dir = normalize_dir.join("rules");
+                        let is_config_change = path == &config_path || path.starts_with(&rules_dir);
+                        let is_internal_normalize_state =
+                            !is_config_change && path.starts_with(&normalize_dir);
+                        if is_internal_normalize_state {
+                            continue;
+                        }
+
+                        if is_config_change {
+                            let last = last_config_reload
+                                .entry(root.clone())
+                                .or_insert(Instant::now() - config_debounce * 2);
+                            if last.elapsed() >= config_debounce {
+                                to_config_reload.push(root.clone());
+                                *last = Instant::now();
+                            }
+                            // Don't broadcast FileChanged for config edits — they're
+                            // not source-file changes from a subscriber's perspective.
+                            continue;
+                        }
+
+                        to_event.push((path.clone(), root.clone()));
+
+                        // Check if this is a .git/index change (triggers native-rules refresh)
+                        let git_index = root.join(".git").join("index");
+                        if path == &git_index {
+                            let last = last_native
+                                .entry(root.clone())
+                                .or_insert(Instant::now() - git_debounce * 2);
+                            if last.elapsed() >= git_debounce {
+                                to_native.push(root.clone());
+                                *last = Instant::now();
+                            }
+                        } else {
+                            let last = last_refresh
+                                .entry(root.clone())
+                                .or_insert(Instant::now() - debounce * 2);
+                            if last.elapsed() >= debounce {
+                                to_refresh.push(root.clone());
+                                *last = Instant::now();
                             }
                         }
                     }
@@ -1625,6 +1713,9 @@ mod unix_impl {
                 for root in to_native {
                     let _ = server_dispatch.native_refresh_tx.send(root);
                 }
+                for root in to_config_reload {
+                    let _ = server_dispatch.config_reload_tx.send(root);
+                }
             }
         });
 
@@ -1641,6 +1732,16 @@ mod unix_impl {
         std::thread::spawn(move || {
             for root in native_refresh_rx {
                 server_native.refresh_native_rules(&root);
+            }
+        });
+
+        // Spawn config-reload handler (for `.normalize/config.toml` and
+        // `.normalize/rules/**` changes). Drops cached diagnostic blobs and
+        // triggers a full reprime against the freshly-loaded config.
+        let server_config = server.clone();
+        std::thread::spawn(move || {
+            for root in config_reload_rx {
+                server_config.reload_config_and_reprime(&root);
             }
         });
 
@@ -2169,12 +2270,14 @@ mod unix_impl {
         async fn make_test_server(root: &Path) -> Arc<DaemonServer> {
             let (refresh_tx, _refresh_rx) = std::sync::mpsc::channel::<PathBuf>();
             let (native_tx, _native_rx) = std::sync::mpsc::channel::<PathBuf>();
+            let (config_reload_tx, _config_reload_rx) = std::sync::mpsc::channel::<PathBuf>();
             let (notify_tx, _notify_rx) =
                 std::sync::mpsc::channel::<notify::Result<notify::Event>>();
             let watcher = RecommendedWatcher::new(notify_tx, Config::default()).unwrap();
             let server = Arc::new(DaemonServer::new(
                 refresh_tx,
                 native_tx,
+                config_reload_tx,
                 tokio::runtime::Handle::current(),
                 watcher,
             ));
