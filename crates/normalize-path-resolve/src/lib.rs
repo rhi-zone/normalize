@@ -477,6 +477,7 @@ pub fn resolve(query: &str, root: &Path, path_source: Option<&dyn PathSource>) -
             .git_ignore(true)
             .git_global(true)
             .git_exclude(true)
+            .add_custom_ignore_filename(".normalizeignore")
             .filter_entry(|e| e.file_name() != ".git")
             .build();
         return walker
@@ -538,6 +539,7 @@ fn get_paths_for_query(
         .git_ignore(true)
         .git_global(true)
         .git_exclude(true)
+        .add_custom_ignore_filename(".normalizeignore")
         .build();
 
     for entry in walker.flatten() {

@@ -82,6 +82,9 @@ Corollary: never add a special-cased filter that only works alone or only works 
 ### 9. Global flags at root level
 Output format flags (`--json`, `--jq`, `--pretty`, `--compact`) are defined once at root, not duplicated per command.
 
+### 10. Project-scoped ignore file
+Normalize respects `.normalizeignore` at the project root using standard gitignore syntax (wired via `WalkBuilder::add_custom_ignore_filename`). It coexists with `.gitignore`, the `[walk] ignore_files` list, and the `[walk] exclude` filename list. Use it for paths that should be excluded from normalize but kept under version control (e.g. third-party tool directories like `.claude/`).
+
 ## Entry Points
 
 Total: ~110 entry points (21 top-level + subcommands)

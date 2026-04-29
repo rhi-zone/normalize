@@ -1047,6 +1047,7 @@ fn analyze_health_unindexed(
     let files: Vec<std::path::PathBuf> = WalkBuilder::new(root)
         .hidden(true)
         .git_ignore(true)
+        .add_custom_ignore_filename(".normalizeignore")
         .build()
         .flatten()
         .filter(|e| e.path().is_file())

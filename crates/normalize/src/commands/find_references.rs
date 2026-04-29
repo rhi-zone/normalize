@@ -184,6 +184,7 @@ fn collect_files(root: &Path) -> Vec<PathBuf> {
     let walker = ignore::WalkBuilder::new(root)
         .hidden(false)
         .git_ignore(true)
+        .add_custom_ignore_filename(".normalizeignore")
         .build();
 
     for entry in walker.flatten() {

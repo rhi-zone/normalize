@@ -845,6 +845,7 @@ pub(crate) fn find_similar_function_pairs(
             .git_ignore(true)
             .git_global(true)
             .git_exclude(true)
+            .add_custom_ignore_filename(".normalizeignore")
             .build()
             .filter_map(|e| e.ok())
             .filter(|e| {
@@ -1096,6 +1097,7 @@ pub fn build_duplicate_functions_report(cfg: DuplicateFunctionsConfig<'_>) -> Du
             .git_ignore(true)
             .git_global(true)
             .git_exclude(true)
+            .add_custom_ignore_filename(".normalizeignore")
             .build()
             .filter_map(|e| e.ok())
             .filter(|e| {
@@ -1302,6 +1304,7 @@ pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> Duplicat
         .git_ignore(true)
         .git_global(true)
         .git_exclude(true)
+        .add_custom_ignore_filename(".normalizeignore")
         .build()
         .filter_map(|e| e.ok())
         .filter(|e| {
@@ -1617,6 +1620,7 @@ pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> DuplicatesRe
         .git_ignore(true)
         .git_global(true)
         .git_exclude(true)
+        .add_custom_ignore_filename(".normalizeignore")
         .build()
         .filter_map(|e| e.ok())
         .filter(|e| {
@@ -1905,6 +1909,7 @@ pub fn build_duplicate_types_report(
             .git_ignore(true)
             .git_global(true)
             .git_exclude(true)
+            .add_custom_ignore_filename(".normalizeignore")
             .build()
             .filter_map(|e| e.ok())
             .filter(|e| {

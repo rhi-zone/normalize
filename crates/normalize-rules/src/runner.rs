@@ -2419,7 +2419,8 @@ fn build_gitignore_allowed_set(
         .hidden(false)
         .git_ignore(has_gitignore)
         .git_global(has_gitignore)
-        .git_exclude(has_gitignore);
+        .git_exclude(has_gitignore)
+        .add_custom_ignore_filename(".normalizeignore");
     for file in &ignore_files {
         if *file != ".gitignore" {
             let ignore_path = root.join(file);

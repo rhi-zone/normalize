@@ -1,8 +1,10 @@
 /// Shared file-walking utilities for native rule checks.
 ///
 /// All walkers respect `.gitignore` (and nested `.gitignore` files in subdirectories)
-/// via the `ignore` crate. Directory exclusions and ignore-file selection are
-/// configurable via [`WalkConfig`] (from `[walk]` in `.normalize/config.toml`).
+/// via the `ignore` crate. They also respect `.normalizeignore` — a project-scoped
+/// gitignore-syntax file wired via `WalkBuilder::add_custom_ignore_filename`. Directory
+/// exclusions and ignore-file selection are configurable via [`WalkConfig`] (from
+/// `[walk]` in `.normalize/config.toml`).
 use normalize_rules_config::{PathFilter, WalkConfig};
 use std::path::Path;
 
@@ -23,6 +25,8 @@ fn configure_walk_builder(
     builder.git_ignore(has_gitignore);
     builder.git_global(has_gitignore);
     builder.git_exclude(has_gitignore);
+    // Project-scoped gitignore-syntax file (sibling of `.gitignore`).
+    builder.add_custom_ignore_filename(".normalizeignore");
 
     // Add any non-.gitignore ignore files
     for file in &ignore_files {
@@ -83,4 +87,41 @@ pub fn filtered_gitignore_walk<'a>(
         let rel = entry.path().strip_prefix(root).unwrap_or(entry.path());
         filter.matches_path(rel)
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+    use std::fs;
+
+    /// `.normalizeignore` at the project root excludes paths from the walker
+    /// using gitignore syntax — same mechanism `.gitignore` uses.
+    #[test]
+    fn normalizeignore_excludes_matching_paths() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let root = tmp.path();
+
+        // Project structure: top-level file + an excluded_dir/ subtree.
+        fs::write(root.join("kept.rs"), "fn a() {}").unwrap();
+        fs::create_dir_all(root.join("excluded_dir")).unwrap();
+        fs::write(root.join("excluded_dir/dropped.rs"), "fn b() {}").unwrap();
+        fs::write(root.join(".normalizeignore"), "excluded_dir/\n").unwrap();
+
+        let walk_config = WalkConfig::default();
+        let visited: HashSet<String> = gitignore_walk(root, &walk_config)
+            .filter_map(|e| {
+                e.path()
+                    .strip_prefix(root)
+                    .ok()
+                    .map(|p| p.to_string_lossy().into_owned())
+            })
+            .collect();
+
+        assert!(visited.iter().any(|p| p == "kept.rs"), "kept.rs visited");
+        assert!(
+            !visited.iter().any(|p| p.starts_with("excluded_dir")),
+            ".normalizeignore should exclude excluded_dir/, got: {visited:?}"
+        );
+    }
 }
