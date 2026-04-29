@@ -293,6 +293,38 @@ mod unix_impl {
         daemon_config_dir().join("daemon.sock")
     }
 
+    /// Register every directory under `root` (respecting `[walk] exclude` and
+    /// `.gitignore`) with `watcher` in [`RecursiveMode::NonRecursive`] mode.
+    ///
+    /// Returns the number of directories successfully watched.
+    ///
+    /// Errors on individual directories are logged at warn level and otherwise
+    /// ignored — losing one watch is far better than aborting the whole prime
+    /// because (e.g.) one subdir hit `EACCES`.
+    pub(super) fn watch_tree_non_recursive(
+        watcher: &mut RecommendedWatcher,
+        root: &Path,
+        walk_config: &normalize_rules_config::WalkConfig,
+    ) -> usize {
+        let mut count = 0usize;
+        for entry in normalize_native_rules::walk::gitignore_walk(root, walk_config) {
+            if !entry.file_type().is_some_and(|ft| ft.is_dir()) {
+                continue;
+            }
+            match watcher.watch(entry.path(), RecursiveMode::NonRecursive) {
+                Ok(()) => count += 1,
+                Err(e) => {
+                    tracing::warn!(
+                        path = %entry.path().display(),
+                        error = %e,
+                        "failed to add directory to file watcher",
+                    );
+                }
+            }
+        }
+        count
+    }
+
     /// A watched root. The shared watcher is owned by `DaemonServer`; this struct
     /// tracks per-root metadata only.
     struct WatchedRoot {
@@ -439,14 +471,29 @@ mod unix_impl {
                 Err(e) => return Response::err(&format!("Failed to open index: {}", e)),
             };
 
-            // Register the root with the shared watcher
+            // Register the root with the shared watcher.
+            //
+            // We walk the tree once respecting `[walk] exclude` and `.gitignore`
+            // (via [`gitignore_walk`]) and register each directory
+            // NonRecursively. Watching the root recursively would descend into
+            // `target/`, `node_modules/`, `.git/`, agent worktrees, etc. — on a
+            // typical Rust workspace that produces 50k+ inotify watches and
+            // sustained CPU when those trees see activity (cargo build,
+            // worktree updates).
+            //
+            // Newly-created directories at runtime are caught by the dispatch
+            // loop's Create-event hook (see `notify_rx` consumer below), which
+            // re-runs the same walk on the new subtree.
             let git_index_path = root.join(".git").join("index");
             let has_git_index = git_index_path.exists();
             {
                 let mut watcher = self.watcher.lock().unwrap_or_else(|e| e.into_inner());
-                if let Err(e) = watcher.watch(&root, RecursiveMode::Recursive) {
-                    return Response::err(&format!("Failed to watch: {}", e));
-                }
+                let watched_count = watch_tree_non_recursive(&mut watcher, &root, &config.walk);
+                tracing::debug!(
+                    root = %root.display(),
+                    dirs = watched_count,
+                    "registered directories with file watcher",
+                );
                 // Also watch .git/index if it exists so `git add` triggers a native-rules refresh.
                 if has_git_index
                     && let Err(e) = watcher.watch(&git_index_path, RecursiveMode::NonRecursive)
@@ -499,6 +546,17 @@ mod unix_impl {
             let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(watched) = roots.remove(root) {
                 let mut watcher = self.watcher.lock().unwrap_or_else(|e| e.into_inner());
+                // We watched each subdirectory NonRecursively in `add_root`;
+                // walk the tree the same way to unwatch each one. Tolerate
+                // errors — entries that have since been deleted on disk are
+                // already gone from the kernel's watch list.
+                for entry in
+                    normalize_native_rules::walk::gitignore_walk(root, &watched.cached_walk)
+                {
+                    if entry.file_type().is_some_and(|ft| ft.is_dir()) {
+                        let _ = watcher.unwatch(entry.path());
+                    }
+                }
                 let _ = watcher.unwatch(root);
                 if watched.has_git_index {
                     let git_index = root.join(".git").join("index");
@@ -2009,6 +2067,16 @@ mod unix_impl {
                 let mut to_refresh: Vec<PathBuf> = Vec::new();
                 let mut to_native: Vec<PathBuf> = Vec::new();
                 let mut to_config_reload: Vec<PathBuf> = Vec::new();
+                // Directories created at runtime that need to be added to the
+                // watcher so their contents are observable. Walked through
+                // `gitignore_walk` (so e.g. a freshly-created `target/` is
+                // skipped) after the roots lock is released.
+                let mut to_watch_new_dir: Vec<(PathBuf, PathBuf)> = Vec::new(); // (new_dir, root)
+                let is_create_event = matches!(
+                    event.kind,
+                    notify::EventKind::Create(notify::event::CreateKind::Folder)
+                        | notify::EventKind::Create(notify::event::CreateKind::Any)
+                );
 
                 {
                     let roots = server_dispatch
@@ -2052,6 +2120,15 @@ mod unix_impl {
 
                         to_event.push((path.clone(), root.clone()));
 
+                        // If the event is a directory-create, schedule the new
+                        // subtree for registration with the watcher (after we
+                        // drop the roots lock). Without this, files created
+                        // inside the new directory would be invisible — we
+                        // only watch directories, NonRecursively.
+                        if is_create_event && path.is_dir() {
+                            to_watch_new_dir.push((path.clone(), root.clone()));
+                        }
+
                         // Check if this is a .git/index change (triggers native-rules refresh)
                         let git_index = root.join(".git").join("index");
                         if path == &git_index {
@@ -2073,6 +2150,45 @@ mod unix_impl {
                         }
                     }
                 } // lock released before sending
+
+                // Register newly-created directories with the watcher. We
+                // re-fetch the cached walk config under the roots lock (briefly)
+                // so that `[walk] exclude` is honored — a freshly-created
+                // `target/` should not be watched. The walker also descends
+                // into the new directory itself, picking up any nested dirs
+                // that were created in the same batch.
+                for (new_dir, root) in to_watch_new_dir {
+                    let walk_config = {
+                        let roots = server_dispatch
+                            .roots
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner());
+                        roots.get(&root).map(|w| w.cached_walk.clone())
+                    };
+                    let Some(walk_config) = walk_config else {
+                        continue;
+                    };
+                    // Skip if the new dir itself is excluded — `gitignore_walk`
+                    // handles this when walking into it, but checking up front
+                    // avoids spawning the walker for an excluded `target/`.
+                    let rel = new_dir.strip_prefix(&root).unwrap_or(&new_dir);
+                    if !rel.as_os_str().is_empty() && walk_config.is_excluded_path(&root, rel, true)
+                    {
+                        continue;
+                    }
+                    let mut watcher = server_dispatch
+                        .watcher
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner());
+                    let added = watch_tree_non_recursive(&mut watcher, &new_dir, &walk_config);
+                    if added > 0 {
+                        tracing::debug!(
+                            path = %new_dir.display(),
+                            dirs = added,
+                            "added newly-created directory to file watcher",
+                        );
+                    }
+                }
 
                 // Broadcast un-debounced file-change events
                 for (path, root) in to_event {
