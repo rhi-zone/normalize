@@ -3,9 +3,10 @@
 
 [walk]
 # Project-wide path exclusions (gitignore-style; affects walker AND index).
-# .claude/ is Claude Code's data directory (settings, command/agent definitions,
-# worktrees, memory) — none of it benefits from normalize linting.
-exclude = [".git", "worktrees", ".claude/"]
+# .claude/worktrees/ holds ephemeral agent worktrees — full repo copies that
+# shouldn't be linted as part of this project. The rest of .claude/ (settings,
+# command/agent definitions, hooks) is project config and IS lintable.
+exclude = [".git/", ".claude/worktrees/"]
 
 [daemon]
 # enabled = true
