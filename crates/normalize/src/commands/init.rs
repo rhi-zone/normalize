@@ -1,6 +1,7 @@
 //! Initialize normalize in a project directory.
 
 use std::fs;
+use std::io::{self, BufRead, IsTerminal, Write};
 use std::path::Path;
 
 /// Common task-tracker file names to detect
@@ -12,6 +13,23 @@ const TODO_CANDIDATES: &[&str] = &[
     "TODO",
     "TASKS",
 ];
+
+/// Scratch directories that are commonly tracked (not in `.gitignore`) but
+/// shouldn't be linted as part of this project. `init` detects which of these
+/// exist in the project and offers to add them to `[walk] exclude`.
+///
+/// Build/temp directories from language conventions (`target/`, `node_modules/`,
+/// `.venv/`, `__pycache__/`, etc.) are deliberately *not* listed here — they
+/// are conventionally gitignored, which the walker respects automatically.
+/// Only commonly-tracked-but-not-lintable dirs need explicit exclusion.
+///
+/// Per `CLAUDE.md`, this list of third-party-tool paths lives in `init.rs`
+/// (the integration layer), never in `normalize-rules-config` or other
+/// rule-engine crates.
+const SCRATCH_DIRS: &[(&str, &str)] = &[(
+    ".claude/worktrees/",
+    "Claude Code agent worktrees (ephemeral scratch — full repo copies)",
+)];
 
 pub async fn run_init(root: &Path, do_index: bool, setup: bool) -> i32 {
     let mut changes = Vec::new();
@@ -32,6 +50,23 @@ pub async fn run_init(root: &Path, do_index: bool, setup: bool) -> i32 {
     // 3. Create or update config.toml
     let config_path = moss_dir.join("config.toml");
     if !config_path.exists() {
+        // Start from the bootstrap (opinionated) config, then layer on
+        // project-specific detections.
+        let mut excludes: Vec<String> = vec![".git/".to_string()];
+
+        let detected = detect_scratch_dirs(root);
+        let interactive = io::stdin().is_terminal() && io::stdout().is_terminal();
+        let accepted: Vec<&(&str, &str)> = if interactive && !detected.is_empty() {
+            prompt_scratch_dirs(&detected)
+        } else {
+            // Non-interactive: include all detected entries by default.
+            detected.iter().collect()
+        };
+        for (dir, _) in &accepted {
+            excludes.push((*dir).to_string());
+            changes.push(format!("Detected scratch dir: {} → [walk] exclude", dir));
+        }
+
         let aliases_section = if todo_files.is_empty() {
             String::new()
         } else {
@@ -42,6 +77,22 @@ pub async fn run_init(root: &Path, do_index: bool, setup: bool) -> i32 {
                 .join(", ");
             format!("\n[aliases]\ntodo = [{}]\n", files_str)
         };
+
+        let exclude_lines = excludes
+            .iter()
+            .map(|s| format!("    \"{}\",", s))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let walk_section = format!(
+            r#"
+[walk]
+# Project-wide path exclusions (gitignore-style; affects walker AND index).
+exclude = [
+{}
+]
+"#,
+            exclude_lines
+        );
 
         let default_config = format!(
             r#"# Normalize configuration
@@ -59,8 +110,8 @@ pub async fn run_init(root: &Path, do_index: bool, setup: bool) -> i32 {
 # complexity = 0.5
 # security = 2.0
 # clones = 0.3
-{}"#,
-            aliases_section
+{}{}"#,
+            walk_section, aliases_section
         );
         if let Err(e) = fs::write(&config_path, default_config) {
             eprintln!("Failed to create config.toml: {}", e);
@@ -121,6 +172,69 @@ pub async fn run_init(root: &Path, do_index: bool, setup: bool) -> i32 {
 /// available as `normalize rules setup`.
 pub fn run_setup_wizard(root: &Path) -> i32 {
     normalize_rules::setup::run_setup_wizard(root)
+}
+
+/// Detect scratch directories in `root` that exist and are not already
+/// gitignored. Returns the matching `SCRATCH_DIRS` entries.
+///
+/// "Already gitignored" is checked against the root `.gitignore` only — if a
+/// scratch dir is covered there, the walker skips it for free, so listing it
+/// in `[walk] exclude` would be redundant noise.
+pub fn detect_scratch_dirs(root: &Path) -> Vec<(&'static str, &'static str)> {
+    SCRATCH_DIRS
+        .iter()
+        .filter(|(dir, _)| {
+            let path = root.join(dir.trim_end_matches('/'));
+            path.exists() && !is_already_gitignored(root, dir)
+        })
+        .copied()
+        .collect()
+}
+
+/// Returns true if `dir` (relative to `root`) is matched by the project's
+/// `.gitignore`. Compiled via the same `ignore` crate the walker uses.
+fn is_already_gitignored(root: &Path, dir: &str) -> bool {
+    let gitignore_path = root.join(".gitignore");
+    if !gitignore_path.exists() {
+        return false;
+    }
+    let mut builder = ignore::gitignore::GitignoreBuilder::new(root);
+    if builder.add(&gitignore_path).is_some() {
+        return false;
+    }
+    let Ok(gi) = builder.build() else {
+        return false;
+    };
+    let rel = std::path::Path::new(dir.trim_end_matches('/'));
+    gi.matched_path_or_any_parents(rel, true).is_ignore()
+}
+
+/// Interactive prompt: for each detected scratch dir, ask the user whether to
+/// add it to `[walk] exclude`. Default is "yes" (Enter accepts).
+fn prompt_scratch_dirs(
+    detected: &[(&'static str, &'static str)],
+) -> Vec<&'static (&'static str, &'static str)> {
+    println!("Detected scratch directories that aren't gitignored:");
+    let stdin = io::stdin();
+    let mut accepted = Vec::new();
+    // Re-borrow against the original SCRATCH_DIRS table so we hand back
+    // 'static references (callers iterate without lifetime juggling).
+    for (dir, desc) in detected {
+        print!("  Exclude {} ({})? [Y/n] ", dir, desc);
+        io::stdout().flush().ok();
+        let mut line = String::new();
+        if stdin.lock().read_line(&mut line).is_err() {
+            break;
+        }
+        let answer = line.trim().to_lowercase();
+        if answer.is_empty() || answer == "y" || answer == "yes" {
+            // Find matching static entry in SCRATCH_DIRS.
+            if let Some(entry) = SCRATCH_DIRS.iter().find(|(d, _)| d == dir) {
+                accepted.push(entry);
+            }
+        }
+    }
+    accepted
 }
 
 /// Detect task-tracking files (TODO.md, TASKS.md, etc.) in the project root.
@@ -361,6 +475,66 @@ mod tests {
         assert!(config.contains("[aliases]"));
         assert!(config.contains("TODO.md"));
         assert!(config.contains("TASKS.md"));
+    }
+
+    #[test]
+    fn test_detect_scratch_dirs_absent() {
+        let tmp = tempdir().unwrap();
+        // Empty project — no .claude/worktrees → nothing detected.
+        let detected = detect_scratch_dirs(tmp.path());
+        assert!(detected.is_empty());
+    }
+
+    #[test]
+    fn test_detect_scratch_dirs_present_and_not_gitignored() {
+        let tmp = tempdir().unwrap();
+        fs::create_dir_all(tmp.path().join(".claude/worktrees")).unwrap();
+        let detected = detect_scratch_dirs(tmp.path());
+        assert_eq!(detected.len(), 1);
+        assert_eq!(detected[0].0, ".claude/worktrees/");
+    }
+
+    #[test]
+    fn test_detect_scratch_dirs_already_gitignored() {
+        let tmp = tempdir().unwrap();
+        fs::create_dir_all(tmp.path().join(".claude/worktrees")).unwrap();
+        fs::write(tmp.path().join(".gitignore"), ".claude/worktrees/\n").unwrap();
+        let detected = detect_scratch_dirs(tmp.path());
+        // Covered by .gitignore → walker skips for free → don't list in exclude.
+        assert!(detected.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_init_non_interactive_adds_detected_scratch_dirs() {
+        let tmp = tempdir().unwrap();
+        fs::create_dir_all(tmp.path().join(".claude/worktrees")).unwrap();
+
+        // Non-interactive (no TTY in test) → all detected scratch dirs added.
+        run_init(tmp.path(), false, false).await;
+
+        let config = fs::read_to_string(tmp.path().join(".normalize/config.toml")).unwrap();
+        assert!(
+            config.contains("[walk]"),
+            "missing [walk] section: {config}"
+        );
+        assert!(
+            config.contains(".claude/worktrees/"),
+            ".claude/worktrees/ should be excluded by default: {config}"
+        );
+        // Bootstrap opinion preserved.
+        assert!(config.contains(".git/"));
+    }
+
+    #[test]
+    fn test_init_writes_walk_exclude_with_git_when_no_scratch_dirs() {
+        let tmp = tempdir().unwrap();
+        // No .claude/worktrees → only bootstrap opinion in exclude.
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(run_init(tmp.path(), false, false));
+        let config = fs::read_to_string(tmp.path().join(".normalize/config.toml")).unwrap();
+        assert!(config.contains("[walk]"));
+        assert!(config.contains(".git/"));
+        assert!(!config.contains(".claude/worktrees"));
     }
 
     #[tokio::test]
