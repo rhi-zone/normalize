@@ -308,7 +308,7 @@ impl normalize_core::Merge for RulesConfig {
 /// ```toml
 /// [walk]
 /// ignore_files = [".gitignore"]   # default
-/// exclude = [".git"]              # default
+/// exclude = []                    # default (empty); `normalize init` seeds [".git/"]
 /// ```
 #[derive(
     Debug,
@@ -324,7 +324,10 @@ pub struct WalkConfig {
     /// List of gitignore-format files to respect. Default: `[".gitignore"]`.
     /// Set to `[]` to disable gitignore-based exclusion entirely.
     pub ignore_files: Option<Vec<String>>,
-    /// Additional gitignore-style patterns to always skip. Default: `[".git"]`.
+    /// Additional gitignore-style patterns to always skip. Default: empty
+    /// (per Rust `Default` convention — opinions live in
+    /// [`crate::NormalizeConfig::bootstrap`] in the main crate, which seeds
+    /// `[".git/"]` for new projects).
     ///
     /// Patterns use the same syntax as `.gitignore`:
     /// - A pattern with no slash (e.g. `node_modules`, `.git`) matches any
@@ -345,11 +348,14 @@ impl WalkConfig {
         }
     }
 
-    /// Returns the directory patterns to exclude, defaulting to `[".git"]`.
+    /// Returns the directory patterns to exclude. Empty when no patterns are
+    /// configured — `Default` is empty per Rust convention. Opinions like
+    /// "always exclude `.git/`" belong in a typed bootstrap constructor on the
+    /// owning config (see `NormalizeConfig::bootstrap`), not here.
     pub fn exclude(&self) -> Vec<&str> {
         match &self.exclude {
             Some(v) => v.iter().map(|s| s.as_str()).collect(),
-            None => vec![".git"],
+            None => Vec::new(),
         }
     }
 
@@ -739,11 +745,13 @@ severity = "error"
 
     #[test]
     fn walk_config_defaults() {
+        // `Default` is empty per Rust convention — opinions like ".git/"
+        // live in NormalizeConfig::bootstrap, not WalkConfig::default.
         let config = WalkConfig::default();
         assert_eq!(config.ignore_files(), vec![".gitignore"]);
-        assert_eq!(config.exclude(), vec![".git"]);
+        assert!(config.exclude().is_empty());
         let root = Path::new("/tmp/root");
-        assert!(config.is_excluded_path(root, Path::new(".git"), true));
+        assert!(!config.is_excluded_path(root, Path::new(".git"), true));
         assert!(!config.is_excluded_path(root, Path::new("src"), true));
     }
 
@@ -816,12 +824,12 @@ exclude = [".git", "node_modules", ".cache"]
     fn walk_config_merge_option_semantics() {
         use normalize_core::Merge;
 
-        // When both are default (None), result is default
+        // When both are default (None), result is default (empty).
         let a = WalkConfig::default();
         let b = WalkConfig::default();
         let merged = a.merge(b);
         assert_eq!(merged.ignore_files(), vec![".gitignore"]);
-        assert_eq!(merged.exclude(), vec![".git"]);
+        assert!(merged.exclude().is_empty());
 
         // When self has custom and other is default (None), self wins
         let a = WalkConfig {
@@ -841,7 +849,7 @@ exclude = [".git", "node_modules", ".cache"]
         };
         let merged = a.merge(b);
         assert_eq!(merged.ignore_files(), vec![".npmignore"]);
-        assert_eq!(merged.exclude(), vec![".git"]); // self's None → default
+        assert!(merged.exclude().is_empty()); // self's None → empty (default)
     }
 
     // -- ConfigDiff -----------------------------------------------------------

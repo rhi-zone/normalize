@@ -159,16 +159,52 @@ pub struct NormalizeConfig {
 }
 
 impl NormalizeConfig {
+    /// Bootstrap defaults — used when the project has no `.normalize/config.toml`.
+    ///
+    /// Distinct from [`Default`] (which is empty per Rust convention) — bootstrap
+    /// has opinions. Today the only opinion is "always exclude `.git/`",
+    /// which is universal: every git repo has a `.git/` directory and
+    /// nothing useful lives in it.
+    ///
+    /// Used by:
+    /// - [`NormalizeConfig::load`] as the fallback when no project config file exists
+    /// - `normalize init` as the starting state for the wizard
+    ///
+    /// Tool-specific scratch directories (e.g. `.claude/worktrees/`) do **not**
+    /// belong here — they go through the `init` detection path.
+    pub fn bootstrap() -> Self {
+        Self {
+            walk: normalize_rules_config::WalkConfig {
+                exclude: Some(vec![".git/".to_string()]),
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
     /// Load configuration for a project.
     ///
     /// Loads global config from ~/.config/normalize/config.toml,
     /// then per-project config from .normalize/config.toml (overrides global).
+    /// When neither file exists, returns [`NormalizeConfig::bootstrap`] (which
+    /// embeds the opinions a fresh project should start with — currently just
+    /// `[walk] exclude = [".git/"]`).
     pub fn load(root: &Path) -> Self {
+        let project_config = root.join(".normalize").join("config.toml");
+        let global_config = Self::global_config_path();
+        let project_exists = project_config.exists();
+        let global_exists = global_config.as_ref().is_some_and(|p| p.exists());
+
+        // No config files at all → use the typed bootstrap (opinionated) directly,
+        // skipping the server-less Defaults source (which uses Self::default()).
+        if !project_exists && !global_exists {
+            return Self::bootstrap();
+        }
+
         let mut sources = vec![server_less::ConfigSource::Defaults];
-        if let Some(global_path) = Self::global_config_path() {
+        if let Some(global_path) = global_config {
             sources.push(server_less::ConfigSource::File(global_path));
         }
-        let project_config = root.join(".normalize").join("config.toml");
         sources.push(server_less::ConfigSource::File(project_config.clone()));
         <Self as server_less::ConfigTrait>::load(&sources).unwrap_or_else(|e| {
             // Warn on parse errors so the user knows their config is being ignored.
@@ -374,10 +410,30 @@ highlight = false
 
     #[test]
     fn test_walk_config_default() {
+        // No .normalize/config.toml → load() returns bootstrap, which seeds
+        // [walk] exclude = [".git/"]. (`WalkConfig::default()` itself is empty.)
         let dir = TempDir::new().unwrap();
         let config = NormalizeConfig::load(dir.path());
         assert_eq!(config.walk.ignore_files(), vec![".gitignore"]);
-        assert_eq!(config.walk.exclude(), vec![".git"]);
+        assert_eq!(config.walk.exclude(), vec![".git/"]);
+    }
+
+    #[test]
+    fn test_bootstrap_carries_opinions() {
+        // Bootstrap has the project-startup opinions; Default does not.
+        let bootstrap = NormalizeConfig::bootstrap();
+        assert_eq!(bootstrap.walk.exclude(), vec![".git/"]);
+
+        let default = NormalizeConfig::default();
+        assert!(default.walk.exclude().is_empty());
+    }
+
+    #[test]
+    fn test_load_missing_config_returns_bootstrap() {
+        let dir = TempDir::new().unwrap();
+        // No .normalize/ subdirectory at all.
+        let config = NormalizeConfig::load(dir.path());
+        assert_eq!(config.walk.exclude(), vec![".git/"]);
     }
 
     #[test]
