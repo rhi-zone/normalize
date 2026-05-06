@@ -12,6 +12,39 @@ pub struct Schema {
     pub definitions: Vec<TypeDef>,
 }
 
+/// A default value for a field.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum DefaultValue {
+    /// A string default.
+    String(String),
+    /// A numeric default (stored as f64 for generality).
+    Number(f64),
+    /// A boolean default.
+    Bool(bool),
+    /// A null default.
+    Null,
+}
+
+/// Constraints for field validation (min/max, length, pattern, format).
+///
+/// All fields are optional — only set the ones relevant to the field type.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FieldConstraints {
+    /// Minimum value (inclusive) for numeric fields.
+    pub min: Option<f64>,
+    /// Maximum value (inclusive) for numeric fields.
+    pub max: Option<f64>,
+    /// Minimum length for string or array fields.
+    pub min_length: Option<u64>,
+    /// Maximum length for string or array fields.
+    pub max_length: Option<u64>,
+    /// Regex pattern for string fields.
+    pub pattern: Option<String>,
+    /// Semantic format hint (e.g. "email", "uri", "date-time").
+    pub format: Option<String>,
+}
+
 /// A named type definition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TypeDef {
@@ -47,10 +80,19 @@ pub struct Field {
     pub name: String,
     /// Field type.
     pub ty: Type,
-    /// Whether the field is required.
+    /// Whether the field is required (absent → field may be omitted).
     pub required: bool,
+    /// Whether the field may hold an explicit `null` value in addition to its type.
+    ///
+    /// Distinct from `required`: a required nullable field must be present but may be `null`.
+    /// An optional non-nullable field may be absent but, when present, must not be `null`.
+    pub nullable: bool,
     /// Documentation comment.
     pub docs: Option<String>,
+    /// Default value for the field (used by validators and documentation generators).
+    pub default: Option<DefaultValue>,
+    /// Validation constraints for the field.
+    pub constraints: Option<FieldConstraints>,
 }
 
 /// An enum definition.
@@ -141,6 +183,56 @@ pub enum Type {
     Any,
 }
 
+/// Errors returned by [`Schema::validate`].
+#[derive(Debug, Clone, PartialEq)]
+pub enum ValidationError {
+    /// A type name is not a valid identifier.
+    InvalidTypeName(String),
+    /// A field name is not a valid identifier.
+    InvalidFieldName {
+        type_name: String,
+        field_name: String,
+    },
+    /// Two definitions share the same name.
+    DuplicateTypeName(String),
+    /// Two fields in the same struct share the same name.
+    DuplicateFieldName {
+        type_name: String,
+        field_name: String,
+    },
+    /// A `Ref` points to a type name that does not exist in this schema.
+    UnresolvedRef { from: String, to: String },
+    /// The schema contains a circular reference (type A → B → … → A).
+    CircularRef(Vec<String>),
+}
+
+impl std::fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidTypeName(n) => write!(f, "invalid type name: {n:?}"),
+            Self::InvalidFieldName {
+                type_name,
+                field_name,
+            } => {
+                write!(f, "invalid field name {field_name:?} in type {type_name:?}")
+            }
+            Self::DuplicateTypeName(n) => write!(f, "duplicate type name: {n:?}"),
+            Self::DuplicateFieldName {
+                type_name,
+                field_name,
+            } => {
+                write!(f, "duplicate field {field_name:?} in type {type_name:?}")
+            }
+            Self::UnresolvedRef { from, to } => {
+                write!(f, "unresolved ref to {to:?} in type {from:?}")
+            }
+            Self::CircularRef(cycle) => write!(f, "circular reference: {}", cycle.join(" → ")),
+        }
+    }
+}
+
+impl std::error::Error for ValidationError {}
+
 impl Schema {
     pub fn new() -> Self {
         Self::default()
@@ -149,6 +241,219 @@ impl Schema {
     pub fn add(&mut self, def: TypeDef) {
         self.definitions.push(def);
     }
+
+    /// Validate the schema for well-formedness.
+    ///
+    /// Checks:
+    /// - All type names and field names are valid identifiers (non-empty, start with a letter or
+    ///   `_`, contain only alphanumerics, `_`, or `.`).
+    /// - No duplicate type names.
+    /// - No duplicate field names within a struct.
+    /// - All `Ref` targets resolve to a defined type.
+    /// - No circular references between types.
+    pub fn validate(&self) -> Vec<ValidationError> {
+        let mut errors = Vec::new();
+
+        // Collect known type names for ref-resolution.
+        let mut known: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let mut seen_names: std::collections::HashSet<&str> = std::collections::HashSet::new();
+
+        for def in &self.definitions {
+            if !is_valid_identifier(&def.name) {
+                errors.push(ValidationError::InvalidTypeName(def.name.clone()));
+            }
+            if !seen_names.insert(def.name.as_str()) {
+                errors.push(ValidationError::DuplicateTypeName(def.name.clone()));
+            }
+            known.insert(def.name.as_str());
+        }
+
+        // Per-type checks (field names, duplicate fields, unresolved refs).
+        for def in &self.definitions {
+            match &def.kind {
+                TypeDefKind::Struct(s) => {
+                    let mut seen_fields: std::collections::HashSet<&str> =
+                        std::collections::HashSet::new();
+                    for field in &s.fields {
+                        if !is_valid_identifier(&field.name) {
+                            errors.push(ValidationError::InvalidFieldName {
+                                type_name: def.name.clone(),
+                                field_name: field.name.clone(),
+                            });
+                        }
+                        if !seen_fields.insert(field.name.as_str()) {
+                            errors.push(ValidationError::DuplicateFieldName {
+                                type_name: def.name.clone(),
+                                field_name: field.name.clone(),
+                            });
+                        }
+                        collect_unresolved_refs(&field.ty, &def.name, &known, &mut errors);
+                    }
+                }
+                TypeDefKind::Enum(e) => {
+                    if let EnumKind::Tagged(tagged) = &e.kind {
+                        for variant in &tagged.variants {
+                            for field in &variant.fields {
+                                collect_unresolved_refs(&field.ty, &def.name, &known, &mut errors);
+                            }
+                        }
+                    }
+                }
+                TypeDefKind::Alias(ty) => {
+                    collect_unresolved_refs(ty, &def.name, &known, &mut errors);
+                }
+            }
+        }
+
+        // Circular reference detection via DFS.
+        let adj = build_ref_graph(self);
+        let names: Vec<&str> = self.definitions.iter().map(|d| d.name.as_str()).collect();
+        let mut state: std::collections::HashMap<&str, DfsState> = std::collections::HashMap::new();
+        for name in &names {
+            if !state.contains_key(name) {
+                let mut path = Vec::new();
+                dfs_cycle(name, &adj, &mut state, &mut path, &mut errors);
+            }
+        }
+
+        errors
+    }
+}
+
+fn is_valid_identifier(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    let mut chars = s.chars();
+    let first = chars.next().unwrap();
+    if !first.is_alphabetic() && first != '_' {
+        return false;
+    }
+    chars.all(|c| c.is_alphanumeric() || c == '_' || c == '.')
+}
+
+fn collect_unresolved_refs(
+    ty: &Type,
+    type_name: &str,
+    known: &std::collections::HashSet<&str>,
+    errors: &mut Vec<ValidationError>,
+) {
+    match ty {
+        Type::Ref(name) => {
+            if !known.contains(name.as_str()) {
+                errors.push(ValidationError::UnresolvedRef {
+                    from: type_name.to_string(),
+                    to: name.clone(),
+                });
+            }
+        }
+        Type::Array(inner) | Type::Optional(inner) => {
+            collect_unresolved_refs(inner, type_name, known, errors);
+        }
+        Type::Map { key, value } => {
+            collect_unresolved_refs(key, type_name, known, errors);
+            collect_unresolved_refs(value, type_name, known, errors);
+        }
+        Type::Union(types) => {
+            for t in types {
+                collect_unresolved_refs(t, type_name, known, errors);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn build_ref_graph(schema: &Schema) -> std::collections::HashMap<String, Vec<String>> {
+    let mut adj: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    for def in &schema.definitions {
+        let mut refs = Vec::new();
+        collect_type_refs_for_def(def, &mut refs);
+        // Deduplicate.
+        refs.sort();
+        refs.dedup();
+        adj.insert(def.name.clone(), refs);
+    }
+    adj
+}
+
+fn collect_type_refs_for_def(def: &TypeDef, refs: &mut Vec<String>) {
+    match &def.kind {
+        TypeDefKind::Struct(s) => {
+            for field in &s.fields {
+                collect_type_refs_from_type(&field.ty, refs);
+            }
+        }
+        TypeDefKind::Enum(e) => {
+            if let EnumKind::Tagged(tagged) = &e.kind {
+                for variant in &tagged.variants {
+                    for field in &variant.fields {
+                        collect_type_refs_from_type(&field.ty, refs);
+                    }
+                }
+            }
+        }
+        TypeDefKind::Alias(ty) => collect_type_refs_from_type(ty, refs),
+    }
+}
+
+fn collect_type_refs_from_type(ty: &Type, refs: &mut Vec<String>) {
+    match ty {
+        Type::Ref(name) => refs.push(name.clone()),
+        Type::Array(inner) | Type::Optional(inner) => collect_type_refs_from_type(inner, refs),
+        Type::Map { key, value } => {
+            collect_type_refs_from_type(key, refs);
+            collect_type_refs_from_type(value, refs);
+        }
+        Type::Union(types) => {
+            for t in types {
+                collect_type_refs_from_type(t, refs);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[derive(PartialEq)]
+enum DfsState {
+    InStack,
+    Done,
+}
+
+fn dfs_cycle<'a>(
+    node: &'a str,
+    adj: &'a std::collections::HashMap<String, Vec<String>>,
+    state: &mut std::collections::HashMap<&'a str, DfsState>,
+    path: &mut Vec<&'a str>,
+    errors: &mut Vec<ValidationError>,
+) {
+    state.insert(node, DfsState::InStack);
+    path.push(node);
+
+    if let Some(neighbors) = adj.get(node) {
+        for neighbor in neighbors {
+            let neighbor_str: &str = neighbor.as_str();
+            // We need a longer lifetime — map neighbor to a key from adj.
+            if let Some(key) = adj.get_key_value(neighbor_str).map(|(k, _)| k.as_str()) {
+                match state.get(key) {
+                    Some(DfsState::InStack) => {
+                        // Found cycle — report from where it starts.
+                        let cycle_start = path.iter().position(|&n| n == key).unwrap_or(0);
+                        let mut cycle: Vec<String> =
+                            path[cycle_start..].iter().map(|s| s.to_string()).collect();
+                        cycle.push(key.to_string()); // Close the loop.
+                        errors.push(ValidationError::CircularRef(cycle));
+                    }
+                    Some(DfsState::Done) => {}
+                    None => {
+                        dfs_cycle(key, adj, state, path, errors);
+                    }
+                }
+            }
+        }
+    }
+
+    path.pop();
+    state.insert(node, DfsState::Done);
 }
 
 impl TypeDef {
@@ -190,7 +495,10 @@ impl Field {
             name: name.into(),
             ty,
             required: true,
+            nullable: false,
             docs: None,
+            default: None,
+            constraints: None,
         }
     }
 
@@ -199,12 +507,33 @@ impl Field {
             name: name.into(),
             ty,
             required: false,
+            nullable: false,
             docs: None,
+            default: None,
+            constraints: None,
         }
     }
 
     pub fn with_docs(mut self, docs: impl Into<String>) -> Self {
         self.docs = Some(docs.into());
+        self
+    }
+
+    /// Mark the field as nullable (may hold an explicit `null` in addition to its declared type).
+    pub fn nullable(mut self) -> Self {
+        self.nullable = true;
+        self
+    }
+
+    /// Set a default value for the field.
+    pub fn with_default(mut self, default: DefaultValue) -> Self {
+        self.default = Some(default);
+        self
+    }
+
+    /// Set validation constraints for the field.
+    pub fn with_constraints(mut self, constraints: FieldConstraints) -> Self {
+        self.constraints = Some(constraints);
         self
     }
 }
@@ -233,5 +562,98 @@ mod tests {
         ));
 
         assert_eq!(schema.definitions.len(), 2);
+    }
+
+    #[test]
+    fn field_nullable_and_default() {
+        let f = Field::required("value", Type::String)
+            .nullable()
+            .with_default(DefaultValue::String("hello".to_string()))
+            .with_constraints(FieldConstraints {
+                min_length: Some(1),
+                max_length: Some(255),
+                pattern: Some(r"^\w+$".to_string()),
+                format: Some("email".to_string()),
+                ..Default::default()
+            });
+
+        assert!(f.nullable);
+        assert_eq!(f.default, Some(DefaultValue::String("hello".to_string())));
+        assert_eq!(f.constraints.as_ref().unwrap().min_length, Some(1));
+        assert_eq!(f.constraints.as_ref().unwrap().max_length, Some(255));
+    }
+
+    #[test]
+    fn validate_valid_schema() {
+        let mut schema = Schema::new();
+        schema.add(TypeDef::string_enum("Status", vec!["active", "inactive"]));
+        schema.add(TypeDef::structure(
+            "User",
+            vec![
+                Field::required("id", Type::String),
+                Field::required("status", Type::Ref("Status".to_string())),
+            ],
+        ));
+        let errors = schema.validate();
+        assert!(errors.is_empty(), "unexpected errors: {errors:?}");
+    }
+
+    #[test]
+    fn validate_duplicate_type_name() {
+        let mut schema = Schema::new();
+        schema.add(TypeDef::string_enum("Status", vec!["a"]));
+        schema.add(TypeDef::string_enum("Status", vec!["b"]));
+        let errors = schema.validate();
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::DuplicateTypeName(n) if n == "Status"))
+        );
+    }
+
+    #[test]
+    fn validate_unresolved_ref() {
+        let mut schema = Schema::new();
+        schema.add(TypeDef::structure(
+            "User",
+            vec![Field::required("role", Type::Ref("Role".to_string()))],
+        ));
+        let errors = schema.validate();
+        assert!(errors.iter().any(|e| matches!(
+            e,
+            ValidationError::UnresolvedRef { to, .. } if to == "Role"
+        )));
+    }
+
+    #[test]
+    fn validate_circular_ref() {
+        let mut schema = Schema::new();
+        schema.add(TypeDef::structure(
+            "A",
+            vec![Field::required("b", Type::Ref("B".to_string()))],
+        ));
+        schema.add(TypeDef::structure(
+            "B",
+            vec![Field::required("a", Type::Ref("A".to_string()))],
+        ));
+        let errors = schema.validate();
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::CircularRef(_))),
+            "expected circular ref error, got: {errors:?}"
+        );
+    }
+
+    #[test]
+    fn validate_invalid_identifier() {
+        let mut schema = Schema::new();
+        schema.add(TypeDef::structure("123Bad", vec![]));
+        let errors = schema.validate();
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::InvalidTypeName(n) if n == "123Bad"))
+        );
     }
 }

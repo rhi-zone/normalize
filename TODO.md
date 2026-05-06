@@ -682,37 +682,37 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
 - [x] ~~GraphQL schema parser - read GraphQL SDL to IR~~ — done; `src/input/graphql.rs` (feature `input-graphql`), uses arborium-graphql tree-sitter; `type`/`input`/`interface`→structs, `enum`→string-literal enum, non-null `!`→required, nullable→`Type::Optional`
 
 **Output Backends:**
-- [ ] JSON Schema output - emit IR back to JSON Schema (for validation/documentation)
-- [ ] GraphQL SDL output - emit IR as GraphQL types
-- [ ] Protobuf output - emit IR as .proto definitions
+- [x] ~~JSON Schema output~~ — done; `src/output/jsonschema.rs` (feature `backend-jsonschema`); emits draft 2020-12 with `$defs`, `$ref`, `anyOf`/`oneOf`, `required` arrays, `additionalProperties: false`; respects `nullable`, constraints, defaults, docs
+- [x] ~~GraphQL SDL output~~ — done; `src/output/graphql.rs` (feature `backend-graphql`); structs→`type`/`input`, string enums→`enum` with UPPER_CASE, tagged unions→`union` + helper types, `nullable`+`required` → non-null `!` vs nullable
+- [x] ~~Protobuf output~~ — done; `src/output/proto.rs` (feature `backend-proto`); emits proto3; structs→`message`, string enums with `_UNSPECIFIED=0` entry, int enums, tagged unions→`message` with `oneof`, arrays→`repeated`, optional fields use explicit `optional` keyword
 
 **CLI Enhancements:**
 - [ ] Multiple output files (`--split` to emit one file per type)
 - [ ] Dry-run mode (`--dry-run` to preview without writing)
 
 **IR Improvements:**
-- [ ] Validation: ensure IR is well-formed before generating (no circular refs, valid names)
-- [ ] Nullable vs Optional distinction (some languages care)
-- [ ] Default values support in Field
-- [ ] Constraints (min/max, pattern, format) for validation libraries
+- [x] ~~Validation~~ — done; `Schema::validate()` checks: valid identifiers, no duplicate type/field names, all `Ref` targets resolve, circular reference detection via DFS; returns `Vec<ValidationError>`
+- [x] ~~Nullable vs Optional distinction~~ — done; `Field::nullable: bool` added (distinct from `required`); `nullable()` builder method; backends (GraphQL, JSON Schema) use it
+- [x] ~~Default values support in Field~~ — done; `Field::default: Option<DefaultValue>` with `String`/`Number`/`Bool`/`Null` variants; `with_default()` builder; JSON Schema backend emits `"default"` keyword
+- [x] ~~Constraints (min/max, pattern, format)~~ — done; `Field::constraints: Option<FieldConstraints>` with `min`, `max`, `min_length`, `max_length`, `pattern`, `format`; `with_constraints()` builder; JSON Schema backend maps to `minimum`/`maximum`/`minLength`/`maxLength`/`pattern`/`format`
 
 ### normalize-surface-syntax
 
 **Readers:**
 - TypeScript reader: ~~missing classes/interfaces/type annotations, spread/destructuring, template literals, async/await~~ — done: classes lowered to function + prototype assignments, interfaces skipped, type annotations ignored, destructuring lowered, rest params handled, await lowered to inner expr, new_expression lowered to call
-- Lua reader: missing metatables/metamethods, string methods (`:method()` syntax)
+- ~~Lua reader: missing metatables/metamethods, string methods (`:method()` syntax)~~ — done: metamethod keys recognized as identifier keys; `obj:method(args)` desugared to `obj.method(obj, args)` with implicit self; `["string"]` computed keys extract string value; multi-variable generic for captures all vars; numeric for step uses grammar step field; elseif chaining bug fixed
 - [x] JavaScript reader — added `javascript.rs` using `arborium-javascript` + shared `ReadContext` via `read_with_language`; feature-gated as `read-javascript`
 
 **Writers:**
-- Lua writer: verify idiomatic output (use `and`/`or` vs `&&`/`||`), string escaping edge cases
+- ~~Lua writer: verify idiomatic output (use `and`/`or` vs `&&`/`||`), string escaping edge cases~~ — done: already correct for `and`/`or`/`not`/`~=`/`nil`; object keys now use bare identifier syntax for valid Lua identifiers; string escaping now handles null bytes; for-in no longer prepends hardcoded `_, `
 - TypeScript writer: type annotations, semicolon placement verification, template literal output
 - [x] JavaScript writer — added `javascript.rs` delegating to `TypeScriptWriter`; feature-gated as `write-javascript`
 
 **Testing:**
-- [ ] Edge case tests: nested expressions, complex control flow, Unicode strings
+- ~~Edge case tests: nested expressions, complex control flow, Unicode strings~~ — done: added reader tests for nested calls, multi-return, Unicode, long strings, numeric for with/without step, generic for multi-var, method call self-desugaring, metamethod keys, computed string keys, complex elseif; added writer tests for Lua idioms, object key emission, string escaping, unicode, for-in multi-var
 
 **IR Improvements:**
-- [ ] Comments preservation (for documentation translation)
+- [ ] Comments preservation (for documentation translation) — IR has no comment nodes; requires adding `Comment` to `Stmt`/`Expr` or a parallel annotation structure
 - [ ] Source locations (for error messages, debugging)
 - [ ] Import/export statements
 - [ ] Class definitions, method definitions (IR-level; currently lowered to functions + prototype assignments)

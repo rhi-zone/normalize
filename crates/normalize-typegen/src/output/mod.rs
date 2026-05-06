@@ -54,3 +54,24 @@ pub mod rust;
 
 #[cfg(feature = "backend-rust")]
 pub use rust::{RustBackend, RustOptions, generate_rust_types};
+
+// JSON Schema
+#[cfg(feature = "backend-jsonschema")]
+pub mod jsonschema;
+
+#[cfg(feature = "backend-jsonschema")]
+pub use jsonschema::{JsonSchemaBackend, generate_json_schema};
+
+// GraphQL SDL
+#[cfg(feature = "backend-graphql")]
+pub mod graphql;
+
+#[cfg(feature = "backend-graphql")]
+pub use graphql::{GraphQlBackend, GraphQlOptions, generate_graphql_sdl};
+
+// Protobuf
+#[cfg(feature = "backend-proto")]
+pub mod proto;
+
+#[cfg(feature = "backend-proto")]
+pub use proto::{ProtoBackend, generate_proto};

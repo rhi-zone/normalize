@@ -13,7 +13,10 @@
 //! Protobuf      ─┼─> Schema ────────├─> Python types (dataclasses, TypedDict)
 //! GraphQL SDL   ─┤   (ir.rs)        ├─> Python validators (Pydantic)
 //! TypeScript    ─┘                  ├─> Go types (structs)
-//!                                   └─> Rust types (serde structs)
+//!                                   ├─> Rust types (serde structs)
+//!                                   ├─> JSON Schema (draft 2020-12)
+//!                                   ├─> GraphQL SDL
+//!                                   └─> Protobuf (proto3)
 //! ```
 //!
 //! # Example
@@ -66,6 +69,9 @@
 //! - `backend-pydantic` - Pydantic model generation
 //! - `backend-go` - Go structs with json tags
 //! - `backend-rust` - Rust structs with serde
+//! - `backend-jsonschema` - JSON Schema (draft 2020-12) output
+//! - `backend-graphql` - GraphQL SDL output
+//! - `backend-proto` - Protobuf (proto3) output
 //!
 //! Language umbrella flags (convenience, enable types + validators):
 //! - `typescript` - backend-typescript + backend-zod + backend-valibot
@@ -122,6 +128,15 @@ pub use output::generate_go_types;
 #[cfg(feature = "backend-rust")]
 pub use output::generate_rust_types;
 
+#[cfg(feature = "backend-jsonschema")]
+pub use output::generate_json_schema;
+
+#[cfg(feature = "backend-graphql")]
+pub use output::generate_graphql_sdl;
+
+#[cfg(feature = "backend-proto")]
+pub use output::generate_proto;
+
 // Re-export backend structs
 #[cfg(feature = "backend-typescript")]
 pub use output::typescript::TypeScriptBackend;
@@ -143,3 +158,12 @@ pub use output::go::GoBackend;
 
 #[cfg(feature = "backend-rust")]
 pub use output::rust::RustBackend;
+
+#[cfg(feature = "backend-jsonschema")]
+pub use output::jsonschema::JsonSchemaBackend;
+
+#[cfg(feature = "backend-graphql")]
+pub use output::graphql::GraphQlBackend;
+
+#[cfg(feature = "backend-proto")]
+pub use output::proto::ProtoBackend;

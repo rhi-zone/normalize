@@ -200,7 +200,10 @@ impl<'a> ExtractContext<'a> {
             name: name_str,
             ty,
             required: !optional,
+            nullable: false,
             docs: None,
+            default: None,
+            constraints: None,
         })
     }
 

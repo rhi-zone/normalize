@@ -7,7 +7,7 @@ repository.workspace = true
 description = "Polyglot type and validator generation from schemas"
 
 [features]
-default = ["typescript", "python", "go", "rust-types"]
+default = ["typescript", "python", "go", "rust-types", "backend-jsonschema", "backend-graphql", "backend-proto"]
 
 # Language umbrella flags (convenience)
 typescript = ["backend-typescript", "typescript-validators"]
@@ -27,6 +27,9 @@ backend-python = []
 backend-pydantic = []
 backend-go = []
 backend-rust = []
+backend-jsonschema = []
+backend-graphql = []
+backend-proto = []
 
 # Input parsers
 input-typescript = ["dep:arborium-typescript", "dep:tree-sitter"]

@@ -56,6 +56,21 @@ fn init_builtin() {
         {
             backends.push(&crate::output::rust::RUST_BACKEND);
         }
+
+        #[cfg(feature = "backend-jsonschema")]
+        {
+            backends.push(&crate::output::jsonschema::JSON_SCHEMA_BACKEND);
+        }
+
+        #[cfg(feature = "backend-graphql")]
+        {
+            backends.push(&crate::output::graphql::GRAPHQL_BACKEND);
+        }
+
+        #[cfg(feature = "backend-proto")]
+        {
+            backends.push(&crate::output::proto::PROTO_BACKEND);
+        }
     });
 }
 
