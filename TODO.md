@@ -151,7 +151,8 @@ implementation nobody should have to re-derive.
 
 Target recipes (in rough priority order):
 - [~] `extract_function` — **first attempt (commit `ed9d3b63`, reverted) is wrong.** Tree-sitter identifier sweep + heuristic parameter inference; no return-value detection, no real scope analysis, no type awareness. Silently generates broken code. Do not merge. Needs the semantic foundation below before it can be done correctly.
-- [ ] `inline_variable` / `inline_function` — inverse of extract
+- [x] `inline_function` — `normalize edit inline-function <file> <line>:<col>` — inlines a single-use function at its call site within the same file. Substitutes arguments for parameters (whole-word replacement), strips `return` keyword, removes the definition. Supports JS/TS function declarations and arrow `const` bindings, Python `def`, Rust `fn`. Conservative: aborts on multiple-return bodies or mismatched argument counts. `--force` overrides single-use check. Recipe at `crates/normalize-refactor/src/inline_function.rs`
+- [ ] `inline_variable` — inline a variable binding at its use site (inverse of introduce_variable)
 - [x] `move_item` — move function/struct/type to another file, fix imports (`normalize edit move`, recipe at `crates/normalize-refactor/src/move_item.rs`). Best-effort import rewriting for Python/Go/JS/TS; Rust and unsupported cases emit warnings rather than fabricate paths. `--reexport` available for Python.
 - [ ] `add_parameter` / `change_signature` — update function signature + all callsites
 - [ ] `introduce_variable` — extract expression into a named binding
@@ -1092,7 +1093,7 @@ Building blocks are all present. Composition layer landed — `normalize-refacto
   import sites. Requires rename infrastructure + import rewriting. After rename lands.
 - [ ] `normalize extract <file:start-end> <new-name>` — extract a region into a new function,
   rewriting the call site. Single-file first; cross-file as stretch.
-- [ ] `normalize inline <target>` — inline a single-use function or constant. Single-file.
+- [x] `normalize inline <target>` — implemented as `normalize edit inline-function <file> <line>:<col>`. Single-file. See recipe at `crates/normalize-refactor/src/inline_function.rs`.
 - [ ] Post-edit index invalidation: after a multi-file edit, mark affected files dirty in the
   daemon's reverse-dep graph so the index refreshes without a full rebuild.
 

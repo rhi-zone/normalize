@@ -464,7 +464,7 @@ fn line_byte_range(content: &str, line_no: usize) -> Option<(usize, usize)> {
 
 /// Replace all whole-word occurrences of `old` in `text` with `new_word`.
 /// Returns the original string unchanged if no occurrences are found.
-fn replace_all_words(text: &str, old: &str, new_word: &str) -> String {
+pub fn replace_all_words(text: &str, old: &str, new_word: &str) -> String {
     if old.is_empty() {
         return text.to_string();
     }

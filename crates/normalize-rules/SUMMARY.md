@@ -7,3 +7,5 @@ Key modules:
 - `src/service.rs` — `RulesService` with `#[cli(description = ...)]` proc-macro registration for server-less 0.4.0; feature-gated behind `cli`. Per-rule timing diagnostics use `eprintln!("[timings] rule-name: {:.1?}", elapsed)` (stderr always, no tracing subscriber needed).
 
 `RulesRunConfig` packages the rule-related config fields (syntax rules, fact rules, SARIF tools, rule-tags) without depending on `normalize`'s `NormalizeConfig`. `load_rules_config()` in `service.rs` parses these fields directly from `.normalize/config.toml`.
+
+Recent: per-rule config migrated to `[rules.rule."<id>"]` namespace (legacy layout still parsed with deprecation warning); syntax-rules walker uses gitignore-style `[walk] exclude` patterns (not filename-only); single-file target routes to daemon per-file fast path; mtime-based SARIF tool cache via `watch` globs; `normalize rules test` command with inline error annotations; parallel effective-files walk for native rules.

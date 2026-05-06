@@ -936,6 +936,10 @@ impl EditService {
     fn display_move(&self, report: &MoveReport) -> String {
         report.format_text()
     }
+
+    fn display_inline_function(&self, report: &InlineFunctionReport) -> String {
+        report.format_text()
+    }
 }
 
 #[cli(
@@ -1393,6 +1397,41 @@ impl EditService {
         .await
     }
 
+    /// Inline a single-use function at its call site.
+    ///
+    /// Locates the function definition and its sole call site within the same file,
+    /// substitutes arguments for parameters, replaces the call with the function body,
+    /// and removes the now-dead definition.
+    ///
+    /// Point `<file>` and `<line>:<col>` at the function name — either in the definition
+    /// or at the call site.  Use `--force` to inline a function that is called more than once
+    /// (all call sites are inlined).
+    ///
+    /// Examples:
+    ///   normalize edit inline-function src/utils.ts 12:1           # inline function at line 12
+    ///   normalize edit inline-function src/utils.ts 12:1 --dry-run # preview
+    ///   normalize edit inline-function src/utils.ts 12:1 --force   # inline even if called >1×
+    #[cli(name = "inline-function", display_with = "display_inline_function")]
+    pub async fn inline_function(
+        &self,
+        #[param(positional, help = "File path")] file: String,
+        #[param(positional, help = "Position in file (line:col, 1-based)")] position: String,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
+        #[param(help = "Inline even when the function is called more than once")] force: bool,
+        #[param(short = 'm', help = "Message for shadow history")] message: Option<String>,
+        #[param(short = 'r', help = "Root directory")] root: Option<String>,
+    ) -> Result<InlineFunctionReport, String> {
+        do_inline_function(
+            &file,
+            &position,
+            root.as_deref().map(Path::new),
+            dry_run,
+            force,
+            message.as_deref(),
+        )
+        .await
+    }
+
     /// View shadow git edit history
     ///
     /// Examples:
@@ -1671,4 +1710,162 @@ async fn do_move(
         files: modified,
         warnings: outcome.plan.warnings,
     })
+}
+
+// ── inline-function ───────────────────────────────────────────────────────────
+
+/// Report returned by `normalize edit inline-function`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct InlineFunctionReport {
+    /// The function that was (or would be) inlined.
+    pub function_name: String,
+    /// File containing the function (relative path).
+    pub file: String,
+    /// Line number of the call site where the function was inlined.
+    pub call_site_line: usize,
+    /// Whether this was a dry run (no files written).
+    pub dry_run: bool,
+    /// Files modified (or that would be modified on dry-run).
+    pub files: Vec<String>,
+}
+
+impl OutputFormatter for InlineFunctionReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let verb = if self.dry_run {
+            "Would inline"
+        } else {
+            "Inlined"
+        };
+        let _ = writeln!(
+            out,
+            "{} '{}' at {}:{}",
+            verb, self.function_name, self.file, self.call_site_line
+        );
+        if !self.files.is_empty() {
+            let _ = writeln!(out, "  files: {}", self.files.join(", "));
+        }
+        out
+    }
+
+    fn format_pretty(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let verb = if self.dry_run {
+            "\x1b[1;33mWould inline\x1b[0m"
+        } else {
+            "\x1b[1;32mInlined\x1b[0m"
+        };
+        let _ = writeln!(
+            out,
+            "{} '\x1b[1m{}\x1b[0m' at \x1b[2m{}:{}\x1b[0m",
+            verb, self.function_name, self.file, self.call_site_line
+        );
+        if !self.files.is_empty() {
+            let _ = writeln!(out, "  files: {}", self.files.join(", "));
+        }
+        out
+    }
+}
+
+async fn do_inline_function(
+    file: &str,
+    position: &str,
+    root: Option<&Path>,
+    dry_run: bool,
+    force: bool,
+    message: Option<&str>,
+) -> Result<InlineFunctionReport, String> {
+    let root = root
+        .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd was deleted
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+
+    let config = NormalizeConfig::load(&root);
+    let shadow_enabled = config.shadow.enabled();
+
+    // Parse position argument "line:col" (col is optional, defaults to 1).
+    let (line, col) = parse_line_col(position)?;
+
+    // Resolve the file path.
+    let file_abs = if Path::new(file).is_absolute() {
+        PathBuf::from(file)
+    } else {
+        root.join(file)
+    };
+    let rel_path = file_abs
+        .strip_prefix(&root)
+        .unwrap_or(&file_abs)
+        .to_string_lossy()
+        .to_string();
+
+    let content = std::fs::read_to_string(&file_abs)
+        .map_err(|e| format!("Error reading {}: {}", rel_path, e))?;
+
+    let ctx = normalize_refactor::RefactoringContext {
+        root: root.clone(),
+        editor: edit::Editor::new(),
+        index: None,
+        loader: normalize_languages::GrammarLoader::new(),
+    };
+
+    let outcome = normalize_refactor::inline_function::plan_inline_function(
+        &ctx, &file_abs, &content, line, col, force,
+    )?;
+
+    // Print warnings
+    for warning in &outcome.plan.warnings {
+        eprintln!("warning: {}", warning);
+    }
+
+    let executor = normalize_refactor::RefactoringExecutor {
+        root: root.clone(),
+        dry_run,
+        shadow_enabled,
+        message: message.map(String::from),
+    };
+
+    let modified = executor.apply(&outcome.plan)?;
+
+    Ok(InlineFunctionReport {
+        function_name: outcome.function_name,
+        file: rel_path,
+        call_site_line: outcome.call_site_line,
+        dry_run,
+        files: modified,
+    })
+}
+
+/// Parse a `"line:col"` or `"line"` string into (line, col), both 1-based.
+fn parse_line_col(s: &str) -> Result<(usize, usize), String> {
+    match s.split_once(':') {
+        Some((l, c)) => {
+            let line = l
+                .trim()
+                .parse::<usize>()
+                .map_err(|_| format!("invalid line in position '{}': expected integer", s))?;
+            let col = c
+                .trim()
+                .parse::<usize>()
+                .map_err(|_| format!("invalid col in position '{}': expected integer", s))?;
+            if line == 0 || col == 0 {
+                return Err(format!(
+                    "position '{}': line and col are 1-based (must be ≥ 1)",
+                    s
+                ));
+            }
+            Ok((line, col))
+        }
+        None => {
+            let line = s
+                .trim()
+                .parse::<usize>()
+                .map_err(|_| format!("invalid position '{}': expected 'line:col' or 'line'", s))?;
+            if line == 0 {
+                return Err(format!("position '{}': line is 1-based (must be ≥ 1)", s));
+            }
+            Ok((line, 1))
+        }
+    }
 }
