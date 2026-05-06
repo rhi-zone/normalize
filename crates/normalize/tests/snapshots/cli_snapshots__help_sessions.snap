@@ -7,15 +7,21 @@ Review AI agent session logs. Use to check cost, duration, and tool usage across
 Usage: normalize sessions [OPTIONS] [COMMAND]
 
 Commands:
-  list       List available sessions
-  show       Show a specific session (summary or full conversation)
-  analyze    Run deep behavioral analysis on a session (tool stats, errors, token costs, corrections)
-  stats      Show aggregate statistics across sessions
-  messages   Extract all messages across sessions into a flat, queryable form
-  subagents  List subagents for a given parent session
-  patterns   Analyze tool call sequence patterns across sessions using Markov chain transition matrices
-  plans      List and view agent plans
-  help       Print this message or the help of the given subcommand(s)
+  list             List available sessions
+  show             Show a specific session (summary or full conversation)
+  analyze          Run deep behavioral analysis on a session (tool stats, errors, token costs, corrections)
+  stats            Show aggregate statistics across sessions
+  ngrams           Extract n-gram frequencies from session messages
+  messages         Extract all messages across sessions into a flat, queryable form
+  subagents        List subagents for a given parent session
+  patterns         Analyze tool call sequence patterns across sessions using Markov chain transition matrices
+  parallelization  Show sequential independent tool calls that could be parallelized
+  heatmap          Show which files were read and edited most (heatmap)
+  cost             Show token cost breakdown with cache savings per turn
+  plans            List and view agent plans
+  mark             Mark a session as reviewed (stores ID in `.normalize/sessions-reviewed`)
+  unmark           Remove a session from the reviewed list
+  help             Print this message or the help of the given subcommand(s)
 
 Options:
       --pretty                     Human-friendly output with colors and formatting

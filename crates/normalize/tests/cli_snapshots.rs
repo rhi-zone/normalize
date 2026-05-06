@@ -293,6 +293,11 @@ fn test_help_sessions_list() {
 }
 
 #[test]
+fn test_help_sessions_ngrams() {
+    insta::assert_snapshot!(snapshot_help(&["sessions", "ngrams"]));
+}
+
+#[test]
 fn test_help_sessions_show() {
     insta::assert_snapshot!(snapshot_help(&["sessions", "show"]));
 }

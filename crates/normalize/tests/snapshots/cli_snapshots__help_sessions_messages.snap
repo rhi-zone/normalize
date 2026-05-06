@@ -33,6 +33,12 @@ Options:
       --agent-type <agent-type>        Filter by agent type (e.g. Explore, general-purpose, Plan)
       --sequence <sequence>            Filter by consecutive tool call sequence (comma-separated tool names, e.g. Grep,Grep,Read)
       --context-turns <context-turns>  Number of context turns to include around each sequence match (requires --sequence, default 1)
+      --has-tool <has-tool>            Only turns that used the named tool (case-insensitive prefix match)
+      --errors-only                    Only turns with tool errors
+      --exclude-interrupted            Skip turns containing [Request interrupted by user]
+      --turn-range <turn-range>        Positional turn range within each session, e.g. 5-10
+      --min-chars <min-chars>          Minimum message length in characters
+      --max-chars <max-chars>          Maximum message length in characters
   -h, --help                           Print help
 
 Examples:
@@ -44,3 +50,8 @@ normalize sessions messages --show-usage --sort -tokens    # heaviest turns firs
 normalize sessions messages --sort timestamp               # chronological across sessions
 normalize sessions messages --sort +session,-tokens        # by session asc, then tokens desc
 normalize sessions messages --sequence Grep,Grep,Read      # turns where Grep,Grep,Read ran consecutively
+normalize sessions messages --has-tool Bash                # turns that used Bash
+normalize sessions messages --errors-only                  # turns with tool errors
+normalize sessions messages --exclude-interrupted          # skip interrupted turns
+normalize sessions messages --turn-range 5-10             # turns 5 through 10 only
+normalize sessions messages --min-chars 100               # messages with at least 100 chars

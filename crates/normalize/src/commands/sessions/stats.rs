@@ -5,12 +5,96 @@ use super::{
     session_matches_grep,
     sort::{DefaultDir, SortDir, SortSpec},
 };
+use crate::output::OutputFormatter;
 use crate::sessions::{FormatRegistry, LogFormat, SessionFile};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime};
+
+/// Per-repository statistics entry for `--by-repo`.
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct RepoStatsEntry {
+    /// Repository name (from session path).
+    pub repo: String,
+    /// Number of sessions for this repo.
+    pub session_count: usize,
+    /// Total assistant turns across sessions.
+    pub turns: u64,
+    /// Total input tokens (including cache reads).
+    pub tokens_in: u64,
+    /// Total output tokens.
+    pub tokens_out: u64,
+    /// Error rate: tool errors / total tool calls (0.0–1.0).
+    pub error_rate: f64,
+    /// Parallelization rate: turns with parallel opportunities / total turns (0.0–1.0).
+    pub parallelization_rate: f64,
+    /// Estimated cost in USD (None if no model pricing available).
+    pub cost_usd: Option<f64>,
+}
+
+/// Report from `sessions stats --by-repo`.
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct RepoStatsReport {
+    /// Per-repo breakdown, sorted by total tokens descending.
+    pub repos: Vec<RepoStatsEntry>,
+    /// Total session count across all repos.
+    pub total_sessions: usize,
+    /// Total repos observed.
+    pub total_repos: usize,
+}
+
+impl OutputFormatter for RepoStatsReport {
+    fn format_text(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push(format!(
+            "{} repos, {} sessions total\n",
+            self.total_repos, self.total_sessions
+        ));
+        // Header
+        lines.push(format!(
+            "{:<30}  {:>8}  {:>10}  {:>10}  {:>8}  {:>7}  {:>8}",
+            "repo", "sessions", "tokens_in", "tokens_out", "err%", "par%", "cost_usd"
+        ));
+        lines.push("-".repeat(90));
+
+        for e in &self.repos {
+            let cost = e
+                .cost_usd
+                .map(|c| format!("${:.4}", c))
+                .unwrap_or_else(|| "n/a".to_string());
+            let repo_display = if e.repo.len() > 30 {
+                format!("...{}", &e.repo[e.repo.len() - 27..])
+            } else {
+                e.repo.clone()
+            };
+            lines.push(format!(
+                "{:<30}  {:>8}  {:>10}  {:>10}  {:>7.1}%  {:>6.1}%  {:>8}",
+                repo_display,
+                e.session_count,
+                format_tokens_u64(e.tokens_in),
+                format_tokens_u64(e.tokens_out),
+                e.error_rate * 100.0,
+                e.parallelization_rate * 100.0,
+                cost,
+            ));
+        }
+        lines.join("\n")
+    }
+}
+
+/// Format token count with K/M suffix (u64 variant).
+fn format_tokens_u64(n: u64) -> String {
+    if n >= 1_000_000 {
+        format!("{:.1}M", n as f64 / 1_000_000.0)
+    } else if n >= 1_000 {
+        format!("{:.1}K", n as f64 / 1_000.0)
+    } else {
+        n.to_string()
+    }
+}
 
 /// Fields that `sessions stats` can be sorted on (affects the per-tool rows).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -672,6 +756,159 @@ fn analyze_paths_to_json(paths: &[PathBuf], format_name: Option<&str>) -> String
         Some(analysis) => serde_json::to_string(&analysis).unwrap_or_else(|_| "{}".to_string()),
         None => "{}".to_string(),
     }
+}
+
+/// Build per-repo statistics report.
+#[allow(clippy::too_many_arguments)]
+pub fn build_repo_stats(
+    root: Option<&Path>,
+    limit: usize,
+    format_name: Option<&str>,
+    grep: Option<&str>,
+    days: Option<u32>,
+    since: Option<&str>,
+    until: Option<&str>,
+    project_filter: Option<&Path>,
+    all_projects: bool,
+    mode: &super::SessionMode,
+    agent_type: Option<&str>,
+) -> Result<RepoStatsReport, String> {
+    let registry = FormatRegistry::new();
+    let format: &dyn LogFormat = match format_name {
+        Some(name) => registry
+            .get(name)
+            .ok_or_else(|| format!("Unknown format: {}", name))?,
+        None => registry.get("claude").ok_or_else(|| {
+            "Claude format not available (compile with feature = format-claude)".to_string()
+        })?,
+    };
+
+    let grep_re = grep
+        .map(|p| regex::Regex::new(p).map_err(|_| format!("Invalid grep pattern: {}", p)))
+        .transpose()?;
+
+    // Collect all sessions (always cross-project for --by-repo to be useful)
+    let mut sessions: Vec<SessionFile> = if all_projects || project_filter.is_none() {
+        list_all_project_sessions_by_mode(format, mode)
+    } else {
+        let project = project_filter.or(root);
+        super::list_sessions_by_mode(format, project, mode)
+    };
+
+    // Date filters
+    let now = SystemTime::now();
+    let since_time = if let Some(d) = days {
+        Some(now - Duration::from_secs(d as u64 * 86400))
+    } else if let Some(s) = since {
+        Some(parse_date(s).ok_or_else(|| format!("Invalid date format: {} (use YYYY-MM-DD)", s))?)
+    } else {
+        None
+    };
+    let until_time = if let Some(u) = until {
+        Some(
+            parse_date(u).ok_or_else(|| format!("Invalid date format: {} (use YYYY-MM-DD)", u))?
+                + Duration::from_secs(86400),
+        )
+    } else {
+        None
+    };
+
+    if let Some(st) = since_time {
+        sessions.retain(|s| s.mtime >= st);
+    }
+    if let Some(ut) = until_time {
+        sessions.retain(|s| s.mtime <= ut);
+    }
+    if let Some(ref re) = grep_re {
+        sessions.retain(|s| super::session_matches_grep(&s.path, re));
+    }
+    if let Some(at) = agent_type {
+        let at_lower = at.to_lowercase();
+        sessions.retain(|s| {
+            s.subagent_type
+                .as_deref()
+                .is_some_and(|t| t.to_lowercase() == at_lower)
+        });
+    }
+
+    sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
+    if limit > 0 {
+        sessions.truncate(limit);
+    }
+
+    if sessions.is_empty() {
+        return Err("No sessions found".to_string());
+    }
+
+    // Group sessions by repo name
+    let mut repo_groups: HashMap<String, Vec<PathBuf>> = HashMap::new();
+    for s in &sessions {
+        let repo = extract_repo_name(&s.path);
+        repo_groups.entry(repo).or_default().push(s.path.clone());
+    }
+
+    let total_sessions = sessions.len();
+    let total_repos = repo_groups.len();
+
+    // Build per-repo entries
+    let mut entries: Vec<RepoStatsEntry> = Vec::with_capacity(repo_groups.len());
+
+    for (repo, paths) in repo_groups {
+        let session_count = paths.len();
+
+        // Aggregate analysis for this repo
+        let agg = aggregate_sessions(&paths, format_name);
+
+        let (turns, tokens_in, tokens_out, error_rate, parallelization_rate, cost_usd) =
+            if let Some(a) = agg {
+                let total_tool_calls = a.tool_stats.values().map(|t| t.calls).sum::<usize>();
+                let total_errors = a.tool_stats.values().map(|t| t.errors).sum::<usize>();
+                let err_rate = if total_tool_calls > 0 {
+                    total_errors as f64 / total_tool_calls as f64
+                } else {
+                    0.0
+                };
+                let par_rate = if a.total_turns > 0 {
+                    a.parallel_opportunities as f64 / a.total_turns as f64
+                } else {
+                    0.0
+                };
+                (
+                    a.total_turns as u64,
+                    a.token_stats.total_input + a.token_stats.cache_read,
+                    a.token_stats.total_output,
+                    err_rate,
+                    par_rate,
+                    a.actual_cost,
+                )
+            } else {
+                (0, 0, 0, 0.0, 0.0, None)
+            };
+
+        entries.push(RepoStatsEntry {
+            repo,
+            session_count,
+            turns,
+            tokens_in,
+            tokens_out,
+            error_rate,
+            parallelization_rate,
+            cost_usd,
+        });
+    }
+
+    // Sort by total tokens descending
+    entries.sort_by(|a, b| {
+        let ta = a.tokens_in + a.tokens_out;
+        let tb = b.tokens_in + b.tokens_out;
+        tb.cmp(&ta).then_with(|| a.repo.cmp(&b.repo))
+    });
+
+    Ok(RepoStatsReport {
+        repos: entries,
+        total_sessions,
+        total_repos,
+    })
 }
 
 #[cfg(test)]

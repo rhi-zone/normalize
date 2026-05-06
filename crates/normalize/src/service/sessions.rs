@@ -2,9 +2,9 @@
 
 use super::resolve_pretty;
 use crate::commands::sessions::{
-    CostReport, HeatmapReport, MarkReport, MessagesReport, ParallelizationReport, PatternsReport,
-    PlanContent, PlansListReport, SessionListReport, SessionMode, SessionShowReport,
-    SubagentsReport,
+    CostReport, HeatmapReport, MarkReport, MessagesReport, NgramRole, NgramsReport,
+    ParallelizationReport, PatternsReport, PlanContent, PlansListReport, SessionListReport,
+    SessionMode, SessionShowReport, SubagentsReport,
 };
 use crate::output::OutputFormatter;
 use crate::sessions::SessionAnalysisReport;
@@ -233,6 +233,7 @@ impl SessionsService {
     ///   normalize sessions stats --days 30                   # stats for the last 30 days
     ///   normalize sessions stats --group-by project          # group results by project
     ///   normalize sessions stats --group-by project,day      # group by project and day
+    ///   normalize sessions stats --by-repo                   # cross-repo comparison (all projects)
     ///   normalize sessions stats --mode subagent             # stats for subagent sessions only
     ///   normalize sessions stats --sort name                 # sort tool rows alphabetically
     ///   normalize sessions stats --sort errors               # sort tool rows by error count
@@ -268,11 +269,32 @@ impl SessionsService {
             help = "Sort tool rows (comma-separated, prefix with - for desc or + for asc): calls, errors, name. E.g. name, -errors"
         )]
         sort: Option<String>,
+        #[param(help = "Group sessions by repository and compare metrics across repos")]
+        by_repo: bool,
     ) -> Result<SessionAnalysisReport, String> {
         let limit = limit.unwrap_or(0);
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let mode = mode.unwrap_or_default();
+
+        // --by-repo: delegate to the repo stats path which exits directly after printing.
+        if by_repo {
+            let report = crate::commands::sessions::build_repo_stats(
+                root_path,
+                limit,
+                format.as_deref(),
+                grep.as_deref(),
+                days,
+                since.as_deref(),
+                until.as_deref(),
+                project_path,
+                all_projects,
+                &mode,
+                agent_type.as_deref(),
+            )?;
+            println!("{}", self.display_output(&report));
+            std::process::exit(0);
+        }
 
         // When group_by is specified, delegate to the grouped command path which prints
         // per-group output directly. This uses process::exit to avoid double-printing
@@ -313,6 +335,79 @@ impl SessionsService {
             &mode,
             agent_type.as_deref(),
             sort.as_deref(),
+        )
+    }
+
+    /// Extract n-gram frequencies from session messages
+    ///
+    /// Examples:
+    ///   normalize sessions ngrams                            # top 20 bigrams from recent sessions
+    ///   normalize sessions ngrams abc123                     # ngrams from a specific session
+    ///   normalize sessions ngrams --n 3 --top 30             # top 30 trigrams
+    ///   normalize sessions ngrams --role assistant           # only assistant message text
+    ///   normalize sessions ngrams --all-projects --n 2       # bigrams across all projects
+    ///   normalize sessions ngrams --days 30                  # ngrams from last 30 days
+    #[cli(display_with = "display_output")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn ngrams(
+        &self,
+        #[param(
+            positional,
+            help = "Session ID or pattern (omit to aggregate across sessions)"
+        )]
+        session: Option<String>,
+        #[param(help = "N-gram size (2=bigram, 3=trigram, etc.; default: 2)")] n: Option<usize>,
+        #[param(help = "Show top K most frequent n-grams (default: 20)")] top: Option<usize>,
+        #[param(help = "Filter by role: assistant, user, or all (default: all)")] role: Option<
+            NgramRole,
+        >,
+        #[param(help = "Filter sessions by grep pattern")] grep: Option<String>,
+        #[param(help = "Filter sessions from the last N days")] days: Option<u32>,
+        #[param(help = "Filter sessions since date (YYYY-MM-DD)")] since: Option<String>,
+        #[param(help = "Filter sessions until date (YYYY-MM-DD)")] until: Option<String>,
+        #[param(help = "Filter by specific project path")] project: Option<String>,
+        #[param(help = "Show sessions from all projects")] all_projects: bool,
+        #[param(help = "Force specific format: claude, codex, gemini, normalize")] format: Option<
+            String,
+        >,
+        #[param(
+            short = 'n',
+            help = "Maximum number of sessions (0 = all, default: all)"
+        )]
+        limit: Option<usize>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Session mode: interactive (default), subagent, or all")] mode: Option<
+            SessionMode,
+        >,
+        #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
+        agent_type: Option<String>,
+    ) -> Result<NgramsReport, String> {
+        let limit = limit.unwrap_or(0);
+        let root_path = root.as_deref().map(std::path::Path::new);
+        let project_path = project.as_deref().map(std::path::Path::new);
+        let mode = mode.unwrap_or_default();
+        let n_val = n.unwrap_or(2).max(1);
+        let top_k = top.unwrap_or(20);
+        let role_filter = role.unwrap_or_default();
+
+        crate::commands::sessions::build_ngrams_report(
+            root_path,
+            limit,
+            format.as_deref(),
+            session.as_deref(),
+            n_val,
+            top_k,
+            role_filter,
+            grep.as_deref(),
+            days,
+            since.as_deref(),
+            until.as_deref(),
+            project_path,
+            all_projects,
+            &mode,
+            agent_type.as_deref(),
         )
     }
 

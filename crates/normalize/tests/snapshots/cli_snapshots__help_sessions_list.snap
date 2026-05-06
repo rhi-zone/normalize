@@ -27,6 +27,8 @@ Options:
       --mode <mode>                Session mode: interactive (default), subagent, or all
       --agent-type <agent-type>    Filter by agent type (e.g. Explore, general-purpose, Plan)
       --sort <sort>                Sort keys (comma-separated, prefix with - for desc or + for asc): date, duration, name. E.g. duration, +name, -date
+      --reviewed                   Only show sessions marked as reviewed
+      --unreviewed                 Only show sessions not yet reviewed
   -h, --help                       Print help
 
 Examples:
@@ -40,3 +42,5 @@ normalize sessions list --mode all            # list interactive + subagent sess
 normalize sessions list --agent-type Explore  # only Explore agents
 normalize sessions list --sort duration       # longest sessions first
 normalize sessions list --sort +name          # alphabetical by session name
+normalize sessions list --reviewed            # only sessions marked as reviewed
+normalize sessions list --unreviewed          # only sessions not yet reviewed

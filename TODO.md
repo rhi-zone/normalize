@@ -296,13 +296,18 @@ Config/markup:
 
 ### Comprehensive language fixtures (long-term, nix flake verification)
 
-- [ ] Design fixture schema: input source file → expected symbols, imports, calls, references
-      (similar to existing syntax-rules fixtures but for extraction + scope resolution)
+- [x] Design fixture schema: input source file → expected symbols, imports, calls (2026-05-06):
+      `crates/normalize-languages/tests/fixtures/<lang>/<case>/input.<ext>` + `expected.json`.
+      Schema: `{exhaustive, symbols: [{name, kind, line}], imports: [{module, name, line}], calls: [{callee, line}]}`.
+      All fields optional; subset matching by default; `"exhaustive": true` for full-list checking.
+- [x] Fixture runner: `normalize structure test-fixtures [--lang <lang>] [--fixture-dir <dir>] [--update]`
+      (2026-05-06): language-agnostic runner in `crates/normalize/src/service/facts.rs`; discovers
+      `<lang>/<case>/` subdirectories, extracts via `SymbolParser`, diffs against `expected.json`.
+      `--update` writes actual output as new expected (bootstrap mode). Report: `ExtractionFixtureTestReport`.
+- [x] Seed fixtures for 3 languages (2026-05-06): `rust/basic-function/`, `python/imports/`, `typescript/classes/` — all passing.
 - [ ] Nix flake approach: each language's fixtures run in a devShell with the real compiler/runtime
       available — lets us verify against `rustc`, `tsc`, `python`, `go build` etc. for ground truth
-- [ ] Fixture runner: language-agnostic test runner (like syntax-rules fixture runner) that loads
-      `tests/fixtures/<lang>/locals/<case>/input.<ext>` + `expected.json` and diffs
-- [ ] Seed fixtures for top 20 languages (high confidence, hand-verified)
+- [ ] Seed fixtures for top 20 languages (high confidence, hand-verified) — long-term
 - [ ] Automated fixture generation: use `normalize analyze` + LLM to bootstrap expected outputs,
       then human-verify before committing
 - [ ] CI integration: `nix flake check` runs all language fixture suites in parallel
@@ -823,8 +828,8 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 - [x] `--exclude-interrupted` — skip messages containing `[Request interrupted by user]`
 
 **Analysis features:**
-1. **Cross-repo comparison**: group sessions by repository, compare metrics: tool usage, error rates, parallelization, costs. `--by-repo` flag to stats command.
-2. **Ngram analysis**: extract common word sequences from assistant messages (bigrams/trigrams/4-grams). Find common error messages, repeated explanations, boilerplate responses.
+1. [x] **Cross-repo comparison**: `normalize sessions stats --by-repo` — groups sessions by repository, shows per-repo breakdown: session count, turns, tokens_in/out, error rate, parallelization rate, cost. Sorted by total tokens desc.
+2. [x] **Ngram analysis**: `normalize sessions ngrams [session-id] [--n N] [--top K] [--role assistant|user|all]` — extracts word n-grams (bigrams by default) from message text, shows top-K most frequent. Useful for finding repeated error messages, boilerplate responses.
 3. [x] **Parallelization hints**: `normalize sessions parallelization [session-id]` — shows turns with sequential same-type tool calls that could be parallelized. `--threshold N` (default 2) minimum group size. Example: `Turn 12: Could parallelize: Read(foo.rs) → Read(bar.rs) → Read(baz.rs)`
 4. [x] **File edit heatmap**: `normalize sessions heatmap [session-id]` — per-file read/write counts, classifies as `hot` (>5 writes), `read_only` (0 writes = potential test gap), `normal`. `--top N` (default 20), sorted by write_count desc.
 5. [x] **Cost breakdown**: `normalize sessions cost [session-id]` — per-turn token counts and estimated USD cost using model-specific pricing; summary shows total cost, cache savings, cache efficiency %.

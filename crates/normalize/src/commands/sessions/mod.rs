@@ -6,6 +6,7 @@ pub mod heatmap;
 pub mod list;
 pub mod mark;
 pub mod messages;
+pub mod ngrams;
 pub mod parallelization;
 pub mod patterns;
 pub mod plans;
@@ -20,6 +21,7 @@ pub use heatmap::{HeatmapReport, build_heatmap_report, build_heatmap_report_for_
 pub use list::{SessionListReport, build_session_list};
 pub use mark::{MarkReport, load_reviewed, mark_session, unmark_session};
 pub use messages::{MessagesReport, build_messages_report};
+pub use ngrams::{NgramRole, NgramsReport, build_ngrams_report};
 pub use parallelization::{
     ParallelizationReport, build_parallelization_report, build_parallelization_report_for_session,
 };
@@ -28,7 +30,7 @@ pub use plans::{PlanContent, PlansListReport, build_plan_content, build_plans_li
 #[cfg(feature = "sessions-web")]
 pub use serve::serve_sessions;
 pub use show::{SessionShowReport, build_analyze_report, build_show_report};
-pub use stats::{build_stats_data, show_stats_grouped};
+pub use stats::{RepoStatsReport, build_repo_stats, build_stats_data, show_stats_grouped};
 
 pub mod subagents;
 

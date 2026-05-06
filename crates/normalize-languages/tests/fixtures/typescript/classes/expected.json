@@ -1,0 +1,10 @@
+{
+  "exhaustive": false,
+  "symbols": [
+    {"name": "Animal", "kind": "class"},
+    {"name": "Dog", "kind": "class"},
+    {"name": "createDog", "kind": "function"}
+  ],
+  "imports": [],
+  "calls": []
+}

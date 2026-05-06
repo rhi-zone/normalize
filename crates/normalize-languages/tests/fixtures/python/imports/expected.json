@@ -1,0 +1,15 @@
+{
+  "exhaustive": false,
+  "symbols": [
+    {"name": "read_file", "kind": "function"},
+    {"name": "list_dir", "kind": "function"}
+  ],
+  "imports": [
+    {"name": "os"},
+    {"name": "sys"},
+    {"module": "pathlib", "name": "Path"},
+    {"module": "collections", "name": "defaultdict"},
+    {"module": "collections", "name": "OrderedDict"}
+  ],
+  "calls": []
+}

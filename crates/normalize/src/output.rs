@@ -123,8 +123,12 @@ mod tests {
         assert_output_formatter::<SessionListReport>();
         assert_output_formatter::<SessionShowReport>();
         assert_output_formatter::<SubagentsReport>();
+        use crate::commands::sessions::ngrams::NgramsReport;
+        assert_output_formatter::<NgramsReport>();
         use crate::commands::sessions::patterns::PatternsReport;
         assert_output_formatter::<PatternsReport>();
+        use crate::commands::sessions::stats::RepoStatsReport;
+        assert_output_formatter::<RepoStatsReport>();
         use crate::commands::sync::SyncReport;
         assert_output_formatter::<SyncReport>();
         assert_output_formatter::<SkeletonDiffReport>();
@@ -205,8 +209,8 @@ mod tests {
 
         // Service report types now implementing OutputFormatter
         use crate::service::facts::{
-            CommandReport, FactsStats, FactsStatsReport, FileListReport, PackagesReport,
-            QueryReport, RebuildReport, StorageReport,
+            CommandReport, ExtractionFixtureTestReport, FactsStats, FactsStatsReport,
+            FileListReport, PackagesReport, QueryReport, RebuildReport, StorageReport,
         };
         assert_output_formatter::<RebuildReport>();
         assert_output_formatter::<FactsStats>();
@@ -216,6 +220,7 @@ mod tests {
         assert_output_formatter::<CommandReport>();
         assert_output_formatter::<FactsStatsReport>();
         assert_output_formatter::<QueryReport>();
+        assert_output_formatter::<ExtractionFixtureTestReport>();
 
         use crate::service::context::{ContextKindReport, ContextMigrateReport};
         assert_output_formatter::<ContextKindReport>();

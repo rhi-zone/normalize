@@ -1,0 +1,43 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+expression: "snapshot_help(&[\"sessions\", \"ngrams\"])"
+---
+Extract n-gram frequencies from session messages
+
+Usage: normalize sessions ngrams [OPTIONS] [session]
+
+Arguments:
+  [session]  Session ID or pattern (omit to aggregate across sessions)
+
+Options:
+      --n <n>                      N-gram size (2=bigram, 3=trigram, etc.; default: 2)
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
+      --top <top>                  Show top K most frequent n-grams (default: 20)
+      --jsonl                      Output one JSON object per line (for arrays)
+      --role <role>                Filter by role: assistant, user, or all (default: all)
+      --grep <grep>                Filter sessions by grep pattern
+      --json                       Output machine-readable JSON
+      --days <days>                Filter sessions from the last N days
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --since <since>              Filter sessions since date (YYYY-MM-DD)
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --until <until>              Filter sessions until date (YYYY-MM-DD)
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --project <project>          Filter by specific project path
+      --all-projects               Show sessions from all projects
+      --format <format>            Force specific format: claude, codex, gemini, normalize
+  -n, --limit <limit>              Maximum number of sessions (0 = all, default: all)
+  -r, --root <root>                Root directory (defaults to current directory)
+      --mode <mode>                Session mode: interactive (default), subagent, or all
+      --agent-type <agent-type>    Filter by agent type (e.g. Explore, general-purpose, Plan)
+  -h, --help                       Print help
+
+Examples:
+normalize sessions ngrams                            # top 20 bigrams from recent sessions
+normalize sessions ngrams abc123                     # ngrams from a specific session
+normalize sessions ngrams --n 3 --top 30             # top 30 trigrams
+normalize sessions ngrams --role assistant           # only assistant message text
+normalize sessions ngrams --all-projects --n 2       # bigrams across all projects
+normalize sessions ngrams --days 30                  # ngrams from last 30 days
