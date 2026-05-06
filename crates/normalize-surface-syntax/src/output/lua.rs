@@ -75,6 +75,15 @@ impl LuaWriter {
                 }
             }
 
+            Stmt::Destructure { pat, value, .. } => {
+                // Lua: `local a, b = table.unpack(expr)` — emit as multi-assignment
+                self.output.push_str("local ");
+                self.write_lua_pat(pat);
+                self.output.push_str(" = table.unpack(");
+                self.write_expr(value);
+                self.output.push(')');
+            }
+
             Stmt::Block(stmts) => {
                 self.output.push_str("do\n");
                 self.indent += 1;
@@ -624,6 +633,43 @@ impl LuaWriter {
             UnaryOp::Not => "not ",
         };
         self.output.push_str(s);
+    }
+
+    /// Write a pattern as a comma-separated list of names (for Lua multi-assignment).
+    fn write_lua_pat(&mut self, pat: &Pat) {
+        match pat {
+            Pat::Ident(name) => {
+                self.output.push_str(name);
+            }
+            Pat::Array(elements, rest) => {
+                for (i, elem) in elements.iter().enumerate() {
+                    if i > 0 {
+                        self.output.push_str(", ");
+                    }
+                    match elem {
+                        None => self.output.push('_'),
+                        Some(p) => self.write_lua_pat(p),
+                    }
+                }
+                if let Some(rest_name) = rest {
+                    if !elements.is_empty() {
+                        self.output.push_str(", ");
+                    }
+                    self.output.push_str(rest_name);
+                }
+            }
+            Pat::Object(fields) => {
+                for (i, field) in fields.iter().enumerate() {
+                    if i > 0 {
+                        self.output.push_str(", ");
+                    }
+                    self.write_lua_pat(&field.pat);
+                }
+            }
+            Pat::Rest(inner) => {
+                self.write_lua_pat(inner);
+            }
+        }
     }
 }
 

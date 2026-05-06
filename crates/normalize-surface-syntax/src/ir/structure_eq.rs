@@ -14,7 +14,7 @@
 //! - Control flow structure
 //! - Expression trees
 
-use crate::{Expr, Function, Method, Program, Stmt, TemplatePart};
+use super::{Expr, Function, Method, Pat, PatField, Program, Stmt, TemplatePart};
 
 /// Trait for structural equality comparison.
 ///
@@ -58,6 +58,22 @@ impl StructureEq for Stmt {
                     span: _,
                 },
             ) => n1 == n2 && option_structure_eq(i1.as_ref(), i2.as_ref()),
+
+            // Destructure: ignore span; mutable is a surface hint
+            (
+                Stmt::Destructure {
+                    pat: p1,
+                    value: v1,
+                    mutable: _,
+                    span: _,
+                },
+                Stmt::Destructure {
+                    pat: p2,
+                    value: v2,
+                    mutable: _,
+                    span: _,
+                },
+            ) => p1.structure_eq(p2) && v1.structure_eq(v2),
 
             (Stmt::Block(a), Stmt::Block(b)) => vec_structure_eq(a, b),
 
@@ -239,6 +255,36 @@ impl StructureEq for Stmt {
 
             _ => false,
         }
+    }
+}
+
+impl StructureEq for Pat {
+    fn structure_eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Pat::Ident(a), Pat::Ident(b)) => a == b,
+            (Pat::Object(a), Pat::Object(b)) => {
+                a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.structure_eq(y))
+            }
+            (Pat::Array(a_elems, a_rest), Pat::Array(b_elems, b_rest)) => {
+                a_rest == b_rest
+                    && a_elems.len() == b_elems.len()
+                    && a_elems.iter().zip(b_elems).all(|(x, y)| match (x, y) {
+                        (None, None) => true,
+                        (Some(p), Some(q)) => p.structure_eq(q),
+                        _ => false,
+                    })
+            }
+            (Pat::Rest(a), Pat::Rest(b)) => a.structure_eq(b),
+            _ => false,
+        }
+    }
+}
+
+impl StructureEq for PatField {
+    fn structure_eq(&self, other: &Self) -> bool {
+        self.key == other.key
+            && self.pat.structure_eq(&other.pat)
+            && option_structure_eq(self.default.as_ref(), other.default.as_ref())
     }
 }
 

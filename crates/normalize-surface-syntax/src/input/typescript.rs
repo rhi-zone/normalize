@@ -1,6 +1,9 @@
 //! Tree-sitter based TypeScript reader.
 
-use crate::ir::*;
+use crate::ir::{
+    BinaryOp, ExportName, Expr, Function, ImportName, Method, Param, Pat, PatField, Program, Span,
+    Stmt, TemplatePart, UnaryOp,
+};
 use crate::traits::{ReadError, Reader};
 use tree_sitter::{Node, Parser, Tree};
 
@@ -825,15 +828,10 @@ impl<'a> ReadContext<'a> {
         // Handle destructuring patterns: { a, b } = obj  or  [x, y] = arr
         match name_node.kind() {
             "object_pattern" | "array_pattern" => {
-                // Lower destructuring to a block of individual let/const bindings.
-                // e.g. const { a, b } = obj  →  const a = obj.a; const b = obj.b;
                 let rhs = init.unwrap_or(Expr::null());
-                let mut stmts = Vec::new();
-                self.lower_destructuring(name_node, rhs, mutable, &mut stmts)?;
-                if stmts.len() == 1 {
-                    return Ok(stmts.remove(0));
-                }
-                return Ok(Stmt::block(stmts));
+                let pat = self.read_pat(name_node)?;
+                let span = Span::from_ts(node.start_position(), node.end_position());
+                return Ok(Stmt::destructure(pat, rhs, mutable).with_span(span));
             }
             _ => {}
         }
@@ -853,33 +851,22 @@ impl<'a> ReadContext<'a> {
         })
     }
 
-    /// Lower a destructuring pattern into a list of let/const statements.
-    fn lower_destructuring(
-        &self,
-        pattern: Node,
-        rhs: Expr,
-        mutable: bool,
-        stmts: &mut Vec<Stmt>,
-    ) -> Result<(), ReadError> {
-        match pattern.kind() {
+    /// Parse a tree-sitter pattern node into a `Pat` IR node.
+    fn read_pat(&self, node: Node) -> Result<Pat, ReadError> {
+        match node.kind() {
+            "identifier" => Ok(Pat::ident(self.node_text(node))),
+
             "object_pattern" => {
-                let mut cursor = pattern.walk();
-                for child in pattern.children(&mut cursor) {
+                let mut fields = Vec::new();
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
                     match child.kind() {
                         "shorthand_property_identifier_pattern" => {
-                            // { foo } → const foo = rhs.foo
-                            let name = self.node_text(child).to_string();
-                            let init = Expr::member(rhs.clone(), name.as_str());
-                            stmts.push(Stmt::Let {
-                                name,
-                                init: Some(init),
-                                mutable,
-                                type_annotation: None,
-                                span: None,
-                            });
+                            // { foo } — shorthand field
+                            fields.push(PatField::shorthand(self.node_text(child)));
                         }
                         "pair_pattern" => {
-                            // { key: name } or { key: name = default }
+                            // { key: pat } or { key: pat = default }
                             let key = child.child_by_field_name("key").ok_or_else(|| {
                                 ReadError::Parse("pair_pattern missing key".into())
                             })?;
@@ -887,107 +874,107 @@ impl<'a> ReadContext<'a> {
                                 ReadError::Parse("pair_pattern missing value".into())
                             })?;
                             let key_str = self.node_text(key).to_string();
-                            let key_access = Expr::member(rhs.clone(), key_str.as_str());
-                            // val might be identifier or nested pattern
-                            if val.kind() == "identifier" {
-                                let name = self.node_text(val).to_string();
-                                stmts.push(Stmt::Let {
-                                    name,
-                                    init: Some(key_access),
-                                    mutable,
-                                    type_annotation: None,
-                                    span: None,
-                                });
+                            // val may be an identifier, nested pattern, or assignment_pattern
+                            let (inner_val, default) = if val.kind() == "assignment_pattern" {
+                                let lhs = val.child_by_field_name("left").ok_or_else(|| {
+                                    ReadError::Parse("assignment_pattern missing left".into())
+                                })?;
+                                let rhs = val.child_by_field_name("right").ok_or_else(|| {
+                                    ReadError::Parse("assignment_pattern missing right".into())
+                                })?;
+                                (lhs, Some(self.read_expr(rhs)?))
                             } else {
-                                self.lower_destructuring(val, key_access, mutable, stmts)?;
+                                (val, None)
+                            };
+                            let pat = self.read_pat(inner_val)?;
+                            let mut field = PatField::nested(key_str, pat);
+                            if let Some(d) = default {
+                                field = field.with_default(d);
                             }
+                            fields.push(field);
+                        }
+                        "assignment_pattern" => {
+                            // shorthand with default: { foo = "bar" }
+                            let lhs = child.child_by_field_name("left").ok_or_else(|| {
+                                ReadError::Parse("assignment_pattern missing left".into())
+                            })?;
+                            let rhs = child.child_by_field_name("right").ok_or_else(|| {
+                                ReadError::Parse("assignment_pattern missing right".into())
+                            })?;
+                            let key = self.node_text(lhs).to_string();
+                            let default = self.read_expr(rhs)?;
+                            fields.push(PatField::shorthand(key.as_str()).with_default(default));
                         }
                         "rest_pattern" => {
-                            // { ...rest } — lowered as rest = rhs (simplified; full rest semantics
-                            // would require Object.assign minus the already-extracted keys)
-                            let mut inner_cursor = child.walk();
-                            for inner in child.children(&mut inner_cursor) {
-                                if inner.kind() == "identifier" {
-                                    let name = self.node_text(inner).to_string();
-                                    stmts.push(Stmt::Let {
-                                        name,
-                                        init: Some(rhs.clone()),
-                                        mutable,
-                                        type_annotation: None,
-                                        span: None,
-                                    });
-                                    break;
-                                }
-                            }
+                            // { ...rest }
+                            let inner = self.read_rest_pat_inner(child)?;
+                            fields.push(PatField::nested("...", Pat::Rest(Box::new(inner))));
                         }
                         _ => {}
                     }
                 }
+                Ok(Pat::Object(fields))
             }
+
             "array_pattern" => {
-                let mut cursor = pattern.walk();
-                let mut idx = 0usize;
-                for child in pattern.children(&mut cursor) {
-                    if !child.is_named() {
-                        continue;
-                    }
+                let mut elements: Vec<Option<Pat>> = Vec::new();
+                let mut rest: Option<String> = None;
+                let mut cursor = node.walk();
+                let children: Vec<_> = node.children(&mut cursor).collect();
+                let mut i = 0;
+                while i < children.len() {
+                    let child = children[i];
                     match child.kind() {
-                        "identifier" => {
-                            let name = self.node_text(child).to_string();
-                            let init = Expr::index(rhs.clone(), Expr::number(idx as f64));
-                            stmts.push(Stmt::Let {
-                                name,
-                                init: Some(init),
-                                mutable,
-                                type_annotation: None,
-                                span: None,
-                            });
-                            idx += 1;
+                        "[" | "]" => {}
+                        "," => {
+                            // A bare comma with no preceding named child since last element =
+                            // a hole. We detect holes by checking if the previous child was
+                            // also a comma (or the opening bracket).
+                            if i == 0
+                                || children[i - 1].kind() == "["
+                                || children[i - 1].kind() == ","
+                            {
+                                elements.push(None);
+                            }
                         }
                         "rest_pattern" => {
-                            let mut inner_cursor = child.walk();
-                            for inner in child.children(&mut inner_cursor) {
+                            // [...rest] — extract the identifier name
+                            let mut inner_cur = child.walk();
+                            for inner in child.children(&mut inner_cur) {
                                 if inner.kind() == "identifier" {
-                                    let name = self.node_text(inner).to_string();
-                                    // arr.slice(idx) — simplified as subscript
-                                    let init = Expr::call(
-                                        Expr::member(rhs.clone(), "slice"),
-                                        vec![Expr::number(idx as f64)],
-                                    );
-                                    stmts.push(Stmt::Let {
-                                        name,
-                                        init: Some(init),
-                                        mutable,
-                                        type_annotation: None,
-                                        span: None,
-                                    });
+                                    rest = Some(self.node_text(inner).to_string());
                                     break;
                                 }
                             }
-                            idx += 1;
                         }
-                        _ => {
-                            // Nested pattern
-                            let elem = Expr::index(rhs.clone(), Expr::number(idx as f64));
-                            self.lower_destructuring(child, elem, mutable, stmts)?;
-                            idx += 1;
+                        _ if child.is_named() => {
+                            elements.push(Some(self.read_pat(child)?));
                         }
+                        _ => {}
                     }
+                    i += 1;
                 }
+                Ok(Pat::Array(elements, rest))
             }
-            _ => {
-                // Fallback: treat as simple identifier
-                let name = self.node_text(pattern).to_string();
-                stmts.push(Stmt::Let {
-                    name,
-                    init: Some(rhs),
-                    mutable,
-                    type_annotation: None,
-                    span: None,
-                });
+
+            "rest_pattern" => {
+                let inner = self.read_rest_pat_inner(node)?;
+                Ok(Pat::Rest(Box::new(inner)))
+            }
+
+            other => Err(ReadError::Unsupported(format!("pattern type '{}'", other))),
+        }
+    }
+
+    /// Extract the inner `Pat` from a `rest_pattern` node (the `...x` part → `Pat::Ident("x")`).
+    fn read_rest_pat_inner(&self, node: Node) -> Result<Pat, ReadError> {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.is_named() {
+                return self.read_pat(child);
             }
         }
-        Ok(())
+        Err(ReadError::Parse("rest_pattern is empty".into()))
     }
 
     fn read_if_statement(&self, node: Node) -> Result<Stmt, ReadError> {
@@ -1868,17 +1855,123 @@ mod tests {
     }
 
     #[test]
-    fn test_object_destructuring() -> Result<(), ReadError> {
+    fn test_object_destructuring_ir() -> Result<(), ReadError> {
         let program = read_typescript("const { a, b } = obj;")?;
-        // Should produce two const declarations (or a block with two)
-        assert!(!program.body.is_empty());
+        assert_eq!(program.body.len(), 1);
+        match &program.body[0] {
+            Stmt::Destructure { pat, mutable, .. } => {
+                assert!(!mutable);
+                match pat {
+                    Pat::Object(fields) => {
+                        assert_eq!(fields.len(), 2);
+                        assert_eq!(fields[0].key, "a");
+                        assert!(matches!(&fields[0].pat, Pat::Ident(n) if n == "a"));
+                        assert_eq!(fields[1].key, "b");
+                        assert!(matches!(&fields[1].pat, Pat::Ident(n) if n == "b"));
+                    }
+                    _ => panic!("expected Pat::Object, got {:?}", pat),
+                }
+            }
+            _ => panic!("expected Destructure, got {:?}", program.body[0]),
+        }
         Ok(())
     }
 
     #[test]
-    fn test_array_destructuring() -> Result<(), ReadError> {
+    fn test_object_destructuring_renamed() -> Result<(), ReadError> {
+        let program = read_typescript("const { b: c } = obj;")?;
+        assert_eq!(program.body.len(), 1);
+        match &program.body[0] {
+            Stmt::Destructure { pat, .. } => match pat {
+                Pat::Object(fields) => {
+                    assert_eq!(fields.len(), 1);
+                    assert_eq!(fields[0].key, "b");
+                    assert!(matches!(&fields[0].pat, Pat::Ident(n) if n == "c"));
+                }
+                _ => panic!("expected Pat::Object"),
+            },
+            _ => panic!("expected Destructure"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_array_destructuring_ir() -> Result<(), ReadError> {
         let program = read_typescript("const [x, y] = arr;")?;
-        assert!(!program.body.is_empty());
+        assert_eq!(program.body.len(), 1);
+        match &program.body[0] {
+            Stmt::Destructure { pat, mutable, .. } => {
+                assert!(!mutable);
+                match pat {
+                    Pat::Array(elements, rest) => {
+                        assert_eq!(elements.len(), 2);
+                        assert!(matches!(&elements[0], Some(Pat::Ident(n)) if n == "x"));
+                        assert!(matches!(&elements[1], Some(Pat::Ident(n)) if n == "y"));
+                        assert!(rest.is_none());
+                    }
+                    _ => panic!("expected Pat::Array, got {:?}", pat),
+                }
+            }
+            _ => panic!("expected Destructure, got {:?}", program.body[0]),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_array_destructuring_with_rest() -> Result<(), ReadError> {
+        let program = read_typescript("const [first, ...rest] = arr;")?;
+        assert_eq!(program.body.len(), 1);
+        match &program.body[0] {
+            Stmt::Destructure { pat, .. } => match pat {
+                Pat::Array(elements, rest) => {
+                    assert_eq!(elements.len(), 1);
+                    assert!(matches!(&elements[0], Some(Pat::Ident(n)) if n == "first"));
+                    assert_eq!(rest.as_deref(), Some("rest"));
+                }
+                _ => panic!("expected Pat::Array"),
+            },
+            _ => panic!("expected Destructure"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_object_destructuring_round_trip() -> Result<(), ReadError> {
+        use crate::output::typescript::TypeScriptWriter;
+        let src = "const { a, b: c } = obj;";
+        let program = read_typescript(src)?;
+        let out = TypeScriptWriter::emit(&program);
+        assert_eq!(out.trim(), "const { a, b: c } = obj;");
+        Ok(())
+    }
+
+    #[test]
+    fn test_array_destructuring_round_trip() -> Result<(), ReadError> {
+        use crate::output::typescript::TypeScriptWriter;
+        let src = "const [x, y] = arr;";
+        let program = read_typescript(src)?;
+        let out = TypeScriptWriter::emit(&program);
+        assert_eq!(out.trim(), "const [x, y] = arr;");
+        Ok(())
+    }
+
+    #[test]
+    fn test_array_rest_destructuring_round_trip() -> Result<(), ReadError> {
+        use crate::output::typescript::TypeScriptWriter;
+        let src = "const [first, ...rest] = arr;";
+        let program = read_typescript(src)?;
+        let out = TypeScriptWriter::emit(&program);
+        assert_eq!(out.trim(), "const [first, ...rest] = arr;");
+        Ok(())
+    }
+
+    #[test]
+    fn test_object_rest_destructuring_round_trip() -> Result<(), ReadError> {
+        use crate::output::typescript::TypeScriptWriter;
+        let src = "const { a, ...rest } = obj;";
+        let program = read_typescript(src)?;
+        let out = TypeScriptWriter::emit(&program);
+        assert_eq!(out.trim(), "const { a, ...rest } = obj;");
         Ok(())
     }
 

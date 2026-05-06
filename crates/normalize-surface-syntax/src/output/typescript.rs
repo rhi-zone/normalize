@@ -88,6 +88,20 @@ impl TypeScriptWriter {
                 self.output.push(';');
             }
 
+            Stmt::Destructure {
+                pat,
+                value,
+                mutable,
+                ..
+            } => {
+                self.output
+                    .push_str(if *mutable { "let " } else { "const " });
+                self.write_pat(pat);
+                self.output.push_str(" = ");
+                self.write_expr(value);
+                self.output.push(';');
+            }
+
             Stmt::Block(stmts) => {
                 self.output.push_str("{\n");
                 self.indent += 1;
@@ -403,6 +417,18 @@ impl TypeScriptWriter {
                     self.write_expr(init);
                 }
             }
+            Stmt::Destructure {
+                pat,
+                value,
+                mutable,
+                ..
+            } => {
+                self.output
+                    .push_str(if *mutable { "let " } else { "const " });
+                self.write_pat(pat);
+                self.output.push_str(" = ");
+                self.write_expr(value);
+            }
             Stmt::Expr(expr) => {
                 self.write_expr(expr);
             }
@@ -695,6 +721,69 @@ impl TypeScriptWriter {
             UnaryOp::Not => "!",
         };
         self.output.push_str(s);
+    }
+
+    /// Write a binding pattern: `{ a, b: c }`, `[x, y]`, or plain `x`.
+    fn write_pat(&mut self, pat: &Pat) {
+        match pat {
+            Pat::Ident(name) => {
+                self.output.push_str(name);
+            }
+            Pat::Object(fields) => {
+                self.output.push_str("{ ");
+                for (i, field) in fields.iter().enumerate() {
+                    if i > 0 {
+                        self.output.push_str(", ");
+                    }
+                    match &field.pat {
+                        // `{ ...rest }` field — key is "..." sentinel
+                        Pat::Rest(inner) => {
+                            self.output.push_str("...");
+                            self.write_pat(inner);
+                        }
+                        // shorthand `{ key }` when key == binding name
+                        Pat::Ident(name) if name == &field.key => {
+                            self.output.push_str(&field.key);
+                        }
+                        // renamed or nested `{ key: pat }`
+                        _ => {
+                            self.output.push_str(&field.key);
+                            self.output.push_str(": ");
+                            self.write_pat(&field.pat);
+                        }
+                    }
+                    if let Some(default) = &field.default {
+                        self.output.push_str(" = ");
+                        self.write_expr(default);
+                    }
+                }
+                self.output.push_str(" }");
+            }
+            Pat::Array(elements, rest) => {
+                self.output.push('[');
+                for (i, elem) in elements.iter().enumerate() {
+                    if i > 0 {
+                        self.output.push_str(", ");
+                    }
+                    match elem {
+                        None => {} // hole — just the comma is sufficient
+                        Some(p) => self.write_pat(p),
+                    }
+                }
+                if let Some(rest_name) = rest {
+                    if !elements.is_empty() {
+                        self.output.push_str(", ");
+                    }
+                    self.output.push_str("...");
+                    self.output.push_str(rest_name);
+                }
+                self.output.push(']');
+            }
+            Pat::Rest(inner) => {
+                self.output.push_str("...");
+                self.write_pat(inner);
+            }
+        }
     }
 }
 

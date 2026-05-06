@@ -151,11 +151,88 @@ impl<'a> ReadContext<'a> {
             .child_by_field_name("right")
             .ok_or_else(|| ReadError::Parse("assignment missing right".into()))?;
 
-        let name = self.node_text(left);
         let value = self.read_expr(right)?;
 
+        // Check for tuple/list unpacking patterns: `a, b = f()` or `[x, y] = arr`
+        match left.kind() {
+            "pattern_list" | "tuple_pattern" | "list_pattern" => {
+                let pat = self.read_py_pat(left)?;
+                let span = Span::from_ts(node.start_position(), node.end_position());
+                return Ok(Stmt::destructure(pat, value, true).with_span(span));
+            }
+            _ => {}
+        }
+
+        let name = self.node_text(left);
         // Treat as let declaration (Python doesn't distinguish)
         Ok(Stmt::let_decl(name, Some(value)))
+    }
+
+    /// Parse a Python tuple/list unpacking pattern into `Pat`.
+    fn read_py_pat(&self, node: Node) -> Result<Pat, ReadError> {
+        match node.kind() {
+            "identifier" => Ok(Pat::ident(self.node_text(node))),
+
+            "pattern_list" | "tuple_pattern" => {
+                // `a, b, *rest` or `(a, b)` — becomes Pat::Array
+                let mut elements: Vec<Option<Pat>> = Vec::new();
+                let mut rest: Option<String> = None;
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    if !child.is_named() {
+                        continue;
+                    }
+                    match child.kind() {
+                        "list_splat_pattern" => {
+                            // `*rest`
+                            let mut inner_cursor = child.walk();
+                            for inner in child.children(&mut inner_cursor) {
+                                if inner.kind() == "identifier" {
+                                    rest = Some(self.node_text(inner).to_string());
+                                    break;
+                                }
+                            }
+                        }
+                        _ => {
+                            elements.push(Some(self.read_py_pat(child)?));
+                        }
+                    }
+                }
+                Ok(Pat::Array(elements, rest))
+            }
+
+            "list_pattern" => {
+                // `[a, b, *rest]` — also Pat::Array
+                let mut elements: Vec<Option<Pat>> = Vec::new();
+                let mut rest: Option<String> = None;
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    if !child.is_named() {
+                        continue;
+                    }
+                    match child.kind() {
+                        "list_splat_pattern" => {
+                            let mut inner_cursor = child.walk();
+                            for inner in child.children(&mut inner_cursor) {
+                                if inner.kind() == "identifier" {
+                                    rest = Some(self.node_text(inner).to_string());
+                                    break;
+                                }
+                            }
+                        }
+                        _ => {
+                            elements.push(Some(self.read_py_pat(child)?));
+                        }
+                    }
+                }
+                Ok(Pat::Array(elements, rest))
+            }
+
+            other => Err(ReadError::Unsupported(format!(
+                "Python pattern type '{}'",
+                other
+            ))),
+        }
     }
 
     fn read_augmented_assignment(&self, node: Node) -> Result<Stmt, ReadError> {
@@ -1153,6 +1230,80 @@ mod tests {
             }
             _ => panic!("expected Class"),
         }
+        Ok(())
+    }
+
+    #[test]
+    fn test_tuple_unpacking_ir() -> Result<(), ReadError> {
+        let ir = read_python("a, b = func()")?;
+        assert_eq!(ir.body.len(), 1);
+        match &ir.body[0] {
+            Stmt::Destructure { pat, .. } => match pat {
+                Pat::Array(elements, rest) => {
+                    assert_eq!(elements.len(), 2);
+                    assert!(matches!(&elements[0], Some(Pat::Ident(n)) if n == "a"));
+                    assert!(matches!(&elements[1], Some(Pat::Ident(n)) if n == "b"));
+                    assert!(rest.is_none());
+                }
+                _ => panic!("expected Pat::Array, got {:?}", pat),
+            },
+            _ => panic!("expected Destructure, got {:?}", ir.body[0]),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_list_pattern_ir() -> Result<(), ReadError> {
+        let ir = read_python("[x, y] = arr")?;
+        assert_eq!(ir.body.len(), 1);
+        match &ir.body[0] {
+            Stmt::Destructure { pat, .. } => match pat {
+                Pat::Array(elements, rest) => {
+                    assert_eq!(elements.len(), 2);
+                    assert!(matches!(&elements[0], Some(Pat::Ident(n)) if n == "x"));
+                    assert!(matches!(&elements[1], Some(Pat::Ident(n)) if n == "y"));
+                    assert!(rest.is_none());
+                }
+                _ => panic!("expected Pat::Array"),
+            },
+            _ => panic!("expected Destructure"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_tuple_unpacking_with_rest() -> Result<(), ReadError> {
+        let ir = read_python("(first, *rest) = items")?;
+        assert_eq!(ir.body.len(), 1);
+        match &ir.body[0] {
+            Stmt::Destructure { pat, .. } => match pat {
+                Pat::Array(elements, rest) => {
+                    assert_eq!(elements.len(), 1);
+                    assert_eq!(rest.as_deref(), Some("rest"));
+                }
+                _ => panic!("expected Pat::Array"),
+            },
+            _ => panic!("expected Destructure"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_tuple_unpacking_round_trip() -> Result<(), ReadError> {
+        use crate::output::python::PythonWriter;
+        let ir = read_python("a, b = func()")?;
+        let out = PythonWriter::emit(&ir);
+        assert_eq!(out.trim(), "a, b = func()");
+        Ok(())
+    }
+
+    #[test]
+    fn test_list_pattern_round_trip() -> Result<(), ReadError> {
+        use crate::output::python::PythonWriter;
+        let ir = read_python("[x, y] = arr")?;
+        let out = PythonWriter::emit(&ir);
+        // Python writer emits tuple syntax for both list and tuple patterns
+        assert_eq!(out.trim(), "x, y = arr");
         Ok(())
     }
 }

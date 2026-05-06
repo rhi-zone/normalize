@@ -195,6 +195,58 @@ fn stmt_to_sexpr(stmt: &Stmt) -> Value {
             let base = extends.as_deref().map(|s| json!(s)).unwrap_or(Value::Null);
             json!(["std.class", name, base, Value::Array(methods_arr)])
         }
+
+        Stmt::Destructure { pat, value, .. } => {
+            // Lower destructuring to a sequence of std.let bindings in sexpr format.
+            // e.g. { a, b: c } = obj  →  std.seq(std.let("a", obj.a), std.let("c", obj.b))
+            let rhs = expr_to_sexpr(value);
+            let mut bindings: Vec<Value> = Vec::new();
+            collect_pat_bindings(pat, &rhs, &mut bindings);
+            if bindings.len() == 1 {
+                bindings.remove(0)
+            } else {
+                let mut arr = vec![json!("std.seq")];
+                arr.extend(bindings);
+                Value::Array(arr)
+            }
+        }
+    }
+}
+
+/// Recursively collect let-binding s-expressions from a pattern.
+fn collect_pat_bindings(pat: &Pat, rhs: &Value, out: &mut Vec<Value>) {
+    match pat {
+        Pat::Ident(name) => {
+            out.push(json!(["std.let", name, rhs.clone()]));
+        }
+        Pat::Object(fields) => {
+            for field in fields {
+                match &field.pat {
+                    Pat::Rest(inner) => {
+                        collect_pat_bindings(inner, rhs, out);
+                    }
+                    _ => {
+                        let access = json!(["obj.get", rhs.clone(), field.key.clone()]);
+                        collect_pat_bindings(&field.pat, &access, out);
+                    }
+                }
+            }
+        }
+        Pat::Array(elements, rest) => {
+            for (i, elem) in elements.iter().enumerate() {
+                if let Some(p) = elem {
+                    let access = json!(["obj.get", rhs.clone(), i]);
+                    collect_pat_bindings(p, &access, out);
+                }
+            }
+            if let Some(rest_name) = rest {
+                let slice = json!(["list.slice", rhs.clone(), elements.len()]);
+                out.push(json!(["std.let", rest_name, slice]));
+            }
+        }
+        Pat::Rest(inner) => {
+            collect_pat_bindings(inner, rhs, out);
+        }
     }
 }
 

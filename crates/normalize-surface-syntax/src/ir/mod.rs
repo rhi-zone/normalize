@@ -7,10 +7,12 @@
 //! the runtime (spore) provides the actual implementations.
 
 mod expr;
+mod pat;
 mod stmt;
 mod structure_eq;
 
 pub use expr::*;
+pub use pat::*;
 pub use stmt::*;
 pub use structure_eq::StructureEq;
 

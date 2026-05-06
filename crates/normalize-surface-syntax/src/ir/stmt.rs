@@ -1,6 +1,6 @@
 //! Statement types for the IR.
 
-use super::{Expr, Span};
+use super::{Expr, Pat, Span};
 use serde::{Deserialize, Serialize};
 
 /// A single name in an import or export specifier list.
@@ -233,6 +233,23 @@ pub enum Stmt {
         span: Option<Span>,
     },
 
+    /// Destructuring declaration: `const { a, b: c } = obj` or `const [x, y] = arr`.
+    ///
+    /// The pattern captures the full structural binding; the `mutable` flag distinguishes
+    /// `let` from `const`. Writers emit the appropriate destructuring syntax for the target
+    /// language (TypeScript/JavaScript: `const { a } = obj`; Python: `a, b = obj`).
+    Destructure {
+        /// The binding pattern.
+        pat: Pat,
+        /// The right-hand side expression.
+        value: Expr,
+        /// `true` for `let` (mutable), `false` for `const`.
+        mutable: bool,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
+    },
+
     /// Comment (line or block). Used to preserve documentation comments during translation.
     ///
     /// `text` is the raw comment text including delimiters (e.g. `// foo`, `/* bar */`,
@@ -382,6 +399,16 @@ impl Stmt {
         }
     }
 
+    /// Create a destructuring declaration.
+    pub fn destructure(pat: Pat, value: Expr, mutable: bool) -> Self {
+        Stmt::Destructure {
+            pat,
+            value,
+            mutable,
+            span: None,
+        }
+    }
+
     /// Create a line comment from raw content (without `//` or `--` delimiter).
     pub fn comment_line(text: impl Into<String>) -> Self {
         Stmt::Comment {
@@ -467,6 +494,17 @@ impl Stmt {
                 catch_param,
                 catch_body,
                 finally_body,
+                span: Some(span),
+            },
+            Stmt::Destructure {
+                pat,
+                value,
+                mutable,
+                ..
+            } => Stmt::Destructure {
+                pat,
+                value,
+                mutable,
                 span: Some(span),
             },
             Stmt::Comment { text, block, .. } => Stmt::Comment {

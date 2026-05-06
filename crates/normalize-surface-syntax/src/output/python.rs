@@ -78,6 +78,13 @@ impl PythonWriter {
                 }
             }
 
+            Stmt::Destructure { pat, value, .. } => {
+                // Python unpacking: `a, b = expr` or `[x, y] = expr`
+                self.write_py_pat(pat);
+                self.output.push_str(" = ");
+                self.write_expr(value);
+            }
+
             Stmt::Block(stmts) => {
                 // Python doesn't have standalone blocks, emit as-is
                 for s in stmts {
@@ -639,6 +646,50 @@ impl PythonWriter {
             UnaryOp::Not => "not ",
         };
         self.output.push_str(s);
+    }
+
+    /// Write a Python unpacking pattern: `a, b` (tuple), `[x, y]` (list), or plain `x`.
+    fn write_py_pat(&mut self, pat: &Pat) {
+        match pat {
+            Pat::Ident(name) => {
+                self.output.push_str(name);
+            }
+            Pat::Array(elements, rest) => {
+                // Use plain `a, b` (tuple syntax) for Python unpacking.
+                // If there's a rest element or >2 elements, the comma-separated form is idiomatic.
+                // List patterns `[a, b]` are also valid Python but less common; emit tuple form.
+                for (i, elem) in elements.iter().enumerate() {
+                    if i > 0 {
+                        self.output.push_str(", ");
+                    }
+                    match elem {
+                        None => self.output.push('_'), // holes → _ in Python
+                        Some(p) => self.write_py_pat(p),
+                    }
+                }
+                if let Some(rest_name) = rest {
+                    if !elements.is_empty() {
+                        self.output.push_str(", ");
+                    }
+                    self.output.push('*');
+                    self.output.push_str(rest_name);
+                }
+            }
+            Pat::Object(fields) => {
+                // Python has no object destructuring syntax — emit as tuple of values
+                // This is a lossy lowering; cross-language usage must account for this.
+                for (i, field) in fields.iter().enumerate() {
+                    if i > 0 {
+                        self.output.push_str(", ");
+                    }
+                    self.write_py_pat(&field.pat);
+                }
+            }
+            Pat::Rest(inner) => {
+                self.output.push('*');
+                self.write_py_pat(inner);
+            }
+        }
     }
 }
 
