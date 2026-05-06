@@ -6,6 +6,12 @@ pub mod typescript;
 #[cfg(feature = "read-typescript")]
 pub use typescript::{TYPESCRIPT_READER, TypeScriptReader, read_typescript};
 
+#[cfg(feature = "read-javascript")]
+pub mod javascript;
+
+#[cfg(feature = "read-javascript")]
+pub use javascript::{JAVASCRIPT_READER, JavaScriptReader, read_javascript};
+
 #[cfg(feature = "read-lua")]
 pub mod lua;
 

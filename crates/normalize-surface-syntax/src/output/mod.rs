@@ -12,6 +12,12 @@ pub mod typescript;
 #[cfg(feature = "write-typescript")]
 pub use typescript::{TYPESCRIPT_WRITER, TypeScriptWriter, TypeScriptWriterImpl};
 
+#[cfg(feature = "write-javascript")]
+pub mod javascript;
+
+#[cfg(feature = "write-javascript")]
+pub use javascript::{JAVASCRIPT_WRITER, JavaScriptWriterImpl};
+
 #[cfg(feature = "write-python")]
 pub mod python;
 

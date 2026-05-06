@@ -29,6 +29,10 @@ fn init_readers() {
         {
             register_reader(&crate::input::typescript::TYPESCRIPT_READER);
         }
+        #[cfg(feature = "read-javascript")]
+        {
+            register_reader(&crate::input::javascript::JAVASCRIPT_READER);
+        }
         #[cfg(feature = "read-lua")]
         {
             register_reader(&crate::input::lua::LUA_READER);
@@ -49,6 +53,10 @@ fn init_writers() {
         #[cfg(feature = "write-typescript")]
         {
             register_writer(&crate::output::typescript::TYPESCRIPT_WRITER);
+        }
+        #[cfg(feature = "write-javascript")]
+        {
+            register_writer(&crate::output::javascript::JAVASCRIPT_WRITER);
         }
         #[cfg(feature = "write-python")]
         {

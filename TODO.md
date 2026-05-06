@@ -699,14 +699,14 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
 ### normalize-surface-syntax
 
 **Readers:**
-- TypeScript reader: missing classes/interfaces/type annotations, spread/destructuring, template literals, async/await
+- TypeScript reader: ~~missing classes/interfaces/type annotations, spread/destructuring, template literals, async/await~~ — done: classes lowered to function + prototype assignments, interfaces skipped, type annotations ignored, destructuring lowered, rest params handled, await lowered to inner expr, new_expression lowered to call
 - Lua reader: missing metatables/metamethods, string methods (`:method()` syntax)
-- [ ] JavaScript reader (or reuse TypeScript reader with flag?)
+- [x] JavaScript reader — added `javascript.rs` using `arborium-javascript` + shared `ReadContext` via `read_with_language`; feature-gated as `read-javascript`
 
 **Writers:**
 - Lua writer: verify idiomatic output (use `and`/`or` vs `&&`/`||`), string escaping edge cases
 - TypeScript writer: type annotations, semicolon placement verification, template literal output
-- [ ] JavaScript writer (or reuse TypeScript writer?)
+- [x] JavaScript writer — added `javascript.rs` delegating to `TypeScriptWriter`; feature-gated as `write-javascript`
 
 **Testing:**
 - [ ] Edge case tests: nested expressions, complex control flow, Unicode strings
@@ -715,9 +715,9 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
 - [ ] Comments preservation (for documentation translation)
 - [ ] Source locations (for error messages, debugging)
 - [ ] Import/export statements
-- [ ] Class definitions, method definitions
+- [ ] Class definitions, method definitions (IR-level; currently lowered to functions + prototype assignments)
 - [ ] Type annotations (optional, for typed languages)
-- [ ] Pattern matching / destructuring
+- [ ] Pattern matching / destructuring (IR-level; currently lowered at read time)
 
 ### Package Index Backlog (simplest → complex)
 
