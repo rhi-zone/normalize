@@ -1,8 +1,9 @@
 //! Native rule checks for normalize.
 //!
 //! Implements stale-summary, check-refs, stale-docs, check-examples, ratchet, budget,
-//! long-file, high-complexity, and long-function as pure Rust checks. These are the
-//! "native engine" checks invoked by `normalize rules run --engine native`.
+//! long-file, high-complexity, long-function, high-fan-out, and high-fan-in as pure
+//! Rust checks. These are the "native engine" checks invoked by
+//! `normalize rules run --engine native`.
 
 pub mod boundary_violations;
 pub mod budget;
@@ -10,6 +11,8 @@ pub mod cache;
 pub mod check_examples;
 pub mod check_refs;
 pub mod high_complexity;
+pub mod high_fan_in;
+pub mod high_fan_out;
 pub mod long_file;
 pub mod long_function;
 pub mod ratchet;
@@ -29,6 +32,8 @@ pub use budget::{BudgetRulesReport, build_budget_report};
 pub use check_examples::build_check_examples_report;
 pub use check_refs::build_check_refs_report;
 pub use high_complexity::build_high_complexity_report;
+pub use high_fan_in::build_high_fan_in_report;
+pub use high_fan_out::build_high_fan_out_report;
 pub use long_file::build_long_file_report;
 pub use long_function::build_long_function_report;
 pub use ratchet::{RatchetRulesReport, build_ratchet_report};
@@ -190,6 +195,20 @@ pub const NATIVE_RULES: &[NativeRuleDescriptor] = &[
         message: "Dependency diff exceeds configured budget limit",
         tags: &["quality", "budget"],
         default_enabled: true,
+    },
+    NativeRuleDescriptor {
+        id: "high-fan-out",
+        default_severity: "warning",
+        message: "File imports from too many other modules (default threshold: 20) — high coupling smell",
+        tags: &["architecture", "coupling"],
+        default_enabled: false,
+    },
+    NativeRuleDescriptor {
+        id: "high-fan-in",
+        default_severity: "warning",
+        message: "File is imported by too many other modules (default threshold: 20) — fragile shared dependency",
+        tags: &["architecture", "coupling"],
+        default_enabled: false,
     },
     NativeRuleDescriptor {
         id: "long-file",

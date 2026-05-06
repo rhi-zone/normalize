@@ -15,6 +15,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`high-fan-out` and `high-fan-in` native rules** — coupling smell detection. `high-fan-out` flags files that import from more than `threshold` (default: 20) distinct resolved modules; `high-fan-in` flags files imported by more than `threshold` distinct files. Both are default disabled, require `normalize structure rebuild`, and are configurable via `[rules.rule."high-fan-out"] threshold = N` / `[rules.rule."high-fan-in"] threshold = N` in `.normalize/config.toml`. Tagged `architecture` and `coupling`.
+
 - **`boundary-violations` native rule** — configurable directory-level import boundary enforcement. Declare pairs like `"services/ cannot import cli/"` under `[rules.rule."boundary-violations"] boundaries = [...]` in `.normalize/config.toml`; the rule queries the structural index's `imports` table and reports each resolved import that crosses a boundary. Default disabled; requires `normalize structure rebuild`. Uses glob matching with `services/` treated as `services/**`.
 
 - **Re-export tracing in import resolution** — `pub use path::Item` in Rust and `export { X } from './y'` in TypeScript/JavaScript are now extracted as re-exports (`is_reexport = 1` in the `imports` table). After `resolve_all_imports()`, a new `trace_reexports()` pass follows re-export chains (up to 10 hops, with cycle detection via early-exit) so imports in file A that land on an intermediate re-exporter B are updated to point to B's source file C. This improves call graph accuracy and `find_callers`/`find_callees` results across module boundaries. Schema bumped v11→v12.

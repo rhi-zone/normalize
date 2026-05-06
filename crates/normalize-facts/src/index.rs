@@ -1542,6 +1542,50 @@ impl FileIndex {
         Ok(edges)
     }
 
+    /// Count distinct resolved import targets per file (fan-out).
+    /// Returns `Vec<(file, count)>` ordered by count descending.
+    /// Only counts rows where `resolved_file IS NOT NULL`.
+    /// Used by the `high-fan-out` native rule.
+    pub async fn import_fan_out_by_file(&self) -> Result<Vec<(String, usize)>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT file, COUNT(DISTINCT resolved_file) AS cnt \
+                 FROM imports WHERE resolved_file IS NOT NULL \
+                 GROUP BY file ORDER BY cnt DESC",
+                (),
+            )
+            .await?;
+        let mut result = Vec::new();
+        while let Some(row) = rows.next().await? {
+            let count = usize::try_from(row.get::<i64>(1)?).unwrap_or(0);
+            result.push((row.get(0)?, count));
+        }
+        Ok(result)
+    }
+
+    /// Count distinct files that import each file (fan-in).
+    /// Returns `Vec<(file, count)>` ordered by count descending.
+    /// Only counts rows where `resolved_file IS NOT NULL`.
+    /// Used by the `high-fan-in` native rule.
+    pub async fn import_fan_in_by_file(&self) -> Result<Vec<(String, usize)>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT resolved_file, COUNT(DISTINCT file) AS cnt \
+                 FROM imports WHERE resolved_file IS NOT NULL \
+                 GROUP BY resolved_file ORDER BY cnt DESC",
+                (),
+            )
+            .await?;
+        let mut result = Vec::new();
+        while let Some(row) = rows.next().await? {
+            let count = usize::try_from(row.get::<i64>(1)?).unwrap_or(0);
+            result.push((row.get(0)?, count));
+        }
+        Ok(result)
+    }
+
     /// Load resolved import edges for a specific importer file (root-relative path).
     /// Returns Vec<imported_file> where `resolved_file IS NOT NULL`.
     /// Used by the daemon to update outgoing edges for a changed file.
