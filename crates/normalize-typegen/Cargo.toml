@@ -30,6 +30,7 @@ backend-rust = []
 
 # Input parsers
 input-typescript = ["dep:arborium-typescript", "dep:tree-sitter"]
+input-graphql = ["dep:arborium-graphql", "dep:tree-sitter"]
 
 # Legacy aliases (for backwards compatibility)
 typescript-types = ["backend-typescript"]
@@ -46,6 +47,7 @@ serde_json = { workspace = true }
 thiserror = "2"
 tree-sitter = { version = "0.26", optional = true }
 arborium-typescript = { version = "2", optional = true }
+arborium-graphql = { version = "2", optional = true }
 
 [dev-dependencies]
 insta = { version = "1", features = ["json"] }

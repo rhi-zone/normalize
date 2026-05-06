@@ -678,8 +678,8 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
 ### normalize-typegen
 
 **Input Parsers:**
-- [ ] Protobuf parser - read .proto files to IR
-- [ ] GraphQL schema parser - read GraphQL SDL to IR
+- [x] ~~Protobuf parser - read .proto files to IR~~ — done; `src/input/proto.rs`, hand-rolled tokenizer (no arborium proto grammar); messages→structs, enums→int-literal enums, `repeated`→arrays, `map<K,V>`→`Type::Map`, `optional`→optional; always available, no feature flag
+- [x] ~~GraphQL schema parser - read GraphQL SDL to IR~~ — done; `src/input/graphql.rs` (feature `input-graphql`), uses arborium-graphql tree-sitter; `type`/`input`/`interface`→structs, `enum`→string-literal enum, non-null `!`→required, nullable→`Type::Optional`
 
 **Output Backends:**
 - [ ] JSON Schema output - emit IR back to JSON Schema (for validation/documentation)

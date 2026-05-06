@@ -9,10 +9,10 @@
 //! Input Formats          IR              Output Backends
 //! ──────────────     ─────────────     ─────────────────
 //! JSON Schema   ─┐                  ┌─> TypeScript types
-//! OpenAPI       ─┼─> Schema ────────┼─> TypeScript validators (Zod, Valibot)
-//! Protobuf      ─┘   (ir.rs)        ├─> Python types (dataclasses, TypedDict)
-//!                                   ├─> Python validators (Pydantic)
-//!                                   ├─> Go types (structs)
+//! OpenAPI       ─┤                  ├─> TypeScript validators (Zod, Valibot)
+//! Protobuf      ─┼─> Schema ────────├─> Python types (dataclasses, TypedDict)
+//! GraphQL SDL   ─┤   (ir.rs)        ├─> Python validators (Pydantic)
+//! TypeScript    ─┘                  ├─> Go types (structs)
 //!                                   └─> Rust types (serde structs)
 //! ```
 //!
@@ -72,6 +72,11 @@
 //! - `python` - backend-python + backend-pydantic
 //! - `go` - backend-go
 //! - `rust-types` - backend-rust
+//!
+//! Input parser flags:
+//! - `input-typescript` - TypeScript source parser (requires arborium-typescript)
+//! - `input-graphql` - GraphQL SDL parser (requires arborium-graphql)
+//! - Protobuf (`.proto`) parsing is always available via [`parse_proto`] (no extra feature needed)
 
 pub mod input;
 pub mod ir;
@@ -80,9 +85,11 @@ pub mod registry;
 pub mod traits;
 
 // Re-export commonly used items
+#[cfg(feature = "input-graphql")]
+pub use input::parse_graphql_schema;
 #[cfg(feature = "input-typescript")]
 pub use input::parse_typescript_types;
-pub use input::{ParseError, parse_json_schema, parse_openapi};
+pub use input::{ParseError, parse_json_schema, parse_openapi, parse_proto};
 
 // Re-export traits
 pub use traits::{Backend, BackendCategory};
