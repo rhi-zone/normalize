@@ -944,6 +944,10 @@ impl EditService {
     fn display_inline_variable(&self, report: &InlineVariableReport) -> String {
         report.format_text()
     }
+
+    fn display_add_parameter(&self, report: &AddParameterReport) -> String {
+        report.format_text()
+    }
 }
 
 #[cli(
@@ -1481,6 +1485,52 @@ impl EditService {
         )
     }
 
+    /// Add a parameter to a function signature and update all call sites.
+    ///
+    /// Parses the file with tree-sitter to locate the function, inserts the new parameter
+    /// into the signature at the given position (default: last), then finds every call site
+    /// via the facts index and inserts the default value at the same argument position.
+    ///
+    /// Supports Rust, TypeScript/JavaScript, and Python. Requires `--type` for typed
+    /// languages if you want a type annotation on the new parameter.
+    ///
+    /// If the facts index is unavailable, only the definition is updated and a warning is
+    /// printed. Run `normalize structure rebuild` first to enable cross-file updates.
+    ///
+    /// Examples:
+    ///   normalize edit add-parameter src/lib.rs my_func --param ctx --type Context --default Context::default()
+    ///   normalize edit add-parameter src/main.py helper --param verbose --default False
+    ///   normalize edit add-parameter src/lib.rs my_func --param x --type i32 --default 0 --position 0 --dry-run
+    #[cli(name = "add-parameter", display_with = "display_add_parameter")]
+    #[allow(clippy::too_many_arguments)]
+    pub async fn add_parameter(
+        &self,
+        #[param(positional, help = "File containing the function definition")] file: String,
+        #[param(positional, help = "Name of the function to modify")] function_name: String,
+        #[param(help = "Name of the new parameter")] param: String,
+        #[param(help = "Default value to insert at call sites")] default: String,
+        #[param(help = "Type annotation for typed languages (Rust, TypeScript)")] r#type: Option<
+            String,
+        >,
+        #[param(help = "0-based position to insert at (default: last)")] position: Option<usize>,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
+        #[param(short = 'm', help = "Message for shadow history")] message: Option<String>,
+        #[param(short = 'r', help = "Root directory")] root: Option<String>,
+    ) -> Result<AddParameterReport, String> {
+        do_add_parameter(
+            &file,
+            &function_name,
+            &param,
+            &default,
+            r#type.as_deref(),
+            position,
+            root.as_deref().map(Path::new),
+            dry_run,
+            message.as_deref(),
+        )
+        .await
+    }
+
     /// View shadow git edit history
     ///
     /// Examples:
@@ -1869,6 +1919,174 @@ fn parse_line_col_position(s: &str) -> Result<(usize, usize), String> {
         ));
     }
     Ok((line, col))
+}
+
+// ── add_parameter ─────────────────────────────────────────────────────────────
+
+/// Report returned by `normalize edit add-parameter`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct AddParameterReport {
+    /// File containing the function definition (relative path).
+    pub function_file: String,
+    /// Name of the function that was modified.
+    pub function_name: String,
+    /// Name of the new parameter.
+    pub param_name: String,
+    /// Number of call sites that were updated.
+    pub call_sites_updated: usize,
+    /// Whether this was a dry run.
+    pub dry_run: bool,
+}
+
+impl OutputFormatter for AddParameterReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let verb = if self.dry_run { "Would add" } else { "Added" };
+        let _ = writeln!(
+            out,
+            "{} parameter '{}' to '{}' in {}",
+            verb, self.param_name, self.function_name, self.function_file
+        );
+        if self.call_sites_updated > 0 {
+            let sites = if self.call_sites_updated == 1 {
+                "site"
+            } else {
+                "sites"
+            };
+            let verb2 = if self.dry_run {
+                "would update"
+            } else {
+                "updated"
+            };
+            let _ = writeln!(
+                out,
+                "  {} {} call {}",
+                verb2, self.call_sites_updated, sites
+            );
+        }
+        if self.dry_run {
+            let _ = writeln!(out, "  (dry run — no files written)");
+        }
+        out
+    }
+
+    fn format_pretty(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let verb = if self.dry_run {
+            "\x1b[1;33mWould add\x1b[0m"
+        } else {
+            "\x1b[1;32mAdded\x1b[0m"
+        };
+        let _ = writeln!(
+            out,
+            "{} parameter '\x1b[1m{}\x1b[0m' to '\x1b[1m{}\x1b[0m' in \x1b[2m{}\x1b[0m",
+            verb, self.param_name, self.function_name, self.function_file
+        );
+        if self.call_sites_updated > 0 {
+            let sites = if self.call_sites_updated == 1 {
+                "site"
+            } else {
+                "sites"
+            };
+            let verb2 = if self.dry_run {
+                "would update"
+            } else {
+                "updated"
+            };
+            let _ = writeln!(
+                out,
+                "  {} \x1b[1m{}\x1b[0m call {}",
+                verb2, self.call_sites_updated, sites
+            );
+        }
+        if self.dry_run {
+            let _ = writeln!(out, "  \x1b[2m(dry run — no files written)\x1b[0m");
+        }
+        out
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn do_add_parameter(
+    file: &str,
+    function_name: &str,
+    param_name: &str,
+    default_value: &str,
+    param_type: Option<&str>,
+    position: Option<usize>,
+    root: Option<&Path>,
+    dry_run: bool,
+    message: Option<&str>,
+) -> Result<AddParameterReport, String> {
+    let root: PathBuf = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+
+    let config = NormalizeConfig::load(&root);
+    let shadow_enabled = config.shadow.enabled();
+
+    let file_path = if Path::new(file).is_absolute() {
+        PathBuf::from(file)
+    } else {
+        root.join(file)
+    };
+
+    let rel_path = file_path
+        .strip_prefix(&root)
+        .unwrap_or(&file_path)
+        .to_string_lossy()
+        .to_string();
+
+    let index = match crate::index::ensure_ready(&root).await {
+        Ok(idx) => Some(idx),
+        Err(e) => {
+            eprintln!(
+                "warning: index not available ({}); updating definition only",
+                e
+            );
+            None
+        }
+    };
+
+    let ctx = normalize_refactor::RefactoringContext {
+        root: root.clone(),
+        editor: edit::Editor::new(),
+        index,
+        loader: normalize_languages::GrammarLoader::new(),
+    };
+
+    let outcome = normalize_refactor::add_parameter::plan_add_parameter(
+        &ctx,
+        &rel_path,
+        function_name,
+        param_name,
+        param_type,
+        default_value,
+        position,
+    )
+    .await?;
+
+    for warning in &outcome.plan.warnings {
+        eprintln!("warning: {}", warning);
+    }
+
+    let executor = normalize_refactor::RefactoringExecutor {
+        root: root.clone(),
+        dry_run,
+        shadow_enabled,
+        message: message.map(String::from),
+    };
+    executor.apply(&outcome.plan)?;
+
+    Ok(AddParameterReport {
+        function_file: rel_path,
+        function_name: function_name.to_string(),
+        param_name: param_name.to_string(),
+        call_sites_updated: outcome.call_sites_updated,
+        dry_run,
+    })
 }
 
 // ── move ─────────────────────────────────────────────────────────────────────

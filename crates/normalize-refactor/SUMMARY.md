@@ -4,7 +4,7 @@ Composable refactoring engine for normalize — domain logic extracted from the 
 
 Three layers:
 - **Actions** (`src/actions.rs`): Pure query and mutation primitives
-- **Recipes** (`src/rename.rs`, `src/move_item.rs`, `src/introduce_variable.rs`): Compositions of actions into complete refactoring plans
+- **Recipes** (`src/rename.rs`, `src/move_item.rs`, `src/introduce_variable.rs`, `src/inline_variable.rs`, `src/add_parameter.rs`): Compositions of actions into complete refactoring plans
 - **Executor** (`src/lib.rs` `RefactoringExecutor`): Shared apply/dry-run/shadow logic
 
 Dependencies: normalize-edit, normalize-facts, normalize-languages, normalize-shadow.
@@ -12,3 +12,5 @@ Dependencies: normalize-edit, normalize-facts, normalize-languages, normalize-sh
 `decoration_extended_start` in `actions.rs` uses `GrammarLoader::get_decorations()` to load language-specific `.scm` queries (`@decoration` captures) when available, falling back to the hardcoded `DECORATION_KINDS` list for languages without a `decorations.scm` file.
 
 `introduce_variable` recipe (`src/introduce_variable.rs`): extracts an expression at a given byte range into a named variable binding. Parses the file with tree-sitter, walks up the CST to find the parent statement, inserts the binding before the statement, and replaces the expression with the variable name. Language-specific keyword: Python uses `name = expr`, JS/TS use `const name = expr;`, all others use `let name = expr;`. Exposed as `normalize edit introduce-variable <file> <range> <name>`.
+
+`add_parameter` recipe (`src/add_parameter.rs`): inserts a new parameter into a function signature at a given 0-based position (default: last) and updates all call sites by inserting the default value at the same argument position. Parses files with tree-sitter to locate function parameter lists and call argument lists. Uses `actions::find_references` to find all callers via the facts index; falls back with a warning if the index is unavailable. Supports Rust (`function_item`/`parameters`/`arguments`), TypeScript/JavaScript (`function_declaration`/`formal_parameters`/`arguments`), and Python (`function_definition`/`parameters`/`argument_list`). Exposed as `normalize edit add-parameter <file> <function> --param <name> --default <value> [--type <type>] [--position <N>] [--dry-run]`.
