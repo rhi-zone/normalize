@@ -118,7 +118,7 @@ impl SymbolParser {
     }
 
     /// Query-based import extraction using `@import`, `@import.path`, `@import.name`,
-    /// `@import.alias`, and `@import.glob` captures.
+    /// `@import.alias`, `@import.glob`, and `@import.reexport` captures.
     fn collect_imports_with_compiled_query(
         root: tree_sitter::Node,
         source: &str,
@@ -128,6 +128,7 @@ impl SymbolParser {
         let name_idx = query.capture_index_for_name("import.name");
         let alias_idx = query.capture_index_for_name("import.alias");
         let glob_idx = query.capture_index_for_name("import.glob");
+        let reexport_idx = query.capture_index_for_name("import.reexport");
         let stmt_idx = query.capture_index_for_name("import");
 
         let mut qcursor = tree_sitter::QueryCursor::new();
@@ -140,6 +141,7 @@ impl SymbolParser {
             let mut name: Option<String> = None;
             let mut alias: Option<String> = None;
             let mut is_glob = false;
+            let mut is_reexport = false;
 
             for cap in m.captures {
                 let text = &source[cap.node.byte_range()];
@@ -154,6 +156,8 @@ impl SymbolParser {
                     alias = Some(text.to_string());
                 } else if glob_idx == Some(idx) {
                     is_glob = true;
+                } else if reexport_idx == Some(idx) {
+                    is_reexport = true;
                 }
             }
 
@@ -163,6 +167,7 @@ impl SymbolParser {
                     name: "*".to_string(),
                     alias,
                     line: stmt_line,
+                    is_reexport,
                 });
             } else if let Some(n) = name {
                 results.push(FlatImport {
@@ -170,6 +175,7 @@ impl SymbolParser {
                     name: n,
                     alias,
                     line: stmt_line,
+                    is_reexport,
                 });
             } else if let Some(p) = path {
                 results.push(FlatImport {
@@ -177,14 +183,34 @@ impl SymbolParser {
                     name: p,
                     alias,
                     line: stmt_line,
+                    is_reexport,
                 });
             }
         }
         if results.is_empty() {
-            None
-        } else {
-            Some(results)
+            return None;
         }
+
+        // Dedup: when both a plain and a re-export pattern match the same use_declaration
+        // (e.g. `pub use` matches both the generic pattern and the reexport pattern),
+        // keep one entry per (module, name, line) and prefer is_reexport=true.
+        let mut seen: std::collections::HashMap<(Option<String>, String, usize), usize> =
+            std::collections::HashMap::new();
+        let mut deduped: Vec<FlatImport> = Vec::with_capacity(results.len());
+        for imp in results {
+            let key = (imp.module.clone(), imp.name.clone(), imp.line);
+            if let Some(&existing_idx) = seen.get(&key) {
+                // Prefer the reexport variant
+                if imp.is_reexport && !deduped[existing_idx].is_reexport {
+                    deduped[existing_idx].is_reexport = true;
+                }
+            } else {
+                seen.insert(key, deduped.len());
+                deduped.push(imp);
+            }
+        }
+
+        Some(deduped)
     }
 
     /// Trait-based import extraction fallback.
@@ -205,6 +231,7 @@ impl SymbolParser {
                         name: "*".to_string(),
                         alias: None,
                         line: import.line,
+                        is_reexport: false,
                     });
                 } else if import.names.is_empty() {
                     // Single import: module is the full path
@@ -213,6 +240,7 @@ impl SymbolParser {
                         name: import.module.clone(),
                         alias: import.alias.clone(),
                         line: import.line,
+                        is_reexport: false,
                     });
                 } else {
                     // Named imports: one entry per name
@@ -222,6 +250,7 @@ impl SymbolParser {
                             name: n.clone(),
                             alias: import.alias.clone(),
                             line: import.line,
+                            is_reexport: false,
                         });
                     }
                 }

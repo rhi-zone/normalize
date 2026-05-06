@@ -2159,18 +2159,18 @@ mod unix_impl {
                 let mut ids = HashSet::new();
                 // Files that were added or changed.
                 for (path, new_hash) in &new_scm_hashes {
-                    if old_scm_hashes.get(path) != Some(new_hash) {
-                        if let Some(id) = scm_path_to_rule_id(path) {
-                            ids.insert(id);
-                        }
+                    if old_scm_hashes.get(path) != Some(new_hash)
+                        && let Some(id) = scm_path_to_rule_id(path)
+                    {
+                        ids.insert(id);
                     }
                 }
                 // Files that were removed.
                 for path in old_scm_hashes.keys() {
-                    if !new_scm_hashes.contains_key(path) {
-                        if let Some(id) = scm_path_to_rule_id(path) {
-                            ids.insert(id);
-                        }
+                    if !new_scm_hashes.contains_key(path)
+                        && let Some(id) = scm_path_to_rule_id(path)
+                    {
+                        ids.insert(id);
                     }
                 }
                 ids

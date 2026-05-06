@@ -58,4 +58,9 @@ pub struct FlatImport {
     pub alias: Option<String>,
     /// Line number
     pub line: usize,
+    /// True when this is a re-export that makes the symbol available to other files.
+    /// In Rust: `pub use path::Item;`. In TypeScript/JS: `export { X } from './y'`.
+    /// Re-exports are both an import (bringing the symbol in) and a publication of it.
+    #[serde(default)]
+    pub is_reexport: bool,
 }

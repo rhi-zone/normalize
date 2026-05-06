@@ -75,7 +75,7 @@ struct CachedFileData {
 }
 
 // Not yet public - just delete .normalize/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 11;
+const SCHEMA_VERSION: i64 = 12;
 
 /// Bump when extraction logic changes to invalidate cached results.
 /// Bumped to "2" (2026-04-27): purge CA cache entries that may have been poisoned
@@ -336,7 +336,8 @@ impl FileIndex {
                 name TEXT NOT NULL,
                 alias TEXT,
                 line INTEGER NOT NULL,
-                resolved_file TEXT
+                resolved_file TEXT,
+                is_reexport INTEGER NOT NULL DEFAULT 0
             )",
             (),
         )
@@ -451,6 +452,12 @@ impl FileIndex {
             conn.execute("ALTER TABLE imports ADD COLUMN resolved_file TEXT", ())
                 .await
                 .ok(); // ignore "duplicate column" error on fresh DBs
+            conn.execute(
+                "ALTER TABLE imports ADD COLUMN is_reexport INTEGER NOT NULL DEFAULT 0",
+                (),
+            )
+            .await
+            .ok(); // ignore "duplicate column" error on fresh DBs
             conn.execute("ALTER TABLE calls ADD COLUMN callee_resolved_file TEXT", ())
                 .await
                 .ok(); // ignore "duplicate column" error on fresh DBs
@@ -1768,6 +1775,73 @@ impl FileIndex {
         Ok(resolved_count)
     }
 
+    /// Follow re-export chains to resolve imports to their ultimate source file.
+    ///
+    /// When file A imports `Foo` from file B, but file B re-exports `Foo` from file C
+    /// (via `pub use c::Foo` in Rust or `export { Foo } from './c'` in TypeScript),
+    /// this updates A's import row so `resolved_file` points to C instead of B.
+    ///
+    /// Runs iteratively (up to `max_depth` passes) to handle chains longer than one hop,
+    /// stopping early when no rows are updated. Wildcard re-exports (`pub use mod::*`)
+    /// are handled by following any re-export from the intermediate file.
+    pub async fn trace_reexports(&self) -> Result<usize, libsql::Error> {
+        let max_depth = 10usize;
+        let mut total_updated = 0usize;
+
+        for _ in 0..max_depth {
+            // For each import row whose resolved_file re-exports the imported name
+            // (or re-exports via wildcard), update resolved_file to point to the
+            // re-export's own resolved_file (the ultimate source).
+            //
+            // A re-export in file B for name N means: imports row where
+            //   file = B, name = N (or name = '*'), is_reexport = 1, resolved_file IS NOT NULL
+            //
+            // We look for imports in A where:
+            //   resolved_file = B  AND  B has a matching re-export row with its own resolved_file
+            let updated = self
+                .conn
+                .execute(
+                    "UPDATE imports AS consumer
+                     SET resolved_file = (
+                         SELECT reexp.resolved_file
+                         FROM imports AS reexp
+                         WHERE reexp.file = consumer.resolved_file
+                           AND reexp.is_reexport = 1
+                           AND reexp.resolved_file IS NOT NULL
+                           AND reexp.resolved_file != consumer.resolved_file
+                           AND (
+                               reexp.name = consumer.name
+                               OR COALESCE(reexp.alias, reexp.name) = consumer.name
+                               OR reexp.name = '*'
+                           )
+                         LIMIT 1
+                     )
+                     WHERE consumer.resolved_file IS NOT NULL
+                       AND EXISTS (
+                           SELECT 1 FROM imports AS reexp2
+                           WHERE reexp2.file = consumer.resolved_file
+                             AND reexp2.is_reexport = 1
+                             AND reexp2.resolved_file IS NOT NULL
+                             AND reexp2.resolved_file != consumer.resolved_file
+                             AND (
+                                 reexp2.name = consumer.name
+                                 OR COALESCE(reexp2.alias, reexp2.name) = consumer.name
+                                 OR reexp2.name = '*'
+                             )
+                       )",
+                    (),
+                )
+                .await? as usize;
+
+            total_updated += updated;
+            if updated == 0 {
+                break;
+            }
+        }
+
+        Ok(total_updated)
+    }
+
     /// Resolve call targets: for each call, try to determine which file defines the callee.
     ///
     /// Uses the import graph: if caller_file imports a name that matches callee_name (or its alias),
@@ -2361,8 +2435,8 @@ impl FileIndex {
 
             for imp in &data.imports {
                 self.conn.execute(
-                    "INSERT INTO imports (file, module, name, alias, line) VALUES (?1, ?2, ?3, ?4, ?5)",
-                    params![data.file_path.clone(), imp.module.clone(), imp.name.clone(), imp.alias.clone(), imp.line as i64],
+                    "INSERT INTO imports (file, module, name, alias, line, is_reexport) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![data.file_path.clone(), imp.module.clone(), imp.name.clone(), imp.alias.clone(), imp.line as i64, imp.is_reexport as i64],
                 ).await?;
                 import_count += 1;
             }
@@ -2391,6 +2465,11 @@ impl FileIndex {
         // files are indexed. Must run after COMMIT so module_to_files() can query them.
         self.resolve_all_imports().await.unwrap_or_else(|e| {
             tracing::warn!("normalize-facts: resolve_all_imports error: {}", e);
+            0
+        });
+        // Follow re-export chains so imports resolve to ultimate source files.
+        self.trace_reexports().await.unwrap_or_else(|e| {
+            tracing::warn!("normalize-facts: trace_reexports error: {}", e);
             0
         });
         // Resolve call targets using the now-populated import graph.
@@ -2603,8 +2682,8 @@ impl FileIndex {
             // Insert imports
             for imp in &imports {
                 self.conn.execute(
-                    "INSERT INTO imports (file, module, name, alias, line) VALUES (?1, ?2, ?3, ?4, ?5)",
-                    params![file_path.clone(), imp.module.clone(), imp.name.clone(), imp.alias.clone(), imp.line as i64],
+                    "INSERT INTO imports (file, module, name, alias, line, is_reexport) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![file_path.clone(), imp.module.clone(), imp.name.clone(), imp.alias.clone(), imp.line as i64, imp.is_reexport as i64],
                 ).await?;
                 import_count += 1;
             }
@@ -2661,6 +2740,11 @@ impl FileIndex {
             tracing::warn!("normalize-facts: resolve_all_imports error: {}", e);
             0
         });
+        // Follow re-export chains so imports resolve to ultimate source files.
+        self.trace_reexports().await.unwrap_or_else(|e| {
+            tracing::warn!("normalize-facts: trace_reexports error: {}", e);
+            0
+        });
         // Resolve call targets using the now-populated import graph.
         self.resolve_all_calls().await.unwrap_or_else(|e| {
             tracing::warn!("normalize-facts: resolve_all_calls error: {}", e);
@@ -2706,6 +2790,10 @@ impl FileIndex {
 
         self.resolve_all_imports().await.unwrap_or_else(|e| {
             tracing::warn!("normalize-facts: resolve_all_imports error: {}", e);
+            0
+        });
+        self.trace_reexports().await.unwrap_or_else(|e| {
+            tracing::warn!("normalize-facts: trace_reexports error: {}", e);
             0
         });
         self.resolve_all_calls().await.unwrap_or_else(|e| {

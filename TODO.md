@@ -562,7 +562,10 @@ See `docs/lint-architecture.md` for full design discussion.
 
 **Architectural analysis next iteration:**
 - [ ] Boundary violation rules (configurable: "services/ cannot import cli/")
-- [ ] Re-export tracing (follow `pub use` to resolve more imports)
+- [x] Re-export tracing (follow `pub use` to resolve more imports) — implemented 2026-05-06:
+      `@import.reexport` capture in `rust.imports.scm`, `typescript.imports.scm`, `javascript.imports.scm`;
+      `is_reexport` column in `imports` table; `trace_reexports()` in `FileIndex` runs after
+      `resolve_all_imports()` to follow chains up to depth 10; schema bumped to 12.
 
 Rules (custom enforcement, future):
 - [ ] Module boundary rules ("services/ cannot import cli/")
