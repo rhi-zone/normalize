@@ -34,6 +34,7 @@ pub struct PopulateStats {
     pub symbols_skipped: usize,
     pub docs_embedded: usize,
     pub commits_embedded: usize,
+    pub contexts_embedded: usize,
     pub errors: usize,
 }
 
@@ -304,7 +305,9 @@ pub async fn populate_incremental_for_paths(
         }
     }
 
-    // Re-embed any changed markdown docs
+    // Re-embed any changed markdown files.
+    // Files under .normalize/context/ are stored as source_type='context';
+    // all other *.md files are stored as source_type='doc'.
     if let Some(root) = repo_root {
         for path in changed_paths {
             if path.ends_with(".md") {
@@ -321,18 +324,35 @@ pub async fn populate_incremental_for_paths(
                         md_ids.push(i as i64);
                     }
                     if !md_texts.is_empty() {
-                        flush_doc_batch(
-                            conn,
-                            &mut embedder,
-                            path,
-                            &md_texts,
-                            &md_ids,
-                            head_commit,
-                            &config.model,
-                            &mut stats,
-                            vec_conn.as_ref(),
-                        )
-                        .await;
+                        let is_context = path.contains(".normalize/context/")
+                            || path.contains(".normalize\\context\\");
+                        if is_context {
+                            flush_context_batch(
+                                conn,
+                                &mut embedder,
+                                path,
+                                &md_texts,
+                                &md_ids,
+                                head_commit,
+                                &config.model,
+                                &mut stats,
+                                vec_conn.as_ref(),
+                            )
+                            .await;
+                        } else {
+                            flush_doc_batch(
+                                conn,
+                                &mut embedder,
+                                path,
+                                &md_texts,
+                                &md_ids,
+                                head_commit,
+                                &config.model,
+                                &mut stats,
+                                vec_conn.as_ref(),
+                            )
+                            .await;
+                        }
                     }
                 }
             }
@@ -342,6 +362,7 @@ pub async fn populate_incremental_for_paths(
     info!(
         symbols = stats.symbols_embedded,
         docs = stats.docs_embedded,
+        contexts = stats.contexts_embedded,
         paths = changed_paths.len(),
         "Incremental re-embedding complete"
     );
@@ -467,6 +488,103 @@ fn collect_md_files(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
             out.push(path);
         }
     }
+}
+
+/// Embed all `.normalize/context/` markdown files in the workspace.
+///
+/// Walks `<repo_root>/.normalize/context/` recursively. Each `*.md` file is
+/// chunked by heading section and stored with `source_type = "context"` so
+/// `normalize context --semantic` can filter to context blocks exclusively.
+///
+/// Existing `context` embeddings for the same paths are replaced via the UNIQUE
+/// constraint on `(source_type, source_path, source_id)`.
+pub async fn populate_context_blocks(
+    conn: &Connection,
+    config: &EmbeddingsConfig,
+    repo_root: &Path,
+    head_commit: Option<&str>,
+    db_path: Option<&Path>,
+) -> anyhow::Result<PopulateStats> {
+    let vec_conn: Option<VecConnection> = db_path.and_then(VecConnection::open);
+    store::ensure_schema(conn).await?;
+
+    let mut embedder = Embedder::load(&config.model, None)?;
+    store::ensure_vec_schema(conn, embedder.dimensions, vec_conn.as_ref()).await;
+
+    let mut stats = PopulateStats::default();
+
+    let context_dir = repo_root.join(".normalize").join("context");
+    if !context_dir.is_dir() {
+        return Ok(stats);
+    }
+
+    let mut md_files: Vec<std::path::PathBuf> = Vec::new();
+    collect_md_files(&context_dir, &mut md_files);
+
+    if md_files.is_empty() {
+        return Ok(stats);
+    }
+
+    eprintln!("Embedding {} context block(s)...", md_files.len());
+
+    for abs_path in &md_files {
+        let rel_path = abs_path
+            .strip_prefix(repo_root)
+            .unwrap_or(abs_path)
+            .to_string_lossy()
+            .into_owned();
+
+        if let Err(e) = store::delete_embeddings_for_path(conn, &rel_path, vec_conn.as_ref()).await
+        {
+            warn!(path = %rel_path, error = %e, "Failed to delete old context embeddings");
+        }
+
+        let content = match std::fs::read_to_string(abs_path) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!(path = %rel_path, error = %e, "Could not read context file");
+                stats.errors += 1;
+                continue;
+            }
+        };
+
+        let sections = split_markdown_sections(&content);
+        let mut texts: Vec<String> = Vec::new();
+        let mut section_ids: Vec<i64> = Vec::new();
+
+        for (i, (breadcrumb, body)) in sections.iter().enumerate() {
+            if body.trim().is_empty() {
+                continue;
+            }
+            texts.push(build_markdown_chunk(&rel_path, breadcrumb, body));
+            section_ids.push(i as i64);
+        }
+
+        if texts.is_empty() {
+            continue;
+        }
+
+        flush_context_batch(
+            conn,
+            &mut embedder,
+            &rel_path,
+            &texts,
+            &section_ids,
+            head_commit,
+            &config.model,
+            &mut stats,
+            vec_conn.as_ref(),
+        )
+        .await;
+    }
+
+    info!(
+        contexts = stats.contexts_embedded,
+        files = md_files.len(),
+        "Context block embedding complete"
+    );
+
+    Ok(stats)
 }
 
 /// Embed recent git commit messages.
@@ -745,6 +863,63 @@ async fn flush_doc_batch(
         }
         Err(e) => {
             warn!(error = %e, path = %rel_path, "Doc embedding batch failed");
+            stats.errors += texts.len();
+        }
+    }
+}
+
+/// Flush a batch of context block chunks through the embedder and store.
+///
+/// Identical to [`flush_doc_batch`] but uses `source_type = "context"` so context
+/// blocks are stored separately and can be filtered in semantic search.
+#[allow(clippy::too_many_arguments)]
+async fn flush_context_batch(
+    conn: &Connection,
+    embedder: &mut Embedder,
+    rel_path: &str,
+    texts: &[String],
+    section_ids: &[i64],
+    head_commit: Option<&str>,
+    model_name: &str,
+    stats: &mut PopulateStats,
+    vec_conn: Option<&VecConnection>,
+) {
+    let text_refs: Vec<&str> = texts.iter().map(String::as_str).collect();
+    match embedder.embed_batch(&text_refs) {
+        Ok(vectors) => {
+            if let Err(e) = conn.execute("BEGIN", ()).await {
+                warn!(error = %e, "Failed to BEGIN transaction for context batch");
+            }
+            for (i, (text, vec)) in texts.iter().zip(vectors.iter()).enumerate() {
+                let blob = encode_vector(vec);
+                let sid = section_ids.get(i).copied().unwrap_or(i as i64);
+                match store::upsert_embedding(
+                    conn,
+                    "context",
+                    rel_path,
+                    Some(sid),
+                    model_name,
+                    head_commit,
+                    0.0,
+                    text,
+                    &blob,
+                    vec_conn,
+                )
+                .await
+                {
+                    Ok(()) => stats.contexts_embedded += 1,
+                    Err(e) => {
+                        warn!(path = %rel_path, section = i, error = %e, "Failed to store context embedding");
+                        stats.errors += 1;
+                    }
+                }
+            }
+            if let Err(e) = conn.execute("COMMIT", ()).await {
+                warn!(error = %e, "Failed to COMMIT transaction for context batch");
+            }
+        }
+        Err(e) => {
+            warn!(error = %e, path = %rel_path, "Context embedding batch failed");
             stats.errors += texts.len();
         }
     }

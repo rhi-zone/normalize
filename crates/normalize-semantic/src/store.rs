@@ -289,6 +289,52 @@ pub async fn load_all_embeddings(
     Ok(result)
 }
 
+/// Load stored embeddings filtered by a specific source type.
+///
+/// Like [`load_all_embeddings`] but scoped to one `source_type` (e.g. `"context"`).
+/// Used for the brute-force fallback path when ANN search is not available and
+/// the caller wants to restrict results to a single source type.
+pub async fn load_embeddings_for_type(
+    conn: &Connection,
+    model: &str,
+    source_type: &str,
+) -> Result<Vec<StoredEmbedding>, libsql::Error> {
+    let mut rows = conn
+        .query(
+            "SELECT id, source_type, source_path, source_id, staleness, chunk_text, last_commit, embedding
+             FROM embeddings WHERE model = ?1 AND source_type = ?2",
+            params![model, source_type],
+        )
+        .await?;
+
+    let mut result = Vec::new();
+    while let Some(row) = rows.next().await? {
+        let id: i64 = row.get(0)?;
+        let source_type_val: String = row.get(1)?;
+        let source_path: String = row.get(2)?;
+        let source_id: Option<i64> = row.get(3)?;
+        let staleness: f64 = row.get(4)?;
+        let chunk_text: String = row.get(5)?;
+        let last_commit: Option<String> = row.get(6)?;
+        let blob: Vec<u8> = row.get(7)?;
+
+        let vector = crate::search::parse_blob(blob);
+
+        result.push(StoredEmbedding {
+            id,
+            source_type: source_type_val,
+            source_path,
+            source_id,
+            staleness: staleness as f32,
+            chunk_text,
+            last_commit,
+            vector,
+        });
+    }
+
+    Ok(result)
+}
+
 /// Count embeddings stored for a given model.
 pub async fn count_embeddings(conn: &Connection, model: &str) -> Result<i64, libsql::Error> {
     let mut rows = conn

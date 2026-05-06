@@ -667,6 +667,20 @@ async fn rebuild_data(
             Err(e) => tracing::warn!("commit message embedding failed (non-fatal): {}", e),
         }
 
+        // 4. Context block embeddings (.normalize/context/*.md)
+        match normalize_semantic::populate_context_blocks(
+            idx.connection(),
+            &embeddings_config,
+            &root,
+            head_commit.as_deref(),
+            Some(&db_path),
+        )
+        .await
+        {
+            Ok(stats) => total_embedded += stats.contexts_embedded,
+            Err(e) => tracing::warn!("context block embedding failed (non-fatal): {}", e),
+        }
+
         if total_embedded > 0 || full {
             result.embeddings = Some(total_embedded);
         }

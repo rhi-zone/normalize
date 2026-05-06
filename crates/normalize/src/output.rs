@@ -287,7 +287,8 @@ mod tests {
         assert_output_formatter::<PackageOutdatedReport>();
         assert_output_formatter::<PackageAuditReport>();
 
-        use normalize_semantic::service::SearchReport;
+        use normalize_semantic::service::{ContextSearchReport, SearchReport};
         assert_output_formatter::<SearchReport>();
+        assert_output_formatter::<ContextSearchReport>();
     }
 }
