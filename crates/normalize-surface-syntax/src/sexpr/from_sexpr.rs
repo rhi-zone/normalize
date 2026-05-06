@@ -171,6 +171,107 @@ fn parse_opcode(opcode: &str, args: &[Value]) -> Result<Stmt, SExprError> {
             Ok(Stmt::function(Function::new(name, params, vec![body])))
         }
 
+        "std.import" => {
+            if args.len() < 2 {
+                return Err(SExprError::WrongArity {
+                    opcode: opcode.into(),
+                    expected: 2,
+                    got: args.len(),
+                });
+            }
+            let source = args[0]
+                .as_str()
+                .ok_or_else(|| {
+                    SExprError::InvalidArgument("std.import source must be string".into())
+                })?
+                .to_string();
+            let mut names = Vec::new();
+            if let Value::Array(name_arr) = &args[1] {
+                for item in name_arr {
+                    match item {
+                        Value::String(s) => {
+                            names.push(ImportName::named(s.clone()));
+                        }
+                        Value::Array(parts) if parts.len() == 2 => {
+                            let first = parts[0].as_str().unwrap_or("").to_string();
+                            let second = parts[1].as_str().unwrap_or("").to_string();
+                            if first == "ns" {
+                                names.push(ImportName::namespace(second));
+                            } else {
+                                names.push(ImportName::aliased(first, second));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Ok(Stmt::import(source, names))
+        }
+
+        "std.export" => {
+            if args.is_empty() {
+                return Err(SExprError::WrongArity {
+                    opcode: opcode.into(),
+                    expected: 1,
+                    got: 0,
+                });
+            }
+            let mut names = Vec::new();
+            if let Value::Array(name_arr) = &args[0] {
+                for item in name_arr {
+                    match item {
+                        Value::String(s) => {
+                            names.push(ExportName::named(s.clone()));
+                        }
+                        Value::Array(parts) if parts.len() == 2 => {
+                            let first = parts[0].as_str().unwrap_or("").to_string();
+                            let second = parts[1].as_str().unwrap_or("").to_string();
+                            names.push(ExportName::aliased(first, second));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            let source = args.get(1).and_then(|v| v.as_str()).map(String::from);
+            Ok(Stmt::export(names, source))
+        }
+
+        "std.class" => {
+            if args.len() < 3 {
+                return Err(SExprError::WrongArity {
+                    opcode: opcode.into(),
+                    expected: 3,
+                    got: args.len(),
+                });
+            }
+            let name = args[0]
+                .as_str()
+                .ok_or_else(|| SExprError::InvalidArgument("std.class name must be string".into()))?
+                .to_string();
+            let extends = args[1].as_str().map(String::from);
+            let mut methods = Vec::new();
+            if let Value::Array(method_arr) = &args[2] {
+                for item in method_arr {
+                    if let Value::Array(parts) = item
+                        && parts.len() >= 3
+                    {
+                        let method_name = parts[0].as_str().unwrap_or("").to_string();
+                        let params = parse_params(&parts[1])?;
+                        let body_stmts = if let Value::Array(body_arr) = &parts[2] {
+                            body_arr
+                                .iter()
+                                .map(value_to_stmt)
+                                .collect::<Result<Vec<_>, _>>()?
+                        } else {
+                            vec![]
+                        };
+                        methods.push(Method::new(method_name, params, body_stmts));
+                    }
+                }
+            }
+            Ok(Stmt::class(name, extends, methods))
+        }
+
         // Expression opcodes - wrap in Stmt::Expr
         _ => {
             let expr = parse_opcode_expr(opcode, args)?;

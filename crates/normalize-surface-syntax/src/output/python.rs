@@ -255,6 +255,114 @@ impl PythonWriter {
                 self.indent -= 1;
             }
 
+            Stmt::Import { source, names, .. } => {
+                // Determine if this is a `from X import Y` style or a bare `import X` style.
+                // Heuristic: if any name differs from the source, it's a from-import.
+                let is_from_import = names.iter().any(|n| n.name != *source);
+                if names.is_empty() || !is_from_import {
+                    // Bare import: `import os` or `import os as o`
+                    self.output.push_str("import ");
+                    if names.is_empty() {
+                        self.output.push_str(source);
+                    } else {
+                        for (i, n) in names.iter().enumerate() {
+                            if i > 0 {
+                                self.output.push_str(", ");
+                            }
+                            self.output.push_str(&n.name);
+                            if let Some(alias) = &n.alias {
+                                self.output.push_str(" as ");
+                                self.output.push_str(alias);
+                            }
+                        }
+                    }
+                } else {
+                    // From-import: `from os.path import join, exists`
+                    self.output.push_str("from ");
+                    self.output.push_str(source);
+                    self.output.push_str(" import ");
+                    for (i, n) in names.iter().enumerate() {
+                        if i > 0 {
+                            self.output.push_str(", ");
+                        }
+                        if n.is_namespace {
+                            self.output.push('*');
+                        } else {
+                            self.output.push_str(&n.name);
+                            if let Some(alias) = &n.alias {
+                                self.output.push_str(" as ");
+                                self.output.push_str(alias);
+                            }
+                        }
+                    }
+                }
+            }
+
+            Stmt::Export { .. } => {
+                // Python has no export statements; emit a comment
+                self.output.push_str("# export (not applicable in Python)");
+            }
+
+            Stmt::Class {
+                name,
+                extends,
+                methods,
+                ..
+            } => {
+                self.output.push_str("class ");
+                self.output.push_str(name);
+                if let Some(base) = extends {
+                    self.output.push('(');
+                    self.output.push_str(base);
+                    self.output.push(')');
+                }
+                self.output.push_str(":\n");
+                self.indent += 1;
+                if methods.is_empty() {
+                    self.write_indent();
+                    self.output.push_str("pass");
+                } else {
+                    for method in methods {
+                        self.write_indent();
+                        if method.is_static {
+                            self.output.push_str("@staticmethod\n");
+                            self.write_indent();
+                        }
+                        self.output.push_str("def ");
+                        self.output.push_str(&method.name);
+                        self.output.push('(');
+                        for (i, param) in method.params.iter().enumerate() {
+                            if i > 0 {
+                                self.output.push_str(", ");
+                            }
+                            self.output.push_str(&param.name);
+                            if let Some(t) = &param.type_annotation {
+                                self.output.push_str(": ");
+                                self.output.push_str(t);
+                            }
+                        }
+                        self.output.push(')');
+                        if let Some(ret) = &method.return_type {
+                            self.output.push_str(" -> ");
+                            self.output.push_str(ret);
+                        }
+                        self.output.push_str(":\n");
+                        self.indent += 1;
+                        if method.body.is_empty() {
+                            self.write_indent();
+                            self.output.push_str("pass\n");
+                        } else {
+                            for s in &method.body {
+                                self.write_stmt(s);
+                                self.output.push('\n');
+                            }
+                        }
+                        self.indent -= 1;
+                    }
+                }
+                self.indent -= 1;
+            }
+
             Stmt::Comment { text, block, .. } => {
                 if *block {
                     // Python block comments use triple-quoted strings or # per line

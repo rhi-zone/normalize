@@ -143,6 +143,58 @@ fn stmt_to_sexpr(stmt: &Stmt) -> Value {
                 json!(["std.comment_line", text])
             }
         }
+
+        Stmt::Import { source, names, .. } => {
+            let names_arr: Vec<Value> = names
+                .iter()
+                .map(|n| {
+                    if n.is_namespace {
+                        json!(["ns", n.alias.as_deref().unwrap_or("*")])
+                    } else if let Some(alias) = &n.alias {
+                        json!([n.name, alias])
+                    } else {
+                        json!(n.name)
+                    }
+                })
+                .collect();
+            json!(["std.import", source, Value::Array(names_arr)])
+        }
+
+        Stmt::Export { names, source, .. } => {
+            let names_arr: Vec<Value> = names
+                .iter()
+                .map(|n| {
+                    if let Some(alias) = &n.alias {
+                        json!([n.name, alias])
+                    } else {
+                        json!(n.name)
+                    }
+                })
+                .collect();
+            if let Some(src) = source {
+                json!(["std.export", Value::Array(names_arr), src])
+            } else {
+                json!(["std.export", Value::Array(names_arr)])
+            }
+        }
+
+        Stmt::Class {
+            name,
+            extends,
+            methods,
+            ..
+        } => {
+            let methods_arr: Vec<Value> = methods
+                .iter()
+                .map(|m| {
+                    let params: Vec<Value> = m.params.iter().map(|p| json!(p.name)).collect();
+                    let body_arr: Vec<Value> = m.body.iter().map(stmt_to_sexpr).collect();
+                    json!([m.name, Value::Array(params), Value::Array(body_arr)])
+                })
+                .collect();
+            let base = extends.as_deref().map(|s| json!(s)).unwrap_or(Value::Null);
+            json!(["std.class", name, base, Value::Array(methods_arr)])
+        }
     }
 }
 

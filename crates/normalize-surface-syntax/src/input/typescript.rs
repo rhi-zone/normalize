@@ -115,9 +115,11 @@ impl<'a> ReadContext<'a> {
             | "abstract_class_declaration"
             | "enum_declaration"
             | "ambient_declaration"
-            | "module"
-            | "export_statement"
-            | "import_statement" => Ok(None),
+            | "module" => Ok(None),
+
+            // Import/export statements — parse into first-class IR nodes
+            "import_statement" => self.read_import_statement(node).map(Some),
+            "export_statement" => self.read_export_statement(node).map(Some),
 
             // Statements
             "expression_statement" => self.read_expression_statement(node).map(Some),
@@ -1311,28 +1313,48 @@ impl<'a> ReadContext<'a> {
         Ok(Stmt::function(func))
     }
 
-    /// Lower a class declaration to a function (constructor) + method assignments.
+    /// Parse a class declaration into a first-class `Stmt::Class` IR node.
     ///
-    /// `class Foo extends Bar { constructor(x) { ... } method() { ... } }` lowers to:
-    ///
-    /// ```text
-    /// function Foo(x) { ... }
-    /// Foo.prototype.method = function() { ... };
-    /// ```
+    /// `class Foo extends Bar { constructor(x) { ... } method() { ... } }` becomes:
+    /// `Stmt::Class { name: "Foo", extends: Some("Bar"), methods: [...] }`
     fn read_class_declaration(&self, node: Node) -> Result<Stmt, ReadError> {
         let name_node = node.child_by_field_name("name");
         let class_name = name_node
             .map(|n| self.node_text(n).to_string())
             .unwrap_or_else(|| "__class__".to_string());
 
+        // Walk class_declaration children to find class_heritage → extends_clause → type_identifier.
+        // `child_by_field_name("heritage")` may not match the grammar's field name.
+        let extends = {
+            let mut cur = node.walk();
+            let heritage = node
+                .children(&mut cur)
+                .find(|c| c.kind() == "class_heritage");
+            heritage.and_then(|h| {
+                let mut c2 = h.walk();
+                let ext_clause = h.children(&mut c2).find(|c| c.kind() == "extends_clause");
+                ext_clause.and_then(|ec| {
+                    let mut c3 = ec.walk();
+                    ec.children(&mut c3)
+                        .find(|c| matches!(c.kind(), "type_identifier" | "identifier"))
+                        .map(|c| self.node_text(c).to_string())
+                })
+            })
+        };
+
         let body = node
             .child_by_field_name("body")
             .ok_or_else(|| ReadError::Parse("class_declaration missing body".into()))?;
 
-        self.lower_class_body(&class_name, body)
+        let methods = self.read_class_body(body)?;
+        let span = Span::from_ts(node.start_position(), node.end_position());
+        Ok(Stmt::class(class_name, extends, methods).with_span(span))
     }
 
-    /// Lower a class expression to a function expression.
+    /// Parse a class expression — lower to a function expression (constructor only).
+    ///
+    /// Class expressions remain lowered to function expressions because `Expr` has no
+    /// `Class` variant — they appear inline and the constructor is the best approximation.
     fn read_class_expr(&self, node: Node) -> Result<Expr, ReadError> {
         let name = node
             .child_by_field_name("name")
@@ -1351,48 +1373,50 @@ impl<'a> ReadContext<'a> {
         ))))
     }
 
-    fn lower_class_body(&self, class_name: &str, body: Node) -> Result<Stmt, ReadError> {
-        let (params, ctor_body) = self.extract_constructor(body)?;
-
-        // Build constructor function
-        let ctor = Stmt::function(Function::new(class_name, params, ctor_body));
-
-        // Collect non-constructor methods
-        let mut stmts = vec![ctor];
+    /// Parse a class body node into a list of `Method` IR nodes.
+    fn read_class_body(&self, body: Node) -> Result<Vec<Method>, ReadError> {
+        let mut methods = Vec::new();
         let mut cursor = body.walk();
+
         for child in body.children(&mut cursor) {
             if child.kind() == "method_definition" {
-                let method_name_node = child.child_by_field_name("name");
-                if let Some(mn) = method_name_node {
-                    let mn_text = self.node_text(mn);
-                    if mn_text == "constructor" {
-                        continue;
-                    }
-                    // Build prototype assignment: ClassName.prototype.method = function(...) { ... }
-                    let mut method_params = Vec::new();
-                    if let Some(mp) = child.child_by_field_name("parameters") {
-                        self.collect_params(mp, &mut method_params);
-                    }
-                    let method_body = child
-                        .child_by_field_name("body")
-                        .map(|b| self.read_block_stmts(b))
-                        .transpose()?
-                        .unwrap_or_default();
+                let name_node = match child.child_by_field_name("name") {
+                    Some(n) => n,
+                    None => continue,
+                };
+                let method_name = self.node_text(name_node).to_string();
 
-                    let func_expr =
-                        Expr::Function(Box::new(Function::anonymous(method_params, method_body)));
-                    let proto_access =
-                        Expr::member(Expr::member(Expr::ident(class_name), "prototype"), mn_text);
-                    stmts.push(Stmt::expr(Expr::assign(proto_access, func_expr)));
+                // Detect `static` keyword
+                let is_static = {
+                    let mut c2 = child.walk();
+                    child
+                        .children(&mut c2)
+                        .any(|ch| ch.kind() == "static" || ch.kind() == "static_keyword")
+                };
+
+                let mut params = Vec::new();
+                if let Some(p) = child.child_by_field_name("parameters") {
+                    self.collect_params(p, &mut params);
                 }
+
+                let body_stmts = child
+                    .child_by_field_name("body")
+                    .map(|b| self.read_block_stmts(b))
+                    .transpose()?
+                    .unwrap_or_default();
+
+                let return_type = child
+                    .child_by_field_name("return_type")
+                    .map(|n| self.extract_type_annotation_text(n));
+
+                let mut method = Method::new(method_name, params, body_stmts);
+                method.is_static = is_static;
+                method.return_type = return_type;
+                methods.push(method);
             }
         }
 
-        if stmts.len() == 1 {
-            Ok(stmts.remove(0))
-        } else {
-            Ok(Stmt::block(stmts))
-        }
+        Ok(methods)
     }
 
     /// Extract constructor params and body from a class body node.
@@ -1417,6 +1441,168 @@ impl<'a> ReadContext<'a> {
         }
         // No constructor: empty body
         Ok((vec![], vec![]))
+    }
+
+    /// Parse `import_statement` into `Stmt::Import`.
+    ///
+    /// Handles:
+    /// - `import { foo, bar as b } from './module'`  → named imports
+    /// - `import * as ns from 'other'`               → namespace import
+    /// - `import DefaultExport from 'default-mod'`   → default import
+    /// - `import './side-effect'`                    → side-effect import (empty names)
+    fn read_import_statement(&self, node: Node) -> Result<Stmt, ReadError> {
+        // Source string: the `from 'source'` part (last string child)
+        let source = self.extract_import_source(node).unwrap_or_default();
+
+        let mut names: Vec<ImportName> = Vec::new();
+
+        // Walk children to find `import_clause` (field name may vary by grammar version)
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "import_clause" {
+                self.collect_import_clause(child, &mut names);
+                break;
+            }
+        }
+
+        let span = Span::from_ts(node.start_position(), node.end_position());
+        Ok(Stmt::import(source, names).with_span(span))
+    }
+
+    /// Extract the `'source'` string from an import/export statement node.
+    fn extract_import_source(&self, node: Node) -> Option<String> {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "string" {
+                let raw = self.node_text(child);
+                // Strip surrounding quotes
+                let inner = raw.trim_matches('"').trim_matches('\'');
+                return Some(inner.to_string());
+            }
+        }
+        None
+    }
+
+    /// Collect import specifiers from an `import_clause` node into `names`.
+    fn collect_import_clause(&self, clause: Node, names: &mut Vec<ImportName>) {
+        let mut cursor = clause.walk();
+        for child in clause.children(&mut cursor) {
+            match child.kind() {
+                // Default import: `import Foo from '...'` — the clause itself is an identifier
+                "identifier" => {
+                    names.push(ImportName::default(self.node_text(child)));
+                }
+                // Namespace import: `import * as ns from '...'`
+                "namespace_import" => {
+                    let mut c2 = child.walk();
+                    if let Some(alias) = child.children(&mut c2).find(|c| c.kind() == "identifier")
+                    {
+                        names.push(ImportName::namespace(self.node_text(alias)));
+                    }
+                }
+                // Named imports: `import { foo, bar as b } from '...'`
+                "named_imports" => {
+                    let mut c2 = child.walk();
+                    for specifier in child.children(&mut c2) {
+                        if specifier.kind() == "import_specifier" {
+                            self.collect_import_specifier(specifier, names);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Parse a single `import_specifier` node and push to `names`.
+    fn collect_import_specifier(&self, node: Node, names: &mut Vec<ImportName>) {
+        // `import_specifier` children: identifier [as identifier]
+        let mut cursor = node.walk();
+        let children: Vec<_> = node
+            .children(&mut cursor)
+            .filter(|c| c.kind() == "identifier")
+            .collect();
+
+        match children.len() {
+            1 => {
+                names.push(ImportName::named(self.node_text(children[0])));
+            }
+            2 => {
+                // `foo as bar`
+                names.push(ImportName::aliased(
+                    self.node_text(children[0]),
+                    self.node_text(children[1]),
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    /// Parse `export_statement` into `Stmt::Export`.
+    ///
+    /// Handles:
+    /// - `export { foo, bar as baz }`         → named export
+    /// - `export { x } from './re-export'`    → re-export
+    /// - `export default expr`                → skip (no IR representation yet)
+    /// - `export class Foo { ... }`           → emit the contained declaration
+    fn read_export_statement(&self, node: Node) -> Result<Stmt, ReadError> {
+        let span = Span::from_ts(node.start_position(), node.end_position());
+
+        // Check for `export_clause` (named exports)
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            match child.kind() {
+                "export_clause" => {
+                    let mut names: Vec<ExportName> = Vec::new();
+                    let mut c2 = child.walk();
+                    for specifier in child.children(&mut c2) {
+                        if specifier.kind() == "export_specifier" {
+                            self.collect_export_specifier(specifier, &mut names);
+                        }
+                    }
+                    let source = self.extract_import_source(node);
+                    return Ok(Stmt::export(names, source).with_span(span));
+                }
+                // `export class Foo { ... }` — parse the class declaration
+                "class_declaration" => {
+                    return self.read_class_declaration(child);
+                }
+                // `export function foo() { ... }` — parse the function
+                "function_declaration" => {
+                    return self.read_function_declaration(child);
+                }
+                // `export default expr` — skip (no IR repr for default export value)
+                "default" => {
+                    return Ok(Stmt::export(vec![], None).with_span(span));
+                }
+                _ => {}
+            }
+        }
+
+        // Fallback: empty export
+        Ok(Stmt::export(vec![], None).with_span(span))
+    }
+
+    /// Parse a single `export_specifier` node and push to `names`.
+    fn collect_export_specifier(&self, node: Node, names: &mut Vec<ExportName>) {
+        let mut cursor = node.walk();
+        let children: Vec<_> = node
+            .children(&mut cursor)
+            .filter(|c| c.kind() == "identifier")
+            .collect();
+
+        match children.len() {
+            1 => {
+                names.push(ExportName::named(self.node_text(children[0])));
+            }
+            2 => {
+                names.push(ExportName::aliased(
+                    self.node_text(children[0]),
+                    self.node_text(children[1]),
+                ));
+            }
+            _ => {}
+        }
     }
 
     /// Lower `await expr` → the inner expression (async/await is transparent at IR level).
@@ -1550,9 +1736,108 @@ mod tests {
         let program = read_typescript(
             "class Animal { constructor(name) { this.name = name; } speak() { return 1; } }",
         )?;
-        // Should produce a block: [function Animal(name){...}, Animal.prototype.speak = ...]
-        assert!(!program.body.is_empty());
-        // First stmt should be a block (constructor + method) or a function
+        assert_eq!(program.body.len(), 1);
+        match &program.body[0] {
+            Stmt::Class {
+                name,
+                extends,
+                methods,
+                ..
+            } => {
+                assert_eq!(name, "Animal");
+                assert!(extends.is_none());
+                assert_eq!(methods.len(), 2);
+                assert_eq!(methods[0].name, "constructor");
+                assert_eq!(methods[1].name, "speak");
+            }
+            _ => panic!("expected Class, got {:?}", program.body[0]),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_class_extends() -> Result<(), ReadError> {
+        let program = read_typescript("class Dog extends Animal { speak() { return 2; } }")?;
+        assert_eq!(program.body.len(), 1);
+        match &program.body[0] {
+            Stmt::Class {
+                name,
+                extends,
+                methods,
+                ..
+            } => {
+                assert_eq!(name, "Dog");
+                assert_eq!(extends.as_deref(), Some("Animal"));
+                assert_eq!(methods.len(), 1);
+            }
+            _ => panic!("expected Class"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_import_named() -> Result<(), ReadError> {
+        let program = read_typescript("import { foo, bar as b } from './module';")?;
+        assert_eq!(program.body.len(), 1);
+        match &program.body[0] {
+            Stmt::Import { source, names, .. } => {
+                assert_eq!(source, "./module");
+                assert_eq!(names.len(), 2);
+                assert_eq!(names[0].name, "foo");
+                assert!(names[0].alias.is_none());
+                assert_eq!(names[1].name, "bar");
+                assert_eq!(names[1].alias.as_deref(), Some("b"));
+            }
+            _ => panic!("expected Import"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_import_namespace() -> Result<(), ReadError> {
+        let program = read_typescript("import * as ns from 'other';")?;
+        assert_eq!(program.body.len(), 1);
+        match &program.body[0] {
+            Stmt::Import { source, names, .. } => {
+                assert_eq!(source, "other");
+                assert_eq!(names.len(), 1);
+                assert!(names[0].is_namespace);
+                assert_eq!(names[0].alias.as_deref(), Some("ns"));
+            }
+            _ => panic!("expected Import"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_export_named() -> Result<(), ReadError> {
+        let program = read_typescript("export { foo, bar as baz };")?;
+        assert_eq!(program.body.len(), 1);
+        match &program.body[0] {
+            Stmt::Export { names, source, .. } => {
+                assert_eq!(names.len(), 2);
+                assert_eq!(names[0].name, "foo");
+                assert_eq!(names[1].name, "bar");
+                assert_eq!(names[1].alias.as_deref(), Some("baz"));
+                assert!(source.is_none());
+            }
+            _ => panic!("expected Export"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_export_reexport() -> Result<(), ReadError> {
+        let program = read_typescript("export { x } from './other';")?;
+        assert_eq!(program.body.len(), 1);
+        match &program.body[0] {
+            Stmt::Export { names, source, .. } => {
+                assert_eq!(names.len(), 1);
+                assert_eq!(names[0].name, "x");
+                assert_eq!(source.as_deref(), Some("./other"));
+            }
+            _ => panic!("expected Export"),
+        }
         Ok(())
     }
 

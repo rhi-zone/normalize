@@ -3,6 +3,112 @@
 use super::{Expr, Span};
 use serde::{Deserialize, Serialize};
 
+/// A single name in an import or export specifier list.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ImportName {
+    /// The exported name being imported (e.g. `foo` in `import { foo } from '...'`).
+    pub name: String,
+    /// Local alias, if any (e.g. `bar` in `import { foo as bar } from '...'`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
+    /// True for namespace imports: `import * as ns from '...'`.
+    pub is_namespace: bool,
+}
+
+impl ImportName {
+    /// Plain named import: `import { name } from '...'`.
+    pub fn named(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            alias: None,
+            is_namespace: false,
+        }
+    }
+
+    /// Aliased named import: `import { name as alias } from '...'`.
+    pub fn aliased(name: impl Into<String>, alias: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            alias: Some(alias.into()),
+            is_namespace: false,
+        }
+    }
+
+    /// Default import: `import Name from '...'`.
+    pub fn default(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            alias: None,
+            is_namespace: false,
+        }
+    }
+
+    /// Namespace import: `import * as ns from '...'`.
+    pub fn namespace(alias: impl Into<String>) -> Self {
+        Self {
+            name: "*".into(),
+            alias: Some(alias.into()),
+            is_namespace: true,
+        }
+    }
+}
+
+/// A single name in an export specifier list.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExportName {
+    /// The local name being exported (e.g. `foo` in `export { foo }`).
+    pub name: String,
+    /// Exported alias, if any (e.g. `bar` in `export { foo as bar }`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
+}
+
+impl ExportName {
+    /// Plain export: `export { name }`.
+    pub fn named(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            alias: None,
+        }
+    }
+
+    /// Aliased export: `export { name as alias }`.
+    pub fn aliased(name: impl Into<String>, alias: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            alias: Some(alias.into()),
+        }
+    }
+}
+
+/// A method in a class definition.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Method {
+    /// Method name.
+    pub name: String,
+    /// Parameters.
+    pub params: Vec<super::Param>,
+    /// Method body.
+    pub body: Vec<Stmt>,
+    /// True for `static` methods.
+    pub is_static: bool,
+    /// Optional return type annotation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub return_type: Option<String>,
+}
+
+impl Method {
+    pub fn new(name: impl Into<String>, params: Vec<super::Param>, body: Vec<Stmt>) -> Self {
+        Self {
+            name: name.into(),
+            params,
+            body,
+            is_static: false,
+            return_type: None,
+        }
+    }
+}
+
 /// A statement (doesn't produce a value directly).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Stmt {
@@ -87,6 +193,45 @@ pub enum Stmt {
 
     /// Function declaration.
     Function(crate::Function),
+
+    /// Import statement: `import { X, Y } from 'source'` or `import * as ns from 'source'`.
+    ///
+    /// `names` is empty for side-effect-only imports: `import './side-effect'`.
+    Import {
+        /// The module specifier string (e.g. `"./module"`, `"react"`).
+        source: String,
+        /// Named/namespace/default specifiers. Empty means side-effect import.
+        names: Vec<ImportName>,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
+    },
+
+    /// Export statement: `export { X, Y }` or re-export: `export { X } from 'source'`.
+    Export {
+        /// Names being exported.
+        names: Vec<ExportName>,
+        /// Source module for re-exports (e.g. `"./other"` in `export { X } from './other'`).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        source: Option<String>,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
+    },
+
+    /// Class definition: `class Foo extends Bar { method() { ... } }`.
+    Class {
+        /// Class name.
+        name: String,
+        /// Superclass name (e.g. `"Bar"` in `class Foo extends Bar`).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        extends: Option<String>,
+        /// Methods (including constructor).
+        methods: Vec<Method>,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
+    },
 
     /// Comment (line or block). Used to preserve documentation comments during translation.
     ///
@@ -209,6 +354,34 @@ impl Stmt {
         Stmt::Function(f)
     }
 
+    /// Create an import statement.
+    pub fn import(source: impl Into<String>, names: Vec<ImportName>) -> Self {
+        Stmt::Import {
+            source: source.into(),
+            names,
+            span: None,
+        }
+    }
+
+    /// Create an export statement.
+    pub fn export(names: Vec<ExportName>, source: Option<String>) -> Self {
+        Stmt::Export {
+            names,
+            source,
+            span: None,
+        }
+    }
+
+    /// Create a class definition.
+    pub fn class(name: impl Into<String>, extends: Option<String>, methods: Vec<Method>) -> Self {
+        Stmt::Class {
+            name: name.into(),
+            extends,
+            methods,
+            span: None,
+        }
+    }
+
     /// Create a line comment from raw content (without `//` or `--` delimiter).
     pub fn comment_line(text: impl Into<String>) -> Self {
         Stmt::Comment {
@@ -299,6 +472,27 @@ impl Stmt {
             Stmt::Comment { text, block, .. } => Stmt::Comment {
                 text,
                 block,
+                span: Some(span),
+            },
+            Stmt::Import { source, names, .. } => Stmt::Import {
+                source,
+                names,
+                span: Some(span),
+            },
+            Stmt::Export { names, source, .. } => Stmt::Export {
+                names,
+                source,
+                span: Some(span),
+            },
+            Stmt::Class {
+                name,
+                extends,
+                methods,
+                ..
+            } => Stmt::Class {
+                name,
+                extends,
+                methods,
                 span: Some(span),
             },
             other => other,

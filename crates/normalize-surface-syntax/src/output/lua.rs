@@ -225,6 +225,162 @@ impl LuaWriter {
                 self.write_function(f);
             }
 
+            Stmt::Import { source, names, .. } => {
+                // Lua has no native import/require syntax at IR level.
+                // Emit as `require('source')` call, assigning names if any.
+                if names.is_empty() {
+                    self.output.push_str("require('");
+                    self.output.push_str(source);
+                    self.output.push_str("')");
+                } else if names.len() == 1 && !names[0].is_namespace {
+                    let local_name = names[0].alias.as_deref().unwrap_or(&names[0].name);
+                    self.output.push_str("local ");
+                    self.output.push_str(local_name);
+                    self.output.push_str(" = require('");
+                    self.output.push_str(source);
+                    self.output.push_str("')");
+                } else {
+                    // Multiple names: local _mod = require('source'); local x = _mod.x; ...
+                    self.output.push_str("local _mod_");
+                    // Use a sanitised version of source as a variable name
+                    let mod_var: String = source
+                        .chars()
+                        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+                        .collect();
+                    self.output.push_str(&mod_var);
+                    self.output.push_str(" = require('");
+                    self.output.push_str(source);
+                    self.output.push_str("')");
+                    for n in names {
+                        if n.is_namespace {
+                            continue;
+                        }
+                        self.output.push('\n');
+                        self.write_indent();
+                        let local_name = n.alias.as_deref().unwrap_or(&n.name);
+                        self.output.push_str("local ");
+                        self.output.push_str(local_name);
+                        self.output.push_str(" = _mod_");
+                        self.output.push_str(&mod_var);
+                        self.output.push('.');
+                        self.output.push_str(&n.name);
+                    }
+                }
+            }
+
+            Stmt::Export { .. } => {
+                // Lua has no export statements; emit a comment
+                self.output.push_str("-- export (not applicable in Lua)");
+            }
+
+            Stmt::Class {
+                name,
+                extends,
+                methods,
+                ..
+            } => {
+                // Lower Lua class to metatable pattern:
+                // local ClassName = {}
+                // ClassName.__index = ClassName
+                // [if extends: setmetatable(ClassName, { __index = Base })]
+                // function ClassName:method(...) ... end
+                // function ClassName.new(...) ... end  (for constructor)
+                self.output.push_str("local ");
+                self.output.push_str(name);
+                self.output.push_str(" = {}");
+                self.output.push('\n');
+                self.write_indent();
+                self.output.push_str(name);
+                self.output.push_str(".__index = ");
+                self.output.push_str(name);
+                if let Some(base) = extends {
+                    self.output.push('\n');
+                    self.write_indent();
+                    self.output.push_str("setmetatable(");
+                    self.output.push_str(name);
+                    self.output.push_str(", { __index = ");
+                    self.output.push_str(base);
+                    self.output.push_str(" })");
+                }
+                for method in methods {
+                    self.output.push('\n');
+                    self.write_indent();
+                    if method.name == "constructor" || method.name == "__init__" {
+                        // Emit as ClassName.new(...)
+                        self.output.push_str("function ");
+                        self.output.push_str(name);
+                        self.output.push_str(".new(");
+                        let params: Vec<_> =
+                            method.params.iter().filter(|p| p.name != "self").collect();
+                        for (i, p) in params.iter().enumerate() {
+                            if i > 0 {
+                                self.output.push_str(", ");
+                            }
+                            self.output.push_str(&p.name);
+                        }
+                        self.output.push_str(")\n");
+                        self.indent += 1;
+                        self.write_indent();
+                        self.output.push_str("local self = setmetatable({}, ");
+                        self.output.push_str(name);
+                        self.output.push_str(")\n");
+                        for s in &method.body {
+                            self.write_stmt(s);
+                            self.output.push('\n');
+                        }
+                        self.write_indent();
+                        self.output.push_str("return self\n");
+                        self.indent -= 1;
+                        self.write_indent();
+                        self.output.push_str("end");
+                    } else if method.is_static {
+                        self.output.push_str("function ");
+                        self.output.push_str(name);
+                        self.output.push('.');
+                        self.output.push_str(&method.name);
+                        self.output.push('(');
+                        for (i, p) in method.params.iter().enumerate() {
+                            if i > 0 {
+                                self.output.push_str(", ");
+                            }
+                            self.output.push_str(&p.name);
+                        }
+                        self.output.push_str(")\n");
+                        self.indent += 1;
+                        for s in &method.body {
+                            self.write_stmt(s);
+                            self.output.push('\n');
+                        }
+                        self.indent -= 1;
+                        self.write_indent();
+                        self.output.push_str("end");
+                    } else {
+                        self.output.push_str("function ");
+                        self.output.push_str(name);
+                        self.output.push(':');
+                        self.output.push_str(&method.name);
+                        self.output.push('(');
+                        let params: Vec<_> =
+                            method.params.iter().filter(|p| p.name != "self").collect();
+                        for (i, p) in params.iter().enumerate() {
+                            if i > 0 {
+                                self.output.push_str(", ");
+                            }
+                            self.output.push_str(&p.name);
+                        }
+                        self.output.push_str(")\n");
+                        self.indent += 1;
+                        for s in &method.body {
+                            self.write_stmt(s);
+                            self.output.push('\n');
+                        }
+                        self.indent -= 1;
+                        self.write_indent();
+                        self.output.push_str("end");
+                    }
+                }
+            }
+
             Stmt::Comment { text, block, .. } => {
                 if *block {
                     self.output.push_str("--[[");

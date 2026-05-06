@@ -211,6 +211,135 @@ impl TypeScriptWriter {
                 self.write_function(f);
             }
 
+            Stmt::Import { source, names, .. } => {
+                self.output.push_str("import ");
+                if names.is_empty() {
+                    // Side-effect import: `import './side-effect'`
+                    self.output.push('\'');
+                    self.output.push_str(source);
+                    self.output.push('\'');
+                } else {
+                    // Check if there is a namespace import
+                    let namespace = names.iter().find(|n| n.is_namespace);
+                    let default_name = names.iter().find(|n| !n.is_namespace && n.alias.is_none());
+                    let named: Vec<_> = names.iter().filter(|n| !n.is_namespace).collect();
+
+                    if let Some(ns) = namespace {
+                        self.output.push_str("* as ");
+                        self.output.push_str(ns.alias.as_deref().unwrap_or("_ns"));
+                    } else if !named.is_empty() {
+                        // Check for default import (single identifier before `{`)
+                        // In our IR, default imports are ImportName { name, alias: None, is_namespace: false }
+                        // and named imports can have aliases. We emit default first if present.
+                        let has_default =
+                            named.iter().any(|n| n.alias.is_none() && names.len() == 1);
+                        let braced: Vec<_> = if has_default && named.len() == 1 {
+                            // Only default import — no braces
+                            let _ = default_name;
+                            self.output.push_str(&named[0].name);
+                            vec![]
+                        } else {
+                            named.clone()
+                        };
+                        if !braced.is_empty() {
+                            self.output.push_str("{ ");
+                            for (i, n) in braced.iter().enumerate() {
+                                if i > 0 {
+                                    self.output.push_str(", ");
+                                }
+                                self.output.push_str(&n.name);
+                                if let Some(alias) = &n.alias {
+                                    self.output.push_str(" as ");
+                                    self.output.push_str(alias);
+                                }
+                            }
+                            self.output.push_str(" }");
+                        }
+                    }
+                    self.output.push_str(" from '");
+                    self.output.push_str(source);
+                    self.output.push('\'');
+                }
+                self.output.push(';');
+            }
+
+            Stmt::Export { names, source, .. } => {
+                self.output.push_str("export");
+                if names.is_empty() {
+                    // Empty export (e.g. `export default ...` stub)
+                } else {
+                    self.output.push_str(" { ");
+                    for (i, n) in names.iter().enumerate() {
+                        if i > 0 {
+                            self.output.push_str(", ");
+                        }
+                        self.output.push_str(&n.name);
+                        if let Some(alias) = &n.alias {
+                            self.output.push_str(" as ");
+                            self.output.push_str(alias);
+                        }
+                    }
+                    self.output.push_str(" }");
+                }
+                if let Some(src) = source {
+                    self.output.push_str(" from '");
+                    self.output.push_str(src);
+                    self.output.push('\'');
+                }
+                self.output.push(';');
+            }
+
+            Stmt::Class {
+                name,
+                extends,
+                methods,
+                ..
+            } => {
+                self.output.push_str("class ");
+                self.output.push_str(name);
+                if let Some(base) = extends {
+                    self.output.push_str(" extends ");
+                    self.output.push_str(base);
+                }
+                self.output.push_str(" {\n");
+                self.indent += 1;
+                for method in methods {
+                    self.write_indent();
+                    if method.is_static {
+                        self.output.push_str("static ");
+                    }
+                    self.output.push_str(&method.name);
+                    self.output.push('(');
+                    for (i, param) in method.params.iter().enumerate() {
+                        if i > 0 {
+                            self.output.push_str(", ");
+                        }
+                        self.output.push_str(&param.name);
+                        if let Some(t) = &param.type_annotation {
+                            self.output.push_str(": ");
+                            self.output.push_str(t);
+                        }
+                    }
+                    self.output.push(')');
+                    if let Some(ret) = &method.return_type {
+                        self.output.push_str(": ");
+                        self.output.push_str(ret);
+                    }
+                    self.output.push_str(" {\n");
+                    self.indent += 1;
+                    for s in &method.body {
+                        self.write_stmt(s);
+                        self.output.push('\n');
+                    }
+                    self.indent -= 1;
+                    self.write_indent();
+                    self.output.push_str("}\n");
+                }
+                self.indent -= 1;
+                self.write_indent();
+                self.output.push('}');
+            }
+
             Stmt::Comment { text, block, .. } => {
                 if *block {
                     // Emit as JSDoc-style block comment if content has multiple lines

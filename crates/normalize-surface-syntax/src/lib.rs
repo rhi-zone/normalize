@@ -54,8 +54,8 @@ pub mod output;
 
 // Re-exports: IR types
 pub use ir::{
-    BinaryOp, Expr, Function, Literal, Param, Program, Span, Stmt, StructureEq, TemplatePart,
-    UnaryOp,
+    BinaryOp, ExportName, Expr, Function, ImportName, Literal, Method, Param, Program, Span, Stmt,
+    StructureEq, TemplatePart, UnaryOp,
 };
 
 // Re-exports: Traits

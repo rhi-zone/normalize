@@ -14,7 +14,7 @@
 //! - Control flow structure
 //! - Expression trees
 
-use crate::{Expr, Function, Program, Stmt, TemplatePart};
+use crate::{Expr, Function, Method, Program, Stmt, TemplatePart};
 
 /// Trait for structural equality comparison.
 ///
@@ -188,6 +188,55 @@ impl StructureEq for Stmt {
                 },
             ) => t1 == t2 && b1 == b2,
 
+            // Import: compare source and names (ignore span)
+            (
+                Stmt::Import {
+                    source: s1,
+                    names: n1,
+                    span: _,
+                },
+                Stmt::Import {
+                    source: s2,
+                    names: n2,
+                    span: _,
+                },
+            ) => s1 == s2 && n1 == n2,
+
+            // Export: compare names and source (ignore span)
+            (
+                Stmt::Export {
+                    names: n1,
+                    source: s1,
+                    span: _,
+                },
+                Stmt::Export {
+                    names: n2,
+                    source: s2,
+                    span: _,
+                },
+            ) => n1 == n2 && s1 == s2,
+
+            // Class: compare name, extends, and methods (ignore span)
+            (
+                Stmt::Class {
+                    name: n1,
+                    extends: e1,
+                    methods: m1,
+                    span: _,
+                },
+                Stmt::Class {
+                    name: n2,
+                    extends: e2,
+                    methods: m2,
+                    span: _,
+                },
+            ) => {
+                n1 == n2
+                    && e1 == e2
+                    && m1.len() == m2.len()
+                    && m1.iter().zip(m2).all(|(a, b)| a.structure_eq(b))
+            }
+
             _ => false,
         }
     }
@@ -317,6 +366,20 @@ impl StructureEq for TemplatePart {
 impl StructureEq for Function {
     fn structure_eq(&self, other: &Self) -> bool {
         self.name == other.name
+            && self.params.len() == other.params.len()
+            && self
+                .params
+                .iter()
+                .zip(&other.params)
+                .all(|(a, b)| a.name == b.name)
+            && vec_structure_eq(&self.body, &other.body)
+    }
+}
+
+impl StructureEq for Method {
+    fn structure_eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.is_static == other.is_static
             && self.params.len() == other.params.len()
             && self
                 .params

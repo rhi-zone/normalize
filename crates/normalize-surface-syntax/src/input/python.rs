@@ -102,11 +102,12 @@ impl<'a> ReadContext<'a> {
             // Function definition
             "function_definition" => self.read_function_definition(node).map(Some),
 
-            // Imports (skip for now)
-            "import_statement" | "import_from_statement" => Ok(None),
+            // Import statements — parse into first-class IR nodes
+            "import_statement" => self.read_import_statement(node).map(Some),
+            "import_from_statement" => self.read_import_from_statement(node).map(Some),
 
-            // Class (skip for now)
-            "class_definition" => Ok(None),
+            // Class definitions — parse into first-class IR nodes
+            "class_definition" => self.read_class_definition(node).map(Some),
 
             // Try/except (skip for now)
             "try_statement" => Ok(None),
@@ -303,6 +304,179 @@ impl<'a> ReadContext<'a> {
             .find(|c| c.is_named() && c.kind() != "return");
         let expr = expr_node.map(|n| self.read_expr(n)).transpose()?;
         Ok(Stmt::return_stmt(expr))
+    }
+
+    /// Parse `import os` → `Stmt::Import { source: "os", names: [] }`.
+    fn read_import_statement(&self, node: Node) -> Result<Stmt, ReadError> {
+        // `import a, b, c` — dotted_name children are the module names
+        let mut names: Vec<ImportName> = Vec::new();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            match child.kind() {
+                "dotted_name" => {
+                    let module = self.node_text(child).to_string();
+                    names.push(ImportName::named(&module));
+                    // Use last segment as the local name for the whole module
+                }
+                "aliased_import" => {
+                    // `import foo as f`
+                    let name = child
+                        .child_by_field_name("name")
+                        .map(|n| self.node_text(n).to_string())
+                        .unwrap_or_default();
+                    let alias = child
+                        .child_by_field_name("alias")
+                        .map(|n| self.node_text(n).to_string());
+                    names.push(ImportName::aliased(name, alias.unwrap_or_default()));
+                }
+                _ => {}
+            }
+        }
+        // Python bare imports: source is the first module, names is the list
+        // Use the first name as source (or empty)
+        let source = names.first().map(|n| n.name.clone()).unwrap_or_default();
+        Ok(Stmt::import(source, names))
+    }
+
+    /// Parse `from os.path import join, exists` → `Stmt::Import { source: "os.path", names: [...] }`.
+    fn read_import_from_statement(&self, node: Node) -> Result<Stmt, ReadError> {
+        // Walk children: structure is [from, dotted_name(source), import, dotted_name(name)...]
+        // After the `import` keyword, dotted_name nodes are the imported names.
+        let mut source = String::new();
+        let mut names: Vec<ImportName> = Vec::new();
+        let mut past_import_kw = false;
+
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            match child.kind() {
+                "from" | "import" => {
+                    if child.kind() == "import" {
+                        past_import_kw = true;
+                    }
+                }
+                // First dotted_name (before `import`) is the module source
+                "dotted_name" | "relative_import" | "import_prefix" if !past_import_kw => {
+                    source = self.node_text(child).to_string();
+                }
+                // dotted_name after `import` keyword is an imported name
+                "dotted_name" if past_import_kw => {
+                    // For `from os.path import join`, join is a dotted_name with one identifier
+                    let name = self.node_text(child).to_string();
+                    names.push(ImportName::named(name));
+                }
+                // `from x import *`
+                "wildcard_import" if past_import_kw => {
+                    names.push(ImportName::namespace("*"));
+                }
+                // `from x import (a, b)` — wrapped in import_list
+                "import_list" if past_import_kw => {
+                    let mut c2 = child.walk();
+                    for spec in child.children(&mut c2) {
+                        match spec.kind() {
+                            "identifier" => {
+                                names.push(ImportName::named(self.node_text(spec)));
+                            }
+                            "aliased_import" => {
+                                let name = spec
+                                    .child_by_field_name("name")
+                                    .map(|n| self.node_text(n).to_string())
+                                    .unwrap_or_default();
+                                let alias = spec
+                                    .child_by_field_name("alias")
+                                    .map(|n| self.node_text(n).to_string());
+                                names.push(ImportName::aliased(name, alias.unwrap_or_default()));
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                // Aliased import at top level: `from x import join as j`
+                "aliased_import" if past_import_kw => {
+                    let name = child
+                        .child_by_field_name("name")
+                        .map(|n| self.node_text(n).to_string())
+                        .unwrap_or_default();
+                    let alias = child
+                        .child_by_field_name("alias")
+                        .map(|n| self.node_text(n).to_string());
+                    names.push(ImportName::aliased(name, alias.unwrap_or_default()));
+                }
+                _ => {}
+            }
+        }
+
+        Ok(Stmt::import(source, names))
+    }
+
+    /// Parse a Python `class_definition` into `Stmt::Class`.
+    fn read_class_definition(&self, node: Node) -> Result<Stmt, ReadError> {
+        let name = node
+            .child_by_field_name("name")
+            .map(|n| self.node_text(n).to_string())
+            .unwrap_or_else(|| "__class__".to_string());
+
+        // Python superclass: `class Foo(Bar):` — find argument_list child
+        let extends = {
+            let mut cur = node.walk();
+            node.children(&mut cur)
+                .find(|c| c.kind() == "argument_list")
+        }
+        .and_then(|args| {
+            let mut c = args.walk();
+            args.children(&mut c)
+                .find(|ch| ch.kind() == "identifier")
+                .map(|ch| self.node_text(ch).to_string())
+        });
+
+        let body = node
+            .child_by_field_name("body")
+            .ok_or_else(|| ReadError::Parse("class_definition missing body".into()))?;
+
+        let methods = self.read_class_body(body)?;
+        Ok(Stmt::class(name, extends, methods))
+    }
+
+    /// Parse a Python class body into a list of `Method` IR nodes.
+    fn read_class_body(&self, body: Node) -> Result<Vec<Method>, ReadError> {
+        let mut methods = Vec::new();
+        let mut cursor = body.walk();
+
+        for child in body.children(&mut cursor) {
+            if child.kind() == "function_definition" {
+                if let Ok(Stmt::Function(f)) = self.read_function_definition(child) {
+                    let method = Method::new(f.name.clone(), f.params.clone(), f.body.clone());
+                    methods.push(method);
+                }
+            } else if child.kind() == "decorated_definition" {
+                // `@staticmethod def foo(): ...`
+                if let Some(inner) = child.child_by_field_name("definition")
+                    && inner.kind() == "function_definition"
+                {
+                    let is_static = {
+                        let mut c2 = child.walk();
+                        child.children(&mut c2).any(|dec| {
+                            if dec.kind() == "decorator" {
+                                let mut c3 = dec.walk();
+                                dec.children(&mut c3).any(|id| {
+                                    id.kind() == "identifier"
+                                        && self.node_text(id) == "staticmethod"
+                                })
+                            } else {
+                                false
+                            }
+                        })
+                    };
+                    if let Ok(Stmt::Function(f)) = self.read_function_definition(inner) {
+                        let mut method =
+                            Method::new(f.name.clone(), f.params.clone(), f.body.clone());
+                        method.is_static = is_static;
+                        methods.push(method);
+                    }
+                }
+            }
+        }
+
+        Ok(methods)
     }
 
     fn read_function_definition(&self, node: Node) -> Result<Stmt, ReadError> {
@@ -904,6 +1078,81 @@ mod tests {
     fn test_dict_literal() -> Result<(), ReadError> {
         let ir = read_python("obj = {\"x\": 1, \"y\": 2}")?;
         assert_eq!(ir.body.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_import_statement() -> Result<(), ReadError> {
+        let ir = read_python("import os")?;
+        assert_eq!(ir.body.len(), 1);
+        match &ir.body[0] {
+            Stmt::Import { source, names, .. } => {
+                assert_eq!(source, "os");
+                assert_eq!(names.len(), 1);
+                assert_eq!(names[0].name, "os");
+            }
+            _ => panic!("expected Import"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_import_from_statement() -> Result<(), ReadError> {
+        let ir = read_python("from os.path import join, exists")?;
+        assert_eq!(ir.body.len(), 1);
+        match &ir.body[0] {
+            Stmt::Import { source, names, .. } => {
+                assert_eq!(source, "os.path");
+                assert_eq!(names.len(), 2);
+                assert_eq!(names[0].name, "join");
+                assert_eq!(names[1].name, "exists");
+            }
+            _ => panic!("expected Import"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_class_definition() -> Result<(), ReadError> {
+        let ir = read_python(
+            "class Animal:\n    def __init__(self, name):\n        self.name = name\n    def speak(self):\n        pass",
+        )?;
+        assert_eq!(ir.body.len(), 1);
+        match &ir.body[0] {
+            Stmt::Class {
+                name,
+                extends,
+                methods,
+                ..
+            } => {
+                assert_eq!(name, "Animal");
+                assert!(extends.is_none());
+                assert_eq!(methods.len(), 2);
+                assert_eq!(methods[0].name, "__init__");
+                assert_eq!(methods[1].name, "speak");
+            }
+            _ => panic!("expected Class"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_class_with_base() -> Result<(), ReadError> {
+        let ir = read_python("class Dog(Animal):\n    def speak(self):\n        pass")?;
+        assert_eq!(ir.body.len(), 1);
+        match &ir.body[0] {
+            Stmt::Class {
+                name,
+                extends,
+                methods,
+                ..
+            } => {
+                assert_eq!(name, "Dog");
+                assert_eq!(extends.as_deref(), Some("Animal"));
+                assert_eq!(methods.len(), 1);
+            }
+            _ => panic!("expected Class"),
+        }
         Ok(())
     }
 }
