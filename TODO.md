@@ -1321,8 +1321,8 @@ find_cycles_dfs iterative conversion (was stack depth ever actually a problem?).
 ### `normalize sync` — project + session portability
 
 - [x] **Single-project sync (done)**: `normalize sync <dest>` copies project tree (excludes target/, node_modules/, .git/objects/, .normalize/findings-cache.sqlite, .fastembed_cache/), session metadata, rewrites index DB paths. `--dry-run`, `--verbose`, `--all`, `--active N`, `--repo <glob>`, `--exclude <glob>`.
-- [ ] **Incremental sync**: track what was copied in a lockfile; only copy changed files on subsequent syncs (useful for large projects or slow network destinations).
-- [ ] **Session format detection**: currently only copies Claude Code `~/.claude/projects/<mangled>/` dirs. Extend `session_metadata_roots()` to use the `normalize_chat_sessions` format registry for multi-format coverage (Codex, Gemini, etc.).
+- [x] **Incremental sync**: `SyncManifest` records blake3 content hashes in `<dest>/.normalize/sync-manifest.json`; `copy_tree_incremental` skips unchanged files on subsequent syncs. `--force` bypasses manifest for a full re-sync. Report includes `files_unchanged` count.
+- [x] **Session format detection**: `session_metadata_roots()` now delegates to `normalize_chat_sessions::project_metadata_roots()`, covering Claude Code, OpenAI Codex, Gemini CLI, and Normalize Agent via the format registry. Service layer (`service/mod.rs`) calls `project_metadata_roots` directly.
 
 ---
 

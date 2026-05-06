@@ -1,7 +1,8 @@
 //! Sync command — copy a project (and its session metadata) to a destination.
 
 use crate::output::OutputFormatter;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 // ── Report types ─────────────────────────────────────────────────────────────
@@ -29,6 +30,8 @@ pub struct SyncReport {
     pub files_copied: usize,
     /// Number of session metadata files copied.
     pub sessions_copied: usize,
+    /// Number of files skipped because their content hash matched the manifest.
+    pub files_unchanged: usize,
     /// Whether path rewriting was performed on the index DB.
     pub index_paths_rewritten: bool,
     /// Whether this was a dry run (nothing written).
@@ -48,6 +51,9 @@ impl OutputFormatter for SyncReport {
         let verb = if self.dry_run { "Would sync" } else { "Synced" };
         let _ = writeln!(out, "{} {} → {}", verb, self.source, self.dest);
         let _ = writeln!(out, "  Project files:  {}", self.files_copied);
+        if self.files_unchanged > 0 {
+            let _ = writeln!(out, "  Unchanged (skipped): {}", self.files_unchanged);
+        }
         if self.sessions_copied > 0 {
             let _ = writeln!(out, "  Session files:  {}", self.sessions_copied);
         }
@@ -154,33 +160,136 @@ pub fn copy_tree(
     (count, items)
 }
 
-/// Discover session metadata roots for a project using the Claude Code convention.
-/// Returns paths like `~/.claude/projects/<mangled>/`.
-pub fn session_metadata_roots(project_root: &Path) -> Vec<PathBuf> {
-    let home = match std::env::var("HOME") {
-        Ok(h) => h,
-        Err(_) => return Vec::new(),
-    };
-    let projects_dir = PathBuf::from(home).join(".claude/projects");
-    if !projects_dir.exists() {
-        return Vec::new();
+// ── Sync manifest (incremental sync) ─────────────────────────────────────────
+
+/// Manifest recording content hashes for all files copied in a previous sync.
+/// Stored as `.normalize/sync-manifest.json` in the *destination* project root.
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct SyncManifest {
+    /// Map from relative path (slash-separated) to hex-encoded blake3 hash of source content.
+    pub files: HashMap<String, String>,
+}
+
+impl SyncManifest {
+    /// Load manifest from `<dest_root>/.normalize/sync-manifest.json`, or return empty.
+    pub fn load(dest_root: &Path) -> Self {
+        let path = dest_root.join(".normalize/sync-manifest.json");
+        if let Ok(data) = std::fs::read_to_string(&path) {
+            serde_json::from_str(&data).unwrap_or_default()
+        } else {
+            Self::default()
+        }
     }
 
-    // Claude Code uses `/<path>` → `-<path>` (replace `/` with `-`).
-    let canonical = project_root
-        .canonicalize()
-        .unwrap_or_else(|_| project_root.to_path_buf());
-    let mangled = canonical.to_string_lossy().replace('/', "-");
-    let candidate = projects_dir.join(format!("-{}", mangled.trim_start_matches('-')));
-    if candidate.exists() {
-        return vec![candidate];
+    /// Save manifest to `<dest_root>/.normalize/sync-manifest.json`.
+    pub fn save(&self, dest_root: &Path) -> Result<(), String> {
+        let dir = dest_root.join(".normalize");
+        std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir {}: {}", dir.display(), e))?;
+        let path = dir.join("sync-manifest.json");
+        let json =
+            serde_json::to_string_pretty(self).map_err(|e| format!("serialize manifest: {}", e))?;
+        std::fs::write(&path, json).map_err(|e| format!("write manifest {}: {}", path.display(), e))
     }
-    // Try without the leading dash
-    let candidate2 = projects_dir.join(&mangled);
-    if candidate2.exists() {
-        return vec![candidate2];
+}
+
+/// Hash a file's contents with blake3. Returns hex-encoded digest.
+fn hash_file(path: &Path) -> Option<String> {
+    let data = std::fs::read(path).ok()?;
+    Some(blake3::hash(&data).to_hex().to_string())
+}
+
+/// Walk `src_root` and copy all non-excluded files to `dest_root`.
+/// If `manifest` is Some, skips files whose content hash matches.
+/// Returns (files_copied, files_unchanged, file_items, updated_manifest_entries).
+#[allow(clippy::too_many_arguments)]
+pub fn copy_tree_incremental(
+    src_root: &Path,
+    dest_root: &Path,
+    dry_run: bool,
+    verbose: bool,
+    force: bool,
+    manifest: &SyncManifest,
+    warnings: &mut Vec<String>,
+    // normalize-syntax-allow: rust/tuple-return
+) -> (usize, usize, Vec<SyncFileItem>, HashMap<String, String>) {
+    let mut copied = 0usize;
+    let mut unchanged = 0usize;
+    let mut items = Vec::new();
+    let mut new_entries: HashMap<String, String> = HashMap::new();
+
+    for entry in walkdir::WalkDir::new(src_root)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        let src_path = entry.path();
+        if src_path.is_dir() {
+            continue;
+        }
+        if is_excluded(src_path, src_root) {
+            continue;
+        }
+
+        let Ok(rel) = src_path.strip_prefix(src_root) else {
+            continue;
+        };
+        let rel_key = rel.to_string_lossy().replace('\\', "/");
+        let dest_path = dest_root.join(rel);
+
+        // Incremental: check hash unless --force
+        if !force && !dry_run {
+            if let Some(src_hash) = hash_file(src_path) {
+                if manifest
+                    .files
+                    .get(&rel_key)
+                    .map(|h| h == &src_hash)
+                    .unwrap_or(false)
+                {
+                    unchanged += 1;
+                    // Keep existing manifest entry
+                    new_entries.insert(rel_key, src_hash);
+                    continue;
+                }
+                // Will copy — record hash
+                new_entries.insert(rel_key.clone(), src_hash);
+            }
+        }
+
+        if verbose {
+            items.push(SyncFileItem {
+                src: src_path.to_string_lossy().into_owned(),
+                dest: dest_path.to_string_lossy().into_owned(),
+                excluded: false,
+            });
+        }
+
+        if !dry_run {
+            if let Some(parent) = dest_path.parent()
+                && let Err(e) = std::fs::create_dir_all(parent)
+            {
+                warnings.push(format!("mkdir {}: {}", parent.display(), e));
+                continue;
+            }
+            if let Err(e) = std::fs::copy(src_path, &dest_path) {
+                warnings.push(format!("copy {}: {}", src_path.display(), e));
+                continue;
+            }
+        }
+        copied += 1;
     }
-    Vec::new()
+
+    (copied, unchanged, items, new_entries)
+}
+
+/// Discover session metadata roots for a project across all registered AI agent formats.
+///
+/// Delegates to the `normalize_chat_sessions` format registry, which covers Claude Code,
+/// OpenAI Codex, Gemini CLI, and any other registered format. Only directories that
+/// exist on disk are returned.
+///
+/// Prefer calling `normalize_chat_sessions::project_metadata_roots` directly where possible.
+pub fn session_metadata_roots(project_root: &Path) -> Vec<PathBuf> {
+    normalize_chat_sessions::project_metadata_roots(project_root)
 }
 
 // ── Index path rewriting ──────────────────────────────────────────────────────

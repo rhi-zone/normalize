@@ -752,10 +752,18 @@ impl NormalizeService {
     /// session metadata to `<dest>`. After copying, rewrites absolute paths in the index DB
     /// so the copy works from its new location.
     ///
+    /// On subsequent syncs, skips files whose content hash matches the manifest stored at
+    /// `<dest>/.normalize/sync-manifest.json`. Use `--force` to bypass the manifest.
+    ///
+    /// Session metadata is discovered across all registered AI agent formats (Claude Code,
+    /// OpenAI Codex, Gemini CLI, Normalize Agent) via the `normalize_chat_sessions` format
+    /// registry.
+    ///
     /// Examples:
     ///   normalize sync /backup/myproject               # copy project to new location
     ///   normalize sync /backup/myproject --dry-run     # preview what would be copied
     ///   normalize sync /backup/myproject --verbose     # show each file as it's copied
+    ///   normalize sync /backup/myproject --force       # force full re-sync (ignore manifest)
     ///   normalize sync /backup --all                   # copy all known projects
     ///   normalize sync /backup --all --active 30       # only projects active in last 30 days
     ///   normalize sync /backup --all --repo "*/rhizone/*"  # filter by path glob
@@ -774,6 +782,7 @@ impl NormalizeService {
         #[param(help = "Dry run — show what would be copied without writing anything")]
         dry_run: bool,
         #[param(short = 'v', help = "Print each file as it is copied")] verbose: bool,
+        #[param(help = "Force full re-sync, ignoring the incremental manifest")] force: bool,
         #[param(
             help = "Only sync projects with activity in the last N days (--all only, default 30)"
         )]
@@ -786,9 +795,10 @@ impl NormalizeService {
         compact: bool,
     ) -> Result<commands::sync::SyncReport, String> {
         use commands::sync::{
-            SyncFileItem, SyncReport, common_prefix, copy_tree, list_all_known_project_roots,
-            rewrite_index_paths, session_metadata_roots,
+            SyncFileItem, SyncManifest, SyncReport, common_prefix, copy_tree_incremental,
+            list_all_known_project_roots, rewrite_index_paths,
         };
+        use normalize_chat_sessions::project_metadata_roots;
         use std::time::{Duration, SystemTime};
 
         let dest_str = dest.ok_or_else(|| {
@@ -864,6 +874,7 @@ impl NormalizeService {
         };
 
         let mut total_files = 0usize;
+        let mut total_unchanged = 0usize;
         let mut total_sessions = 0usize;
         let mut all_file_items: Vec<SyncFileItem> = Vec::new();
         let mut all_warnings: Vec<String> = Vec::new();
@@ -878,13 +889,44 @@ impl NormalizeService {
                 dest_root.clone()
             };
 
-            // 1. Copy project tree.
-            let (n, items) = copy_tree(proj_root, &proj_dest, dry_run, verbose, &mut all_warnings);
+            // 1. Load incremental manifest from destination.
+            let manifest = if force || dry_run {
+                SyncManifest::default()
+            } else {
+                SyncManifest::load(&proj_dest)
+            };
+
+            // 2. Copy project tree (incremental).
+            let (n, unchanged, items, new_entries) = copy_tree_incremental(
+                proj_root,
+                &proj_dest,
+                dry_run,
+                verbose,
+                force,
+                &manifest,
+                &mut all_warnings,
+            );
             total_files += n;
+            total_unchanged += unchanged;
             all_file_items.extend(items);
 
-            // 2. Copy session metadata.
-            for meta_root in session_metadata_roots(proj_root) {
+            // 3. Save updated manifest.
+            if !dry_run {
+                let mut updated = SyncManifest::default();
+                // Preserve unchanged entries + add newly computed entries
+                for (k, v) in &manifest.files {
+                    updated.files.insert(k.clone(), v.clone());
+                }
+                for (k, v) in new_entries {
+                    updated.files.insert(k, v);
+                }
+                if let Err(e) = updated.save(&proj_dest) {
+                    all_warnings.push(format!("manifest save: {}", e));
+                }
+            }
+
+            // 4. Copy session metadata for all registered formats.
+            for meta_root in project_metadata_roots(proj_root) {
                 let format_name = meta_root
                     .parent()
                     .and_then(|p| p.file_name())
@@ -894,18 +936,21 @@ impl NormalizeService {
                     .join(".sessions")
                     .join(format_name)
                     .join(meta_root.file_name().unwrap_or_default());
-                let (sn, sitems) = copy_tree(
+                // Session metadata is not incremental (always copy; manifests track project files)
+                let (sn, _unchanged, sitems, _) = copy_tree_incremental(
                     &meta_root,
                     &sessions_dest,
                     dry_run,
                     verbose,
+                    true,
+                    &SyncManifest::default(),
                     &mut all_warnings,
                 );
                 total_sessions += sn;
                 all_file_items.extend(sitems);
             }
 
-            // 3. Rewrite index paths.
+            // 5. Rewrite index paths.
             if !dry_run {
                 let dest_db = proj_dest.join(".normalize").join("index.sqlite");
                 if dest_db.exists() {
@@ -930,6 +975,7 @@ impl NormalizeService {
             dest: dest_str,
             source,
             files_copied: total_files,
+            files_unchanged: total_unchanged,
             sessions_copied: total_sessions,
             index_paths_rewritten: index_rewritten,
             dry_run,
