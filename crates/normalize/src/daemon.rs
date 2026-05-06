@@ -132,6 +132,24 @@ pub enum Request {
         #[serde(default)]
         filter_files: Option<Vec<String>>,
     },
+    /// Query the daemon's in-memory context index for matching blocks.
+    /// The daemon pre-indexes all `.normalize/context/` files and updates them
+    /// incrementally via the file watcher, giving near-zero latency responses.
+    #[serde(rename = "query_context")]
+    QueryContext {
+        /// Root directory whose context hierarchy to query.
+        root: PathBuf,
+        /// Caller-provided key=value pairs for matching (dot-path keys).
+        /// Empty means no filtering (equivalent to `--all`).
+        #[serde(default)]
+        match_keys: Vec<(String, String)>,
+        /// When true, return all blocks without filtering.
+        #[serde(default)]
+        all: bool,
+        /// Context directory name inside `.normalize/` (default: "context").
+        #[serde(default)]
+        dir_name: Option<String>,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -366,6 +384,128 @@ mod unix_impl {
         count
     }
 
+    /// In-memory cache of parsed context blocks for a watched root.
+    ///
+    /// Holds pre-parsed blocks keyed by absolute file path. Rebuilt incrementally
+    /// when `.normalize/context/` files change via the file watcher, so
+    /// `QueryContext` requests return results without any filesystem I/O.
+    struct ContextIndex {
+        /// Blocks keyed by absolute file path. Each value is a vec of
+        /// `(frontmatter_json, body)` pairs for the blocks in that file.
+        entries: HashMap<PathBuf, Vec<(serde_json::Value, String)>>,
+    }
+
+    impl ContextIndex {
+        fn new() -> Self {
+            Self {
+                entries: HashMap::new(),
+            }
+        }
+
+        /// (Re)load all `.md` files from `context_dir` into the index.
+        fn load_dir(&mut self, context_dir: &Path) {
+            let Ok(read) = std::fs::read_dir(context_dir) else {
+                return;
+            };
+            for entry in read.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) == Some("md") {
+                    self.load_file(&path);
+                }
+            }
+        }
+
+        /// (Re)load a single file into the index, replacing any previous entry.
+        fn load_file(&mut self, path: &Path) {
+            let Ok(content) = std::fs::read_to_string(path) else {
+                self.entries.remove(path);
+                return;
+            };
+            let blocks = normalize_context::parse_blocks(&content);
+            let parsed: Vec<(serde_json::Value, String)> = blocks
+                .into_iter()
+                .map(|b| {
+                    let meta = b
+                        .frontmatter
+                        .map(normalize_context::yaml_to_json)
+                        .unwrap_or(serde_json::Value::Null);
+                    (meta, b.body)
+                })
+                .collect();
+            self.entries.insert(path.to_path_buf(), parsed);
+        }
+
+        /// Remove a file from the index (called when file is deleted).
+        fn remove_file(&mut self, path: &Path) {
+            self.entries.remove(path);
+        }
+
+        /// Query the index for blocks matching `caller_ctx`. Returns blocks in
+        /// file-path order (deterministic).
+        fn query(
+            &self,
+            caller_ctx: &normalize_context::CallerContext,
+            all_flag: bool,
+        ) -> Vec<(PathBuf, serde_json::Value, String)> {
+            let mut file_paths: Vec<&PathBuf> = self.entries.keys().collect();
+            file_paths.sort();
+
+            let mut results = Vec::new();
+            for path in file_paths {
+                let blocks = &self.entries[path];
+                for (meta, body) in blocks {
+                    let yaml_meta = context_json_to_yaml(meta);
+                    let parsed_block = normalize_context::ParsedBlock {
+                        frontmatter: if yaml_meta.is_null() {
+                            None
+                        } else {
+                            Some(yaml_meta)
+                        },
+                        body: body.clone(),
+                    };
+                    if normalize_context::block_matches(&parsed_block, caller_ctx, all_flag) {
+                        let trimmed = body.trim().to_string();
+                        if !trimmed.is_empty() || parsed_block.frontmatter.is_some() {
+                            results.push((path.clone(), meta.clone(), trimmed));
+                        }
+                    }
+                }
+            }
+            results
+        }
+    }
+
+    /// Convert a `serde_json::Value` back to `serde_yaml::Value` for block_matches.
+    fn context_json_to_yaml(v: &serde_json::Value) -> serde_yaml::Value {
+        match v {
+            serde_json::Value::Null => serde_yaml::Value::Null,
+            serde_json::Value::Bool(b) => serde_yaml::Value::Bool(*b),
+            serde_json::Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    serde_yaml::Value::Number(serde_yaml::Number::from(i))
+                } else if let Some(f) = n.as_f64() {
+                    serde_yaml::Value::Number(serde_yaml::Number::from(f))
+                } else {
+                    serde_yaml::Value::Null
+                }
+            }
+            serde_json::Value::String(s) => serde_yaml::Value::String(s.clone()),
+            serde_json::Value::Array(arr) => {
+                serde_yaml::Value::Sequence(arr.iter().map(context_json_to_yaml).collect())
+            }
+            serde_json::Value::Object(obj) => {
+                let mut map = serde_yaml::Mapping::new();
+                for (k, v) in obj {
+                    map.insert(
+                        serde_yaml::Value::String(k.clone()),
+                        context_json_to_yaml(v),
+                    );
+                }
+                serde_yaml::Value::Mapping(map)
+            }
+        }
+    }
+
     /// A watched root. The shared watcher is owned by `DaemonServer`; this struct
     /// tracks per-root metadata only.
     struct WatchedRoot {
@@ -411,6 +551,9 @@ mod unix_impl {
         /// Cleared at the end of every prime — a fresh prime persists blobs
         /// under the current config, so no serve-time filtering is needed.
         serve_filter_pending: bool,
+        /// In-memory context index for `.normalize/context/` files.
+        /// Updated incrementally when context files change via the file watcher.
+        context_index: Arc<Mutex<ContextIndex>>,
     }
 
     /// Global daemon server managing multiple roots.
@@ -555,6 +698,14 @@ mod unix_impl {
             // snapshot to reflect what was actually used to produce the cache.
             let initial_config = NormalizeConfig::load(&root);
             let initial_scm_hashes = hash_scm_files(&root);
+
+            // Pre-load context index from the default context directory.
+            let mut ctx_index = ContextIndex::new();
+            let context_dir = root.join(".normalize").join("context");
+            if context_dir.is_dir() {
+                ctx_index.load_dir(&context_dir);
+            }
+
             roots.insert(
                 root.clone(),
                 WatchedRoot {
@@ -566,6 +717,7 @@ mod unix_impl {
                     cached_walk: Arc::new(initial_config.walk.clone()),
                     cached_scm_hashes: initial_scm_hashes,
                     serve_filter_pending: false,
+                    context_index: Arc::new(Mutex::new(ctx_index)),
                 },
             );
 
@@ -664,7 +816,60 @@ mod unix_impl {
                     engine,
                     filter_files,
                 } => self.run_rules(root, filter_ids, filter_rule, engine, filter_files),
+                Request::QueryContext {
+                    root,
+                    match_keys,
+                    all,
+                    dir_name,
+                } => self.query_context(root, match_keys, all, dir_name),
             }
+        }
+
+        fn query_context(
+            &self,
+            root: PathBuf,
+            match_keys: Vec<(String, String)>,
+            all: bool,
+            dir_name: Option<String>,
+        ) -> Response {
+            let dir_name = dir_name.as_deref().unwrap_or("context");
+
+            // Collect context_index arcs for this root and any ancestor roots
+            // that the daemon happens to be watching.
+            // The primary path: query the in-memory index for this root directly.
+            let context_arc = {
+                let roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+                roots.get(&root).map(|w| w.context_index.clone())
+            };
+
+            let Some(context_arc) = context_arc else {
+                return Response::err("root not watched");
+            };
+
+            let caller_ctx: normalize_context::CallerContext = match_keys.into_iter().collect();
+
+            // If the request uses a non-default dir_name, we can't serve from the
+            // pre-indexed default "context" directory — fall through to the
+            // filesystem (return an error so the client falls back to v1).
+            if dir_name != "context" {
+                return Response::err("non-default dir_name; use filesystem fallback");
+            }
+
+            let ctx_index = context_arc.lock().unwrap_or_else(|e| e.into_inner());
+            let blocks = ctx_index.query(&caller_ctx, all);
+
+            let json_blocks: Vec<serde_json::Value> = blocks
+                .into_iter()
+                .map(|(path, metadata, body)| {
+                    serde_json::json!({
+                        "source": path.to_string_lossy(),
+                        "metadata": metadata,
+                        "body": body,
+                    })
+                })
+                .collect();
+
+            Response::ok(serde_json::json!(json_blocks))
         }
 
         fn run_rules(
@@ -2392,6 +2597,8 @@ mod unix_impl {
                 let mut to_refresh: Vec<PathBuf> = Vec::new();
                 let mut to_native: Vec<PathBuf> = Vec::new();
                 let mut to_config_reload: Vec<PathBuf> = Vec::new();
+                // Context file changes: (file_path, context_index_arc)
+                let mut to_context_update: Vec<(PathBuf, Arc<Mutex<ContextIndex>>)> = Vec::new();
                 // Directories created at runtime that need to be added to the
                 // watcher so their contents are observable. Walked through
                 // `gitignore_walk` (so e.g. a freshly-created `target/` is
@@ -2423,10 +2630,22 @@ mod unix_impl {
                         let normalize_dir = root.join(".normalize");
                         let config_path = normalize_dir.join("config.toml");
                         let rules_dir = normalize_dir.join("rules");
+                        let context_dir = normalize_dir.join("context");
                         let is_config_change = path == &config_path || path.starts_with(&rules_dir);
-                        let is_internal_normalize_state =
-                            !is_config_change && path.starts_with(&normalize_dir);
+                        let is_context_change = path.starts_with(&context_dir)
+                            && path.extension().and_then(|e| e.to_str()) == Some("md");
+                        let is_internal_normalize_state = !is_config_change
+                            && !is_context_change
+                            && path.starts_with(&normalize_dir);
                         if is_internal_normalize_state {
+                            continue;
+                        }
+
+                        if is_context_change {
+                            if let Some(ctx_arc) = roots.get(root).map(|w| w.context_index.clone())
+                            {
+                                to_context_update.push((path.clone(), ctx_arc));
+                            }
                             continue;
                         }
 
@@ -2530,6 +2749,18 @@ mod unix_impl {
                 }
                 for root in to_config_reload {
                     let _ = server_dispatch.config_reload_tx.send(root);
+                }
+                // Update the in-memory context index for changed context files.
+                // Done inline (no channel needed) — loading a single .md file is
+                // fast (<1ms) and doesn't block the event loop.
+                for (path, ctx_arc) in to_context_update {
+                    let mut ctx_index = ctx_arc.lock().unwrap_or_else(|e| e.into_inner());
+                    if path.exists() {
+                        ctx_index.load_file(&path);
+                    } else {
+                        ctx_index.remove_file(&path);
+                    }
+                    tracing::debug!(path = %path.display(), "context index updated");
                 }
             }
         });
@@ -2938,6 +3169,26 @@ mod unix_impl {
             serde_json::from_str(&line).map_err(|e| e.to_string())
         }
 
+        /// Query the daemon's in-memory context index.
+        ///
+        /// Returns matching context blocks without any filesystem I/O.
+        /// Falls back to `Err` if the daemon is not available or the root is not watched.
+        pub fn query_context(
+            &self,
+            root: &Path,
+            match_keys: Vec<(String, String)>,
+            all: bool,
+            dir_name: Option<String>,
+        ) -> Result<Response, String> {
+            let request = Request::QueryContext {
+                root: root.to_path_buf(),
+                match_keys,
+                all,
+                dir_name,
+            };
+            self.send(&request)
+        }
+
         /// Subscribe to daemon events, calling `on_event` for each one.
         ///
         /// Blocks until the connection is closed or `on_event` returns `false`.
@@ -3164,6 +3415,7 @@ mod unix_impl {
                     cached_walk: Arc::new(normalize_rules_config::WalkConfig::default()),
                     cached_scm_hashes: HashMap::new(),
                     serve_filter_pending: false,
+                    context_index: Arc::new(Mutex::new(ContextIndex::new())),
                 },
             );
             drop(roots);
@@ -3652,6 +3904,16 @@ impl DaemonClient {
         _filter_rule: Option<String>,
         _engine: Option<String>,
         _filter_files: Option<Vec<String>>,
+    ) -> Result<Response, String> {
+        Err("normalize daemon is not supported on Windows".to_string())
+    }
+
+    pub fn query_context(
+        &self,
+        _root: &Path,
+        _match_keys: Vec<(String, String)>,
+        _all: bool,
+        _dir_name: Option<String>,
     ) -> Result<Response, String> {
         Err("normalize daemon is not supported on Windows".to_string())
     }

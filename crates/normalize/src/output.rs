@@ -216,8 +216,10 @@ mod tests {
         assert_output_formatter::<FactsStatsReport>();
         assert_output_formatter::<QueryReport>();
 
-        use crate::service::{ContextKindReport, InitReport, TranslateReport};
+        use crate::service::context::{ContextKindReport, ContextMigrateReport};
         assert_output_formatter::<ContextKindReport>();
+        assert_output_formatter::<ContextMigrateReport>();
+        use crate::service::{InitReport, TranslateReport};
         assert_output_formatter::<InitReport>();
         assert_output_formatter::<TranslateReport>();
         use crate::service::UpdateReport as ServiceUpdateReport;

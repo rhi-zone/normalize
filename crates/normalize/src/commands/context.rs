@@ -76,6 +76,9 @@ pub fn collect_context_files(
 
 /// Get merged context content for a path (legacy system).
 /// Used by `view --dir-context`.
+///
+/// Emits a deprecation warning to stderr if any legacy `.context.md` / `CONTEXT.md` files
+/// are found, prompting the user to run `normalize context migrate`.
 pub fn get_merged_context(root: &Path, target: &Path, max_depth: Option<usize>) -> Option<String> {
     let target_dir = if target.is_file() {
         target.parent().unwrap_or(root).to_path_buf()
@@ -99,6 +102,12 @@ pub fn get_merged_context(root: &Path, target: &Path, max_depth: Option<usize>) 
     if files_target_to_root.is_empty() {
         return None;
     }
+
+    // Emit deprecation warning so users know to migrate.
+    eprintln!(
+        "warning: Found legacy .context.md files; run `normalize context migrate` to move them \
+         to .normalize/context/"
+    );
 
     let mut content = String::new();
     for (i, file) in files_target_to_root.iter().rev().enumerate() {

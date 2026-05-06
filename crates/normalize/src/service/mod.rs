@@ -19,6 +19,7 @@
 
 pub mod analyze;
 pub mod config;
+pub mod context;
 pub mod daemon;
 pub mod edit;
 pub mod facts;
@@ -40,10 +41,6 @@ pub mod view;
 
 use crate::commands;
 use crate::commands::aliases::{AliasesReport, detect_project_languages};
-use crate::commands::context::{
-    CallerContext, ContextBlock, ContextListReport, ContextReport, collect_new_context_files,
-    parse_match_pairs, read_file_context, read_stdin_context, resolve_context, yaml_to_json,
-};
 use crate::config::NormalizeConfig;
 use crate::output::OutputFormatter;
 use crate::text_search::{self, GrepReport};
@@ -57,6 +54,7 @@ pub struct NormalizeService {
     pretty: Cell<bool>,
     analyze: analyze::AnalyzeService,
     config: config::ConfigService,
+    context: context::ContextService,
     daemon: daemon::DaemonService,
     edit: edit::EditService,
     structure: facts::FactsService,
@@ -100,6 +98,7 @@ impl NormalizeService {
         Self {
             analyze: analyze::AnalyzeService::new(&pretty),
             config: config::ConfigService::new(&pretty),
+            context: context::ContextService::new(&pretty),
             daemon: daemon::DaemonService,
             edit: edit::EditService {
                 history: history::HistoryService,
@@ -152,21 +151,6 @@ impl NormalizeService {
         }
     }
 
-    /// Display bridge for ContextKindReport (dispatches to inner type).
-    fn display_context(&self, value: &ContextKindReport) -> String {
-        let pretty = self.pretty.get();
-        match value {
-            ContextKindReport::List(r) => r.format_text(),
-            ContextKindReport::Full(r) => {
-                if pretty {
-                    r.format_pretty()
-                } else {
-                    r.format_text()
-                }
-            }
-        }
-    }
-
     /// Display bridge for TranslateReport.
     fn display_translate(&self, value: &TranslateReport) -> String {
         if let Some(ref path) = value.output_path {
@@ -176,30 +160,6 @@ impl NormalizeService {
             )
         } else {
             value.code.clone()
-        }
-    }
-}
-
-/// Output type for `normalize context`: either a list of context files or full content.
-#[derive(serde::Serialize, schemars::JsonSchema)]
-#[serde(tag = "kind")]
-pub enum ContextKindReport {
-    List(ContextListReport),
-    Full(ContextReport),
-}
-
-impl OutputFormatter for ContextKindReport {
-    fn format_text(&self) -> String {
-        match self {
-            Self::List(r) => r.format_text(),
-            Self::Full(r) => r.format_text(),
-        }
-    }
-
-    fn format_pretty(&self) -> String {
-        match self {
-            Self::List(r) => r.format_text(),
-            Self::Full(r) => r.format_pretty(),
         }
     }
 }
@@ -372,80 +332,9 @@ impl NormalizeService {
     }
 
     /// Inject project context into LLM prompts. Use to provide per-project instructions to agents.
-    ///
-    /// Walks .normalize/context/ directories bottom-up from the working directory
-    /// (project-specific first, global ~/.normalize/context/ last). Each .md file
-    /// may contain YAML frontmatter; blocks are filtered by matching the frontmatter
-    /// against caller-provided context (--match / --stdin).
-    ///
-    /// Without conditions and no matching frontmatter keys → block always matches.
-    ///
-    /// Examples:
-    ///   normalize context                                          # dump all (no filter)
-    ///   normalize context --match hook=UserPromptSubmit            # filter by key=value
-    ///   normalize context --match claudecode.hook=UserPromptSubmit # nested dot-path
-    ///   echo '{"hook":"X"}' | normalize context --stdin --prefix claudecode
-    ///   normalize context --all --list                            # list all source files
-    ///   normalize context --file cfg=config.toml                  # load file under prefix
     #[server(group = "utilities")]
-    #[cli(display_with = "display_context")]
-    #[allow(clippy::too_many_arguments)]
-    pub fn context(
-        &self,
-        #[param(help = "Root directory for hierarchy walk (default: cwd)")] root: Option<String>,
-        #[param(help = "Match context against KEY=VALUE pair (repeatable)")] r#match: Vec<String>,
-        #[param(help = "Read context JSON from stdin")] stdin: bool,
-        #[param(help = "Namespace stdin JSON under this prefix")] prefix: Option<String>,
-        #[param(help = "Return all context entries without filtering")] all: bool,
-        #[param(help = "Context directory name inside .normalize/ (default: context)")]
-        from: Option<String>,
-        #[param(help = "Show source file paths only, not content")] list: bool,
-        #[param(
-            help = "Load a structured file into caller context as PREFIX=PATH (repeatable; supports .json, .toml, .yaml/.yml)"
-        )]
-        file: Vec<String>,
-    ) -> Result<ContextKindReport, String> {
-        let root_path = root
-            .map(PathBuf::from)
-            .map(Ok)
-            .unwrap_or_else(std::env::current_dir)
-            .map_err(|e| format!("Failed to get current directory: {e}"))?;
-
-        let dir_name = from.as_deref().unwrap_or("context");
-
-        if list {
-            let files = collect_new_context_files(&root_path, dir_name);
-            return Ok(ContextKindReport::List(ContextListReport::new(files)));
-        }
-
-        // Build caller context from --match pairs, optionally --stdin, and --file entries.
-        let mut caller_ctx: CallerContext = parse_match_pairs(&r#match)?;
-        if stdin {
-            let stdin_ctx = read_stdin_context(prefix.as_deref())?;
-            caller_ctx.extend(stdin_ctx);
-        }
-        for entry in &file {
-            if let Some((pfx, path)) = entry.split_once('=') {
-                let file_ctx = read_file_context(pfx, path)?;
-                caller_ctx.extend(file_ctx);
-            } else {
-                return Err(format!(
-                    "--file argument must be PREFIX=PATH, got: {entry:?}"
-                ));
-            }
-        }
-
-        let raw = resolve_context(&root_path, dir_name, &caller_ctx, all);
-        let blocks: Vec<ContextBlock> = raw
-            .into_iter()
-            .map(|(source, metadata, body)| ContextBlock {
-                source,
-                metadata: yaml_to_json(metadata),
-                body,
-            })
-            .collect();
-
-        Ok(ContextKindReport::Full(ContextReport::new(blocks)))
+    pub fn context(&self) -> &context::ContextService {
+        &self.context
     }
 
     /// Set up normalize in a new project. Run once after cloning to create .normalize/ config.

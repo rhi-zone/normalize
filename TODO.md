@@ -386,7 +386,8 @@ All original hotspots resolved. Remaining max is `split_query_patterns` (22) in 
 
 **Top-level command level issues (low priority):**
 - [x] ~~`context` could be `normalize view context [path]`~~ — redesigned as a standalone frontmatter-filtered system (`docs/context-redesign.md`); no longer relevant to merge with view.
-- [ ] `normalize context` v2 follow-ups: daemon caching (v2 in design doc), embedding search (v3), migration helper for old `.context.md` files.
+- [ ] `normalize context` v2 follow-ups: daemon caching (v2 in design doc), embedding search (v3).
+- [x] ~~`normalize context` migration helper for old `.context.md` files~~ — `normalize context migrate` (dry-run by default, `--apply` to perform); deprecation warning added to `get_merged_context` for `view --dir-context`.
 - `aliases` is a cross-cutting utility. Too small for top-level but has no clear parent. Low priority.
 
 ### `normalize init --setup` extensions
