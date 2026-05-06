@@ -15,6 +15,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`normalize edit add-parameter`** — add a parameter to a function signature and update all call sites. `normalize edit add-parameter <file> <function> --param <name> --default <value> [--type <type>] [--position <N>] [--dry-run]`. Uses tree-sitter to locate the function and argument lists; finds callers via the facts index (falls back gracefully when unavailable). Supports Rust, TypeScript/JavaScript, Python.
+
 - **Semantic search: markdown doc + commit message embedding** — `normalize structure rebuild` now also embeds markdown documentation (SUMMARY.md, CLAUDE.md, README.md, and all `*.md` under `docs/`) and recent git commit messages (last 500) alongside code symbols. Markdown files are chunked by heading section with a breadcrumb of parent headings prepended for context. Commit chunks include subject, body, short hash, and date. Commit embedding is incremental — repeated rebuilds only embed new commits. `normalize structure search` results now include `doc` and `commit` source types.
 
 - **Daemon incremental re-embedding on file change** — when the file watcher triggers a source refresh, the daemon now queues a background thread to re-embed changed files via `populate_incremental_for_paths`. Changed symbol and markdown embeddings are deleted and replaced; the re-embed runs in the background without blocking diagnostic delivery.
