@@ -2,6 +2,15 @@
 //!
 //! Uses tree-sitter tags queries to identify function boundaries and measures
 //! line span (end_line - start_line + 1).
+//!
+//! # Configuration
+//!
+//! The threshold is configurable via `.normalize/config.toml`:
+//!
+//! ```toml
+//! [rules.rule."long-function"]
+//! threshold = 50   # default: 100
+//! ```
 
 use normalize_languages::parsers::{grammar_loader, parse_with_grammar};
 use normalize_languages::support_for_path;
@@ -176,4 +185,77 @@ pub fn build_long_function_report(
 ) -> DiagnosticsReport {
     let rule = LongFunctionRule { threshold };
     run_file_rule(&rule, root, explicit_files, walk_config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write as _;
+
+    /// Write a Python file with a single function spanning `body_lines` lines.
+    fn make_python_function(
+        dir: &std::path::Path,
+        name: &str,
+        body_lines: usize,
+    ) -> std::path::PathBuf {
+        let path = dir.join(name);
+        let mut f = std::fs::File::create(&path).unwrap();
+        writeln!(f, "def long_function():").unwrap();
+        for i in 0..body_lines {
+            writeln!(f, "    x = {i}").unwrap();
+        }
+        path
+    }
+
+    #[test]
+    fn test_default_threshold_not_triggered() {
+        let dir = tempfile::tempdir().unwrap();
+        // 99-line body → 100 total lines but function span is 100 (threshold is >=)
+        let path = make_python_function(dir.path(), "short.py", 98);
+        let rule = LongFunctionRule { threshold: 100 };
+        let findings = rule.check_file(&path, dir.path());
+        assert!(
+            findings.is_empty(),
+            "99-line function should not trigger default threshold of 100"
+        );
+    }
+
+    #[test]
+    fn test_default_threshold_triggered() {
+        let dir = tempfile::tempdir().unwrap();
+        // 100-line body → function span >= 100
+        let path = make_python_function(dir.path(), "long.py", 100);
+        let rule = LongFunctionRule { threshold: 100 };
+        let findings = rule.check_file(&path, dir.path());
+        assert!(
+            !findings.is_empty(),
+            "100-line function should trigger threshold of 100"
+        );
+    }
+
+    #[test]
+    fn test_custom_threshold_lower() {
+        let dir = tempfile::tempdir().unwrap();
+        // 30-line body — below default (100) but above custom threshold of 20
+        let path = make_python_function(dir.path(), "medium.py", 30);
+        let rule = LongFunctionRule { threshold: 20 };
+        let findings = rule.check_file(&path, dir.path());
+        assert!(
+            !findings.is_empty(),
+            "30-line function should trigger custom threshold of 20"
+        );
+    }
+
+    #[test]
+    fn test_custom_threshold_higher() {
+        let dir = tempfile::tempdir().unwrap();
+        // 100-line body — at default (100) but below custom threshold of 200
+        let path = make_python_function(dir.path(), "medium.py", 100);
+        let rule = LongFunctionRule { threshold: 200 };
+        let findings = rule.check_file(&path, dir.path());
+        assert!(
+            findings.is_empty(),
+            "100-line function should not trigger custom threshold of 200"
+        );
+    }
 }

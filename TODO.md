@@ -56,8 +56,10 @@ Accumulation of per-root indexes is the next chapter — see the P1 "Content-add
 (CA store)" entry below.
 
 Remaining (not blocking the memory fix):
-- Grammar/tree lifetime: parse → extract → **drop tree before returning** — scope
-  `GrammarLoader` to the indexing task, not the daemon lifetime
+- [x] Grammar/tree lifetime: eliminated duplicate `GRAMMAR_LOADER` singleton from
+  `normalize-facts/src/parsers.rs` — it now delegates to the canonical singleton in
+  `normalize_languages::parsers`; trees are already local and dropped after extraction
+  in all call sites; no `GrammarLoader` is stored in daemon state or long-lived structs
 
 ### LSP diagnostics improvements
 

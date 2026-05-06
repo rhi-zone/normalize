@@ -1,40 +1,24 @@
-//! Tree-sitter parser initialization and management.
+//! Tree-sitter parser convenience re-exports.
 //!
-//! Provides free functions for parsing using a global singleton GrammarLoader.
+//! Delegates entirely to [`normalize_languages::parsers`] — the canonical
+//! singleton lives there.  This module exists so that call sites inside
+//! `normalize-facts` can write `crate::parsers::parse_with_grammar` without
+//! importing from a sibling crate explicitly.
+//!
+//! # Lifetime safety
+//!
+//! The `GrammarLoader` is stored in a `'static OnceLock` inside
+//! `normalize_languages::parsers`, so it outlives any `Tree` produced here.
+//! Trees must be dropped before the end of the extraction call that created
+//! them; they must not be stored in long-lived structs.
 
-use normalize_languages::GrammarLoader;
-use std::sync::{Arc, OnceLock};
-use tree_sitter::Parser;
+use std::sync::Arc;
 
-/// Global grammar loader singleton - avoids reloading grammars for each parse.
-static GRAMMAR_LOADER: OnceLock<Arc<GrammarLoader>> = OnceLock::new();
+pub use normalize_languages::parsers::{
+    available_external_grammars, parse_with_grammar, parser_for,
+};
 
-/// Get the global grammar loader singleton.
-pub fn grammar_loader() -> Arc<GrammarLoader> {
-    GRAMMAR_LOADER
-        .get_or_init(|| Arc::new(GrammarLoader::new()))
-        .clone()
-}
-
-/// Create a parser for a specific grammar.
-///
-/// The grammar name should match tree-sitter grammar names (e.g., "python", "rust", "typescript").
-pub fn parser_for(grammar: &str) -> Option<Parser> {
-    let language = grammar_loader().get(grammar).ok()?;
-    let mut parser = Parser::new();
-    parser.set_language(&language).ok()?;
-    Some(parser)
-}
-
-/// Parse source code with a specific grammar.
-///
-/// The grammar name should match tree-sitter grammar names (e.g., "python", "rust", "typescript").
-pub fn parse_with_grammar(grammar: &str, source: &str) -> Option<tree_sitter::Tree> {
-    let mut parser = parser_for(grammar)?;
-    parser.parse(source, None)
-}
-
-/// List grammars available in external search paths.
-pub fn available_external_grammars() -> Vec<String> {
-    grammar_loader().available_external()
+/// Get the global grammar loader singleton (canonical instance from `normalize-languages`).
+pub fn grammar_loader() -> Arc<normalize_languages::GrammarLoader> {
+    normalize_languages::parsers::grammar_loader()
 }

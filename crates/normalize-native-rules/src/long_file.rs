@@ -1,6 +1,15 @@
 //! `long-file` native rule — flags source files exceeding a line count threshold.
 //!
 //! Respects `.normalize/large-files-allow` allowlist and excludes lock files.
+//!
+//! # Configuration
+//!
+//! The threshold is configurable via `.normalize/config.toml`:
+//!
+//! ```toml
+//! [rules.rule."long-file"]
+//! threshold = 300   # default: 500
+//! ```
 
 use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
 use std::path::Path;
@@ -191,4 +200,73 @@ pub fn build_long_file_report(
 ) -> DiagnosticsReport {
     let rule = LongFileRule::new(threshold, root);
     run_file_rule(&rule, root, files, walk_config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write as _;
+
+    fn make_file_with_lines(dir: &std::path::Path, name: &str, n: usize) -> std::path::PathBuf {
+        let path = dir.join(name);
+        let mut f = std::fs::File::create(&path).unwrap();
+        for i in 0..n {
+            writeln!(f, "line {i}").unwrap();
+        }
+        path
+    }
+
+    #[test]
+    fn test_default_threshold_not_triggered() {
+        let dir = tempfile::tempdir().unwrap();
+        // 499 lines — below default threshold of 500
+        let path = make_file_with_lines(dir.path(), "short.rs", 499);
+        let rule = LongFileRule::new(500, dir.path());
+        let findings = rule.check_file(&path, dir.path());
+        assert!(
+            findings.is_empty(),
+            "499 lines should not trigger default threshold of 500"
+        );
+    }
+
+    #[test]
+    fn test_default_threshold_triggered() {
+        let dir = tempfile::tempdir().unwrap();
+        // 500 lines — at default threshold
+        let path = make_file_with_lines(dir.path(), "long.rs", 500);
+        let rule = LongFileRule::new(500, dir.path());
+        let findings = rule.check_file(&path, dir.path());
+        assert_eq!(
+            findings.len(),
+            1,
+            "500 lines should trigger default threshold of 500"
+        );
+    }
+
+    #[test]
+    fn test_custom_threshold_lower() {
+        let dir = tempfile::tempdir().unwrap();
+        // 100 lines — below default but above custom threshold of 50
+        let path = make_file_with_lines(dir.path(), "medium.rs", 100);
+        let rule = LongFileRule::new(50, dir.path());
+        let findings = rule.check_file(&path, dir.path());
+        assert_eq!(
+            findings.len(),
+            1,
+            "100 lines should trigger custom threshold of 50"
+        );
+    }
+
+    #[test]
+    fn test_custom_threshold_higher() {
+        let dir = tempfile::tempdir().unwrap();
+        // 500 lines — at default but below custom threshold of 1000
+        let path = make_file_with_lines(dir.path(), "medium.rs", 500);
+        let rule = LongFileRule::new(1000, dir.path());
+        let findings = rule.check_file(&path, dir.path());
+        assert!(
+            findings.is_empty(),
+            "500 lines should not trigger custom threshold of 1000"
+        );
+    }
 }

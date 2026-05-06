@@ -2,6 +2,15 @@
 //!
 //! Uses tree-sitter tags queries to identify functions and complexity queries
 //! (or the `compute_complexity` fallback) to measure cyclomatic complexity.
+//!
+//! # Configuration
+//!
+//! The threshold is configurable via `.normalize/config.toml`:
+//!
+//! ```toml
+//! [rules.rule."high-complexity"]
+//! threshold = 10   # default: 20
+//! ```
 
 use normalize_facts::extract::compute_complexity;
 use normalize_languages::parsers::{grammar_loader, parse_with_grammar};
@@ -216,4 +225,82 @@ pub fn build_high_complexity_report(
 ) -> DiagnosticsReport {
     let rule = HighComplexityRule { threshold };
     run_file_rule(&rule, root, explicit_files, walk_config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write as _;
+
+    /// Write a Python file with a function containing `branch_count` if-branches,
+    /// giving it cyclomatic complexity of `branch_count + 1`.
+    fn make_python_function_with_branches(
+        dir: &std::path::Path,
+        name: &str,
+        branch_count: usize,
+    ) -> std::path::PathBuf {
+        let path = dir.join(name);
+        let mut f = std::fs::File::create(&path).unwrap();
+        writeln!(f, "def complex_function(x):").unwrap();
+        for i in 0..branch_count {
+            writeln!(f, "    if x == {i}:").unwrap();
+            writeln!(f, "        return {i}").unwrap();
+        }
+        writeln!(f, "    return -1").unwrap();
+        path
+    }
+
+    #[test]
+    fn test_default_threshold_not_triggered() {
+        let dir = tempfile::tempdir().unwrap();
+        // 19 branches → complexity 20; threshold is >= 20, so 19 branches (complexity 20) triggers.
+        // Use 18 branches (complexity 19) to stay below default threshold of 20.
+        let path = make_python_function_with_branches(dir.path(), "low.py", 18);
+        let rule = HighComplexityRule { threshold: 20 };
+        let findings = rule.check_file(&path, dir.path());
+        assert!(
+            findings.is_empty(),
+            "complexity 19 should not trigger default threshold of 20; got {} findings",
+            findings.len()
+        );
+    }
+
+    #[test]
+    fn test_default_threshold_triggered() {
+        let dir = tempfile::tempdir().unwrap();
+        // 19 branches → complexity 20 (base 1 + 19 branches); should trigger threshold of 20
+        let path = make_python_function_with_branches(dir.path(), "high.py", 19);
+        let rule = HighComplexityRule { threshold: 20 };
+        let findings = rule.check_file(&path, dir.path());
+        assert!(
+            !findings.is_empty(),
+            "complexity 20 should trigger default threshold of 20"
+        );
+    }
+
+    #[test]
+    fn test_custom_threshold_lower() {
+        let dir = tempfile::tempdir().unwrap();
+        // 5 branches → complexity 6; below default (20) but above custom threshold of 5
+        let path = make_python_function_with_branches(dir.path(), "medium.py", 5);
+        let rule = HighComplexityRule { threshold: 5 };
+        let findings = rule.check_file(&path, dir.path());
+        assert!(
+            !findings.is_empty(),
+            "complexity 6 should trigger custom threshold of 5"
+        );
+    }
+
+    #[test]
+    fn test_custom_threshold_higher() {
+        let dir = tempfile::tempdir().unwrap();
+        // 19 branches → complexity 20; at default (20) but below custom threshold of 30
+        let path = make_python_function_with_branches(dir.path(), "medium.py", 19);
+        let rule = HighComplexityRule { threshold: 30 };
+        let findings = rule.check_file(&path, dir.path());
+        assert!(
+            findings.is_empty(),
+            "complexity 20 should not trigger custom threshold of 30"
+        );
+    }
 }
