@@ -1,6 +1,6 @@
 # Normalize Roadmap
 
-Last triaged: 2026-04-27
+Last triaged: 2026-05-06
 
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
@@ -21,7 +21,7 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 **Pre-release checklist:**
 - [ ] Verify daemon nested-runtime panic is gone (smoke-test `normalize daemon run`)
-- [ ] Bump EXTRACTOR_VERSION to "2" in normalize-facts/src/index.rs to purge CA cache entries that may have been poisoned by old binaries without grammars
+- [x] Bump EXTRACTOR_VERSION to "2" in normalize-facts/src/index.rs to purge CA cache entries that may have been poisoned by old binaries without grammars — done: `const EXTRACTOR_VERSION: &str = "2"` in `normalize-facts/src/index.rs`
 - [ ] Run `normalize structure rebuild --full` on a fresh checkout to verify 0.3.0 extraction quality
 - [ ] Tag v0.3.0 and update CHANGELOG `[Unreleased]` → `[0.3.0]`
 
@@ -70,16 +70,7 @@ Remaining (not blocking the memory fix):
 - [x] Persistent `SkeletonExtractor` in LSP backend (avoids recreating per request)
 - [x] Compiled query caching in `GrammarLoader` (tags, imports, calls, complexity)
 - [x] Configurable debounce interval (`[serve] fact_debounce_ms`, default 1500)
-- **Per-file daemon storage shape**: split `daemon_diagnostics` into per-engine "all" blobs
-  (existing) plus a per-file table `daemon_diagnostics_per_file (path, issues_blob, updated_at)`.
-  "No row = file is clean" — only files with issues consume rows. Each access pattern hits a
-  fast path matching its query: pull "all" → existing zero-copy; pull one/N files → per-file
-  table zero-copy concat; rule-id filter → existing slow path on "all". Add `filter_files`
-  to `RunRules` request. Daemon write cycle: group by path, upsert changed rows, delete
-  rows for paths that became clean, rebuild "all" from the union — single transaction.
-  Also write `.normalize/diagnostics.json` (keyed by path) atomically (write+rename) for
-  ephemeral consumers (shell scripts, post-daemon-exit reads). LSP can either subscribe for
-  push or inotify-watch the file.
+- [x] **Per-file daemon storage shape**: `daemon_diagnostics_per_file (path, issues_blob, updated_at)` table exists; `filter_files` on `RunRules` request wired; `.normalize/diagnostics.json` written atomically after each refresh. All three pieces confirmed implemented.
 - [x] **Daemon-push diagnostics for LSP**: `Event::DiagnosticsUpdated { root, updates }` is now
   broadcast on every prime/refresh with per-file deltas (blob-compared to skip unchanged files).
   Subscribe connections opened with the `0x01` magic byte stream length-prefixed rkyv frames;
@@ -525,7 +516,7 @@ The current architecture is batch-oriented: commands scan the whole workspace, p
 - **JIT threading bug in ascent-interpreter** (2026-04-27): `engine.run()` with JIT enabled panics with `index out of bounds: len is 0, index is 0` in `jit_stratum_advance_s4_inner` (packed_helpers.rs line 872) when two JIT engines run concurrently. Root cause: `jit_recent_indices` Vec is empty for `jit_is_sink = true` relations; the concurrent access exposes an otherwise latent issue. Fix in ascent-interpreter needed before JIT can be re-enabled in the parallel `run_rules_batch`.
 - Syntax rules load and compile all tree-sitter queries on every invocation
 - **Fact rules**: incremental Datalog. When facts for one file change, re-derive only affected conclusions. This is hard — may need semi-naive evaluation with change tracking.
-- **Watch mode**: `normalize watch` that keeps the index live and re-runs checks on file changes (inotify/fsevents). The LSP server is one consumer; a TUI dashboard could be another.
+- [x] **Watch mode**: `normalize watch` that keeps the index live and re-runs checks on file changes (inotify/fsevents). The LSP server is one consumer; a TUI dashboard could be another. — done: `normalize daemon watch` streams file-change events to terminal; see L91 `[x] normalize watch CLI`.
 - **`SymbolIndex` trait**: injected API for symbol resolution (daemon → index → parse-on-miss). See `docs/design/daemon-as-kernel.md`.
 
 **Next incremental steps:**
@@ -573,7 +564,7 @@ See `docs/lint-architecture.md` for full design discussion.
 
 Rules (custom enforcement, future):
 - [x] Module boundary rules ("services/ cannot import cli/") — covered by `boundary-violations` native rule (see above)
-- [ ] Threshold rules ("fan-out > 20 is error")
+- [x] Threshold rules ("fan-out > 20 is error") — covered by `high-fan-out` and `high-fan-in` native rules (index-based, configurable threshold, default disabled, tags: architecture/coupling)
 - [ ] Dependency path queries ("what's between A and B?")
 
 **Rule unit testing (`normalize rules test`):**
@@ -1105,8 +1096,9 @@ Building blocks are all present. Composition layer landed — `normalize-refacto
   (`crates/normalize-refactor/`). `plan_rename` takes pre-resolved path components; caller
   does path resolution. `normalize-syntax-rules` `fix` feature gate established for future
   `PlannedEdit` integration.
-- [ ] `normalize move <target> <destination>` — move a symbol to another file, updating all
+- [x] `normalize move <target> <destination>` — move a symbol to another file, updating all
   import sites. Requires rename infrastructure + import rewriting. After rename lands.
+  Done as `normalize edit move` (`crates/normalize-refactor/src/move_item.rs`); best-effort import rewriting for Python/Go/JS/TS; `--reexport` available.
 - [ ] `normalize extract <file:start-end> <new-name>` — extract a region into a new function,
   rewriting the call site. Single-file first; cross-file as stretch.
 - [ ] `normalize inline <target>` — inline a single-use function or constant. Single-file.

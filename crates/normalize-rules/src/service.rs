@@ -701,6 +701,8 @@ impl RulesService {
             let run_long_function = is_native_enabled("long-function");
             let run_stale_doc = is_native_enabled("stale-doc");
             let run_boundary_violations = is_native_enabled("boundary-violations");
+            let run_high_fan_out = is_native_enabled("high-fan-out");
+            let run_high_fan_in = is_native_enabled("high-fan-in");
 
             let boundary_cfg: normalize_native_rules::BoundaryViolationsConfig = native_config
                 .rules
@@ -741,6 +743,20 @@ impl RulesService {
                 .map(|r| r.rule_config::<ThresholdConfig>())
                 .and_then(|c| c.threshold)
                 .unwrap_or(100);
+            let high_fan_out_threshold: usize = native_config
+                .rules
+                .rules
+                .get("high-fan-out")
+                .map(|r| r.rule_config::<ThresholdConfig>())
+                .and_then(|c| c.threshold)
+                .unwrap_or(20);
+            let high_fan_in_threshold: usize = native_config
+                .rules
+                .rules
+                .get("high-fan-in")
+                .map(|r| r.rule_config::<ThresholdConfig>())
+                .and_then(|c| c.threshold)
+                .unwrap_or(20);
 
             let stale_doc_cfg: normalize_native_rules::StaleDocConfig = native_config
                 .rules
@@ -913,13 +929,15 @@ impl RulesService {
 
             // Advisory rules (default disabled — only run when explicitly enabled).
             // long-file / high-complexity / long-function are tree-sitter-heavy.
-            // stale-doc and boundary-violations require the index, so also advisory.
+            // stale-doc, boundary-violations, high-fan-out, and high-fan-in require the index.
             let (
                 long_file_res,
                 high_complexity_res,
                 long_function_res,
                 stale_doc_res,
                 boundary_violations_res,
+                high_fan_out_res,
+                high_fan_in_res,
             ) = tokio::join!(
                 async {
                     if !run_long_file {
@@ -1019,6 +1037,30 @@ impl RulesService {
                     eprintln!("[timings] boundary-violations: {:.1?}", t.elapsed());
                     Some(r)
                 },
+                async {
+                    if !run_high_fan_out {
+                        return None;
+                    }
+                    let root = native_root.clone();
+                    let threshold = high_fan_out_threshold;
+                    let t = std::time::Instant::now();
+                    let r =
+                        normalize_native_rules::build_high_fan_out_report(&root, threshold).await;
+                    eprintln!("[timings] high-fan-out: {:.1?}", t.elapsed());
+                    Some(r)
+                },
+                async {
+                    if !run_high_fan_in {
+                        return None;
+                    }
+                    let root = native_root.clone();
+                    let threshold = high_fan_in_threshold;
+                    let t = std::time::Instant::now();
+                    let r =
+                        normalize_native_rules::build_high_fan_in_report(&root, threshold).await;
+                    eprintln!("[timings] high-fan-in: {:.1?}", t.elapsed());
+                    Some(r)
+                },
             );
 
             if let Some(r) = long_file_res {
@@ -1034,6 +1076,12 @@ impl RulesService {
                 report.merge(r);
             }
             if let Some(r) = boundary_violations_res {
+                report.merge(r);
+            }
+            if let Some(r) = high_fan_out_res {
+                report.merge(r);
+            }
+            if let Some(r) = high_fan_in_res {
                 report.merge(r);
             }
 
