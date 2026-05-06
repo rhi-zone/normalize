@@ -16,9 +16,9 @@ default = ["jit"]
 jit = ["ascent-interpreter/jit-asm"]
 
 [dependencies]
-normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.2.0" }
-normalize-core = { path = "../normalize-core", version = "0.2.0" }
-normalize-rules-config = { path = "../normalize-rules-config", version = "0.2.0" }
+normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.3.0" }
+normalize-core = { path = "../normalize-core", version = "0.3.0" }
+normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.0" }
 ascent-interpreter.workspace = true
 syn = { version = "2.0", features = ["full"] }
 serde.workspace = true

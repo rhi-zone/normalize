@@ -6,6 +6,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-06
+
 ### Changed
 
 - **`*-allow` files removed in favor of `config.toml` entries.** The 7 legacy `.normalize/*-allow` files (`large-files-allow`, `hotspots-allow`, `duplicate-blocks-allow`, `duplicate-functions-allow`, `duplicate-types-allow`, `similar-blocks-allow`, `similar-functions-allow`) are no longer loaded. Their entries now live directly in `config.toml`: `large-files-allow` → `[rules.rule."long-file"] allow = [...]`; `hotspots-allow` → `[analyze] hotspots_exclude`; duplicate/similar command allowlists → `[analyze.<subcommand>] allow = [...]`. **Migration:** if you have custom entries in any `*-allow` file, move them to the appropriate `config.toml` section.

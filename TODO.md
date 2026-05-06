@@ -20,10 +20,10 @@ extract, inline, move — correct, without LSPs, without false positives.
 **Assessed 2026-04-27.** CHANGELOG `[Unreleased]` has a very large feature set — enough for a release. No P0 blockers found. The daemon nested-runtime panic may already be resolved (daemon now uses `Handle::current()`; needs verification before the release commit). Headline features: `normalize edit move`, `normalize sync`, daemon memory leak fix, parallel fact rule evaluation (~2× speedup).
 
 **Pre-release checklist:**
-- [ ] Verify daemon nested-runtime panic is gone (smoke-test `normalize daemon run`)
+- [x] Verify daemon nested-runtime panic is gone (smoke-test `normalize daemon run`)
 - [x] Bump EXTRACTOR_VERSION to "2" in normalize-facts/src/index.rs to purge CA cache entries that may have been poisoned by old binaries without grammars — done: `const EXTRACTOR_VERSION: &str = "2"` in `normalize-facts/src/index.rs`
-- [ ] Run `normalize structure rebuild --full` on a fresh checkout to verify 0.3.0 extraction quality
-- [ ] Tag v0.3.0 and update CHANGELOG `[Unreleased]` → `[0.3.0]`
+- [x] Run `normalize structure rebuild --full` on a fresh checkout to verify 0.3.0 extraction quality
+- [x] Tag v0.3.0 and update CHANGELOG `[Unreleased]` → `[0.3.0]`
 
 ---
 
