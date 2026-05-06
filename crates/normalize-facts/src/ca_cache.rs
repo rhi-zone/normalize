@@ -303,11 +303,71 @@ mod tests {
         cache
             .put(hash.as_bytes(), "current", "rust", &payload)
             .unwrap();
+        // "old" is not a symbols- prefix entry, so it should be deleted
         let deleted = cache.gc_stale_versions("current").unwrap();
         assert_eq!(deleted, 1);
         let got: Option<Payload> = cache.get(hash.as_bytes(), "old", "rust").unwrap();
         assert_eq!(got, None);
         let got: Option<Payload> = cache.get(hash.as_bytes(), "current", "rust").unwrap();
+        assert!(got.is_some());
+    }
+
+    #[test]
+    fn gc_stale_versions_preserves_symbol_cache() {
+        let cache = temp_cache();
+        let hash = blake3::hash(b"test");
+        let payload = Payload {
+            symbols: vec![],
+            count: 0,
+        };
+        // Put an extraction entry (old version) and a symbol cache entry
+        cache.put(hash.as_bytes(), "old", "rust", &payload).unwrap();
+        cache
+            .put(hash.as_bytes(), "symbols-v1-all", "rust", &payload)
+            .unwrap();
+        // gc_stale_versions should delete "old" but NOT "symbols-v1-all"
+        let deleted = cache.gc_stale_versions("current").unwrap();
+        assert_eq!(deleted, 1);
+        let got: Option<Payload> = cache.get(hash.as_bytes(), "old", "rust").unwrap();
+        assert_eq!(got, None);
+        let got: Option<Payload> = cache
+            .get(hash.as_bytes(), "symbols-v1-all", "rust")
+            .unwrap();
+        assert!(
+            got.is_some(),
+            "symbol cache entries must survive extraction GC"
+        );
+    }
+
+    #[test]
+    fn gc_stale_symbol_versions() {
+        let cache = temp_cache();
+        let hash = blake3::hash(b"sym-test");
+        let payload = Payload {
+            symbols: vec![],
+            count: 0,
+        };
+        cache
+            .put(hash.as_bytes(), "symbols-v0-all", "rust", &payload)
+            .unwrap();
+        cache
+            .put(hash.as_bytes(), "symbols-v1-all", "rust", &payload)
+            .unwrap();
+        cache
+            .put(hash.as_bytes(), "symbols-v1-public", "rust", &payload)
+            .unwrap();
+        // Only v0 should be deleted
+        let deleted = cache
+            .gc_stale_symbol_versions(&["symbols-v1-all", "symbols-v1-public"])
+            .unwrap();
+        assert_eq!(deleted, 1);
+        let got: Option<Payload> = cache
+            .get(hash.as_bytes(), "symbols-v0-all", "rust")
+            .unwrap();
+        assert_eq!(got, None);
+        let got: Option<Payload> = cache
+            .get(hash.as_bytes(), "symbols-v1-all", "rust")
+            .unwrap();
         assert!(got.is_some());
     }
 
