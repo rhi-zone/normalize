@@ -1,14 +1,14 @@
 //! `long-file` native rule — flags source files exceeding a line count threshold.
 //!
-//! Respects `.normalize/large-files-allow` allowlist and excludes lock files.
+//! Excludes well-known lock files and paths matching the `allow` list configured
+//! under `[rules.rule."long-file"] allow = [...]` in `.normalize/config.toml`.
 //!
 //! # Configuration
 //!
-//! The threshold is configurable via `.normalize/config.toml`:
-//!
 //! ```toml
 //! [rules.rule."long-file"]
-//! threshold = 300   # default: 500
+//! threshold = 300         # default: 500
+//! allow = ["grammars/**"] # paths to skip (glob patterns)
 //! ```
 
 use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
@@ -53,24 +53,6 @@ fn is_lockfile(name: &str) -> bool {
     )
 }
 
-/// Load glob patterns from `.normalize/large-files-allow`.
-fn load_allow_patterns(root: &Path) -> Vec<glob::Pattern> {
-    let path = root.join(".normalize").join("large-files-allow");
-    let content = match std::fs::read_to_string(&path) {
-        Ok(c) => c,
-        Err(_) => return Vec::new(),
-    };
-
-    content
-        .lines()
-        .filter(|line| {
-            let trimmed = line.trim();
-            !trimmed.is_empty() && !trimmed.starts_with('#')
-        })
-        .filter_map(|line| glob::Pattern::new(line.trim()).ok())
-        .collect()
-}
-
 /// Rule that flags source files exceeding a line count threshold.
 pub struct LongFileRule {
     pub threshold: usize,
@@ -78,11 +60,21 @@ pub struct LongFileRule {
 }
 
 impl LongFileRule {
-    /// Create a new `LongFileRule`, loading allowlist patterns from the project root.
-    pub fn new(threshold: usize, root: &Path) -> Self {
+    /// Create a new `LongFileRule` with the given threshold and allow-list patterns.
+    ///
+    /// Callers should pass the `allow` list from `[rules.rule."long-file"]` in config:
+    /// ```ignore
+    /// let allow = config.rules.rules.get("long-file").map(|r| r.allow.clone()).unwrap_or_default();
+    /// let rule = LongFileRule::new(threshold, &allow);
+    /// ```
+    pub fn new(threshold: usize, allow: &[String]) -> Self {
+        let allow_patterns = allow
+            .iter()
+            .filter_map(|p| glob::Pattern::new(p).ok())
+            .collect();
         Self {
             threshold,
-            allow_patterns: load_allow_patterns(root),
+            allow_patterns,
         }
     }
 }
@@ -190,15 +182,16 @@ impl FileRule for LongFileRule {
 /// Build a `DiagnosticsReport` for the `long-file` rule.
 ///
 /// Walks all source files under `root`, counts lines, and emits an issue for
-/// each file exceeding the threshold. Lock files and allowlisted paths are
-/// skipped.
+/// each file exceeding the threshold. Lock files and `allow`-listed paths are
+/// skipped. `allow` should come from `[rules.rule."long-file"] allow` in config.
 pub fn build_long_file_report(
     root: &Path,
     threshold: usize,
     files: Option<&[std::path::PathBuf]>,
     walk_config: &WalkConfig,
+    allow: &[String],
 ) -> DiagnosticsReport {
-    let rule = LongFileRule::new(threshold, root);
+    let rule = LongFileRule::new(threshold, allow);
     run_file_rule(&rule, root, files, walk_config)
 }
 
@@ -221,7 +214,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         // 499 lines — below default threshold of 500
         let path = make_file_with_lines(dir.path(), "short.rs", 499);
-        let rule = LongFileRule::new(500, dir.path());
+        let rule = LongFileRule::new(500, &[]);
         let findings = rule.check_file(&path, dir.path());
         assert!(
             findings.is_empty(),
@@ -234,7 +227,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         // 500 lines — at default threshold
         let path = make_file_with_lines(dir.path(), "long.rs", 500);
-        let rule = LongFileRule::new(500, dir.path());
+        let rule = LongFileRule::new(500, &[]);
         let findings = rule.check_file(&path, dir.path());
         assert_eq!(
             findings.len(),
@@ -248,7 +241,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         // 100 lines — below default but above custom threshold of 50
         let path = make_file_with_lines(dir.path(), "medium.rs", 100);
-        let rule = LongFileRule::new(50, dir.path());
+        let rule = LongFileRule::new(50, &[]);
         let findings = rule.check_file(&path, dir.path());
         assert_eq!(
             findings.len(),
@@ -262,7 +255,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         // 500 lines — at default but below custom threshold of 1000
         let path = make_file_with_lines(dir.path(), "medium.rs", 500);
-        let rule = LongFileRule::new(1000, dir.path());
+        let rule = LongFileRule::new(1000, &[]);
         let findings = rule.check_file(&path, dir.path());
         assert!(
             findings.is_empty(),

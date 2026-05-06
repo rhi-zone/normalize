@@ -100,6 +100,12 @@ pub struct SubcommandConfig {
     /// Minimum lines threshold (used by duplicate detection modes).
     /// Default: 15 for similar-blocks, 10 for similar-functions/clusters, 5 for exact-blocks, 1 for exact-functions.
     pub min_lines: Option<usize>,
+    /// Allowlist entries for this subcommand (migrated from `.normalize/*-allow` files).
+    /// For duplicate-functions/similar-functions: `file:symbol` format.
+    /// For duplicate-blocks/similar-blocks: `file:start-end` or `file:func:start-end` format.
+    /// For duplicate-types: `TypeA TypeB` format.
+    #[serde(default)]
+    pub allow: Vec<String>,
 }
 
 /// Weights for each analysis pass (higher = more impact on grade).
@@ -174,9 +180,18 @@ impl AnalyzeConfig {
         }
         result
     }
+
+    /// Get allowlist entries for a specific subcommand from config.
+    /// These are the config-based equivalent of the legacy `.normalize/*-allow` files.
+    pub fn allows_for(&self, subcommand: &str) -> Vec<String> {
+        self.subcommands
+            .get(subcommand)
+            .map(|s| s.allow.clone())
+            .unwrap_or_default()
+    }
 }
 
-/// Load patterns from a .normalize allow file (e.g., hotspots-allow, large-files-allow)
+/// Load patterns from a .normalize allow file (e.g., complexity-allow, length-allow, test-gaps-allow)
 pub fn load_allow_file(root: &Path, filename: &str) -> Vec<String> {
     let path = root.join(".normalize").join(filename);
     let content = match std::fs::read_to_string(&path) {

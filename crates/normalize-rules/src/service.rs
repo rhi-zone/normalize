@@ -597,6 +597,12 @@ impl RulesService {
                 .map(|r| r.rule_config::<ThresholdConfig>())
                 .and_then(|c| c.threshold)
                 .unwrap_or(500);
+            let long_file_allow: Vec<String> = native_config
+                .rules
+                .rules
+                .get("long-file")
+                .map(|r| r.allow.clone())
+                .unwrap_or_default();
             let high_complexity_threshold: usize = native_config
                 .rules
                 .rules
@@ -791,6 +797,7 @@ impl RulesService {
                     }
                     let root = native_root.clone();
                     let threshold = long_file_threshold;
+                    let allow = long_file_allow.clone();
                     let ef = effective_files.clone();
                     let wc = native_config.walk.clone();
                     let t = std::time::Instant::now();
@@ -800,6 +807,7 @@ impl RulesService {
                             threshold,
                             ef.as_deref(),
                             &wc,
+                            &allow,
                         )
                     })
                     .await

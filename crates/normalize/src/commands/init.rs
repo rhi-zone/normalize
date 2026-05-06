@@ -253,10 +253,6 @@ pub fn detect_todo_files(root: &Path) -> Vec<String> {
 const GITIGNORE_ENTRIES: &[&str] = &[
     ".normalize/*",
     "!.normalize/config.toml",
-    "!.normalize/duplicate-functions-allow",
-    "!.normalize/duplicate-types-allow",
-    "!.normalize/hotspots-allow",
-    "!.normalize/large-files-allow",
     "!.normalize/memory/",
 ];
 
@@ -420,16 +416,6 @@ mod tests {
 
         // But negation entries should still be added
         assert!(lines.iter().any(|l| l.trim() == "!.normalize/config.toml"));
-        assert!(
-            lines
-                .iter()
-                .any(|l| l.trim() == "!.normalize/duplicate-functions-allow")
-        );
-        assert!(
-            lines
-                .iter()
-                .any(|l| l.trim() == "!.normalize/duplicate-types-allow")
-        );
     }
 
     #[tokio::test]

@@ -429,13 +429,9 @@ impl RankService {
         let root_path = Self::root_path(root)?;
         self.resolve_format(pretty, compact, &root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
-        // Merge: global excludes + [analyze.hotspots] excludes + legacy hotspots_exclude + allow file
+        // Merge: global excludes + [analyze.hotspots] excludes + hotspots_exclude
         let mut excludes = config.analyze.excludes_for("hotspots");
         excludes.extend(config.analyze.hotspots_exclude.clone());
-        excludes.extend(crate::commands::analyze::load_allow_file(
-            &root_path,
-            "hotspots-allow",
-        ));
         if let Some(repos_dir) = repos_dir {
             let repo_paths = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
             let entries: Vec<crate::commands::analyze::hotspots::HotspotsRepoEntry> = repo_paths
@@ -1350,6 +1346,7 @@ impl RankService {
                             min_lines: min_lines.or(config_min_lines).unwrap_or(1),
                             include_trait_impls,
                             filter: filter.as_ref(),
+                            config_allow: config.analyze.allows_for("duplicate-functions"),
                         },
                     ),
                 )
@@ -1366,6 +1363,7 @@ impl RankService {
                         allow: None,
                         reason: None,
                         filter: filter.as_ref(),
+                        config_allow: config.analyze.allows_for("duplicate-blocks"),
                     },
                 ),
             ),
@@ -1389,6 +1387,7 @@ impl RankService {
                             allow: None,
                             reason: None,
                             filter: filter.as_ref(),
+                            config_allow: config.analyze.allows_for("similar-functions"),
                         },
                     ),
                 )
@@ -1407,6 +1406,7 @@ impl RankService {
                         allow: None,
                         reason: None,
                         filter: filter.as_ref(),
+                        config_allow: config.analyze.allows_for("similar-blocks"),
                     },
                 ),
             ),
@@ -1447,14 +1447,17 @@ impl RankService {
         >,
     ) -> Result<DuplicateTypesReport, String> {
         let root_path = Self::root_path(root)?;
+        let config = crate::config::NormalizeConfig::load(&root_path);
         let scan_root = target
             .map(PathBuf::from)
             .unwrap_or_else(|| root_path.clone());
+        let config_allow = config.analyze.allows_for("duplicate-types");
         Ok(
             crate::commands::analyze::duplicates::build_duplicate_types_report(
                 &scan_root,
                 &root_path,
                 min_overlap.unwrap_or(70),
+                &config_allow,
             ),
         )
     }

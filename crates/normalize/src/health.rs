@@ -796,24 +796,6 @@ fn is_lockfile(path: &str) -> bool {
     )
 }
 
-/// Load patterns from an allow file (.normalize/large-files-allow or similar)
-fn load_allow_patterns(root: &Path, filename: &str) -> Vec<Pattern> {
-    let path = root.join(".normalize").join(filename);
-    let content = match std::fs::read_to_string(&path) {
-        Ok(c) => c,
-        Err(_) => return Vec::new(),
-    };
-
-    content
-        .lines()
-        .filter(|line| {
-            let trimmed = line.trim();
-            !trimmed.is_empty() && !trimmed.starts_with('#')
-        })
-        .filter_map(|line| Pattern::new(line.trim()).ok())
-        .collect()
-}
-
 /// Check if path matches any allow pattern
 fn is_allowed(path: &str, patterns: &[Pattern]) -> bool {
     patterns.iter().any(|p| p.matches(path))
@@ -890,6 +872,7 @@ fn compute_extra_metrics(root: &Path) -> ExtraMetrics {
                 || {
                     rayon::join(
                         || {
+                            let dup_fn_config = crate::config::NormalizeConfig::load(root);
                             let cfg = DuplicateFunctionsConfig {
                                 roots: std::slice::from_ref(&root_buf),
                                 elide_identifiers: false,
@@ -898,6 +881,9 @@ fn compute_extra_metrics(root: &Path) -> ExtraMetrics {
                                 min_lines: 4,
                                 include_trait_impls: false,
                                 filter: None,
+                                config_allow: dup_fn_config
+                                    .analyze
+                                    .allows_for("duplicate-functions"),
                             };
                             build_duplicate_functions_report(cfg)
                         },
@@ -923,16 +909,24 @@ fn compute_extra_metrics(root: &Path) -> ExtraMetrics {
 }
 
 pub fn analyze_health(root: &Path) -> HealthReport {
-    let allow_patterns = load_allow_patterns(root, "large-files-allow");
+    // Load config first to get the allow list for large-files (migrated from .normalize/large-files-allow).
+    let config = crate::config::NormalizeConfig::load(root);
+    let long_file_allow = config
+        .rules
+        .rules
+        .get("long-file")
+        .map(|r| r.allow.clone())
+        .unwrap_or_default();
+    let allow_patterns: Vec<Pattern> = long_file_allow
+        .iter()
+        .filter_map(|p| Pattern::new(p).ok())
+        .collect();
 
     // Compute complexity and extra metrics in parallel (before entering async context)
     let (complexity, extra) = rayon::join(
         || compute_complexity_stats(root, &[]),
         || compute_extra_metrics(root),
     );
-
-    // Try index first for file/line stats, fall back to filesystem walk
-    let config = crate::config::NormalizeConfig::load(root);
     if config.index.enabled() {
         let fut = async { crate::index::open(root).await.ok() };
         let indexed = match tokio::runtime::Handle::try_current() {

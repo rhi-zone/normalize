@@ -477,12 +477,17 @@ Once Pillar 7 (sub-100ms hot path) delivers acceptable perf, add Claude Code hoo
 run `normalize rules run --files <changed>` after every tool call. This gives agents
 immediate feedback on violations they introduce. Blocked on Pillar 7.
 
-### Phase out *-allow files
+### ~~Phase out *-allow files~~ ✓ Done
 
-`.normalize/large-files-allow` and similar per-rule allowlists should migrate to
-`[rules."long-file"] allow = [...]` in config.toml. The file-based allowlists are a
-legacy pattern from before the config system existed. Remove the file-loading code
-once all entries are in config.
+All 7 legacy allow files migrated to `config.toml` and file-loading code removed:
+- `large-files-allow` → `[rules.rule."long-file"] allow = [...]`; `LongFileRule::new()` now takes allow list as parameter
+- `hotspots-allow` → `[analyze] hotspots_exclude = [...]`
+- `duplicate-blocks-allow` → `[analyze.duplicate-blocks] allow = [...]`
+- `duplicate-functions-allow` → `[analyze.duplicate-functions] allow = [...]`
+- `duplicate-types-allow` → `[analyze.duplicate-types] allow = [...]`
+- `similar-blocks-allow` → `[analyze.similar-blocks] allow = [...]`
+- `similar-functions-allow` → `[analyze.similar-functions] allow = [...]`
+`SubcommandConfig` gained `allow: Vec<String>` field; `AnalyzeConfig::allows_for()` reads it.
 
 ---
 

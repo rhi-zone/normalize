@@ -141,22 +141,6 @@ impl OutputFormatter for DuplicateTypesReport {
     }
 }
 
-/// Load allowed duplicate function locations from .normalize/duplicate-functions-allow file
-fn load_duplicate_functions_allowlist(root: &Path) -> HashSet<String> {
-    let path = root.join(".normalize/duplicate-functions-allow");
-    let mut allowed = HashSet::new();
-    if let Ok(content) = std::fs::read_to_string(&path) {
-        for line in content.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
-            allowed.insert(line.to_string());
-        }
-    }
-    allowed
-}
-
 /// Detect duplicate functions.
 pub struct DuplicateFunctionsConfig<'a> {
     pub roots: &'a [PathBuf],
@@ -166,6 +150,9 @@ pub struct DuplicateFunctionsConfig<'a> {
     pub min_lines: usize,
     pub include_trait_impls: bool,
     pub filter: Option<&'a Filter>,
+    /// Allowlist entries from config (migrated from `.normalize/duplicate-functions-allow`).
+    /// Format: `file:symbol` (one per entry).
+    pub config_allow: Vec<String>,
 }
 
 // ── Duplicate block detection (subtree-level) ─────────────────────────────────
@@ -231,19 +218,8 @@ fn block_allow_key(
     }
 }
 
-fn load_block_allowlist(root: &Path, filename: &str) -> HashSet<String> {
-    let path = root.join(".normalize").join(filename);
-    let mut allowed = HashSet::new();
-    if let Ok(content) = std::fs::read_to_string(&path) {
-        for line in content.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
-            allowed.insert(line.to_string());
-        }
-    }
-    allowed
+fn entries_to_allowlist(entries: &[String]) -> HashSet<String> {
+    entries.iter().cloned().collect()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -342,6 +318,9 @@ pub struct DuplicateBlocksConfig<'a> {
     pub allow: Option<String>,
     pub reason: Option<String>,
     pub filter: Option<&'a Filter>,
+    /// Allowlist entries from config (migrated from `.normalize/duplicate-blocks-allow`).
+    /// Format: `file:start-end` or `file:func:start-end`.
+    pub config_allow: Vec<String>,
 }
 
 // ── Fuzzy / partial clone detection (MinHash LSH) ─────────────────────────────
@@ -769,6 +748,9 @@ pub struct SimilarBlocksConfig<'a> {
     pub allow: Option<String>,
     pub reason: Option<String>,
     pub filter: Option<&'a Filter>,
+    /// Allowlist entries from config (migrated from `.normalize/similar-blocks-allow`).
+    /// Format: `file:start-end` or `file:func:start-end`.
+    pub config_allow: Vec<String>,
 }
 
 // ── Similar functions (fuzzy function-level matching) ─────────────────────────
@@ -800,6 +782,9 @@ pub struct SimilarFunctionsConfig<'a> {
     pub allow: Option<String>,
     pub reason: Option<String>,
     pub filter: Option<&'a Filter>,
+    /// Allowlist entries from config (migrated from `.normalize/similar-functions-allow`).
+    /// Format: `file:symbol:start-end` or `file:start-end`.
+    pub config_allow: Vec<String>,
 }
 
 /// Core pair detection: extract MinHash signatures and find similar function pairs via LSH.
@@ -1075,6 +1060,7 @@ pub fn build_duplicate_functions_report(cfg: DuplicateFunctionsConfig<'_>) -> Du
         min_lines,
         include_trait_impls,
         filter,
+        config_allow,
     } = cfg;
     let extractor = Extractor::new();
     let multi_repo = roots.len() > 1;
@@ -1082,10 +1068,9 @@ pub fn build_duplicate_functions_report(cfg: DuplicateFunctionsConfig<'_>) -> Du
     let mut hash_groups: HashMap<u64, Vec<DuplicateFunctionLocation>> = HashMap::new();
     let mut files_scanned = 0usize;
     let mut functions_hashed = 0usize;
-    let mut combined_allowlist: HashSet<String> = HashSet::new();
+    let combined_allowlist: HashSet<String> = entries_to_allowlist(&config_allow);
 
     for root in roots {
-        let allowlist = load_duplicate_functions_allowlist(root);
         let repo_name = root
             .file_name()
             .and_then(|n| n.to_str())
@@ -1168,14 +1153,6 @@ pub fn build_duplicate_functions_report(cfg: DuplicateFunctionsConfig<'_>) -> Du
             functions_hashed += fn_count;
             for (hash, loc) in entries {
                 hash_groups.entry(hash).or_default().push(loc);
-            }
-        }
-
-        for key in allowlist {
-            if multi_repo {
-                combined_allowlist.insert(format!("{}/{}", repo_name, key));
-            } else {
-                combined_allowlist.insert(key);
             }
         }
     }
@@ -1289,6 +1266,7 @@ pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> Duplicat
         allow: _allow,
         reason: _reason,
         filter,
+        config_allow,
     } = cfg;
     let extractor = Extractor::new();
     let mut hash_groups: HashMap<u64, Vec<DuplicateBlockLocation>> = HashMap::new();
@@ -1396,7 +1374,7 @@ pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> Duplicat
         block_allow_key(&loc.file, loc.start_line, loc.end_line, func.as_deref())
     };
 
-    let allowlist = load_block_allowlist(root, "duplicate-blocks-allow");
+    let allowlist = entries_to_allowlist(&config_allow);
     let loc_allowed = |loc: &DuplicateBlockLocation| {
         allowlist.contains(&allow_key(loc))
             || allowlist.contains(&format!("{}:{}-{}", loc.file, loc.start_line, loc.end_line))
@@ -1462,9 +1440,10 @@ pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> Duplic
         allow: _allow,
         reason: _reason,
         filter,
+        config_allow,
     } = cfg;
 
-    let multi_repo = roots.len() > 1;
+    let _multi_repo = roots.len() > 1;
     let result = find_similar_function_pairs(
         roots,
         min_lines,
@@ -1483,25 +1462,7 @@ pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> Duplic
         format!("{}:{}:{}-{}", file, symbol, start, end)
     };
 
-    let combined_allowlist: HashSet<String> = roots
-        .iter()
-        .flat_map(|root| {
-            let repo_name = root
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown")
-                .to_string();
-            load_block_allowlist(root, "similar-functions-allow")
-                .into_iter()
-                .map(move |k| {
-                    if multi_repo {
-                        format!("{}/{}", repo_name, k)
-                    } else {
-                        k
-                    }
-                })
-        })
-        .collect();
+    let combined_allowlist: HashSet<String> = entries_to_allowlist(&config_allow);
     let pairs: Vec<SimilarFunctionPair> = pairs
         .into_iter()
         .filter(|p| {
@@ -1605,6 +1566,7 @@ pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> DuplicatesRe
         allow: _allow,
         reason: _reason,
         filter,
+        config_allow,
     } = cfg;
     let extractor = Extractor::new();
     let mut all_blocks: Vec<(DuplicateBlockLocation, [u64; MINHASH_N])> = Vec::new();
@@ -1796,7 +1758,7 @@ pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> DuplicatesRe
         block_allow_key(&loc.file, loc.start_line, loc.end_line, func.as_deref())
     };
 
-    let allowlist = load_block_allowlist(root, "similar-blocks-allow");
+    let allowlist = entries_to_allowlist(&config_allow);
     let loc_in_allowlist = |loc: &DuplicateBlockLocation| {
         allowlist.contains(&pair_allow_key(loc))
             || allowlist.contains(&format!("{}:{}-{}", loc.file, loc.start_line, loc.end_line))
@@ -1867,16 +1829,17 @@ pub fn build_duplicate_types_report(
     root: &Path,
     config_root: &Path,
     min_overlap_percent: usize,
+    config_allow: &[String],
 ) -> DuplicateTypesReport {
     use regex::Regex;
 
+    let _ = config_root; // previously used to load .normalize/duplicate-types-allow; now unused
+
     let extractor = Extractor::new();
 
-    let allowlist_path = config_root.join(".normalize/duplicate-types-allow");
-    let allowed_pairs: HashSet<(String, String)> = std::fs::read_to_string(&allowlist_path)
-        .unwrap_or_default()
-        .lines()
-        .filter(|l| !l.trim().is_empty() && !l.trim().starts_with('#'))
+    // Parse allowed pairs from config (format: "TypeA TypeB" per entry).
+    let allowed_pairs: HashSet<(String, String)> = config_allow
+        .iter()
         .filter_map(|l| {
             let parts: Vec<&str> = l.split_whitespace().collect();
             if parts.len() == 2 {
@@ -2028,14 +1991,20 @@ pub fn build_duplicate_types_report(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
 
     #[test]
-    fn test_load_duplicate_functions_allowlist_empty() {
-        // normalize-syntax-allow: rust/unwrap-in-impl - test code, panic is appropriate
-        let tmp = tempdir().unwrap();
-        let allowlist = load_duplicate_functions_allowlist(tmp.path());
+    fn test_entries_to_allowlist_empty() {
+        let allowlist = entries_to_allowlist(&[]);
         assert!(allowlist.is_empty());
+    }
+
+    #[test]
+    fn test_entries_to_allowlist_populated() {
+        let entries = vec!["file.rs:foo".to_string(), "file.rs:bar".to_string()];
+        let allowlist = entries_to_allowlist(&entries);
+        assert!(allowlist.contains("file.rs:foo"));
+        assert!(allowlist.contains("file.rs:bar"));
+        assert!(!allowlist.contains("file.rs:baz"));
     }
 
     #[test]

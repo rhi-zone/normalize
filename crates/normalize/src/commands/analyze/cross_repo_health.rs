@@ -159,11 +159,7 @@ fn gather_metrics(repo_path: &Path) -> RawMetrics {
 
     // --- Churn (hotspots) ---
     let config = crate::config::NormalizeConfig::load(repo_path);
-    let mut hotspot_excludes = config.analyze.hotspots_exclude.clone();
-    hotspot_excludes.extend(crate::commands::analyze::load_allow_file(
-        repo_path,
-        "hotspots-allow",
-    ));
+    let hotspot_excludes = config.analyze.hotspots_exclude.clone();
 
     let (churn_score, hotspot_files, churn_error) =
         match crate::commands::analyze::hotspots::analyze_hotspots(
