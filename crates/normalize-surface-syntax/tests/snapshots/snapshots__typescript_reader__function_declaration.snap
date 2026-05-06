@@ -1,6 +1,5 @@
 ---
 source: crates/normalize-surface-syntax/tests/snapshots.rs
-assertion_line: 91
 expression: "parse(\"function greet(name) { return \\\"Hello, \\\" + name; }\")"
 ---
 {
@@ -9,7 +8,9 @@ expression: "parse(\"function greet(name) { return \\\"Hello, \\\" + name; }\")"
       "Function": {
         "name": "greet",
         "params": [
-          "name"
+          {
+            "name": "name"
+          }
         ],
         "body": [
           {

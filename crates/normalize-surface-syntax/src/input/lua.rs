@@ -502,9 +502,9 @@ impl<'a> ReadContext<'a> {
     }
 
     fn read_function_expr(&self, node: Node) -> Result<Expr, ReadError> {
-        let mut param_names = Vec::new();
-        if let Some(params) = node.child_by_field_name("parameters") {
-            self.collect_params(params, &mut param_names);
+        let mut params = Vec::new();
+        if let Some(params_node) = node.child_by_field_name("parameters") {
+            self.collect_params(params_node, &mut params);
         }
 
         let body_node = node
@@ -513,19 +513,16 @@ impl<'a> ReadContext<'a> {
 
         let body = self.read_block_stmts(body_node)?;
 
-        Ok(Expr::Function(Box::new(Function::anonymous(
-            param_names,
-            body,
-        ))))
+        Ok(Expr::Function(Box::new(Function::anonymous(params, body))))
     }
 
-    fn collect_params(&self, params: Node, param_names: &mut Vec<String>) {
+    fn collect_params(&self, params: Node, out: &mut Vec<Param>) {
         let mut cursor = params.walk();
         for child in params.children(&mut cursor) {
             if child.kind() == "identifier" {
-                param_names.push(self.node_text(child).to_string());
+                out.push(Param::new(self.node_text(child)));
             } else if child.kind() == "vararg_expression" {
-                param_names.push("...".to_string());
+                out.push(Param::new("..."));
             }
         }
     }
@@ -583,6 +580,7 @@ impl<'a> ReadContext<'a> {
                 name: names.remove(0),
                 init,
                 mutable: true,
+                type_annotation: None,
                 span: None,
             });
         }
@@ -595,6 +593,7 @@ impl<'a> ReadContext<'a> {
                 name,
                 init,
                 mutable: true,
+                type_annotation: None,
                 span: None,
             });
         }
@@ -895,9 +894,9 @@ impl<'a> ReadContext<'a> {
 
         let name_str = self.node_text(name).to_string();
 
-        let mut param_names = Vec::new();
-        if let Some(params) = node.child_by_field_name("parameters") {
-            self.collect_params(params, &mut param_names);
+        let mut params = Vec::new();
+        if let Some(params_node) = node.child_by_field_name("parameters") {
+            self.collect_params(params_node, &mut params);
         }
 
         let body_node = node
@@ -906,7 +905,7 @@ impl<'a> ReadContext<'a> {
 
         let body = self.read_block_stmts(body_node)?;
 
-        Ok(Stmt::function(Function::new(name_str, param_names, body)))
+        Ok(Stmt::function(Function::new(name_str, params, body)))
     }
 
     fn read_local_function_declaration(&self, node: Node) -> Result<Stmt, ReadError> {
@@ -985,7 +984,9 @@ mod tests {
         match &program.body[0] {
             Stmt::Function(f) => {
                 assert_eq!(f.name, "add");
-                assert_eq!(f.params, vec!["a", "b"]);
+                assert_eq!(f.params.len(), 2);
+                assert_eq!(f.params[0].name, "a");
+                assert_eq!(f.params[1].name, "b");
             }
             _ => panic!("expected Function"),
         }
@@ -1033,7 +1034,8 @@ mod tests {
         let program = read_lua("function foo(...) return ... end")?;
         match &program.body[0] {
             Stmt::Function(f) => {
-                assert_eq!(f.params, vec!["..."]);
+                assert_eq!(f.params.len(), 1);
+                assert_eq!(f.params[0].name, "...");
                 match &f.body[0] {
                     Stmt::Return(Some(Expr::Ident(name))) => {
                         assert_eq!(name, "...");

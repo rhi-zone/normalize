@@ -71,11 +71,16 @@ impl TypeScriptWriter {
                 name,
                 init,
                 mutable,
+                type_annotation,
                 ..
             } => {
                 self.output
                     .push_str(if *mutable { "let " } else { "const " });
                 self.output.push_str(name);
+                if let Some(t) = type_annotation {
+                    self.output.push_str(": ");
+                    self.output.push_str(t);
+                }
                 if let Some(init) = init {
                     self.output.push_str(" = ");
                     self.write_expr(init);
@@ -254,11 +259,16 @@ impl TypeScriptWriter {
                 name,
                 init,
                 mutable,
+                type_annotation,
                 ..
             } => {
                 self.output
                     .push_str(if *mutable { "let " } else { "const " });
                 self.output.push_str(name);
+                if let Some(t) = type_annotation {
+                    self.output.push_str(": ");
+                    self.output.push_str(t);
+                }
                 if let Some(init) = init {
                     self.output.push_str(" = ");
                     self.write_expr(init);
@@ -308,9 +318,18 @@ impl TypeScriptWriter {
             if i > 0 {
                 self.output.push_str(", ");
             }
-            self.output.push_str(param);
+            self.output.push_str(&param.name);
+            if let Some(t) = &param.type_annotation {
+                self.output.push_str(": ");
+                self.output.push_str(t);
+            }
         }
-        self.output.push_str(") {\n");
+        self.output.push(')');
+        if let Some(ret) = &f.return_type {
+            self.output.push_str(": ");
+            self.output.push_str(ret);
+        }
+        self.output.push_str(" {\n");
         self.indent += 1;
         for stmt in &f.body {
             self.write_stmt(stmt);
@@ -418,9 +437,18 @@ impl TypeScriptWriter {
                         if i > 0 {
                             self.output.push_str(", ");
                         }
-                        self.output.push_str(param);
+                        self.output.push_str(&param.name);
+                        if let Some(t) = &param.type_annotation {
+                            self.output.push_str(": ");
+                            self.output.push_str(t);
+                        }
                     }
-                    self.output.push_str(") => ");
+                    self.output.push(')');
+                    if let Some(ret) = &f.return_type {
+                        self.output.push_str(": ");
+                        self.output.push_str(ret);
+                    }
+                    self.output.push_str(" => ");
 
                     // Single return statement can be expression body
                     if f.body.len() == 1
@@ -463,6 +491,31 @@ impl TypeScriptWriter {
                 self.write_expr(target);
                 self.output.push_str(" = ");
                 self.write_expr(value);
+            }
+
+            Expr::TemplateLiteral(parts) => {
+                self.output.push('`');
+                for part in parts {
+                    match part {
+                        TemplatePart::Text(s) => {
+                            // Escape backticks and backslashes in template text
+                            for ch in s.chars() {
+                                match ch {
+                                    '`' => self.output.push_str("\\`"),
+                                    '\\' => self.output.push_str("\\\\"),
+                                    '$' => self.output.push_str("\\$"),
+                                    c => self.output.push(c),
+                                }
+                            }
+                        }
+                        TemplatePart::Expr(e) => {
+                            self.output.push_str("${");
+                            self.write_expr(e);
+                            self.output.push('}');
+                        }
+                    }
+                }
+                self.output.push('`');
             }
         }
     }
@@ -581,10 +634,11 @@ mod tests {
 
     #[test]
     fn test_arrow_function() {
+        use crate::Param;
         let program = Program::new(vec![Stmt::const_decl(
             "add",
             Expr::Function(Box::new(Function::anonymous(
-                vec!["a".to_string(), "b".to_string()],
+                vec![Param::new("a"), Param::new("b")],
                 vec![Stmt::return_stmt(Some(Expr::binary(
                     Expr::ident("a"),
                     BinaryOp::Add,
@@ -667,5 +721,57 @@ mod tests {
         assert!(ts.contains("/**"));
         assert!(ts.contains(" * Adds two numbers"));
         assert!(ts.contains(" */"));
+    }
+
+    #[test]
+    fn test_typed_function() {
+        use crate::Param;
+        let program = Program::new(vec![Stmt::function(crate::Function {
+            name: "greet".to_string(),
+            params: vec![
+                Param::typed("name", "string"),
+                Param::typed("age", "number"),
+            ],
+            return_type: Some("string".to_string()),
+            body: vec![Stmt::return_stmt(Some(Expr::ident("name")))],
+        })]);
+        let ts = TypeScriptWriter::emit(&program);
+        assert!(ts.contains("function greet(name: string, age: number): string {"));
+    }
+
+    #[test]
+    fn test_typed_variable() {
+        let program = Program::new(vec![Stmt::Let {
+            name: "x".to_string(),
+            init: Some(Expr::number(42)),
+            mutable: false,
+            type_annotation: Some("number".to_string()),
+            span: None,
+        }]);
+        let ts = TypeScriptWriter::emit(&program);
+        assert_eq!(ts.trim(), "const x: number = 42;");
+    }
+
+    #[test]
+    fn test_template_literal() {
+        let program = Program::new(vec![Stmt::const_decl(
+            "msg",
+            Expr::TemplateLiteral(vec![
+                TemplatePart::Text("Hello ".to_string()),
+                TemplatePart::Expr(Box::new(Expr::ident("name"))),
+                TemplatePart::Text("!".to_string()),
+            ]),
+        )]);
+        let ts = TypeScriptWriter::emit(&program);
+        assert_eq!(ts.trim(), "const msg = `Hello ${name}!`;");
+    }
+
+    #[test]
+    fn test_template_literal_round_trip() {
+        use crate::input::read_typescript;
+        let src = "const msg = `Hello ${name}!`;";
+        let program = read_typescript(src).expect("parse failed");
+        let ts = TypeScriptWriter::emit(&program);
+        assert_eq!(ts.trim(), src);
     }
 }

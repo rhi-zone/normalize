@@ -14,6 +14,9 @@ pub enum Stmt {
         name: String,
         init: Option<Expr>,
         mutable: bool,
+        /// Optional type annotation (e.g. `string` for `let x: string = ...`).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        type_annotation: Option<String>,
         /// Source location (populated by readers; ignored by writers).
         #[serde(skip_serializing_if = "Option::is_none")]
         span: Option<Span>,
@@ -115,6 +118,7 @@ impl Stmt {
             name: name.into(),
             init,
             mutable: true,
+            type_annotation: None,
             span: None,
         }
     }
@@ -124,6 +128,7 @@ impl Stmt {
             name: name.into(),
             init: Some(init),
             mutable: false,
+            type_annotation: None,
             span: None,
         }
     }
@@ -229,11 +234,13 @@ impl Stmt {
                 name,
                 init,
                 mutable,
+                type_annotation,
                 ..
             } => Stmt::Let {
                 name,
                 init,
                 mutable,
+                type_annotation,
                 span: Some(span),
             },
             Stmt::If {

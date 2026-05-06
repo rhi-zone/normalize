@@ -101,7 +101,10 @@ mod tests {
         let program = read_javascript("function sum(...args) { return args[0]; }")?;
         assert_eq!(program.body.len(), 1);
         match &program.body[0] {
-            Stmt::Function(f) => assert_eq!(f.params, vec!["args"]),
+            Stmt::Function(f) => {
+                assert_eq!(f.params.len(), 1);
+                assert_eq!(f.params[0].name, "args");
+            }
             _ => panic!("expected Function"),
         }
         Ok(())

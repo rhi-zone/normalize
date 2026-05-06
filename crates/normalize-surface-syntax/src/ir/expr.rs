@@ -78,6 +78,22 @@ pub enum Expr {
         #[serde(skip_serializing_if = "Option::is_none")]
         span: Option<Span>,
     },
+
+    /// Template literal: `` `text${expr}more` ``.
+    ///
+    /// Carries the original template structure for languages that support native
+    /// string interpolation (TypeScript/JavaScript). Writers for other languages
+    /// (Lua, Python) fall back to string concatenation.
+    TemplateLiteral(Vec<TemplatePart>),
+}
+
+/// A part of a template literal.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum TemplatePart {
+    /// A literal text fragment.
+    Text(String),
+    /// An interpolated expression: `${expr}`.
+    Expr(Box<Expr>),
 }
 
 /// Literal values.
@@ -210,6 +226,10 @@ impl Expr {
             value: Box::new(value),
             span: None,
         }
+    }
+
+    pub fn template_literal(parts: Vec<TemplatePart>) -> Self {
+        Expr::TemplateLiteral(parts)
     }
 
     /// Attach a source location span to this expression.

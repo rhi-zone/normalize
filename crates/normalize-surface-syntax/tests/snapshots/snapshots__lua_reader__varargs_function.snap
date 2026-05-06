@@ -8,7 +8,9 @@ expression: "parse(\"function foo(...) return ... end\")"
       "Function": {
         "name": "foo",
         "params": [
-          "..."
+          {
+            "name": "..."
+          }
         ],
         "body": [
           {

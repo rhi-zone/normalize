@@ -265,7 +265,8 @@ impl LuaWriter {
             if i > 0 {
                 self.output.push_str(", ");
             }
-            self.output.push_str(param);
+            // Lua has no type annotations — emit name only
+            self.output.push_str(&param.name);
         }
         self.output.push_str(")\n");
         self.indent += 1;
@@ -392,6 +393,38 @@ impl LuaWriter {
                 self.write_expr(target);
                 self.output.push_str(" = ");
                 self.write_expr(value);
+            }
+
+            Expr::TemplateLiteral(parts) => {
+                // Lua has no string interpolation — emit as `..` concatenation
+                if parts.is_empty() {
+                    self.output.push_str("\"\"");
+                    return;
+                }
+                let exprs: Vec<Expr> = parts
+                    .iter()
+                    .filter_map(|p| match p {
+                        TemplatePart::Text(s) if s.is_empty() => None,
+                        TemplatePart::Text(s) => Some(Expr::string(s.clone())),
+                        TemplatePart::Expr(e) => Some(*e.clone()),
+                    })
+                    .collect();
+                if exprs.is_empty() {
+                    self.output.push_str("\"\"");
+                    return;
+                }
+                if exprs.len() == 1 {
+                    self.write_expr(&exprs[0]);
+                    return;
+                }
+                self.output.push('(');
+                for (i, e) in exprs.iter().enumerate() {
+                    if i > 0 {
+                        self.output.push_str(" .. ");
+                    }
+                    self.write_expr(e);
+                }
+                self.output.push(')');
             }
         }
     }

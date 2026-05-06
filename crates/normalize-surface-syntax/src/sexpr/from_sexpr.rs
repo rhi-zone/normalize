@@ -357,14 +357,14 @@ fn unary_op(args: &[Value], op: UnaryOp) -> Result<Expr, SExprError> {
     Ok(Expr::unary(op, value_to_expr(&args[0])?))
 }
 
-fn parse_params(value: &Value) -> Result<Vec<String>, SExprError> {
+fn parse_params(value: &Value) -> Result<Vec<Param>, SExprError> {
     let arr = value
         .as_array()
         .ok_or_else(|| SExprError::InvalidArgument("params must be array".into()))?;
     arr.iter()
         .map(|v| {
             v.as_str()
-                .map(|s| s.to_string())
+                .map(Param::new)
                 .ok_or_else(|| SExprError::InvalidArgument("param must be string".into()))
         })
         .collect()

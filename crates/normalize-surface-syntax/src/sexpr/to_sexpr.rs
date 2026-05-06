@@ -249,6 +249,31 @@ fn expr_to_sexpr(expr: &Expr) -> Value {
                 }
             }
         }
+
+        Expr::TemplateLiteral(parts) => {
+            // Lower to string concatenation in sexpr format
+            if parts.is_empty() {
+                return Value::String(String::new());
+            }
+            let exprs: Vec<Value> = parts
+                .iter()
+                .map(|part| match part {
+                    TemplatePart::Text(s) => Value::String(s.clone()),
+                    TemplatePart::Expr(e) => expr_to_sexpr(e),
+                })
+                .collect();
+            if exprs.len() == 1 {
+                exprs.into_iter().next().unwrap()
+            } else {
+                // Chain std.concat for multiple parts
+                let mut iter = exprs.into_iter();
+                let mut result = iter.next().unwrap();
+                for next in iter {
+                    result = json!(["str.concat", result, next]);
+                }
+                result
+            }
+        }
     }
 }
 
@@ -262,7 +287,7 @@ fn literal_to_sexpr(lit: &Literal) -> Value {
 }
 
 fn function_to_sexpr(f: &Function) -> Value {
-    let params: Vec<Value> = f.params.iter().map(|p| json!(p)).collect();
+    let params: Vec<Value> = f.params.iter().map(|p| json!(p.name)).collect();
     let body = if f.body.len() == 1 {
         stmt_to_sexpr(&f.body[0])
     } else {

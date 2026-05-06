@@ -243,7 +243,7 @@ impl<'a> ReadContext<'a> {
 
     /// Handle template strings with interpolation (e.g., `Hello ${name}!`)
     fn read_template_string(&self, node: Node) -> Result<Expr, ReadError> {
-        let mut parts: Vec<Expr> = Vec::new();
+        let mut parts: Vec<TemplatePart> = Vec::new();
         let mut cursor = node.walk();
 
         for child in node.children(&mut cursor) {
@@ -252,14 +252,14 @@ impl<'a> ReadContext<'a> {
                 "string_fragment" | "template_fragment" => {
                     let text = self.node_text(child);
                     if !text.is_empty() {
-                        parts.push(Expr::string(text));
+                        parts.push(TemplatePart::Text(text.to_string()));
                     }
                 }
                 // Interpolation: ${...}
                 "template_substitution" => {
                     // Find the expression inside the ${ }
                     if let Some(expr) = child.named_child(0) {
-                        parts.push(self.read_expr(expr)?);
+                        parts.push(TemplatePart::Expr(Box::new(self.read_expr(expr)?)));
                     }
                 }
                 // Skip the ` characters
@@ -268,22 +268,7 @@ impl<'a> ReadContext<'a> {
             }
         }
 
-        // If no parts, return empty string
-        if parts.is_empty() {
-            return Ok(Expr::string(""));
-        }
-
-        // If single part that's a string, return it directly
-        if parts.len() == 1 {
-            return Ok(parts.remove(0));
-        }
-
-        // Multiple parts: chain concat operations
-        let mut result = parts.remove(0);
-        for part in parts {
-            result = Expr::binary(result, BinaryOp::Concat, part);
-        }
-        Ok(result)
+        Ok(Expr::TemplateLiteral(parts))
     }
 
     /// Handle TypeScript `as` type assertions
@@ -581,18 +566,23 @@ impl<'a> ReadContext<'a> {
     }
 
     fn read_arrow_function(&self, node: Node) -> Result<Expr, ReadError> {
-        let mut param_names = Vec::new();
+        let mut params = Vec::new();
 
         // Try "parameters" field first (for parenthesized params)
-        if let Some(params) = node.child_by_field_name("parameters") {
-            self.collect_params(params, &mut param_names);
+        if let Some(params_node) = node.child_by_field_name("parameters") {
+            self.collect_params(params_node, &mut params);
         }
         // Try "parameter" field (for single unparenthesized param: x => ...)
         if let Some(param) = node.child_by_field_name("parameter")
             && param.kind() == "identifier"
         {
-            param_names.push(self.node_text(param).to_string());
+            params.push(Param::new(self.node_text(param)));
         }
+
+        // Get return type annotation if present
+        let return_type = node
+            .child_by_field_name("return_type")
+            .map(|n| self.extract_type_annotation_text(n));
 
         // Get body
         let body_node = node
@@ -612,10 +602,9 @@ impl<'a> ReadContext<'a> {
             vec![Stmt::return_stmt(Some(expr))]
         };
 
-        Ok(Expr::Function(Box::new(Function::anonymous(
-            param_names,
-            body,
-        ))))
+        let mut func = Function::anonymous(params, body);
+        func.return_type = return_type;
+        Ok(Expr::Function(Box::new(func)))
     }
 
     fn read_function_expr(&self, node: Node) -> Result<Expr, ReadError> {
@@ -624,10 +613,14 @@ impl<'a> ReadContext<'a> {
             .map(|n| self.node_text(n).to_string())
             .unwrap_or_default();
 
-        let mut param_names = Vec::new();
-        if let Some(params) = node.child_by_field_name("parameters") {
-            self.collect_params(params, &mut param_names);
+        let mut params = Vec::new();
+        if let Some(params_node) = node.child_by_field_name("parameters") {
+            self.collect_params(params_node, &mut params);
         }
+
+        let return_type = node
+            .child_by_field_name("return_type")
+            .map(|n| self.extract_type_annotation_text(n));
 
         let body_node = node
             .child_by_field_name("body")
@@ -635,44 +628,52 @@ impl<'a> ReadContext<'a> {
 
         let body = self.read_block_stmts(body_node)?;
 
-        if name.is_empty() {
-            Ok(Expr::Function(Box::new(Function::anonymous(
-                param_names,
-                body,
-            ))))
+        let mut func = if name.is_empty() {
+            Function::anonymous(params, body)
         } else {
-            Ok(Expr::Function(Box::new(Function::new(
-                name,
-                param_names,
-                body,
-            ))))
-        }
+            Function::new(name, params, body)
+        };
+        func.return_type = return_type;
+        Ok(Expr::Function(Box::new(func)))
     }
 
-    fn collect_params(&self, params: Node, param_names: &mut Vec<String>) {
+    fn collect_params(&self, params: Node, out: &mut Vec<Param>) {
         match params.kind() {
             "identifier" => {
-                param_names.push(self.node_text(params).to_string());
+                out.push(Param::new(self.node_text(params)));
             }
             "formal_parameters" => {
                 let mut cursor = params.walk();
                 for child in params.children(&mut cursor) {
-                    self.collect_param(child, param_names);
+                    self.collect_param(child, out);
                 }
             }
             _ => {}
         }
     }
 
-    fn collect_param(&self, node: Node, param_names: &mut Vec<String>) {
+    fn collect_param(&self, node: Node, out: &mut Vec<Param>) {
         match node.kind() {
             "identifier" => {
-                param_names.push(self.node_text(node).to_string());
+                out.push(Param::new(self.node_text(node)));
             }
             // TypeScript required_parameter: pattern with optional type annotation
             "required_parameter" | "optional_parameter" => {
                 if let Some(pattern) = node.child_by_field_name("pattern") {
-                    self.collect_param(pattern, param_names);
+                    // Extract the type annotation from the parameter node (not the pattern)
+                    let type_annotation = node
+                        .child_by_field_name("type")
+                        .map(|n| self.extract_type_annotation_text(n));
+
+                    // If pattern is a simple identifier, create a typed param directly
+                    if pattern.kind() == "identifier" {
+                        let mut param = Param::new(self.node_text(pattern));
+                        param.type_annotation = type_annotation;
+                        out.push(param);
+                    } else {
+                        // Destructuring pattern: collect sub-params (no type annotation for each)
+                        self.collect_param(pattern, out);
+                    }
                 }
             }
             // rest parameter: ...args
@@ -681,7 +682,7 @@ impl<'a> ReadContext<'a> {
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
                     if child.kind() == "identifier" {
-                        param_names.push(self.node_text(child).to_string());
+                        out.push(Param::new(self.node_text(child)));
                         return;
                     }
                 }
@@ -692,18 +693,18 @@ impl<'a> ReadContext<'a> {
                 for child in node.children(&mut cursor) {
                     match child.kind() {
                         "shorthand_property_identifier_pattern" => {
-                            param_names.push(self.node_text(child).to_string());
+                            out.push(Param::new(self.node_text(child)));
                         }
                         "pair_pattern" => {
                             // { key: name } — use the value name
                             if let Some(val) = child.child_by_field_name("value")
                                 && val.kind() == "identifier"
                             {
-                                param_names.push(self.node_text(val).to_string());
+                                out.push(Param::new(self.node_text(val)));
                             }
                         }
                         "rest_pattern" => {
-                            self.collect_param(child, param_names);
+                            self.collect_param(child, out);
                         }
                         _ => {}
                     }
@@ -714,12 +715,31 @@ impl<'a> ReadContext<'a> {
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
                     if child.is_named() && child.kind() != "," {
-                        self.collect_param(child, param_names);
+                        self.collect_param(child, out);
                     }
                 }
             }
             _ => {}
         }
+    }
+
+    /// Extract the type text from a `type_annotation` node (strips the leading `:`).
+    fn extract_type_annotation_text(&self, node: Node) -> String {
+        // type_annotation nodes have the form `: type_expr`
+        // We want the text of the type expression child, not the whole node (which includes `:`)
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            match child.kind() {
+                ":" => continue,
+                _ if child.is_named() => {
+                    return self.node_text(child).to_string();
+                }
+                _ => {}
+            }
+        }
+        // Fallback: trim the leading `: ` from the raw text
+        let raw = self.node_text(node);
+        raw.trim_start_matches(':').trim().to_string()
     }
 
     fn read_ternary(&self, node: Node) -> Result<Expr, ReadError> {
@@ -817,16 +837,18 @@ impl<'a> ReadContext<'a> {
         }
 
         let name_str = self.node_text(name_node).to_string();
-        if mutable {
-            Ok(Stmt::let_decl(name_str, init))
-        } else {
-            Ok(Stmt::Let {
-                name: name_str,
-                init,
-                mutable: false,
-                span: None,
-            })
-        }
+        // Extract type annotation from the declarator's `type` field
+        // In TS: `const x: string = ...` — the variable_declarator has a `type_annotation` child
+        let type_annotation = node
+            .child_by_field_name("type")
+            .map(|n| self.extract_type_annotation_text(n));
+        Ok(Stmt::Let {
+            name: name_str,
+            init,
+            mutable,
+            type_annotation,
+            span: None,
+        })
     }
 
     /// Lower a destructuring pattern into a list of let/const statements.
@@ -850,6 +872,7 @@ impl<'a> ReadContext<'a> {
                                 name,
                                 init: Some(init),
                                 mutable,
+                                type_annotation: None,
                                 span: None,
                             });
                         }
@@ -870,6 +893,7 @@ impl<'a> ReadContext<'a> {
                                     name,
                                     init: Some(key_access),
                                     mutable,
+                                    type_annotation: None,
                                     span: None,
                                 });
                             } else {
@@ -887,6 +911,7 @@ impl<'a> ReadContext<'a> {
                                         name,
                                         init: Some(rhs.clone()),
                                         mutable,
+                                        type_annotation: None,
                                         span: None,
                                     });
                                     break;
@@ -912,6 +937,7 @@ impl<'a> ReadContext<'a> {
                                 name,
                                 init: Some(init),
                                 mutable,
+                                type_annotation: None,
                                 span: None,
                             });
                             idx += 1;
@@ -930,6 +956,7 @@ impl<'a> ReadContext<'a> {
                                         name,
                                         init: Some(init),
                                         mutable,
+                                        type_annotation: None,
                                         span: None,
                                     });
                                     break;
@@ -953,6 +980,7 @@ impl<'a> ReadContext<'a> {
                     name,
                     init: Some(rhs),
                     mutable,
+                    type_annotation: None,
                     span: None,
                 });
             }
@@ -1263,10 +1291,14 @@ impl<'a> ReadContext<'a> {
             .child_by_field_name("name")
             .ok_or_else(|| ReadError::Parse("function_declaration missing name".into()))?;
 
-        let mut param_names = Vec::new();
-        if let Some(params) = node.child_by_field_name("parameters") {
-            self.collect_params(params, &mut param_names);
+        let mut params = Vec::new();
+        if let Some(params_node) = node.child_by_field_name("parameters") {
+            self.collect_params(params_node, &mut params);
         }
+
+        let return_type = node
+            .child_by_field_name("return_type")
+            .map(|n| self.extract_type_annotation_text(n));
 
         let body_node = node
             .child_by_field_name("body")
@@ -1274,11 +1306,9 @@ impl<'a> ReadContext<'a> {
 
         let body = self.read_block_stmts(body_node)?;
 
-        Ok(Stmt::function(Function::new(
-            self.node_text(name),
-            param_names,
-            body,
-        )))
+        let mut func = Function::new(self.node_text(name), params, body);
+        func.return_type = return_type;
+        Ok(Stmt::function(func))
     }
 
     /// Lower a class declaration to a function (constructor) + method assignments.
@@ -1366,7 +1396,7 @@ impl<'a> ReadContext<'a> {
     }
 
     /// Extract constructor params and body from a class body node.
-    fn extract_constructor(&self, body: Node) -> Result<(Vec<String>, Vec<Stmt>), ReadError> {
+    fn extract_constructor(&self, body: Node) -> Result<(Vec<Param>, Vec<Stmt>), ReadError> {
         let mut cursor = body.walk();
         for child in body.children(&mut cursor) {
             if child.kind() == "method_definition" {
@@ -1535,11 +1565,18 @@ mod tests {
     }
 
     #[test]
-    fn test_type_annotation_ignored() -> Result<(), ReadError> {
+    fn test_type_annotation_on_variable() -> Result<(), ReadError> {
         let program = read_typescript("const x: string = 'hello';")?;
         assert_eq!(program.body.len(), 1);
         match &program.body[0] {
-            Stmt::Let { name, .. } => assert_eq!(name, "x"),
+            Stmt::Let {
+                name,
+                type_annotation,
+                ..
+            } => {
+                assert_eq!(name, "x");
+                assert_eq!(type_annotation.as_deref(), Some("string"));
+            }
             _ => panic!("expected Let"),
         }
         Ok(())
@@ -1566,9 +1603,47 @@ mod tests {
         assert_eq!(program.body.len(), 1);
         match &program.body[0] {
             Stmt::Function(f) => {
-                assert_eq!(f.params, vec!["args"]);
+                assert_eq!(f.params.len(), 1);
+                assert_eq!(f.params[0].name, "args");
             }
             _ => panic!("expected Function"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_typed_params_and_return_type() -> Result<(), ReadError> {
+        let program =
+            read_typescript("function greet(name: string, age: number): string { return name; }")?;
+        assert_eq!(program.body.len(), 1);
+        match &program.body[0] {
+            Stmt::Function(f) => {
+                assert_eq!(f.params.len(), 2);
+                assert_eq!(f.params[0].name, "name");
+                assert_eq!(f.params[0].type_annotation.as_deref(), Some("string"));
+                assert_eq!(f.params[1].name, "age");
+                assert_eq!(f.params[1].type_annotation.as_deref(), Some("number"));
+                assert_eq!(f.return_type.as_deref(), Some("string"));
+            }
+            _ => panic!("expected Function"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_typed_variable_declaration() -> Result<(), ReadError> {
+        let program = read_typescript("const x: number = 42;")?;
+        assert_eq!(program.body.len(), 1);
+        match &program.body[0] {
+            Stmt::Let {
+                name,
+                type_annotation,
+                ..
+            } => {
+                assert_eq!(name, "x");
+                assert_eq!(type_annotation.as_deref(), Some("number"));
+            }
+            _ => panic!("expected Let"),
         }
         Ok(())
     }
@@ -1577,6 +1652,35 @@ mod tests {
     fn test_template_literal() -> Result<(), ReadError> {
         let program = read_typescript("const msg = `Hello ${name}!`;")?;
         assert_eq!(program.body.len(), 1);
+        match &program.body[0] {
+            Stmt::Let {
+                init: Some(Expr::TemplateLiteral(parts)),
+                ..
+            } => {
+                assert_eq!(parts.len(), 3);
+                assert!(matches!(&parts[0], TemplatePart::Text(t) if t == "Hello "));
+                assert!(matches!(&parts[1], TemplatePart::Expr(_)));
+                assert!(matches!(&parts[2], TemplatePart::Text(t) if t == "!"));
+            }
+            _ => panic!("expected Let with TemplateLiteral"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_template_literal_no_interp() -> Result<(), ReadError> {
+        let program = read_typescript("const s = `plain text`;")?;
+        assert_eq!(program.body.len(), 1);
+        match &program.body[0] {
+            Stmt::Let {
+                init: Some(Expr::TemplateLiteral(parts)),
+                ..
+            } => {
+                assert_eq!(parts.len(), 1);
+                assert!(matches!(&parts[0], TemplatePart::Text(t) if t == "plain text"));
+            }
+            _ => panic!("expected Let with TemplateLiteral"),
+        }
         Ok(())
     }
 

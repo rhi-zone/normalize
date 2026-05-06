@@ -699,13 +699,13 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
 ### normalize-surface-syntax
 
 **Readers:**
-- TypeScript reader: ~~missing classes/interfaces/type annotations, spread/destructuring, template literals, async/await~~ — done: classes lowered to function + prototype assignments, interfaces skipped, type annotations ignored, destructuring lowered, rest params handled, await lowered to inner expr, new_expression lowered to call
+- TypeScript reader: ~~missing classes/interfaces/type annotations, spread/destructuring, template literals, async/await~~ — done: classes lowered to function + prototype assignments, interfaces skipped, ~~type annotations ignored~~ type annotations now preserved in `Param::type_annotation`/`Function::return_type`/`Stmt::Let::type_annotation`, ~~template literals lowered to Concat~~ template literals now produce `Expr::TemplateLiteral`, destructuring lowered, rest params handled, await lowered to inner expr, new_expression lowered to call
 - ~~Lua reader: missing metatables/metamethods, string methods (`:method()` syntax)~~ — done: metamethod keys recognized as identifier keys; `obj:method(args)` desugared to `obj.method(obj, args)` with implicit self; `["string"]` computed keys extract string value; multi-variable generic for captures all vars; numeric for step uses grammar step field; elseif chaining bug fixed
 - [x] JavaScript reader — added `javascript.rs` using `arborium-javascript` + shared `ReadContext` via `read_with_language`; feature-gated as `read-javascript`
 
 **Writers:**
 - ~~Lua writer: verify idiomatic output (use `and`/`or` vs `&&`/`||`), string escaping edge cases~~ — done: already correct for `and`/`or`/`not`/`~=`/`nil`; object keys now use bare identifier syntax for valid Lua identifiers; string escaping now handles null bytes; for-in no longer prepends hardcoded `_, `
-- ~~TypeScript writer: type annotations, semicolon placement verification, template literal output~~ — done: semicolons verified correct on all statement types (`Stmt::Expr`, `Let`, `Return`, `Break`, `Continue`); type annotations: IR does not carry type annotations (reader strips them at parse time) — adding them requires IR-level `Type annotations` item below; template literals: reader lowers `` `${x}` `` to `Concat` binary ops at parse time, no round-trip possible without a `TemplateLiteral` IR node — also deferred to `Type annotations` item. Comments (see IR below) are now emitted.
+- ~~TypeScript writer: type annotations, semicolon placement verification, template literal output~~ — done: semicolons verified; type annotations now emitted (`: type` on params/vars, `: return_type` on functions); template literals now emitted as backtick syntax; comments emitted.
 - [x] JavaScript writer — added `javascript.rs` delegating to `TypeScriptWriter`; feature-gated as `write-javascript`
 
 **Testing:**
@@ -716,7 +716,7 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
 - [x] ~~Source locations (for error messages, debugging)~~ — done; `Span { start_line, start_col, end_line, end_col }` added to `ir/mod.rs` (1-based lines, 0-based cols); `span: Option<Span>` added to structured `Stmt` variants (`Let`, `If`, `While`, `For`, `ForIn`, `TryCatch`) and `Expr` variants (`Binary`, `Unary`, `Call`, `Member`, `Conditional`, `Assign`); `Span::from_ts()` converts tree-sitter `Point`; `with_span()` builder on both types; writers ignore spans; `StructureEq` ignores spans
 - [ ] Import/export statements
 - [ ] Class definitions, method definitions (IR-level; currently lowered to functions + prototype assignments)
-- [ ] Type annotations (optional, for typed languages) — also required for TypeScript writer to emit `: Type` on parameters/returns, and for template literal `TemplateLiteral` IR node to enable round-trip backtick output
+- [x] ~~Type annotations~~ — done: `Param { name, type_annotation: Option<String> }` added; `Function::return_type: Option<String>` added; `Stmt::Let::type_annotation: Option<String>` added; TypeScript reader populates all three from `type_annotation` nodes and `return_type` field; Python reader populates `Param::type_annotation` from `typed_parameter` nodes and `Function::return_type` from `return_type` field; TypeScript/Python writers emit annotations in language-appropriate syntax; Lua writer ignores annotations; `StructureEq` treats type annotations as surface hints (ignored in comparison). Template literals: `Expr::TemplateLiteral(Vec<TemplatePart>)` added; `TemplatePart::Text(String)` and `TemplatePart::Expr(Box<Expr>)`; TypeScript reader produces `TemplateLiteral` instead of `Concat` chains; TypeScript writer emits backtick syntax; Python writer emits f-strings; Lua writer lowers to `..` concatenation; s-expr serializes as chained `str.concat` calls.
 - [ ] Pattern matching / destructuring (IR-level; currently lowered at read time)
 
 ### Package Index Backlog (simplest → complex)

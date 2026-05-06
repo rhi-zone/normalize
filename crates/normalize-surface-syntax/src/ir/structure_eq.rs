@@ -14,7 +14,7 @@
 //! - Control flow structure
 //! - Expression trees
 
-use crate::{Expr, Function, Program, Stmt};
+use crate::{Expr, Function, Program, Stmt, TemplatePart};
 
 /// Trait for structural equality comparison.
 ///
@@ -41,18 +41,20 @@ impl StructureEq for Stmt {
         match (self, other) {
             (Stmt::Expr(a), Stmt::Expr(b)) => a.structure_eq(b),
 
-            // Ignore `mutable` and `span` - they are surface hints
+            // Ignore `mutable`, `type_annotation`, and `span` - they are surface hints
             (
                 Stmt::Let {
                     name: n1,
                     init: i1,
                     mutable: _,
+                    type_annotation: _,
                     span: _,
                 },
                 Stmt::Let {
                     name: n2,
                     init: i2,
                     mutable: _,
+                    type_annotation: _,
                     span: _,
                 },
             ) => n1 == n2 && option_structure_eq(i1.as_ref(), i2.as_ref()),
@@ -293,6 +295,20 @@ impl StructureEq for Expr {
                 },
             ) => t1.structure_eq(t2) && v1.structure_eq(v2),
 
+            (Expr::TemplateLiteral(a), Expr::TemplateLiteral(b)) => {
+                a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.structure_eq(y))
+            }
+
+            _ => false,
+        }
+    }
+}
+
+impl StructureEq for TemplatePart {
+    fn structure_eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (TemplatePart::Text(a), TemplatePart::Text(b)) => a == b,
+            (TemplatePart::Expr(a), TemplatePart::Expr(b)) => a.structure_eq(b),
             _ => false,
         }
     }
@@ -301,7 +317,12 @@ impl StructureEq for Expr {
 impl StructureEq for Function {
     fn structure_eq(&self, other: &Self) -> bool {
         self.name == other.name
-            && self.params == other.params
+            && self.params.len() == other.params.len()
+            && self
+                .params
+                .iter()
+                .zip(&other.params)
+                .all(|(a, b)| a.name == b.name)
             && vec_structure_eq(&self.body, &other.body)
     }
 }
@@ -330,12 +351,14 @@ mod tests {
             name: "x".into(),
             init: Some(Expr::number(42)),
             mutable: false,
+            type_annotation: None,
             span: None,
         };
         let let_decl = Stmt::Let {
             name: "x".into(),
             init: Some(Expr::number(42)),
             mutable: true,
+            type_annotation: None,
             span: None,
         };
 
@@ -368,12 +391,14 @@ mod tests {
             name: "x".into(),
             init: Some(Expr::number(1)),
             mutable: false,
+            type_annotation: None,
             span: None,
         };
         let y = Stmt::Let {
             name: "y".into(),
             init: Some(Expr::number(1)),
             mutable: false,
+            type_annotation: None,
             span: None,
         };
 

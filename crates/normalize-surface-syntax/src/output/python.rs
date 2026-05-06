@@ -226,8 +226,22 @@ impl PythonWriter {
                     self.output.push_str(&func.name);
                 }
                 self.output.push('(');
-                self.output.push_str(&func.params.join(", "));
-                self.output.push_str("):\n");
+                for (i, param) in func.params.iter().enumerate() {
+                    if i > 0 {
+                        self.output.push_str(", ");
+                    }
+                    self.output.push_str(&param.name);
+                    if let Some(t) = &param.type_annotation {
+                        self.output.push_str(": ");
+                        self.output.push_str(t);
+                    }
+                }
+                self.output.push(')');
+                if let Some(ret) = &func.return_type {
+                    self.output.push_str(" -> ");
+                    self.output.push_str(ret);
+                }
+                self.output.push_str(":\n");
                 self.indent += 1;
                 if func.body.is_empty() {
                     self.write_indent();
@@ -396,7 +410,12 @@ impl PythonWriter {
                     && let Stmt::Return(Some(ret_expr)) = &func.body[0]
                 {
                     self.output.push_str("lambda ");
-                    self.output.push_str(&func.params.join(", "));
+                    for (i, param) in func.params.iter().enumerate() {
+                        if i > 0 {
+                            self.output.push_str(", ");
+                        }
+                        self.output.push_str(&param.name);
+                    }
                     self.output.push_str(": ");
                     self.write_expr(ret_expr);
                     return;
@@ -426,6 +445,32 @@ impl PythonWriter {
                 self.write_expr(target);
                 self.output.push_str(" = ");
                 self.write_expr(value);
+            }
+
+            Expr::TemplateLiteral(parts) => {
+                // Python f-string: f"text{expr}more"
+                self.output.push_str("f\"");
+                for part in parts {
+                    match part {
+                        TemplatePart::Text(s) => {
+                            for ch in s.chars() {
+                                match ch {
+                                    '"' => self.output.push_str("\\\""),
+                                    '\\' => self.output.push_str("\\\\"),
+                                    '{' => self.output.push_str("{{"),
+                                    '}' => self.output.push_str("}}"),
+                                    c => self.output.push(c),
+                                }
+                            }
+                        }
+                        TemplatePart::Expr(e) => {
+                            self.output.push('{');
+                            self.write_expr(e);
+                            self.output.push('}');
+                        }
+                    }
+                }
+                self.output.push('"');
             }
         }
     }

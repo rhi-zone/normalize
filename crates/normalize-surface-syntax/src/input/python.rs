@@ -322,29 +322,41 @@ impl<'a> ReadContext<'a> {
             .unwrap_or_default();
         let fn_body = self.read_block_stmts(body)?;
 
-        Ok(Stmt::function(Function::new(fn_name, fn_params, fn_body)))
+        // Extract return type annotation: `-> type` on function_definition
+        let return_type = node
+            .child_by_field_name("return_type")
+            .map(|n| self.node_text(n).to_string());
+
+        let mut func = Function::new(fn_name, fn_params, fn_body);
+        func.return_type = return_type;
+        Ok(Stmt::function(func))
     }
 
-    fn read_parameters(&self, node: Node) -> Result<Vec<String>, ReadError> {
+    fn read_parameters(&self, node: Node) -> Result<Vec<Param>, ReadError> {
         let mut params = Vec::new();
         let mut cursor = node.walk();
 
         for child in node.children(&mut cursor) {
             match child.kind() {
                 "identifier" => {
-                    params.push(self.node_text(child).to_string());
+                    params.push(Param::new(self.node_text(child)));
                 }
                 "default_parameter" => {
                     if let Some(name) = child.child_by_field_name("name") {
-                        params.push(self.node_text(name).to_string());
+                        params.push(Param::new(self.node_text(name)));
                     }
                 }
                 "typed_parameter" | "typed_default_parameter" => {
-                    // Get just the name, ignore type annotation
+                    // First child is the identifier name
                     if let Some(name) = child.child(0)
                         && name.kind() == "identifier"
                     {
-                        params.push(self.node_text(name).to_string());
+                        let type_annotation = child
+                            .child_by_field_name("type")
+                            .map(|n| self.node_text(n).to_string());
+                        let mut param = Param::new(self.node_text(name));
+                        param.type_annotation = type_annotation;
+                        params.push(param);
                     }
                 }
                 _ => {}
@@ -777,13 +789,13 @@ impl<'a> ReadContext<'a> {
         ))))
     }
 
-    fn read_lambda_parameters(&self, node: Node) -> Result<Vec<String>, ReadError> {
+    fn read_lambda_parameters(&self, node: Node) -> Result<Vec<Param>, ReadError> {
         let mut params = Vec::new();
         let mut cursor = node.walk();
 
         for child in node.children(&mut cursor) {
             if child.kind() == "identifier" {
-                params.push(self.node_text(child).to_string());
+                params.push(Param::new(self.node_text(child)));
             }
         }
 
@@ -834,7 +846,28 @@ mod tests {
         match &ir.body[0] {
             Stmt::Function(f) => {
                 assert_eq!(f.name, "add");
-                assert_eq!(f.params, vec!["a", "b"]);
+                assert_eq!(f.params.len(), 2);
+                assert_eq!(f.params[0].name, "a");
+                assert_eq!(f.params[1].name, "b");
+            }
+            _ => panic!("expected Function"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_typed_function_declaration() -> Result<(), ReadError> {
+        let ir = read_python("def greet(name: str, age: int) -> str:\n    return name")?;
+        assert_eq!(ir.body.len(), 1);
+        match &ir.body[0] {
+            Stmt::Function(f) => {
+                assert_eq!(f.name, "greet");
+                assert_eq!(f.params.len(), 2);
+                assert_eq!(f.params[0].name, "name");
+                assert_eq!(f.params[0].type_annotation.as_deref(), Some("str"));
+                assert_eq!(f.params[1].name, "age");
+                assert_eq!(f.params[1].type_annotation.as_deref(), Some("int"));
+                assert_eq!(f.return_type.as_deref(), Some("str"));
             }
             _ => panic!("expected Function"),
         }

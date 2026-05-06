@@ -1,6 +1,5 @@
 ---
 source: crates/normalize-surface-syntax/tests/snapshots.rs
-assertion_line: 172
 expression: "parse(\"local add = function(a, b) return a + b end\")"
 ---
 {
@@ -12,8 +11,12 @@ expression: "parse(\"local add = function(a, b) return a + b end\")"
           "Function": {
             "name": "",
             "params": [
-              "a",
-              "b"
+              {
+                "name": "a"
+              },
+              {
+                "name": "b"
+              }
             ],
             "body": [
               {

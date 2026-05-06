@@ -57,27 +57,73 @@ impl Program {
     }
 }
 
+/// A function parameter.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Param {
+    /// Parameter name.
+    pub name: String,
+    /// Optional type annotation (e.g. `string` for `x: string` in TypeScript,
+    /// `str` for `x: str` in Python). Carried as raw source text; not interpreted.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub type_annotation: Option<String>,
+}
+
+impl Param {
+    /// Create a plain parameter with no type annotation.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            type_annotation: None,
+        }
+    }
+
+    /// Create a typed parameter.
+    pub fn typed(name: impl Into<String>, annotation: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            type_annotation: Some(annotation.into()),
+        }
+    }
+}
+
+impl From<&str> for Param {
+    fn from(s: &str) -> Self {
+        Param::new(s)
+    }
+}
+
+impl From<String> for Param {
+    fn from(s: String) -> Self {
+        Param::new(s)
+    }
+}
+
 /// A function definition.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Function {
     /// Function name (empty for anonymous functions).
     pub name: String,
-    /// Parameter names.
-    pub params: Vec<String>,
+    /// Parameters (with optional type annotations).
+    pub params: Vec<Param>,
+    /// Optional return type annotation (e.g. `string` for `): string` in TypeScript,
+    /// `int` for `-> int` in Python).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub return_type: Option<String>,
     /// Function body.
     pub body: Vec<Stmt>,
 }
 
 impl Function {
-    pub fn new(name: impl Into<String>, params: Vec<String>, body: Vec<Stmt>) -> Self {
+    pub fn new(name: impl Into<String>, params: Vec<Param>, body: Vec<Stmt>) -> Self {
         Self {
             name: name.into(),
             params,
+            return_type: None,
             body,
         }
     }
 
-    pub fn anonymous(params: Vec<String>, body: Vec<Stmt>) -> Self {
+    pub fn anonymous(params: Vec<Param>, body: Vec<Stmt>) -> Self {
         Self::new("", params, body)
     }
 }

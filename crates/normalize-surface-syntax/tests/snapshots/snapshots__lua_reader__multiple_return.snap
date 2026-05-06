@@ -8,8 +8,12 @@ expression: "parse(\"function swap(a, b) return b, a end\")"
       "Function": {
         "name": "swap",
         "params": [
-          "a",
-          "b"
+          {
+            "name": "a"
+          },
+          {
+            "name": "b"
+          }
         ],
         "body": [
           {
