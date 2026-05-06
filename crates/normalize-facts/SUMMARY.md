@@ -8,4 +8,4 @@ Extraction is memoized via `ca_cache::CaCache` (inlined module, formerly the `no
 
 `CallEntry.access` is populated from the call graph index with read/write distinction when the language supports it. `ChangedFiles` tracks which files changed between index refreshes for incremental fact-rule evaluation via the daemon.
 
-The `cli` feature adds a standalone `FactsCliService` (`src/service.rs`) with `rebuild`, `stats`, and `files` subcommands. Output types (`RebuildReport`, `StructureStatsReport`, `StructureFilesReport`) implement `OutputFormatter`.
+The `cli` feature adds a standalone `FactsCliService` (`src/service.rs`) with `rebuild`, `stats`, and `files` subcommands. Output types (`RebuildReport`, `StructureStatsReport`, `StructureFilesReport`) implement `OutputFormatter`. Note: function parameters are not extracted as facts (no "parameter" `SymbolKind`); parameter-level analysis is handled by `normalize-scope` via `locals.scm` queries.

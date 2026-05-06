@@ -35,7 +35,7 @@
 
 ; Parameters
 (parameter
-  name: (identifier) @local.definition)
+  name: (identifier) @local.definition.parameter)
 
 ; Local variable declarations
 (variable_declarator

@@ -36,17 +36,31 @@
 (identifier) @local.binding-leaf
 (shorthand_property_identifier_pattern) @local.binding-leaf
 
-; Function parameters — pattern: field restricts to the binding side;
-; @local.definition.each recurses into it collecting binding leaves at any depth.
+; Simple identifier parameters — captured as .parameter for the dead-parameter rule.
 (required_parameter
-  pattern: (_) @local.definition.each)
+  pattern: (identifier) @local.definition.parameter)
 
 (optional_parameter
-  pattern: (_) @local.definition.each)
+  pattern: (identifier) @local.definition.parameter)
+
+; Destructured parameters — recurse into pattern leaves (no subkind).
+(required_parameter
+  pattern: (object_pattern) @local.definition.each)
+(required_parameter
+  pattern: (array_pattern) @local.definition.each)
+(required_parameter
+  pattern: (rest_pattern) @local.definition.each)
+
+(optional_parameter
+  pattern: (object_pattern) @local.definition.each)
+(optional_parameter
+  pattern: (array_pattern) @local.definition.each)
+(optional_parameter
+  pattern: (rest_pattern) @local.definition.each)
 
 ; Arrow function single parameter (no parentheses)
 (arrow_function
-  parameter: (identifier) @local.definition)
+  parameter: (identifier) @local.definition.parameter)
 
 ; References
 ; ----------

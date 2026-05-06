@@ -589,6 +589,7 @@ impl RulesService {
             let run_high_complexity = is_native_enabled("high-complexity");
             let run_long_function = is_native_enabled("long-function");
             let run_stale_doc = is_native_enabled("stale-doc");
+            let run_dead_parameter = is_native_enabled("dead-parameter");
 
             let long_file_threshold: usize = native_config
                 .rules
@@ -783,8 +784,15 @@ impl RulesService {
 
             // Advisory rules (default disabled — only run when explicitly enabled).
             // long-file / high-complexity / long-function are tree-sitter-heavy.
+            // dead-parameter uses the scope engine (locals.scm queries).
             // stale-doc requires the index and a git walk, so also advisory.
-            let (long_file_res, high_complexity_res, long_function_res, stale_doc_res) = tokio::join!(
+            let (
+                long_file_res,
+                high_complexity_res,
+                long_function_res,
+                stale_doc_res,
+                dead_parameter_res,
+            ) = tokio::join!(
                 async {
                     if !run_long_file {
                         return None;
@@ -867,6 +875,26 @@ impl RulesService {
                     eprintln!("[timings] stale-doc: {:.1?}", t.elapsed());
                     r
                 },
+                async {
+                    if !run_dead_parameter {
+                        return None;
+                    }
+                    let root = native_root.clone();
+                    let ef = effective_files.clone();
+                    let wc = native_config.walk.clone();
+                    let t = std::time::Instant::now();
+                    let r = tokio::task::spawn_blocking(move || {
+                        normalize_native_rules::build_dead_parameter_report(
+                            &root,
+                            ef.as_deref(),
+                            &wc,
+                        )
+                    })
+                    .await
+                    .ok();
+                    eprintln!("[timings] dead-parameter: {:.1?}", t.elapsed());
+                    r
+                },
             );
 
             if let Some(r) = long_file_res {
@@ -879,6 +907,9 @@ impl RulesService {
                 report.merge(r);
             }
             if let Some(r) = stale_doc_res {
+                report.merge(r);
+            }
+            if let Some(r) = dead_parameter_res {
                 report.merge(r);
             }
 

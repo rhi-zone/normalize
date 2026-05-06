@@ -29,12 +29,12 @@
 
 ; Formal parameters
 (formal_parameter
-  name: (identifier) @local.definition)
+  name: (identifier) @local.definition.parameter)
 
 ; Spread (vararg) parameters
 (spread_parameter
   (variable_declarator
-    name: (identifier) @local.definition))
+    name: (identifier) @local.definition.parameter))
 
 ; Local variable declarations
 (variable_declarator

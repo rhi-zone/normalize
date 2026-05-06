@@ -8,6 +8,7 @@ pub mod budget;
 pub mod cache;
 pub mod check_examples;
 pub mod check_refs;
+pub mod dead_parameter;
 pub mod high_complexity;
 pub mod long_file;
 pub mod long_function;
@@ -24,6 +25,7 @@ pub use cache::{
 pub use budget::{BudgetRulesReport, build_budget_report};
 pub use check_examples::build_check_examples_report;
 pub use check_refs::build_check_refs_report;
+pub use dead_parameter::build_dead_parameter_report;
 pub use high_complexity::build_high_complexity_report;
 pub use long_file::build_long_file_report;
 pub use long_function::build_long_function_report;
@@ -199,6 +201,13 @@ pub const NATIVE_RULES: &[NativeRuleDescriptor] = &[
         default_severity: "warning",
         message: "Function exceeds line count threshold (default: 100 lines)",
         tags: &["quality"],
+        default_enabled: false,
+    },
+    NativeRuleDescriptor {
+        id: "dead-parameter",
+        default_severity: "warning",
+        message: "Function parameter is never used in the function body",
+        tags: &["correctness", "unused"],
         default_enabled: false,
     },
 ];

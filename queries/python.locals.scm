@@ -20,19 +20,19 @@
 
 ; Function parameters (simple identifier)
 (parameters
-  (identifier) @local.definition)
+  (identifier) @local.definition.parameter)
 
 ; Function parameters with defaults
 (default_parameter
-  name: (identifier) @local.definition)
+  name: (identifier) @local.definition.parameter)
 
 ; Typed parameters
 (typed_parameter
-  (identifier) @local.definition)
+  (identifier) @local.definition.parameter)
 
 ; Lambda parameters
 (lambda_parameters
-  (identifier) @local.definition)
+  (identifier) @local.definition.parameter)
 
 ; For loop target (function-scoped in Python)
 (for_statement
