@@ -1,0 +1,14 @@
+[
+  {
+    "rule": "no-todo-comment",
+    "file": "no-todo-comment.input.rs",
+    "line": 4,
+    "message": "TODO comment found"
+  },
+  {
+    "rule": "no-todo-comment",
+    "file": "no-todo-comment.input.rs",
+    "line": 7,
+    "message": "TODO comment found"
+  }
+]

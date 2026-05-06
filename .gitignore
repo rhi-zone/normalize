@@ -83,6 +83,7 @@ cache/
 /.normalize/*
 !/.normalize/config.toml
 !/.normalize/SUMMARY.md
+!/.normalize/rule-tests/
 !/.normalize/duplicate-functions-allow
 !/.normalize/duplicate-blocks-allow
 !/.normalize/duplicate-types-allow
@@ -95,6 +96,7 @@ cache/
 .normalize/*
 !.normalize/config.toml
 !.normalize/SUMMARY.md
+!.normalize/rule-tests/
 !.normalize/duplicate-functions-allow
 !.normalize/duplicate-blocks-allow
 !.normalize/duplicate-types-allow

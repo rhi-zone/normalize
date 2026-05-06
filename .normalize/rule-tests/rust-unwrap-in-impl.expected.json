@@ -1,0 +1,14 @@
+[
+  {
+    "rule": "rust/unwrap-in-impl",
+    "file": "rust-unwrap-in-impl.input.rs",
+    "line": 11,
+    "message": ".unwrap() found - consider using ? to propagate or .unwrap_or_else() for fallbacks"
+  },
+  {
+    "rule": "rust/unwrap-in-impl",
+    "file": "rust-unwrap-in-impl.input.rs",
+    "line": 18,
+    "message": ".unwrap() found - consider using ? to propagate or .unwrap_or_else() for fallbacks"
+  }
+]

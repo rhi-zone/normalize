@@ -580,10 +580,13 @@ Rules (custom enforcement, future):
       rules against a source file and asserts annotated lines (`// error[rule-id]`) match actual
       diagnostics. Language-agnostic; multiple annotations per line supported. Implemented in
       `crates/normalize-rules/src/service.rs`.
-- [ ] Fixture format alternative: `test.input.<ext>` + `test.expected.json` for cases where inline
+- [x] Fixture format alternative: `test.input.<ext>` + `test.expected.json` for cases where inline
       markers are awkward (multi-file rules, fact rules over a whole project).
-- The syntax-rules fixture runner already exists as prior art — extend it rather than build from scratch.
-- `normalize rules test` as a standalone command (not just a CI check) so rule authors can iterate fast.
+      Implemented as `normalize rules test-fixtures` in `crates/normalize-rules/src/service.rs`.
+      Auto-discovers cases under `.normalize/rule-tests/` (single-file: `<stem>.input.<ext>` +
+      `<stem>.expected.json`; multi-file: `<case>/input/` + `<case>/expected.json`).
+      `--update` flag rewrites `expected.json` with actual findings for bootstrap.
+      `message` field uses substring matching. Example fixtures in `.normalize/rule-tests/`.
 
 **Facts & Rules Architecture:**
 - [x] `normalize rules compile <rules.dl>` — validates syntax + checks all relation names against declared/built-in set; exits 1 on errors; CI-friendly
