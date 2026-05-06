@@ -825,9 +825,9 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 **Analysis features:**
 1. **Cross-repo comparison**: group sessions by repository, compare metrics: tool usage, error rates, parallelization, costs. `--by-repo` flag to stats command.
 2. **Ngram analysis**: extract common word sequences from assistant messages (bigrams/trigrams/4-grams). Find common error messages, repeated explanations, boilerplate responses.
-3. **Parallelization hints**: beyond counting, show specific turns with sequential independent calls. Example: `Turn 12: Could parallelize: Read(foo.rs) → Read(bar.rs) → Read(baz.rs)`
-4. **File edit heatmap**: which files churned most? Files read but never edited: potential test gaps. Files edited multiple times: fragile design or iterative refinement?
-5. **Cost breakdown**: model-specific pricing, cache savings display, per-turn cost tracking.
+3. [x] **Parallelization hints**: `normalize sessions parallelization [session-id]` — shows turns with sequential same-type tool calls that could be parallelized. `--threshold N` (default 2) minimum group size. Example: `Turn 12: Could parallelize: Read(foo.rs) → Read(bar.rs) → Read(baz.rs)`
+4. [x] **File edit heatmap**: `normalize sessions heatmap [session-id]` — per-file read/write counts, classifies as `hot` (>5 writes), `read_only` (0 writes = potential test gap), `normal`. `--top N` (default 20), sorted by write_count desc.
+5. [x] **Cost breakdown**: `normalize sessions cost [session-id]` — per-turn token counts and estimated USD cost using model-specific pricing; summary shows total cost, cache savings, cache efficiency %.
 
 **Other session analysis:**
 - Web syntax highlighting: share tree-sitter grammars between native and web SPAs

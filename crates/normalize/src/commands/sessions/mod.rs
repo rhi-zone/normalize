@@ -1,9 +1,12 @@
 //! Sessions command - analyze Claude Code and other agent session logs.
 
 pub mod analyze;
+pub mod cost;
+pub mod heatmap;
 pub mod list;
 pub mod mark;
 pub mod messages;
+pub mod parallelization;
 pub mod patterns;
 pub mod plans;
 #[cfg(feature = "sessions-web")]
@@ -12,9 +15,14 @@ pub mod show;
 pub mod sort;
 pub mod stats;
 
+pub use cost::{CostReport, build_cost_report, build_cost_report_for_session};
+pub use heatmap::{HeatmapReport, build_heatmap_report, build_heatmap_report_for_session};
 pub use list::{SessionListReport, build_session_list};
 pub use mark::{MarkReport, load_reviewed, mark_session, unmark_session};
 pub use messages::{MessagesReport, build_messages_report};
+pub use parallelization::{
+    ParallelizationReport, build_parallelization_report, build_parallelization_report_for_session,
+};
 pub use patterns::{PatternsReport, build_patterns_report};
 pub use plans::{PlanContent, PlansListReport, build_plan_content, build_plans_list};
 #[cfg(feature = "sessions-web")]

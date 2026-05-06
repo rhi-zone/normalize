@@ -103,6 +103,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`normalize sessions parallelization [session-id]`** — finds turns with sequential same-type tool calls that could be parallelized (e.g. `Read(foo.rs) → Read(bar.rs)`). `--threshold N` controls minimum group size (default: 2). Works per-session or aggregated across filtered sessions.
+
+- **`normalize sessions heatmap [session-id]`** — per-file read/write counts across a session. Classifies files as `hot` (>5 writes), `read_only` (reads with 0 writes — potential test gap), or `normal`. Sorted by write count, `--top N` to limit rows.
+
+- **`normalize sessions cost [session-id]`** — per-turn token cost breakdown using model-specific Anthropic pricing. Shows input/output/cache-read/cache-write tokens and estimated USD per turn. Summary includes total cost, cost without cache, cache savings (USD), and cache efficiency %.
+
 - **`normalize edit move`** — second major refactoring recipe after `rename`. Moves a symbol's definition to another file and rewrites import statements in every file that imported it from the old location. Per-language module-path derivation is best-effort: Python, Go, and JavaScript/TypeScript imports are rewritten when a new path can be derived; Rust and unsupported cases emit warnings and skip the import site rather than fabricating wrong paths. `--reexport` (Python only) leaves a re-export stub at the source location so callers that haven't updated yet still resolve. Supports `--dry-run` and shadow-history `--message`. Leading decorations (doc comments, attributes, decorators, annotations, pragmas) preceding the symbol are included in the move, classified by tree-sitter `node.kind()` rather than text patterns so the rule generalizes across every grammar. Languages without a loaded grammar fall back to moving just the symbol body.
 - **`normalize sync`** — new command to copy a project (and its AI agent session metadata) to a destination for portability. Excludes `target/`, `node_modules/`, `.git/objects/`, `.normalize/findings-cache.sqlite`, `.fastembed_cache/` by default. After copying, rewrites absolute paths in the index DB so the copy works from its new location. Supports `--dry-run`, `--verbose`, `--all` (sync all known projects), `--active N` (only projects with activity in last N days), `--repo <glob>`, `--exclude <glob>`.
 

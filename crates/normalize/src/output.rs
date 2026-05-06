@@ -138,6 +138,7 @@ mod tests {
         assert_output_formatter::<ViewHistoryReport>();
         assert_output_formatter::<ViewReport>();
         assert_output_formatter::<ViewListReport>();
+        assert_output_formatter::<crate::commands::view::chunked::ChunkedViewReport>();
 
         use crate::service::config::{
             ConfigSchemaReport, ConfigSetReport, ConfigShowReport, ConfigValidateReport,

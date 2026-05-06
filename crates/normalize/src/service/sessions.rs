@@ -2,8 +2,9 @@
 
 use super::resolve_pretty;
 use crate::commands::sessions::{
-    MarkReport, MessagesReport, PatternsReport, PlanContent, PlansListReport, SessionListReport,
-    SessionMode, SessionShowReport, SubagentsReport,
+    CostReport, HeatmapReport, MarkReport, MessagesReport, ParallelizationReport, PatternsReport,
+    PlanContent, PlansListReport, SessionListReport, SessionMode, SessionShowReport,
+    SubagentsReport,
 };
 use crate::output::OutputFormatter;
 use crate::sessions::SessionAnalysisReport;
@@ -553,6 +554,236 @@ impl SessionsService {
             agent_type.as_deref(),
             sort.as_deref(),
         )
+    }
+
+    /// Show sequential independent tool calls that could be parallelized
+    ///
+    /// Examples:
+    ///   normalize sessions parallelization abc123          # hints for a specific session
+    ///   normalize sessions parallelization abc123 --pretty # colored output
+    ///   normalize sessions parallelization --days 7        # aggregate across recent sessions
+    ///   normalize sessions parallelization abc123 --threshold 3  # only groups of 3+
+    #[cli(display_with = "display_output")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn parallelization(
+        &self,
+        #[param(
+            positional,
+            help = "Session ID or pattern (omit to aggregate across sessions)"
+        )]
+        session: Option<String>,
+        #[param(help = "Require exact/prefix match (disable fuzzy)")] exact: bool,
+        #[param(help = "Minimum sequential calls to report (default: 2)")] threshold: Option<usize>,
+        #[param(help = "Filter sessions by grep pattern")] grep: Option<String>,
+        #[param(help = "Filter sessions from the last N days")] days: Option<u32>,
+        #[param(help = "Filter sessions since date (YYYY-MM-DD)")] since: Option<String>,
+        #[param(help = "Filter sessions until date (YYYY-MM-DD)")] until: Option<String>,
+        #[param(help = "Filter by specific project path")] project: Option<String>,
+        #[param(help = "Show sessions from all projects")] all_projects: bool,
+        #[param(help = "Force specific format: claude, codex, gemini, normalize")] format: Option<
+            String,
+        >,
+        #[param(
+            short = 'n',
+            help = "Maximum number of sessions (0 = all, default: all)"
+        )]
+        limit: Option<usize>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Session mode: interactive (default), subagent, or all")] mode: Option<
+            SessionMode,
+        >,
+        #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
+        agent_type: Option<String>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ParallelizationReport, String> {
+        let threshold = threshold.unwrap_or(2);
+        let limit = limit.unwrap_or(0);
+        let root_path = root.as_deref().map(std::path::Path::new);
+        let project_path = project.as_deref().map(std::path::Path::new);
+        let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
+        self.pretty
+            .set(resolve_pretty(resolved_root, pretty, compact));
+        let mode = mode.unwrap_or_default();
+        let effective_project = project_path.or(root_path);
+        if let Some(ref session_id) = session {
+            crate::commands::sessions::build_parallelization_report_for_session(
+                session_id,
+                effective_project,
+                format.as_deref(),
+                exact,
+                threshold,
+            )
+        } else {
+            crate::commands::sessions::build_parallelization_report(
+                root_path,
+                limit,
+                format.as_deref(),
+                grep.as_deref(),
+                days,
+                since.as_deref(),
+                until.as_deref(),
+                project_path,
+                all_projects,
+                &mode,
+                agent_type.as_deref(),
+                threshold,
+            )
+        }
+    }
+
+    /// Show which files were read and edited most (heatmap)
+    ///
+    /// Examples:
+    ///   normalize sessions heatmap abc123              # heatmap for a specific session
+    ///   normalize sessions heatmap abc123 --pretty     # colored output
+    ///   normalize sessions heatmap --days 7            # aggregate across recent sessions
+    ///   normalize sessions heatmap abc123 --top 10     # show top 10 files only
+    #[cli(display_with = "display_output")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn heatmap(
+        &self,
+        #[param(
+            positional,
+            help = "Session ID or pattern (omit to aggregate across sessions)"
+        )]
+        session: Option<String>,
+        #[param(help = "Require exact/prefix match (disable fuzzy)")] exact: bool,
+        #[param(help = "Show top N files by write count (default: 20)")] top: Option<usize>,
+        #[param(help = "Filter sessions by grep pattern")] grep: Option<String>,
+        #[param(help = "Filter sessions from the last N days")] days: Option<u32>,
+        #[param(help = "Filter sessions since date (YYYY-MM-DD)")] since: Option<String>,
+        #[param(help = "Filter sessions until date (YYYY-MM-DD)")] until: Option<String>,
+        #[param(help = "Filter by specific project path")] project: Option<String>,
+        #[param(help = "Show sessions from all projects")] all_projects: bool,
+        #[param(help = "Force specific format: claude, codex, gemini, normalize")] format: Option<
+            String,
+        >,
+        #[param(
+            short = 'n',
+            help = "Maximum number of sessions (0 = all, default: all)"
+        )]
+        limit: Option<usize>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Session mode: interactive (default), subagent, or all")] mode: Option<
+            SessionMode,
+        >,
+        #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
+        agent_type: Option<String>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<HeatmapReport, String> {
+        let top = top.unwrap_or(20);
+        let limit = limit.unwrap_or(0);
+        let root_path = root.as_deref().map(std::path::Path::new);
+        let project_path = project.as_deref().map(std::path::Path::new);
+        let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
+        self.pretty
+            .set(resolve_pretty(resolved_root, pretty, compact));
+        let mode = mode.unwrap_or_default();
+        let effective_project = project_path.or(root_path);
+        if let Some(ref session_id) = session {
+            crate::commands::sessions::build_heatmap_report_for_session(
+                session_id,
+                effective_project,
+                format.as_deref(),
+                exact,
+                top,
+            )
+        } else {
+            crate::commands::sessions::build_heatmap_report(
+                root_path,
+                limit,
+                format.as_deref(),
+                grep.as_deref(),
+                days,
+                since.as_deref(),
+                until.as_deref(),
+                project_path,
+                all_projects,
+                &mode,
+                agent_type.as_deref(),
+                top,
+            )
+        }
+    }
+
+    /// Show token cost breakdown with cache savings per turn
+    ///
+    /// Examples:
+    ///   normalize sessions cost abc123              # cost breakdown for a specific session
+    ///   normalize sessions cost abc123 --pretty     # colored output
+    ///   normalize sessions cost --days 7            # aggregate costs across recent sessions
+    ///   normalize sessions cost --all-projects      # costs across all projects
+    #[cli(display_with = "display_output")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn cost(
+        &self,
+        #[param(
+            positional,
+            help = "Session ID or pattern (omit to aggregate across sessions)"
+        )]
+        session: Option<String>,
+        #[param(help = "Require exact/prefix match (disable fuzzy)")] exact: bool,
+        #[param(help = "Filter sessions by grep pattern")] grep: Option<String>,
+        #[param(help = "Filter sessions from the last N days")] days: Option<u32>,
+        #[param(help = "Filter sessions since date (YYYY-MM-DD)")] since: Option<String>,
+        #[param(help = "Filter sessions until date (YYYY-MM-DD)")] until: Option<String>,
+        #[param(help = "Filter by specific project path")] project: Option<String>,
+        #[param(help = "Show sessions from all projects")] all_projects: bool,
+        #[param(help = "Force specific format: claude, codex, gemini, normalize")] format: Option<
+            String,
+        >,
+        #[param(
+            short = 'n',
+            help = "Maximum number of sessions (0 = all, default: all)"
+        )]
+        limit: Option<usize>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Session mode: interactive (default), subagent, or all")] mode: Option<
+            SessionMode,
+        >,
+        #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
+        agent_type: Option<String>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<CostReport, String> {
+        let limit = limit.unwrap_or(0);
+        let root_path = root.as_deref().map(std::path::Path::new);
+        let project_path = project.as_deref().map(std::path::Path::new);
+        let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
+        self.pretty
+            .set(resolve_pretty(resolved_root, pretty, compact));
+        let mode = mode.unwrap_or_default();
+        let effective_project = project_path.or(root_path);
+        if let Some(ref session_id) = session {
+            crate::commands::sessions::build_cost_report_for_session(
+                session_id,
+                effective_project,
+                format.as_deref(),
+                exact,
+            )
+        } else {
+            crate::commands::sessions::build_cost_report(
+                root_path,
+                limit,
+                format.as_deref(),
+                grep.as_deref(),
+                days,
+                since.as_deref(),
+                until.as_deref(),
+                project_path,
+                all_projects,
+                &mode,
+                agent_type.as_deref(),
+            )
+        }
     }
 
     /// List and view agent plans
