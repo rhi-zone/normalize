@@ -7,6 +7,7 @@
 
 pub mod actions;
 pub mod add_parameter;
+pub mod inline_function;
 pub mod inline_variable;
 pub mod introduce_variable;
 pub mod move_item;

@@ -18,6 +18,9 @@ Same as `normalize view`:
 | `replace` | Replace target with new content |
 | `swap` | Swap two symbols |
 | `insert` | Insert content relative to target |
+| `rename` | Rename a symbol across definition and all call/import sites |
+| `move` | Move a symbol to another file, rewriting imports |
+| `inline-function` | Inline a single-use function at its call site |
 | `undo` | Undo the last N edits |
 | `redo` | Redo the last undone edit |
 | `goto` | Jump to a specific shadow commit |
@@ -55,6 +58,15 @@ normalize edit history
 
 # Apply batch edits from JSON
 normalize edit batch edits.json
+
+# Inline a function at its definition (line 12, col 1)
+normalize edit inline-function src/utils.ts 12:1
+
+# Preview inline without modifying
+normalize edit inline-function src/utils.ts 12:1 --dry-run
+
+# Inline even if called more than once (inlines first call site)
+normalize edit inline-function src/utils.ts 12:1 --force
 ```
 
 ## Glob Patterns

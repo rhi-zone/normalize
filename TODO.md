@@ -145,7 +145,7 @@ implementation nobody should have to re-derive.
 Target recipes (in rough priority order):
 - [~] `extract_function` — **first attempt (commit `ed9d3b63`, reverted) is wrong.** Tree-sitter identifier sweep + heuristic parameter inference; no return-value detection, no real scope analysis, no type awareness. Silently generates broken code. Do not merge. Needs the semantic foundation below before it can be done correctly.
 - [x] `inline_variable` — inverse of extract: replace all uses of a variable with its initializer and remove the binding (`normalize edit inline-variable <file> <line>:<col>`, recipe at `crates/normalize-refactor/src/inline_variable.rs`). Position points to the variable name in its declaration. Supports Rust, TypeScript/JavaScript, Python. Errors on reassignment or missing initializer; warns on side-effect risk with multiple references. `--safe` flag refuses to inline unused variables.
-- [ ] `inline_function` — inverse of extract function
+- [x] `inline_function` — `normalize edit inline-function <file> <line>:<col>` — inlines a single-use function at its call site within the same file. Substitutes arguments for parameters (whole-word replacement), strips `return` keyword, removes the definition. Supports JS/TS function declarations and arrow `const` bindings, Python `def`, Rust `fn`. Conservative: aborts on multiple-return bodies or mismatched argument counts. `--force` overrides single-use check. Recipe at `crates/normalize-refactor/src/inline_function.rs`
 - [x] `move_item` — move function/struct/type to another file, fix imports (`normalize edit move`, recipe at `crates/normalize-refactor/src/move_item.rs`). Best-effort import rewriting for Python/Go/JS/TS; Rust and unsupported cases emit warnings rather than fabricate paths. `--reexport` available for Python.
 - [x] `add_parameter` / `change_signature` — update function signature + all callsites (`normalize edit add-parameter <file> <function> --param <name> --default <value> [--type <type>] [--position <N>]`, recipe at `crates/normalize-refactor/src/add_parameter.rs`). Uses tree-sitter to locate the function and argument lists. Finds all call sites via the facts index; falls back with a warning if the index is unavailable. Supports Rust, TypeScript/JavaScript, Python.
 - [x] `introduce_variable` — extract expression into a named binding (`normalize edit introduce-variable <file> <range> <name>`, recipe at `crates/normalize-refactor/src/introduce_variable.rs`). Language-specific binding keyword: Python uses bare assignment, JS/TS use `const`, all others use `let`. Range specified as `start_line:start_col-end_line:end_col` (1-based).
@@ -1102,7 +1102,7 @@ Building blocks are all present. Composition layer landed — `normalize-refacto
   Done as `normalize edit move` (`crates/normalize-refactor/src/move_item.rs`); best-effort import rewriting for Python/Go/JS/TS; `--reexport` available.
 - [ ] `normalize extract <file:start-end> <new-name>` — extract a region into a new function,
   rewriting the call site. Single-file first; cross-file as stretch.
-- [ ] `normalize inline <target>` — inline a single-use function or constant. Single-file.
+- [x] `normalize inline <target>` — implemented as `normalize edit inline-function <file> <line>:<col>`. Single-file. See recipe at `crates/normalize-refactor/src/inline_function.rs`.
 - [ ] Post-edit index invalidation: after a multi-file edit, mark affected files dirty in the
   daemon's reverse-dep graph so the index refreshes without a full rebuild.
 
