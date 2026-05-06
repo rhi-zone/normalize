@@ -15,6 +15,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`boundary-violations` native rule** — configurable directory-level import boundary enforcement. Declare pairs like `"services/ cannot import cli/"` under `[rules.rule."boundary-violations"] boundaries = [...]` in `.normalize/config.toml`; the rule queries the structural index's `imports` table and reports each resolved import that crosses a boundary. Default disabled; requires `normalize structure rebuild`. Uses glob matching with `services/` treated as `services/**`.
+
 - **Re-export tracing in import resolution** — `pub use path::Item` in Rust and `export { X } from './y'` in TypeScript/JavaScript are now extracted as re-exports (`is_reexport = 1` in the `imports` table). After `resolve_all_imports()`, a new `trace_reexports()` pass follows re-export chains (up to 10 hops, with cycle detection via early-exit) so imports in file A that land on an intermediate re-exporter B are updated to point to B's source file C. This improves call graph accuracy and `find_callers`/`find_callees` results across module boundaries. Schema bumped v11→v12.
 
 - **`ConfigDiff` for surgical daemon cache invalidation** — `normalize-rules-config` now exports a `ConfigDiff::compute(old, new)` helper that classifies a config change as filter-only (severities, allow-lists, `enabled = false`), per-rule re-run (newly-enabled, threshold/extra-field change), or full reprime (`[walk] exclude` change). The daemon's config-reload path consumes this to skip work that the previous full-reprime strategy did unconditionally. Phase 1 of a multi-tier rework; subsequent phases wire it through the daemon.

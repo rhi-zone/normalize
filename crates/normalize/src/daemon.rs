@@ -1529,6 +1529,18 @@ mod unix_impl {
 
             let root_owned = root.to_path_buf();
 
+            // Read config for boundary-violations rule.
+            let boundary_cfg: normalize_native_rules::BoundaryViolationsConfig = rules_config
+                .rules
+                .get("boundary-violations")
+                .map(|r| r.rule_config())
+                .unwrap_or_default();
+            let boundaries: Vec<normalize_native_rules::Boundary> = boundary_cfg
+                .boundaries
+                .iter()
+                .filter_map(|s| normalize_native_rules::parse_boundary(s))
+                .collect();
+
             let (
                 missing_res,
                 summary_res,
@@ -1537,6 +1549,7 @@ mod unix_impl {
                 refs_res,
                 ratchet_res,
                 budget_res,
+                boundary_res,
             ) = tokio::join!(
                 tokio::task::spawn_blocking({
                     let r = root_owned.clone();
@@ -1579,6 +1592,7 @@ mod unix_impl {
                     let r = root_owned.clone();
                     move || normalize_native_rules::build_budget_report(&r)
                 }),
+                normalize_native_rules::build_boundary_violations_report(&root_owned, &boundaries),
             );
 
             let mut report = DiagnosticsReport::new();
@@ -1603,6 +1617,7 @@ mod unix_impl {
             if let Ok(r) = budget_res {
                 report.merge(r.into());
             }
+            report.merge(boundary_res);
 
             normalize_rules::apply_native_rules_config(&mut report, rules_config);
             report.issues

@@ -4,6 +4,7 @@
 //! long-file, high-complexity, and long-function as pure Rust checks. These are the
 //! "native engine" checks invoked by `normalize rules run --engine native`.
 
+pub mod boundary_violations;
 pub mod budget;
 pub mod cache;
 pub mod check_examples;
@@ -21,6 +22,9 @@ pub use cache::{
     FileRule, FindingsCache, file_mtime_nanos as cache_file_mtime_nanos, run_file_rule,
 };
 
+pub use boundary_violations::{
+    Boundary, BoundaryViolationsConfig, build_boundary_violations_report, parse_boundary,
+};
 pub use budget::{BudgetRulesReport, build_budget_report};
 pub use check_examples::build_check_examples_report;
 pub use check_refs::build_check_refs_report;
@@ -54,6 +58,13 @@ pub struct NativeRuleDescriptor {
 
 /// All native rules with their default metadata.
 pub const NATIVE_RULES: &[NativeRuleDescriptor] = &[
+    NativeRuleDescriptor {
+        id: "boundary-violations",
+        default_severity: "warning",
+        message: "Import crosses a configured directory boundary (e.g. services/ → cli/)",
+        tags: &["architecture", "boundaries"],
+        default_enabled: false,
+    },
     NativeRuleDescriptor {
         id: "broken-ref",
         default_severity: "warning",

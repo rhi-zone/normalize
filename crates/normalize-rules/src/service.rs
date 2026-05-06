@@ -249,6 +249,117 @@ impl OutputFormatter for RulesTestReport {
     }
 }
 
+/// One expected finding in a fixture `expected.json` file.
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+)]
+pub struct FixtureExpectedFinding {
+    /// Rule ID that should fire (e.g. `rust/unwrap-in-impl`).
+    pub rule: String,
+    /// Source file path, relative to the fixture's `input/` dir (or the input filename for single-file cases).
+    pub file: String,
+    /// 1-based line number.
+    pub line: usize,
+    /// Diagnostic message (substring match — actual message must contain this).
+    pub message: String,
+}
+
+/// Result for a single fixture case.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct FixtureCaseResult {
+    /// Case name (directory or file stem).
+    pub case: String,
+    /// `true` if actual findings matched expected.
+    pub passed: bool,
+    /// Lines describing mismatches (empty when passed).
+    pub diff: Vec<String>,
+}
+
+/// Report returned by `normalize rules test-fixtures`.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct RulesFixtureTestReport {
+    /// Root directory that was scanned for fixtures.
+    pub fixture_dir: String,
+    /// Results for each discovered case.
+    pub cases: Vec<FixtureCaseResult>,
+    /// Number of cases that passed.
+    pub passed: usize,
+    /// Number of cases that failed.
+    pub failed: usize,
+    /// `true` when run with --update (rewrites expected.json).
+    pub updated: bool,
+}
+
+impl OutputFormatter for RulesFixtureTestReport {
+    fn format_text(&self) -> String {
+        let mut out = String::new();
+        for c in &self.cases {
+            if c.passed {
+                out.push_str(&format!("PASS {}\n", c.case));
+            } else {
+                out.push_str(&format!("FAIL {}:\n", c.case));
+                for line in &c.diff {
+                    out.push_str(&format!("  {line}\n"));
+                }
+            }
+        }
+        if self.updated {
+            out.push_str(&format!("\nUpdated {} case(s).\n", self.cases.len()));
+        } else {
+            out.push_str(&format!(
+                "\n{} passed, {} failed\n",
+                self.passed, self.failed
+            ));
+        }
+        out
+    }
+
+    fn format_pretty(&self) -> String {
+        use nu_ansi_term::Color;
+        let mut out = String::new();
+        for c in &self.cases {
+            if c.passed {
+                out.push_str(&format!(
+                    "{} {}\n",
+                    Color::Green.bold().paint("PASS"),
+                    c.case
+                ));
+            } else {
+                out.push_str(&format!(
+                    "{} {}:\n",
+                    Color::Red.bold().paint("FAIL"),
+                    c.case
+                ));
+                for line in &c.diff {
+                    out.push_str(&format!("  {}\n", Color::Yellow.paint(line.as_str())));
+                }
+            }
+        }
+        if self.updated {
+            out.push_str(&format!("\n{} case(s) updated.\n", self.cases.len()));
+        } else {
+            out.push_str(&format!(
+                "\n{} passed, {} failed\n",
+                Color::Green.paint(self.passed.to_string()),
+                if self.failed > 0 {
+                    Color::Red.paint(self.failed.to_string()).to_string()
+                } else {
+                    "0".to_string()
+                }
+            ));
+        }
+        out
+    }
+}
+
 /// Rules management sub-service.
 pub struct RulesService {
     pretty: Cell<bool>,
@@ -589,6 +700,19 @@ impl RulesService {
             let run_high_complexity = is_native_enabled("high-complexity");
             let run_long_function = is_native_enabled("long-function");
             let run_stale_doc = is_native_enabled("stale-doc");
+            let run_boundary_violations = is_native_enabled("boundary-violations");
+
+            let boundary_cfg: normalize_native_rules::BoundaryViolationsConfig = native_config
+                .rules
+                .rules
+                .get("boundary-violations")
+                .map(|r| r.rule_config())
+                .unwrap_or_default();
+            let boundaries: Vec<normalize_native_rules::Boundary> = boundary_cfg
+                .boundaries
+                .iter()
+                .filter_map(|s| normalize_native_rules::parse_boundary(s))
+                .collect();
 
             let long_file_threshold: usize = native_config
                 .rules
@@ -789,8 +913,14 @@ impl RulesService {
 
             // Advisory rules (default disabled — only run when explicitly enabled).
             // long-file / high-complexity / long-function are tree-sitter-heavy.
-            // stale-doc requires the index and a git walk, so also advisory.
-            let (long_file_res, high_complexity_res, long_function_res, stale_doc_res) = tokio::join!(
+            // stale-doc and boundary-violations require the index, so also advisory.
+            let (
+                long_file_res,
+                high_complexity_res,
+                long_function_res,
+                stale_doc_res,
+                boundary_violations_res,
+            ) = tokio::join!(
                 async {
                     if !run_long_file {
                         return None;
@@ -875,6 +1005,20 @@ impl RulesService {
                     eprintln!("[timings] stale-doc: {:.1?}", t.elapsed());
                     r
                 },
+                async {
+                    if !run_boundary_violations {
+                        return None;
+                    }
+                    let root = native_root.clone();
+                    let t = std::time::Instant::now();
+                    let r = normalize_native_rules::build_boundary_violations_report(
+                        &root,
+                        &boundaries,
+                    )
+                    .await;
+                    eprintln!("[timings] boundary-violations: {:.1?}", t.elapsed());
+                    Some(r)
+                },
             );
 
             if let Some(r) = long_file_res {
@@ -887,6 +1031,9 @@ impl RulesService {
                 report.merge(r);
             }
             if let Some(r) = stale_doc_res {
+                report.merge(r);
+            }
+            if let Some(r) = boundary_violations_res {
                 report.merge(r);
             }
 
@@ -1447,6 +1594,387 @@ impl RulesService {
             let detail = self.display_output(&report);
             Err(format!("{detail}\n{n} test failure(s)"))
         }
+    }
+
+    /// Run fixture-based tests for rules.
+    ///
+    /// Discovers fixture cases under `fixture_dir` (defaults to `.normalize/rule-tests/`).
+    ///
+    /// **Single-file format** (flat, one file per case):
+    /// ```text
+    /// <fixture-dir>/
+    ///   case-name.input.rs          # input source file
+    ///   case-name.expected.json     # expected findings array
+    /// ```
+    ///
+    /// **Multi-file format** (one subdirectory per case):
+    /// ```text
+    /// <fixture-dir>/
+    ///   case-name/
+    ///     input/
+    ///       main.rs                 # one or more input files
+    ///       helper.rs
+    ///     expected.json             # expected findings array
+    /// ```
+    ///
+    /// The `expected.json` file is an array of objects:
+    /// ```json
+    /// [{"rule": "rust/no-todo-comment", "file": "main.rs", "line": 3, "message": "TODO"}]
+    /// ```
+    ///
+    /// `message` is a **substring match** — the actual diagnostic message only needs to
+    /// contain the expected string.
+    ///
+    /// With `--update` the actual findings are written back to `expected.json`, making it
+    /// easy to bootstrap a new fixture case.
+    ///
+    /// Examples:
+    ///   normalize rules test-fixtures                           # scan .normalize/rule-tests/
+    ///   normalize rules test-fixtures --fixture-dir tests/rules # custom dir
+    ///   normalize rules test-fixtures --update                  # overwrite expected.json
+    #[cli(display_with = "display_output")]
+    pub fn test_fixtures(
+        &self,
+        #[param(
+            short = 'd',
+            help = "Directory containing fixture cases (default: .normalize/rule-tests/)"
+        )]
+        fixture_dir: Option<String>,
+        #[param(help = "Overwrite expected.json with actual findings (bootstrap mode)")]
+        update: bool,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<RulesFixtureTestReport, String> {
+        self.resolve_format(pretty, compact);
+
+        let effective_root = root
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+
+        let fixture_root = match fixture_dir {
+            Some(ref d) => {
+                let p = std::path::Path::new(d);
+                if p.is_absolute() {
+                    p.to_path_buf()
+                } else {
+                    effective_root.join(p)
+                }
+            }
+            None => effective_root.join(".normalize").join("rule-tests"),
+        };
+
+        if !fixture_root.exists() {
+            return Err(format!(
+                "Fixture directory '{}' does not exist. \
+                 Create it and add .input.<ext> + .expected.json pairs.",
+                fixture_root.display()
+            ));
+        }
+
+        let config = load_rules_config(&effective_root);
+        let cases = discover_fixture_cases(&fixture_root)
+            .map_err(|e| format!("Failed to discover fixtures: {e}"))?;
+
+        if cases.is_empty() {
+            return Err(format!(
+                "No fixture cases found under '{}'. \
+                 Add .input.<ext> + .expected.json pairs (single-file format) \
+                 or case-name/input/ + case-name/expected.json (multi-file format).",
+                fixture_root.display()
+            ));
+        }
+
+        let mut case_results: Vec<FixtureCaseResult> = Vec::new();
+
+        for case in &cases {
+            let result = run_fixture_case(case, &effective_root, &config, update);
+            case_results.push(result);
+        }
+
+        let passed = case_results.iter().filter(|c| c.passed).count();
+        let failed = case_results.iter().filter(|c| !c.passed).count();
+
+        let report = RulesFixtureTestReport {
+            fixture_dir: fixture_root.display().to_string(),
+            cases: case_results,
+            passed,
+            failed,
+            updated: update,
+        };
+
+        if failed > 0 && !update {
+            let detail = self.display_output(&report);
+            Err(format!("{detail}\n{failed} fixture case(s) failed"))
+        } else {
+            Ok(report)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Fixture discovery and execution helpers (not part of the CLI surface)
+// ---------------------------------------------------------------------------
+
+/// A discovered fixture case — either single-file or multi-file.
+struct FixtureCase {
+    /// Human-readable case name (used in output).
+    name: String,
+    /// Input files: Vec<(filename, absolute_path)>.
+    inputs: Vec<(String, std::path::PathBuf)>,
+    /// Absolute path to `expected.json`.
+    expected_json: std::path::PathBuf,
+}
+
+/// Discover all fixture cases under `root`.
+///
+/// Scans for:
+/// 1. `*.input.<ext>` files paired with `*.expected.json` (single-file).
+/// 2. Subdirectories containing `input/` + `expected.json` (multi-file).
+fn discover_fixture_cases(root: &std::path::Path) -> std::io::Result<Vec<FixtureCase>> {
+    let mut cases: Vec<FixtureCase> = Vec::new();
+    let mut single_file_stems: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    let mut entries: Vec<_> = std::fs::read_dir(root)?
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .collect();
+    entries.sort();
+
+    // First pass: collect single-file cases (*.input.*)
+    for path in &entries {
+        let file_name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n.to_string(),
+            None => continue,
+        };
+        // Match pattern: <stem>.input.<ext>
+        if let Some(stem) = extract_input_stem(&file_name) {
+            let expected = root.join(format!("{stem}.expected.json"));
+            // Always discover: expected.json may not exist yet (--update creates it).
+            single_file_stems.insert(stem.clone());
+            cases.push(FixtureCase {
+                name: stem,
+                inputs: vec![(file_name.clone(), path.clone())],
+                expected_json: expected,
+            });
+        }
+    }
+
+    // Second pass: multi-file cases (subdirectories with input/ + expected.json)
+    for path in &entries {
+        if !path.is_dir() {
+            continue;
+        }
+        let dir_name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n.to_string(),
+            None => continue,
+        };
+        // Skip if we already handled this as a single-file case
+        if single_file_stems.contains(&dir_name) {
+            continue;
+        }
+        let input_dir = path.join("input");
+        let expected = path.join("expected.json");
+        if input_dir.is_dir() && (expected.exists() || !expected.exists()) {
+            // Collect all files under input/
+            let mut inputs: Vec<(String, std::path::PathBuf)> = Vec::new();
+            collect_input_files(&input_dir, &input_dir, &mut inputs)?;
+            inputs.sort_by(|a, b| a.0.cmp(&b.0));
+            if !inputs.is_empty() {
+                cases.push(FixtureCase {
+                    name: dir_name,
+                    inputs,
+                    expected_json: expected,
+                });
+            }
+        }
+    }
+
+    cases.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(cases)
+}
+
+/// Extract the stem from a filename matching `<stem>.input.<ext>`.
+/// Returns `None` if the pattern doesn't match.
+fn extract_input_stem(file_name: &str) -> Option<String> {
+    // We need at least two dots: <stem>.input.<ext>
+    let parts: Vec<&str> = file_name.splitn(3, '.').collect();
+    if parts.len() >= 3 && parts[1] == "input" {
+        Some(parts[0].to_string())
+    } else {
+        None
+    }
+}
+
+/// Recursively collect files under `dir`, recording paths relative to `base`.
+fn collect_input_files(
+    dir: &std::path::Path,
+    base: &std::path::Path,
+    out: &mut Vec<(String, std::path::PathBuf)>,
+) -> std::io::Result<()> {
+    for entry in std::fs::read_dir(dir)?.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_input_files(&path, base, out)?;
+        } else {
+            let rel = path.strip_prefix(base).unwrap_or(&path);
+            out.push((rel.to_string_lossy().to_string(), path));
+        }
+    }
+    Ok(())
+}
+
+/// Run a single fixture case and return the result.
+fn run_fixture_case(
+    case: &FixtureCase,
+    project_root: &std::path::Path,
+    config: &crate::runner::RulesRunConfig,
+    update: bool,
+) -> FixtureCaseResult {
+    // Collect the input file paths for the rule runner
+    let input_paths: Vec<std::path::PathBuf> = case.inputs.iter().map(|(_, p)| p.clone()).collect();
+
+    // Use a temp directory as the root so relative file paths in findings are clean
+    let input_root: std::path::PathBuf = if case.inputs.len() == 1 {
+        // Single-file: use the file's parent dir
+        case.inputs[0]
+            .1
+            .parent()
+            .unwrap_or(project_root)
+            .to_path_buf()
+    } else {
+        // Multi-file: use the input/ directory (first input's parent)
+        case.inputs[0]
+            .1
+            .parent()
+            .unwrap_or(project_root)
+            .to_path_buf()
+    };
+
+    // Run syntax rules on the input files
+    let debug_flags = normalize_syntax_rules::DebugFlags::default();
+    let path_filter = normalize_rules_config::PathFilter::new(&[], &[]);
+    let findings = run_syntax_rules(
+        &input_root,
+        project_root,
+        None,
+        None,
+        None,
+        &config.rules,
+        &debug_flags,
+        Some(&input_paths),
+        &path_filter,
+        &config.walk,
+    );
+
+    // Convert findings to FixtureExpectedFinding (sorted for stable comparison)
+    let mut actual: Vec<FixtureExpectedFinding> = findings
+        .iter()
+        .map(|f| {
+            let file_rel = f
+                .file
+                .strip_prefix(&input_root)
+                .unwrap_or(&f.file)
+                .to_string_lossy()
+                .to_string();
+            FixtureExpectedFinding {
+                rule: f.rule_id.clone(),
+                file: file_rel,
+                line: f.start_line,
+                message: f.message.clone(),
+            }
+        })
+        .collect();
+    actual.sort();
+    actual.dedup();
+
+    if update {
+        // Write actual findings back to expected.json
+        let json = serde_json::to_string_pretty(&actual).unwrap_or_else(|_| "[]".to_string());
+        if let Err(e) = std::fs::write(&case.expected_json, json) {
+            return FixtureCaseResult {
+                case: case.name.clone(),
+                passed: false,
+                diff: vec![format!("Failed to write expected.json: {e}")],
+            };
+        }
+        return FixtureCaseResult {
+            case: case.name.clone(),
+            passed: true,
+            diff: Vec::new(),
+        };
+    }
+
+    // Load expected findings
+    let expected: Vec<FixtureExpectedFinding> = if case.expected_json.exists() {
+        match std::fs::read_to_string(&case.expected_json)
+            .map_err(|e| e.to_string())
+            .and_then(|s| serde_json::from_str(&s).map_err(|e| e.to_string()))
+        {
+            Ok(v) => v,
+            Err(e) => {
+                return FixtureCaseResult {
+                    case: case.name.clone(),
+                    passed: false,
+                    diff: vec![format!("Failed to read expected.json: {e}")],
+                };
+            }
+        }
+    } else {
+        // No expected.json → treat as expecting zero findings
+        Vec::new()
+    };
+
+    // Compare: expected uses substring match on message
+    let mut diff: Vec<String> = Vec::new();
+
+    // Findings in actual but not matched by any expected entry → unexpected
+    let mut matched_actuals: Vec<bool> = vec![false; actual.len()];
+    let mut matched_expected: Vec<bool> = vec![false; expected.len()];
+
+    for (ei, exp) in expected.iter().enumerate() {
+        let found = actual.iter().enumerate().find(|(ai, act)| {
+            !matched_actuals[*ai]
+                && act.rule == exp.rule
+                && act.file == exp.file
+                && act.line == exp.line
+                && act.message.contains(&exp.message)
+        });
+        if let Some((ai, _)) = found {
+            matched_actuals[ai] = true;
+            matched_expected[ei] = true;
+        }
+    }
+
+    for (ei, exp) in expected.iter().enumerate() {
+        if !matched_expected[ei] {
+            diff.push(format!(
+                "missing: {}:{} [{}] {:?}",
+                exp.file, exp.line, exp.rule, exp.message
+            ));
+        }
+    }
+
+    for (ai, act) in actual.iter().enumerate() {
+        if !matched_actuals[ai] {
+            diff.push(format!(
+                "unexpected: {}:{} [{}] {:?}",
+                act.file, act.line, act.rule, act.message
+            ));
+        }
+    }
+
+    diff.sort();
+
+    FixtureCaseResult {
+        case: case.name.clone(),
+        passed: diff.is_empty(),
+        diff,
     }
 }
 

@@ -180,12 +180,14 @@ mod tests {
         assert_output_formatter::<HealthReport>();
 
         use normalize_rules::{
-            RulesCompileReport, RulesListReport, RulesTestReport, RulesValidateReport,
+            RulesCompileReport, RulesFixtureTestReport, RulesListReport, RulesTestReport,
+            RulesValidateReport,
         };
         assert_output_formatter::<RulesListReport>();
         assert_output_formatter::<RulesValidateReport>();
         assert_output_formatter::<RulesCompileReport>();
         assert_output_formatter::<RulesTestReport>();
+        assert_output_formatter::<RulesFixtureTestReport>();
 
         use normalize_native_rules::check_examples::CheckExamplesReport;
         use normalize_native_rules::check_refs::CheckRefsReport;

@@ -56,7 +56,10 @@ impl OutputFormatter for CheckRefsReport {
 /// 1. If `NORMALIZE_INDEX_DIR` is set to an absolute path, use it directly.
 /// 2. If `NORMALIZE_INDEX_DIR` is set to a relative path, use `$XDG_DATA_HOME/normalize/<relative>`.
 /// 3. Otherwise, use `<root>/.normalize`.
-fn normalize_dir(root: &Path) -> std::path::PathBuf {
+///
+/// Public so that sibling modules (e.g. `boundary_violations`) can locate
+/// the index without duplicating the resolution logic.
+pub fn normalize_dir_for_root(root: &Path) -> std::path::PathBuf {
     if let Ok(index_dir) = std::env::var("NORMALIZE_INDEX_DIR") {
         let path = std::path::PathBuf::from(&index_dir);
         if path.is_absolute() {
@@ -80,7 +83,7 @@ pub async fn build_check_refs_report(
     walk_config: &normalize_rules_config::WalkConfig,
 ) -> Result<CheckRefsReport, String> {
     // Open index to get known symbols
-    let db_path = normalize_dir(root).join("index.sqlite");
+    let db_path = normalize_dir_for_root(root).join("index.sqlite");
     let idx = normalize_facts::FileIndex::open(&db_path, root)
         .await
         .map_err(|e| format!("Failed to open index: {e}"))?;

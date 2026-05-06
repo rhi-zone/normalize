@@ -1520,6 +1520,28 @@ impl FileIndex {
         Ok(edges)
     }
 
+    /// Load all resolved import edges with line numbers.
+    /// Returns `Vec<(importer_file, line, resolved_file)>` for rows where
+    /// `resolved_file IS NOT NULL`. Used by the boundary-violations native rule
+    /// to check cross-boundary imports with precise source locations.
+    pub async fn all_resolved_imports_with_lines(
+        &self,
+    ) -> Result<Vec<(String, u32, String)>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT file, line, resolved_file FROM imports WHERE resolved_file IS NOT NULL",
+                (),
+            )
+            .await?;
+        let mut edges = Vec::new();
+        while let Some(row) = rows.next().await? {
+            let line = u32::try_from(row.get::<i64>(1)?).unwrap_or(0);
+            edges.push((row.get(0)?, line, row.get(2)?));
+        }
+        Ok(edges)
+    }
+
     /// Load resolved import edges for a specific importer file (root-relative path).
     /// Returns Vec<imported_file> where `resolved_file IS NOT NULL`.
     /// Used by the daemon to update outgoing edges for a changed file.

@@ -1229,7 +1229,27 @@ impl NormalizeService {
             let stale_summary_filenames = stale_summary_cfg.filenames;
             let stale_summary_paths = stale_summary_cfg.paths;
 
-            let (summary_res, stale_res, examples_res, refs_res, ratchet_res, budget_res) = tokio::join!(
+            let boundary_cfg: normalize_native_rules::BoundaryViolationsConfig = native_config
+                .rules
+                .rules
+                .get("boundary-violations")
+                .map(|r| r.rule_config())
+                .unwrap_or_default();
+            let boundaries: Vec<normalize_native_rules::Boundary> = boundary_cfg
+                .boundaries
+                .iter()
+                .filter_map(|s| normalize_native_rules::parse_boundary(s))
+                .collect();
+
+            let (
+                summary_res,
+                stale_res,
+                examples_res,
+                refs_res,
+                ratchet_res,
+                budget_res,
+                boundary_res,
+            ) = tokio::join!(
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
                     let wc = native_config.walk.clone();
@@ -1262,6 +1282,7 @@ impl NormalizeService {
                     let root = native_root.clone();
                     move || normalize_native_rules::build_budget_report(&root)
                 }),
+                normalize_native_rules::build_boundary_violations_report(&native_root, &boundaries),
             );
             let mut native_report = DiagnosticsReport::new();
             if let Ok(r) = summary_res {
@@ -1282,6 +1303,7 @@ impl NormalizeService {
             if let Ok(r) = budget_res {
                 native_report.merge(r.into());
             }
+            native_report.merge(boundary_res);
             apply_native_rules_config(&mut native_report, &native_config.rules);
             native_report.sources_run.push("native".into());
             merged.merge(native_report);
