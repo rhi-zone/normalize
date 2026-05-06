@@ -1027,8 +1027,12 @@ the default path.
   Warm-cache (cached HEAD) run: already fast at ~2.2s. Root cause of 5+ min runs was `.claude/`
   worktrees (5190 dirs) not excluded from walker — fixed by `.gitignore` + `[walk] exclude`.
 - [x] **Incremental native rules** — stale-summary already does this: when HEAD moves, `git_incremental_commit_stats` walks only new commits and updates only dirs touched in those commits (`stale_summary.rs` L676-701).
-- [ ] **Persistent query cache** — store per-file tree-sitter query results in the SQLite index
+- [x] **Persistent query cache** — store per-file tree-sitter query results in the SQLite index
   so repeated `normalize view`, `normalize rank`, etc. don't re-parse unchanged files.
+  Implemented in `Extractor::extract_with_support` via a `symbol_cache()` singleton that reuses
+  the existing CA cache DB (`~/.config/normalize/ca-cache.sqlite`). Key: `(blake3(content),
+  "symbols-v1-{all|public}", grammar_name)`. Cross-file resolver results (TS/JS interface
+  resolution) are not cached. `gc_stale_versions` now preserves `"symbols-*"` entries.
 
 **Pillar 5 — Perf and memory baseline**
 
@@ -1103,8 +1107,10 @@ Building blocks are all present. Composition layer landed — `normalize-refacto
 - [ ] `normalize extract <file:start-end> <new-name>` — extract a region into a new function,
   rewriting the call site. Single-file first; cross-file as stretch.
 - [x] `normalize inline <target>` — implemented as `normalize edit inline-function <file> <line>:<col>`. Single-file. See recipe at `crates/normalize-refactor/src/inline_function.rs`.
-- [ ] Post-edit index invalidation: after a multi-file edit, mark affected files dirty in the
+- [x] Post-edit index invalidation: after a multi-file edit, mark affected files dirty in the
   daemon's reverse-dep graph so the index refreshes without a full rebuild.
+  Implemented via `Request::FilesChanged` + `DaemonClient::notify_files_changed()` called
+  from `edit.rs` after every refactoring `executor.apply()`. Non-fatal if daemon is not running.
 
 **Pillar 3 — Semantic rules (stretch goal)**
 

@@ -150,6 +150,17 @@ pub enum Request {
         #[serde(default)]
         dir_name: Option<String>,
     },
+    /// Notify the daemon that specific files have changed on disk and should be
+    /// re-indexed. This is a direct "push" path that avoids waiting for inotify —
+    /// useful after in-process writes (e.g. refactoring edits). Non-fatal if the
+    /// root is not currently watched.
+    #[serde(rename = "files_changed")]
+    FilesChanged {
+        /// The watched root the files belong to.
+        root: PathBuf,
+        /// Absolute or relative paths to the files that changed.
+        paths: Vec<PathBuf>,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -822,7 +833,41 @@ mod unix_impl {
                     all,
                     dir_name,
                 } => self.query_context(root, match_keys, all, dir_name),
+                Request::FilesChanged { root, paths } => self.handle_files_changed(root, paths),
             }
+        }
+
+        fn handle_files_changed(&self, root: PathBuf, paths: Vec<PathBuf>) -> Response {
+            // Check the root is actually watched; if not, return ok (non-fatal).
+            let is_watched = {
+                let roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+                roots.contains_key(&root)
+            };
+            if !is_watched {
+                tracing::debug!(
+                    root = ?root,
+                    "FilesChanged: root not watched, ignoring"
+                );
+                return Response::ok(
+                    serde_json::json!({"queued": false, "reason": "root not watched"}),
+                );
+            }
+
+            // Broadcast FileChanged events so subscribers (e.g. `normalize daemon watch`)
+            // see the push-triggered changes the same as inotify-triggered ones.
+            for path in &paths {
+                let path_str = path.to_string_lossy().into_owned();
+                let root_str = root.to_string_lossy().into_owned();
+                let _ = self.event_tx.send(Event::FileChanged {
+                    path: path_str,
+                    root: root_str,
+                });
+            }
+
+            // Trigger the same incremental refresh cycle that inotify fires.
+            let _ = self.refresh_tx.send(root);
+
+            Response::ok(serde_json::json!({"queued": true}))
         }
 
         fn query_context(
@@ -3172,6 +3217,29 @@ mod unix_impl {
             Ok(())
         }
 
+        /// Notify the daemon that specific files have been written to disk and
+        /// should be re-indexed. This is the "push" complement to inotify:
+        /// callers (e.g. refactoring commands) call this immediately after
+        /// writing files so the index refreshes without waiting for inotify.
+        ///
+        /// Non-fatal: if the daemon is not running or the root is not watched,
+        /// returns `Ok(())` after logging a debug message.
+        pub fn notify_files_changed(&self, root: &Path, paths: &[PathBuf]) -> Result<(), String> {
+            if paths.is_empty() {
+                return Ok(());
+            }
+            match self.send(&Request::FilesChanged {
+                root: root.to_path_buf(),
+                paths: paths.to_vec(),
+            }) {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    tracing::debug!("notify_files_changed: daemon unavailable ({})", e);
+                    Ok(())
+                }
+            }
+        }
+
         /// Run rules via the daemon, returning cached diagnostics.
         ///
         /// Uses a 5-minute timeout since the first request may trigger a full
@@ -3941,6 +4009,10 @@ impl DaemonClient {
 
     pub fn shutdown(&self) -> Result<(), String> {
         Err("normalize daemon is not supported on Windows".to_string())
+    }
+
+    pub fn notify_files_changed(&self, _root: &Path, _paths: &[PathBuf]) -> Result<(), String> {
+        Ok(()) // daemon not supported on Windows; silently no-op
     }
 
     pub fn run_rules(

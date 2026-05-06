@@ -6,6 +6,8 @@ Key exports: `FileIndex` (open/query the SQLite index), `Extractor` (walk a proj
 
 Extraction is memoized via `ca_cache::CaCache` (inlined module, formerly the `normalize-ca-cache` crate): `refresh_call_graph` does a serial CA pre-pass (blake3 hash + CA get) before the rayon par-iter, extracting only uncached files. `reindex_files` (incremental path) checks and populates the CA cache per file. The CA cache is keyed by `(blake3(file_bytes), EXTRACTOR_VERSION, grammar_name)` and stored at `~/.config/normalize/ca-cache.sqlite`.
 
+The `Extractor` (used by `normalize view`, `normalize rank`, single-file analysis, etc.) also uses the CA cache via a separate `symbol_cache()` global singleton. Symbol cache entries use version keys `"symbols-v1-all"` / `"symbols-v1-public"` (determined by `include_private`), keeping them distinct from index extraction entries. `gc_stale_versions` now preserves `"symbols-*"` entries; `gc_stale_symbol_versions` handles symbol cache GC separately. Cross-file resolver results (TypeScript/JavaScript interface resolution) are never cached since they depend on other files.
+
 `CallEntry.access` is populated from the call graph index with read/write distinction when the language supports it. `ChangedFiles` tracks which files changed between index refreshes for incremental fact-rule evaluation via the daemon.
 
 The `cli` feature adds a standalone `FactsCliService` (`src/service.rs`) with `rebuild`, `stats`, and `files` subcommands. Output types (`RebuildReport`, `StructureStatsReport`, `StructureFilesReport`) implement `OutputFormatter`. Note: function parameters are not extracted as facts (no "parameter" `SymbolKind`); parameter-level analysis is handled by `normalize-scope` via `locals.scm` queries.

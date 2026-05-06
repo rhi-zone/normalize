@@ -1,7 +1,7 @@
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Serialize, de::DeserializeOwned};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 #[derive(Debug)]
 pub(crate) struct Error(String);
@@ -44,6 +44,7 @@ impl CaCache {
         conn.execute_batch(
             "PRAGMA journal_mode=WAL;
              PRAGMA synchronous=NORMAL;
+             PRAGMA busy_timeout=5000;
              CREATE TABLE IF NOT EXISTS ca_entries (
                hash      BLOB    NOT NULL,
                extr_ver  TEXT    NOT NULL,
@@ -114,13 +115,41 @@ impl CaCache {
         Ok(())
     }
 
-    /// Remove entries for outdated extractor versions. Call once at startup.
+    /// Remove extraction entries for outdated extractor versions. Call once at startup.
+    ///
+    /// Only removes entries whose `extr_ver` does not start with `"symbols-"` (those
+    /// belong to the symbol extraction cache and are managed separately). This lets
+    /// symbol cache entries survive across index rebuilds.
     pub(crate) fn gc_stale_versions(&self, current_extr_ver: &str) -> Result<usize, Error> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let deleted = conn.execute(
-            "DELETE FROM ca_entries WHERE extr_ver != ?1",
+            "DELETE FROM ca_entries WHERE extr_ver != ?1 AND extr_ver NOT LIKE 'symbols-%'",
             params![current_extr_ver],
         )?;
+        Ok(deleted)
+    }
+
+    /// Remove symbol cache entries for outdated symbol cache versions. Call once at startup.
+    ///
+    /// Removes all `"symbols-*"` entries except those matching the current symbol
+    /// cache version strings (`"symbols-v1-all"`, `"symbols-v1-public"`).
+    pub(crate) fn gc_stale_symbol_versions(
+        &self,
+        current_versions: &[&str],
+    ) -> Result<usize, Error> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        // Build a NOT IN clause for the current versions
+        let placeholders: String = current_versions
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "DELETE FROM ca_entries WHERE extr_ver LIKE 'symbols-%' AND extr_ver NOT IN ({placeholders})"
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let deleted = stmt.execute(rusqlite::params_from_iter(current_versions.iter()))?;
         Ok(deleted)
     }
 
@@ -174,6 +203,47 @@ fn unix_now() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0)
+}
+
+/// Global singleton for the symbol extraction cache used by `Extractor`.
+///
+/// Initialized lazily on first access. Uses the same SQLite DB as the
+/// content-addressed extraction cache. Returns `None` if the DB cannot be
+/// opened (non-fatal — callers fall through to live parsing).
+static SYMBOL_CACHE: OnceLock<Option<CaCache>> = OnceLock::new();
+
+/// Current symbol cache version strings. Bump these when the `Symbol` struct or
+/// post-processing logic changes in ways that invalidate cached results.
+pub(crate) const SYMBOL_CACHE_VERSIONS: &[&str] = &["symbols-v1-all", "symbols-v1-public"];
+
+/// Get the global symbol cache singleton.
+///
+/// Returns `None` if the cache could not be opened (e.g., no write permission
+/// to `~/.config/normalize/`). Callers should treat `None` as a cache miss
+/// and proceed with live parsing.
+pub(crate) fn symbol_cache() -> Option<&'static CaCache> {
+    SYMBOL_CACHE
+        .get_or_init(|| {
+            let path = CaCache::default_path();
+            match CaCache::open(&path, 512 * 1024 * 1024) {
+                Ok(cache) => {
+                    // GC stale symbol cache entries at singleton init (best-effort).
+                    if let Err(e) = cache.gc_stale_symbol_versions(SYMBOL_CACHE_VERSIONS) {
+                        tracing::debug!("normalize-facts: symbol cache GC error: {}", e);
+                    }
+                    Some(cache)
+                }
+                Err(e) => {
+                    tracing::debug!(
+                        "normalize-facts: symbol cache unavailable at {}: {}",
+                        path.display(),
+                        e
+                    );
+                    None
+                }
+            }
+        })
+        .as_ref()
 }
 
 #[cfg(test)]

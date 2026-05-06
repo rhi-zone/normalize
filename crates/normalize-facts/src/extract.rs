@@ -12,6 +12,7 @@
 //! After extraction, post-processing steps apply (Rust impl-block merging,
 //! TypeScript/JavaScript interface marking).
 
+use crate::ca_cache;
 use crate::parsers;
 use normalize_facts_core::SymbolKind;
 use normalize_languages::{Language, Symbol, Visibility, support_for_path};
@@ -285,6 +286,36 @@ impl Extractor {
         current_file: &str,
     ) -> Vec<Symbol> {
         let grammar_name = support.grammar_name();
+
+        // Cache version encodes the extraction schema and include_private flag.
+        // Bump this string whenever the Symbol struct, post-processing, or query
+        // semantics change in a way that invalidates existing cached results.
+        // Cross-file resolver results are not cached (resolver.is_none() guard below).
+        let cache_ver = if self.options.include_private {
+            "symbols-v1-all"
+        } else {
+            "symbols-v1-public"
+        };
+
+        // Check the persistent symbol cache before parsing (only when no cross-file
+        // resolver is involved, as resolver results depend on other files).
+        if resolver.is_none()
+            && let Some(cache) = ca_cache::symbol_cache()
+        {
+            let hash = blake3::hash(content.as_bytes());
+            match cache.get::<Vec<Symbol>>(hash.as_bytes(), cache_ver, grammar_name) {
+                Ok(Some(cached)) => return cached,
+                Ok(None) => {} // cache miss — fall through to parse
+                Err(e) => {
+                    tracing::debug!(
+                        "normalize-facts: symbol cache get error for {}: {}",
+                        current_file,
+                        e
+                    );
+                }
+            }
+        }
+
         let tree = match parsers::parse_with_grammar(grammar_name, content) {
             Some(t) => t,
             None => return Vec::new(),
@@ -323,6 +354,21 @@ impl Extractor {
         // Post-process for TypeScript/JavaScript: mark interface implementations
         if grammar_name == "typescript" || grammar_name == "javascript" {
             Self::mark_interface_implementations(&mut symbols, resolver, current_file);
+        }
+
+        // Store in the persistent symbol cache (only when no cross-file resolver
+        // was used, so the result is fully content-addressed).
+        if resolver.is_none()
+            && let Some(cache) = ca_cache::symbol_cache()
+        {
+            let hash = blake3::hash(content.as_bytes());
+            if let Err(e) = cache.put(hash.as_bytes(), cache_ver, grammar_name, &symbols) {
+                tracing::debug!(
+                    "normalize-facts: symbol cache put error for {}: {}",
+                    current_file,
+                    e
+                );
+            }
         }
 
         symbols

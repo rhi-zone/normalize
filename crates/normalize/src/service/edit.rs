@@ -1580,6 +1580,24 @@ impl EditService {
     }
 }
 
+// ── Daemon notification ───────────────────────────────────────────────────────
+
+/// After writing refactoring edits to disk, notify the daemon to re-index the
+/// changed files immediately rather than waiting for inotify. Best-effort and
+/// non-fatal: if the daemon is not running, this is a silent no-op.
+fn notify_daemon_after_edit(root: &Path, modified_rel: &[String]) {
+    if modified_rel.is_empty() {
+        return;
+    }
+    let abs_paths: Vec<PathBuf> = modified_rel.iter().map(|rel| root.join(rel)).collect();
+    let client = crate::daemon::DaemonClient::new();
+    if let Err(e) = client.notify_files_changed(root, &abs_paths) {
+        tracing::debug!("notify_daemon_after_edit: {}", e);
+    }
+}
+
+// ── rename ────────────────────────────────────────────────────────────────────
+
 /// Rename a symbol across its definition, all call sites, and all import statements.
 ///
 /// Uses the facts index to find callers and importers. Falls back gracefully if the
@@ -1656,6 +1674,10 @@ async fn do_rename(
     };
 
     let modified = executor.apply(&plan)?;
+
+    if !dry_run {
+        notify_daemon_after_edit(&root, &modified);
+    }
 
     Ok(EditResult {
         success: true,
@@ -1776,7 +1798,11 @@ fn do_introduce_variable(
         shadow_enabled,
         message: message.map(String::from),
     };
-    executor.apply(&outcome.plan)?;
+    let modified = executor.apply(&outcome.plan)?;
+
+    if !dry_run {
+        notify_daemon_after_edit(&root, &modified);
+    }
 
     Ok(IntroduceVariableReport {
         file: rel_path,
@@ -1926,7 +1952,11 @@ fn do_inline_variable(
         shadow_enabled,
         message: message.map(String::from),
     };
-    executor.apply(&outcome.plan)?;
+    let modified = executor.apply(&outcome.plan)?;
+
+    if !dry_run {
+        notify_daemon_after_edit(&root, &modified);
+    }
 
     Ok(InlineVariableReport {
         file: rel_path,
@@ -2117,7 +2147,11 @@ async fn do_add_parameter(
         shadow_enabled,
         message: message.map(String::from),
     };
-    executor.apply(&outcome.plan)?;
+    let modified = executor.apply(&outcome.plan)?;
+
+    if !dry_run {
+        notify_daemon_after_edit(&root, &modified);
+    }
 
     Ok(AddParameterReport {
         function_file: rel_path,
@@ -2295,6 +2329,10 @@ async fn do_move(
 
     let modified = executor.apply(&outcome.plan)?;
 
+    if !dry_run {
+        notify_daemon_after_edit(&root, &modified);
+    }
+
     Ok(MoveReport {
         symbol: outcome.symbol,
         from_file: outcome.from_file,
@@ -2424,6 +2462,10 @@ async fn do_inline_function(
     };
 
     let modified = executor.apply(&outcome.plan)?;
+
+    if !dry_run {
+        notify_daemon_after_edit(&root, &modified);
+    }
 
     Ok(InlineFunctionReport {
         function_name: outcome.function_name,
