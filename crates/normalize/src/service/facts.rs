@@ -48,7 +48,8 @@ pub struct RebuildReport {
     /// Number of co-change edge pairs written during this rebuild.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub co_change_edges: Option<usize>,
-    /// Number of symbol embeddings generated (only set when embeddings.enabled = true).
+    /// Total embeddings generated across all source types (symbol, doc, commit).
+    /// Only set when embeddings.enabled = true.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub embeddings: Option<usize>,
     /// Whether this was an incremental rebuild (true) or a full rebuild (false).
@@ -614,19 +615,15 @@ async fn rebuild_data(
     if embeddings_config.enabled {
         // Resolve HEAD commit for incremental invalidation tracking.
         let head_commit = resolve_head_sha(&root);
-        // For incremental rebuilds, only re-embed changed files.
-        let changed: Option<Vec<String>> = if full {
-            None
-        } else {
-            // Collect changed paths from the incremental walk (not easily available here;
-            // use None to let populate handle it via the last_commit comparison).
-            None
-        };
         let db_path = root.join(".normalize").join("index.sqlite");
+
+        let mut total_embedded = 0usize;
+
+        // 1. Symbol embeddings
         match normalize_semantic::populate_embeddings(
             idx.connection(),
             &embeddings_config,
-            changed.as_deref(),
+            None, // always full rebuild here (incremental via daemon)
             head_commit.as_deref(),
             Some(&root),
             Some(&db_path),
@@ -634,13 +631,44 @@ async fn rebuild_data(
         .await
         {
             Ok(stats) => {
-                if stats.symbols_embedded > 0 || full {
-                    result.embeddings = Some(stats.symbols_embedded);
-                }
+                total_embedded += stats.symbols_embedded;
             }
             Err(e) => {
-                tracing::warn!("embedding population failed (non-fatal): {}", e);
+                tracing::warn!("symbol embedding failed (non-fatal): {}", e);
             }
+        }
+
+        // 2. Markdown doc embeddings
+        match normalize_semantic::populate_markdown_docs(
+            idx.connection(),
+            &embeddings_config,
+            &root,
+            head_commit.as_deref(),
+            Some(&db_path),
+        )
+        .await
+        {
+            Ok(stats) => total_embedded += stats.docs_embedded,
+            Err(e) => tracing::warn!("markdown doc embedding failed (non-fatal): {}", e),
+        }
+
+        // 3. Commit message embeddings (last 500 commits)
+        match normalize_semantic::populate_commit_messages(
+            idx.connection(),
+            &embeddings_config,
+            &root,
+            head_commit.as_deref(),
+            Some(&db_path),
+            normalize_semantic::DEFAULT_MAX_COMMITS,
+        )
+        .await
+        {
+            Ok(stats) => total_embedded += stats.commits_embedded,
+            Err(e) => tracing::warn!("commit message embedding failed (non-fatal): {}", e),
+        }
+
+        if total_embedded > 0 || full {
+            result.embeddings = Some(total_embedded);
         }
     }
 

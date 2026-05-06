@@ -7,19 +7,22 @@
 //!
 //! ## Architecture
 //!
-//! - **[`config`]** — `EmbeddingsConfig` (`[embeddings]` section of config.toml)
-//! - **[`chunks`]** — context window construction from index rows
-//! - **[`embedder`]** — fastembed wrapper (ONNX, no server required)
-//! - **[`schema`]** — SQLite DDL for the `embeddings` table
-//! - **[`store`]** — read/write embeddings to/from SQLite
-//! - **[`search`]** — ANN search + staleness re-ranking
-//! - **[`populate`]** — walk the structural index and embed all symbols
-//! - **[`service`]** — CLI service (`normalize structure search`) — `cli` feature
+//! - **[`config`]** -- `EmbeddingsConfig` (`[embeddings]` section of config.toml)
+//! - **[`chunks`]** -- context window construction from index rows
+//! - **[`embedder`]** -- fastembed wrapper (ONNX, no server required)
+//! - **[`schema`]** -- SQLite DDL for the `embeddings` table
+//! - **[`store`]** -- read/write embeddings to/from SQLite
+//! - **[`search`]** -- ANN search + staleness re-ranking
+//! - **[`populate`]** -- walk the structural index and embed symbols, docs, and commits
+//! - **[`service`]** -- CLI service (`normalize structure search`) -- `cli` feature
 //!
 //! ## Usage
 //!
 //! After `structure rebuild`, call [`populate::populate_embeddings`] with the
 //! active `FileIndex` connection to generate and store embeddings.
+//!
+//! For markdown and commit embeddings, call [`populate::populate_markdown_docs`]
+//! and [`populate::populate_commit_messages`] respectively.
 //!
 //! To search, call [`service::SemanticService::search`] (CLI) or use
 //! [`store::load_all_embeddings`] + [`search::rerank`] directly.
@@ -39,7 +42,10 @@ pub mod service;
 
 // Re-export the key public types for convenience.
 pub use config::EmbeddingsConfig;
-pub use populate::{PopulateStats, populate_embeddings};
+pub use populate::{
+    DEFAULT_MAX_COMMITS, PopulateStats, populate_commit_messages, populate_embeddings,
+    populate_incremental_for_paths, populate_markdown_docs,
+};
 pub use search::SearchHit;
 
 use libsql::Connection;

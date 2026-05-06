@@ -237,22 +237,23 @@ pub fn copy_tree_incremental(
         let dest_path = dest_root.join(rel);
 
         // Incremental: check hash unless --force
-        if !force && !dry_run {
-            if let Some(src_hash) = hash_file(src_path) {
-                if manifest
-                    .files
-                    .get(&rel_key)
-                    .map(|h| h == &src_hash)
-                    .unwrap_or(false)
-                {
-                    unchanged += 1;
-                    // Keep existing manifest entry
-                    new_entries.insert(rel_key, src_hash);
-                    continue;
-                }
-                // Will copy — record hash
-                new_entries.insert(rel_key.clone(), src_hash);
+        if !force
+            && !dry_run
+            && let Some(src_hash) = hash_file(src_path)
+        {
+            if manifest
+                .files
+                .get(&rel_key)
+                .map(|h| h == &src_hash)
+                .unwrap_or(false)
+            {
+                unchanged += 1;
+                // Keep existing manifest entry
+                new_entries.insert(rel_key, src_hash);
+                continue;
             }
+            // Will copy — record hash
+            new_entries.insert(rel_key.clone(), src_hash);
         }
 
         if verbose {
