@@ -29,15 +29,15 @@
 
 ; Parameters
 (parameter_declaration
-  declarator: (identifier) @local.definition)
+  declarator: (identifier) @local.definition.parameter)
 
 (parameter_declaration
   declarator: (pointer_declarator
-    declarator: (identifier) @local.definition))
+    declarator: (identifier) @local.definition.parameter))
 
 (parameter_declaration
   declarator: (reference_declarator
-    (identifier) @local.definition))
+    (identifier) @local.definition.parameter))
 
 ; Local variable declarations (simple)
 (declaration

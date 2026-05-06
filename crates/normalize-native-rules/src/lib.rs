@@ -10,6 +10,7 @@ pub mod budget;
 pub mod cache;
 pub mod check_examples;
 pub mod check_refs;
+pub mod dead_parameter;
 pub mod high_complexity;
 pub mod high_fan_in;
 pub mod high_fan_out;
@@ -31,6 +32,7 @@ pub use boundary_violations::{
 pub use budget::{BudgetRulesReport, build_budget_report};
 pub use check_examples::build_check_examples_report;
 pub use check_refs::build_check_refs_report;
+pub use dead_parameter::build_dead_parameter_report;
 pub use high_complexity::build_high_complexity_report;
 pub use high_fan_in::build_high_fan_in_report;
 pub use high_fan_out::build_high_fan_out_report;
@@ -229,6 +231,13 @@ pub const NATIVE_RULES: &[NativeRuleDescriptor] = &[
         default_severity: "warning",
         message: "Function exceeds line count threshold (default: 100 lines)",
         tags: &["quality"],
+        default_enabled: false,
+    },
+    NativeRuleDescriptor {
+        id: "dead-parameter",
+        default_severity: "warning",
+        message: "Function parameter is never used in the function body",
+        tags: &["correctness", "unused"],
         default_enabled: false,
     },
 ];

@@ -8,6 +8,7 @@ description = "Native rule checks for normalize (stale-summary, check-refs, stal
 
 [dependencies]
 normalize-rules-config = { path = "../normalize-rules-config", version = "0.2.0" }
+normalize-scope = { path = "../normalize-scope", version = "0.2.0" }
 normalize-output = { path = "../normalize-output", version = "0.2.0" }
 normalize-facts = { path = "../normalize-facts", version = "0.2.0" }
 normalize-languages = { path = "../normalize-languages", version = "0.2.0" }

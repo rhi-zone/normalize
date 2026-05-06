@@ -26,11 +26,11 @@
 
 ; Function and method parameters
 (parameter_declaration
-  name: (identifier) @local.definition)
+  name: (identifier) @local.definition.parameter)
 
 ; Variadic parameter
 (variadic_parameter_declaration
-  name: (identifier) @local.definition)
+  name: (identifier) @local.definition.parameter)
 
 ; Short variable declarations (:=)
 (short_var_declaration

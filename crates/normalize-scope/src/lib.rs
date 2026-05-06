@@ -80,6 +80,13 @@ pub struct Reference {
 pub struct Definition {
     pub name: String,
     pub location: Location,
+    /// Sub-kind of the definition, derived from the capture name suffix.
+    ///
+    /// `@local.definition` → `None`
+    /// `@local.definition.parameter` → `Some("parameter")`
+    /// `@local.definition.function` → `Some("function")`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
 }
 
 /// Scope analysis engine backed by tree-sitter locals queries.
@@ -112,6 +119,7 @@ impl<'a> ScopeEngine<'a> {
             .map(|d| Definition {
                 name: d.name,
                 location: d.location,
+                kind: d.kind,
             })
             .collect()
     }
@@ -142,6 +150,44 @@ impl<'a> ScopeEngine<'a> {
             .map(|d| Definition {
                 name: d.name,
                 location: d.location,
+                kind: d.kind,
+            })
+            .collect()
+    }
+
+    /// Find parameters that are never referenced in their enclosing function body.
+    ///
+    /// Returns definitions whose `kind` is `"parameter"` and whose `name` has no
+    /// resolved reference in the same file. Underscore-prefixed names (`_`, `_foo`)
+    /// are excluded — those are the conventional way to mark intentionally unused
+    /// parameters in most languages.
+    ///
+    /// Requires `@local.definition.parameter` captures in the language's `locals.scm`.
+    /// Languages without that capture produce an empty result.
+    pub fn find_unused_parameters(&self, lang: &str, source: &str) -> Vec<Definition> {
+        let Some(analysis) = self.analyze(lang, source) else {
+            return Vec::new();
+        };
+
+        // Build a set of names that have at least one resolved reference.
+        let referenced_names: std::collections::HashSet<&str> = analysis
+            .references
+            .iter()
+            .filter(|r| r.definition.is_some())
+            .map(|r| r.name.as_str())
+            .collect();
+
+        analysis
+            .definitions
+            .into_iter()
+            .filter(|d| d.kind.as_deref() == Some("parameter"))
+            // Underscore-prefixed names are intentionally unused by convention.
+            .filter(|d| !d.name.starts_with('_'))
+            .filter(|d| !referenced_names.contains(d.name.as_str()))
+            .map(|d| Definition {
+                name: d.name,
+                location: d.location,
+                kind: d.kind,
             })
             .collect()
     }
@@ -212,14 +258,21 @@ impl<'a> ScopeEngine<'a> {
                         end_byte: node.end_byte(),
                     });
                 } else if name.starts_with("local.definition") {
+                    // Extract subkind: "local.definition.parameter" → Some("parameter")
+                    let kind = name
+                        .strip_prefix("local.definition.")
+                        .filter(|s| !s.is_empty())
+                        .map(|s| s.to_string());
                     raw_defs.push(RawCapture {
                         name: text.to_string(),
                         location: loc,
+                        kind,
                     });
                 } else if name == "local.reference" {
                     raw_refs.push(RawCapture {
                         name: text.to_string(),
                         location: loc,
+                        kind: None,
                     });
                 }
             }
@@ -318,6 +371,8 @@ struct ScopeRange {
 struct RawCapture {
     name: String,
     location: Location,
+    /// Sub-kind extracted from the capture name (e.g. "parameter" from "local.definition.parameter").
+    kind: Option<String>,
 }
 
 /// Resolve a reference to its definition by walking up the scope chain.
@@ -386,6 +441,7 @@ fn collect_binding_identifiers(
                     start_byte: node.start_byte(),
                     end_byte: node.end_byte(),
                 },
+                kind: None,
             });
         }
     } else {

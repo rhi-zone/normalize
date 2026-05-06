@@ -1115,7 +1115,10 @@ incremental evaluation so they're fast enough for pre-commit use:
 - [x] New fact rules: `missing-test` (exported function with no test calling it) and
   `stale-mock` (test mock references a function that no longer exists) — both added,
   disabled by default, attribute-based detection.
-- [ ] New fact rule: `dead-parameter` (param never read in any call path, needs scope).
+- [x] New fact rule: `dead-parameter` — implemented as a **native rule** (not Datalog) using
+  `normalize-scope`'s `ScopeEngine::find_unused_parameters()` since parameters are not in the
+  facts schema. Requires `@local.definition.parameter` in `locals.scm`; added for Rust, Python,
+  JS, TS, TSX, Go, Java, C, C++, C#. Underscore-prefixed params excluded. Default disabled.
 - JIT fix and incremental eval wiring moved to 0.2.0 blockers.
 
 **Rules engine architecture — drop abi_stable, external process + rkyv for custom rules**

@@ -21,11 +21,11 @@
 
 ; Function parameters
 (parameter
-  pattern: (identifier) @local.definition)
+  pattern: (identifier) @local.definition.parameter)
 
 ; Closure parameters
 (closure_parameters
-  (identifier) @local.definition)
+  (identifier) @local.definition.parameter)
 
 ; Let bindings (simple identifier pattern)
 (let_declaration

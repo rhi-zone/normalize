@@ -703,6 +703,7 @@ impl RulesService {
             let run_boundary_violations = is_native_enabled("boundary-violations");
             let run_high_fan_out = is_native_enabled("high-fan-out");
             let run_high_fan_in = is_native_enabled("high-fan-in");
+            let run_dead_parameter = is_native_enabled("dead-parameter");
 
             let boundary_cfg: normalize_native_rules::BoundaryViolationsConfig = native_config
                 .rules
@@ -929,6 +930,7 @@ impl RulesService {
 
             // Advisory rules (default disabled — only run when explicitly enabled).
             // long-file / high-complexity / long-function are tree-sitter-heavy.
+            // dead-parameter uses the scope engine (locals.scm queries).
             // stale-doc, boundary-violations, high-fan-out, and high-fan-in require the index.
             let (
                 long_file_res,
@@ -938,6 +940,7 @@ impl RulesService {
                 boundary_violations_res,
                 high_fan_out_res,
                 high_fan_in_res,
+                dead_parameter_res,
             ) = tokio::join!(
                 async {
                     if !run_long_file {
@@ -1061,6 +1064,26 @@ impl RulesService {
                     eprintln!("[timings] high-fan-in: {:.1?}", t.elapsed());
                     Some(r)
                 },
+                async {
+                    if !run_dead_parameter {
+                        return None;
+                    }
+                    let root = native_root.clone();
+                    let ef = effective_files.clone();
+                    let wc = native_config.walk.clone();
+                    let t = std::time::Instant::now();
+                    let r = tokio::task::spawn_blocking(move || {
+                        normalize_native_rules::build_dead_parameter_report(
+                            &root,
+                            ef.as_deref(),
+                            &wc,
+                        )
+                    })
+                    .await
+                    .ok();
+                    eprintln!("[timings] dead-parameter: {:.1?}", t.elapsed());
+                    r
+                },
             );
 
             if let Some(r) = long_file_res {
@@ -1082,6 +1105,9 @@ impl RulesService {
                 report.merge(r);
             }
             if let Some(r) = high_fan_in_res {
+                report.merge(r);
+            }
+            if let Some(r) = dead_parameter_res {
                 report.merge(r);
             }
 

@@ -29,14 +29,27 @@
 (identifier) @local.binding-leaf
 (shorthand_property_identifier_pattern) @local.binding-leaf
 
-; Function parameters — @local.definition.each recurses into each direct child of
-; formal_parameters and collects all binding leaf nodes at any nesting depth.
+; Simple identifier parameters — captured as .parameter so the dead-parameter rule works.
 (formal_parameters
-  (_) @local.definition.each)
+  (identifier) @local.definition.parameter)
+
+; Default-valued parameters where the binding name is a simple identifier.
+(formal_parameters
+  (assignment_pattern
+    left: (identifier) @local.definition.parameter))
+
+; Destructured and rest parameters — recurse into pattern leaves (no subkind since
+; the recursion can't propagate one; these won't be reported as dead).
+(formal_parameters
+  (object_pattern) @local.definition.each)
+(formal_parameters
+  (array_pattern) @local.definition.each)
+(formal_parameters
+  (rest_pattern) @local.definition.each)
 
 ; Arrow function single parameter (no parentheses)
 (arrow_function
-  parameter: (identifier) @local.definition)
+  parameter: (identifier) @local.definition.parameter)
 
 ; Catch clause parameter
 (catch_clause
