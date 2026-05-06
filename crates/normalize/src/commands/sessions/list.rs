@@ -87,6 +87,11 @@ impl SessionListReport {
         self.sessions.is_empty()
     }
 
+    /// Retain only sessions whose ID is in `ids` (when `keep=true`) or not in `ids` (when `keep=false`).
+    pub fn filter_by_ids(&mut self, ids: &std::collections::HashSet<String>, keep: bool) {
+        self.sessions.retain(|s| ids.contains(&s.id) == keep);
+    }
+
     /// Returns true if sessions span more than one project.
     fn is_multi_project(&self) -> bool {
         let projects: HashSet<Option<&str>> =

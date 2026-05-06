@@ -2,6 +2,7 @@
 
 pub mod analyze;
 pub mod list;
+pub mod mark;
 pub mod messages;
 pub mod patterns;
 pub mod plans;
@@ -12,6 +13,7 @@ pub mod sort;
 pub mod stats;
 
 pub use list::{SessionListReport, build_session_list};
+pub use mark::{MarkReport, load_reviewed, mark_session, unmark_session};
 pub use messages::{MessagesReport, build_messages_report};
 pub use patterns::{PatternsReport, build_patterns_report};
 pub use plans::{PlanContent, PlansListReport, build_plan_content, build_plans_list};

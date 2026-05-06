@@ -2,8 +2,8 @@
 
 use super::resolve_pretty;
 use crate::commands::sessions::{
-    MessagesReport, PatternsReport, PlanContent, PlansListReport, SessionListReport, SessionMode,
-    SessionShowReport, SubagentsReport,
+    MarkReport, MessagesReport, PatternsReport, PlanContent, PlansListReport, SessionListReport,
+    SessionMode, SessionShowReport, SubagentsReport,
 };
 use crate::output::OutputFormatter;
 use crate::sessions::SessionAnalysisReport;
@@ -81,6 +81,8 @@ impl SessionsService {
     ///   normalize sessions list --agent-type Explore  # only Explore agents
     ///   normalize sessions list --sort duration       # longest sessions first
     ///   normalize sessions list --sort +name          # alphabetical by session name
+    ///   normalize sessions list --reviewed            # only sessions marked as reviewed
+    ///   normalize sessions list --unreviewed          # only sessions not yet reviewed
     #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn list(
@@ -107,6 +109,8 @@ impl SessionsService {
             help = "Sort keys (comma-separated, prefix with - for desc or + for asc): date, duration, name. E.g. duration, +name, -date"
         )]
         sort: Option<String>,
+        #[param(help = "Only show sessions marked as reviewed")] reviewed: bool,
+        #[param(help = "Only show sessions not yet reviewed")] unreviewed: bool,
         pretty: bool,
         compact: bool,
     ) -> Result<SessionListReport, String> {
@@ -117,7 +121,7 @@ impl SessionsService {
         self.pretty
             .set(resolve_pretty(resolved_root, pretty, compact));
         let mode = mode.unwrap_or_default();
-        crate::commands::sessions::build_session_list(
+        let mut report = crate::commands::sessions::build_session_list(
             root_path,
             limit,
             format.as_deref(),
@@ -130,7 +134,13 @@ impl SessionsService {
             &mode,
             agent_type.as_deref(),
             sort.as_deref(),
-        )
+        )?;
+        // Apply reviewed/unreviewed filter after building the list.
+        if reviewed || unreviewed {
+            let ids = crate::commands::sessions::load_reviewed(root_path);
+            report.filter_by_ids(&ids, reviewed);
+        }
+        Ok(report)
     }
 
     /// Show a specific session (summary or full conversation)
@@ -316,6 +326,11 @@ impl SessionsService {
     ///   normalize sessions messages --sort timestamp               # chronological across sessions
     ///   normalize sessions messages --sort +session,-tokens        # by session asc, then tokens desc
     ///   normalize sessions messages --sequence Grep,Grep,Read      # turns where Grep,Grep,Read ran consecutively
+    ///   normalize sessions messages --has-tool Bash                # turns that used Bash
+    ///   normalize sessions messages --errors-only                  # turns with tool errors
+    ///   normalize sessions messages --exclude-interrupted          # skip interrupted turns
+    ///   normalize sessions messages --turn-range 5-10             # turns 5 through 10 only
+    ///   normalize sessions messages --min-chars 100               # messages with at least 100 chars
     #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn messages(
@@ -359,6 +374,16 @@ impl SessionsService {
             help = "Number of context turns to include around each sequence match (requires --sequence, default 1)"
         )]
         context_turns: Option<usize>,
+        #[param(help = "Only turns that used the named tool (case-insensitive prefix match)")]
+        has_tool: Option<String>,
+        #[param(help = "Only turns with tool errors")] errors_only: bool,
+        #[param(help = "Skip turns containing [Request interrupted by user]")]
+        exclude_interrupted: bool,
+        #[param(help = "Positional turn range within each session, e.g. 5-10")] turn_range: Option<
+            String,
+        >,
+        #[param(help = "Minimum message length in characters")] min_chars: Option<usize>,
+        #[param(help = "Maximum message length in characters")] max_chars: Option<usize>,
         pretty: bool,
         compact: bool,
     ) -> Result<MessagesReport, String> {
@@ -383,6 +408,33 @@ impl SessionsService {
         }
         let ctx_turns = context_turns.unwrap_or(0);
         let mode = mode.unwrap_or_default();
+        // Parse --turn-range N-M
+        let turn_range_parsed = turn_range
+            .as_deref()
+            .map(|s| {
+                let parts: Vec<&str> = s.splitn(2, '-').collect();
+                if parts.len() == 2 {
+                    let start = parts[0]
+                        .parse::<usize>()
+                        .map_err(|_| format!("Invalid turn-range start: '{}'", parts[0]))?;
+                    let end = parts[1]
+                        .parse::<usize>()
+                        .map_err(|_| format!("Invalid turn-range end: '{}'", parts[1]))?;
+                    if start > end {
+                        return Err(format!(
+                            "turn-range start ({}) must be <= end ({})",
+                            start, end
+                        ));
+                    }
+                    Ok((start, end))
+                } else {
+                    Err(format!(
+                        "Invalid turn-range '{}': expected format N-M (e.g. 5-10)",
+                        s
+                    ))
+                }
+            })
+            .transpose()?;
         crate::commands::sessions::build_messages_report(
             root_path,
             limit,
@@ -402,6 +454,12 @@ impl SessionsService {
             agent_type.as_deref(),
             sequence_vec.as_deref(),
             ctx_turns,
+            has_tool.as_deref(),
+            errors_only,
+            exclude_interrupted,
+            turn_range_parsed,
+            min_chars,
+            max_chars,
         )
     }
 
@@ -519,5 +577,37 @@ impl SessionsService {
                 Ok(PlansReport::List(list))
             }
         }
+    }
+
+    /// Mark a session as reviewed (stores ID in `.normalize/sessions-reviewed`)
+    ///
+    /// Examples:
+    ///   normalize sessions mark abc123               # mark session as reviewed
+    #[cli(display_with = "display_output")]
+    pub fn mark(
+        &self,
+        #[param(positional, help = "Session ID to mark as reviewed")] session: String,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+    ) -> Result<MarkReport, String> {
+        let root_path = root.as_deref().map(std::path::Path::new);
+        crate::commands::sessions::mark_session(&session, root_path)
+    }
+
+    /// Remove a session from the reviewed list
+    ///
+    /// Examples:
+    ///   normalize sessions unmark abc123             # remove reviewed mark from session
+    #[cli(display_with = "display_output")]
+    pub fn unmark(
+        &self,
+        #[param(positional, help = "Session ID to unmark")] session: String,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+    ) -> Result<MarkReport, String> {
+        let root_path = root.as_deref().map(std::path::Path::new);
+        crate::commands::sessions::unmark_session(&session, root_path)
     }
 }

@@ -664,6 +664,46 @@ fn tool_name_matches(name: &str, pattern: &str) -> bool {
     name.to_lowercase().starts_with(&pattern.to_lowercase())
 }
 
+/// Returns true if the turn passes all turn-level filters.
+fn turn_passes_filters(
+    turn: &Turn,
+    turn_idx: usize,
+    turn_range: Option<(usize, usize)>,
+    has_tool: Option<&str>,
+    errors_only: bool,
+) -> bool {
+    // Turn range filter.
+    if let Some((start, end)) = turn_range
+        && (turn_idx < start || turn_idx > end)
+    {
+        return false;
+    }
+    // --has-tool: at least one ToolUse block in the turn matching the pattern.
+    if let Some(tool_pat) = has_tool {
+        let has = turn.messages.iter().any(|m| {
+            m.content.iter().any(|c| {
+                matches!(c, ContentBlock::ToolUse { name, .. }
+                    if tool_name_matches(name, tool_pat))
+            })
+        });
+        if !has {
+            return false;
+        }
+    }
+    // --errors-only: at least one ToolResult with is_error=true.
+    if errors_only {
+        let has_error = turn.messages.iter().any(|m| {
+            m.content
+                .iter()
+                .any(|c| matches!(c, ContentBlock::ToolResult { is_error: true, .. }))
+        });
+        if !has_error {
+            return false;
+        }
+    }
+    true
+}
+
 /// Given a session's turns and a tool call sequence pattern, return a sorted, deduplicated
 /// set of turn indices that should be included in the output (matching turns plus context).
 fn find_sequence_turn_indices(
@@ -756,6 +796,12 @@ pub fn build_messages_report(
     agent_type: Option<&str>,
     sequence: Option<&[String]>,
     context_turns: usize,
+    has_tool: Option<&str>,
+    errors_only: bool,
+    exclude_interrupted: bool,
+    turn_range: Option<(usize, usize)>,
+    min_chars: Option<usize>,
+    max_chars: Option<usize>,
 ) -> Result<MessagesReport, String> {
     use super::stats::list_all_project_sessions_by_mode;
 
@@ -882,6 +928,11 @@ pub fn build_messages_report(
                 continue;
             }
 
+            // Turn-level filters (range, has-tool, errors-only).
+            if !turn_passes_filters(turn, turn_idx, turn_range, has_tool, errors_only) {
+                continue;
+            }
+
             for msg in &turn.messages {
                 // Role filter
                 let role_str = msg.role.to_string();
@@ -923,6 +974,23 @@ pub fn build_messages_report(
                     .join("\n");
 
                 if text.is_empty() {
+                    continue;
+                }
+
+                // --exclude-interrupted filter: skip messages that are just an interruption notice.
+                if exclude_interrupted && text.contains("[Request interrupted by user]") {
+                    continue;
+                }
+
+                // --min-chars / --max-chars filters
+                if let Some(min) = min_chars
+                    && text.len() < min
+                {
+                    continue;
+                }
+                if let Some(max) = max_chars
+                    && text.len() > max
+                {
                     continue;
                 }
 
