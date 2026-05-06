@@ -1857,6 +1857,202 @@ mod unix_impl {
             self.rebuild_per_file_diagnostics(root);
         }
 
+        /// Tier 2 surgical config invalidation: re-run only the affected rules.
+        ///
+        /// Called when [`ConfigDiff`] has a non-empty `rules_to_rerun` set but
+        /// `requires_full_reprime()` is false (i.e. `[walk] exclude` didn't
+        /// change, so the file set is the same). For each affected rule ID:
+        ///
+        /// 1. Re-run the rule through whichever engines can handle it (syntax,
+        ///    fact, native) using the existing per-engine filter_ids path.
+        /// 2. Load the current per-engine blob, strip findings for the affected
+        ///    rule IDs, merge the new findings.
+        /// 3. Save updated per-engine blobs, rebuild the "all" blob and per-file
+        ///    rows, broadcast a `DiagnosticsUpdated` event.
+        fn surgical_rerun_rules(
+            &self,
+            root: &Path,
+            rules_to_rerun: &HashSet<String>,
+            new_rules: normalize_rules_config::RulesConfig,
+            new_walk: normalize_rules_config::WalkConfig,
+        ) {
+            tracing::info!(
+                root = ?root,
+                rules = rules_to_rerun.len(),
+                "config reload: Tier 2 surgical per-rule re-eval"
+            );
+
+            let config_hash = compute_config_hash(root);
+
+            // Re-run syntax rules filtered to the affected rule IDs.
+            let new_syntax_for_rules: Vec<normalize_output::diagnostics::Issue> = {
+                let root_owned = root.to_path_buf();
+                let rules_config = new_rules.clone();
+                let walk_config = new_walk.clone();
+                let filter_ids = rules_to_rerun.clone();
+                std::thread::Builder::new()
+                    .stack_size(64 * 1024 * 1024)
+                    .spawn(move || {
+                        let debug_flags = normalize_syntax_rules::DebugFlags::default();
+                        let path_filter = normalize_rules_config::PathFilter::default();
+                        let findings = normalize_rules::cmd_rules::run_syntax_rules(
+                            &root_owned,
+                            &root_owned,
+                            None,
+                            None,
+                            Some(&filter_ids),
+                            &rules_config,
+                            &debug_flags,
+                            None,
+                            &path_filter,
+                            &walk_config,
+                        );
+                        findings
+                            .iter()
+                            .map(|f| normalize_rules::finding_to_issue(f, &root_owned))
+                            .collect()
+                    })
+                    .expect("failed to spawn Tier 2 syntax thread")
+                    .join()
+                    .expect("Tier 2 syntax thread panicked")
+            };
+
+            // Re-run fact rules filtered to the affected rule IDs.
+            let new_fact_for_rules: Vec<normalize_output::diagnostics::Issue> = {
+                let root_owned = root.to_path_buf();
+                let rules_config = new_rules.clone();
+                let filter_ids = rules_to_rerun.clone();
+                let handle = self.runtime_handle.clone();
+                std::thread::Builder::new()
+                    .stack_size(64 * 1024 * 1024)
+                    .spawn(move || {
+                        let diagnostics =
+                            handle.block_on(normalize_rules::collect_fact_diagnostics_incremental(
+                                &root_owned,
+                                &rules_config,
+                                Some(&filter_ids),
+                                None,
+                                None,
+                            ));
+                        diagnostics
+                            .iter()
+                            .map(normalize_rules::abi_diagnostic_to_issue)
+                            .collect()
+                    })
+                    .expect("failed to spawn Tier 2 fact thread")
+                    .join()
+                    .expect("Tier 2 fact thread panicked")
+            };
+
+            // Re-run native rules and retain only the affected rule IDs.
+            let new_native_for_rules: Vec<normalize_output::diagnostics::Issue> = {
+                let root_owned = root.to_path_buf();
+                let rules_config = new_rules.clone();
+                let walk_config = new_walk.clone();
+                let handle = self.runtime_handle.clone();
+                let filter_ids = rules_to_rerun.clone();
+                std::thread::Builder::new()
+                    .stack_size(64 * 1024 * 1024)
+                    .spawn(move || {
+                        let mut all = handle.block_on(Self::run_native_rules(
+                            &root_owned,
+                            &rules_config,
+                            &walk_config,
+                        ));
+                        all.retain(|i| filter_ids.contains(&i.rule_id));
+                        all
+                    })
+                    .expect("failed to spawn Tier 2 native thread")
+                    .join()
+                    .expect("Tier 2 native thread panicked")
+            };
+
+            tracing::debug!(
+                root = ?root,
+                syntax = new_syntax_for_rules.len(),
+                fact = new_fact_for_rules.len(),
+                native = new_native_for_rules.len(),
+                "Tier 2: new findings for affected rules"
+            );
+
+            // For each engine blob: load existing, drop findings for the
+            // affected rule IDs, merge new findings, save.
+            let get_idx = || self.get_root_index(root);
+
+            for (engine, new_for_rules) in [
+                ("syntax", &new_syntax_for_rules),
+                ("fact", &new_fact_for_rules),
+                ("native", &new_native_for_rules),
+            ] {
+                let Some(idx_arc) = get_idx() else { continue };
+                let mut existing: Vec<normalize_output::diagnostics::Issue> = {
+                    let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
+                    match tokio::task::block_in_place(|| {
+                        self.runtime_handle
+                            .block_on(idx.load_diagnostics_blob(engine, &config_hash))
+                    }) {
+                        Ok(Some(blob)) => rkyv::from_bytes::<
+                            Vec<normalize_output::diagnostics::Issue>,
+                            rkyv::rancor::Error,
+                        >(&blob)
+                        .unwrap_or_default(),
+                        _ => Vec::new(),
+                    }
+                };
+                // Drop findings for rules that just re-ran.
+                existing.retain(|i| !rules_to_rerun.contains(&i.rule_id));
+                // Merge new findings.
+                existing.extend_from_slice(new_for_rules);
+                self.save_diagnostics_to_index(root, engine, &existing, &config_hash);
+            }
+
+            // Rebuild derived views.
+            self.rebuild_all_blob(root);
+            let delta = {
+                // Rebuild per-file table from the updated per-engine blobs.
+                // We delegate to rebuild_per_file_diagnostics which re-reads
+                // the blobs we just wrote and diffs against the existing rows.
+                let Some(idx_arc) = get_idx() else {
+                    return;
+                };
+                let mut syntax: Vec<normalize_output::diagnostics::Issue> = Vec::new();
+                let mut fact: Vec<normalize_output::diagnostics::Issue> = Vec::new();
+                let mut native: Vec<normalize_output::diagnostics::Issue> = Vec::new();
+                for (eng, sink) in [
+                    ("syntax", &mut syntax),
+                    ("fact", &mut fact),
+                    ("native", &mut native),
+                ] {
+                    let idx = idx_arc.lock().unwrap_or_else(|e| e.into_inner());
+                    if let Ok(Some(blob)) = tokio::task::block_in_place(|| {
+                        self.runtime_handle
+                            .block_on(idx.load_diagnostics_blob(eng, &config_hash))
+                    }) && let Ok(issues) = rkyv::from_bytes::<
+                        Vec<normalize_output::diagnostics::Issue>,
+                        rkyv::rancor::Error,
+                    >(&blob)
+                    {
+                        *sink = issues;
+                    }
+                }
+                let d = self.save_per_file_diagnostics(root, &syntax, &fact, &native, &config_hash);
+                self.write_json_mirror(root, &syntax, &fact, &native);
+                d
+            };
+
+            // Update the cached config snapshot.
+            {
+                let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(w) = roots.get_mut(root) {
+                    w.cached_rules = Arc::new(new_rules);
+                    w.cached_walk = Arc::new(new_walk);
+                    w.serve_filter_pending = false;
+                }
+            }
+
+            self.broadcast_diagnostics_delta(root, delta);
+        }
+
         /// Handle a `.normalize/config.toml` (or `.normalize/rules/**`) change.
         ///
         /// Computes a [`ConfigDiff`] between the cached snapshot (what the
@@ -1873,15 +2069,12 @@ mod unix_impl {
         ///   subscribers re-pull on their own.
         /// - **No-op diff** (config bytes changed but no observable effect,
         ///   e.g. only a comment): nothing to do.
-        /// - **Anything else** (per-rule re-eval needed, walk-exclude changed,
-        ///   sarif tools changed, or any future field): full reprime under the
-        ///   new config. This is also the conservative fallback for changes
-        ///   the diff doesn't yet model.
-        ///
-        /// Tier 2 (per-rule re-evaluation only) and Tier 3 (smart walk-exclude
-        /// partial) are tracked in TODO.md as follow-ups; they require
-        /// per-rule re-run hooks and a per-file walk-exclude diff that aren't
-        /// in place yet.
+        /// - **Per-rule re-eval** (a rule was newly enabled, its `extra`
+        ///   threshold changed, etc.): re-run only the affected rules through
+        ///   each engine, splice updated findings into the stored blobs, and
+        ///   broadcast `DiagnosticsUpdated`. No full reprime needed.
+        /// - **Full reprime** (`[walk] exclude` changed — file set differs):
+        ///   clear blobs and reprime from scratch.
         fn reload_config_and_reprime(&self, root: &Path) {
             // Snapshot old config + load new config under the lock so the
             // diff sees a consistent view.
@@ -1951,9 +2144,20 @@ mod unix_impl {
                 return;
             }
 
-            // Tier 3 (full reprime) fallback: any non-filter-only diff lands
-            // here today. Tier 2 surgical per-rule re-eval is a future
-            // optimization; see TODO.md.
+            // Tier 2: per-rule re-eval — the file set hasn't changed but one
+            // or more rules need to re-run. Splice updated findings into the
+            // existing blobs without clearing everything.
+            if !diff.requires_full_reprime() {
+                self.surgical_rerun_rules(root, &diff.rules_to_rerun, new_rules, new_walk);
+                let _ = self.event_tx.send(Event::IndexRefreshed {
+                    root: root.to_string_lossy().into_owned(),
+                    files: 0,
+                });
+                return;
+            }
+
+            // Tier 3 (full reprime): `[walk] exclude` changed — file set
+            // differs, must clear blobs and reprime from scratch.
             tracing::info!(
                 root = ?root,
                 rerun = diff.rules_to_rerun.len(),
