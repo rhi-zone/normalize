@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 391
 expression: "snapshot_help(&[\"generate\", \"types\"])"
 ---
 Generate types/validators from schema
@@ -17,7 +18,7 @@ Options:
   -f, --format <format>            Input format (auto, json-schema, openapi, typescript)
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression
-  -o, --output <output>            Output file (stdout if not specified)
+  -o, --output <output>            Output file or directory (stdout if not specified)
       --export <export>            Export all types (add 'export' keyword)
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --infer-types                Generate type inference (for Zod/Valibot)
@@ -25,9 +26,13 @@ Options:
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
       --readonly                   Make types readonly/frozen
       --package <package>          Package name (for Go)
+      --dry-run                    Preview output without writing any files
+      --split                      Emit one file per top-level type into the output directory (requires --output)
   -h, --help                       Print help
 
 Examples:
 normalize generate types schema.json -b typescript        # generate TypeScript types
 normalize generate types schema.json -b zod --infer-types # Zod schemas with type inference
 normalize generate types schema.json -b go --package models -o models.go
+normalize generate types schema.json -b typescript --dry-run  # preview without writing
+normalize generate types schema.json -b typescript --split -o types/  # one file per type

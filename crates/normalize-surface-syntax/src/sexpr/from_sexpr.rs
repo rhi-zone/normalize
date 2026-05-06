@@ -233,6 +233,7 @@ fn parse_opcode_expr(opcode: &str, args: &[Value]) -> Result<Expr, SExprError> {
                 object: Box::new(obj),
                 property: Box::new(prop),
                 computed: true,
+                span: None,
             })
         }
 
@@ -245,6 +246,7 @@ fn parse_opcode_expr(opcode: &str, args: &[Value]) -> Result<Expr, SExprError> {
                 object: Box::new(obj),
                 property: Box::new(prop),
                 computed: true,
+                span: None,
             };
             Ok(Expr::assign(target, value))
         }
@@ -418,7 +420,7 @@ mod tests {
         let sexpr = json!(["console.log", "hello"]);
         let program = from_sexpr(&sexpr)?;
         match &program.body[0] {
-            Stmt::Expr(Expr::Call { callee, args }) => {
+            Stmt::Expr(Expr::Call { callee, args, .. }) => {
                 assert_eq!(args.len(), 1);
                 // Callee should be console.log member expression
                 match callee.as_ref() {

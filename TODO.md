@@ -687,8 +687,8 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
 - [x] ~~Protobuf output~~ — done; `src/output/proto.rs` (feature `backend-proto`); emits proto3; structs→`message`, string enums with `_UNSPECIFIED=0` entry, int enums, tagged unions→`message` with `oneof`, arrays→`repeated`, optional fields use explicit `optional` keyword
 
 **CLI Enhancements:**
-- [ ] Multiple output files (`--split` to emit one file per type)
-- [ ] Dry-run mode (`--dry-run` to preview without writing)
+- [x] ~~Multiple output files (`--split` to emit one file per type)~~ — done; `--split` added to `normalize generate types`; requires `--output` dir; emits one file per `TypeDef` with snake_case filename derived from type name; `type_name_to_filename` handles PascalCase→snake_case conversion
+- [x] ~~Dry-run mode (`--dry-run` to preview without writing)~~ — done; `--dry-run` added to `normalize generate types`; prints `--- filename ---\n<content>` for each file that would be written without touching disk; works with both normal and `--split` modes
 
 **IR Improvements:**
 - [x] ~~Validation~~ — done; `Schema::validate()` checks: valid identifiers, no duplicate type/field names, all `Ref` targets resolve, circular reference detection via DFS; returns `Vec<ValidationError>`
@@ -713,7 +713,7 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
 
 **IR Improvements:**
 - [ ] Comments preservation (for documentation translation) — IR has no comment nodes; requires adding `Comment` to `Stmt`/`Expr` or a parallel annotation structure
-- [ ] Source locations (for error messages, debugging)
+- [x] ~~Source locations (for error messages, debugging)~~ — done; `Span { start_line, start_col, end_line, end_col }` added to `ir/mod.rs` (1-based lines, 0-based cols); `span: Option<Span>` added to structured `Stmt` variants (`Let`, `If`, `While`, `For`, `ForIn`, `TryCatch`) and `Expr` variants (`Binary`, `Unary`, `Call`, `Member`, `Conditional`, `Assign`); `Span::from_ts()` converts tree-sitter `Point`; `with_span()` builder on both types; writers ignore spans; `StructureEq` ignores spans
 - [ ] Import/export statements
 - [ ] Class definitions, method definitions (IR-level; currently lowered to functions + prototype assignments)
 - [ ] Type annotations (optional, for typed languages)

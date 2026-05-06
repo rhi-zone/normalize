@@ -1,5 +1,6 @@
 //! Expression types for the IR.
 
+use super::Span;
 use serde::{Deserialize, Serialize};
 
 /// An expression that produces a value.
@@ -16,13 +17,28 @@ pub enum Expr {
         left: Box<Expr>,
         op: BinaryOp,
         right: Box<Expr>,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
     },
 
     /// Unary operation: `op expr`.
-    Unary { op: UnaryOp, expr: Box<Expr> },
+    Unary {
+        op: UnaryOp,
+        expr: Box<Expr>,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
+    },
 
     /// Function call: `callee(args...)`.
-    Call { callee: Box<Expr>, args: Vec<Expr> },
+    Call {
+        callee: Box<Expr>,
+        args: Vec<Expr>,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
+    },
 
     /// Member access: `object.property` or `object[property]`.
     Member {
@@ -30,6 +46,9 @@ pub enum Expr {
         property: Box<Expr>,
         /// True for `obj[expr]`, false for `obj.ident`.
         computed: bool,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
     },
 
     /// Array literal: `[a, b, c]`.
@@ -46,10 +65,19 @@ pub enum Expr {
         test: Box<Expr>,
         consequent: Box<Expr>,
         alternate: Box<Expr>,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
     },
 
     /// Assignment: `target = value`.
-    Assign { target: Box<Expr>, value: Box<Expr> },
+    Assign {
+        target: Box<Expr>,
+        value: Box<Expr>,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
+    },
 }
 
 /// Literal values.
@@ -121,6 +149,7 @@ impl Expr {
             left: Box::new(left),
             op,
             right: Box::new(right),
+            span: None,
         }
     }
 
@@ -128,6 +157,7 @@ impl Expr {
         Expr::Unary {
             op,
             expr: Box::new(expr),
+            span: None,
         }
     }
 
@@ -135,6 +165,7 @@ impl Expr {
         Expr::Call {
             callee: Box::new(callee),
             args,
+            span: None,
         }
     }
 
@@ -143,6 +174,7 @@ impl Expr {
             object: Box::new(object),
             property: Box::new(Expr::string(property)),
             computed: false,
+            span: None,
         }
     }
 
@@ -151,6 +183,7 @@ impl Expr {
             object: Box::new(object),
             property: Box::new(index),
             computed: true,
+            span: None,
         }
     }
 
@@ -167,6 +200,7 @@ impl Expr {
             test: Box::new(test),
             consequent: Box::new(consequent),
             alternate: Box::new(alternate),
+            span: None,
         }
     }
 
@@ -174,6 +208,59 @@ impl Expr {
         Expr::Assign {
             target: Box::new(target),
             value: Box::new(value),
+            span: None,
+        }
+    }
+
+    /// Attach a source location span to this expression.
+    pub fn with_span(self, span: Span) -> Self {
+        match self {
+            Expr::Binary {
+                left, op, right, ..
+            } => Expr::Binary {
+                left,
+                op,
+                right,
+                span: Some(span),
+            },
+            Expr::Unary { op, expr, .. } => Expr::Unary {
+                op,
+                expr,
+                span: Some(span),
+            },
+            Expr::Call { callee, args, .. } => Expr::Call {
+                callee,
+                args,
+                span: Some(span),
+            },
+            Expr::Member {
+                object,
+                property,
+                computed,
+                ..
+            } => Expr::Member {
+                object,
+                property,
+                computed,
+                span: Some(span),
+            },
+            Expr::Conditional {
+                test,
+                consequent,
+                alternate,
+                ..
+            } => Expr::Conditional {
+                test,
+                consequent,
+                alternate,
+                span: Some(span),
+            },
+            Expr::Assign { target, value, .. } => Expr::Assign {
+                target,
+                value,
+                span: Some(span),
+            },
+            other => other,
         }
     }
 }

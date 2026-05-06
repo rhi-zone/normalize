@@ -50,6 +50,7 @@ mod tests {
                 name,
                 init,
                 mutable,
+                ..
             } => {
                 assert_eq!(name, "x");
                 assert!(mutable);

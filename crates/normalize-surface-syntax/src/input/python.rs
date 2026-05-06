@@ -818,7 +818,7 @@ mod tests {
         let ir = read_python("print(\"hello\", 42)")?;
         assert_eq!(ir.body.len(), 1);
         match &ir.body[0] {
-            Stmt::Expr(Expr::Call { callee, args }) => {
+            Stmt::Expr(Expr::Call { callee, args, .. }) => {
                 assert!(matches!(callee.as_ref(), Expr::Ident(n) if n == "print"));
                 assert_eq!(args.len(), 2);
             }

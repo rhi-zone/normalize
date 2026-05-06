@@ -563,6 +563,7 @@ impl<'a> ReadContext<'a> {
                 name: names.remove(0),
                 init,
                 mutable: true,
+                span: None,
             });
         }
 
@@ -574,6 +575,7 @@ impl<'a> ReadContext<'a> {
                 name,
                 init,
                 mutable: true,
+                span: None,
             });
         }
 
@@ -945,7 +947,7 @@ mod tests {
     fn test_function_call() -> Result<(), ReadError> {
         let program = read_lua("print('hello')")?;
         match &program.body[0] {
-            Stmt::Expr(Expr::Call { callee, args }) => {
+            Stmt::Expr(Expr::Call { callee, args, .. }) => {
                 assert_eq!(args.len(), 1);
                 match callee.as_ref() {
                     Expr::Ident(name) => assert_eq!(name, "print"),
@@ -1043,7 +1045,7 @@ mod tests {
     fn test_repeat_until() -> Result<(), ReadError> {
         let program = read_lua("repeat x = x + 1 until x > 10")?;
         match &program.body[0] {
-            Stmt::While { test, body } => {
+            Stmt::While { test, body, .. } => {
                 // repeat-until becomes while(true) { body; if(cond) break }
                 assert!(matches!(test, Expr::Literal(Literal::Bool(true))));
                 match body.as_ref() {
@@ -1076,7 +1078,7 @@ mod tests {
         let program = read_lua("local x = f(g(h(42)))")?;
         match &program.body[0] {
             Stmt::Let {
-                init: Some(Expr::Call { callee, args }),
+                init: Some(Expr::Call { callee, args, .. }),
                 ..
             } => {
                 match callee.as_ref() {
@@ -1219,13 +1221,14 @@ mod tests {
         // obj:method(x) should desugar to obj.method(obj, x)
         let program = read_lua("obj:method(42)")?;
         match &program.body[0] {
-            Stmt::Expr(Expr::Call { callee, args }) => {
+            Stmt::Expr(Expr::Call { callee, args, .. }) => {
                 // callee is obj.method
                 match callee.as_ref() {
                     Expr::Member {
                         object,
                         property,
                         computed: false,
+                        ..
                     } => {
                         match object.as_ref() {
                             Expr::Ident(name) => assert_eq!(name, "obj"),

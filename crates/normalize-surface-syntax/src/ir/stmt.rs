@@ -1,6 +1,6 @@
 //! Statement types for the IR.
 
-use crate::Expr;
+use super::{Expr, Span};
 use serde::{Deserialize, Serialize};
 
 /// A statement (doesn't produce a value directly).
@@ -14,6 +14,9 @@ pub enum Stmt {
         name: String,
         init: Option<Expr>,
         mutable: bool,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
     },
 
     /// Block: `{ stmts... }`.
@@ -24,10 +27,19 @@ pub enum Stmt {
         test: Expr,
         consequent: Box<Stmt>,
         alternate: Option<Box<Stmt>>,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
     },
 
     /// While loop: `while (test) body`.
-    While { test: Expr, body: Box<Stmt> },
+    While {
+        test: Expr,
+        body: Box<Stmt>,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
+    },
 
     /// For loop: `for (init; test; update) body`.
     For {
@@ -35,6 +47,9 @@ pub enum Stmt {
         test: Option<Expr>,
         update: Option<Expr>,
         body: Box<Stmt>,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
     },
 
     /// For-in/for-of loop: `for (variable in/of iterable) body`.
@@ -42,6 +57,9 @@ pub enum Stmt {
         variable: String,
         iterable: Expr,
         body: Box<Stmt>,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
     },
 
     /// Return statement: `return expr`.
@@ -59,6 +77,9 @@ pub enum Stmt {
         catch_param: Option<String>,
         catch_body: Option<Box<Stmt>>,
         finally_body: Option<Box<Stmt>>,
+        /// Source location (populated by readers; ignored by writers).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
     },
 
     /// Function declaration.
@@ -76,6 +97,7 @@ impl Stmt {
             name: name.into(),
             init,
             mutable: true,
+            span: None,
         }
     }
 
@@ -84,6 +106,7 @@ impl Stmt {
             name: name.into(),
             init: Some(init),
             mutable: false,
+            span: None,
         }
     }
 
@@ -96,6 +119,7 @@ impl Stmt {
             test,
             consequent: Box::new(consequent),
             alternate: alternate.map(Box::new),
+            span: None,
         }
     }
 
@@ -103,6 +127,7 @@ impl Stmt {
         Stmt::While {
             test,
             body: Box::new(body),
+            span: None,
         }
     }
 
@@ -117,6 +142,7 @@ impl Stmt {
             test,
             update,
             body: Box::new(body),
+            span: None,
         }
     }
 
@@ -125,6 +151,7 @@ impl Stmt {
             variable: variable.into(),
             iterable,
             body: Box::new(body),
+            span: None,
         }
     }
 
@@ -151,10 +178,82 @@ impl Stmt {
             catch_param,
             catch_body: catch_body.map(Box::new),
             finally_body: finally_body.map(Box::new),
+            span: None,
         }
     }
 
     pub fn function(f: crate::Function) -> Self {
         Stmt::Function(f)
+    }
+
+    /// Attach a source location span to this statement.
+    pub fn with_span(self, span: Span) -> Self {
+        match self {
+            Stmt::Let {
+                name,
+                init,
+                mutable,
+                ..
+            } => Stmt::Let {
+                name,
+                init,
+                mutable,
+                span: Some(span),
+            },
+            Stmt::If {
+                test,
+                consequent,
+                alternate,
+                ..
+            } => Stmt::If {
+                test,
+                consequent,
+                alternate,
+                span: Some(span),
+            },
+            Stmt::While { test, body, .. } => Stmt::While {
+                test,
+                body,
+                span: Some(span),
+            },
+            Stmt::For {
+                init,
+                test,
+                update,
+                body,
+                ..
+            } => Stmt::For {
+                init,
+                test,
+                update,
+                body,
+                span: Some(span),
+            },
+            Stmt::ForIn {
+                variable,
+                iterable,
+                body,
+                ..
+            } => Stmt::ForIn {
+                variable,
+                iterable,
+                body,
+                span: Some(span),
+            },
+            Stmt::TryCatch {
+                body,
+                catch_param,
+                catch_body,
+                finally_body,
+                ..
+            } => Stmt::TryCatch {
+                body,
+                catch_param,
+                catch_body,
+                finally_body,
+                span: Some(span),
+            },
+            other => other,
+        }
     }
 }

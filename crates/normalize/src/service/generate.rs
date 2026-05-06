@@ -95,6 +95,8 @@ impl GenerateService {
     ///   normalize generate types schema.json -b typescript        # generate TypeScript types
     ///   normalize generate types schema.json -b zod --infer-types # Zod schemas with type inference
     ///   normalize generate types schema.json -b go --package models -o models.go
+    ///   normalize generate types schema.json -b typescript --dry-run  # preview without writing
+    ///   normalize generate types schema.json -b typescript --split -o types/  # one file per type
     #[cli(display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn types(
@@ -110,13 +112,20 @@ impl GenerateService {
             help = "Input format (auto, json-schema, openapi, typescript)"
         )]
         format: Option<InputFormat>,
-        #[param(short = 'o', help = "Output file (stdout if not specified)")] output: Option<
-            String,
-        >,
+        #[param(
+            short = 'o',
+            help = "Output file or directory (stdout if not specified)"
+        )]
+        output: Option<String>,
         #[param(help = "Export all types (add 'export' keyword)")] export: Option<bool>,
         #[param(help = "Generate type inference (for Zod/Valibot)")] infer_types: bool,
         #[param(help = "Make types readonly/frozen")] readonly: bool,
         #[param(help = "Package name (for Go)")] package: Option<String>,
+        #[param(help = "Preview output without writing any files")] dry_run: bool,
+        #[param(
+            help = "Emit one file per top-level type into the output directory (requires --output)"
+        )]
+        split: bool,
     ) -> Result<GenerateReport, String> {
         let input_format = format.unwrap_or(InputFormat::Auto);
         let export = export.unwrap_or(true);
@@ -133,6 +142,8 @@ impl GenerateService {
             infer_types,
             readonly,
             package,
+            dry_run,
+            split,
         )
     }
 

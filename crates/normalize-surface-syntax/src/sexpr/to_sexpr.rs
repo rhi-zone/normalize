@@ -42,6 +42,7 @@ fn stmt_to_sexpr(stmt: &Stmt) -> Value {
             test,
             consequent,
             alternate,
+            ..
         } => {
             let mut arr = vec![
                 json!("std.if"),
@@ -54,7 +55,7 @@ fn stmt_to_sexpr(stmt: &Stmt) -> Value {
             Value::Array(arr)
         }
 
-        Stmt::While { test, body } => {
+        Stmt::While { test, body, .. } => {
             json!(["std.while", expr_to_sexpr(test), stmt_to_sexpr(body)])
         }
 
@@ -63,6 +64,7 @@ fn stmt_to_sexpr(stmt: &Stmt) -> Value {
             test,
             update,
             body,
+            ..
         } => {
             // Convert to: std.seq(init, std.while(test, std.seq(body, update)))
             let body_sexpr = stmt_to_sexpr(body);
@@ -89,6 +91,7 @@ fn stmt_to_sexpr(stmt: &Stmt) -> Value {
             variable,
             iterable,
             body,
+            ..
         } => {
             json!([
                 "std.for",
@@ -114,6 +117,7 @@ fn stmt_to_sexpr(stmt: &Stmt) -> Value {
             catch_param,
             catch_body,
             finally_body,
+            ..
         } => {
             let mut parts: Vec<Value> = vec![json!("std.try"), stmt_to_sexpr(body)];
             if let Some(cb) = catch_body {
@@ -139,17 +143,19 @@ fn expr_to_sexpr(expr: &Expr) -> Value {
 
         Expr::Ident(name) => json!(["std.var", name]),
 
-        Expr::Binary { left, op, right } => {
+        Expr::Binary {
+            left, op, right, ..
+        } => {
             let opcode = binary_op_to_opcode(*op);
             json!([opcode, expr_to_sexpr(left), expr_to_sexpr(right)])
         }
 
-        Expr::Unary { op, expr } => {
+        Expr::Unary { op, expr, .. } => {
             let opcode = unary_op_to_opcode(*op);
             json!([opcode, expr_to_sexpr(expr)])
         }
 
-        Expr::Call { callee, args } => {
+        Expr::Call { callee, args, .. } => {
             // Try to get a simple function name for the opcode
             if let Some(name) = get_call_name(callee) {
                 let mut arr = vec![json!(name)];
@@ -167,6 +173,7 @@ fn expr_to_sexpr(expr: &Expr) -> Value {
             object,
             property,
             computed,
+            ..
         } => {
             if *computed {
                 // obj[expr] - could be list or object access
@@ -198,6 +205,7 @@ fn expr_to_sexpr(expr: &Expr) -> Value {
             test,
             consequent,
             alternate,
+            ..
         } => {
             json!([
                 "std.if",
@@ -207,7 +215,7 @@ fn expr_to_sexpr(expr: &Expr) -> Value {
             ])
         }
 
-        Expr::Assign { target, value } => {
+        Expr::Assign { target, value, .. } => {
             match target.as_ref() {
                 Expr::Ident(name) => {
                     json!(["std.set", name, expr_to_sexpr(value)])
@@ -294,6 +302,7 @@ fn get_call_name(expr: &Expr) -> Option<String> {
             object,
             property,
             computed: false,
+            ..
         } => {
             if let (Some(obj_name), Expr::Literal(Literal::String(prop))) =
                 (get_call_name(object), property.as_ref())

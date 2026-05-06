@@ -90,6 +90,7 @@ impl PythonWriter {
                 test,
                 consequent,
                 alternate,
+                ..
             } => {
                 self.output.push_str("if ");
                 self.write_expr(test);
@@ -113,7 +114,7 @@ impl PythonWriter {
                 }
             }
 
-            Stmt::While { test, body } => {
+            Stmt::While { test, body, .. } => {
                 self.output.push_str("while ");
                 self.write_expr(test);
                 self.output.push_str(":\n");
@@ -127,6 +128,7 @@ impl PythonWriter {
                 test,
                 update,
                 body,
+                ..
             } => {
                 // C-style for loops don't exist in Python
                 // Convert to while loop
@@ -156,6 +158,7 @@ impl PythonWriter {
                 variable,
                 iterable,
                 body,
+                ..
             } => {
                 self.output.push_str("for ");
                 self.output.push_str(variable);
@@ -188,6 +191,7 @@ impl PythonWriter {
                 catch_param,
                 catch_body,
                 finally_body,
+                ..
             } => {
                 self.output.push_str("try:\n");
                 self.indent += 1;
@@ -246,6 +250,7 @@ impl PythonWriter {
                 test,
                 consequent,
                 alternate,
+                ..
             } => {
                 self.output.push_str("if ");
                 self.write_expr(test);
@@ -298,7 +303,9 @@ impl PythonWriter {
                 self.output.push_str(name);
             }
 
-            Expr::Binary { left, op, right } => {
+            Expr::Binary {
+                left, op, right, ..
+            } => {
                 self.output.push('(');
                 self.write_expr(left);
                 self.output.push(' ');
@@ -308,12 +315,12 @@ impl PythonWriter {
                 self.output.push(')');
             }
 
-            Expr::Unary { op, expr } => {
+            Expr::Unary { op, expr, .. } => {
                 self.write_unary_op(*op);
                 self.write_expr(expr);
             }
 
-            Expr::Call { callee, args } => {
+            Expr::Call { callee, args, .. } => {
                 self.write_expr(callee);
                 self.output.push('(');
                 for (i, arg) in args.iter().enumerate() {
@@ -329,6 +336,7 @@ impl PythonWriter {
                 object,
                 property,
                 computed,
+                ..
             } => {
                 self.write_expr(object);
                 if *computed {
@@ -390,6 +398,7 @@ impl PythonWriter {
                 test,
                 consequent,
                 alternate,
+                ..
             } => {
                 // Python ternary: consequent if test else alternate
                 self.output.push('(');
@@ -401,7 +410,7 @@ impl PythonWriter {
                 self.output.push(')');
             }
 
-            Expr::Assign { target, value } => {
+            Expr::Assign { target, value, .. } => {
                 self.write_expr(target);
                 self.output.push_str(" = ");
                 self.write_expr(value);

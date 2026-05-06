@@ -41,17 +41,19 @@ impl StructureEq for Stmt {
         match (self, other) {
             (Stmt::Expr(a), Stmt::Expr(b)) => a.structure_eq(b),
 
-            // Ignore `mutable` - it's a surface hint
+            // Ignore `mutable` and `span` - they are surface hints
             (
                 Stmt::Let {
                     name: n1,
                     init: i1,
                     mutable: _,
+                    span: _,
                 },
                 Stmt::Let {
                     name: n2,
                     init: i2,
                     mutable: _,
+                    span: _,
                 },
             ) => n1 == n2 && option_structure_eq(i1.as_ref(), i2.as_ref()),
 
@@ -62,11 +64,13 @@ impl StructureEq for Stmt {
                     test: t1,
                     consequent: c1,
                     alternate: a1,
+                    span: _,
                 },
                 Stmt::If {
                     test: t2,
                     consequent: c2,
                     alternate: a2,
+                    span: _,
                 },
             ) => {
                 t1.structure_eq(t2)
@@ -78,9 +82,18 @@ impl StructureEq for Stmt {
                     }
             }
 
-            (Stmt::While { test: t1, body: b1 }, Stmt::While { test: t2, body: b2 }) => {
-                t1.structure_eq(t2) && b1.structure_eq(b2.as_ref())
-            }
+            (
+                Stmt::While {
+                    test: t1,
+                    body: b1,
+                    span: _,
+                },
+                Stmt::While {
+                    test: t2,
+                    body: b2,
+                    span: _,
+                },
+            ) => t1.structure_eq(t2) && b1.structure_eq(b2.as_ref()),
 
             (
                 Stmt::For {
@@ -88,12 +101,14 @@ impl StructureEq for Stmt {
                     test: t1,
                     update: u1,
                     body: b1,
+                    span: _,
                 },
                 Stmt::For {
                     init: i2,
                     test: t2,
                     update: u2,
                     body: b2,
+                    span: _,
                 },
             ) => {
                 (match (i1, i2) {
@@ -110,11 +125,13 @@ impl StructureEq for Stmt {
                     variable: v1,
                     iterable: i1,
                     body: b1,
+                    span: _,
                 },
                 Stmt::ForIn {
                     variable: v2,
                     iterable: i2,
                     body: b2,
+                    span: _,
                 },
             ) => v1 == v2 && i1.structure_eq(i2) && b1.structure_eq(b2.as_ref()),
 
@@ -129,12 +146,14 @@ impl StructureEq for Stmt {
                     catch_param: cp1,
                     catch_body: cb1,
                     finally_body: fb1,
+                    span: _,
                 },
                 Stmt::TryCatch {
                     body: b2,
                     catch_param: cp2,
                     catch_body: cb2,
                     finally_body: fb2,
+                    span: _,
                 },
             ) => {
                 b1.structure_eq(b2.as_ref())
@@ -169,40 +188,55 @@ impl StructureEq for Expr {
                     left: l1,
                     op: o1,
                     right: r1,
+                    span: _,
                 },
                 Expr::Binary {
                     left: l2,
                     op: o2,
                     right: r2,
+                    span: _,
                 },
             ) => o1 == o2 && l1.structure_eq(l2) && r1.structure_eq(r2),
 
-            (Expr::Unary { op: o1, expr: e1 }, Expr::Unary { op: o2, expr: e2 }) => {
-                o1 == o2 && e1.structure_eq(e2)
-            }
+            (
+                Expr::Unary {
+                    op: o1,
+                    expr: e1,
+                    span: _,
+                },
+                Expr::Unary {
+                    op: o2,
+                    expr: e2,
+                    span: _,
+                },
+            ) => o1 == o2 && e1.structure_eq(e2),
 
             (
                 Expr::Call {
                     callee: c1,
                     args: a1,
+                    span: _,
                 },
                 Expr::Call {
                     callee: c2,
                     args: a2,
+                    span: _,
                 },
             ) => c1.structure_eq(c2) && vec_structure_eq(a1, a2),
 
-            // Normalize `computed` when property is a string literal
+            // Normalize `computed` when property is a string literal; ignore `span`
             (
                 Expr::Member {
                     object: o1,
                     property: p1,
                     computed: _,
+                    span: _,
                 },
                 Expr::Member {
                     object: o2,
                     property: p2,
                     computed: _,
+                    span: _,
                 },
             ) => o1.structure_eq(o2) && p1.structure_eq(p2),
 
@@ -222,11 +256,13 @@ impl StructureEq for Expr {
                     test: t1,
                     consequent: c1,
                     alternate: a1,
+                    span: _,
                 },
                 Expr::Conditional {
                     test: t2,
                     consequent: c2,
                     alternate: a2,
+                    span: _,
                 },
             ) => t1.structure_eq(t2) && c1.structure_eq(c2) && a1.structure_eq(a2),
 
@@ -234,10 +270,12 @@ impl StructureEq for Expr {
                 Expr::Assign {
                     target: t1,
                     value: v1,
+                    span: _,
                 },
                 Expr::Assign {
                     target: t2,
                     value: v2,
+                    span: _,
                 },
             ) => t1.structure_eq(t2) && v1.structure_eq(v2),
 
@@ -278,11 +316,13 @@ mod tests {
             name: "x".into(),
             init: Some(Expr::number(42)),
             mutable: false,
+            span: None,
         };
         let let_decl = Stmt::Let {
             name: "x".into(),
             init: Some(Expr::number(42)),
             mutable: true,
+            span: None,
         };
 
         assert!(const_decl.structure_eq(&let_decl));
@@ -295,11 +335,13 @@ mod tests {
             object: Box::new(Expr::ident("obj")),
             property: Box::new(Expr::string("foo")),
             computed: false,
+            span: None,
         };
         let bracket_access = Expr::Member {
             object: Box::new(Expr::ident("obj")),
             property: Box::new(Expr::string("foo")),
             computed: true,
+            span: None,
         };
 
         assert!(dot_access.structure_eq(&bracket_access));
@@ -312,11 +354,13 @@ mod tests {
             name: "x".into(),
             init: Some(Expr::number(1)),
             mutable: false,
+            span: None,
         };
         let y = Stmt::Let {
             name: "y".into(),
             init: Some(Expr::number(1)),
             mutable: false,
+            span: None,
         };
 
         assert!(!x.structure_eq(&y));

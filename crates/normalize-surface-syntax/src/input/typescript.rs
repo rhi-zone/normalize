@@ -802,6 +802,7 @@ impl<'a> ReadContext<'a> {
                 name: name_str,
                 init,
                 mutable: false,
+                span: None,
             })
         }
     }
@@ -827,6 +828,7 @@ impl<'a> ReadContext<'a> {
                                 name,
                                 init: Some(init),
                                 mutable,
+                                span: None,
                             });
                         }
                         "pair_pattern" => {
@@ -846,6 +848,7 @@ impl<'a> ReadContext<'a> {
                                     name,
                                     init: Some(key_access),
                                     mutable,
+                                    span: None,
                                 });
                             } else {
                                 self.lower_destructuring(val, key_access, mutable, stmts)?;
@@ -862,6 +865,7 @@ impl<'a> ReadContext<'a> {
                                         name,
                                         init: Some(rhs.clone()),
                                         mutable,
+                                        span: None,
                                     });
                                     break;
                                 }
@@ -886,6 +890,7 @@ impl<'a> ReadContext<'a> {
                                 name,
                                 init: Some(init),
                                 mutable,
+                                span: None,
                             });
                             idx += 1;
                         }
@@ -903,6 +908,7 @@ impl<'a> ReadContext<'a> {
                                         name,
                                         init: Some(init),
                                         mutable,
+                                        span: None,
                                     });
                                     break;
                                 }
@@ -925,6 +931,7 @@ impl<'a> ReadContext<'a> {
                     name,
                     init: Some(rhs),
                     mutable,
+                    span: None,
                 });
             }
         }
@@ -1419,6 +1426,7 @@ mod tests {
                 name,
                 init,
                 mutable,
+                ..
             } => {
                 assert_eq!(name, "x");
                 assert!(mutable);
@@ -1445,7 +1453,7 @@ mod tests {
     fn test_function_call() -> Result<(), ReadError> {
         let program = read_typescript("console.log('hello')")?;
         match &program.body[0] {
-            Stmt::Expr(Expr::Call { callee, args }) => {
+            Stmt::Expr(Expr::Call { callee, args, .. }) => {
                 assert_eq!(args.len(), 1);
                 match callee.as_ref() {
                     Expr::Member { .. } => {}
