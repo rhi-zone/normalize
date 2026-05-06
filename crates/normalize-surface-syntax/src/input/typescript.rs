@@ -84,8 +84,30 @@ impl<'a> ReadContext<'a> {
 
     fn read_stmt(&self, node: Node) -> Result<Option<Stmt>, ReadError> {
         match node.kind() {
-            // Comments and empty statements (skip)
-            "comment" | "empty_statement" => Ok(None),
+            // Empty statements (skip)
+            "empty_statement" => Ok(None),
+
+            // Comments — preserve as Stmt::Comment for documentation translation
+            "comment" => {
+                let raw = self.node_text(node);
+                let span = Span::from_ts(node.start_position(), node.end_position());
+                let stmt = if let Some(inner) = raw.strip_prefix("/**") {
+                    // JSDoc block comment: strip /** and */
+                    let content = inner.strip_suffix("*/").unwrap_or(inner).trim();
+                    Stmt::comment_block(content)
+                } else if let Some(inner) = raw.strip_prefix("/*") {
+                    // Block comment: strip /* and */
+                    let content = inner.strip_suffix("*/").unwrap_or(inner).trim();
+                    Stmt::comment_block(content)
+                } else if let Some(inner) = raw.strip_prefix("//") {
+                    // Line comment: strip //
+                    let content = inner.trim_start_matches('/').trim();
+                    Stmt::comment_line(content)
+                } else {
+                    Stmt::comment_line(raw.trim())
+                };
+                Ok(Some(stmt.with_span(span)))
+            }
 
             // TypeScript-only declarations (no runtime meaning, skip)
             "interface_declaration"
@@ -1590,6 +1612,49 @@ mod tests {
                 ..
             } => {}
             _ => panic!("expected Let with Call init"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_line_comment_preserved() -> Result<(), ReadError> {
+        let program = read_typescript("// This is a comment\nconst x = 1;")?;
+        assert_eq!(program.body.len(), 2);
+        match &program.body[0] {
+            Stmt::Comment { text, block, .. } => {
+                assert_eq!(text, "This is a comment");
+                assert!(!block);
+            }
+            _ => panic!("expected Comment"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_block_comment_preserved() -> Result<(), ReadError> {
+        let program = read_typescript("/* block comment */\nconst x = 1;")?;
+        assert_eq!(program.body.len(), 2);
+        match &program.body[0] {
+            Stmt::Comment { text, block, .. } => {
+                assert_eq!(text, "block comment");
+                assert!(*block);
+            }
+            _ => panic!("expected Comment"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_jsdoc_comment_preserved() -> Result<(), ReadError> {
+        let src = "/** Adds two numbers */\nfunction add(a, b) { return a + b; }";
+        let program = read_typescript(src)?;
+        assert_eq!(program.body.len(), 2);
+        match &program.body[0] {
+            Stmt::Comment { text, block, .. } => {
+                assert_eq!(text, "Adds two numbers");
+                assert!(*block);
+            }
+            _ => panic!("expected Comment"),
         }
         Ok(())
     }

@@ -134,6 +134,15 @@ fn stmt_to_sexpr(stmt: &Stmt) -> Value {
         }
 
         Stmt::Function(f) => function_to_sexpr(f),
+
+        // Comments are metadata; represent as a tagged string in s-expr form
+        Stmt::Comment { text, block, .. } => {
+            if *block {
+                json!(["std.comment_block", text])
+            } else {
+                json!(["std.comment_line", text])
+            }
+        }
     }
 }
 

@@ -705,18 +705,18 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
 
 **Writers:**
 - ~~Lua writer: verify idiomatic output (use `and`/`or` vs `&&`/`||`), string escaping edge cases~~ — done: already correct for `and`/`or`/`not`/`~=`/`nil`; object keys now use bare identifier syntax for valid Lua identifiers; string escaping now handles null bytes; for-in no longer prepends hardcoded `_, `
-- TypeScript writer: type annotations, semicolon placement verification, template literal output
+- ~~TypeScript writer: type annotations, semicolon placement verification, template literal output~~ — done: semicolons verified correct on all statement types (`Stmt::Expr`, `Let`, `Return`, `Break`, `Continue`); type annotations: IR does not carry type annotations (reader strips them at parse time) — adding them requires IR-level `Type annotations` item below; template literals: reader lowers `` `${x}` `` to `Concat` binary ops at parse time, no round-trip possible without a `TemplateLiteral` IR node — also deferred to `Type annotations` item. Comments (see IR below) are now emitted.
 - [x] JavaScript writer — added `javascript.rs` delegating to `TypeScriptWriter`; feature-gated as `write-javascript`
 
 **Testing:**
 - ~~Edge case tests: nested expressions, complex control flow, Unicode strings~~ — done: added reader tests for nested calls, multi-return, Unicode, long strings, numeric for with/without step, generic for multi-var, method call self-desugaring, metamethod keys, computed string keys, complex elseif; added writer tests for Lua idioms, object key emission, string escaping, unicode, for-in multi-var
 
 **IR Improvements:**
-- [ ] Comments preservation (for documentation translation) — IR has no comment nodes; requires adding `Comment` to `Stmt`/`Expr` or a parallel annotation structure
+- [x] ~~Comments preservation (for documentation translation)~~ — done: `Stmt::Comment { text, block, span }` added to IR; builders `Stmt::comment_line(text)` and `Stmt::comment_block(text)`; TypeScript reader parses `// line`, `/* block */`, `/** JSDoc */` comments; Lua reader parses `-- line`, `--- LuaDoc`, `--[[ block ]]` comments; TypeScript writer emits `//`/`/* */`/`/** */` (JSDoc multi-line when `block && text.contains('\n')`); Lua writer emits `--`/`--[[ ]]`; Python writer emits `#`/`"""..."""`; s-expr serializes as `["std.comment_line", text]`/`["std.comment_block", text]`; `StructureEq` compares `text` + `block`; `with_span()` supported
 - [x] ~~Source locations (for error messages, debugging)~~ — done; `Span { start_line, start_col, end_line, end_col }` added to `ir/mod.rs` (1-based lines, 0-based cols); `span: Option<Span>` added to structured `Stmt` variants (`Let`, `If`, `While`, `For`, `ForIn`, `TryCatch`) and `Expr` variants (`Binary`, `Unary`, `Call`, `Member`, `Conditional`, `Assign`); `Span::from_ts()` converts tree-sitter `Point`; `with_span()` builder on both types; writers ignore spans; `StructureEq` ignores spans
 - [ ] Import/export statements
 - [ ] Class definitions, method definitions (IR-level; currently lowered to functions + prototype assignments)
-- [ ] Type annotations (optional, for typed languages)
+- [ ] Type annotations (optional, for typed languages) — also required for TypeScript writer to emit `: Type` on parameters/returns, and for template literal `TemplateLiteral` IR node to enable round-trip backtick output
 - [ ] Pattern matching / destructuring (IR-level; currently lowered at read time)
 
 ### Package Index Backlog (simplest → complex)

@@ -205,6 +205,31 @@ impl TypeScriptWriter {
             Stmt::Function(f) => {
                 self.write_function(f);
             }
+
+            Stmt::Comment { text, block, .. } => {
+                if *block {
+                    // Emit as JSDoc-style block comment if content has multiple lines
+                    // or starts with `*`, otherwise as a simple `/* ... */`
+                    if text.contains('\n') || text.starts_with('*') {
+                        self.output.push_str("/**\n");
+                        for line in text.lines() {
+                            self.write_indent();
+                            self.output.push_str(" * ");
+                            self.output.push_str(line.trim_start_matches('*').trim());
+                            self.output.push('\n');
+                        }
+                        self.write_indent();
+                        self.output.push_str(" */");
+                    } else {
+                        self.output.push_str("/* ");
+                        self.output.push_str(text);
+                        self.output.push_str(" */");
+                    }
+                } else {
+                    self.output.push_str("// ");
+                    self.output.push_str(text);
+                }
+            }
         }
     }
 
@@ -613,5 +638,34 @@ mod tests {
         )]);
         let ts = TypeScriptWriter::emit(&program);
         assert_eq!(ts.trim(), "const obj = { a: 1, b: 2 };");
+    }
+
+    #[test]
+    fn test_line_comment() {
+        let program = Program::new(vec![
+            Stmt::comment_line("This is a line comment"),
+            Stmt::const_decl("x", Expr::number(1)),
+        ]);
+        let ts = TypeScriptWriter::emit(&program);
+        assert!(ts.contains("// This is a line comment"));
+        assert!(ts.contains("const x = 1;"));
+    }
+
+    #[test]
+    fn test_block_comment() {
+        let program = Program::new(vec![Stmt::comment_block("Block comment text")]);
+        let ts = TypeScriptWriter::emit(&program);
+        assert!(ts.contains("/* Block comment text */"));
+    }
+
+    #[test]
+    fn test_jsdoc_comment() {
+        let program = Program::new(vec![Stmt::comment_block(
+            "* Adds two numbers\n * @param a first\n * @param b second",
+        )]);
+        let ts = TypeScriptWriter::emit(&program);
+        assert!(ts.contains("/**"));
+        assert!(ts.contains(" * Adds two numbers"));
+        assert!(ts.contains(" */"));
     }
 }

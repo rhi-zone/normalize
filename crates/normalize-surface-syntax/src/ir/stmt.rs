@@ -84,6 +84,24 @@ pub enum Stmt {
 
     /// Function declaration.
     Function(crate::Function),
+
+    /// Comment (line or block). Used to preserve documentation comments during translation.
+    ///
+    /// `text` is the raw comment text including delimiters (e.g. `// foo`, `/* bar */`,
+    /// `/** JSDoc */`, `-- Lua`, `--[[ block ]]`). Writers emit the text verbatim so the
+    /// correct delimiter style for the target language must be supplied by the writer.
+    ///
+    /// For cross-language translation, use `Stmt::comment_line(text)` / `Stmt::comment_block(text)`
+    /// which store only the content; writers format it according to the target language.
+    Comment {
+        /// Comment content (without delimiters).
+        text: String,
+        /// Whether this was originally a block comment (`/* */`, `--[[ ]]`).
+        block: bool,
+        /// Source location.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        span: Option<Span>,
+    },
 }
 
 // Builder methods for statements
@@ -186,6 +204,24 @@ impl Stmt {
         Stmt::Function(f)
     }
 
+    /// Create a line comment from raw content (without `//` or `--` delimiter).
+    pub fn comment_line(text: impl Into<String>) -> Self {
+        Stmt::Comment {
+            text: text.into(),
+            block: false,
+            span: None,
+        }
+    }
+
+    /// Create a block comment from raw content (without `/* */` or `--[[ ]]` delimiters).
+    pub fn comment_block(text: impl Into<String>) -> Self {
+        Stmt::Comment {
+            text: text.into(),
+            block: true,
+            span: None,
+        }
+    }
+
     /// Attach a source location span to this statement.
     pub fn with_span(self, span: Span) -> Self {
         match self {
@@ -251,6 +287,11 @@ impl Stmt {
                 catch_param,
                 catch_body,
                 finally_body,
+                span: Some(span),
+            },
+            Stmt::Comment { text, block, .. } => Stmt::Comment {
+                text,
+                block,
                 span: Some(span),
             },
             other => other,

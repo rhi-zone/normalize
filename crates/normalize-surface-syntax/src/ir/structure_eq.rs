@@ -172,6 +172,20 @@ impl StructureEq for Stmt {
 
             (Stmt::Function(a), Stmt::Function(b)) => a.structure_eq(b),
 
+            // Comments: compare text and block flag; ignore span
+            (
+                Stmt::Comment {
+                    text: t1,
+                    block: b1,
+                    span: _,
+                },
+                Stmt::Comment {
+                    text: t2,
+                    block: b2,
+                    span: _,
+                },
+            ) => t1 == t2 && b1 == b2,
+
             _ => false,
         }
     }

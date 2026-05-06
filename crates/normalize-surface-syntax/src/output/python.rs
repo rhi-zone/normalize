@@ -240,6 +240,18 @@ impl PythonWriter {
                 }
                 self.indent -= 1;
             }
+
+            Stmt::Comment { text, block, .. } => {
+                if *block {
+                    // Python block comments use triple-quoted strings or # per line
+                    self.output.push_str("\"\"\"");
+                    self.output.push_str(text);
+                    self.output.push_str("\"\"\"");
+                } else {
+                    self.output.push_str("# ");
+                    self.output.push_str(text);
+                }
+            }
         }
     }
 

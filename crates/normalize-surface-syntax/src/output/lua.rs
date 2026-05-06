@@ -224,6 +224,17 @@ impl LuaWriter {
             Stmt::Function(f) => {
                 self.write_function(f);
             }
+
+            Stmt::Comment { text, block, .. } => {
+                if *block {
+                    self.output.push_str("--[[");
+                    self.output.push_str(text);
+                    self.output.push_str("]]");
+                } else {
+                    self.output.push_str("-- ");
+                    self.output.push_str(text);
+                }
+            }
         }
     }
 
@@ -605,5 +616,23 @@ mod tests {
             lua.contains("こんにちは 🌍"),
             "unicode should pass through unescaped, got: {lua}"
         );
+    }
+
+    #[test]
+    fn test_line_comment() {
+        let program = Program::new(vec![
+            Stmt::comment_line("This is a comment"),
+            Stmt::let_decl("x", Some(Expr::number(1))),
+        ]);
+        let lua = LuaWriter::emit(&program);
+        assert!(lua.contains("-- This is a comment"), "got: {lua}");
+        assert!(lua.contains("local x = 1"), "got: {lua}");
+    }
+
+    #[test]
+    fn test_block_comment() {
+        let program = Program::new(vec![Stmt::comment_block("block comment")]);
+        let lua = LuaWriter::emit(&program);
+        assert!(lua.contains("--[[block comment]]"), "got: {lua}");
     }
 }

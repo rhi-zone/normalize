@@ -75,8 +75,28 @@ impl<'a> ReadContext<'a> {
 
     fn read_stmt(&self, node: Node) -> Result<Option<Stmt>, ReadError> {
         match node.kind() {
-            // Skip comments and goto/labels (no IR equivalent)
-            "comment" | "goto_statement" | "label_statement" => Ok(None),
+            // Skip goto/labels (no IR equivalent)
+            "goto_statement" | "label_statement" => Ok(None),
+
+            // Comments — preserve as Stmt::Comment for documentation translation
+            "comment" => {
+                let raw = self.node_text(node);
+                let span = Span::from_ts(node.start_position(), node.end_position());
+                let stmt = if let Some(inner) = raw.strip_prefix("--[[") {
+                    // Long block comment: --[[ ... ]]
+                    let content = inner.strip_suffix("]]").unwrap_or(inner).trim();
+                    Stmt::comment_block(content)
+                } else if let Some(inner) = raw.strip_prefix("---") {
+                    // LuaDoc triple-dash: preserve as line comment
+                    Stmt::comment_line(inner.trim())
+                } else if let Some(inner) = raw.strip_prefix("--") {
+                    // Line comment: strip --
+                    Stmt::comment_line(inner.trim())
+                } else {
+                    Stmt::comment_line(raw.trim())
+                };
+                Ok(Some(stmt.with_span(span)))
+            }
 
             // Variable declarations (Lua grammar: variable_declaration contains local + assignment)
             "variable_declaration" => self.read_local_variable_declaration(node).map(Some),
@@ -1331,6 +1351,48 @@ end
                 }
             }
             _ => panic!("expected Function"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_line_comment_preserved() -> Result<(), ReadError> {
+        let program = read_lua("-- This is a comment\nlocal x = 1")?;
+        assert_eq!(program.body.len(), 2);
+        match &program.body[0] {
+            Stmt::Comment { text, block, .. } => {
+                assert_eq!(text, "This is a comment");
+                assert!(!block);
+            }
+            _ => panic!("expected Comment"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_luadoc_comment_preserved() -> Result<(), ReadError> {
+        let program = read_lua("--- Adds two numbers\nlocal function add(a, b) return a + b end")?;
+        assert_eq!(program.body.len(), 2);
+        match &program.body[0] {
+            Stmt::Comment { text, block, .. } => {
+                assert!(text.contains("Adds two numbers"));
+                assert!(!block);
+            }
+            _ => panic!("expected Comment"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_block_comment_preserved() -> Result<(), ReadError> {
+        let program = read_lua("--[[ block comment ]]\nlocal x = 1")?;
+        assert_eq!(program.body.len(), 2);
+        match &program.body[0] {
+            Stmt::Comment { text, block, .. } => {
+                assert!(text.contains("block comment"));
+                assert!(*block);
+            }
+            _ => panic!("expected Comment"),
         }
         Ok(())
     }
