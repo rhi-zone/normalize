@@ -16,8 +16,8 @@ use std::path::{Path, PathBuf};
 
 // Re-export domain types used by service/mod.rs
 pub use normalize_context::{
-    CallerContext, ContextBlock, ContextListReport, ContextReport, collect_new_context_files,
-    resolve_context, yaml_to_json,
+    CallerContext, ContextBlock, ContextListReport, ContextReport, block_matches,
+    collect_new_context_files, parse_blocks, resolve_context, yaml_to_json,
 };
 
 // ---------------------------------------------------------------------------

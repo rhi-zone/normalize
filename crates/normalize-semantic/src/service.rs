@@ -220,6 +220,137 @@ pub async fn run_search(
     })
 }
 
+/// One result entry returned by `normalize context --semantic`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "cli", derive(JsonSchema))]
+pub struct ContextSearchEntry {
+    /// Relative path to the context block file.
+    pub path: String,
+    /// The full text content of this context block section.
+    pub content: String,
+    /// Cosine similarity to the query (before staleness penalty).
+    pub similarity: f32,
+    /// Final re-ranked score.
+    pub score: f32,
+}
+
+impl From<SearchHit> for ContextSearchEntry {
+    fn from(h: SearchHit) -> Self {
+        Self {
+            path: h.source_path,
+            content: h.chunk_text,
+            similarity: h.similarity,
+            score: h.score,
+        }
+    }
+}
+
+/// Report returned by `normalize context --semantic`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "cli", derive(JsonSchema))]
+pub struct ContextSearchReport {
+    /// The query string as submitted.
+    pub query: String,
+    /// Embedding model used.
+    pub model: String,
+    /// Ranked context block results, best first.
+    pub results: Vec<ContextSearchEntry>,
+    /// Total context embeddings scanned.
+    pub total_scanned: usize,
+}
+
+impl OutputFormatter for ContextSearchReport {
+    fn format_text(&self) -> String {
+        if self.results.is_empty() {
+            return format!(
+                "No context blocks found for query: {}\n(Hint: run `normalize structure rebuild` to populate embeddings for context blocks)",
+                self.query
+            );
+        }
+
+        let mut out = String::new();
+        for r in &self.results {
+            out.push_str(&r.content);
+            if !r.content.ends_with('\n') {
+                out.push('\n');
+            }
+            out.push('\n');
+        }
+        // Remove trailing blank line
+        while out.ends_with("\n\n") {
+            out.pop();
+        }
+        out
+    }
+}
+
+/// Core search logic for `normalize context --semantic`.
+///
+/// Searches the embeddings index restricted to `source_type = "context"` blocks.
+/// Returns the top-k most relevant context blocks by cosine similarity.
+pub async fn run_context_search(
+    root: &std::path::Path,
+    query: String,
+    top_k: usize,
+) -> Result<ContextSearchReport, String> {
+    let config = load_embeddings_config(root);
+
+    if !config.enabled {
+        return Err(
+            "Semantic search not enabled. Add [embeddings] enabled = true to .normalize/config.toml, then run `normalize structure rebuild`.".to_string(),
+        );
+    }
+
+    let idx = crate::open_index(root)
+        .await
+        .map_err(|e| format!("Failed to open index: {e}"))?;
+
+    let conn = idx.connection();
+
+    let db_path = root.join(".normalize").join("index.sqlite");
+    let vec_conn: Option<VecConnection> = VecConnection::open(&db_path);
+
+    store::ensure_schema(conn)
+        .await
+        .map_err(|e| format!("Schema error: {e}"))?;
+
+    let dims = crate::embedder::dims_for_model(&config.model).unwrap_or(768);
+    store::ensure_vec_schema(conn, dims, vec_conn.as_ref()).await;
+
+    let mut embedder = crate::embedder::Embedder::load(&config.model, None)
+        .map_err(|e| format!("Failed to load embedding model: {e}"))?;
+
+    let query_vec = embedder
+        .embed_one(&query)
+        .map_err(|e| format!("Embedding failed: {e}"))?;
+
+    // For context blocks, use the brute-force path scoped to source_type='context'.
+    // ANN search returns all source types; post-filtering would waste candidates.
+    // Since context blocks are few, brute-force is fast enough.
+    let candidates = store::load_embeddings_for_type(conn, &config.model, "context")
+        .await
+        .map_err(|e| format!("Failed to load context embeddings: {e}"))?;
+
+    if candidates.is_empty() {
+        return Ok(ContextSearchReport {
+            query,
+            model: config.model,
+            results: Vec::new(),
+            total_scanned: 0,
+        });
+    }
+
+    let total_scanned = candidates.len();
+    let hits = crate::search::rerank(&query_vec, candidates, top_k);
+
+    Ok(ContextSearchReport {
+        query,
+        model: config.model,
+        results: hits.into_iter().map(ContextSearchEntry::from).collect(),
+        total_scanned,
+    })
+}
+
 /// Load embeddings config from the project's config.toml.
 /// Falls back to default (disabled) if config is missing or malformed.
 pub fn load_embeddings_config(root: &std::path::Path) -> EmbeddingsConfig {

@@ -4,8 +4,9 @@
 //! and the `migrate` subcommand (migration helper for old `.context.md` files).
 
 use crate::commands::context::{
-    CallerContext, ContextBlock, ContextListReport, ContextReport, collect_new_context_files,
-    parse_match_pairs, read_file_context, read_stdin_context, resolve_context, yaml_to_json,
+    CallerContext, ContextBlock, ContextListReport, ContextReport, block_matches,
+    collect_new_context_files, parse_blocks, parse_match_pairs, read_file_context,
+    read_stdin_context, resolve_context, yaml_to_json,
 };
 use crate::output::OutputFormatter;
 use server_less::cli;
@@ -208,6 +209,10 @@ impl ContextService {
     ///
     /// Without conditions and no matching frontmatter keys → block always matches.
     ///
+    /// With --semantic, uses embedding similarity to find the most relevant context
+    /// blocks by meaning rather than by metadata filtering. Requires embeddings to
+    /// be populated via `normalize structure rebuild`.
+    ///
     /// Examples:
     ///   normalize context                                          # dump all (no filter)
     ///   normalize context --match hook=UserPromptSubmit            # filter by key=value
@@ -215,11 +220,13 @@ impl ContextService {
     ///   echo '{"hook":"X"}' | normalize context --stdin --prefix claudecode
     ///   normalize context --all --list                            # list all source files
     ///   normalize context --file cfg=config.toml                  # load file under prefix
+    ///   normalize context --semantic "how to refactor Rust code"  # semantic search (v3)
+    ///   normalize context --semantic "query" --limit 10           # top-10 by similarity
     ///   normalize context migrate                                  # migrate old .context.md files
     ///   normalize context migrate --apply                         # apply migration
     #[cli(default, display_with = "display_context")]
     #[allow(clippy::too_many_arguments)]
-    pub fn context(
+    pub async fn context(
         &self,
         #[param(help = "Root directory for hierarchy walk (default: cwd)")] root: Option<String>,
         #[param(help = "Match context against KEY=VALUE pair (repeatable)")] r#match: Vec<String>,
@@ -233,6 +240,13 @@ impl ContextService {
             help = "Load a structured file into caller context as PREFIX=PATH (repeatable; supports .json, .toml, .yaml/.yml)"
         )]
         file: Vec<String>,
+        #[param(help = "Find context blocks by semantic similarity to this query (v3)")]
+        semantic: Option<String>,
+        #[param(
+            short = 'n',
+            help = "Maximum number of results for --semantic (default: 5)"
+        )]
+        limit: Option<usize>,
         pretty: bool,
         compact: bool,
     ) -> Result<ContextKindReport, String> {
@@ -249,6 +263,57 @@ impl ContextService {
         if list {
             let files = collect_new_context_files(&root_path, dir_name);
             return Ok(ContextKindReport::List(ContextListReport::new(files)));
+        }
+
+        // v3: Semantic search path — embedding similarity over context blocks.
+        if let Some(query) = semantic {
+            let top_k = limit.unwrap_or(5);
+            let report =
+                normalize_semantic::service::run_context_search(&root_path, query, top_k).await?;
+
+            // Apply any --match filters on top of the semantic results.
+            let caller_ctx: CallerContext = parse_match_pairs(&r#match)?;
+            let blocks: Vec<ContextBlock> = if caller_ctx.is_empty() {
+                // No metadata filter — return all semantic hits directly.
+                report
+                    .results
+                    .into_iter()
+                    .map(|r| ContextBlock {
+                        source: std::path::PathBuf::from(&r.path),
+                        metadata: serde_json::Value::Null,
+                        body: r.content,
+                    })
+                    .collect()
+            } else {
+                // Re-parse the source files to get frontmatter and apply --match filtering.
+                report
+                    .results
+                    .into_iter()
+                    .filter_map(|r| {
+                        let abs_path = root_path.join(&r.path);
+                        let content = std::fs::read_to_string(&abs_path).ok()?;
+                        let parsed_blocks = parse_blocks(&content);
+                        // Find the first block that matches the caller context.
+                        for pb in &parsed_blocks {
+                            if block_matches(pb, &caller_ctx, false) {
+                                let meta_json = pb
+                                    .frontmatter
+                                    .as_ref()
+                                    .map(|fm| yaml_to_json(fm.clone()))
+                                    .unwrap_or(serde_json::Value::Null);
+                                return Some(ContextBlock {
+                                    source: std::path::PathBuf::from(&r.path),
+                                    metadata: meta_json,
+                                    body: pb.body.clone(),
+                                });
+                            }
+                        }
+                        None
+                    })
+                    .collect()
+            };
+
+            return Ok(ContextKindReport::Full(ContextReport::new(blocks)));
         }
 
         // Build caller context from --match pairs, optionally --stdin, and --file entries.

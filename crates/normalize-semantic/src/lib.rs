@@ -23,8 +23,10 @@
 //!
 //! For markdown and commit embeddings, call [`populate::populate_markdown_docs`]
 //! and [`populate::populate_commit_messages`] respectively.
+//! For `.normalize/context/` block embeddings, call [`populate::populate_context_blocks`].
 //!
-//! To search, call [`service::SemanticService::search`] (CLI) or use
+//! To search, call [`service::run_search`] (all source types) or
+//! [`service::run_context_search`] (context blocks only), or use
 //! [`store::load_all_embeddings`] + [`search::rerank`] directly.
 
 pub mod chunks;
@@ -43,8 +45,8 @@ pub mod service;
 // Re-export the key public types for convenience.
 pub use config::EmbeddingsConfig;
 pub use populate::{
-    DEFAULT_MAX_COMMITS, PopulateStats, populate_commit_messages, populate_embeddings,
-    populate_incremental_for_paths, populate_markdown_docs,
+    DEFAULT_MAX_COMMITS, PopulateStats, populate_commit_messages, populate_context_blocks,
+    populate_embeddings, populate_incremental_for_paths, populate_markdown_docs,
 };
 pub use search::SearchHit;
 
