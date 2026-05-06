@@ -5,6 +5,7 @@
 
 use crate::commands::analyze::call_graph::CallEntry;
 use crate::commands::analyze::graph::{DependentsReport, GraphReport, GraphTarget};
+use crate::commands::analyze::import_path::ImportPathReport;
 use crate::commands::analyze::provenance::ProvenanceReport;
 use crate::commands::view::report::{ViewHistoryReport, ViewListReport, ViewReport};
 use crate::output::OutputFormatter;
@@ -111,6 +112,10 @@ impl ViewService {
     }
 
     fn display_provenance(&self, r: &ProvenanceReport) -> String {
+        self.display_output(r)
+    }
+
+    fn display_import_path(&self, r: &ImportPathReport) -> String {
         self.display_output(r)
     }
 }
@@ -543,6 +548,42 @@ impl ViewService {
         crate::commands::analyze::graph::analyze_graph(&idx, effective_limit, target)
             .await
             .map_err(|e| format!("Graph analysis failed: {}", e))
+    }
+
+    /// Find the shortest import chain between two files (requires facts index)
+    ///
+    /// Uses BFS over the resolved import graph to find the path from `<from>` to `<to>`.
+    /// Also known as: dependency path, import chain, module reachability.
+    ///
+    /// Examples:
+    ///   normalize view import-path src/a.rs src/b.rs           # shortest path
+    ///   normalize view import-path src/a.rs src/b.rs --all     # all simple paths (up to 5)
+    ///   normalize view import-path src/a.rs src/b.rs --reverse # path from b to a
+    #[cli(display_with = "display_import_path")]
+    pub async fn import_path(
+        &self,
+        #[param(positional, help = "Source file (root-relative or absolute path)")] from: String,
+        #[param(positional, help = "Target file (root-relative or absolute path)")] to: String,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Show all simple paths instead of just the shortest (up to --limit)")]
+        all: bool,
+        #[param(
+            short = 'l',
+            help = "Maximum number of paths to return with --all (default: 5)"
+        )]
+        limit: Option<usize>,
+        #[param(help = "Find paths from <to> to <from> instead")] reverse: bool,
+    ) -> Result<ImportPathReport, String> {
+        let root_path = Self::root_path(root)?;
+        let path_limit = limit.unwrap_or(5);
+        let idx = crate::index::ensure_ready(&root_path).await?;
+        crate::commands::analyze::import_path::find_import_path_command(
+            &idx, &root_path, &from, &to, all, path_limit, reverse,
+        )
+        .await
+        .map_err(|e| format!("Import path query failed: {}", e))
     }
 
     /// Git blame with session attribution and code relations

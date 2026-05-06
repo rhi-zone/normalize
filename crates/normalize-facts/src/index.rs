@@ -1607,6 +1607,141 @@ impl FileIndex {
         Ok(targets)
     }
 
+    /// Find the shortest import path(s) from `from` to `to` via BFS over the resolved import graph.
+    ///
+    /// `from` and `to` are root-relative path strings (as stored in the DB).
+    /// Returns all shortest paths (there may be more than one of equal length).
+    /// If `all_paths` is true, returns all simple paths up to `path_limit` paths
+    /// and up to `max_depth` hops deep.
+    /// Returns an empty vec if no path exists.
+    pub async fn find_import_path(
+        &self,
+        from: &str,
+        to: &str,
+        all_paths: bool,
+        path_limit: usize,
+        max_depth: usize,
+    ) -> Result<Vec<Vec<String>>, libsql::Error> {
+        use std::collections::{HashMap, HashSet, VecDeque};
+
+        if from == to {
+            return Ok(vec![vec![from.to_string()]]);
+        }
+
+        // Build adjacency list: file -> set of files it imports
+        let mut adj: HashMap<String, Vec<String>> = HashMap::new();
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT file, resolved_file FROM imports WHERE resolved_file IS NOT NULL",
+                (),
+            )
+            .await?;
+        while let Some(row) = rows.next().await? {
+            let file: String = row.get(0)?;
+            let resolved: String = row.get(1)?;
+            adj.entry(file).or_default().push(resolved);
+        }
+
+        if !all_paths {
+            // BFS for shortest path
+            let mut visited: HashMap<String, String> = HashMap::new(); // node -> parent
+            let mut queue: VecDeque<String> = VecDeque::new();
+            queue.push_back(from.to_string());
+            visited.insert(from.to_string(), String::new());
+
+            let mut found = false;
+            'bfs: while let Some(node) = queue.pop_front() {
+                // Check depth
+                let depth = {
+                    let mut d = 0usize;
+                    let mut cur = &node;
+                    while let Some(p) = visited.get(cur) {
+                        if p.is_empty() {
+                            break;
+                        }
+                        d += 1;
+                        cur = p;
+                        if d > max_depth {
+                            break;
+                        }
+                    }
+                    d
+                };
+                if depth >= max_depth {
+                    continue;
+                }
+                if let Some(neighbors) = adj.get(&node) {
+                    for neighbor in neighbors {
+                        if !visited.contains_key(neighbor.as_str()) {
+                            visited.insert(neighbor.clone(), node.clone());
+                            if neighbor == to {
+                                found = true;
+                                break 'bfs;
+                            }
+                            queue.push_back(neighbor.clone());
+                        }
+                    }
+                }
+            }
+
+            if !found {
+                return Ok(vec![]);
+            }
+
+            // Reconstruct path by backtracking through visited
+            let mut path = vec![to.to_string()];
+            let mut cur = to.to_string();
+            loop {
+                let parent = visited.get(&cur).cloned().unwrap_or_default();
+                if parent.is_empty() {
+                    break;
+                }
+                path.push(parent.clone());
+                cur = parent;
+            }
+            path.reverse();
+            Ok(vec![path])
+        } else {
+            // DFS to find all simple paths up to path_limit
+            let mut result: Vec<Vec<String>> = Vec::new();
+            let mut stack: VecDeque<(String, Vec<String>, HashSet<String>)> = VecDeque::new();
+            let mut initial_visited = HashSet::new();
+            initial_visited.insert(from.to_string());
+            stack.push_back((from.to_string(), vec![from.to_string()], initial_visited));
+
+            while let Some((node, path, visited)) = stack.pop_back() {
+                if result.len() >= path_limit {
+                    break;
+                }
+                if path.len() > max_depth + 1 {
+                    continue;
+                }
+                if let Some(neighbors) = adj.get(&node) {
+                    for neighbor in neighbors {
+                        if visited.contains(neighbor.as_str()) {
+                            continue;
+                        }
+                        let mut new_path = path.clone();
+                        new_path.push(neighbor.clone());
+                        if neighbor == to {
+                            result.push(new_path);
+                            if result.len() >= path_limit {
+                                break;
+                            }
+                        } else {
+                            let mut new_visited = visited.clone();
+                            new_visited.insert(neighbor.clone());
+                            stack.push_back((neighbor.clone(), new_path, new_visited));
+                        }
+                    }
+                }
+            }
+
+            Ok(result)
+        }
+    }
+
     /// Load all symbol implements from the symbol_implements table.
     /// Returns Vec<(file, name, interface)>.
     pub async fn all_symbol_implements(

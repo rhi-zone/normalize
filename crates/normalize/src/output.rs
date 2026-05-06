@@ -239,6 +239,9 @@ mod tests {
         assert_output_formatter::<DaemonRootReport>();
         assert_output_formatter::<DaemonRootsReport>();
 
+        use crate::commands::analyze::import_path::ImportPathReport;
+        assert_output_formatter::<ImportPathReport>();
+
         use crate::service::view::TraceReport;
         assert_output_formatter::<TraceReport>();
 
@@ -267,6 +270,9 @@ mod tests {
 
         use crate::service::sessions::PlansReport;
         assert_output_formatter::<PlansReport>();
+
+        use crate::commands::sessions::mark::MarkReport;
+        assert_output_formatter::<MarkReport>();
 
         use crate::service::package::{
             PackageAuditReport, PackageInfoReport, PackageListReport, PackageOutdatedReport,

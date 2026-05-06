@@ -566,7 +566,7 @@ See `docs/lint-architecture.md` for full design discussion.
 Rules (custom enforcement, future):
 - [x] Module boundary rules ("services/ cannot import cli/") — covered by `boundary-violations` native rule (see above)
 - [x] Threshold rules ("fan-out > 20 is error") — covered by `high-fan-out` and `high-fan-in` native rules (index-based, configurable threshold, default disabled, tags: architecture/coupling)
-- [ ] Dependency path queries ("what's between A and B?")
+- [x] Dependency path queries ("what's between A and B?") — `normalize view import-path <from> <to>` (BFS over resolved import graph; `--all` for all simple paths, `--reverse` to flip direction)
 
 **Rule unit testing (`normalize rules test`):**
 - [x] Inline marker format (fourslash-style): `normalize rules test <file>` runs all enabled syntax
@@ -811,16 +811,16 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 ### Session Analysis Backlog
 
 **Replace `--sort-by-*` flags with `--sort <field>`:**
-- `--sort-by-x` proliferates flags. Replace with a single `--sort <field>` accepting composite sorts: `--sort -tokens,+session` (`-`=desc, `+`=asc, prefix omitted = sensible default). Sensible defaults: numeric→desc, string→asc, date→desc (except message/event sequences where chronological order is natural, so date→asc). Applies everywhere sort is exposed (sessions, tools, etc.).
+- [x] `--sort-by-x` proliferates flags. Replace with a single `--sort <field>` accepting composite sorts: `--sort -tokens,+session` (`-`=desc, `+`=asc, prefix omitted = sensible default). Sensible defaults: numeric→desc, string→asc, date→desc (except message/event sequences where chronological order is natural, so date→asc). Applies everywhere sort is exposed (sessions, tools, etc.). Note: no `--sort-by-*` flags existed; `--sort <field>` was already the interface. This item is done.
 
 - [x] **Tool sequence filtering (`--sequence`):** `normalize sessions messages --sequence Grep,Grep,Read` — returns turns where consecutive tool calls match the pattern (case-insensitive prefix match), with `--context-turns N` surrounding context. Answers the "frequency vs motivation" gap: transition matrix shows how often, sequence filter shows what actually happened.
 
 **Composable message filters:**
-- `--has-tool <name>` — messages in turns that used a specific tool
-- `--min-chars <N>` / `--max-chars <N>` — filter by message length (not just truncation)
-- `--errors-only` — turns with tool errors
-- `--turn-range <start>-<end>` — positional filtering within sessions
-- `--exclude-interrupted` — skip `[Request interrupted by user]` noise
+- [x] `--has-tool <name>` — messages in turns that used a specific tool (case-insensitive prefix match on tool name)
+- [x] `--min-chars <N>` / `--max-chars <N>` — filter by message length
+- [x] `--errors-only` — turns with tool errors (ToolResult is_error=true)
+- [x] `--turn-range <start>-<end>` — positional filtering within sessions (e.g. `--turn-range 5-10`)
+- [x] `--exclude-interrupted` — skip messages containing `[Request interrupted by user]`
 
 **Analysis features:**
 1. **Cross-repo comparison**: group sessions by repository, compare metrics: tool usage, error rates, parallelization, costs. `--by-repo` flag to stats command.
@@ -844,7 +844,7 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
   - GitHub Copilot (VS Code)
 - Better `--compact` format: key:value pairs, no tables, all info preserved
 - Better `--pretty` format: bar charts for tools, progress bar for success rate
-- `normalize sessions mark <id>`: mark as reviewed (store in `.normalize/sessions-reviewed`)
+- [x] `normalize sessions mark <id>` / `unmark <id>`: mark/unmark as reviewed (stored in `.normalize/sessions-reviewed`); `--reviewed`/`--unreviewed` filter flags on `sessions list`
 - [x] **Project sync / portability** (`normalize sync <dest>`): implemented. Uses `walkdir` +
   `std::fs::copy` (note: `fast_rsync` is a delta algorithm library, not a file copier).
   Copies project dir + session metadata via `project_metadata_roots`, rewrites index paths
