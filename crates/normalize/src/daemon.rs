@@ -220,6 +220,47 @@ mod unix_impl {
         hasher.finalize().to_hex().to_string()
     }
 
+    /// Hash each regular `.scm` file under `.normalize/rules/` and return
+    /// a map from absolute path → blake3 digest.
+    ///
+    /// Used by [`DaemonServer::reload_config_and_reprime`] to detect which
+    /// custom rule files changed since the last prime, so their rule IDs can
+    /// be routed through [`DaemonServer::surgical_rerun_rules`] (Tier 2)
+    /// instead of falling back to a full reprime (Tier 3).
+    fn hash_scm_files(root: &Path) -> HashMap<PathBuf, [u8; 32]> {
+        let mut map = HashMap::new();
+        let rules_dir = root.join(".normalize/rules");
+        let Ok(entries) = std::fs::read_dir(&rules_dir) else {
+            return map;
+        };
+        let mut paths: Vec<PathBuf> = entries
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.is_file() && p.extension().map(|x| x == "scm").unwrap_or(false))
+            .collect();
+        paths.sort();
+        for p in paths {
+            if let Ok(content) = std::fs::read(&p) {
+                let digest = blake3::hash(&content);
+                map.insert(p, *digest.as_bytes());
+            }
+        }
+        map
+    }
+
+    /// Map a `.scm` file path to its rule ID.
+    ///
+    /// The rule ID is the file stem (e.g. `foo.scm` → `"foo"`). This matches
+    /// the convention in [`normalize_syntax_rules::loader::parse_rule_file`]
+    /// where the default ID is the file stem and frontmatter can override it.
+    /// We use the stem here because reading frontmatter from every changed
+    /// file on every config reload would be wasteful; the stem convention
+    /// covers the vast majority of custom rules.
+    fn scm_path_to_rule_id(path: &Path) -> Option<String> {
+        path.file_stem()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_string())
+    }
+
     /// Resolve the directory used for daemon lock + socket files.
     ///
     /// In production this is `~/.config/normalize`. Tests can set
@@ -354,6 +395,13 @@ mod unix_impl {
         /// per-issue filter loop.
         cached_rules: Arc<normalize_rules_config::RulesConfig>,
         cached_walk: Arc<normalize_rules_config::WalkConfig>,
+        /// Per-file blake3 hashes for every `.scm` file under `.normalize/rules/`
+        /// at the time of the last prime or Tier 2 reload. Compared against
+        /// freshly-computed hashes in [`DaemonServer::reload_config_and_reprime`]
+        /// to identify which custom rules changed, so their IDs can be added to
+        /// `rules_to_rerun` and routed through [`DaemonServer::surgical_rerun_rules`]
+        /// (Tier 2) instead of triggering a full reprime (Tier 3).
+        cached_scm_hashes: HashMap<PathBuf, [u8; 32]>,
         /// Set to `true` when a Tier 1 (filter-only) config reload arrived
         /// since the last prime. The serve paths apply
         /// [`DaemonServer::apply_filter_at_serve`] when set so cached blobs
@@ -506,6 +554,7 @@ mod unix_impl {
             // has something to diff against. The next prime will refresh this
             // snapshot to reflect what was actually used to produce the cache.
             let initial_config = NormalizeConfig::load(&root);
+            let initial_scm_hashes = hash_scm_files(&root);
             roots.insert(
                 root.clone(),
                 WatchedRoot {
@@ -515,6 +564,7 @@ mod unix_impl {
                     index,
                     cached_rules: Arc::new(initial_config.rules.clone()),
                     cached_walk: Arc::new(initial_config.walk.clone()),
+                    cached_scm_hashes: initial_scm_hashes,
                     serve_filter_pending: false,
                 },
             );
@@ -1150,6 +1200,10 @@ mod unix_impl {
                 // blobs.
                 watched.cached_rules = Arc::new(config.rules.clone());
                 watched.cached_walk = Arc::new(config.walk.clone());
+                // Refresh the .scm hash snapshot so the next
+                // reload_config_and_reprime can diff against what was actually
+                // used to produce the blobs.
+                watched.cached_scm_hashes = hash_scm_files(root);
                 // Persisted blobs now match the cached config — no serve-time
                 // filtering needed until the next config reload.
                 watched.serve_filter_pending = false;
@@ -1875,6 +1929,7 @@ mod unix_impl {
             rules_to_rerun: &HashSet<String>,
             new_rules: normalize_rules_config::RulesConfig,
             new_walk: normalize_rules_config::WalkConfig,
+            new_scm_hashes: HashMap<PathBuf, [u8; 32]>,
         ) {
             tracing::info!(
                 root = ?root,
@@ -2046,6 +2101,9 @@ mod unix_impl {
                 if let Some(w) = roots.get_mut(root) {
                     w.cached_rules = Arc::new(new_rules);
                     w.cached_walk = Arc::new(new_walk);
+                    // Update the .scm hash snapshot so the next reload can
+                    // diff against the hashes that produced the current blobs.
+                    w.cached_scm_hashes = new_scm_hashes;
                     w.serve_filter_pending = false;
                 }
             }
@@ -2082,17 +2140,56 @@ mod unix_impl {
             let new_rules = new_config.rules.clone();
             let new_walk = new_config.walk.clone();
 
-            let (old_rules, old_walk) = {
+            let (old_rules, old_walk, old_scm_hashes) = {
                 let roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
                 match roots.get(root) {
-                    Some(w) => (w.cached_rules.clone(), w.cached_walk.clone()),
+                    Some(w) => (
+                        w.cached_rules.clone(),
+                        w.cached_walk.clone(),
+                        w.cached_scm_hashes.clone(),
+                    ),
                     None => return, // root not watched — nothing to do
                 }
             };
 
-            let diff = normalize_rules_config::ConfigDiff::compute(
+            // Compute fresh .scm hashes and diff against the cached snapshot
+            // to find which custom rule files changed.
+            let new_scm_hashes = hash_scm_files(root);
+            let scm_changed_rule_ids: HashSet<String> = {
+                let mut ids = HashSet::new();
+                // Files that were added or changed.
+                for (path, new_hash) in &new_scm_hashes {
+                    if old_scm_hashes.get(path) != Some(new_hash) {
+                        if let Some(id) = scm_path_to_rule_id(path) {
+                            ids.insert(id);
+                        }
+                    }
+                }
+                // Files that were removed.
+                for path in old_scm_hashes.keys() {
+                    if !new_scm_hashes.contains_key(path) {
+                        if let Some(id) = scm_path_to_rule_id(path) {
+                            ids.insert(id);
+                        }
+                    }
+                }
+                ids
+            };
+
+            let mut diff = normalize_rules_config::ConfigDiff::compute(
                 &old_rules, &new_rules, &old_walk, &new_walk,
             );
+
+            // Union .scm-derived rule IDs into the config diff so they route
+            // through Tier 2 (surgical re-run) rather than Tier 3 (full reprime).
+            if !scm_changed_rule_ids.is_empty() {
+                tracing::info!(
+                    root = ?root,
+                    scm_rules = scm_changed_rule_ids.len(),
+                    "config reload: .scm files changed — adding to rules_to_rerun"
+                );
+                diff.rules_to_rerun.extend(scm_changed_rule_ids);
+            }
 
             if diff.is_empty() {
                 // The config bytes changed (notify fired) but nothing the
@@ -2105,6 +2202,7 @@ mod unix_impl {
                 if let Some(w) = roots.get_mut(root) {
                     w.cached_rules = Arc::new(new_rules);
                     w.cached_walk = Arc::new(new_walk);
+                    w.cached_scm_hashes = new_scm_hashes;
                 }
                 drop(roots);
                 tracing::debug!(root = ?root, "config reload: no observable change");
@@ -2131,6 +2229,7 @@ mod unix_impl {
                     if let Some(w) = roots.get_mut(root) {
                         w.cached_rules = Arc::new(new_rules);
                         w.cached_walk = Arc::new(new_walk);
+                        w.cached_scm_hashes = new_scm_hashes;
                         w.serve_filter_pending = true;
                     }
                 }
@@ -2145,10 +2244,17 @@ mod unix_impl {
             }
 
             // Tier 2: per-rule re-eval — the file set hasn't changed but one
-            // or more rules need to re-run. Splice updated findings into the
-            // existing blobs without clearing everything.
+            // or more rules need to re-run (including any .scm file edits
+            // detected above). Splice updated findings into the existing blobs
+            // without clearing everything.
             if !diff.requires_full_reprime() {
-                self.surgical_rerun_rules(root, &diff.rules_to_rerun, new_rules, new_walk);
+                self.surgical_rerun_rules(
+                    root,
+                    &diff.rules_to_rerun,
+                    new_rules,
+                    new_walk,
+                    new_scm_hashes,
+                );
                 let _ = self.event_tx.send(Event::IndexRefreshed {
                     root: root.to_string_lossy().into_owned(),
                     files: 0,
@@ -3041,6 +3147,7 @@ mod unix_impl {
                     index: Arc::new(std::sync::Mutex::new(idx)),
                     cached_rules: Arc::new(normalize_rules_config::RulesConfig::default()),
                     cached_walk: Arc::new(normalize_rules_config::WalkConfig::default()),
+                    cached_scm_hashes: HashMap::new(),
                     serve_filter_pending: false,
                 },
             );

@@ -352,6 +352,8 @@ allow = [
     "crates/normalize-languages/src/*.rs",
     # Rules service run() method: large due to orchestrating multiple engines
     "crates/normalize-rules/src/service.rs",
+    # try_open grew past 430 lines after is_reexport schema migration (v12)
+    "crates/normalize-facts/src/index.rs",
 ]
 
 [rules.rule."go/context-todo"]
