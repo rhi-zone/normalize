@@ -7,6 +7,7 @@ use crate::commands::analyze::call_graph::CallEntry;
 use crate::commands::analyze::graph::{DependentsReport, GraphReport, GraphTarget};
 use crate::commands::analyze::import_path::ImportPathReport;
 use crate::commands::analyze::provenance::ProvenanceReport;
+use crate::commands::view::chunked::ChunkedViewReport;
 use crate::commands::view::report::{ViewHistoryReport, ViewListReport, ViewReport};
 use crate::output::OutputFormatter;
 use server_less::cli;
@@ -84,6 +85,11 @@ impl ViewService {
 
     #[allow(dead_code)] // called by server-less proc macro via display_with = "display_view_list"
     fn display_view_list(&self, value: &ViewListReport) -> String {
+        self.display_output(value)
+    }
+
+    #[allow(dead_code)] // called by server-less proc macro via display_with = "display_chunked"
+    fn display_chunked(&self, value: &ChunkedViewReport) -> String {
         self.display_output(value)
     }
 
@@ -298,6 +304,63 @@ impl ViewService {
         }
 
         Ok(report)
+    }
+
+    /// View a large file in navigable chunks or anchored around a pattern match.
+    ///
+    /// Use `--chunk N` to view the Nth fixed-size chunk (1-indexed, default chunk size 100 lines).
+    /// Use `--around <pattern>` to show context around the first regex/substring match.
+    ///
+    /// Examples:
+    ///   normalize view chunk src/main.rs --chunk 3          # lines 201-300
+    ///   normalize view chunk src/main.rs --chunk 3 --chunk-size 50  # lines 101-150
+    ///   normalize view chunk src/main.rs --around "fn main"         # ±50 lines around match
+    ///   normalize view chunk src/main.rs --around "TODO" --context 20  # ±20 lines
+    ///   normalize view chunk src/main.rs --around "fn" --match-index 3  # 3rd match
+    #[cli(display_with = "display_chunked")]
+    #[allow(clippy::too_many_arguments)]
+    pub async fn chunk(
+        &self,
+        #[param(positional, help = "File path to view")] target: String,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(help = "Show chunk N (1-indexed) of the file")] chunk: Option<usize>,
+        #[param(help = "Lines per chunk (default: 100)")] chunk_size: Option<usize>,
+        #[param(help = "Show context around first occurrence of pattern (regex or substring)")]
+        around: Option<String>,
+        #[param(
+            help = "Lines of context to show before and after match (default: 50)",
+            name = "context"
+        )]
+        context_lines: Option<usize>,
+        #[param(help = "Which match to show (1-indexed, default: 1)")] match_index: Option<usize>,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<ChunkedViewReport, String> {
+        let root_path = root
+            .map(PathBuf::from)
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+
+        self.resolve_format(pretty, compact, &root_path);
+
+        match (chunk, around) {
+            (Some(n), None) => {
+                let size = chunk_size.unwrap_or(100);
+                crate::commands::view::chunked::build_chunk_view(&target, &root_path, n, size)
+            }
+            (None, Some(ref pattern)) => {
+                let ctx = context_lines.unwrap_or(50);
+                let idx = match_index.unwrap_or(1);
+                crate::commands::view::chunked::build_around_view(
+                    &target, &root_path, pattern, ctx, idx,
+                )
+            }
+            (Some(_), Some(_)) => Err("--chunk and --around are mutually exclusive".to_string()),
+            (None, None) => Err("Specify --chunk N or --around <pattern>".to_string()),
+        }
     }
 
     /// Show what references this symbol (callers in the call graph; requires facts index)

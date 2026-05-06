@@ -1,5 +1,6 @@
 //! View command - unified view of files, directories, and symbols.
 
+pub mod chunked;
 pub mod file;
 pub mod history;
 pub mod lines;

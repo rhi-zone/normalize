@@ -794,7 +794,7 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 **RLM-inspired** (see `docs/research/recursive-language-models.md`):
 - [ ] Recursive investigation: agent self-invokes on subsets (e.g., `view --types-only` → pick symbols → `view symbol` → recurse if large)
 - [ ] Decomposition prompting: system prompt guides "search before answering" strategy
-- [ ] Chunked viewing: `view path --chunk N` or `view path --around "pattern"` for large files
+- [x] Chunked viewing: `normalize view chunk <file> --chunk N` or `--around "pattern"` for large files
 - [ ] REPL-style persistence: extend ephemeral context beyond 1 turn for iterative refinement
 - [ ] Depth/cost limits: cap recursion depth, token budgets per investigation
 
