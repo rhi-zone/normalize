@@ -936,6 +936,10 @@ impl EditService {
     fn display_move(&self, report: &MoveReport) -> String {
         report.format_text()
     }
+
+    fn display_introduce_variable(&self, report: &IntroduceVariableReport) -> String {
+        report.format_text()
+    }
 }
 
 #[cli(
@@ -1393,6 +1397,46 @@ impl EditService {
         .await
     }
 
+    /// Extract an expression into a named variable binding.
+    ///
+    /// Parses the file with tree-sitter to locate the expression at the given range,
+    /// inserts a binding declaration (`let name = <expr>;` or language equivalent)
+    /// immediately before the containing statement, and replaces the expression with
+    /// the variable name. Supports Rust, TypeScript, JavaScript, Python and any other
+    /// language with a tree-sitter grammar available.
+    ///
+    /// The range is specified as `start_line:start_col-end_line:end_col` (1-based).
+    ///
+    /// Examples:
+    ///   normalize edit introduce-variable src/lib.rs 10:20-10:35 value
+    ///   normalize edit introduce-variable src/main.py 5:5-5:18 result --dry-run
+    #[cli(
+        name = "introduce-variable",
+        display_with = "display_introduce_variable"
+    )]
+    pub fn introduce_variable(
+        &self,
+        #[param(positional, help = "File to edit")] file: String,
+        #[param(
+            positional,
+            help = "Expression range as start_line:start_col-end_line:end_col (1-based)"
+        )]
+        range: String,
+        #[param(positional, help = "Variable name to introduce")] name: String,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
+        #[param(short = 'm', help = "Message for shadow history")] message: Option<String>,
+        #[param(short = 'r', help = "Root directory")] root: Option<String>,
+    ) -> Result<IntroduceVariableReport, String> {
+        do_introduce_variable(
+            &file,
+            &range,
+            &name,
+            root.as_deref().map(Path::new),
+            dry_run,
+            message.as_deref(),
+        )
+    }
+
     /// View shadow git edit history
     ///
     /// Examples:
@@ -1489,6 +1533,125 @@ async fn do_rename(
         new_content: None,
         changes: vec![],
         files: modified,
+    })
+}
+
+// ── introduce_variable ───────────────────────────────────────────────────────
+
+/// Report returned by `normalize edit introduce-variable`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IntroduceVariableReport {
+    /// Relative file path that was (or would be) edited.
+    pub file: String,
+    /// The variable name that was introduced.
+    pub name: String,
+    /// 1-based line number where the binding was inserted.
+    pub inserted_line: usize,
+    /// Byte offset of the start of the replaced expression.
+    pub replaced_start: usize,
+    /// Byte offset of the end of the replaced expression.
+    pub replaced_end: usize,
+    /// Whether this was a dry run (no file written).
+    pub dry_run: bool,
+}
+
+impl OutputFormatter for IntroduceVariableReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let verb = if self.dry_run {
+            "Would introduce"
+        } else {
+            "Introduced"
+        };
+        let _ = writeln!(
+            out,
+            "{} variable '{}' at line {} in {}",
+            verb, self.name, self.inserted_line, self.file
+        );
+        if self.dry_run {
+            let _ = writeln!(out, "  (dry run — no files written)");
+        }
+        out
+    }
+
+    fn format_pretty(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let verb = if self.dry_run {
+            "\x1b[1;33mWould introduce\x1b[0m"
+        } else {
+            "\x1b[1;32mIntroduced\x1b[0m"
+        };
+        let _ = writeln!(
+            out,
+            "{} variable '\x1b[1m{}\x1b[0m' at line \x1b[2m{}\x1b[0m in \x1b[2m{}\x1b[0m",
+            verb, self.name, self.inserted_line, self.file
+        );
+        if self.dry_run {
+            let _ = writeln!(out, "  \x1b[2m(dry run — no files written)\x1b[0m");
+        }
+        out
+    }
+}
+
+fn do_introduce_variable(
+    file: &str,
+    range_str: &str,
+    name: &str,
+    root: Option<&Path>,
+    dry_run: bool,
+    message: Option<&str>,
+) -> Result<IntroduceVariableReport, String> {
+    let root: PathBuf = root
+        .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd deleted
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+
+    let config = NormalizeConfig::load(&root);
+    let shadow_enabled = config.shadow.enabled();
+
+    // Resolve file path (accept relative or absolute).
+    let file_path = if Path::new(file).is_absolute() {
+        PathBuf::from(file)
+    } else {
+        root.join(file)
+    };
+
+    let rel_path = file_path
+        .strip_prefix(&root)
+        .unwrap_or(&file_path)
+        .to_string_lossy()
+        .to_string();
+
+    let content = std::fs::read_to_string(&file_path)
+        .map_err(|e| format!("Error reading {}: {}", rel_path, e))?;
+
+    // Parse range.
+    let byte_range =
+        normalize_refactor::introduce_variable::parse_line_col_range(&content, range_str)?;
+
+    // Plan the refactoring.
+    let outcome = normalize_refactor::introduce_variable::plan_introduce_variable(
+        &file_path, &content, byte_range, name,
+    )?;
+
+    // Execute.
+    let executor = normalize_refactor::RefactoringExecutor {
+        root: root.clone(),
+        dry_run,
+        shadow_enabled,
+        message: message.map(String::from),
+    };
+    executor.apply(&outcome.plan)?;
+
+    Ok(IntroduceVariableReport {
+        file: rel_path,
+        name: outcome.name,
+        inserted_line: outcome.inserted_line,
+        replaced_start: outcome.replaced_start,
+        replaced_end: outcome.replaced_end,
+        dry_run,
     })
 }
 

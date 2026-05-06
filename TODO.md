@@ -147,7 +147,7 @@ Target recipes (in rough priority order):
 - [ ] `inline_variable` / `inline_function` — inverse of extract
 - [x] `move_item` — move function/struct/type to another file, fix imports (`normalize edit move`, recipe at `crates/normalize-refactor/src/move_item.rs`). Best-effort import rewriting for Python/Go/JS/TS; Rust and unsupported cases emit warnings rather than fabricate paths. `--reexport` available for Python.
 - [ ] `add_parameter` / `change_signature` — update function signature + all callsites
-- [ ] `introduce_variable` — extract expression into a named binding
+- [x] `introduce_variable` — extract expression into a named binding (`normalize edit introduce-variable <file> <range> <name>`, recipe at `crates/normalize-refactor/src/introduce_variable.rs`). Language-specific binding keyword: Python uses bare assignment, JS/TS use `const`, all others use `let`. Range specified as `start_line:start_col-end_line:end_col` (1-based).
 
 Each recipe should be language-agnostic where possible (via the Language trait + .scm queries)
 with language-specific overrides for things the generic tree-sitter model can't express.

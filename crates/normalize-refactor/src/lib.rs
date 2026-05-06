@@ -6,6 +6,7 @@
 //! - **Executor** (`RefactoringExecutor`): Shared apply/dry-run/shadow logic
 
 pub mod actions;
+pub mod introduce_variable;
 pub mod move_item;
 pub mod rename;
 

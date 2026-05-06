@@ -7,17 +7,19 @@ Edit code by symbol name. Use for batch renames, signature changes, or pattern-b
 Usage: normalize edit [OPTIONS] [COMMAND]
 
 Commands:
-  delete   Delete a symbol.
-  replace  Replace a symbol with new content.
-  swap     Swap two symbols
-  insert   Insert content relative to a symbol.
-  rename   Rename a symbol across its definition, call sites, and import statements.
-  undo     Undo the last N edits
-  redo     Redo the last undone edit
-  goto     Jump to a specific shadow commit
-  batch    Apply batch edits from JSON file
-  history  View shadow git edit history
-  help     Print this message or the help of the given subcommand(s)
+  delete               Delete a symbol.
+  replace              Replace a symbol with new content.
+  swap                 Swap two symbols
+  insert               Insert content relative to a symbol.
+  rename               Rename a symbol across its definition, call sites, and import statements.
+  undo                 Undo the last N edits
+  redo                 Redo the last undone edit
+  goto                 Jump to a specific shadow commit
+  batch                Apply batch edits from JSON file
+  move                 Move a symbol's definition to another file and rewrite import sites.
+  introduce-variable   Extract an expression into a named variable binding.
+  history              View shadow git edit history
+  help                 Print this message or the help of the given subcommand(s)
 
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
