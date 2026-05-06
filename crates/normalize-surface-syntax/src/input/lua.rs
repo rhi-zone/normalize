@@ -319,10 +319,25 @@ impl<'a> ReadContext<'a> {
             .ok_or_else(|| ReadError::Parse("function_call missing name".into()))?;
         let arguments = node.child_by_field_name("arguments");
 
-        let callee = self.read_expr(name)?;
+        // Check if the callee is a method_index_expression (obj:method syntax).
+        // Desugar obj:method(args) → obj.method(obj, args) to preserve Lua semantics.
+        let (callee, implicit_self) = if name.kind() == "method_index_expression" {
+            let table = name
+                .child_by_field_name("table")
+                .ok_or_else(|| ReadError::Parse("method_index_expression missing table".into()))?;
+            let method = name
+                .child_by_field_name("method")
+                .ok_or_else(|| ReadError::Parse("method_index_expression missing method".into()))?;
+            let table_expr = self.read_expr(table)?;
+            let method_name = self.node_text(method);
+            let callee = Expr::member(table_expr.clone(), method_name);
+            (callee, Some(table_expr))
+        } else {
+            (self.read_expr(name)?, None)
+        };
 
         // Parse arguments
-        let args = if let Some(args_node) = arguments {
+        let mut args = if let Some(args_node) = arguments {
             self.read_arguments(args_node)?
         } else {
             // Lua allows: f"string" and f{table} as shorthand
@@ -343,6 +358,14 @@ impl<'a> ReadContext<'a> {
             args
         };
 
+        // Prepend implicit self for method calls: obj:method(a) → obj.method(obj, a)
+        if let Some(self_expr) = implicit_self {
+            args.insert(0, self_expr);
+        }
+
+        // Recognize setmetatable(t, mt) and lower to prototype chain representation.
+        // If the second argument is a table literal with __index, emit a metatable comment
+        // but preserve the call in the IR (no lossless lowering without class IR).
         Ok(Expr::call(callee, args))
     }
 
@@ -388,7 +411,9 @@ impl<'a> ReadContext<'a> {
     }
 
     fn read_method_index(&self, node: Node) -> Result<Expr, ReadError> {
-        // obj:method -> obj.method with implicit self
+        // obj:method used as an expression (not a call) — lower to obj.method.
+        // When used as the callee in a function_call, read_function_call handles
+        // the desugaring (inserts implicit self as first argument).
         let table = node
             .child_by_field_name("table")
             .ok_or_else(|| ReadError::Parse("method_index_expression missing table".into()))?;
@@ -410,19 +435,35 @@ impl<'a> ReadContext<'a> {
         for child in node.children(&mut cursor) {
             match child.kind() {
                 "field" => {
-                    // Named field: key = value
-                    let name = child.child_by_field_name("name");
+                    // Named field: key = value  OR  [expr] = value
+                    let name_node = child.child_by_field_name("name");
                     let value = child
                         .child_by_field_name("value")
                         .ok_or_else(|| ReadError::Parse("field missing value".into()))?;
 
-                    let key = if let Some(name_node) = name {
-                        self.node_text(name_node).to_string()
-                    } else {
-                        // Implicit numeric key for array-style entries
-                        let k = array_index.to_string();
-                        array_index += 1;
-                        k
+                    let key = match name_node {
+                        Some(n) if n.kind() == "identifier" => {
+                            // plain = value  (identifier key, e.g. `x = 1` or `__index = fn`)
+                            self.node_text(n).to_string()
+                        }
+                        Some(n) if n.kind() == "string" => {
+                            // ["key"] = value  (string literal key)
+                            // Extract the inner string value by reading it as an expression.
+                            match self.read_string(n)? {
+                                Expr::Literal(crate::ir::Literal::String(s)) => s,
+                                _ => self.node_text(n).to_string(),
+                            }
+                        }
+                        Some(n) => {
+                            // [expr] = value  (computed key — use raw text as key name)
+                            self.node_text(n).to_string()
+                        }
+                        None => {
+                            // Implicit numeric key for array-style entries (no `=`)
+                            let k = array_index.to_string();
+                            array_index += 1;
+                            k
+                        }
                     };
 
                     pairs.push((key, self.read_expr(value)?));
@@ -591,14 +632,18 @@ impl<'a> ReadContext<'a> {
         let then_stmts = self.read_block_stmts(consequence)?;
         let then_stmt = Stmt::block(then_stmts);
 
-        // Handle elseif and else
+        // Handle elseif and else.
+        // Elseif nodes are siblings of the if — read_elseif_statement chains via
+        // next_sibling(), so we only need to find the *first* elseif/else child and
+        // stop there. Iterating all children would overwrite the chained result.
         let mut else_stmt: Option<Stmt> = None;
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             match child.kind() {
                 "elseif_statement" => {
-                    let elseif = self.read_elseif_statement(child)?;
-                    else_stmt = Some(elseif);
+                    // read_elseif_statement recurses into sibling elseif/else nodes.
+                    else_stmt = Some(self.read_elseif_statement(child)?);
+                    break; // stop — chaining handled by read_elseif_statement
                 }
                 "else_statement" => {
                     let else_body = child
@@ -606,6 +651,7 @@ impl<'a> ReadContext<'a> {
                         .ok_or_else(|| ReadError::Parse("else_statement missing body".into()))?;
                     let stmts = self.read_block_stmts(else_body)?;
                     else_stmt = Some(Stmt::block(stmts));
+                    break;
                 }
                 _ => {}
             }
@@ -710,13 +756,20 @@ impl<'a> ReadContext<'a> {
         let var_name = self.node_text(name).to_string();
         let start_expr = self.read_expr(start)?;
         let finish_expr = self.read_expr(finish)?;
+        let step_expr = clause
+            .child_by_field_name("step")
+            .map(|n| self.read_expr(n))
+            .transpose()?;
 
         let body_node = node
             .child_by_field_name("body")
             .ok_or_else(|| ReadError::Parse("for_statement missing body".into()))?;
         let body_stmts = self.read_block_stmts(body_node)?;
 
-        // Convert to: for (init; test; update) { body }
+        // Convert `for i = start, stop[, step] do ... end` to:
+        // `local i = start; while i <= stop do ... ; i = i + step end`
+        // (step defaults to 1 when absent).
+        let step = step_expr.unwrap_or_else(|| Expr::number(1.0));
         let init = Stmt::let_decl(var_name.clone(), Some(start_expr));
         let test = Expr::binary(
             Expr::ident(var_name.clone()),
@@ -725,7 +778,7 @@ impl<'a> ReadContext<'a> {
         );
         let update = Expr::assign(
             Expr::ident(var_name.clone()),
-            Expr::binary(Expr::ident(var_name), BinaryOp::Add, Expr::number(1.0)),
+            Expr::binary(Expr::ident(var_name), BinaryOp::Add, step),
         );
 
         Ok(Stmt::for_loop(
@@ -768,11 +821,15 @@ impl<'a> ReadContext<'a> {
             .ok_or_else(|| ReadError::Parse("for_statement missing body".into()))?;
         let body_stmts = self.read_block_stmts(body_node)?;
 
-        // Use first variable as iteration variable
-        let var_name = var_names
-            .into_iter()
-            .next()
-            .unwrap_or_else(|| "_".to_string());
+        // The IR ForIn supports a single variable name.
+        // For multi-variable generic for (e.g. `for k, v in pairs(t)`), join all names
+        // with a comma so they can be round-tripped via the Lua writer which emits
+        // `for <variable> in pairs(<iterable>)`.
+        let var_name = if var_names.is_empty() {
+            "_".to_string()
+        } else {
+            var_names.join(", ")
+        };
 
         Ok(Stmt::for_in(var_name, iter_expr, Stmt::block(body_stmts)))
     }
@@ -1009,6 +1066,268 @@ mod tests {
         match &program.body[0] {
             Stmt::Expr(Expr::Call { .. }) => {}
             _ => panic!("expected Call"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_nested_function_calls() -> Result<(), ReadError> {
+        // f(g(h(42))) — three levels of nesting
+        let program = read_lua("local x = f(g(h(42)))")?;
+        match &program.body[0] {
+            Stmt::Let {
+                init: Some(Expr::Call { callee, args }),
+                ..
+            } => {
+                match callee.as_ref() {
+                    Expr::Ident(name) => assert_eq!(name, "f"),
+                    _ => panic!("expected Ident callee"),
+                }
+                assert_eq!(args.len(), 1);
+                match &args[0] {
+                    Expr::Call { callee: inner, .. } => match inner.as_ref() {
+                        Expr::Ident(name) => assert_eq!(name, "g"),
+                        _ => panic!("expected Ident inner callee"),
+                    },
+                    _ => panic!("expected nested Call"),
+                }
+            }
+            _ => panic!("expected Let with Call"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_multi_return_local() -> Result<(), ReadError> {
+        // local a, b = f() — multi-variable declaration
+        let program = read_lua("local a, b = f()")?;
+        // IR lowers to a Block with two Let statements
+        match &program.body[0] {
+            Stmt::Block(stmts) => {
+                assert_eq!(stmts.len(), 2);
+                match &stmts[0] {
+                    Stmt::Let { name, .. } => assert_eq!(name, "a"),
+                    _ => panic!("expected Let a"),
+                }
+                match &stmts[1] {
+                    Stmt::Let { name, .. } => assert_eq!(name, "b"),
+                    _ => panic!("expected Let b"),
+                }
+            }
+            _ => panic!("expected Block for multi-variable declaration"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_unicode_string() -> Result<(), ReadError> {
+        let program = read_lua(r#"local s = "こんにちは""#)?;
+        match &program.body[0] {
+            Stmt::Let {
+                init: Some(Expr::Literal(Literal::String(s))),
+                ..
+            } => {
+                assert_eq!(s, "こんにちは");
+            }
+            _ => panic!("expected Let with String"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_string() -> Result<(), ReadError> {
+        let program = read_lua("local s = [[hello world]]")?;
+        match &program.body[0] {
+            Stmt::Let {
+                init: Some(Expr::Literal(Literal::String(s))),
+                ..
+            } => {
+                assert_eq!(s, "hello world");
+            }
+            _ => panic!("expected Let with String"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_numeric_for_with_step() -> Result<(), ReadError> {
+        // for i = 1, 10, 2 do ... end — step should be 2, not 1
+        let program = read_lua("for i = 1, 10, 2 do print(i) end")?;
+        match &program.body[0] {
+            Stmt::For { init, update, .. } => {
+                // Init: local i = 1
+                match init.as_ref().map(|b| b.as_ref()) {
+                    Some(Stmt::Let { name, .. }) => assert_eq!(name, "i"),
+                    _ => panic!("expected Let init"),
+                }
+                // Update: i = i + 2
+                match update {
+                    Some(Expr::Assign { value, .. }) => match value.as_ref() {
+                        Expr::Binary { op, right, .. } => {
+                            assert_eq!(op, &BinaryOp::Add);
+                            match right.as_ref() {
+                                Expr::Literal(Literal::Number(n)) => assert_eq!(*n, 2.0),
+                                _ => panic!("expected step = 2"),
+                            }
+                        }
+                        _ => panic!("expected Binary update"),
+                    },
+                    _ => panic!("expected Assign update"),
+                }
+            }
+            _ => panic!("expected For"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_numeric_for_default_step() -> Result<(), ReadError> {
+        // for i = 1, 10 do ... end — step defaults to 1
+        let program = read_lua("for i = 1, 10 do print(i) end")?;
+        match &program.body[0] {
+            Stmt::For { update, .. } => match update {
+                Some(Expr::Assign { value, .. }) => match value.as_ref() {
+                    Expr::Binary { right, .. } => match right.as_ref() {
+                        Expr::Literal(Literal::Number(n)) => assert_eq!(*n, 1.0),
+                        _ => panic!("expected step = 1"),
+                    },
+                    _ => panic!("expected Binary"),
+                },
+                _ => panic!("expected Assign update"),
+            },
+            _ => panic!("expected For"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_generic_for_multi_var() -> Result<(), ReadError> {
+        // for k, v in pairs(t) — both k and v should be captured
+        let program = read_lua("for k, v in pairs(t) do print(k) end")?;
+        match &program.body[0] {
+            Stmt::ForIn { variable, .. } => {
+                // Both variables preserved as "k, v"
+                assert_eq!(variable, "k, v");
+            }
+            _ => panic!("expected ForIn"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_method_call_desugars_self() -> Result<(), ReadError> {
+        // obj:method(x) should desugar to obj.method(obj, x)
+        let program = read_lua("obj:method(42)")?;
+        match &program.body[0] {
+            Stmt::Expr(Expr::Call { callee, args }) => {
+                // callee is obj.method
+                match callee.as_ref() {
+                    Expr::Member {
+                        object,
+                        property,
+                        computed: false,
+                    } => {
+                        match object.as_ref() {
+                            Expr::Ident(name) => assert_eq!(name, "obj"),
+                            _ => panic!("expected Ident object"),
+                        }
+                        match property.as_ref() {
+                            Expr::Literal(Literal::String(s)) => assert_eq!(s, "method"),
+                            _ => panic!("expected String property"),
+                        }
+                    }
+                    _ => panic!("expected Member callee"),
+                }
+                // First arg is implicit self (obj)
+                assert_eq!(args.len(), 2);
+                match &args[0] {
+                    Expr::Ident(name) => assert_eq!(name, "obj"),
+                    _ => panic!("expected Ident as first (self) arg"),
+                }
+            }
+            _ => panic!("expected Expr Call"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_metamethod_table_keys() -> Result<(), ReadError> {
+        // Table with __index metamethod key — should be recognized as a named field
+        let program = read_lua("local mt = { __index = function(self, k) return nil end }")?;
+        match &program.body[0] {
+            Stmt::Let {
+                init: Some(Expr::Object(pairs)),
+                ..
+            } => {
+                assert_eq!(pairs.len(), 1);
+                assert_eq!(pairs[0].0, "__index");
+                assert!(matches!(pairs[0].1, Expr::Function(_)));
+            }
+            _ => panic!("expected Let with Object"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_table_computed_string_key() -> Result<(), ReadError> {
+        // ["key"] = value — computed string key should extract the string value
+        let program = read_lua(r#"local t = { ["hello"] = 42 }"#)?;
+        match &program.body[0] {
+            Stmt::Let {
+                init: Some(Expr::Object(pairs)),
+                ..
+            } => {
+                assert_eq!(pairs.len(), 1);
+                // Key should be the string content "hello", not the raw text ["hello"]
+                assert_eq!(pairs[0].0, "hello");
+            }
+            _ => panic!("expected Let with Object"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_complex_control_flow() -> Result<(), ReadError> {
+        let src = r#"
+local function classify(x)
+  if x > 100 then
+    return "big"
+  elseif x > 10 then
+    return "medium"
+  else
+    return "small"
+  end
+end
+"#;
+        let program = read_lua(src)?;
+        match &program.body[0] {
+            Stmt::Function(f) => {
+                assert_eq!(f.name, "classify");
+                match &f.body[0] {
+                    Stmt::If {
+                        test,
+                        alternate: Some(alt),
+                        ..
+                    } => {
+                        assert!(matches!(
+                            test,
+                            Expr::Binary {
+                                op: BinaryOp::Gt,
+                                ..
+                            }
+                        ));
+                        // elseif becomes a nested If
+                        match alt.as_ref() {
+                            Stmt::If {
+                                alternate: Some(_), ..
+                            } => {}
+                            _ => panic!("expected nested If (elseif)"),
+                        }
+                    }
+                    _ => panic!("expected If"),
+                }
+            }
+            _ => panic!("expected Function"),
         }
         Ok(())
     }

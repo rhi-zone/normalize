@@ -156,7 +156,7 @@ impl LuaWriter {
                 iterable,
                 body,
             } => {
-                self.output.push_str("for _, ");
+                self.output.push_str("for ");
                 self.output.push_str(variable);
                 self.output.push_str(" in pairs(");
                 self.write_expr(iterable);
@@ -335,9 +335,16 @@ impl LuaWriter {
                     if i > 0 {
                         self.output.push_str(", ");
                     }
-                    self.output.push_str("[\"");
-                    self.output.push_str(key);
-                    self.output.push_str("\"] = ");
+                    if is_lua_identifier(key) {
+                        // Use idiomatic `key = value` syntax for valid Lua identifiers.
+                        self.output.push_str(key);
+                        self.output.push_str(" = ");
+                    } else {
+                        // Fall back to bracket syntax for non-identifier keys.
+                        self.output.push_str("[\"");
+                        self.output.push_str(&escape_string(key));
+                        self.output.push_str("\"] = ");
+                    }
                     self.write_expr(value);
                 }
                 self.output.push('}');
@@ -419,11 +426,32 @@ impl Default for LuaWriter {
 }
 
 fn escape_string(s: &str) -> String {
-    s.replace('\\', "\\\\")
-        .replace('"', "\\\"")
-        .replace('\n', "\\n")
-        .replace('\r', "\\r")
-        .replace('\t', "\\t")
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\0' => out.push_str("\\0"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// Returns true if `s` is a valid Lua identifier (can be used as a bare table key).
+fn is_lua_identifier(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    let mut chars = s.chars();
+    let first = chars.next().unwrap();
+    if !first.is_ascii_alphabetic() && first != '_' {
+        return false;
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 #[cfg(test)]
@@ -455,5 +483,119 @@ mod tests {
         )]);
         let lua = LuaWriter::emit(&program);
         assert_eq!(lua.trim(), "local sum = (1 + 2)");
+    }
+
+    #[test]
+    fn test_logical_operators_idiomatic() {
+        // Lua uses `and`/`or`/`not`, never `&&`/`||`/`!`
+        let program = Program::new(vec![Stmt::const_decl(
+            "b",
+            Expr::binary(
+                Expr::bool(true),
+                BinaryOp::And,
+                Expr::binary(Expr::bool(false), BinaryOp::Or, Expr::bool(true)),
+            ),
+        )]);
+        let lua = LuaWriter::emit(&program);
+        assert!(lua.contains("and"), "should use `and`, got: {lua}");
+        assert!(lua.contains("or"), "should use `or`, got: {lua}");
+        assert!(!lua.contains("&&"), "should not use `&&`, got: {lua}");
+        assert!(!lua.contains("||"), "should not use `||`, got: {lua}");
+    }
+
+    #[test]
+    fn test_inequality_idiomatic() {
+        // Lua uses `~=`, never `!=`
+        let program = Program::new(vec![Stmt::expr(Expr::binary(
+            Expr::ident("a"),
+            BinaryOp::Ne,
+            Expr::ident("b"),
+        ))]);
+        let lua = LuaWriter::emit(&program);
+        assert!(lua.contains("~="), "should use `~=`, got: {lua}");
+        assert!(!lua.contains("!="), "should not use `!=`, got: {lua}");
+    }
+
+    #[test]
+    fn test_null_is_nil() {
+        let program = Program::new(vec![Stmt::const_decl("x", Expr::null())]);
+        let lua = LuaWriter::emit(&program);
+        assert!(lua.contains("nil"), "should use `nil`, got: {lua}");
+        assert!(!lua.contains("null"), "should not use `null`, got: {lua}");
+    }
+
+    #[test]
+    fn test_object_idiomatic_keys() {
+        // Valid identifier keys should be emitted as `key = value`, not `["key"] = value`
+        let program = Program::new(vec![Stmt::const_decl(
+            "t",
+            Expr::object(vec![
+                ("x".to_string(), Expr::number(1)),
+                ("__index".to_string(), Expr::null()),
+                ("1".to_string(), Expr::number(99)), // numeric key: not a valid ident
+            ]),
+        )]);
+        let lua = LuaWriter::emit(&program);
+        assert!(
+            lua.contains("x = 1"),
+            "plain key should be bare, got: {lua}"
+        );
+        assert!(
+            lua.contains("__index = nil"),
+            "metamethod key should be bare, got: {lua}"
+        );
+        assert!(
+            lua.contains("[\"1\"] = 99"),
+            "numeric key should use brackets, got: {lua}"
+        );
+    }
+
+    #[test]
+    fn test_string_escaping() {
+        let program = Program::new(vec![Stmt::const_decl(
+            "s",
+            Expr::string("line1\nline2\ttab\"quote\\backslash\0null"),
+        )]);
+        let lua = LuaWriter::emit(&program);
+        assert!(lua.contains("\\n"), "newline should be escaped");
+        assert!(lua.contains("\\t"), "tab should be escaped");
+        assert!(lua.contains("\\\""), "quote should be escaped");
+        assert!(lua.contains("\\\\"), "backslash should be escaped");
+        assert!(lua.contains("\\0"), "null byte should be escaped");
+    }
+
+    #[test]
+    fn test_not_operator() {
+        let program = Program::new(vec![Stmt::expr(Expr::unary(
+            UnaryOp::Not,
+            Expr::bool(true),
+        ))]);
+        let lua = LuaWriter::emit(&program);
+        assert!(lua.contains("not "), "should use `not `, got: {lua}");
+        assert!(!lua.contains('!'), "should not use `!`, got: {lua}");
+    }
+
+    #[test]
+    fn test_for_in_multi_var() {
+        let program = Program::new(vec![Stmt::for_in(
+            "k, v",
+            Expr::call(Expr::ident("pairs"), vec![Expr::ident("t")]),
+            Stmt::block(vec![]),
+        )]);
+        let lua = LuaWriter::emit(&program);
+        assert!(
+            lua.contains("for k, v in pairs"),
+            "should preserve both loop vars, got: {lua}"
+        );
+    }
+
+    #[test]
+    fn test_unicode_string_preserved() {
+        let program = Program::new(vec![Stmt::const_decl("s", Expr::string("こんにちは 🌍"))]);
+        let lua = LuaWriter::emit(&program);
+        assert!(
+            lua.contains("こんにちは 🌍"),
+            "unicode should pass through unescaped, got: {lua}"
+        );
     }
 }
