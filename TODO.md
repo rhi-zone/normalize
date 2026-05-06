@@ -144,7 +144,8 @@ implementation nobody should have to re-derive.
 
 Target recipes (in rough priority order):
 - [~] `extract_function` — **first attempt (commit `ed9d3b63`, reverted) is wrong.** Tree-sitter identifier sweep + heuristic parameter inference; no return-value detection, no real scope analysis, no type awareness. Silently generates broken code. Do not merge. Needs the semantic foundation below before it can be done correctly.
-- [ ] `inline_variable` / `inline_function` — inverse of extract
+- [x] `inline_variable` — inverse of extract: replace all uses of a variable with its initializer and remove the binding (`normalize edit inline-variable <file> <line>:<col>`, recipe at `crates/normalize-refactor/src/inline_variable.rs`). Position points to the variable name in its declaration. Supports Rust, TypeScript/JavaScript, Python. Errors on reassignment or missing initializer; warns on side-effect risk with multiple references. `--safe` flag refuses to inline unused variables.
+- [ ] `inline_function` — inverse of extract function
 - [x] `move_item` — move function/struct/type to another file, fix imports (`normalize edit move`, recipe at `crates/normalize-refactor/src/move_item.rs`). Best-effort import rewriting for Python/Go/JS/TS; Rust and unsupported cases emit warnings rather than fabricate paths. `--reexport` available for Python.
 - [ ] `add_parameter` / `change_signature` — update function signature + all callsites
 - [x] `introduce_variable` — extract expression into a named binding (`normalize edit introduce-variable <file> <range> <name>`, recipe at `crates/normalize-refactor/src/introduce_variable.rs`). Language-specific binding keyword: Python uses bare assignment, JS/TS use `const`, all others use `let`. Range specified as `start_line:start_col-end_line:end_col` (1-based).

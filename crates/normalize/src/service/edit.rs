@@ -940,6 +940,10 @@ impl EditService {
     fn display_introduce_variable(&self, report: &IntroduceVariableReport) -> String {
         report.format_text()
     }
+
+    fn display_inline_variable(&self, report: &InlineVariableReport) -> String {
+        report.format_text()
+    }
 }
 
 #[cli(
@@ -1437,6 +1441,46 @@ impl EditService {
         )
     }
 
+    /// Inline a variable: replace all uses with the initializer and remove the binding.
+    ///
+    /// Parses the file with tree-sitter to locate the variable declaration at the given
+    /// position, finds all references within the same scope, replaces each reference with
+    /// the initializer expression, and removes the declaration line.
+    ///
+    /// The position must point to the variable name in its declaration (e.g. the `x` in
+    /// `let x = expr`). Supports Rust (`let`), TypeScript/JavaScript (`const`/`let`/`var`),
+    /// and Python (bare assignment).
+    ///
+    /// Errors if the variable has no initializer or is reassigned anywhere in the scope.
+    /// Warns if the initializer has side effects and is used more than once.
+    ///
+    /// Examples:
+    ///   normalize edit inline-variable src/lib.rs 10:9
+    ///   normalize edit inline-variable src/main.py 5:5 --dry-run
+    #[cli(name = "inline-variable", display_with = "display_inline_variable")]
+    pub fn inline_variable(
+        &self,
+        #[param(positional, help = "File to edit")] file: String,
+        #[param(
+            positional,
+            help = "Position of the variable name in its declaration as line:col (1-based)"
+        )]
+        position: String,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
+        #[param(help = "Refuse to inline if variable has 0 uses")] safe: bool,
+        #[param(short = 'm', help = "Message for shadow history")] message: Option<String>,
+        #[param(short = 'r', help = "Root directory")] root: Option<String>,
+    ) -> Result<InlineVariableReport, String> {
+        do_inline_variable(
+            &file,
+            &position,
+            dry_run,
+            safe,
+            root.as_deref().map(Path::new),
+            message.as_deref(),
+        )
+    }
+
     /// View shadow git edit history
     ///
     /// Examples:
@@ -1653,6 +1697,178 @@ fn do_introduce_variable(
         replaced_end: outcome.replaced_end,
         dry_run,
     })
+}
+
+// ── inline_variable ──────────────────────────────────────────────────────────
+
+/// Report returned by `normalize edit inline-variable`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct InlineVariableReport {
+    /// Relative file path that was (or would be) edited.
+    pub file: String,
+    /// The variable name that was inlined.
+    pub variable_name: String,
+    /// Number of use-sites replaced.
+    pub references_replaced: usize,
+    /// Whether this was a dry run (no file written).
+    pub dry_run: bool,
+    /// Warnings emitted during planning (e.g. side-effect risk).
+    pub warnings: Vec<String>,
+}
+
+impl OutputFormatter for InlineVariableReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let verb = if self.dry_run {
+            "Would inline"
+        } else {
+            "Inlined"
+        };
+        let _ = writeln!(
+            out,
+            "{} variable '{}' in {} ({} reference{})",
+            verb,
+            self.variable_name,
+            self.file,
+            self.references_replaced,
+            if self.references_replaced == 1 {
+                ""
+            } else {
+                "s"
+            }
+        );
+        for w in &self.warnings {
+            let _ = writeln!(out, "  warning: {}", w);
+        }
+        if self.dry_run {
+            let _ = writeln!(out, "  (dry run — no files written)");
+        }
+        out
+    }
+
+    fn format_pretty(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let verb = if self.dry_run {
+            "\x1b[1;33mWould inline\x1b[0m"
+        } else {
+            "\x1b[1;32mInlined\x1b[0m"
+        };
+        let _ = writeln!(
+            out,
+            "{} variable '\x1b[1m{}\x1b[0m' in \x1b[2m{}\x1b[0m ({} reference{})",
+            verb,
+            self.variable_name,
+            self.file,
+            self.references_replaced,
+            if self.references_replaced == 1 {
+                ""
+            } else {
+                "s"
+            }
+        );
+        for w in &self.warnings {
+            let _ = writeln!(out, "  \x1b[0;33mwarning\x1b[0m: {}", w);
+        }
+        if self.dry_run {
+            let _ = writeln!(out, "  \x1b[2m(dry run — no files written)\x1b[0m");
+        }
+        out
+    }
+}
+
+fn do_inline_variable(
+    file: &str,
+    position: &str,
+    dry_run: bool,
+    safe: bool,
+    root: Option<&Path>,
+    message: Option<&str>,
+) -> Result<InlineVariableReport, String> {
+    let root: PathBuf = root
+        .map(|p| p.to_path_buf())
+        // normalize-syntax-allow: rust/unwrap-in-impl - current_dir() only fails if cwd deleted
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+
+    let config = NormalizeConfig::load(&root);
+    let shadow_enabled = config.shadow.enabled();
+
+    // Resolve file path (accept relative or absolute).
+    let file_path = if Path::new(file).is_absolute() {
+        PathBuf::from(file)
+    } else {
+        root.join(file)
+    };
+
+    let rel_path = file_path
+        .strip_prefix(&root)
+        .unwrap_or(&file_path)
+        .to_string_lossy()
+        .to_string();
+
+    let content = std::fs::read_to_string(&file_path)
+        .map_err(|e| format!("Error reading {}: {}", rel_path, e))?;
+
+    // Parse position (line:col).
+    let (line, col) = parse_line_col_position(position)?;
+
+    // Plan the refactoring.
+    let outcome =
+        normalize_refactor::inline_variable::plan_inline_variable(&file_path, &content, line, col)?;
+
+    // --safe: refuse if variable has zero uses.
+    if safe && outcome.references_replaced == 0 {
+        return Err(format!(
+            "Variable '{}' has no uses; use without --safe to remove it anyway",
+            outcome.name
+        ));
+    }
+
+    // Print warnings to stderr before executing.
+    for w in &outcome.plan.warnings {
+        eprintln!("warning: {}", w);
+    }
+
+    // Execute.
+    let executor = normalize_refactor::RefactoringExecutor {
+        root: root.clone(),
+        dry_run,
+        shadow_enabled,
+        message: message.map(String::from),
+    };
+    executor.apply(&outcome.plan)?;
+
+    Ok(InlineVariableReport {
+        file: rel_path,
+        variable_name: outcome.name,
+        references_replaced: outcome.references_replaced,
+        dry_run,
+        warnings: outcome.plan.warnings,
+    })
+}
+
+/// Parse a `line:col` position string (1-based).
+fn parse_line_col_position(s: &str) -> Result<(usize, usize), String> {
+    let (line_s, col_s) = s.split_once(':').ok_or_else(|| {
+        format!(
+            "Invalid position '{}': expected format line:col (e.g. 5:9)",
+            s
+        )
+    })?;
+    let line: usize = line_s
+        .parse()
+        .map_err(|_| format!("Invalid line number '{}' in position '{}'", line_s, s))?;
+    let col: usize = col_s
+        .parse()
+        .map_err(|_| format!("Invalid column number '{}' in position '{}'", col_s, s))?;
+    if line == 0 || col == 0 {
+        return Err(format!(
+            "Line and column numbers are 1-based; got {} in position '{}'",
+            s, s
+        ));
+    }
+    Ok((line, col))
 }
 
 // ── move ─────────────────────────────────────────────────────────────────────
