@@ -349,12 +349,18 @@ pub fn validate_unused_kinds_audit(
     documented_unused: &[&str],
 ) -> Result<(), String> {
     use crate::GrammarLoader;
+    use crate::grammar_loader::GrammarLoadError;
     use std::collections::HashSet;
 
     let loader = GrammarLoader::new();
-    let ts_lang = loader
-        .get(lang.grammar_name())
-        .map_err(|e| format!("Grammar '{}' not found: {e}", lang.grammar_name()))?;
+    let ts_lang = match loader.get(lang.grammar_name()) {
+        Ok(l) => l,
+        // Grammar `.so` not present — typical in `cargo test` without
+        // `cargo xtask build-grammars`. Skip the audit instead of panicking.
+        // Real audit failures (loaded but mismatched) still surface.
+        Err(GrammarLoadError::NotFound(_)) => return Ok(()),
+        Err(e) => return Err(format!("Grammar '{}' not found: {e}", lang.grammar_name())),
+    };
 
     // Keywords that suggest a node kind might be useful (same as cross_check_node_kinds)
     let interesting_patterns = [
