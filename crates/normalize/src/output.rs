@@ -293,7 +293,7 @@ mod tests {
         assert_output_formatter::<PackageOutdatedReport>();
         assert_output_formatter::<PackageAuditReport>();
 
-        use normalize_semantic::service::{ContextSearchReport, SearchReport};
+        use crate::semantic_compat::{ContextSearchReport, SearchReport};
         assert_output_formatter::<SearchReport>();
         assert_output_formatter::<ContextSearchReport>();
     }

@@ -3,6 +3,7 @@
 //! Hosts the default `context` command (frontmatter-filtered context resolution)
 //! and the `migrate` subcommand (migration helper for old `.context.md` files).
 
+#[cfg_attr(not(feature = "embeddings"), allow(unused_imports))]
 use crate::commands::context::{
     CallerContext, ContextBlock, ContextListReport, ContextReport, block_matches,
     collect_new_context_files, parse_blocks, parse_match_pairs, read_file_context,
@@ -266,54 +267,67 @@ impl ContextService {
         }
 
         // v3: Semantic search path — embedding similarity over context blocks.
-        if let Some(query) = semantic {
-            let top_k = limit.unwrap_or(5);
-            let report =
-                normalize_semantic::service::run_context_search(&root_path, query, top_k).await?;
+        if let Some(_query) = semantic {
+            #[cfg(not(feature = "embeddings"))]
+            {
+                let _ = (limit, _query);
+                return Err(
+                    "semantic search is not available in this build (compiled without the `embeddings` feature)"
+                        .to_string(),
+                );
+            }
+            #[cfg(feature = "embeddings")]
+            {
+                let query = _query;
+                let top_k = limit.unwrap_or(5);
+                let report =
+                    normalize_semantic::service::run_context_search(&root_path, query, top_k)
+                        .await?;
 
-            // Apply any --match filters on top of the semantic results.
-            let caller_ctx: CallerContext = parse_match_pairs(&r#match)?;
-            let blocks: Vec<ContextBlock> = if caller_ctx.is_empty() {
-                // No metadata filter — return all semantic hits directly.
-                report
-                    .results
-                    .into_iter()
-                    .map(|r| ContextBlock {
-                        source: std::path::PathBuf::from(&r.path),
-                        metadata: serde_json::Value::Null,
-                        body: r.content,
-                    })
-                    .collect()
-            } else {
-                // Re-parse the source files to get frontmatter and apply --match filtering.
-                report
-                    .results
-                    .into_iter()
-                    .filter_map(|r| {
-                        let abs_path = root_path.join(&r.path);
-                        let content = std::fs::read_to_string(&abs_path).ok()?;
-                        let parsed_blocks = parse_blocks(&content);
-                        // Find the first block that matches the caller context.
-                        for pb in &parsed_blocks {
-                            if block_matches(pb, &caller_ctx, false) {
-                                let meta_json = pb
-                                    .frontmatter
-                                    .as_ref()
-                                    .map(|fm| yaml_to_json(fm.clone()))
-                                    .unwrap_or(serde_json::Value::Null);
-                                return Some(ContextBlock {
-                                    source: std::path::PathBuf::from(&r.path),
-                                    metadata: meta_json,
-                                    body: pb.body.clone(),
-                                });
+                // Apply any --match filters on top of the semantic results.
+                let caller_ctx: CallerContext = parse_match_pairs(&r#match)?;
+                let blocks: Vec<ContextBlock> = if caller_ctx.is_empty() {
+                    // No metadata filter — return all semantic hits directly.
+                    report
+                        .results
+                        .into_iter()
+                        .map(|r| ContextBlock {
+                            source: std::path::PathBuf::from(&r.path),
+                            metadata: serde_json::Value::Null,
+                            body: r.content,
+                        })
+                        .collect()
+                } else {
+                    // Re-parse the source files to get frontmatter and apply --match filtering.
+                    report
+                        .results
+                        .into_iter()
+                        .filter_map(|r| {
+                            let abs_path = root_path.join(&r.path);
+                            let content = std::fs::read_to_string(&abs_path).ok()?;
+                            let parsed_blocks = parse_blocks(&content);
+                            // Find the first block that matches the caller context.
+                            for pb in &parsed_blocks {
+                                if block_matches(pb, &caller_ctx, false) {
+                                    let meta_json = pb
+                                        .frontmatter
+                                        .as_ref()
+                                        .map(|fm| yaml_to_json(fm.clone()))
+                                        .unwrap_or(serde_json::Value::Null);
+                                    return Some(ContextBlock {
+                                        source: std::path::PathBuf::from(&r.path),
+                                        metadata: meta_json,
+                                        body: pb.body.clone(),
+                                    });
+                                }
                             }
-                        }
-                        None
-                    })
-                    .collect()
-            };
+                            None
+                        })
+                        .collect()
+                };
 
-            return Ok(ContextKindReport::Full(ContextReport::new(blocks)));
+                return Ok(ContextKindReport::Full(ContextReport::new(blocks)));
+            }
         }
 
         // Build caller context from --match pairs, optionally --stdin, and --file entries.

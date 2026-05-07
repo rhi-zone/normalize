@@ -24,6 +24,9 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             archive: tar.gz
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            archive: tar.gz
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             archive: tar.gz
@@ -48,6 +51,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
+      - name: Install musl-tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
@@ -60,7 +69,13 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
+      - name: Build CLI (musl, no embeddings)
+        # ort/ONNX has no musl prebuilts; ship a smaller binary without semantic search.
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: cargo build --release --target ${{ matrix.target }} -p normalize --no-default-features --features cli-full,sessions-web
+
       - name: Build CLI
+        if: matrix.target != 'x86_64-unknown-linux-musl'
         run: cargo build --release --target ${{ matrix.target }} -p normalize --features sessions-web
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc

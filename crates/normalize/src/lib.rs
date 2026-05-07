@@ -40,6 +40,7 @@ pub mod paths;
 #[cfg(feature = "rg-cli")]
 pub mod rg;
 pub mod rules;
+pub mod semantic_compat;
 pub mod serve;
 #[cfg(feature = "cli")]
 pub mod service;

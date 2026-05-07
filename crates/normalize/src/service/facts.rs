@@ -611,78 +611,82 @@ async fn rebuild_data(
     }
 
     // Populate semantic embeddings if enabled in config.
-    let embeddings_config = normalize_semantic::service::load_embeddings_config(&root);
-    if embeddings_config.enabled {
-        // Resolve HEAD commit for incremental invalidation tracking.
-        let head_commit = resolve_head_sha(&root);
-        let db_path = root.join(".normalize").join("index.sqlite");
+    // No-op when the `embeddings` feature is disabled (e.g. musl builds).
+    #[cfg(feature = "embeddings")]
+    {
+        let embeddings_config = normalize_semantic::service::load_embeddings_config(&root);
+        if embeddings_config.enabled {
+            // Resolve HEAD commit for incremental invalidation tracking.
+            let head_commit = resolve_head_sha(&root);
+            let db_path = root.join(".normalize").join("index.sqlite");
 
-        let mut total_embedded = 0usize;
+            let mut total_embedded = 0usize;
 
-        // 1. Symbol embeddings
-        match normalize_semantic::populate_embeddings(
-            idx.connection(),
-            &embeddings_config,
-            None, // always full rebuild here (incremental via daemon)
-            head_commit.as_deref(),
-            Some(&root),
-            Some(&db_path),
-        )
-        .await
-        {
-            Ok(stats) => {
-                total_embedded += stats.symbols_embedded;
+            // 1. Symbol embeddings
+            match normalize_semantic::populate_embeddings(
+                idx.connection(),
+                &embeddings_config,
+                None, // always full rebuild here (incremental via daemon)
+                head_commit.as_deref(),
+                Some(&root),
+                Some(&db_path),
+            )
+            .await
+            {
+                Ok(stats) => {
+                    total_embedded += stats.symbols_embedded;
+                }
+                Err(e) => {
+                    tracing::warn!("symbol embedding failed (non-fatal): {}", e);
+                }
             }
-            Err(e) => {
-                tracing::warn!("symbol embedding failed (non-fatal): {}", e);
+
+            // 2. Markdown doc embeddings
+            match normalize_semantic::populate_markdown_docs(
+                idx.connection(),
+                &embeddings_config,
+                &root,
+                head_commit.as_deref(),
+                Some(&db_path),
+            )
+            .await
+            {
+                Ok(stats) => total_embedded += stats.docs_embedded,
+                Err(e) => tracing::warn!("markdown doc embedding failed (non-fatal): {}", e),
             }
-        }
 
-        // 2. Markdown doc embeddings
-        match normalize_semantic::populate_markdown_docs(
-            idx.connection(),
-            &embeddings_config,
-            &root,
-            head_commit.as_deref(),
-            Some(&db_path),
-        )
-        .await
-        {
-            Ok(stats) => total_embedded += stats.docs_embedded,
-            Err(e) => tracing::warn!("markdown doc embedding failed (non-fatal): {}", e),
-        }
+            // 3. Commit message embeddings (last 500 commits)
+            match normalize_semantic::populate_commit_messages(
+                idx.connection(),
+                &embeddings_config,
+                &root,
+                head_commit.as_deref(),
+                Some(&db_path),
+                normalize_semantic::DEFAULT_MAX_COMMITS,
+            )
+            .await
+            {
+                Ok(stats) => total_embedded += stats.commits_embedded,
+                Err(e) => tracing::warn!("commit message embedding failed (non-fatal): {}", e),
+            }
 
-        // 3. Commit message embeddings (last 500 commits)
-        match normalize_semantic::populate_commit_messages(
-            idx.connection(),
-            &embeddings_config,
-            &root,
-            head_commit.as_deref(),
-            Some(&db_path),
-            normalize_semantic::DEFAULT_MAX_COMMITS,
-        )
-        .await
-        {
-            Ok(stats) => total_embedded += stats.commits_embedded,
-            Err(e) => tracing::warn!("commit message embedding failed (non-fatal): {}", e),
-        }
+            // 4. Context block embeddings (.normalize/context/*.md)
+            match normalize_semantic::populate_context_blocks(
+                idx.connection(),
+                &embeddings_config,
+                &root,
+                head_commit.as_deref(),
+                Some(&db_path),
+            )
+            .await
+            {
+                Ok(stats) => total_embedded += stats.contexts_embedded,
+                Err(e) => tracing::warn!("context block embedding failed (non-fatal): {}", e),
+            }
 
-        // 4. Context block embeddings (.normalize/context/*.md)
-        match normalize_semantic::populate_context_blocks(
-            idx.connection(),
-            &embeddings_config,
-            &root,
-            head_commit.as_deref(),
-            Some(&db_path),
-        )
-        .await
-        {
-            Ok(stats) => total_embedded += stats.contexts_embedded,
-            Err(e) => tracing::warn!("context block embedding failed (non-fatal): {}", e),
-        }
-
-        if total_embedded > 0 || full {
-            result.embeddings = Some(total_embedded);
+            if total_embedded > 0 || full {
+                result.embeddings = Some(total_embedded);
+            }
         }
     }
 
@@ -691,6 +695,7 @@ async fn rebuild_data(
 
 /// Attempt to resolve the current HEAD SHA for the given root.
 /// Returns None if not in a git repo or on failure.
+#[cfg(feature = "embeddings")]
 fn resolve_head_sha(root: &Path) -> Option<String> {
     let repo = gix::discover(root).ok()?;
     let head = repo.head_id().ok()?;
@@ -1059,15 +1064,26 @@ impl FactsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-    ) -> Result<normalize_semantic::service::SearchReport, String> {
-        let top_k = limit.unwrap_or(10);
-        let root_path = root
-            .map(PathBuf::from)
-            .map(Ok)
-            .unwrap_or_else(std::env::current_dir)
-            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+    ) -> Result<crate::semantic_compat::SearchReport, String> {
+        #[cfg(not(feature = "embeddings"))]
+        {
+            let _ = (query, limit, root);
+            Err(
+                "semantic search is not available in this build (compiled without the `embeddings` feature)"
+                    .to_string(),
+            )
+        }
+        #[cfg(feature = "embeddings")]
+        {
+            let top_k = limit.unwrap_or(10);
+            let root_path = root
+                .map(PathBuf::from)
+                .map(Ok)
+                .unwrap_or_else(std::env::current_dir)
+                .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
-        normalize_semantic::service::run_search(&root_path, query, top_k).await
+            normalize_semantic::service::run_search(&root_path, query, top_k).await
+        }
     }
 
     /// Test language extraction fixtures — verify symbols, imports, and calls are extracted

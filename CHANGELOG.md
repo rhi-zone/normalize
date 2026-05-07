@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`embeddings` cargo feature (default-enabled)** — gates the `normalize-semantic` dependency (fastembed → ONNX Runtime). Disable with `--no-default-features --features cli-full` to build on targets without ONNX Runtime prebuilts (notably `x86_64-unknown-linux-musl`). When disabled, `normalize structure search` and `normalize context --semantic` are unavailable and the embedding-population step of `normalize structure rebuild` is a no-op; everything else works.
+
+### Fixed
+
+- **Restored `x86_64-unknown-linux-musl` release artifacts.** The musl build is now produced with `--no-default-features --features cli-full,sessions-web` (excluding `embeddings`), so it ships without semantic search but unblocks NixOS, Alpine, and other minimal-Linux installs that `install.sh` directs at the musl tarball.
+
 ## [0.3.0] — 2026-05-06
 
 ### Changed
