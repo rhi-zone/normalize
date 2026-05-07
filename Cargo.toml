@@ -72,7 +72,6 @@ axum = "0.8"
 
 # Database
 libsql = "0.9"
-rusqlite = { version = "0.32", features = ["bundled"] }
 
 # File system
 walkdir = "2"

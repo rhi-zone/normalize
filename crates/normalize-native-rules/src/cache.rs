@@ -3,9 +3,16 @@
 //! Stored at `<project_root>/.normalize/findings-cache.sqlite`.
 //! Keyed by `(path, engine)`: each engine stores its own findings per file.
 //! A `config_hash` column invalidates the entry when rule config changes.
+//!
+//! Backed by libsql. To keep the public API synchronous (the `FileRule` trait
+//! is sync because rule implementations parse files with tree-sitter and run
+//! pure analysis), we own a dedicated current-thread tokio runtime per cache
+//! and drive libsql through `runtime.block_on(...)`.
 
-use rusqlite::{Connection, params};
+use libsql::{Builder, Connection, Database, params};
+use std::future::Future;
 use std::path::Path;
+use tokio::runtime::{Handle, Runtime};
 
 /// SQLite-backed per-file findings cache.
 ///
@@ -14,6 +21,49 @@ use std::path::Path;
 /// A `config_hash` column invalidates the entry when rule config changes.
 pub struct FindingsCache {
     conn: Connection,
+    /// Keep the Database alive for the lifetime of the connection.
+    #[allow(dead_code)]
+    db: Database,
+    /// Owned runtime — only present when we are not running inside an existing
+    /// tokio runtime. If `None`, calls use `Handle::current()` + `block_in_place`.
+    runtime: Option<Runtime>,
+}
+
+impl FindingsCache {
+    fn block_on<F: Future + Send>(&self, fut: F) -> F::Output
+    where
+        F::Output: Send,
+    {
+        block_on_helper(&self.runtime, fut)
+    }
+}
+
+/// Drive `fut` to completion, choosing a strategy that works regardless of whether
+/// we are inside a tokio runtime and what its flavor is.
+fn block_on_helper<F: Future + Send>(runtime: &Option<Runtime>, fut: F) -> F::Output
+where
+    F::Output: Send,
+{
+    if let Some(rt) = runtime {
+        return rt.block_on(fut);
+    }
+    let handle = Handle::current();
+    match handle.runtime_flavor() {
+        tokio::runtime::RuntimeFlavor::MultiThread => {
+            tokio::task::block_in_place(|| handle.block_on(fut))
+        }
+        _ => std::thread::scope(|s| {
+            s.spawn(|| {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .expect("failed to build tokio runtime worker thread");
+                rt.block_on(fut)
+            })
+            .join()
+            .expect("libsql worker thread panicked")
+        }),
+    }
 }
 
 impl FindingsCache {
@@ -26,25 +76,46 @@ impl FindingsCache {
         let _ = std::fs::create_dir_all(&dir);
         let db_path = dir.join("findings-cache.sqlite");
 
-        let conn = Connection::open(&db_path)
-            .or_else(|_| Connection::open_in_memory())
-            .expect("failed to open in-memory SQLite connection");
+        let runtime: Option<Runtime> = if Handle::try_current().is_ok() {
+            None
+        } else {
+            Some(
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .expect("failed to build tokio runtime for findings cache"),
+            )
+        };
+        let init = async {
+            // Try opening the on-disk DB; fall back to in-memory on any error.
+            let db = match Builder::new_local(&db_path).build().await {
+                Ok(db) => db,
+                Err(_) => Builder::new_local(":memory:")
+                    .build()
+                    .await
+                    .expect("failed to open in-memory libsql database"),
+            };
+            let conn = db.connect().expect("failed to connect to libsql database");
+            // Best-effort schema setup.
+            let _ = conn
+                .execute_batch(
+                    "PRAGMA journal_mode=WAL;
+                     PRAGMA synchronous=NORMAL;
+                     CREATE TABLE IF NOT EXISTS findings_cache (
+                        path TEXT NOT NULL,
+                        engine TEXT NOT NULL,
+                        mtime_nanos INTEGER NOT NULL,
+                        config_hash TEXT NOT NULL,
+                        findings_json TEXT NOT NULL,
+                        PRIMARY KEY (path, engine)
+                    );",
+                )
+                .await;
+            (db, conn)
+        };
+        let (db, conn) = block_on_helper(&runtime, init);
 
-        conn.execute_batch(
-            "PRAGMA journal_mode=WAL;
-             PRAGMA synchronous=NORMAL;
-             CREATE TABLE IF NOT EXISTS findings_cache (
-                path TEXT NOT NULL,
-                engine TEXT NOT NULL,
-                mtime_nanos INTEGER NOT NULL,
-                config_hash TEXT NOT NULL,
-                findings_json TEXT NOT NULL,
-                PRIMARY KEY (path, engine)
-            );",
-        )
-        .ok();
-
-        Self { conn }
+        Self { conn, db, runtime }
     }
 
     /// Return cached findings JSON blob if `(path, mtime_nanos, config_hash, engine)` all match.
@@ -55,14 +126,19 @@ impl FindingsCache {
         config_hash: &str,
         engine: &str,
     ) -> Option<String> {
-        self.conn
-            .query_row(
-                "SELECT findings_json FROM findings_cache
-                 WHERE path = ?1 AND engine = ?2 AND mtime_nanos = ?3 AND config_hash = ?4",
-                params![path, engine, mtime_nanos as i64, config_hash],
-                |row| row.get::<_, String>(0),
-            )
-            .ok()
+        let conn = &self.conn;
+        self.block_on(async {
+            let mut rows = conn
+                .query(
+                    "SELECT findings_json FROM findings_cache
+                     WHERE path = ?1 AND engine = ?2 AND mtime_nanos = ?3 AND config_hash = ?4",
+                    params![path, engine, mtime_nanos as i64, config_hash],
+                )
+                .await
+                .ok()?;
+            let row = rows.next().await.ok()??;
+            row.get::<String>(0).ok()
+        })
     }
 
     /// Store findings for a file. Called after a fresh analysis.
@@ -74,21 +150,25 @@ impl FindingsCache {
         engine: &str,
         findings_json: &str,
     ) {
-        self.conn
-            .execute(
+        let conn = &self.conn;
+        let _ = self.block_on(async {
+            conn.execute(
                 "INSERT OR REPLACE INTO findings_cache (path, engine, mtime_nanos, config_hash, findings_json)
                  VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![path, engine, mtime_nanos as i64, config_hash, findings_json],
             )
-            .ok();
+            .await
+        });
     }
 
     pub fn begin(&self) {
-        self.conn.execute_batch("BEGIN;").ok();
+        let conn = &self.conn;
+        let _ = self.block_on(async { conn.execute_batch("BEGIN;").await });
     }
 
     pub fn commit(&self) {
-        self.conn.execute_batch("COMMIT;").ok();
+        let conn = &self.conn;
+        let _ = self.block_on(async { conn.execute_batch("COMMIT;").await });
     }
 
     /// No-op — retained for API symmetry; callers should use begin/commit.

@@ -1,7 +1,9 @@
-use rusqlite::{Connection, OptionalExtension, params};
+use libsql::{Builder, Connection, Database, params};
 use serde::{Serialize, de::DeserializeOwned};
+use std::future::Future;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
+use tokio::runtime::{Handle, Runtime};
 
 #[derive(Debug)]
 pub(crate) struct Error(String);
@@ -14,8 +16,8 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl From<rusqlite::Error> for Error {
-    fn from(e: rusqlite::Error) -> Self {
+impl From<libsql::Error> for Error {
+    fn from(e: libsql::Error) -> Self {
         Error(e.to_string())
     }
 }
@@ -28,10 +30,78 @@ impl From<bincode::Error> for Error {
 
 /// Content-addressed extraction cache. Keyed by `(blake3_hash, extractor_version, grammar)`.
 /// One shared DB across the whole daemon process; safe to clone and share across threads.
+///
+/// Backed by libsql. The cache owns a dedicated current-thread tokio runtime so its
+/// public API stays synchronous (callers can't reasonably switch to async without
+/// cascading through the entire native-rules surface).
 #[derive(Clone)]
 pub(crate) struct CaCache {
-    conn: Arc<Mutex<Connection>>,
+    inner: Arc<Inner>,
     max_size_bytes: u64,
+}
+
+struct Inner {
+    conn: Connection,
+    /// Keep the Database alive for the lifetime of the connection.
+    #[allow(dead_code)]
+    db: Database,
+    /// Owned runtime — only present when we are not running inside an existing
+    /// tokio runtime. If `None`, calls use `Handle::current()` + `block_in_place`.
+    runtime: Option<Runtime>,
+}
+
+impl Inner {
+    fn block_on<F: Future + Send>(&self, fut: F) -> F::Output
+    where
+        F::Output: Send,
+    {
+        block_on_helper(&self.runtime, fut)
+    }
+}
+
+/// Drive `fut` to completion, choosing a strategy that works regardless of whether
+/// we are inside a tokio runtime and what its flavor is.
+///
+/// - If we own a runtime (`Some`), use it.
+/// - If we are inside a multi-threaded runtime, use `block_in_place` + the current handle.
+/// - If we are inside a current-thread runtime (where `block_in_place` panics), spawn
+///   a fresh OS thread that hosts its own current-thread runtime to drive the future.
+fn block_on_helper<F: Future + Send>(runtime: &Option<Runtime>, fut: F) -> F::Output
+where
+    F::Output: Send,
+{
+    if let Some(rt) = runtime {
+        return rt.block_on(fut);
+    }
+    let handle = Handle::current();
+    match handle.runtime_flavor() {
+        tokio::runtime::RuntimeFlavor::MultiThread => {
+            tokio::task::block_in_place(|| handle.block_on(fut))
+        }
+        _ => std::thread::scope(|s| {
+            s.spawn(|| {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .expect("failed to build tokio runtime worker thread");
+                rt.block_on(fut)
+            })
+            .join()
+            .expect("libsql worker thread panicked")
+        }),
+    }
+}
+
+/// Build a current-thread tokio runtime if we are not already inside one.
+fn maybe_build_runtime() -> Result<Option<Runtime>, Error> {
+    if Handle::try_current().is_ok() {
+        return Ok(None);
+    }
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map(Some)
+        .map_err(|e| Error(format!("tokio runtime: {e}")))
 }
 
 impl CaCache {
@@ -40,22 +110,29 @@ impl CaCache {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| Error(format!("create_dir_all: {e}")))?;
         }
-        let conn = Connection::open(path)?;
-        conn.execute_batch(
-            "PRAGMA journal_mode=WAL;
-             PRAGMA synchronous=NORMAL;
-             PRAGMA busy_timeout=5000;
-             CREATE TABLE IF NOT EXISTS ca_entries (
-               hash      BLOB    NOT NULL,
-               extr_ver  TEXT    NOT NULL,
-               grammar   TEXT    NOT NULL,
-               payload   BLOB    NOT NULL,
-               last_used INTEGER NOT NULL DEFAULT (strftime('%s','now')),
-               PRIMARY KEY (hash, extr_ver, grammar)
-             ) WITHOUT ROWID;",
-        )?;
+        let runtime = maybe_build_runtime()?;
+        let init = async {
+            let db = Builder::new_local(path).build().await?;
+            let conn = db.connect()?;
+            conn.execute_batch(
+                "PRAGMA journal_mode=WAL;
+                 PRAGMA synchronous=NORMAL;
+                 PRAGMA busy_timeout=5000;
+                 CREATE TABLE IF NOT EXISTS ca_entries (
+                   hash      BLOB    NOT NULL,
+                   extr_ver  TEXT    NOT NULL,
+                   grammar   TEXT    NOT NULL,
+                   payload   BLOB    NOT NULL,
+                   last_used INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+                   PRIMARY KEY (hash, extr_ver, grammar)
+                 ) WITHOUT ROWID;",
+            )
+            .await?;
+            Ok::<_, libsql::Error>((db, conn))
+        };
+        let (db, conn) = block_on_helper(&runtime, init)?;
         Ok(Self {
-            conn: Arc::new(Mutex::new(conn)),
+            inner: Arc::new(Inner { conn, db, runtime }),
             max_size_bytes,
         })
     }
@@ -75,22 +152,32 @@ impl CaCache {
         extr_ver: &str,
         grammar: &str,
     ) -> Result<Option<T>, Error> {
-        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let now = unix_now();
-        let result: Option<Vec<u8>> = conn
-            .query_row(
-                "SELECT payload FROM ca_entries WHERE hash = ?1 AND extr_ver = ?2 AND grammar = ?3",
-                params![hash, extr_ver, grammar],
-                |row| row.get(0),
-            )
-            .optional()?;
-        if let Some(bytes) = &result {
-            // Touch last_used (best-effort — ignore errors)
-            let _ = conn.execute(
-                "UPDATE ca_entries SET last_used = ?1 WHERE hash = ?2 AND extr_ver = ?3 AND grammar = ?4",
-                params![now, hash, extr_ver, grammar],
-            );
-            let value: T = bincode::deserialize(bytes)?;
+        let conn = &self.inner.conn;
+        let bytes_opt: Option<Vec<u8>> = self.inner.block_on(async {
+            let mut rows = conn
+                .query(
+                    "SELECT payload FROM ca_entries WHERE hash = ?1 AND extr_ver = ?2 AND grammar = ?3",
+                    params![hash, extr_ver, grammar],
+                )
+                .await?;
+            let row = rows.next().await?;
+            if let Some(row) = row {
+                let bytes: Vec<u8> = row.get(0)?;
+                // Touch last_used (best-effort — ignore errors)
+                let _ = conn
+                    .execute(
+                        "UPDATE ca_entries SET last_used = ?1 WHERE hash = ?2 AND extr_ver = ?3 AND grammar = ?4",
+                        params![now, hash, extr_ver, grammar],
+                    )
+                    .await;
+                Ok::<_, libsql::Error>(Some(bytes))
+            } else {
+                Ok(None)
+            }
+        })?;
+        if let Some(bytes) = bytes_opt {
+            let value: T = bincode::deserialize(&bytes)?;
             return Ok(Some(value));
         }
         Ok(None)
@@ -105,13 +192,16 @@ impl CaCache {
         value: &T,
     ) -> Result<(), Error> {
         let bytes = bincode::serialize(value)?;
-        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let now = unix_now();
-        conn.execute(
-            "INSERT OR REPLACE INTO ca_entries (hash, extr_ver, grammar, payload, last_used)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![hash, extr_ver, grammar, bytes, now],
-        )?;
+        let conn = &self.inner.conn;
+        self.inner.block_on(async {
+            conn.execute(
+                "INSERT OR REPLACE INTO ca_entries (hash, extr_ver, grammar, payload, last_used)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![hash, extr_ver, grammar, bytes, now],
+            )
+            .await
+        })?;
         Ok(())
     }
 
@@ -121,12 +211,15 @@ impl CaCache {
     /// belong to the symbol extraction cache and are managed separately). This lets
     /// symbol cache entries survive across index rebuilds.
     pub(crate) fn gc_stale_versions(&self, current_extr_ver: &str) -> Result<usize, Error> {
-        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
-        let deleted = conn.execute(
-            "DELETE FROM ca_entries WHERE extr_ver != ?1 AND extr_ver NOT LIKE 'symbols-%'",
-            params![current_extr_ver],
-        )?;
-        Ok(deleted)
+        let conn = &self.inner.conn;
+        let n = self.inner.block_on(async {
+            conn.execute(
+                "DELETE FROM ca_entries WHERE extr_ver != ?1 AND extr_ver NOT LIKE 'symbols-%'",
+                params![current_extr_ver],
+            )
+            .await
+        })?;
+        Ok(n as usize)
     }
 
     /// Remove symbol cache entries for outdated symbol cache versions. Call once at startup.
@@ -137,7 +230,6 @@ impl CaCache {
         &self,
         current_versions: &[&str],
     ) -> Result<usize, Error> {
-        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         // Build a NOT IN clause for the current versions
         let placeholders: String = current_versions
             .iter()
@@ -148,54 +240,68 @@ impl CaCache {
         let sql = format!(
             "DELETE FROM ca_entries WHERE extr_ver LIKE 'symbols-%' AND extr_ver NOT IN ({placeholders})"
         );
-        let mut stmt = conn.prepare(&sql)?;
-        let deleted = stmt.execute(rusqlite::params_from_iter(current_versions.iter()))?;
-        Ok(deleted)
+        let owned: Vec<String> = current_versions.iter().map(|s| s.to_string()).collect();
+        let conn = &self.inner.conn;
+        let n = self.inner.block_on(async {
+            // libsql accepts a Vec<Value> as IntoParams for variable-arity statements.
+            let values: Vec<libsql::Value> = owned
+                .iter()
+                .map(|s| libsql::Value::Text(s.clone()))
+                .collect();
+            conn.execute(&sql, values).await
+        })?;
+        Ok(n as usize)
     }
 
     /// Evict oldest-accessed entries until DB file size is under `max_size_bytes`.
     /// Uses page_count * page_size as the size estimate; runs VACUUM after deletion.
     #[allow(dead_code)] // not yet wired into the refresh path; retained for future use
     pub(crate) fn evict_if_over_limit(&self) -> Result<(), Error> {
-        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
-        let size: u64 = conn
-            .query_row(
-                "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()",
-                [],
-                |row| row.get::<_, i64>(0),
-            )
-            .map(|n| n as u64)
-            .unwrap_or(0);
-        if size <= self.max_size_bytes {
-            return Ok(());
-        }
-        // Evict ~10% at a time to avoid over-deleting
-        let target = self.max_size_bytes * 9 / 10;
-        loop {
-            let current: u64 = conn
-                .query_row(
-                    "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()",
-                    [],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map(|n| n as u64)
-                .unwrap_or(0);
-            if current <= target {
-                break;
+        let conn = &self.inner.conn;
+        let max = self.max_size_bytes;
+        self.inner.block_on(async {
+            let size = current_db_size(conn).await.unwrap_or(0);
+            if size <= max {
+                return Ok::<_, libsql::Error>(());
             }
-            let deleted = conn.execute(
-                "DELETE FROM ca_entries WHERE (hash, extr_ver, grammar) IN (
-                   SELECT hash, extr_ver, grammar FROM ca_entries ORDER BY last_used ASC LIMIT 100
-                 )",
-                [],
-            )?;
-            if deleted == 0 {
-                break;
+            let target = max * 9 / 10;
+            loop {
+                let current = current_db_size(conn).await.unwrap_or(0);
+                if current <= target {
+                    break;
+                }
+                let deleted = conn
+                    .execute(
+                        "DELETE FROM ca_entries WHERE (hash, extr_ver, grammar) IN (
+                           SELECT hash, extr_ver, grammar FROM ca_entries ORDER BY last_used ASC LIMIT 100
+                         )",
+                        (),
+                    )
+                    .await?;
+                if deleted == 0 {
+                    break;
+                }
             }
-        }
-        conn.execute_batch("VACUUM;")?;
+            conn.execute_batch("VACUUM;").await?;
+            Ok(())
+        })?;
         Ok(())
     }
+}
+
+async fn current_db_size(conn: &Connection) -> Result<u64, libsql::Error> {
+    let mut rows = conn
+        .query(
+            "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()",
+            (),
+        )
+        .await?;
+    let n: i64 = if let Some(row) = rows.next().await? {
+        row.get(0).unwrap_or(0)
+    } else {
+        0
+    };
+    Ok(n as u64)
 }
 
 fn unix_now() -> i64 {

@@ -1796,7 +1796,7 @@ pub fn run_sarif_tools(
             /// Cache hit: issues already added; skip running the tool.
             Hit,
             /// Cache miss: run the tool and store results at this mtime.
-            Miss(normalize_native_rules::FindingsCache, u64),
+            Miss(Box<normalize_native_rules::FindingsCache>, u64),
         }
 
         let cache_decision = if tool.watch.is_empty() {
@@ -1819,7 +1819,7 @@ pub fn run_sarif_tools(
                         }
                         CacheDecision::Hit
                     } else {
-                        CacheDecision::Miss(cache, max_mtime)
+                        CacheDecision::Miss(Box::new(cache), max_mtime)
                     }
                 }
             }

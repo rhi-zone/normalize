@@ -13,16 +13,16 @@ required-features = ["cli"]
 
 [features]
 default = ["fix"]
-cli = ["dep:server-less", "dep:tokio", "fix"]
+cli = ["dep:server-less", "fix"]
 fix = []
 
 [dependencies]
 server-less = { workspace = true, optional = true }
 serde_json.workspace = true
-tokio = { workspace = true, optional = true }
+tokio.workspace = true
 # Core
 serde.workspace = true
-rusqlite.workspace = true
+libsql.workspace = true
 gix = { workspace = true }
 dirs.workspace = true
 ignore.workspace = true

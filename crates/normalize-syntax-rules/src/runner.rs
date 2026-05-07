@@ -73,51 +73,124 @@ impl From<CachedFinding> for Finding {
 /// Stored at `<project_root>/.normalize/findings-cache.sqlite`.
 /// This is a private duplicate of the `FindingsCache` in `normalize-native-rules`
 /// to avoid a heavy cross-crate dependency for a small utility.
+///
+/// Backed by libsql. To keep the surrounding `run_rules()` API synchronous
+/// (the syntax engine is pure tree-sitter + rayon), we own a dedicated
+/// current-thread tokio runtime and drive libsql through `runtime.block_on(...)`.
 struct FindingsCache {
-    conn: rusqlite::Connection,
+    conn: libsql::Connection,
+    #[allow(dead_code)]
+    db: libsql::Database,
+    runtime: Option<tokio::runtime::Runtime>,
+}
+
+/// Drive `fut` to completion, choosing a strategy that works regardless of whether
+/// we are inside a tokio runtime and what its flavor is.
+fn findings_cache_block_on<F: std::future::Future + Send>(
+    runtime: &Option<tokio::runtime::Runtime>,
+    fut: F,
+) -> F::Output
+where
+    F::Output: Send,
+{
+    if let Some(rt) = runtime {
+        return rt.block_on(fut);
+    }
+    let handle = tokio::runtime::Handle::current();
+    match handle.runtime_flavor() {
+        tokio::runtime::RuntimeFlavor::MultiThread => {
+            tokio::task::block_in_place(|| handle.block_on(fut))
+        }
+        _ => std::thread::scope(|s| {
+            s.spawn(|| {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .expect("failed to build tokio runtime worker thread");
+                rt.block_on(fut)
+            })
+            .join()
+            .expect("libsql worker thread panicked")
+        }),
+    }
 }
 
 impl FindingsCache {
+    fn block_on<F: std::future::Future + Send>(&self, fut: F) -> F::Output
+    where
+        F::Output: Send,
+    {
+        findings_cache_block_on(&self.runtime, fut)
+    }
+
     fn open(project_root: &Path) -> Self {
         let dir = project_root.join(".normalize");
         let _ = std::fs::create_dir_all(&dir);
         let db_path = dir.join("findings-cache.sqlite");
-        let conn = rusqlite::Connection::open(&db_path)
-            .or_else(|_| rusqlite::Connection::open_in_memory())
-            .expect("failed to open in-memory SQLite connection");
-        conn.execute_batch(
-            "PRAGMA journal_mode=WAL;
-             PRAGMA synchronous=NORMAL;
-             CREATE TABLE IF NOT EXISTS findings_cache (
-                path TEXT NOT NULL,
-                engine TEXT NOT NULL,
-                mtime_nanos INTEGER NOT NULL,
-                config_hash TEXT NOT NULL,
-                findings_json TEXT NOT NULL,
-                PRIMARY KEY (path, engine)
-            );",
-        )
-        .ok();
-        Self { conn }
+        let runtime: Option<tokio::runtime::Runtime> =
+            if tokio::runtime::Handle::try_current().is_ok() {
+                None
+            } else {
+                Some(
+                    tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .expect("failed to build tokio runtime for syntax findings cache"),
+                )
+            };
+        let init = async {
+            let db = match libsql::Builder::new_local(&db_path).build().await {
+                Ok(db) => db,
+                Err(_) => libsql::Builder::new_local(":memory:")
+                    .build()
+                    .await
+                    .expect("failed to open in-memory libsql database"),
+            };
+            let conn = db.connect().expect("failed to connect to libsql database");
+            let _ = conn
+                .execute_batch(
+                    "PRAGMA journal_mode=WAL;
+                     PRAGMA synchronous=NORMAL;
+                     CREATE TABLE IF NOT EXISTS findings_cache (
+                        path TEXT NOT NULL,
+                        engine TEXT NOT NULL,
+                        mtime_nanos INTEGER NOT NULL,
+                        config_hash TEXT NOT NULL,
+                        findings_json TEXT NOT NULL,
+                        PRIMARY KEY (path, engine)
+                    );",
+                )
+                .await;
+            (db, conn)
+        };
+        let (db, conn) = findings_cache_block_on(&runtime, init);
+        Self { conn, db, runtime }
     }
 
     fn begin(&self) {
-        self.conn.execute_batch("BEGIN;").ok();
+        let conn = &self.conn;
+        let _ = self.block_on(async { conn.execute_batch("BEGIN;").await });
     }
 
     fn commit(&self) {
-        self.conn.execute_batch("COMMIT;").ok();
+        let conn = &self.conn;
+        let _ = self.block_on(async { conn.execute_batch("COMMIT;").await });
     }
 
     fn get(&self, path: &str, mtime_nanos: u64, config_hash: &str, engine: &str) -> Option<String> {
-        self.conn
-            .query_row(
-                "SELECT findings_json FROM findings_cache
-                 WHERE path = ?1 AND engine = ?2 AND mtime_nanos = ?3 AND config_hash = ?4",
-                rusqlite::params![path, engine, mtime_nanos as i64, config_hash],
-                |row| row.get::<_, String>(0),
-            )
-            .ok()
+        let conn = &self.conn;
+        self.block_on(async {
+            let mut rows = conn
+                .query(
+                    "SELECT findings_json FROM findings_cache
+                     WHERE path = ?1 AND engine = ?2 AND mtime_nanos = ?3 AND config_hash = ?4",
+                    libsql::params![path, engine, mtime_nanos as i64, config_hash],
+                )
+                .await
+                .ok()?;
+            let row = rows.next().await.ok()??;
+            row.get::<String>(0).ok()
+        })
     }
 
     fn put(
@@ -128,13 +201,15 @@ impl FindingsCache {
         engine: &str,
         findings_json: &str,
     ) {
-        self.conn
-            .execute(
+        let conn = &self.conn;
+        let _ = self.block_on(async {
+            conn.execute(
                 "INSERT OR REPLACE INTO findings_cache (path, engine, mtime_nanos, config_hash, findings_json)
                  VALUES (?1, ?2, ?3, ?4, ?5)",
-                rusqlite::params![path, engine, mtime_nanos as i64, config_hash, findings_json],
+                libsql::params![path, engine, mtime_nanos as i64, config_hash, findings_json],
             )
-            .ok();
+            .await
+        });
     }
 }
 
