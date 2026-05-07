@@ -19,6 +19,8 @@ Commands:
   move                Move a symbol's definition to another file and rewrite import sites.
   introduce-variable  Extract an expression into a named variable binding.
   inline-variable     Inline a variable: replace all uses with the initializer and remove the binding.
+  add-parameter       Add a parameter to a function signature and update all call sites.
+  inline-function     Inline a single-use function at its call site.
   history             View shadow git edit history
   help                Print this message or the help of the given subcommand(s)
 
