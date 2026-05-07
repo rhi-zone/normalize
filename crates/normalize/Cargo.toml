@@ -103,6 +103,7 @@ utoipa = { version = "5", features = ["axum_extras"] }
 notify.workspace = true
 ureq = { version = "2", features = ["json"] }
 flate2 = "1"
+sha2 = "0.10"
 tar = "0.4"
 zip = "2"
 regex = "1"
