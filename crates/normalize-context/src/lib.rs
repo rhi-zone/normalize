@@ -746,7 +746,29 @@ mod tests {
         let mut caller = CallerContext::new();
         caller.insert("hook".into(), "test".into());
 
+        // Isolate from the developer's `~/.normalize/context/` — without this,
+        // any global context files in the real `$HOME` get picked up via the
+        // global layer in `collect_new_context_files` and inflate the result
+        // count. We point HOME at the tempdir, which has no global layer.
+        // SAFETY: tests in this file run sequentially within this module by
+        // default (no other test reads HOME concurrently here).
+        let prev_home = std::env::var_os("HOME");
+        // SAFETY: `set_var`/`remove_var` are unsafe in 2024 edition because
+        // they're not thread-safe — within a single test, no other thread is
+        // concurrently reading HOME.
+        unsafe {
+            std::env::set_var("HOME", tmp.path());
+        }
+
         let results = resolve_context(tmp.path(), "context", &caller, false);
+
+        unsafe {
+            match prev_home {
+                Some(v) => std::env::set_var("HOME", v),
+                None => std::env::remove_var("HOME"),
+            }
+        }
+
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].2, "Do the thing.");
     }
