@@ -131,13 +131,18 @@ mod tests {
     /// Returns true if external grammars are loadable by the global loader.
     /// Tests that require grammars should skip (return early) when this is false.
     /// To enable: run `cargo xtask build-grammars` and set `NORMALIZE_GRAMMAR_PATH=target/grammars`.
-    fn grammars_available() -> bool {
-        normalize_facts::parse_with_grammar("python", "x = 1").is_some()
+    ///
+    /// The argument is a tiny snippet to probe with: each test should pass a
+    /// snippet in the *specific* grammar it needs. Older code used a single
+    /// hardcoded `"python"` probe, which was wrong — having Python's grammar
+    /// installed says nothing about whether Go's, Java's, or Markdown's are.
+    fn grammars_available(grammar: &str, sample: &str) -> bool {
+        normalize_facts::parse_with_grammar(grammar, sample).is_some()
     }
 
     #[test]
     fn test_python_skeleton() {
-        if !grammars_available() {
+        if !grammars_available("python", "x = 1") {
             return;
         }
         let extractor = SkeletonExtractor::new();
@@ -171,7 +176,7 @@ class Bar:
 
     #[test]
     fn test_rust_skeleton() {
-        if !grammars_available() {
+        if !grammars_available("rust", "fn x() {}") {
             return;
         }
         let extractor = SkeletonExtractor::new();
@@ -200,7 +205,7 @@ impl Foo {
 
     #[test]
     fn test_to_view_node() {
-        if !grammars_available() {
+        if !grammars_available("python", "x = 1") {
             return;
         }
         let extractor = SkeletonExtractor::new();
@@ -226,7 +231,7 @@ def greet(name: str) -> str:
 
     #[test]
     fn test_markdown_skeleton() {
-        if !grammars_available() {
+        if !grammars_available("markdown", "# h") {
             return;
         }
         let extractor = SkeletonExtractor::new();
@@ -275,7 +280,7 @@ More content.
 
     #[test]
     fn test_javascript_skeleton() {
-        if !grammars_available() {
+        if !grammars_available("javascript", "var x;") {
             return;
         }
         let extractor = SkeletonExtractor::new();
@@ -312,7 +317,7 @@ class Greeter {
 
     #[test]
     fn test_filter_types() {
-        if !grammars_available() {
+        if !grammars_available("python", "x = 1") {
             return;
         }
         let extractor = SkeletonExtractor::new();
@@ -345,7 +350,7 @@ class AnotherClass:
 
     #[test]
     fn test_filter_types_rust() {
-        if !grammars_available() {
+        if !grammars_available("rust", "fn x() {}") {
             return;
         }
         let extractor = SkeletonExtractor::new();
@@ -385,7 +390,7 @@ fn another_function() {}
 
     #[test]
     fn test_filter_types_typescript() {
-        if !grammars_available() {
+        if !grammars_available("typescript", "let x;") {
             return;
         }
         let extractor = SkeletonExtractor::new();
@@ -424,7 +429,7 @@ const arrow = () => {};
 
     #[test]
     fn test_filter_types_go() {
-        if !grammars_available() {
+        if !grammars_available("go", "package x") {
             return;
         }
         let extractor = SkeletonExtractor::new();
@@ -456,7 +461,7 @@ type MyInterface interface {
 
     #[test]
     fn test_filter_types_java() {
-        if !grammars_available() {
+        if !grammars_available("java", "class X {}") {
             return;
         }
         let extractor = SkeletonExtractor::new();
@@ -485,7 +490,7 @@ enum MyEnum {
 
     #[test]
     fn test_filter_types_ruby() {
-        if !grammars_available() {
+        if !grammars_available("ruby", "x = 1") {
             return;
         }
         let extractor = SkeletonExtractor::new();
@@ -516,7 +521,7 @@ end
 
     #[test]
     fn test_scala_skeleton() {
-        if !grammars_available() {
+        if !grammars_available("scala", "object X") {
             return;
         }
         let extractor = SkeletonExtractor::new();
@@ -596,7 +601,7 @@ div { color: red; }
 
     #[test]
     fn test_filter_types_scala() {
-        if !grammars_available() {
+        if !grammars_available("scala", "object X") {
             return;
         }
         let extractor = SkeletonExtractor::new();
@@ -629,7 +634,7 @@ trait MyTrait {
 
     #[test]
     fn test_python_trait_extraction() {
-        if !grammars_available() {
+        if !grammars_available("python", "x = 1") {
             return;
         }
         // Test that trait-based extraction works for Python
