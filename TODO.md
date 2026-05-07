@@ -25,19 +25,53 @@ extract, inline, move — correct, without LSPs, without false positives.
 - [x] Run `normalize structure rebuild --full` on a fresh checkout to verify 0.3.0 extraction quality
 - [x] Tag v0.3.0 and update CHANGELOG `[Unreleased]` → `[0.3.0]`
 
-## Tag-based symbol search (0.4 design)
+## Structured-metadata symbol search (0.4 design)
 
-Replaces the embedding-based symbol search dropped in 0.3.0. Symbols get
-discrete tags from four sources:
-1. Structural (free): kind, module path, complexity, effect:async, effect:io
-2. Pattern (.scm queries → tag captures): "uses tokio::spawn" → tag:async
-3. LLM-tagged (cached by blake3(body)): domain tags like domain:auth
-4. User-supplied: #[normalize::tag(domain = "auth")] / // @tag annotations
+Replaces the embedding-based symbol search dropped in 0.3.0. The design sits
+under the broader rhizone direction — arbitrary structured metadata as the
+primary shape for facts about *anything* (symbols, files, sessions, rules,
+manifests, etc.) — not a normalize-local tag system. "Tags" is a degenerate
+case (flat key, optional string value); we want the full structured shape from
+day one so we don't paint ourselves into a corner.
 
-Storage: symbol_tags many-to-many table alongside symbols.
-Query: view list --tag X --tag Y composes with existing structural primitives.
-BM25 over (name + leading-doc + path-tokens) via SQLite FTS5 covers lexical search.
-Embeddings could return as a niche escape hatch, but not in the default path.
+Each symbol gets a metadata document — nested, typed, schema-aware:
+```
+{
+  kind: "function",
+  module: "crates/foo/src/bar.rs",
+  effect: { io: true, async: false },
+  complexity: { cyclomatic: 12, cognitive: 8 },
+  domain: ["auth", "session"],
+  tested: { has_test: true, coverage_pct: 73 },
+  ...
+}
+```
+
+Sources of metadata, cheap → expensive:
+1. Structural (free): kind, module path, complexity, sync/async, has-test
+2. Query-derived (.scm captures producing structured fragments): "uses tokio::spawn" → `effect.async = true`
+3. LLM-derived (cached by blake3(body)): domain classification, summary
+4. User-supplied: attribute / annotation / sidecar — `#[normalize::meta(...)]`,
+   `// @meta domain: auth`, `.normalize/meta/<symbol>.toml`
+
+Storage: a structured doc per symbol (rkyv blob in SQLite, or columnar where
+schema is fixed). Query: predicate evaluation over structure — path-into-doc
++ match — composes with existing structural primitives. The exact query
+surface needs design (jsonpath-shaped? jq-shaped? typed predicates?) but it
+has to be richer than tag-set intersection.
+
+This is not normalize-specific. The same shape applies to:
+- `.normalize/context/*.md` frontmatter (already structured YAML)
+- session metadata across agent formats
+- manifest data (`normalize-manifest`)
+- rule metadata (already has nested fields)
+
+Aligning normalize's symbol metadata shape with the cross-project direction is
+part of the work — the schema lives somewhere shared, not buried in normalize.
+
+BM25 over (name + leading-doc + path-tokens) via SQLite FTS5 covers cheap
+lexical search alongside the structured query path. Embeddings could return
+as a niche escape hatch, but not in the default path.
 
 ---
 
