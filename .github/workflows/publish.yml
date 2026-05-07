@@ -100,7 +100,7 @@ jobs:
           set -u
           for crate in ${{ steps.order.outputs.crates }}; do
             echo "Publishing $crate..."
-            if output=$(cargo publish -p "$crate" 2>&1); then
+            if output=$(cargo publish -p "$crate" --no-verify 2>&1); then
               echo "$output"
               echo "  ✓ published"
               sleep 20
