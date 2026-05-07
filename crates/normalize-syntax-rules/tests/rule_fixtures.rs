@@ -12,6 +12,7 @@
 //! joining path components with `/`. e.g. `fixtures/rust/static-mut/` → `rust/static-mut`.
 
 use normalize_languages::GrammarLoader;
+use normalize_rules_config::{PathFilter, WalkConfig};
 use normalize_syntax_rules::{DebugFlags, apply_fixes, load_all_rules, run_rules};
 use std::path::{Path, PathBuf};
 
@@ -140,6 +141,8 @@ fn test_rule_fixtures() {
             None,
             &debug,
             None,
+            &PathFilter::default(),
+            &WalkConfig::default(),
         );
 
         // Partition findings by fixture file type.
@@ -272,6 +275,8 @@ fn run_fix_fixture(
             None,
             debug,
             None,
+            &PathFilter::default(),
+            &WalkConfig::default(),
         );
         let fixable: Vec<_> = findings.into_iter().filter(|f| f.fix.is_some()).collect();
         if fixable.is_empty() {
@@ -326,6 +331,8 @@ fn test_rust_missing_module_doc() {
         None,
         &debug,
         None,
+        &PathFilter::default(),
+        &WalkConfig::default(),
     );
     assert!(
         !findings.is_empty(),
@@ -350,6 +357,8 @@ fn test_rust_missing_module_doc() {
         None,
         &debug,
         None,
+        &PathFilter::default(),
+        &WalkConfig::default(),
     );
     assert!(
         no_match_findings.is_empty(),
