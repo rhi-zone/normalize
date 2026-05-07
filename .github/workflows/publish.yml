@@ -78,17 +78,37 @@ jobs:
               f.write(output + "\n")
           PYEOF
 
-      - name: Publish crates
+      - name: Check CARGO_REGISTRY_TOKEN is set
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           if [ -z "$CARGO_REGISTRY_TOKEN" ]; then
             echo "ERROR: CARGO_REGISTRY_TOKEN secret is not set." >&2
-            echo "Set it at: Settings → Secrets and variables → Actions → New repository secret" >&2
+            echo "" >&2
+            echo "To fix:" >&2
+            echo "  1. Generate a token at https://crates.io/settings/tokens" >&2
+            echo "  2. Add it at: Settings → Secrets and variables → Actions → New repository secret" >&2
+            echo "  3. Name the secret CARGO_REGISTRY_TOKEN" >&2
+            echo "  4. Re-run this workflow" >&2
             exit 1
           fi
+
+      - name: Publish crates
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -u
           for crate in ${{ steps.order.outputs.crates }}; do
             echo "Publishing $crate..."
-            cargo publish -p "$crate" --no-verify
-            sleep 20
+            if output=$(cargo publish -p "$crate" 2>&1); then
+              echo "$output"
+              echo "  ✓ published"
+              sleep 20
+            elif echo "$output" | grep -qE "already (uploaded|exists on crates.io)"; then
+              echo "  ✓ already published (skipping)"
+            else
+              echo "$output" >&2
+              echo "  ✗ publish failed for $crate" >&2
+              exit 1
+            fi
           done
