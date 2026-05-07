@@ -16,7 +16,7 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [features]
-default = ["cli-full", "embeddings"]
+default = ["cli-full"]
 
 # Core normalize CLI (server-less proc macro; clap re-exported from server-less)
 cli = []
@@ -35,10 +35,6 @@ mcp = ["rmcp"]
 # Build sessions web UI (requires bun/npm, enable in CI)
 sessions-web = []
 
-# Semantic embeddings (fastembed/ort). Disable to build on targets without
-# ONNX Runtime prebuilts (e.g. x86_64-unknown-linux-musl).
-embeddings = ["dep:normalize-semantic"]
-
 [dependencies]
 clap = { workspace = true, optional = true }
 serde.workspace = true
@@ -56,7 +52,6 @@ normalize-core = { path = "../normalize-core", version = "0.3.0" }
 normalize-output = { path = "../normalize-output", version = "0.3.0" }
 normalize-facts = { path = "../normalize-facts", version = "0.3.0" }
 normalize-facts-core = { path = "../normalize-facts-core", version = "0.3.0" }
-normalize-semantic = { path = "../normalize-semantic", version = "0.3.0", features = ["cli"], optional = true }
 normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.3.0" }
 normalize-facts-rules-interpret = { path = "../normalize-facts-rules-interpret", version = "0.3.0" }
 tracing = "0.1"

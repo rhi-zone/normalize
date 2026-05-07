@@ -113,35 +113,6 @@ impl IndexConfig {
 #[serde(transparent)]
 pub struct RuleTagsConfig(pub std::collections::HashMap<String, Vec<String>>);
 
-/// Re-export / stub of [`normalize_semantic::EmbeddingsConfig`].
-///
-/// When the `embeddings` cargo feature is enabled, this is the real config
-/// from `normalize-semantic`. When disabled (e.g. musl builds without ONNX
-/// Runtime prebuilts), a structurally-identical stub is provided so that
-/// `.normalize/config.toml` continues to parse and round-trip cleanly.
-#[cfg(feature = "embeddings")]
-pub use normalize_semantic::EmbeddingsConfig;
-
-#[cfg(not(feature = "embeddings"))]
-#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, PartialEq)]
-#[serde(default)]
-pub struct EmbeddingsConfig {
-    /// Whether semantic embeddings are enabled. Defaults to false.
-    pub enabled: bool,
-    /// Embedding model to use. Changing this triggers a full re-embed.
-    pub model: String,
-}
-
-#[cfg(not(feature = "embeddings"))]
-impl Default for EmbeddingsConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            model: "nomic-embed-text-v1.5".to_string(),
-        }
-    }
-}
-
 /// Root configuration structure.
 #[derive(Debug, Clone, Deserialize, Serialize, Default, JsonSchema, server_less::Config)]
 #[serde(default)]
@@ -179,9 +150,6 @@ pub struct NormalizeConfig {
     /// Diff-based budget tracking (`[budget]` section).
     #[param(nested, serde)]
     pub budget: BudgetConfig,
-    /// Semantic embeddings configuration (`[embeddings]` section).
-    #[param(nested, serde)]
-    pub embeddings: EmbeddingsConfig,
     /// Walk configuration for directory traversal (`[walk]` section).
     #[param(nested, serde)]
     pub walk: normalize_rules_config::WalkConfig,

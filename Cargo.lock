@@ -5167,7 +5167,6 @@ dependencies = [
  "normalize-rules",
  "normalize-rules-config",
  "normalize-scope",
- "normalize-semantic",
  "normalize-session-analysis",
  "normalize-shadow",
  "normalize-surface-syntax",

@@ -292,9 +292,5 @@ mod tests {
         assert_output_formatter::<PackageWhyReport>();
         assert_output_formatter::<PackageOutdatedReport>();
         assert_output_formatter::<PackageAuditReport>();
-
-        use crate::semantic_compat::{ContextSearchReport, SearchReport};
-        assert_output_formatter::<SearchReport>();
-        assert_output_formatter::<ContextSearchReport>();
     }
 }

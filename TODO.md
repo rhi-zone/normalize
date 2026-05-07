@@ -25,6 +25,20 @@ extract, inline, move — correct, without LSPs, without false positives.
 - [x] Run `normalize structure rebuild --full` on a fresh checkout to verify 0.3.0 extraction quality
 - [x] Tag v0.3.0 and update CHANGELOG `[Unreleased]` → `[0.3.0]`
 
+## Tag-based symbol search (0.4 design)
+
+Replaces the embedding-based symbol search dropped in 0.3.0. Symbols get
+discrete tags from four sources:
+1. Structural (free): kind, module path, complexity, effect:async, effect:io
+2. Pattern (.scm queries → tag captures): "uses tokio::spawn" → tag:async
+3. LLM-tagged (cached by blake3(body)): domain tags like domain:auth
+4. User-supplied: #[normalize::tag(domain = "auth")] / // @tag annotations
+
+Storage: symbol_tags many-to-many table alongside symbols.
+Query: view list --tag X --tag Y composes with existing structural primitives.
+BM25 over (name + leading-doc + path-tokens) via SQLite FTS5 covers lexical search.
+Embeddings could return as a niche escape hatch, but not in the default path.
+
 ---
 
 ## P0 — Blocking / Broken / Incoherent

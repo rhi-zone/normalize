@@ -48,10 +48,6 @@ pub struct RebuildReport {
     /// Number of co-change edge pairs written during this rebuild.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub co_change_edges: Option<usize>,
-    /// Total embeddings generated across all source types (symbol, doc, commit).
-    /// Only set when embeddings.enabled = true.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub embeddings: Option<usize>,
     /// Whether this was an incremental rebuild (true) or a full rebuild (false).
     #[serde(skip_serializing_if = "is_false")]
     pub incremental: bool,
@@ -88,11 +84,6 @@ impl OutputFormatter for RebuildReport {
             && e > 0
         {
             parts.push(format!("{} co-change edges", e));
-        }
-        if let Some(emb) = self.embeddings
-            && emb > 0
-        {
-            parts.push(format!("{} embeddings", emb));
         }
         if !parts.is_empty() {
             out.push_str(&format!("\nIndexed {}", parts.join(", ")));
@@ -558,7 +549,6 @@ async fn rebuild_data(
         calls: None,
         imports: None,
         co_change_edges: None,
-        embeddings: None,
         incremental: !full,
     };
 
@@ -610,96 +600,7 @@ async fn rebuild_data(
         }
     }
 
-    // Populate semantic embeddings if enabled in config.
-    // No-op when the `embeddings` feature is disabled (e.g. musl builds).
-    #[cfg(feature = "embeddings")]
-    {
-        let embeddings_config = normalize_semantic::service::load_embeddings_config(&root);
-        if embeddings_config.enabled {
-            // Resolve HEAD commit for incremental invalidation tracking.
-            let head_commit = resolve_head_sha(&root);
-            let db_path = root.join(".normalize").join("index.sqlite");
-
-            let mut total_embedded = 0usize;
-
-            // 1. Symbol embeddings
-            match normalize_semantic::populate_embeddings(
-                idx.connection(),
-                &embeddings_config,
-                None, // always full rebuild here (incremental via daemon)
-                head_commit.as_deref(),
-                Some(&root),
-                Some(&db_path),
-            )
-            .await
-            {
-                Ok(stats) => {
-                    total_embedded += stats.symbols_embedded;
-                }
-                Err(e) => {
-                    tracing::warn!("symbol embedding failed (non-fatal): {}", e);
-                }
-            }
-
-            // 2. Markdown doc embeddings
-            match normalize_semantic::populate_markdown_docs(
-                idx.connection(),
-                &embeddings_config,
-                &root,
-                head_commit.as_deref(),
-                Some(&db_path),
-            )
-            .await
-            {
-                Ok(stats) => total_embedded += stats.docs_embedded,
-                Err(e) => tracing::warn!("markdown doc embedding failed (non-fatal): {}", e),
-            }
-
-            // 3. Commit message embeddings (last 500 commits)
-            match normalize_semantic::populate_commit_messages(
-                idx.connection(),
-                &embeddings_config,
-                &root,
-                head_commit.as_deref(),
-                Some(&db_path),
-                normalize_semantic::DEFAULT_MAX_COMMITS,
-            )
-            .await
-            {
-                Ok(stats) => total_embedded += stats.commits_embedded,
-                Err(e) => tracing::warn!("commit message embedding failed (non-fatal): {}", e),
-            }
-
-            // 4. Context block embeddings (.normalize/context/*.md)
-            match normalize_semantic::populate_context_blocks(
-                idx.connection(),
-                &embeddings_config,
-                &root,
-                head_commit.as_deref(),
-                Some(&db_path),
-            )
-            .await
-            {
-                Ok(stats) => total_embedded += stats.contexts_embedded,
-                Err(e) => tracing::warn!("context block embedding failed (non-fatal): {}", e),
-            }
-
-            if total_embedded > 0 || full {
-                result.embeddings = Some(total_embedded);
-            }
-        }
-    }
-
     Ok(result)
-}
-
-/// Attempt to resolve the current HEAD SHA for the given root.
-/// Returns None if not in a git repo or on failure.
-#[cfg(feature = "embeddings")]
-fn resolve_head_sha(root: &Path) -> Option<String> {
-    let repo = gix::discover(root).ok()?;
-    let head = repo.head_id().ok()?;
-    Some(head.to_string())
 }
 
 async fn stats_data(root: Option<&Path>) -> Result<FactsStats, String> {
@@ -1043,47 +944,6 @@ impl FactsService {
             .map_err(|e| format!("Query error: {}", e))?;
 
         Ok(QueryReport { rows })
-    }
-
-    /// Search the semantic index for chunks matching a natural-language query
-    ///
-    /// Embeds the query with the configured model (nomic-embed-text-v1.5 by default),
-    /// performs cosine similarity search over all stored symbol embeddings, and
-    /// re-ranks results by staleness. Requires `embeddings.enabled = true` in
-    /// `.normalize/config.toml` and a prior `normalize structure rebuild`.
-    ///
-    /// Examples:
-    ///   normalize structure search "error handling"
-    ///   normalize structure search "database connection pool" --limit 5
-    ///   normalize structure search "authentication middleware" --json
-    #[cli(display_with = "display_output")]
-    pub async fn search(
-        &self,
-        #[param(positional, help = "Natural language query")] query: String,
-        #[param(short = 'n', help = "Maximum results to return (default 10)")] limit: Option<usize>,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-    ) -> Result<crate::semantic_compat::SearchReport, String> {
-        #[cfg(not(feature = "embeddings"))]
-        {
-            let _ = (query, limit, root);
-            Err(
-                "semantic search is not available in this build (compiled without the `embeddings` feature)"
-                    .to_string(),
-            )
-        }
-        #[cfg(feature = "embeddings")]
-        {
-            let top_k = limit.unwrap_or(10);
-            let root_path = root
-                .map(PathBuf::from)
-                .map(Ok)
-                .unwrap_or_else(std::env::current_dir)
-                .map_err(|e| format!("Failed to get current directory: {e}"))?;
-
-            normalize_semantic::service::run_search(&root_path, query, top_k).await
-        }
     }
 
     /// Test language extraction fixtures — verify symbols, imports, and calls are extracted

@@ -2106,58 +2106,6 @@ mod unix_impl {
 
                         self.broadcast_diagnostics_delta(root, delta);
 
-                        // Incremental re-embedding: queue in background so it
-                        // does not block the diagnostics refresh.
-                        // No-op when the `embeddings` feature is disabled
-                        // (e.g. musl builds without ONNX Runtime).
-                        #[cfg(feature = "embeddings")]
-                        {
-                            let embeddings_config =
-                                normalize_semantic::service::load_embeddings_config(root);
-                            if embeddings_config.enabled {
-                                let changed_rel: Vec<String> = changed
-                                    .iter()
-                                    .filter_map(|p| {
-                                        p.strip_prefix(root)
-                                            .ok()
-                                            .map(|r| r.to_string_lossy().into_owned())
-                                    })
-                                    .collect();
-                                if !changed_rel.is_empty() {
-                                    let root_owned = root.to_path_buf();
-                                    let db_path = root.join(".normalize").join("index.sqlite");
-                                    let idx_arc_emb = idx_arc.clone();
-                                    let handle = self.runtime_handle.clone();
-                                    std::thread::Builder::new()
-                                        .name("semantic-reembed".into())
-                                        .stack_size(16 * 1024 * 1024)
-                                        .spawn(move || {
-                                            let idx = idx_arc_emb
-                                                .lock()
-                                                .unwrap_or_else(|e| e.into_inner());
-                                            let conn = idx.connection();
-                                            if let Err(e) = handle.block_on(
-                                                normalize_semantic::populate_incremental_for_paths(
-                                                    conn,
-                                                    &embeddings_config,
-                                                    &changed_rel,
-                                                    None,
-                                                    Some(&root_owned),
-                                                    Some(&db_path),
-                                                ),
-                                            ) {
-                                                tracing::warn!(
-                                                    error = %e,
-                                                    paths = changed_rel.len(),
-                                                    "incremental re-embedding failed (non-fatal)"
-                                                );
-                                            }
-                                        })
-                                        .ok(); // spawn failure is non-fatal
-                                }
-                            }
-                        }
-
                         {
                             let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
                             if let Some(watched) = roots.get_mut(root) {

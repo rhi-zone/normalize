@@ -69,13 +69,7 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      - name: Build CLI (musl, no embeddings)
-        # ort/ONNX has no musl prebuilts; ship a smaller binary without semantic search.
-        if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: cargo build --release --target ${{ matrix.target }} -p normalize --no-default-features --features cli-full,sessions-web
-
       - name: Build CLI
-        if: matrix.target != 'x86_64-unknown-linux-musl'
         run: cargo build --release --target ${{ matrix.target }} -p normalize --features sessions-web
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
