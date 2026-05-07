@@ -146,11 +146,8 @@ impl Language for Python {
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
                     match child.kind() {
-                        "dotted_name" | "identifier" => {
-                            // Skip the module name itself
-                            if child.start_byte() > module_end {
-                                names.push(content[child.byte_range()].to_string());
-                            }
+                        "dotted_name" | "identifier" if child.start_byte() > module_end => {
+                            names.push(content[child.byte_range()].to_string());
                         }
                         "aliased_import" => {
                             if let Some(name) = child.child_by_field_name("name") {

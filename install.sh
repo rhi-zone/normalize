@@ -5,7 +5,8 @@
 # This copy may be out of date. Keep them in sync when making changes.
 #
 # Usage: curl -fsSL https://rhi.zone/normalize/install.sh | sh
-# Version pinning: NORMALIZE_VERSION=0.2.0 curl -fsSL ... | sh
+# Version pinning: curl -fsSL ... | NORMALIZE_VERSION=0.2.0 sh
+# (env prefix on curl alone is a no-op — the var must be set for the shell that runs the script)
 
 set -e
 
