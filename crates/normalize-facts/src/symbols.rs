@@ -3170,6 +3170,20 @@ mod tests {
     use crate::SymbolKind;
     use std::path::PathBuf;
 
+    /// Probe whether the grammar for `path`'s extension is loadable. Used by
+    /// per-language type-ref tests to skip cleanly when the developer hasn't
+    /// run `cargo xtask build-grammars` (only the 6 default grammars in
+    /// `~/.config/normalize/grammars/` are loadable otherwise). Without these
+    /// guards a missing grammar would panic the test, which in turn poisons
+    /// the libsql global init and cascades into spurious failures in
+    /// unrelated `index::tests::*`.
+    fn grammar_for_path_loaded(path: &std::path::Path, sample: &str) -> bool {
+        let Some(support) = normalize_languages::support_for_path(path) else {
+            return false;
+        };
+        crate::parsers::parse_with_grammar(support.grammar_name(), sample).is_some()
+    }
+
     #[test]
     fn test_parse_python_function() {
         let parser = SymbolParser::new();
@@ -3249,7 +3263,11 @@ type Server struct {
     Logger  Logger
 }
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("main.go"), content);
+        let __probe_path = PathBuf::from("main.go");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         let field_refs: Vec<_> = refs
             .iter()
             .filter(|r| r.kind == TypeRefKind::FieldType)
@@ -3278,7 +3296,11 @@ type ReadWriter interface {
     Writer
 }
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("main.go"), content);
+        let __probe_path = PathBuf::from("main.go");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         let impl_refs: Vec<_> = refs
             .iter()
             .filter(|r| r.kind == TypeRefKind::Implements)
@@ -3306,7 +3328,11 @@ func Process(req Request) Response {
     return Response{}
 }
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("main.go"), content);
+        let __probe_path = PathBuf::from("main.go");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter().any(|r| r.kind == TypeRefKind::ParamType
                 && r.source_symbol == "Process"
@@ -3328,7 +3354,11 @@ func Process(req Request) Response {
 
 type MyHandler = http.Handler
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("main.go"), content);
+        let __probe_path = PathBuf::from("main.go");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter().any(|r| r.kind == TypeRefKind::TypeAlias
                 && r.source_symbol == "MyHandler"
@@ -3343,7 +3373,11 @@ type MyHandler = http.Handler
         let content = r#"public class Foo extends Bar implements Baz, Qux {
 }
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("Foo.java"), content);
+        let __probe_path = PathBuf::from("Foo.java");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter()
                 .any(|r| r.kind == TypeRefKind::Extends && r.target_type == "Bar"),
@@ -3372,7 +3406,11 @@ type MyHandler = http.Handler
     }
 }
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("Service.java"), content);
+        let __probe_path = PathBuf::from("Service.java");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter().any(|r| r.kind == TypeRefKind::FieldType
                 && r.source_symbol == "Service"
@@ -3400,7 +3438,11 @@ type MyHandler = http.Handler
     public <T extends Comparable> void sort(T[] arr) {}
 }
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("Sorter.java"), content);
+        let __probe_path = PathBuf::from("Sorter.java");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter().any(|r| r.kind == TypeRefKind::GenericBound
                 && r.source_symbol == "sort"
@@ -3415,7 +3457,11 @@ type MyHandler = http.Handler
         let content = r#"interface ReadWriter extends Reader, Writer {
 }
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("ReadWriter.java"), content);
+        let __probe_path = PathBuf::from("ReadWriter.java");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter().any(|r| r.kind == TypeRefKind::Extends
                 && r.source_symbol == "ReadWriter"
@@ -3438,7 +3484,11 @@ type MyHandler = http.Handler
         let content = r#"class Service : BaseService, IService {
 }
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("Service.cs"), content);
+        let __probe_path = PathBuf::from("Service.cs");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter()
                 .any(|r| r.source_symbol == "Service" && r.target_type == "BaseService"),
@@ -3463,7 +3513,11 @@ type MyHandler = http.Handler
     }
 }
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("Processor.cs"), content);
+        let __probe_path = PathBuf::from("Processor.cs");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter()
                 .any(|r| r.kind == TypeRefKind::FieldType && r.target_type == "Repository"),
@@ -3494,7 +3548,11 @@ type MyHandler = http.Handler
         let content = r#"class Service : BaseService(), IService {
 }
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("Service.kt"), content);
+        let __probe_path = PathBuf::from("Service.kt");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter()
                 .any(|r| r.source_symbol == "Service" && r.target_type == "BaseService"),
@@ -3519,7 +3577,11 @@ type MyHandler = http.Handler
     }
 }
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("Repo.kt"), content);
+        let __probe_path = PathBuf::from("Repo.kt");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter()
                 .any(|r| r.kind == TypeRefKind::FieldType && r.target_type == "Handler"),
@@ -3550,7 +3612,11 @@ type MyHandler = http.Handler
         let content = r#"class Service: BaseService, IService {
 }
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("Service.swift"), content);
+        let __probe_path = PathBuf::from("Service.swift");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter()
                 .any(|r| r.source_symbol == "Service" && r.target_type == "BaseService"),
@@ -3574,7 +3640,11 @@ type MyHandler = http.Handler
     }
 }
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("Processor.swift"), content);
+        let __probe_path = PathBuf::from("Processor.swift");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter().any(|r| r.kind == TypeRefKind::ParamType
                 && r.source_symbol == "process"
@@ -3599,7 +3669,11 @@ type MyHandler = http.Handler
         let content = r#"class Derived : public Base, public IFoo {
 };
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("derived.cpp"), content);
+        let __probe_path = PathBuf::from("derived.cpp");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter()
                 .any(|r| r.source_symbol == "Derived" && r.target_type == "Base"),
@@ -3621,7 +3695,11 @@ type MyHandler = http.Handler
     return Response();
 }
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("proc.cpp"), content);
+        let __probe_path = PathBuf::from("proc.cpp");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter()
                 .any(|r| r.kind == TypeRefKind::ReturnType && r.target_type == "Response"),
@@ -3644,7 +3722,11 @@ type MyHandler = http.Handler
         let content = r#"class Service < BaseService
 end
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("service.rb"), content);
+        let __probe_path = PathBuf::from("service.rb");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter().any(|r| r.kind == TypeRefKind::Extends
                 && r.source_symbol == "Service"
@@ -3662,7 +3744,11 @@ end
   prepend Auditable
 end
 "#;
-        let refs = parser.find_type_refs(&PathBuf::from("worker.rb"), content);
+        let __probe_path = PathBuf::from("worker.rb");
+        if !grammar_for_path_loaded(&__probe_path, content) {
+            return;
+        }
+        let refs = parser.find_type_refs(&__probe_path, content);
         assert!(
             refs.iter().any(|r| r.kind == TypeRefKind::Implements
                 && r.source_symbol == "Worker"
