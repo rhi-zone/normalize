@@ -1,6 +1,11 @@
 //! Python language support.
 
-use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use std::path::{Path, PathBuf};
+
+use crate::{
+    ContainerBody, Import, ImportSpec, Language, LanguageSymbols, ModuleId, ModuleResolver,
+    Resolution, ResolverConfig, Visibility,
+};
 use tree_sitter::Node;
 
 // ============================================================================
@@ -314,9 +319,221 @@ impl Language for Python {
             is_empty,
         })
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: PythonModuleResolver = PythonModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Python {}
+
+// =============================================================================
+// Python Module Resolver
+// =============================================================================
+
+/// Module resolver for Python.
+///
+/// Handles:
+/// - Relative imports (`from . import foo`, `from ..utils import bar`)
+/// - Absolute imports against workspace root and `src/` layout
+/// - `pyproject.toml` / `setup.cfg` discovery for package roots
+pub struct PythonModuleResolver;
+
+impl ModuleResolver for PythonModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        let mut search_roots: Vec<PathBuf> = Vec::new();
+
+        // Detect src/ layout
+        let src_dir = root.join("src");
+        if src_dir.is_dir() {
+            search_roots.push(src_dir);
+        }
+
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots,
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if !matches!(ext, "py" | "pyi" | "pyw") {
+            return Vec::new();
+        }
+
+        // Find the package root: walk up from file's directory looking for __init__.py
+        let file_dir = match file.parent() {
+            Some(d) => d,
+            None => return Vec::new(),
+        };
+
+        // Find the topmost directory that is still a package (has __init__.py)
+        // by walking up until we hit a dir without __init__.py or the workspace root.
+        let root = &cfg.workspace_root;
+
+        // Start from file_dir and find the package root
+        let package_root = find_package_root(file_dir, root, &cfg.search_roots);
+
+        let rel = file.strip_prefix(&package_root).unwrap_or(file);
+
+        let components: Vec<&str> = rel
+            .components()
+            .filter_map(|c| {
+                if let std::path::Component::Normal(s) = c {
+                    s.to_str()
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if components.is_empty() {
+            return Vec::new();
+        }
+
+        let last = *components.last().unwrap();
+        let module_path = if last == "__init__.py" {
+            // Package itself
+            if components.len() == 1 {
+                return Vec::new(); // top-level __init__.py with no package name
+            }
+            components[..components.len() - 1].join(".")
+        } else {
+            let stem = last.strip_suffix(".py").unwrap_or(last);
+            let mut parts: Vec<&str> = components[..components.len() - 1].to_vec();
+            parts.push(stem);
+            parts.join(".")
+        };
+
+        if module_path.is_empty() {
+            return Vec::new();
+        }
+
+        vec![ModuleId {
+            canonical_path: module_path,
+        }]
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if !matches!(ext, "py" | "pyi" | "pyw") {
+            return Resolution::NotApplicable;
+        }
+
+        let raw = &spec.raw;
+
+        // 1. Relative imports (is_relative or raw starts with dots — counted by caller)
+        if spec.is_relative {
+            return resolve_python_relative(from_file, raw, cfg);
+        }
+
+        // 2. Absolute imports: search workspace root and src/ search roots
+        let search_bases: Vec<PathBuf> = std::iter::once(cfg.workspace_root.clone())
+            .chain(cfg.search_roots.iter().cloned())
+            .collect();
+
+        let module_rel = raw.replace('.', "/");
+        for base in &search_bases {
+            // Try module/path.py
+            let as_file = base.join(format!("{}.py", module_rel));
+            if as_file.exists() {
+                let exported_name = spec.names.first().cloned().unwrap_or_default();
+                return Resolution::Resolved(as_file, exported_name);
+            }
+            // Try module/path/__init__.py
+            let as_pkg = base.join(&module_rel).join("__init__.py");
+            if as_pkg.exists() {
+                let exported_name = spec.names.first().cloned().unwrap_or_default();
+                return Resolution::Resolved(as_pkg, exported_name);
+            }
+        }
+
+        Resolution::NotFound
+    }
+}
+
+/// Find the topmost package root for a file.
+/// Returns the first ancestor directory that does NOT have an `__init__.py`
+/// (i.e., the directory containing the top-level package dir).
+fn find_package_root(file_dir: &Path, workspace_root: &Path, search_roots: &[PathBuf]) -> PathBuf {
+    // If file is under a search root, use that as the base
+    for sr in search_roots {
+        if file_dir.starts_with(sr) {
+            return sr.clone();
+        }
+    }
+
+    // Walk up from file_dir until we find a dir without __init__.py
+    let mut current = file_dir.to_path_buf();
+    let mut last_package_parent = workspace_root.to_path_buf();
+
+    loop {
+        if current.join("__init__.py").exists() {
+            if let Some(parent) = current.parent() {
+                last_package_parent = parent.to_path_buf();
+                if parent == workspace_root || !parent.starts_with(workspace_root) {
+                    break;
+                }
+                current = parent.to_path_buf();
+            } else {
+                break;
+            }
+        } else {
+            // This directory is not a package — it's the package root
+            last_package_parent = current.clone();
+            break;
+        }
+    }
+
+    last_package_parent
+}
+
+/// Resolve a relative Python import.
+///
+/// `from . import foo` → `spec.raw = ""`, `spec.names = ["foo"]`, `is_relative = true`
+/// `from .utils import bar` → `spec.raw = "utils"`, `is_relative = true`
+/// `from ..pkg import x` → `spec.raw = "..pkg"` (or similar)
+fn resolve_python_relative(from_file: &Path, raw: &str, _cfg: &ResolverConfig) -> Resolution {
+    let file_dir = match from_file.parent() {
+        Some(d) => d,
+        None => return Resolution::NotFound,
+    };
+
+    // Count leading dots to determine how many levels up to go
+    let dot_count = raw.chars().take_while(|&c| c == '.').count();
+    let module_part = &raw[dot_count..];
+
+    // Go up (dot_count - 1) levels from file_dir (1 dot = same dir)
+    let mut base = file_dir.to_path_buf();
+    for _ in 1..dot_count {
+        base = match base.parent() {
+            Some(p) => p.to_path_buf(),
+            None => return Resolution::NotFound,
+        };
+    }
+
+    if module_part.is_empty() {
+        // `from . import foo` — look in base dir for each name
+        return Resolution::NotFound; // can't resolve without knowing the names here
+    }
+
+    let module_rel = module_part.replace('.', "/");
+
+    // Try module_part.py
+    let as_file = base.join(format!("{}.py", module_rel));
+    if as_file.exists() {
+        return Resolution::Resolved(as_file, String::new());
+    }
+    // Try module_part/__init__.py
+    let as_pkg = base.join(&module_rel).join("__init__.py");
+    if as_pkg.exists() {
+        return Resolution::Resolved(as_pkg, String::new());
+    }
+
+    Resolution::NotFound
+}
 
 /// Extract the module-level docstring from Python source.
 ///

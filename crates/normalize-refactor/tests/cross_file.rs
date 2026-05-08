@@ -1,8 +1,9 @@
 //! Cross-file name resolution tests.
 //!
-//! Tests ModuleResolver implementations for Rust and TypeScript
+//! Tests ModuleResolver implementations for Rust, TypeScript, and Python
 //! against fixture directories under `tests/fixtures/xfile/`.
 
+use normalize_languages::python::PythonModuleResolver;
 use normalize_languages::rust::RustModuleResolver;
 use normalize_languages::typescript::TsModuleResolver;
 use normalize_languages::{ImportSpec, ModuleResolver, Resolution};
@@ -283,4 +284,75 @@ fn ts_module_of_file() {
     let modules = resolver.module_of_file(&root, &file, &cfg);
     assert_eq!(modules.len(), 1);
     assert_eq!(modules[0].canonical_path, "utils");
+}
+
+// =============================================================================
+// Python resolver tests
+// =============================================================================
+
+fn py_fixture_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/xfile/python")
+}
+
+#[test]
+fn py_resolve_relative_import() {
+    let root = py_fixture_root();
+    let resolver = PythonModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let from = root.join("models.py");
+    let spec = ImportSpec {
+        raw: ".utils".to_string(),
+        is_relative: true,
+        names: vec!["format_name".to_string()],
+        is_glob: false,
+    };
+    match resolver.resolve(&from, &spec, &cfg) {
+        Resolution::Resolved(path, _) => {
+            assert_eq!(path, root.join("utils.py"));
+        }
+        other => panic!(
+            "expected Resolved, got {:?}",
+            std::mem::discriminant(&other)
+        ),
+    }
+}
+
+#[test]
+fn py_not_applicable_for_non_py_file() {
+    let root = py_fixture_root();
+    let resolver = PythonModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let from = root.join("app.rb");
+    let spec = ImportSpec {
+        raw: "utils".to_string(),
+        is_relative: false,
+        names: Vec::new(),
+        is_glob: false,
+    };
+    assert!(matches!(
+        resolver.resolve(&from, &spec, &cfg),
+        Resolution::NotApplicable
+    ));
+}
+
+#[test]
+fn py_absolute_import_not_found() {
+    let root = py_fixture_root();
+    let resolver = PythonModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let from = root.join("main.py");
+    let spec = ImportSpec {
+        raw: "os.path".to_string(),
+        is_relative: false,
+        names: Vec::new(),
+        is_glob: false,
+    };
+    // stdlib — can't be resolved
+    assert!(matches!(
+        resolver.resolve(&from, &spec, &cfg),
+        Resolution::NotFound
+    ));
 }
