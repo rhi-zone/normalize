@@ -22,10 +22,18 @@ fn print_help() {
     eprintln!("Usage: cargo xtask <command>");
     eprintln!();
     eprintln!("Commands:");
-    eprintln!("  build-grammars [--out <dir>] [--force]");
+    eprintln!("  build-grammars [--out <dir>] [--force] [--target <triple>] [--cc <compiler>]");
     eprintln!("      Compile tree-sitter grammars to shared libraries");
-    eprintln!("      --out <dir>  Output directory (default: target/grammars)");
-    eprintln!("      --force      Recompile even if grammar already exists");
+    eprintln!("      --out <dir>      Output directory (default: target/grammars,");
+    eprintln!("                       or target/<triple>/grammars when --target is set)");
+    eprintln!("      --force          Recompile even if grammar already exists");
+    eprintln!("      --target <triple>  Target triple (e.g. x86_64-unknown-linux-musl)");
+    eprintln!("                         Selects compiler (unless --cc is given), platform");
+    eprintln!("                         flags, and library extension. Default: host.");
+    eprintln!(
+        "      --cc <compiler>  Override the C compiler (e.g. musl-gcc, x86_64-linux-musl-gcc)."
+    );
+    eprintln!("                       Falls back to $CC, then a default chosen by --target.");
     eprintln!("  bump-version <new-version> [--dry-run]");
     eprintln!("      Update version strings for all normalize-* crates");
     eprintln!("      <new-version>  New semver version (e.g. 0.3.0)");
@@ -35,8 +43,19 @@ fn print_help() {
 
 fn build_grammars(args: &[String]) {
     let args = parse_build_args(args);
-    let (out_dir, force) = (args.out_dir, args.force);
+    let BuildArgs {
+        out_dir,
+        force,
+        target,
+        cc,
+    } = args;
+    let target = target.as_deref();
+    let cc = cc.as_deref();
     fs::create_dir_all(&out_dir).expect("Failed to create output directory");
+    if let Some(t) = target {
+        println!("Target triple: {t}");
+    }
+    println!("C compiler: {}", resolve_cc(target, cc));
 
     let registry_src = find_cargo_registry_src();
     let grammars = find_arborium_grammars(&registry_src);
@@ -64,7 +83,7 @@ fn build_grammars(args: &[String]) {
         queries_copied += copy_query_files(lang, crate_dir, &out_dir);
 
         // Check if grammar already exists
-        let lib_ext = lib_extension();
+        let lib_ext = lib_extension(target);
         let out_file = out_dir.join(format!("{lang}.{lib_ext}"));
 
         if out_file.exists() && !force {
@@ -72,7 +91,7 @@ fn build_grammars(args: &[String]) {
             continue;
         }
 
-        match compile_grammar(lang, crate_dir, &out_dir) {
+        match compile_grammar(lang, crate_dir, &out_dir, target, cc) {
             Ok(size) => {
                 println!("  {lang}: {}", human_size(size));
                 compiled += 1;
@@ -93,7 +112,7 @@ fn build_grammars(args: &[String]) {
             local_grammars.len()
         );
         for (lang, grammar_dir) in &local_grammars {
-            match compile_local_grammar(lang, grammar_dir, &out_dir) {
+            match compile_local_grammar(lang, grammar_dir, &out_dir, target, cc) {
                 Ok(size) => {
                     println!("  {lang}: {} (local)", human_size(size));
                     compiled += 1;
@@ -124,16 +143,28 @@ fn build_grammars(args: &[String]) {
 struct BuildArgs {
     out_dir: PathBuf,
     force: bool,
+    target: Option<String>,
+    cc: Option<String>,
 }
 
 fn parse_build_args(args: &[String]) -> BuildArgs {
-    let mut out_dir = PathBuf::from("target/grammars");
+    let mut out_dir: Option<PathBuf> = None;
     let mut force = false;
+    let mut target: Option<String> = None;
+    let mut cc: Option<String> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--out" if i + 1 < args.len() => {
-                out_dir = PathBuf::from(&args[i + 1]);
+                out_dir = Some(PathBuf::from(&args[i + 1]));
+                i += 1;
+            }
+            "--target" if i + 1 < args.len() => {
+                target = Some(args[i + 1].clone());
+                i += 1;
+            }
+            "--cc" if i + 1 < args.len() => {
+                cc = Some(args[i + 1].clone());
                 i += 1;
             }
             "--force" => force = true,
@@ -141,17 +172,104 @@ fn parse_build_args(args: &[String]) -> BuildArgs {
         }
         i += 1;
     }
-    BuildArgs { out_dir, force }
+    let out_dir = out_dir.unwrap_or_else(|| match &target {
+        Some(t) => PathBuf::from(format!("target/{t}/grammars")),
+        None => PathBuf::from("target/grammars"),
+    });
+    BuildArgs {
+        out_dir,
+        force,
+        target,
+        cc,
+    }
 }
 
-fn lib_extension() -> &'static str {
-    if cfg!(target_os = "macos") {
-        "dylib"
-    } else if cfg!(target_os = "windows") {
-        "dll"
-    } else {
-        "so"
+/// Extension for compiled shared libraries, picked from the target triple
+/// (or the host platform when `target` is None).
+fn lib_extension(target: Option<&str>) -> &'static str {
+    match target {
+        Some(t) if t.contains("apple-darwin") || t.contains("apple-ios") => "dylib",
+        Some(t) if t.contains("windows") => "dll",
+        Some(_) => "so",
+        None => {
+            if cfg!(target_os = "macos") {
+                "dylib"
+            } else if cfg!(target_os = "windows") {
+                "dll"
+            } else {
+                "so"
+            }
+        }
     }
+}
+
+/// True when the target (or host, if None) is a Linux-like ELF platform that
+/// uses GNU ld-style flags. Includes `*-linux-gnu`, `*-linux-musl`, etc.
+fn is_linux_target(target: Option<&str>) -> bool {
+    match target {
+        Some(t) => t.contains("linux"),
+        None => cfg!(target_os = "linux"),
+    }
+}
+
+/// True for Apple targets (macOS / iOS), which use Mach-O linker flags.
+fn is_apple_target(target: Option<&str>) -> bool {
+    match target {
+        Some(t) => t.contains("apple"),
+        None => cfg!(target_os = "macos"),
+    }
+}
+
+/// Resolve the C compiler to use for grammar compilation.
+/// Priority: explicit `--cc` > `$CC` env var > target-specific default > `cc`.
+fn resolve_cc(target: Option<&str>, cc: Option<&str>) -> String {
+    if let Some(c) = cc {
+        return c.to_string();
+    }
+    if let Ok(c) = env::var("CC") {
+        if !c.is_empty() {
+            return c;
+        }
+    }
+    if let Some(t) = target {
+        // Pick a sensible default for known cross-targets. Users can override
+        // with --cc or $CC.
+        if t == "x86_64-unknown-linux-musl" {
+            // Prefer the prefixed cross-compiler if available; otherwise musl-gcc
+            // (as installed by Ubuntu's `musl-tools`).
+            if which("x86_64-linux-musl-gcc") {
+                return "x86_64-linux-musl-gcc".to_string();
+            }
+            if which("musl-gcc") {
+                return "musl-gcc".to_string();
+            }
+        }
+        if t == "aarch64-unknown-linux-musl" && which("aarch64-linux-musl-gcc") {
+            return "aarch64-linux-musl-gcc".to_string();
+        }
+        if t == "aarch64-unknown-linux-gnu" && which("aarch64-linux-gnu-gcc") {
+            return "aarch64-linux-gnu-gcc".to_string();
+        }
+    }
+    "cc".to_string()
+}
+
+fn which(prog: &str) -> bool {
+    // Lightweight check — avoids pulling in a `which` crate.
+    let Ok(path) = env::var("PATH") else {
+        return false;
+    };
+    let sep = if cfg!(target_os = "windows") {
+        ';'
+    } else {
+        ':'
+    };
+    for dir in path.split(sep) {
+        if Path::new(dir).join(prog).exists() {
+            return true;
+        }
+    }
+    false
 }
 
 /// Copy query files (highlights.scm, injections.scm, locals.scm) if they don't exist.
@@ -258,12 +376,19 @@ fn find_local_grammars() -> Vec<(String, PathBuf)> {
 
 /// Compile a local grammar from `grammars/<lang>/`.
 /// Local structure differs from arborium: parser at `src/parser.c`, scanner at `src/scanner.c`.
-fn compile_local_grammar(lang: &str, grammar_dir: &Path, out_dir: &Path) -> Result<u64, String> {
+fn compile_local_grammar(
+    lang: &str,
+    grammar_dir: &Path,
+    out_dir: &Path,
+    target: Option<&str>,
+    cc: Option<&str>,
+) -> Result<u64, String> {
     let parser_c = grammar_dir.join("src/parser.c");
     let scanner_c = grammar_dir.join("src/scanner.c");
-    let out_file = out_dir.join(format!("{lang}.{}", lib_extension()));
+    let out_file = out_dir.join(format!("{lang}.{}", lib_extension(target)));
 
-    let mut cmd = Command::new("cc");
+    let compiler = resolve_cc(target, cc);
+    let mut cmd = Command::new(&compiler);
     cmd.arg("-shared")
         .arg("-fPIC")
         .arg("-O2")
@@ -275,15 +400,18 @@ fn compile_local_grammar(lang: &str, grammar_dir: &Path, out_dir: &Path) -> Resu
         cmd.arg(&scanner_c);
     }
 
-    #[cfg(target_os = "linux")]
-    cmd.arg("-Wl,--unresolved-symbols=ignore-in-shared-libs");
-
-    #[cfg(target_os = "macos")]
-    cmd.arg("-undefined").arg("dynamic_lookup");
+    if is_linux_target(target) {
+        cmd.arg("-Wl,--unresolved-symbols=ignore-in-shared-libs");
+    }
+    if is_apple_target(target) {
+        cmd.arg("-undefined").arg("dynamic_lookup");
+    }
 
     cmd.arg("-o").arg(&out_file);
 
-    let output = cmd.output().map_err(|e| format!("Failed to run cc: {e}"))?;
+    let output = cmd
+        .output()
+        .map_err(|e| format!("Failed to run {compiler}: {e}"))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -348,13 +476,20 @@ fn find_arborium_grammars(registry_src: &Path) -> Vec<(String, PathBuf)> {
     grammars
 }
 
-fn compile_grammar(lang: &str, crate_dir: &Path, out_dir: &Path) -> Result<u64, String> {
+fn compile_grammar(
+    lang: &str,
+    crate_dir: &Path,
+    out_dir: &Path,
+    target: Option<&str>,
+    cc: Option<&str>,
+) -> Result<u64, String> {
     let parser_c = crate_dir.join("grammar/src/parser.c");
     let scanner_c = crate_dir.join("grammar/scanner.c");
 
-    let out_file = out_dir.join(format!("{lang}.{}", lib_extension()));
+    let out_file = out_dir.join(format!("{lang}.{}", lib_extension(target)));
 
-    let mut cmd = Command::new("cc");
+    let compiler = resolve_cc(target, cc);
+    let mut cmd = Command::new(&compiler);
     cmd.arg("-shared")
         .arg("-fPIC")
         .arg("-O2")
@@ -373,15 +508,18 @@ fn compile_grammar(lang: &str, crate_dir: &Path, out_dir: &Path) -> Result<u64, 
     }
 
     // Scanner uses ts_calloc/ts_free - resolved at runtime
-    #[cfg(target_os = "linux")]
-    cmd.arg("-Wl,--unresolved-symbols=ignore-in-shared-libs");
-
-    #[cfg(target_os = "macos")]
-    cmd.arg("-undefined").arg("dynamic_lookup");
+    if is_linux_target(target) {
+        cmd.arg("-Wl,--unresolved-symbols=ignore-in-shared-libs");
+    }
+    if is_apple_target(target) {
+        cmd.arg("-undefined").arg("dynamic_lookup");
+    }
 
     cmd.arg("-o").arg(&out_file);
 
-    let output = cmd.output().map_err(|e| format!("Failed to run cc: {e}"))?;
+    let output = cmd
+        .output()
+        .map_err(|e| format!("Failed to run {compiler}: {e}"))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

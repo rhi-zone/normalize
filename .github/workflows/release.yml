@@ -85,9 +85,35 @@ jobs:
           # is fully self-contained — no system musl required.
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN"
 
-      - name: Build grammars
-        if: matrix.target != 'aarch64-unknown-linux-gnu'  # Skip cross-compiled targets
+      - name: Build grammars (host)
+        # Skip cross-compiled targets (aarch64-linux-gnu) and musl, which
+        # builds grammars against the musl target in the dedicated step below
+        # so the .so files are loadable by the musl-linked binary.
+        if: matrix.target != 'aarch64-unknown-linux-gnu' && matrix.target != 'x86_64-unknown-linux-musl'
         run: cargo xtask build-grammars
+
+      - name: Build grammars (musl target)
+        # Build grammars with musl-gcc so the resulting .so files link against
+        # musl libc, matching the binary in the musl tarball. Glibc-linked
+        # grammars cannot be dlopen'd by a musl-linked normalize binary
+        # (different loader, different libc soname).
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          cargo xtask build-grammars \
+            --target x86_64-unknown-linux-musl \
+            --cc musl-gcc \
+            --out target/x86_64-unknown-linux-musl/grammars
+          # Sanity-check: the first grammar should depend on libc.musl-*, not libc.so.6.
+          FIRST_GRAMMAR=$(ls target/x86_64-unknown-linux-musl/grammars/*.so | head -1)
+          echo "Verifying $FIRST_GRAMMAR is musl-linked:"
+          file "$FIRST_GRAMMAR"
+          if readelf -d "$FIRST_GRAMMAR" | grep -q 'libc.so.6'; then
+            echo "ERROR: grammar links against glibc (libc.so.6) — musl build failed" >&2
+            readelf -d "$FIRST_GRAMMAR" | grep NEEDED >&2
+            exit 1
+          fi
+          echo "Grammar dependencies look correct (no glibc):"
+          readelf -d "$FIRST_GRAMMAR" | grep NEEDED || true
 
       - name: Prepare artifact (Unix)
         if: runner.os != 'Windows' && matrix.target != 'x86_64-unknown-linux-musl'
@@ -186,9 +212,17 @@ jobs:
       - name: Prepare grammars artifact (Unix)
         if: runner.os != 'Windows' && matrix.target != 'aarch64-unknown-linux-gnu'
         run: |
-          cd target/grammars
-          tar -czf ../../dist/normalize-grammars-${{ matrix.target }}.tar.gz *.so 2>/dev/null || \
-          tar -czf ../../dist/normalize-grammars-${{ matrix.target }}.tar.gz *.dylib 2>/dev/null || \
+          # The musl build outputs to target/<triple>/grammars so the .so files
+          # don't collide with host (glibc) grammars in target/grammars/.
+          # Other Unix targets still use the host output directory.
+          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
+            GRAMMAR_DIR="target/x86_64-unknown-linux-musl/grammars"
+          else
+            GRAMMAR_DIR="target/grammars"
+          fi
+          cd "$GRAMMAR_DIR"
+          tar -czf "$GITHUB_WORKSPACE/dist/normalize-grammars-${{ matrix.target }}.tar.gz" *.so 2>/dev/null || \
+          tar -czf "$GITHUB_WORKSPACE/dist/normalize-grammars-${{ matrix.target }}.tar.gz" *.dylib 2>/dev/null || \
           true
 
       - name: Prepare artifact (Windows)
