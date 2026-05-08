@@ -87,8 +87,13 @@ jobs:
           # on Ubuntu and doesn't synthesise musl-specific link flags). musl-gcc
           # knows libm folds into libc on musl and handles math symbol resolution
           # correctly without manual `-lm`.
+          # `-static-libgcc`: rust's musl target emits `-lgcc_s` after the
+          # dynamic-section marker; musl ships only static libgcc, no
+          # libgcc_s.so. Telling gcc to statically link libgcc resolves
+          # `-lgcc_s` against `libgcc.a` and avoids the missing-shared-lib
+          # error. Everything else stays dynamic via crt-static=false.
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
-          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN"
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN -C link-arg=-static-libgcc"
 
       - name: Fetch normalize-grammars deps
         # `cargo build -p normalize` only fetches `normalize`'s dep tree.
