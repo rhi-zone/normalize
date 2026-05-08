@@ -55,7 +55,7 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
           sudo apt-get update
-          sudo apt-get install -y musl-tools
+          sudo apt-get install -y musl-tools patchelf
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -79,10 +79,10 @@ jobs:
           # dlopen at runtime — that limited musl users to the 6 grammars
           # statically linked via `arborium-*` crates. We disable crt-static
           # and add `$ORIGIN` rpath so the binary can find bundled grammar
-          # libraries next to itself.
-          # Runtime requirement: musl libc (`ld-musl-x86_64.so.1` and
-          # `libc.musl-x86_64.so.1`). Available out of the box on Alpine,
-          # distroless musl images, and NixOS (with `pkgs.musl` in the env).
+          # libraries (and the bundled libc) next to itself.
+          # The release tarball ships a wrapper script + bundled
+          # `ld-musl-x86_64.so.1` / `libc.musl-x86_64.so.1`, so the artifact
+          # is fully self-contained — no system musl required.
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN"
 
       - name: Build grammars
@@ -90,13 +90,98 @@ jobs:
         run: cargo xtask build-grammars
 
       - name: Prepare artifact (Unix)
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && matrix.target != 'x86_64-unknown-linux-musl'
         run: |
           mkdir -p dist
           cp target/${{ matrix.target }}/release/normalize dist/
           cd dist
           tar -czf normalize-${{ matrix.target }}.tar.gz normalize
           rm normalize
+
+      - name: Prepare artifact (musl, self-contained)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          set -euo pipefail
+          # Layout inside the tarball:
+          #   normalize                       <- POSIX-sh wrapper script
+          #   runtime/normalize.elf           <- the actual ELF binary
+          #   runtime/ld-musl-x86_64.so.1     <- bundled musl loader
+          #   runtime/libc.musl-x86_64.so.1   <- bundled musl libc (same file
+          #                                      as the loader on musl)
+          # The wrapper resolves its own real path (via readlink -f), then
+          # invokes `runtime/ld-musl-x86_64.so.1 --library-path runtime
+          # runtime/normalize.elf "$@"`. This makes the artifact fully
+          # self-contained — no system musl libc / loader required.
+          mkdir -p dist/runtime
+
+          # Locate musl libc on the runner. Ubuntu's `musl-tools` package
+          # installs it at one of these paths.
+          MUSL_LIBC=""
+          for candidate in \
+            /usr/lib/x86_64-linux-musl/libc.so \
+            /lib/x86_64-linux-musl/libc.so \
+            /lib/ld-musl-x86_64.so.1; do
+            if [ -e "$candidate" ]; then
+              MUSL_LIBC="$candidate"
+              break
+            fi
+          done
+          if [ -z "$MUSL_LIBC" ]; then
+            echo "Could not locate musl libc on the runner" >&2
+            exit 1
+          fi
+          echo "Using musl libc: $MUSL_LIBC"
+
+          cp target/${{ matrix.target }}/release/normalize dist/runtime/normalize.elf
+          # On musl, the dynamic loader and libc are literally the same .so
+          # file. Ship it under both names so dlopen("libc.musl-...") and
+          # the explicit loader invocation both work.
+          cp "$MUSL_LIBC" dist/runtime/ld-musl-x86_64.so.1
+          cp "$MUSL_LIBC" dist/runtime/libc.musl-x86_64.so.1
+          chmod +x dist/runtime/ld-musl-x86_64.so.1
+
+          # Also patch the ELF's PT_INTERP to a relative path so anyone
+          # who invokes `runtime/normalize.elf` directly (without the
+          # wrapper) and happens to be `cd`'d into `runtime/` still works.
+          # The wrapper does NOT rely on this — it calls the loader
+          # explicitly — but a relative interpreter is harmless and gives
+          # one extra fallback.
+          patchelf --set-interpreter './ld-musl-x86_64.so.1' dist/runtime/normalize.elf || true
+          patchelf --set-rpath '$ORIGIN' dist/runtime/normalize.elf
+
+          cat > dist/normalize <<'WRAPPER'
+          #!/bin/sh
+          # normalize wrapper — invokes the bundled musl loader explicitly so
+          # the artifact runs on any Linux x86_64 system without requiring
+          # musl libc to be installed.
+          set -e
+          # Resolve the wrapper's real location (follows symlinks).
+          SELF="$0"
+          if [ -L "$SELF" ]; then
+              # readlink -f is GNU/busybox; fall back to a manual loop on
+              # systems where it's missing.
+              if command -v readlink >/dev/null 2>&1; then
+                  RESOLVED=$(readlink -f "$SELF" 2>/dev/null || true)
+                  if [ -n "$RESOLVED" ]; then SELF="$RESOLVED"; fi
+              fi
+          fi
+          DIR=$(cd "$(dirname "$SELF")" && pwd)
+          RUNTIME="$DIR/runtime"
+          if [ ! -x "$RUNTIME/ld-musl-x86_64.so.1" ] || [ ! -f "$RUNTIME/normalize.elf" ]; then
+              echo "normalize: bundled runtime not found at $RUNTIME" >&2
+              echo "  expected files: ld-musl-x86_64.so.1, normalize.elf" >&2
+              echo "  did the install step preserve the runtime/ directory?" >&2
+              exit 127
+          fi
+          exec "$RUNTIME/ld-musl-x86_64.so.1" \
+              --library-path "$RUNTIME" \
+              "$RUNTIME/normalize.elf" "$@"
+          WRAPPER
+          chmod +x dist/normalize
+
+          cd dist
+          tar -czf normalize-${{ matrix.target }}.tar.gz normalize runtime
+          rm -rf normalize runtime
 
       - name: Prepare grammars artifact (Unix)
         if: runner.os != 'Windows' && matrix.target != 'aarch64-unknown-linux-gnu'

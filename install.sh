@@ -12,6 +12,11 @@ set -e
 
 REPO="rhi-zone/normalize"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
+# For artifacts that ship a bundled runtime (currently: musl), we install the
+# whole layout (wrapper + runtime/) under LIBEXEC_DIR and symlink the wrapper
+# into INSTALL_DIR. This keeps PATH clean while preserving the wrapper's
+# expected `runtime/` sibling directory.
+LIBEXEC_DIR="${LIBEXEC_DIR:-$HOME/.local/share/normalize}"
 
 # Detect platform
 OS="$(uname -s)"
@@ -21,28 +26,21 @@ case "$OS" in
     Linux)
         case "$ARCH" in
             x86_64)
-                # The musl release build is now dynamically linked so it can
-                # `dlopen()` tree-sitter grammar `.so` files at runtime. It
-                # therefore requires the musl loader (`ld-musl-x86_64.so.1`)
-                # to be present. Prefer musl when:
-                #   - The musl loader is on the system (Alpine, distroless musl), OR
-                #   - This is NixOS (the user is expected to have `pkgs.musl`
-                #     available — `/lib64/ld-linux-x86-64.so.2` on NixOS is
-                #     usually a stub that doesn't actually work for foreign
-                #     dynamic glibc binaries).
-                # Otherwise fall back to the gnu build.
-                if [ -e /lib/ld-musl-x86_64.so.1 ] || [ -e /lib64/ld-musl-x86_64.so.1 ]; then
-                    TARGET="x86_64-unknown-linux-musl"
-                elif [ -f /etc/NIXOS ]; then
-                    # NixOS without musl on the system path — warn the user.
-                    echo "Warning: NixOS detected but musl loader (ld-musl-x86_64.so.1) not found." >&2
-                    echo "Add 'pkgs.musl' to your environment, or the binary will fail to start." >&2
+                # The musl release build is fully self-contained — it ships
+                # a wrapper script + bundled `ld-musl-x86_64.so.1` and
+                # `libc.musl-x86_64.so.1`, so it has zero system runtime
+                # dependencies and is the safe default on any Linux x86_64.
+                # Prefer the gnu build only when glibc is present and the
+                # system is NOT NixOS (NixOS's `/lib64/ld-linux-x86-64.so.2`
+                # is typically absent or a stub that won't load foreign
+                # glibc binaries — musl is more reliable there).
+                if [ -f /etc/NIXOS ]; then
                     TARGET="x86_64-unknown-linux-musl"
                 elif [ -e /lib64/ld-linux-x86-64.so.2 ]; then
                     TARGET="x86_64-unknown-linux-gnu"
                 else
-                    echo "No suitable dynamic linker found (neither glibc nor musl)." >&2
-                    exit 1
+                    # No glibc — use the self-contained musl artifact.
+                    TARGET="x86_64-unknown-linux-musl"
                 fi
                 ;;
             aarch64|arm64) TARGET="aarch64-unknown-linux-gnu" ;;
@@ -130,16 +128,40 @@ if [ -z "$SKIP_INSTALL" ]; then
 
     echo "Checksum verified."
 
-    # Extract and install
+    # Extract
     tar xz -C "$TMPWORK" -f "$TMPWORK/normalize.tar.gz"
     mkdir -p "$INSTALL_DIR"
-    if [ -w "$INSTALL_DIR" ]; then
-        mv "$TMPWORK/normalize" "$INSTALL_DIR/normalize"
+
+    # If the tarball contains a `runtime/` sibling (currently: musl artifact
+    # with bundled loader + libc), install the wrapper + runtime as a unit
+    # under LIBEXEC_DIR and symlink the wrapper into INSTALL_DIR.
+    # Otherwise install the single binary directly into INSTALL_DIR.
+    if [ -d "$TMPWORK/runtime" ] && [ -f "$TMPWORK/normalize" ]; then
+        echo "Installing self-contained runtime to $LIBEXEC_DIR..."
+        # Wipe any prior install so we don't leak old runtime files.
+        rm -rf "$LIBEXEC_DIR/runtime" "$LIBEXEC_DIR/normalize"
+        mkdir -p "$LIBEXEC_DIR"
+        mv "$TMPWORK/runtime" "$LIBEXEC_DIR/runtime"
+        mv "$TMPWORK/normalize" "$LIBEXEC_DIR/normalize"
+        chmod +x "$LIBEXEC_DIR/normalize"
+        chmod +x "$LIBEXEC_DIR/runtime/ld-musl-x86_64.so.1" 2>/dev/null || true
+
+        # Symlink (or copy, if symlinking isn't possible) into INSTALL_DIR.
+        if [ -w "$INSTALL_DIR" ]; then
+            ln -sf "$LIBEXEC_DIR/normalize" "$INSTALL_DIR/normalize"
+        else
+            echo "Linking into $INSTALL_DIR (requires sudo)..."
+            sudo ln -sf "$LIBEXEC_DIR/normalize" "$INSTALL_DIR/normalize"
+        fi
     else
-        echo "Installing to $INSTALL_DIR (requires sudo)..."
-        sudo mv "$TMPWORK/normalize" "$INSTALL_DIR/normalize"
+        if [ -w "$INSTALL_DIR" ]; then
+            mv "$TMPWORK/normalize" "$INSTALL_DIR/normalize"
+        else
+            echo "Installing to $INSTALL_DIR (requires sudo)..."
+            sudo mv "$TMPWORK/normalize" "$INSTALL_DIR/normalize"
+        fi
+        chmod +x "$INSTALL_DIR/normalize"
     fi
-    chmod +x "$INSTALL_DIR/normalize"
 fi
 
 if [ -z "$SKIP_INSTALL" ]; then
