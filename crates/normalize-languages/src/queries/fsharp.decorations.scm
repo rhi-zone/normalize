@@ -1,4 +1,4 @@
-(attribute) @decoration
+(attributes) @decoration
 
 (line_comment) @decoration
 

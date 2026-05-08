@@ -1,7 +1,5 @@
 (annotation) @decoration
 
-(multi_annotation) @decoration
+(line_comment) @decoration
 
 (multiline_comment) @decoration
-
-(line_comment) @decoration

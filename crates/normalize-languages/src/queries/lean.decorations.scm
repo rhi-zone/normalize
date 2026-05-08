@@ -1,5 +1,3 @@
-(attribute) @decoration
-
-(doc_comment) @decoration
+(attributes) @decoration
 
 (comment) @decoration

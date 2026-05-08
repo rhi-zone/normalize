@@ -51,6 +51,22 @@ fn is_decoration_kind(kind: &str) -> bool {
     kind.contains("comment") || DECORATION_KINDS.contains(&kind)
 }
 
+/// Tree-sitter node kinds that wrap a definition together with its decorations
+/// (decorators, attributes, export modifier, etc.) under a single parent. When
+/// the captured symbol node's parent is one of these, leading comments live as
+/// siblings of the *wrapper*, not of the symbol — so the walk must climb to
+/// the wrapper before scanning previous siblings.
+const DECORATION_WRAPPER_KINDS: &[&str] = &[
+    "decorated_definition", // Python `@decorator\ndef foo()` / `@decorator\nclass Foo`
+    "export_statement",     // TypeScript/JavaScript `export function foo()` / `export class Foo`
+    "export_default_declaration", // TypeScript/JavaScript `export default class Foo`
+    "ambient_declaration",  // TypeScript `declare ...`
+];
+
+fn is_decoration_wrapper_kind(kind: &str) -> bool {
+    DECORATION_WRAPPER_KINDS.contains(&kind)
+}
+
 /// Walk backward from the symbol's node through preceding named siblings,
 /// collecting decoration nodes (doc comments, attributes, decorators, etc.).
 /// Returns `(byte_offset, warning)` where:
@@ -91,11 +107,15 @@ pub fn decoration_extended_start(
     };
 
     let root = tree.root_node();
-    // The symbol's def node — descendant_for_byte_range expects start <= end and
-    // both within the tree. Use the line-start of the symbol as the anchor.
+    // The symbol's def node — descendant_for_byte_range returns the smallest
+    // node containing the range. Using the full [start, end) of the symbol can
+    // overshoot the def node when end_byte is set to the start of the line
+    // after the symbol (a common convention) — that byte may not lie within
+    // the def node, forcing us up to `module`. Use a point query at the start
+    // byte to anchor on the def itself; we then walk up to find the outermost
+    // ancestor that begins at the same byte.
     let sym_start = loc.start_byte.min(content.len());
-    let sym_end = loc.end_byte.min(content.len()).max(sym_start);
-    let Some(mut node) = root.descendant_for_byte_range(sym_start, sym_end) else {
+    let Some(mut node) = root.descendant_for_byte_range(sym_start, sym_start) else {
         return (fallback, None);
     };
 
@@ -140,26 +160,53 @@ pub fn decoration_extended_start(
     };
 
     // Walk preceding named siblings while they classify as decorations.
-    let mut earliest_start = node.start_byte();
+    //
+    // Some grammars wrap a definition together with its decorators/attributes
+    // under a single node (e.g. Python `decorated_definition`, TS `export_statement`).
+    // When we exhaust prev siblings within that wrapper, climb to the wrapper
+    // and continue scanning siblings of the wrapper itself — leading comments
+    // live there, not under the wrapper.
+    let initial_start = node.start_byte();
+    let mut earliest_start = initial_start;
     let mut cursor = node;
-    while let Some(prev) = cursor.prev_named_sibling() {
-        if !is_decoration(prev) {
+    loop {
+        while let Some(prev) = cursor.prev_named_sibling() {
+            if !is_decoration(prev) {
+                // Encountered a non-decoration sibling; stop entirely.
+                return finalize(content, earliest_start, initial_start, fallback);
+            }
+            // Only include if the gap between `prev` and the decoration block we've
+            // already accepted is whitespace-only (no intervening code/punctuation).
+            let gap = &content.as_bytes()[prev.end_byte()..earliest_start];
+            if !gap.iter().all(|b| b.is_ascii_whitespace()) {
+                return finalize(content, earliest_start, initial_start, fallback);
+            }
+            earliest_start = prev.start_byte();
+            cursor = prev;
+        }
+        // No more prev siblings inside the current scope. If the parent is a
+        // known decoration-wrapper, step out to the wrapper and keep scanning.
+        let Some(parent) = cursor.parent() else { break };
+        if parent.id() == root.id() || !is_decoration_wrapper_kind(parent.kind()) {
             break;
         }
-        // Only include if the gap between `prev` and the decoration block we've
-        // already accepted is whitespace-only (no intervening code/punctuation).
-        let gap = &content.as_bytes()[prev.end_byte()..earliest_start];
-        if !gap.iter().all(|b| b.is_ascii_whitespace()) {
-            break;
-        }
-        earliest_start = prev.start_byte();
-        cursor = prev;
+        // The wrapper's leading content (everything up to its first child) is
+        // part of the symbol's surface — walk wrapper's prev siblings next.
+        cursor = parent;
     }
+    finalize(content, earliest_start, initial_start, fallback)
+}
 
-    if earliest_start == node.start_byte() {
+fn finalize(
+    content: &str,
+    earliest_start: usize,
+    initial_start: usize,
+    fallback: usize,
+    // normalize-syntax-allow: rust/tuple-return
+) -> (usize, Option<String>) {
+    if earliest_start == initial_start {
         return (fallback, None);
     }
-
     // Snap to the start of the line containing earliest_start so we capture
     // any indentation on that line (consistent with `delete_symbol`'s line
     // semantics).

@@ -1,5 +1,5 @@
 (pragma) @decoration
 
-(comment) @decoration
+(haddock) @decoration
 
-(block_comment) @decoration
+(comment) @decoration

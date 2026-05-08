@@ -1,3 +1,3 @@
 (doc_comment) @decoration
 
-(comment) @decoration
+(line_comment) @decoration

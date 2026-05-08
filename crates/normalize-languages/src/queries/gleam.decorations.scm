@@ -1,5 +1,5 @@
-(module_doc_comment) @decoration
+(module_comment) @decoration
 
-(statement_doc_comment) @decoration
+(statement_comment) @decoration
 
 (comment) @decoration

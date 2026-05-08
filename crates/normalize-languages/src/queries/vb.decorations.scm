@@ -1,3 +1,3 @@
-(attribute_list) @decoration
+(attribute_block) @decoration
 
 (comment) @decoration
