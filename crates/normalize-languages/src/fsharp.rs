@@ -1,6 +1,8 @@
 //! F# language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use std::path::Path;
 use tree_sitter::Node;
 
 /// F# language support.
@@ -217,9 +219,86 @@ impl Language for FSharp {
             _ => None,
         }
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: FSharpModuleResolver = FSharpModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for FSharp {}
+
+// =============================================================================
+// F# Module Resolver
+// =============================================================================
+
+/// Module resolver for F#.
+///
+/// `open MyModule.SubModule` → look for `MyModule/SubModule.fs` relative to workspace root.
+pub struct FSharpModuleResolver;
+
+impl ModuleResolver for FSharpModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: vec![root.to_path_buf()],
+        }
+    }
+
+    fn module_of_file(&self, root: &Path, file: &Path, _cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "fs" && ext != "fsi" && ext != "fsx" {
+            return Vec::new();
+        }
+        if let Ok(rel) = file.strip_prefix(root) {
+            let rel_str = rel
+                .to_str()
+                .unwrap_or("")
+                .trim_end_matches(".fsx")
+                .trim_end_matches(".fsi")
+                .trim_end_matches(".fs")
+                .replace(['/', '\\'], ".");
+            if !rel_str.is_empty() {
+                return vec![ModuleId {
+                    canonical_path: rel_str,
+                }];
+            }
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "fs" && ext != "fsi" && ext != "fsx" {
+            return Resolution::NotApplicable;
+        }
+        // Strip "open " prefix if present
+        let raw = spec.raw.strip_prefix("open ").unwrap_or(&spec.raw).trim();
+        let exported_name = raw.rsplit('.').next().unwrap_or(raw).to_string();
+        let path_part = raw.replace('.', "/");
+
+        for ext_try in &["fs", "fsi", "fsx"] {
+            let candidate = cfg
+                .workspace_root
+                .join(format!("{}.{}", path_part, ext_try));
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, exported_name.clone());
+            }
+        }
+        // Also try last component in same directory as from_file
+        if let Some(parent) = from_file.parent() {
+            let last = raw.rsplit('.').next().unwrap_or(raw);
+            for ext_try in &["fs", "fsi"] {
+                let candidate = parent.join(format!("{}.{}", last, ext_try));
+                if candidate.exists() {
+                    return Resolution::Resolved(candidate, exported_name.clone());
+                }
+            }
+        }
+        Resolution::NotFound
+    }
+}
 
 #[cfg(test)]
 mod tests {

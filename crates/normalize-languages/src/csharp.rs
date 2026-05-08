@@ -1,6 +1,8 @@
 //! C# language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use std::path::Path;
 use tree_sitter::Node;
 
 /// C# language support.
@@ -252,9 +254,76 @@ impl Language for CSharp {
         // C# default visibility depends on context, but for skeleton purposes treat as public
         Visibility::Public
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: CSharpModuleResolver = CSharpModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for CSharp {}
+
+// =============================================================================
+// C# Module Resolver
+// =============================================================================
+
+/// Module resolver for C# (.NET / project-file conventions).
+///
+/// C# namespaces don't map 1:1 to file paths, but best-effort: convert
+/// dotted namespace to a path and look for the file relative to the project root.
+pub struct CSharpModuleResolver;
+
+impl ModuleResolver for CSharpModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        // Look for *.csproj to confirm project root — but no structured mappings needed.
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: vec![root.to_path_buf()],
+        }
+    }
+
+    fn module_of_file(&self, root: &Path, file: &Path, _cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "cs" {
+            return Vec::new();
+        }
+        if let Ok(rel) = file.strip_prefix(root) {
+            let rel_str = rel
+                .to_str()
+                .unwrap_or("")
+                .trim_end_matches(".cs")
+                .replace(['/', '\\'], ".");
+            if !rel_str.is_empty() {
+                return vec![ModuleId {
+                    canonical_path: rel_str,
+                }];
+            }
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "cs" {
+            return Resolution::NotApplicable;
+        }
+        let raw = &spec.raw;
+        let exported_name = raw.rsplit('.').next().unwrap_or(raw).to_string();
+
+        // Try progressively stripping leading namespace components
+        // (the project root namespace may be implicit)
+        let parts: Vec<&str> = raw.split('.').collect();
+        for skip in 0..parts.len() {
+            let path_part = parts[skip..].join("/");
+            let candidate = cfg.workspace_root.join(format!("{}.cs", path_part));
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, exported_name);
+            }
+        }
+        Resolution::NotFound
+    }
+}
 
 /// Strip common XML doc comment tags.
 fn strip_xml_tags(s: &str) -> String {
