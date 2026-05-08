@@ -98,17 +98,61 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           set -u
+
+          publish_one() {
+            local crate=$1
+            local attempt=0
+            while [ $attempt -lt 5 ]; do
+              attempt=$((attempt + 1))
+              local output
+              if output=$(cargo publish -p "$crate" --no-verify 2>&1); then
+                echo "$output"
+                echo "  ✓ published"
+                return 0
+              elif echo "$output" | grep -qE "already (uploaded|exists on crates.io)"; then
+                echo "  ✓ already published (skipping)"
+                return 0
+              elif echo "$output" | grep -qE "429 Too Many Requests"; then
+                # crates.io rate limit. Two flavours:
+                #   - "Please try again after <RFC date>" (new-crate burst)
+                #   - generic "too many ... please try again later"
+                # Parse the date if present and sleep until then; else fall
+                # back to exponential backoff (60s, 120s, 240s, 480s, 960s).
+                local retry_after
+                retry_after=$(echo "$output" \
+                  | grep -oE "Please try again after [^.]+\." \
+                  | sed -E 's/^Please try again after //; s/\.$//')
+                local sleep_secs
+                if [ -n "$retry_after" ]; then
+                  local target_epoch now_epoch
+                  target_epoch=$(date -u -d "$retry_after" +%s 2>/dev/null || echo 0)
+                  now_epoch=$(date -u +%s)
+                  if [ "$target_epoch" -gt "$now_epoch" ]; then
+                    sleep_secs=$((target_epoch - now_epoch + 30))
+                  else
+                    sleep_secs=$((60 * (1 << (attempt - 1))))
+                  fi
+                  echo "  ⏳ rate-limited, retry-after $retry_after (sleeping ${sleep_secs}s)" >&2
+                else
+                  sleep_secs=$((60 * (1 << (attempt - 1))))
+                  echo "  ⏳ rate-limited (no retry-after header), backing off ${sleep_secs}s" >&2
+                fi
+                sleep "$sleep_secs"
+                continue
+              else
+                echo "$output" >&2
+                echo "  ✗ publish failed for $crate" >&2
+                return 1
+              fi
+            done
+            echo "  ✗ giving up on $crate after $attempt attempts" >&2
+            return 1
+          }
+
           for crate in ${{ steps.order.outputs.crates }}; do
             echo "Publishing $crate..."
-            if output=$(cargo publish -p "$crate" --no-verify 2>&1); then
-              echo "$output"
-              echo "  ✓ published"
-              sleep 20
-            elif echo "$output" | grep -qE "already (uploaded|exists on crates.io)"; then
-              echo "  ✓ already published (skipping)"
-            else
-              echo "$output" >&2
-              echo "  ✗ publish failed for $crate" >&2
+            if ! publish_one "$crate"; then
               exit 1
             fi
+            sleep 20
           done
