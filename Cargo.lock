@@ -5085,7 +5085,7 @@ checksum = "9737e026353e5cd0736f98eddae28665118eb6f6600902a7f50db585621fecb6"
 
 [[package]]
 name = "normalize"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -5189,7 +5189,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-analyze"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "schemars",
  "serde",
@@ -5197,7 +5197,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-architecture"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "libsql",
  "normalize-facts",
@@ -5220,7 +5220,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-budget"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "gix",
@@ -5243,7 +5243,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-chat-sessions"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "gix",
  "regex",
@@ -5255,7 +5255,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-cli-parser"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "insta",
  "regex",
@@ -5265,7 +5265,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-code-similarity"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "normalize-languages",
  "streaming-iterator",
@@ -5274,7 +5274,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-context"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "dirs 5.0.1",
  "normalize-output",
@@ -5288,14 +5288,14 @@ dependencies = [
 
 [[package]]
 name = "normalize-core"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "normalize-derive",
 ]
 
 [[package]]
 name = "normalize-deps"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "normalize-languages",
  "streaming-iterator",
@@ -5304,7 +5304,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-derive"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5313,7 +5313,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-ecosystems"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "base64 0.22.1",
  "glob",
@@ -5329,7 +5329,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-edit"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "normalize-facts",
  "normalize-languages",
@@ -5339,7 +5339,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-facts"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bincode",
  "blake3",
@@ -5367,14 +5367,14 @@ dependencies = [
 
 [[package]]
 name = "normalize-facts-core"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "normalize-facts-rules-api"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "ascent",
  "rkyv",
@@ -5383,7 +5383,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-facts-rules-interpret"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "ascent-interpreter",
  "dirs 5.0.1",
@@ -5402,7 +5402,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-filter"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "ignore",
  "normalize-core",
@@ -5418,7 +5418,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-grammars"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "arborium-ada",
  "arborium-agda",
@@ -5522,7 +5522,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-graph"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "normalize-output",
  "nu-ansi-term",
@@ -5532,7 +5532,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-language-meta"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "serde",
  "toml",
@@ -5540,7 +5540,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-languages"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "ast-grep-core",
  "dirs 5.0.1",
@@ -5560,14 +5560,14 @@ dependencies = [
 
 [[package]]
 name = "normalize-local-deps"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "normalize-manifest",
 ]
 
 [[package]]
 name = "normalize-manifest"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "roxmltree",
  "serde",
@@ -5577,7 +5577,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-metrics"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "schemars",
@@ -5586,7 +5586,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-native-rules"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "dirs 5.0.1",
  "gix",
@@ -5614,14 +5614,14 @@ dependencies = [
 
 [[package]]
 name = "normalize-openapi"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
 name = "normalize-output"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "normalize-core",
  "nu-ansi-term",
@@ -5633,7 +5633,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-package-index"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "base64 0.22.1",
  "flate2",
@@ -5652,7 +5652,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-path-resolve"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "glob",
  "ignore",
@@ -5662,7 +5662,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-ratchet"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "gix",
@@ -5686,7 +5686,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-refactor"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "normalize-edit",
  "normalize-facts",
@@ -5699,7 +5699,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-rules"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "chrono",
  "dirs 5.0.1",
@@ -5730,7 +5730,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-rules-config"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "glob",
  "ignore",
@@ -5742,7 +5742,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-scope"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "normalize-languages",
  "schemars",
@@ -5753,7 +5753,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-semantic"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "fastembed",
@@ -5773,7 +5773,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-session-analysis"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "normalize-chat-sessions",
  "normalize-output",
@@ -5784,7 +5784,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-shadow"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "normalize-core",
  "schemars",
@@ -5795,7 +5795,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-surface-syntax"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "insta",
  "normalize-languages",
@@ -5807,7 +5807,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-syntax-rules"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "ast-grep-core",
  "dirs 5.0.1",
@@ -5833,7 +5833,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-tools"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "normalize-output",
  "rayon",
@@ -5846,7 +5846,7 @@ dependencies = [
 
 [[package]]
 name = "normalize-typegen"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "insta",
  "normalize-languages",
@@ -8983,7 +8983,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.3.0"
+version = "0.3.1"
 
 [[package]]
 name = "xz2"

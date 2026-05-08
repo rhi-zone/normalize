@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-05-08
+
+### Removed
+
+- **Semantic embedding search dropped from the shipping binary.** `normalize structure search`, `normalize context --semantic`, the `[embeddings]` config section, daemon incremental re-embedding, markdown/commit/context-block embedding during `structure rebuild`, the `embeddings` cargo feature flag, and the `semantic_compat` shim are all removed from the `normalize` binary. The `normalize-semantic` crate remains published on crates.io for standalone use; symbol search is being redesigned around discrete tags for a future release. Release builds simplify to a single `cargo build` step (musl no longer needs a no-default-features carve-out).
+
 ### Added
 
 - **First-run grammar install.** The first time a user runs any
@@ -20,37 +26,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   check has zero cost after first use. Users who already have a populated
   grammar directory (e.g. from `cargo xtask build-grammars` or
   `NORMALIZE_GRAMMAR_PATH`) are detected and stamped without a download.
-
-### Changed
-
-- **All tree-sitter grammars now load uniformly via `dlopen()`.** Previously
-  `normalize-surface-syntax` and `normalize-typegen` statically linked four
-  `arborium-*` grammar crates (TypeScript, JavaScript, Lua, Python — and
-  GraphQL in typegen), while every other grammar loaded dynamically through
-  the shared `GrammarLoader`. The static linking is gone: those readers now
-  request grammars from the process-wide `grammar_loader()` singleton like
-  the rest of the codebase. Net effect on the binary: the four (five for
-  typegen) compiled-in parsers are removed; the runtime requirement that
-  the relevant `.so` files live in a search path was already true for all
-  other languages and is unchanged. Cargo features `read-typescript`,
-  `read-javascript`, `read-lua`, `read-python`, `input-typescript`, and
-  `input-graphql` continue to work — they now gate the reader source code,
-  not a grammar dependency.
-- **musl release build is now fully self-contained — no system runtime dependencies.** Previously the `x86_64-unknown-linux-musl` artifact was a static-pie binary (couldn't `dlopen()` grammar `.so` files), then briefly a dynamic binary that required the system to provide `ld-musl-x86_64.so.1` and `libc.musl-x86_64.so.1`. The release tarball now bundles its own musl loader and libc alongside a tiny POSIX-sh wrapper script that invokes the bundled loader explicitly (`exec "$DIR/runtime/ld-musl-x86_64.so.1" --library-path "$DIR/runtime" "$DIR/runtime/normalize.elf" "$@"`). The artifact runs on any Linux x86_64 system — Alpine, distroless, NixOS without `pkgs.musl`, glibc-only distros — with no installed musl required. `install.sh` extracts the tarball under `~/.local/share/normalize/` and symlinks the wrapper into `~/.local/bin/`. The musl artifact is now also the safe default on systems without glibc (and the only choice on NixOS).
-
-### Fixed
-
-- **musl release tarball now ships musl-linked grammars.** The release workflow previously built grammars once on the glibc host runner and bundled the same `.so` files into both the gnu and musl tarballs. The musl-linked `normalize` binary uses the musl loader, which cannot `dlopen()` glibc-linked shared objects, so any grammar load on musl would fail at runtime. The workflow now invokes `cargo xtask build-grammars --target x86_64-unknown-linux-musl --cc musl-gcc` for the musl matrix entry and packs the resulting `target/x86_64-unknown-linux-musl/grammars/*.so` into the musl grammar artifact. A `readelf -d` check in CI fails the build if any grammar still depends on `libc.so.6`. `cargo xtask build-grammars` gained `--target <triple>` and `--cc <compiler>` flags; both default to host behavior so existing invocations are unchanged.
-- **libsql `block_on` shim no longer deadlocks/panics when called from a tokio worker.** The cache layers in `normalize-facts`, `normalize-native-rules`, and `normalize-syntax-rules` cache an owned current-thread runtime when constructed from sync code (the common case). Previously the helper used that cached runtime unconditionally, which caused `Cannot start a runtime from within a runtime` panics whenever a `#[tokio::test]` (or any other tokio task) hit a cache that had been initialized earlier from a sync test in the same process. The helper now inspects the call site's tokio context first — only falling back to the cached runtime when not already inside one — so the public API stays synchronous while remaining safe to call from any context.
-
-## [0.3.1] — 2026-05-08
-
-### Removed
-
-- **Semantic embedding search dropped from the shipping binary.** `normalize structure search`, `normalize context --semantic`, the `[embeddings]` config section, daemon incremental re-embedding, markdown/commit/context-block embedding during `structure rebuild`, the `embeddings` cargo feature flag, and the `semantic_compat` shim are all removed from the `normalize` binary. The `normalize-semantic` crate remains published on crates.io for standalone use; symbol search is being redesigned around discrete tags for a future release. Release builds simplify to a single `cargo build` step (musl no longer needs a no-default-features carve-out).
-
-### Added
-
 - **`normalize structure test-fixtures`** — language extraction fixture runner. Discovers `<lang>/<case>/input.<ext>` + `expected.json` pairs under `crates/normalize-languages/tests/fixtures/`, extracts symbols/imports/calls via `SymbolParser`, and diffs against expected JSON. Flags: `--lang <lang>` (filter to one language), `--fixture-dir <dir>` (custom fixture root), `--update` (write actual output as expected — bootstrap mode). Schema: `{exhaustive, symbols: [{name, kind, line}], imports: [{module, name, line}], calls: [{callee, line}]}`. All fields optional; subset matching by default; `"exhaustive": true` for exhaustive checking.
 - **`normalize rules test-fixtures`** — fixture-based test format for native/syntax rules. Discovers test cases with input source + expected diagnostics under `.normalize/rule-tests/` (configurable via `--fixture-dir`) and runs them through the engine with subset or exhaustive matching.
 - **`normalize view chunk <file> --chunk N` and `--around <pattern>`** — large-file navigation for agents. `--chunk N` divides a file into fixed-size chunks (default 100 lines, configurable via `--chunk-size`) and shows chunk N (1-indexed). `--around <pattern>` finds the first regex/substring match and shows ±50 lines of context (configurable via `--context-lines`). Multiple matches: `--match-index I` to navigate. Returns `ChunkedViewReport` with `file`, `chunk`, `total_chunks`, `line_start`, `line_end`, `content`, and (for `--around`) `match_line`, `total_matches`, `match_index`. Works with `--json`/`--jq`/`--jsonl`.
@@ -111,6 +86,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **All tree-sitter grammars now load uniformly via `dlopen()`.** Previously
+  `normalize-surface-syntax` and `normalize-typegen` statically linked four
+  `arborium-*` grammar crates (TypeScript, JavaScript, Lua, Python — and
+  GraphQL in typegen), while every other grammar loaded dynamically through
+  the shared `GrammarLoader`. The static linking is gone: those readers now
+  request grammars from the process-wide `grammar_loader()` singleton like
+  the rest of the codebase. Net effect on the binary: the four (five for
+  typegen) compiled-in parsers are removed; the runtime requirement that
+  the relevant `.so` files live in a search path was already true for all
+  other languages and is unchanged. Cargo features `read-typescript`,
+  `read-javascript`, `read-lua`, `read-python`, `input-typescript`, and
+  `input-graphql` continue to work — they now gate the reader source code,
+  not a grammar dependency.
+- **musl release build is now fully self-contained — no system runtime dependencies.** Previously the `x86_64-unknown-linux-musl` artifact was a static-pie binary (couldn't `dlopen()` grammar `.so` files), then briefly a dynamic binary that required the system to provide `ld-musl-x86_64.so.1` and `libc.musl-x86_64.so.1`. The release tarball now bundles its own musl loader and libc alongside a tiny POSIX-sh wrapper script that invokes the bundled loader explicitly (`exec "$DIR/runtime/ld-musl-x86_64.so.1" --library-path "$DIR/runtime" "$DIR/runtime/normalize.elf" "$@"`). The artifact runs on any Linux x86_64 system — Alpine, distroless, NixOS without `pkgs.musl`, glibc-only distros — with no installed musl required. `install.sh` extracts the tarball under `~/.local/share/normalize/` and symlinks the wrapper into `~/.local/bin/`. The musl artifact is now also the safe default on systems without glibc (and the only choice on NixOS).
 - **rusqlite → libsql migration across the workspace.** `normalize-facts` (CA cache), `normalize-native-rules` (findings cache), `normalize-syntax-rules` (findings cache), and the `normalize sync` path-rewrite all moved off `rusqlite` onto `libsql`. Resolves a sqlite link conflict that previously forced workspace-wide symbol coordination. No user-visible behavior change; cache files at `~/.config/normalize/ca-cache.sqlite` and `.normalize/findings-cache.sqlite` are still SQLite and remain compatible.
 - **`*-allow` files removed in favor of `config.toml` entries.** The 7 legacy `.normalize/*-allow` files (`large-files-allow`, `hotspots-allow`, `duplicate-blocks-allow`, `duplicate-functions-allow`, `duplicate-types-allow`, `similar-blocks-allow`, `similar-functions-allow`) are no longer loaded. Their entries now live directly in `config.toml`: `large-files-allow` → `[rules.rule."long-file"] allow = [...]`; `hotspots-allow` → `[analyze] hotspots_exclude`; duplicate/similar command allowlists → `[analyze.<subcommand>] allow = [...]`. **Migration:** if you have custom entries in any `*-allow` file, move them to the appropriate `config.toml` section.
 - **Per-rule config moved to `[rules.rule."<id>"]`.** Previously `[rules]` hosted both engine-wide bare keys (e.g. `global-allow`, `sarif-tools`) and per-rule sub-tables (e.g. `[rules."rust/dbg-macro"]`) — a TOML namespace collision waiting to happen. Per-rule overrides are now nested under a dedicated `rule` sub-table; the bare-key namespace under `[rules]` is reserved for engine-wide configuration. The legacy layout is still parsed for one release with a stderr deprecation warning. **Migration:** rename every `[rules."<id>"]` to `[rules.rule."<id>"]`. Engine-wide keys stay where they are.
@@ -155,6 +144,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **musl release tarball now ships musl-linked grammars.** The release workflow previously built grammars once on the glibc host runner and bundled the same `.so` files into both the gnu and musl tarballs. The musl-linked `normalize` binary uses the musl loader, which cannot `dlopen()` glibc-linked shared objects, so any grammar load on musl would fail at runtime. The workflow now invokes `cargo xtask build-grammars --target x86_64-unknown-linux-musl --cc musl-gcc` for the musl matrix entry and packs the resulting `target/x86_64-unknown-linux-musl/grammars/*.so` into the musl grammar artifact. A `readelf -d` check in CI fails the build if any grammar still depends on `libc.so.6`. `cargo xtask build-grammars` gained `--target <triple>` and `--cc <compiler>` flags; both default to host behavior so existing invocations are unchanged.
+- **libsql `block_on` shim no longer deadlocks/panics when called from a tokio worker.** The cache layers in `normalize-facts`, `normalize-native-rules`, and `normalize-syntax-rules` cache an owned current-thread runtime when constructed from sync code (the common case). Previously the helper used that cached runtime unconditionally, which caused `Cannot start a runtime from within a runtime` panics whenever a `#[tokio::test]` (or any other tokio task) hit a cache that had been initialized earlier from a sync test in the same process. The helper now inspects the call site's tokio context first — only falling back to the cached runtime when not already inside one — so the public API stays synchronous while remaining safe to call from any context.
 - **`normalize update` no longer recomputes SHA-256 in O(n²).** The hand-rolled hash implementation in the self-update path was quadratic and could take minutes on macOS releases (~45 MB binary). Replaced with the `sha2` crate; verification is now milliseconds.
 - **`DaemonClient` socket path captured at construction, not at every method call.** `DaemonClient::new()` previously re-read `NORMALIZE_DAEMON_CONFIG_DIR` on every method invocation. Under any concurrent use this raced. `DaemonClient::new()` now resolves the env var once and stores the resolved `PathBuf`. New `DaemonClient::with_socket_path(PathBuf)` constructor lets callers (tests, LSP servers talking to multiple workspaces, library embedders) target a specific socket without touching env vars.
 - **Daemon refresh events suppressed during first 60 s after `add_root`.** `FileIndex::incremental_refresh()` short-circuited via a `needs_refresh()` staleness gate (a cold-CLI optimization). The daemon's `refresh_root` called the gated variant, killing LSP push diagnostics during the first minute of a daemon session. Adds `FileIndex::incremental_refresh_force()` which skips the gate; the daemon now uses it.

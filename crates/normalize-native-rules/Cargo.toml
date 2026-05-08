@@ -7,13 +7,13 @@ repository.workspace = true
 description = "Native rule checks for normalize (stale-summary, check-refs, stale-docs, check-examples)"
 
 [dependencies]
-normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.0" }
-normalize-scope = { path = "../normalize-scope", version = "0.3.0" }
-normalize-output = { path = "../normalize-output", version = "0.3.0" }
-normalize-facts = { path = "../normalize-facts", version = "0.3.0" }
-normalize-languages = { path = "../normalize-languages", version = "0.3.0" }
-normalize-budget = { path = "../normalize-budget", version = "0.3.0", features = ["cli"] }
-normalize-ratchet = { path = "../normalize-ratchet", version = "0.3.0", features = ["cli"] }
+normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.1" }
+normalize-scope = { path = "../normalize-scope", version = "0.3.1" }
+normalize-output = { path = "../normalize-output", version = "0.3.1" }
+normalize-facts = { path = "../normalize-facts", version = "0.3.1" }
+normalize-languages = { path = "../normalize-languages", version = "0.3.1" }
+normalize-budget = { path = "../normalize-budget", version = "0.3.1", features = ["cli"] }
+normalize-ratchet = { path = "../normalize-ratchet", version = "0.3.1", features = ["cli"] }
 gix = { workspace = true }
 serde.workspace = true
 serde_json.workspace = true

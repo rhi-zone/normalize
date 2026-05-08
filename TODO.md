@@ -15,15 +15,15 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ---
 
-## 0.3.0 readiness
+## 0.3.1 readiness
 
-**Assessed 2026-04-27.** CHANGELOG `[Unreleased]` has a very large feature set — enough for a release. No P0 blockers found. The daemon nested-runtime panic may already be resolved (daemon now uses `Handle::current()`; needs verification before the release commit). Headline features: `normalize edit move`, `normalize sync`, daemon memory leak fix, parallel fact rule evaluation (~2× speedup).
+**Assessed 2026-04-27, released 2026-05-08.** CHANGELOG `[Unreleased]` had a very large feature set — enough for a release. No P0 blockers. Headline features: `normalize edit move`, `normalize sync`, daemon memory leak fix, parallel fact rule evaluation (~2× speedup). 0.3.0 was skipped due to a partial CI publish; 0.3.1 supersedes it.
 
 **Pre-release checklist:**
 - [x] Verify daemon nested-runtime panic is gone (smoke-test `normalize daemon run`)
 - [x] Bump EXTRACTOR_VERSION to "2" in normalize-facts/src/index.rs to purge CA cache entries that may have been poisoned by old binaries without grammars — done: `const EXTRACTOR_VERSION: &str = "2"` in `normalize-facts/src/index.rs`
-- [x] Run `normalize structure rebuild --full` on a fresh checkout to verify 0.3.0 extraction quality
-- [x] Tag v0.3.0 and update CHANGELOG `[Unreleased]` → `[0.3.0]`
+- [x] Run `normalize structure rebuild --full` on a fresh checkout to verify 0.3.1 extraction quality
+- [x] Bump workspace version 0.3.0 → 0.3.1 and consolidate CHANGELOG `[Unreleased]` → `[0.3.1]`
 
 ## Structured-metadata symbol search (0.4 design)
 

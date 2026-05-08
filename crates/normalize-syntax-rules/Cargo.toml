@@ -40,15 +40,15 @@ streaming-iterator = "0.1"
 ast-grep-core = "0.40.5"
 
 # Language support
-normalize-languages = { path = "../normalize-languages", version = "0.3.0" }
+normalize-languages = { path = "../normalize-languages", version = "0.3.1" }
 
 # Schema generation
 schemars = "1"
 
 # Core traits
-normalize-core = { path = "../normalize-core", version = "0.3.0" }
-normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.0" }
-normalize-output = { path = "../normalize-output", version = "0.3.0" }
+normalize-core = { path = "../normalize-core", version = "0.3.1" }
+normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.1" }
+normalize-output = { path = "../normalize-output", version = "0.3.1" }
 
 [dev-dependencies]
 tempfile = "3"
