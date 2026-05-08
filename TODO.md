@@ -1,6 +1,6 @@
 # Normalize Roadmap
 
-Last triaged: 2026-05-06
+Last triaged: 2026-05-08
 
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
@@ -15,15 +15,79 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ---
 
-## 0.3.1 readiness
+## 0.4 — semantic analysis (vague target)
 
-**Assessed 2026-04-27, released 2026-05-08.** CHANGELOG `[Unreleased]` had a very large feature set — enough for a release. No P0 blockers. Headline features: `normalize edit move`, `normalize sync`, daemon memory leak fix, parallel fact rule evaluation (~2× speedup). 0.3.0 was skipped due to a partial CI publish; 0.3.1 supersedes it.
+The 0.3.x line shipped the recipe scaffolding (rename, move, inline-variable,
+inline-function, introduce-variable, add-parameter) but the harder recipes —
+extract-function in particular — stalled because they need real semantic
+infrastructure that doesn't exist yet. 0.4's loose theme: build that
+infrastructure.
 
-**Pre-release checklist:**
-- [x] Verify daemon nested-runtime panic is gone (smoke-test `normalize daemon run`)
-- [x] Bump EXTRACTOR_VERSION to "2" in normalize-facts/src/index.rs to purge CA cache entries that may have been poisoned by old binaries without grammars — done: `const EXTRACTOR_VERSION: &str = "2"` in `normalize-facts/src/index.rs`
-- [x] Run `normalize structure rebuild --full` on a fresh checkout to verify 0.3.1 extraction quality
-- [x] Bump workspace version 0.3.0 → 0.3.1 and consolidate CHANGELOG `[Unreleased]` → `[0.3.1]`
+Two complementary threads already sketched in TODO:
+
+1. **Semantic foundation for refactoring recipes** — see "Refactoring recipe
+   ecosystem → Semantic foundation needed" below. Name resolution
+   (cross-file), CFG, liveness, effect/mutation tracking, tiered type
+   information. The dependency order suggests starting with name resolution
+   and CFG — those unblock the rest.
+
+2. **Structured-metadata symbol search** — see the dedicated section below.
+   Replaces the dropped embedding search; shape aligns with broader rhizone
+   direction (arbitrary structured metadata as the primary fact shape across
+   sessions, manifests, rules, symbols).
+
+The two intersect: structured metadata is the natural carrier for
+semantic-analysis outputs (effect bits, type info, liveness flags). Worth
+designing them together rather than as separate pipelines.
+
+Open question, not resolved: do we lean toward extending the existing Datalog
+fact engine for semantic analysis, or stand up a new analysis layer? Datalog
+fits naturally for liveness/reachability/call-graph queries; less natural for
+type inference proper. Hybrid is plausible but complicates the story.
+
+## 0.3.x post-release follow-ups (advisory)
+
+Items that surfaced during the 0.3.1 release rodeo and may be worth a
+second look — none are blocking, none are strictly committed:
+
+- **Musl artifact end-to-end install never validated on a clean machine.**
+  CI builds it cleanly and the wrapper script + bundled loader/libc/libgcc
+  approach is principled, but no one has actually `tar xzf`'d the release
+  on a fresh NixOS / Alpine / distroless container and verified the wrapper
+  resolves correctly under `~/.local/bin/`-via-symlink, PATH lookups, etc.
+  First user to install will be the integration test.
+
+- **Crates.io rate-limit handling works but is slow.** publish.yml has
+  Retry-After-aware retry; new-crate publishes still take 1-2 hours total
+  for ~13 first-time-published crates due to the per-window cap. Could ask
+  crates.io to raise our limit (their docs invite this for legitimate
+  workspaces) — would shrink publish time to minutes.
+
+- **Musl grammar build uses glibc libgcc_s.so.1.** We copy it from the
+  Ubuntu runner into musl-gcc's sysroot at link time and bundle it into the
+  release tarball. libgcc_s contains only compiler builtins, so the
+  glibc-into-musl mixing is safe in theory — but worth keeping an eye on
+  if anyone reports `__divti3`/`__udivdi3` ABI surprises on musl.
+
+- **Some commits in this release line had to be retried 6+ times in CI**
+  because each push surfaced a different latent bug (musl libm, libgcc_s,
+  cargo fetch flag spelling, premature publish trigger). Pattern: each fix
+  was correct in isolation but downstream effects only showed up on the
+  next CI run. A `cargo build --target x86_64-unknown-linux-musl` smoke
+  test in `ci.yml` (PR-time) would catch most musl-target issues before
+  they hit release.yml. Currently `ci.yml` only builds the host target.
+
+- **0.3.0 partial-publish leftovers on crates.io.** 10 crates were
+  published at 0.3.0 before the failed run was caught. They live alongside
+  their 0.3.1 versions; if anyone pinned to `=0.3.0` they'd get a
+  potentially-broken build (some crates had path deps without `version =`
+  pinned, which is what caused the failure). Could yank the 0.3.0 versions
+  for safety.
+
+- **Daemon flake `config_edit_triggers_reload_event`** — failed once in
+  a workspace test run, passed in isolation and on subsequent runs. The
+  agent who chased it called it transient (possibly inotify saturation
+  under parallel test load). Watch for recurrences.
 
 ## Structured-metadata symbol search (0.4 design)
 
