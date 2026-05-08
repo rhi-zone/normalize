@@ -15,35 +15,19 @@ extract, inline, move — correct, without LSPs, without false positives.
 
 ---
 
-## 0.4 — semantic analysis (vague target)
+## 0.4 — working cross-language LSP with JetBrains-parity refactoring
+
+**Concrete target**: a working LSP server exposing Find Usages, Rename, Safe
+Delete, Extract Method/Variable, Inline, Change Signature across all ~98
+supported languages — without LSP delegation, without false positives.
+JetBrains-parity for refactoring is the bar; an LSP surface is how we
+make it observable and usable from editors.
 
 The 0.3.x line shipped the recipe scaffolding (rename, move, inline-variable,
 inline-function, introduce-variable, add-parameter) but the harder recipes —
 extract-function in particular — stalled because they need real semantic
-infrastructure that doesn't exist yet. 0.4's loose theme: build that
-infrastructure.
-
-Two complementary threads already sketched in TODO:
-
-1. **Semantic foundation for refactoring recipes** — see "Refactoring recipe
-   ecosystem → Semantic foundation needed" below. Name resolution
-   (cross-file), CFG, liveness, effect/mutation tracking, tiered type
-   information. The dependency order suggests starting with name resolution
-   and CFG — those unblock the rest.
-
-2. **Structured-metadata symbol search** — see the dedicated section below.
-   Replaces the dropped embedding search; shape aligns with broader rhizone
-   direction (arbitrary structured metadata as the primary fact shape across
-   sessions, manifests, rules, symbols).
-
-The two intersect: structured metadata is the natural carrier for
-semantic-analysis outputs (effect bits, type info, liveness flags). Worth
-designing them together rather than as separate pipelines.
-
-Open question, not resolved: do we lean toward extending the existing Datalog
-fact engine for semantic analysis, or stand up a new analysis layer? Datalog
-fits naturally for liveness/reachability/call-graph queries; less natural for
-type inference proper. Hybrid is plausible but complicates the story.
+infrastructure. 0.4 builds that infrastructure in five phases and surfaces it
+via LSP. See `docs/roadmap-0.4.md` for the full phase design.
 
 ### Phase 0 — Cross-file name resolution (in progress)
 
