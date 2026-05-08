@@ -1,6 +1,8 @@
 //! PHP language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// PHP language support.
@@ -197,9 +199,115 @@ impl Language for Php {
         // PHP default visibility for methods/properties in classes is public
         Visibility::Public
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: PhpModuleResolver = PhpModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Php {}
+
+// =============================================================================
+// PHP Module Resolver
+// =============================================================================
+
+/// Module resolver for PHP (PSR-4 / composer.json conventions).
+///
+/// Reads `composer.json` `autoload.psr-4` to build namespace→directory mappings.
+pub struct PhpModuleResolver;
+
+impl ModuleResolver for PhpModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        let mut path_mappings: Vec<(String, PathBuf)> = Vec::new();
+
+        let composer_json = root.join("composer.json");
+        if let Ok(content) = std::fs::read_to_string(&composer_json)
+            && let Ok(json) = serde_json::from_str::<serde_json::Value>(&content)
+        {
+            // Parse autoload.psr-4 and autoload-dev.psr-4
+            for autoload_key in &["autoload", "autoload-dev"] {
+                if let Some(psr4) = json
+                    .get(autoload_key)
+                    .and_then(|a| a.get("psr-4"))
+                    .and_then(|p| p.as_object())
+                {
+                    for (namespace, dir) in psr4 {
+                        let ns = namespace.trim_end_matches('\\').to_string();
+                        if let Some(dir_str) = dir.as_str() {
+                            let target = root.join(dir_str);
+                            path_mappings.push((ns, target));
+                        }
+                    }
+                }
+            }
+        }
+
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings,
+            search_roots: vec![root.to_path_buf()],
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "php" && ext != "phtml" {
+            return Vec::new();
+        }
+        for (ns, dir) in &cfg.path_mappings {
+            if let Ok(rel) = file.strip_prefix(dir) {
+                let rel_str = rel
+                    .to_str()
+                    .unwrap_or("")
+                    .trim_end_matches(".phtml")
+                    .trim_end_matches(".php")
+                    .replace('/', "\\");
+                let canonical = format!("{}\\{}", ns, rel_str);
+                return vec![ModuleId {
+                    canonical_path: canonical,
+                }];
+            }
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "php" && ext != "phtml" {
+            return Resolution::NotApplicable;
+        }
+        let raw = &spec.raw;
+        let exported_name = raw.rsplit('\\').next().unwrap_or(raw).to_string();
+
+        // Try PSR-4 mappings
+        for (ns, dir) in &cfg.path_mappings {
+            let ns_prefix = format!("{}\\", ns);
+            if let Some(rest) = raw
+                .strip_prefix(&ns_prefix)
+                .or_else(|| if raw == ns { Some("") } else { None })
+            {
+                let file_path = rest.replace('\\', "/");
+                let candidate = dir.join(format!("{}.php", file_path));
+                if candidate.exists() {
+                    return Resolution::Resolved(candidate, exported_name);
+                }
+            }
+        }
+
+        // Relative require/include
+        if (spec.is_relative || raw.starts_with('.'))
+            && let Some(parent) = from_file.parent()
+        {
+            let candidate = parent.join(raw);
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, exported_name);
+            }
+        }
+
+        Resolution::NotFound
+    }
+}
 
 /// Extract a PHPDoc comment (`/** ... */`) preceding a PHP declaration.
 fn extract_phpdoc(node: &Node, content: &str) -> Option<String> {

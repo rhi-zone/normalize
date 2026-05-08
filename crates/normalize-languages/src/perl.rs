@@ -1,6 +1,8 @@
 //! Perl language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use std::path::Path;
 use tree_sitter::Node;
 
 /// Perl language support.
@@ -131,9 +133,73 @@ impl Language for Perl {
     ) -> Option<ContainerBody> {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: PerlModuleResolver = PerlModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Perl {}
+
+// =============================================================================
+// Perl Module Resolver
+// =============================================================================
+
+/// Module resolver for Perl.
+///
+/// `use Module::Name` → `Module/Name.pm` in `lib/`.
+pub struct PerlModuleResolver;
+
+impl ModuleResolver for PerlModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: vec![root.join("lib"), root.to_path_buf()],
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "pm" {
+            return Vec::new();
+        }
+        for search_root in &cfg.search_roots {
+            if let Ok(rel) = file.strip_prefix(search_root) {
+                let module = rel
+                    .to_str()
+                    .unwrap_or("")
+                    .trim_end_matches(".pm")
+                    .replace('/', "::");
+                if !module.is_empty() {
+                    return vec![ModuleId {
+                        canonical_path: module,
+                    }];
+                }
+            }
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "pl" && ext != "pm" && ext != "t" {
+            return Resolution::NotApplicable;
+        }
+        let raw = &spec.raw;
+        let path_part = raw.replace("::", "/");
+        let exported_name = raw.rsplit("::").next().unwrap_or(raw).to_string();
+
+        for search_root in &cfg.search_roots {
+            let candidate = search_root.join(format!("{}.pm", path_part));
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, exported_name);
+            }
+        }
+        Resolution::NotFound
+    }
+}
 
 #[cfg(test)]
 mod tests {

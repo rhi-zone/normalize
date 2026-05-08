@@ -1,7 +1,9 @@
 //! Lua language support.
 
 use crate::docstring::extract_preceding_prefix_comments;
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{Import, Language, LanguageSymbols, Visibility};
+use std::path::Path;
 use tree_sitter::Node;
 
 /// Lua language support.
@@ -115,9 +117,79 @@ impl Language for Lua {
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: LuaModuleResolver = LuaModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Lua {}
+
+// =============================================================================
+// Lua Module Resolver
+// =============================================================================
+
+/// Module resolver for Lua.
+///
+/// `require("foo.bar")` → `foo/bar.lua` or `foo/bar/init.lua`.
+pub struct LuaModuleResolver;
+
+impl ModuleResolver for LuaModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: vec![root.to_path_buf()],
+        }
+    }
+
+    fn module_of_file(&self, root: &Path, file: &Path, _cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "lua" {
+            return Vec::new();
+        }
+        if let Ok(rel) = file.strip_prefix(root) {
+            let rel_str = rel.to_str().unwrap_or("");
+            // Handle init.lua → directory name as module
+            let module = if rel_str.ends_with("/init.lua") || rel_str == "init.lua" {
+                rel_str
+                    .trim_end_matches("/init.lua")
+                    .trim_end_matches("init.lua")
+                    .trim_end_matches('/')
+                    .replace('/', ".")
+            } else {
+                rel_str.trim_end_matches(".lua").replace('/', ".")
+            };
+            if !module.is_empty() {
+                return vec![ModuleId {
+                    canonical_path: module,
+                }];
+            }
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "lua" {
+            return Resolution::NotApplicable;
+        }
+        let raw = &spec.raw;
+        let path_part = raw.replace('.', "/");
+        let exported_name = raw.rsplit('.').next().unwrap_or(raw).to_string();
+
+        let direct = cfg.workspace_root.join(format!("{}.lua", path_part));
+        if direct.exists() {
+            return Resolution::Resolved(direct, exported_name);
+        }
+        let init = cfg.workspace_root.join(format!("{}/init.lua", path_part));
+        if init.exists() {
+            return Resolution::Resolved(init, exported_name);
+        }
+        Resolution::NotFound
+    }
+}
 
 #[cfg(test)]
 mod tests {
