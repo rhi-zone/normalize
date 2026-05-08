@@ -1,7 +1,12 @@
 //! R language support.
 
+use std::path::Path;
+
 use crate::docstring::extract_preceding_prefix_comments;
-use crate::{Import, Language, LanguageSymbols, Visibility};
+use crate::{
+    Import, ImportSpec, Language, LanguageSymbols, ModuleId, ModuleResolver, Resolution,
+    ResolverConfig, Visibility,
+};
 use tree_sitter::Node;
 
 /// R language support.
@@ -90,9 +95,81 @@ impl Language for R {
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> {
         None
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: RModuleResolver = RModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for R {}
+
+// =============================================================================
+// R Module Resolver
+// =============================================================================
+
+/// Module resolver for R.
+///
+/// `source("./utils.R")` is a relative file load — resolved against the caller's
+/// directory. `library(pkg)` / `require(pkg)` are package calls — `NotFound`
+/// because they require the R package library to resolve.
+pub struct RModuleResolver;
+
+impl ModuleResolver for RModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: vec![root.to_path_buf()],
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "R" && ext != "r" {
+            return Vec::new();
+        }
+
+        let rel = file.strip_prefix(&cfg.workspace_root).unwrap_or(file);
+        let path_str = rel.to_string_lossy().into_owned();
+        if path_str.is_empty() {
+            return Vec::new();
+        }
+        vec![ModuleId {
+            canonical_path: path_str,
+        }]
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "R" && ext != "r" {
+            return Resolution::NotApplicable;
+        }
+
+        let raw = &spec.raw;
+
+        // Relative paths: ./utils.R or ../shared/helpers.R
+        if raw.starts_with("./") || raw.starts_with("../") {
+            let base_dir = from_file.parent().unwrap_or(&cfg.workspace_root);
+            let candidate = base_dir.join(raw);
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, String::new());
+            }
+            // Try adding .R extension if no extension present
+            if candidate.extension().is_none() {
+                let mut with_ext = candidate.clone();
+                with_ext.set_extension("R");
+                if with_ext.exists() {
+                    return Resolution::Resolved(with_ext, String::new());
+                }
+            }
+            return Resolution::NotFound;
+        }
+
+        // library(pkg) / require(pkg) — package calls, not resolvable here
+        Resolution::NotFound
+    }
+}
 
 #[cfg(test)]
 mod tests {

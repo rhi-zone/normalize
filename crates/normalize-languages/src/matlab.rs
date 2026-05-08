@@ -1,6 +1,11 @@
 //! MATLAB language support.
 
-use crate::{ContainerBody, Import, Language, LanguageSymbols};
+use std::path::{Path, PathBuf};
+
+use crate::{
+    ContainerBody, Import, ImportSpec, Language, LanguageSymbols, ModuleId, ModuleResolver,
+    Resolution, ResolverConfig,
+};
 use tree_sitter::Node;
 
 /// MATLAB language support.
@@ -86,9 +91,89 @@ impl Language for Matlab {
         }
         None
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: MatlabModuleResolver = MatlabModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Matlab {}
+
+// =============================================================================
+// MATLAB Module Resolver
+// =============================================================================
+
+/// Module resolver for MATLAB.
+///
+/// In MATLAB, one function or class lives in each `.m` file, and the filename
+/// is the function/class name. Functions are found on the path — there is no
+/// explicit import syntax (the `import` command is for Java class imports, not
+/// MATLAB function lookup). `ImportSpec.raw` will be a function/class name.
+pub struct MatlabModuleResolver;
+
+impl ModuleResolver for MatlabModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        let mut search_roots: Vec<PathBuf> = vec![root.to_path_buf()];
+        // Also search common subdirectories
+        for subdir in &["src", "lib"] {
+            let candidate = root.join(subdir);
+            if candidate.is_dir() {
+                search_roots.push(candidate);
+            }
+        }
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots,
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, _cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "m" {
+            return Vec::new();
+        }
+
+        // In MATLAB, the function/class name = filename stem
+        if let Some(stem) = file.file_stem().and_then(|s| s.to_str()) {
+            return vec![ModuleId {
+                canonical_path: stem.to_string(),
+            }];
+        }
+
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "m" {
+            return Resolution::NotApplicable;
+        }
+
+        let raw = &spec.raw;
+        // Look for <name>.m in search_roots and from_file's directory
+        let filename = format!("{}.m", raw);
+
+        // Check caller's directory first
+        if let Some(dir) = from_file.parent() {
+            let candidate = dir.join(&filename);
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, String::new());
+            }
+        }
+
+        // Search configured roots
+        for root in &cfg.search_roots {
+            let candidate = root.join(&filename);
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, String::new());
+            }
+        }
+
+        Resolution::NotFound
+    }
+}
 
 #[cfg(test)]
 mod tests {

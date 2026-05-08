@@ -1,6 +1,11 @@
 //! Julia language support.
 
-use crate::{ContainerBody, Import, Language, LanguageSymbols};
+use std::path::{Path, PathBuf};
+
+use crate::{
+    ContainerBody, Import, ImportSpec, Language, LanguageSymbols, ModuleId, ModuleResolver,
+    Resolution, ResolverConfig,
+};
 use tree_sitter::Node;
 
 /// Julia language support.
@@ -144,9 +149,117 @@ impl Language for Julia {
     ) -> Option<ContainerBody> {
         crate::body::analyze_end_body(body_node, content, inner_indent)
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: JuliaModuleResolver = JuliaModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Julia {}
+
+// =============================================================================
+// Julia Module Resolver
+// =============================================================================
+
+/// Module resolver for Julia.
+///
+/// `include("utils.jl")` is a relative file inclusion resolved against the
+/// caller's directory. `using`/`import` of a package name is matched against
+/// workspace packages (from `Project.toml`). Other external packages return
+/// `NotFound`.
+pub struct JuliaModuleResolver;
+
+impl ModuleResolver for JuliaModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        let mut path_mappings: Vec<(String, PathBuf)> = Vec::new();
+
+        let project_toml = root.join("Project.toml");
+        if let Ok(content) = std::fs::read_to_string(&project_toml)
+            && let Ok(parsed) = content.parse::<toml::Value>()
+            && let Some(name) = parsed.get("name").and_then(|v| v.as_str())
+        {
+            let src_dir = root.join("src");
+            path_mappings.push((name.to_string(), src_dir));
+        }
+
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings,
+            search_roots: Vec::new(),
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "jl" {
+            return Vec::new();
+        }
+
+        // Try stripping from src/ first, then workspace root
+        let src_dir = cfg.workspace_root.join("src");
+        let base = if let Ok(rel) = file.strip_prefix(&src_dir) {
+            rel.to_string_lossy().into_owned()
+        } else if let Ok(rel) = file.strip_prefix(&cfg.workspace_root) {
+            rel.to_string_lossy().into_owned()
+        } else {
+            return Vec::new();
+        };
+
+        let canonical = base.strip_suffix(".jl").unwrap_or(&base).to_string();
+
+        if canonical.is_empty() {
+            return Vec::new();
+        }
+        vec![ModuleId {
+            canonical_path: canonical,
+        }]
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "jl" {
+            return Resolution::NotApplicable;
+        }
+
+        let raw = &spec.raw;
+
+        // include("file.jl") — relative path, ends with .jl or is_relative
+        if spec.is_relative || raw.ends_with(".jl") {
+            let base_dir = from_file.parent().unwrap_or(&cfg.workspace_root);
+            let candidate = base_dir.join(raw);
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, String::new());
+            }
+            // Try adding .jl if not present
+            if !raw.ends_with(".jl") {
+                let with_ext = base_dir.join(format!("{}.jl", raw));
+                if with_ext.exists() {
+                    return Resolution::Resolved(with_ext, String::new());
+                }
+            }
+            return Resolution::NotFound;
+        }
+
+        // using/import PackageName — check workspace packages
+        for (pkg_name, pkg_src) in &cfg.path_mappings {
+            if raw == pkg_name {
+                // Try src/<PkgName>.jl
+                let main_file = pkg_src.join(format!("{}.jl", pkg_name));
+                if main_file.exists() {
+                    return Resolution::Resolved(main_file, String::new());
+                }
+                // Fallback: src/ directory itself
+                if pkg_src.exists() {
+                    return Resolution::Resolved(pkg_src.clone(), String::new());
+                }
+            }
+        }
+
+        // External package — not resolvable
+        Resolution::NotFound
+    }
+}
 
 #[cfg(test)]
 mod tests {

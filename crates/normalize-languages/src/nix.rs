@@ -1,6 +1,11 @@
 //! Nix language support.
 
-use crate::{Import, Language, LanguageSymbols};
+use std::path::Path;
+
+use crate::{
+    Import, ImportSpec, Language, LanguageSymbols, ModuleId, ModuleResolver, Resolution,
+    ResolverConfig,
+};
 use tree_sitter::Node;
 
 /// Nix language support.
@@ -63,9 +68,79 @@ impl Language for Nix {
         node.child_by_field_name("attrpath")
             .map(|n| &content[n.byte_range()])
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: NixModuleResolver = NixModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Nix {}
+
+// =============================================================================
+// Nix Module Resolver
+// =============================================================================
+
+/// Module resolver for Nix.
+///
+/// Nix has no module system — `import` is a file path operation. Relative paths
+/// (`./foo.nix`, `../lib/default.nix`) are resolved against the caller's directory.
+/// Channel/nixpkgs imports (`<nixpkgs>`) are returned as `NotFound` because they
+/// require nix evaluation to resolve.
+pub struct NixModuleResolver;
+
+impl ModuleResolver for NixModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: Vec::new(),
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "nix" {
+            return Vec::new();
+        }
+
+        let rel = file.strip_prefix(&cfg.workspace_root).unwrap_or(file);
+        let path_str = rel.to_string_lossy().into_owned();
+        if path_str.is_empty() {
+            return Vec::new();
+        }
+        vec![ModuleId {
+            canonical_path: path_str,
+        }]
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "nix" {
+            return Resolution::NotApplicable;
+        }
+
+        let raw = &spec.raw;
+
+        // Channel form: <nixpkgs>, <nixpkgs/pkgs/...> — not resolvable
+        if raw.starts_with('<') {
+            return Resolution::NotFound;
+        }
+
+        // Relative paths: ./foo.nix or ../lib/default.nix
+        if raw.starts_with("./") || raw.starts_with("../") {
+            let base_dir = from_file.parent().unwrap_or(&cfg.workspace_root);
+            let candidate = base_dir.join(raw);
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, String::new());
+            }
+            return Resolution::NotFound;
+        }
+
+        // Bare name (e.g. `nixpkgs`) — not resolvable without nix toolchain
+        Resolution::NotFound
+    }
+}
 
 #[cfg(test)]
 mod tests {
