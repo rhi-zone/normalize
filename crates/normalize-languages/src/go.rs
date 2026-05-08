@@ -1,7 +1,12 @@
 //! Go language support.
 
+use std::path::{Path, PathBuf};
+
 use crate::docstring::extract_preceding_prefix_comments;
-use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use crate::{
+    ContainerBody, Import, ImportSpec, Language, LanguageSymbols, ModuleId, ModuleResolver,
+    Resolution, ResolverConfig, Visibility,
+};
 use tree_sitter::Node;
 
 /// Go language support.
@@ -166,9 +171,117 @@ impl Language for Go {
     ) -> Option<ContainerBody> {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: GoModuleResolver = GoModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Go {}
+
+// =============================================================================
+// Go Module Resolver
+// =============================================================================
+
+/// Module resolver for Go.
+///
+/// Uses `go.mod` at the workspace root to extract the module path.
+/// In Go, a package = a directory, so all `.go` files in the same directory
+/// belong to the same package (same import path).
+pub struct GoModuleResolver;
+
+impl ModuleResolver for GoModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        let mut path_mappings: Vec<(String, PathBuf)> = Vec::new();
+
+        let go_mod = root.join("go.mod");
+        if let Ok(content) = std::fs::read_to_string(&go_mod) {
+            // Parse `module <path>` line
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if let Some(module_path) = trimmed.strip_prefix("module ") {
+                    let module_path = module_path.trim().to_string();
+                    path_mappings.push((module_path, root.to_path_buf()));
+                    break;
+                }
+            }
+        }
+
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings,
+            search_roots: Vec::new(),
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "go" {
+            return Vec::new();
+        }
+
+        // Package import path = module path + path from root to file's directory
+        for (module_path, module_root) in &cfg.path_mappings {
+            let file_dir = match file.parent() {
+                Some(d) => d,
+                None => continue,
+            };
+            if let Ok(rel) = file_dir.strip_prefix(module_root) {
+                let rel_str = rel
+                    .components()
+                    .filter_map(|c| {
+                        if let std::path::Component::Normal(s) = c {
+                            s.to_str()
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join("/");
+
+                let canonical = if rel_str.is_empty() {
+                    module_path.clone()
+                } else {
+                    format!("{}/{}", module_path, rel_str)
+                };
+                return vec![ModuleId {
+                    canonical_path: canonical,
+                }];
+            }
+        }
+
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "go" {
+            return Resolution::NotApplicable;
+        }
+
+        let raw = &spec.raw;
+
+        // Check if the import path starts with our module path
+        for (module_path, module_root) in &cfg.path_mappings {
+            if raw == module_path {
+                // Importing the root package itself
+                return Resolution::Resolved(module_root.clone(), String::new());
+            }
+            if let Some(rest) = raw.strip_prefix(&format!("{}/", module_path)) {
+                // rest is the subdirectory path within the module
+                let target_dir = module_root.join(rest);
+                if target_dir.is_dir() {
+                    return Resolution::Resolved(target_dir, String::new());
+                }
+                return Resolution::NotFound;
+            }
+        }
+
+        // Not in this module (stdlib or third-party)
+        Resolution::NotFound
+    }
+}
 
 /// Extract the Go package comment from source.
 ///

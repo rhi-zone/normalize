@@ -1,8 +1,9 @@
 //! Cross-file name resolution tests.
 //!
-//! Tests ModuleResolver implementations for Rust, TypeScript, and Python
+//! Tests ModuleResolver implementations for Rust, TypeScript, Python, and Go
 //! against fixture directories under `tests/fixtures/xfile/`.
 
+use normalize_languages::go::GoModuleResolver;
 use normalize_languages::python::PythonModuleResolver;
 use normalize_languages::rust::RustModuleResolver;
 use normalize_languages::typescript::TsModuleResolver;
@@ -355,4 +356,82 @@ fn py_absolute_import_not_found() {
         resolver.resolve(&from, &spec, &cfg),
         Resolution::NotFound
     ));
+}
+
+// =============================================================================
+// Go resolver tests
+// =============================================================================
+
+fn go_fixture_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/xfile/go")
+}
+
+#[test]
+fn go_workspace_config_reads_module_path() {
+    let root = go_fixture_root();
+    let resolver = GoModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    assert!(
+        cfg.path_mappings
+            .iter()
+            .any(|(name, _)| name == "example.com/myapp"),
+        "expected 'example.com/myapp' in path_mappings, got: {:?}",
+        cfg.path_mappings.iter().map(|(n, _)| n).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn go_resolve_subpackage() {
+    let root = go_fixture_root();
+    let resolver = GoModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let from = root.join("main.go");
+    let spec = ImportSpec {
+        raw: "example.com/myapp/utils".to_string(),
+        is_relative: false,
+        names: Vec::new(),
+        is_glob: false,
+    };
+    match resolver.resolve(&from, &spec, &cfg) {
+        Resolution::Resolved(path, _) => {
+            assert_eq!(path, root.join("utils"));
+        }
+        other => panic!(
+            "expected Resolved, got {:?}",
+            std::mem::discriminant(&other)
+        ),
+    }
+}
+
+#[test]
+fn go_not_applicable_for_non_go_file() {
+    let root = go_fixture_root();
+    let resolver = GoModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let from = root.join("main.rs");
+    let spec = ImportSpec {
+        raw: "example.com/myapp/utils".to_string(),
+        is_relative: false,
+        names: Vec::new(),
+        is_glob: false,
+    };
+    assert!(matches!(
+        resolver.resolve(&from, &spec, &cfg),
+        Resolution::NotApplicable
+    ));
+}
+
+#[test]
+fn go_module_of_file() {
+    let root = go_fixture_root();
+    let resolver = GoModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let file = root.join("utils/math.go");
+    let modules = resolver.module_of_file(&root, &file, &cfg);
+    assert_eq!(modules.len(), 1);
+    assert_eq!(modules[0].canonical_path, "example.com/myapp/utils");
 }
