@@ -90,13 +90,14 @@ jobs:
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN"
 
-      - name: Fetch all workspace deps
+      - name: Fetch normalize-grammars deps
         # `cargo build -p normalize` only fetches `normalize`'s dep tree.
         # `normalize-grammars` is publish=false and not in `normalize`'s tree,
         # so its `arborium-*` deps (the grammar source crates that
-        # `xtask build-grammars` walks the registry for) wouldn't be fetched.
-        # `cargo fetch --workspace` populates the registry for all members.
-        run: cargo fetch --workspace
+        # `xtask build-grammars` walks the registry for) wouldn't be fetched
+        # otherwise. (`cargo fetch` does not accept `--workspace`; targeting
+        # `normalize-grammars` specifically pulls all 98 arborium crates.)
+        run: cargo fetch -p normalize-grammars
 
       - name: Build grammars (host)
         # Skip cross-compiled targets (aarch64-linux-gnu) and musl, which
