@@ -179,7 +179,12 @@ pub fn ensure_grammars_first_use() -> GrammarsFirstRun {
     eprintln!("Auto-installing grammars on first use...");
     let pretty = std::cell::Cell::new(false);
     let service = crate::service::grammars::GrammarService::new(&pretty);
-    match service.install(None, false, false) {
+    // Pin to the binary's own version. Grammars from a different release may
+    // have ABI/extraction changes incompatible with this binary; falling back
+    // to `releases/latest` would silently install the wrong artifact for any
+    // user not on the latest version.
+    let pinned_version = format!("v{}", env!("CARGO_PKG_VERSION"));
+    match service.install(Some(pinned_version), false, false) {
         Ok(report) => {
             let version = report.version.clone().unwrap_or_else(|| "unknown".into());
             write_installed_stamp(&dir, &format!("{version}\n"));

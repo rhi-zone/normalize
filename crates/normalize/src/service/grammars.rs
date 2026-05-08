@@ -98,13 +98,21 @@ impl GrammarService {
     #[cli(display_with = "display_output")]
     pub fn install(
         &self,
-        #[param(help = "Specific version to install (default: latest)")] version: Option<String>,
+        #[param(help = "Specific version to install (default: this binary's version)")]
+        version: Option<String>,
         #[param(help = "Force reinstall even if grammars exist")] force: bool,
         #[param(help = "Preview what would be installed without downloading")] dry_run: bool,
     ) -> Result<GrammarInstallReport, String> {
         use crate::commands::update::get_target_triple;
 
         const GITHUB_REPO: &str = "rhi-zone/normalize";
+
+        // Default version: this binary's own. Grammars from a different release may
+        // have ABI/extraction changes incompatible with the running binary; falling
+        // back to `releases/latest` would silently install wrong artifacts for any
+        // user not on the latest published version. Explicit `--version latest` (or
+        // any tag) is honored as-is.
+        let version = version.or_else(|| Some(format!("v{}", env!("CARGO_PKG_VERSION"))));
 
         let install_dir = dirs::config_dir()
             .map(|c| c.join("normalize/grammars"))
@@ -130,7 +138,7 @@ impl GrammarService {
         if dry_run {
             return Ok(GrammarInstallReport {
                 status: "would_install".to_string(),
-                version: version.or_else(|| Some("latest".to_string())),
+                version: version.clone(),
                 path: install_dir.display().to_string(),
                 count: 0,
                 dry_run,
