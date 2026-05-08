@@ -1,6 +1,11 @@
 //! Ruby language support.
 
-use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use std::path::Path;
+
+use crate::{
+    ContainerBody, Import, ImportSpec, Language, LanguageSymbols, ModuleId, ModuleResolver,
+    Resolution, ResolverConfig, Visibility,
+};
 use tree_sitter::Node;
 
 /// Ruby language support.
@@ -163,9 +168,104 @@ impl Language for Ruby {
     fn extract_module_doc(&self, src: &str) -> Option<String> {
         extract_ruby_module_doc(src)
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: RubyModuleResolver = RubyModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Ruby {}
+
+// =============================================================================
+// Ruby Module Resolver
+// =============================================================================
+
+/// Module resolver for Ruby.
+///
+/// Handles `require_relative` imports (resolved against the caller's directory).
+/// Bare `require` calls (Gem dependencies) return `NotFound`.
+pub struct RubyModuleResolver;
+
+impl ModuleResolver for RubyModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: Vec::new(),
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "rb" {
+            return Vec::new();
+        }
+
+        let rel = file.strip_prefix(&cfg.workspace_root).unwrap_or(file);
+
+        let path_str = rel
+            .components()
+            .filter_map(|c| {
+                if let std::path::Component::Normal(s) = c {
+                    s.to_str()
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("/");
+
+        if path_str.is_empty() {
+            return Vec::new();
+        }
+
+        // Strip .rb extension
+        let canonical = path_str
+            .strip_suffix(".rb")
+            .unwrap_or(&path_str)
+            .to_string();
+
+        vec![ModuleId {
+            canonical_path: canonical,
+        }]
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "rb" {
+            return Resolution::NotApplicable;
+        }
+
+        let raw = &spec.raw;
+
+        // Only resolve require_relative (is_relative = true)
+        if !spec.is_relative {
+            return Resolution::NotFound;
+        }
+
+        let base_dir = from_file.parent().unwrap_or(&cfg.workspace_root);
+        let candidate_base = base_dir.join(raw);
+
+        // Try with .rb extension first, then as-is
+        let with_rb = if candidate_base.extension().is_none() {
+            let mut p = candidate_base.clone();
+            p.set_extension("rb");
+            p
+        } else {
+            candidate_base.clone()
+        };
+
+        if with_rb.exists() {
+            return Resolution::Resolved(with_rb, String::new());
+        }
+        if candidate_base.exists() {
+            return Resolution::Resolved(candidate_base, String::new());
+        }
+
+        Resolution::NotFound
+    }
+}
 
 /// Extract the module-level doc comment from Ruby source.
 ///

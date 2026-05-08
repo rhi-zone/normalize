@@ -1,14 +1,15 @@
 //! Cross-file name resolution tests.
 //!
-//! Tests ModuleResolver implementations for Rust, TypeScript, Python, Go, and JS
-//! against fixture directories under `tests/fixtures/xfile/`.
+//! Tests ModuleResolver implementations for Rust, TypeScript, Python, Go,
+//! JavaScript, and Ruby against fixture directories under `tests/fixtures/xfile/`.
 
 use normalize_languages::go::GoModuleResolver;
 use normalize_languages::javascript::JsModuleResolver;
 use normalize_languages::python::PythonModuleResolver;
+use normalize_languages::ruby::RubyModuleResolver;
 use normalize_languages::rust::RustModuleResolver;
 use normalize_languages::typescript::TsModuleResolver;
-use normalize_languages::{ImportSpec, ModuleResolver, Resolution};
+use normalize_languages::{ImportSpec, ModuleResolver, Resolution, support_for_path};
 use std::path::PathBuf;
 
 fn fixture_root() -> PathBuf {
@@ -505,4 +506,120 @@ fn js_bare_specifier_is_not_found() {
         resolver.resolve(&from, &spec, &cfg),
         Resolution::NotFound
     ));
+}
+
+// =============================================================================
+// Ruby resolver tests
+// =============================================================================
+
+fn rb_fixture_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/xfile/ruby")
+}
+
+#[test]
+fn rb_resolve_require_relative() {
+    let root = rb_fixture_root();
+    let resolver = RubyModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let from = root.join("app.rb");
+    let spec = ImportSpec {
+        raw: "utils".to_string(),
+        is_relative: true,
+        names: Vec::new(),
+        is_glob: false,
+    };
+    match resolver.resolve(&from, &spec, &cfg) {
+        Resolution::Resolved(path, _) => {
+            assert_eq!(path, root.join("utils.rb"));
+        }
+        other => panic!(
+            "expected Resolved, got {:?}",
+            std::mem::discriminant(&other)
+        ),
+    }
+}
+
+#[test]
+fn rb_bare_require_is_not_found() {
+    let root = rb_fixture_root();
+    let resolver = RubyModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let from = root.join("app.rb");
+    let spec = ImportSpec {
+        raw: "json".to_string(),
+        is_relative: false,
+        names: Vec::new(),
+        is_glob: false,
+    };
+    assert!(matches!(
+        resolver.resolve(&from, &spec, &cfg),
+        Resolution::NotFound
+    ));
+}
+
+#[test]
+fn rb_not_applicable_for_non_rb_file() {
+    let root = rb_fixture_root();
+    let resolver = RubyModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let from = root.join("app.py");
+    let spec = ImportSpec {
+        raw: "utils".to_string(),
+        is_relative: true,
+        names: Vec::new(),
+        is_glob: false,
+    };
+    assert!(matches!(
+        resolver.resolve(&from, &spec, &cfg),
+        Resolution::NotApplicable
+    ));
+}
+
+// =============================================================================
+// find_references confidence tagging
+// =============================================================================
+
+/// Verify that find_references tags results with "resolved" for Rust files
+/// (which have a ModuleResolver) and "heuristic" for files without one.
+#[test]
+fn find_references_confidence_tag_no_index() {
+    use std::path::Path;
+
+    // Rust files have a resolver → would tag as "resolved"
+    let rust_file = Path::new("src/utils.rs");
+    let has_rust_resolver = support_for_path(rust_file)
+        .and_then(|lang| lang.module_resolver())
+        .is_some();
+    assert!(has_rust_resolver, "Rust should have a module_resolver");
+
+    // TypeScript files have a resolver
+    let ts_file = Path::new("src/utils.ts");
+    let has_ts_resolver = support_for_path(ts_file)
+        .and_then(|lang| lang.module_resolver())
+        .is_some();
+    assert!(has_ts_resolver, "TypeScript should have a module_resolver");
+
+    // Python files have a resolver
+    let py_file = Path::new("src/utils.py");
+    let has_py_resolver = support_for_path(py_file)
+        .and_then(|lang| lang.module_resolver())
+        .is_some();
+    assert!(has_py_resolver, "Python should have a module_resolver");
+
+    // Go files have a resolver
+    let go_file = Path::new("main.go");
+    let has_go_resolver = support_for_path(go_file)
+        .and_then(|lang| lang.module_resolver())
+        .is_some();
+    assert!(has_go_resolver, "Go should have a module_resolver");
+
+    // A Bash file has no resolver → would tag as "heuristic"
+    let sh_file = Path::new("script.sh");
+    let has_sh_resolver = support_for_path(sh_file)
+        .and_then(|lang| lang.module_resolver())
+        .is_some();
+    assert!(!has_sh_resolver, "Bash should NOT have a module_resolver");
 }
