@@ -1,6 +1,8 @@
 //! OCaml language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{ContainerBody, Import, Language, LanguageSymbols};
+use std::path::Path;
 use tree_sitter::Node;
 
 /// OCaml language support.
@@ -148,9 +150,91 @@ impl Language for OCaml {
             _ => None,
         }
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: OCamlModuleResolver = OCamlModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for OCaml {}
+
+// =============================================================================
+// OCaml Module Resolver
+// =============================================================================
+
+/// Module resolver for OCaml (dune/opam conventions).
+///
+/// OCaml module name = capitalized filename stem. `open Utils` → `utils.ml`.
+pub struct OCamlModuleResolver;
+
+impl ModuleResolver for OCamlModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: vec![root.to_path_buf(), root.join("lib"), root.join("src")],
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, _cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "ml" && ext != "mli" {
+            return Vec::new();
+        }
+        if let Some(stem) = file.file_stem().and_then(|s| s.to_str()) {
+            // OCaml module name = capitalized stem
+            let module_name = {
+                let mut chars = stem.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+                }
+            };
+            return vec![ModuleId {
+                canonical_path: module_name,
+            }];
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "ml" && ext != "mli" {
+            return Resolution::NotApplicable;
+        }
+        // Strip "open " prefix if present
+        let raw = spec.raw.strip_prefix("open ").unwrap_or(&spec.raw).trim();
+
+        // Convert module name to file: Utils → utils.ml
+        // For dotted paths: Utils.Foo → try Utils/Foo.ml first, then fall back to utils.ml
+        let parts: Vec<&str> = raw.split('.').collect();
+        let exported_name = parts.last().copied().unwrap_or(raw).to_string();
+
+        // Try same directory as from_file first (common case)
+        if let Some(parent) = from_file.parent() {
+            let file_name = parts.last().copied().unwrap_or(raw).to_lowercase();
+            for ext_try in &["ml", "mli"] {
+                let candidate = parent.join(format!("{}.{}", file_name, ext_try));
+                if candidate.exists() {
+                    return Resolution::Resolved(candidate, exported_name.clone());
+                }
+            }
+        }
+
+        // Search in search_roots
+        for search_root in &cfg.search_roots {
+            let file_name = parts.last().copied().unwrap_or(raw).to_lowercase();
+            for ext_try in &["ml", "mli"] {
+                let candidate = search_root.join(format!("{}.{}", file_name, ext_try));
+                if candidate.exists() {
+                    return Resolution::Resolved(candidate, exported_name.clone());
+                }
+            }
+        }
+        Resolution::NotFound
+    }
+}
 
 /// Extract an OCamldoc comment (`(** ... *)`) preceding a definition node.
 ///

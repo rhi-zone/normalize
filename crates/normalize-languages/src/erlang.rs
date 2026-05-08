@@ -1,6 +1,8 @@
 //! Erlang language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{Import, Language, LanguageSymbols};
+use std::path::Path;
 use tree_sitter::Node;
 
 /// Erlang language support.
@@ -134,9 +136,80 @@ impl Language for Erlang {
     fn test_file_globs(&self) -> &'static [&'static str] {
         &["**/*_SUITE.erl", "**/*_test.erl", "**/*_tests.erl"]
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: ErlangModuleResolver = ErlangModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Erlang {}
+
+// =============================================================================
+// Erlang Module Resolver
+// =============================================================================
+
+/// Module resolver for Erlang.
+///
+/// Erlang module = file (1:1). `foo.erl` is module `foo`.
+/// Resolves `-import(mymodule, [...])` → `mymodule.erl` in `src/` or `lib/`.
+pub struct ErlangModuleResolver;
+
+impl ModuleResolver for ErlangModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: vec![root.join("src"), root.join("lib"), root.to_path_buf()],
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, _cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "erl" && ext != "hrl" {
+            return Vec::new();
+        }
+        if let Some(stem) = file.file_stem().and_then(|s| s.to_str()) {
+            return vec![ModuleId {
+                canonical_path: stem.to_string(),
+            }];
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "erl" && ext != "hrl" {
+            return Resolution::NotApplicable;
+        }
+        let raw = &spec.raw;
+
+        // Relative include imports (.hrl files)
+        if (spec.is_relative || raw.ends_with(".hrl") || raw.ends_with(".erl"))
+            && let Some(parent) = from_file.parent()
+        {
+            let candidate = parent.join(raw);
+            if candidate.exists() {
+                let name = candidate
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string();
+                return Resolution::Resolved(candidate, name);
+            }
+        }
+
+        for search_root in &cfg.search_roots {
+            for ext_try in &["erl", "hrl"] {
+                let candidate = search_root.join(format!("{}.{}", raw, ext_try));
+                if candidate.exists() {
+                    return Resolution::Resolved(candidate, raw.to_string());
+                }
+            }
+        }
+        Resolution::NotFound
+    }
+}
 
 #[cfg(test)]
 mod tests {

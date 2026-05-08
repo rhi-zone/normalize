@@ -1,6 +1,8 @@
 //! Haskell language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{ContainerBody, Import, Language, LanguageSymbols};
+use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// Haskell language support.
@@ -109,9 +111,114 @@ impl Language for Haskell {
         // directly, with no enclosing keywords in the node itself
         crate::body::analyze_end_body(body_node, content, inner_indent)
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: HaskellModuleResolver = HaskellModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Haskell {}
+
+// =============================================================================
+// Haskell Module Resolver
+// =============================================================================
+
+/// Module resolver for Haskell (Cabal/Stack conventions).
+///
+/// `import Data.Map` → `Data/Map.hs` (or `.lhs`) in the source directory.
+pub struct HaskellModuleResolver;
+
+impl ModuleResolver for HaskellModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        let mut search_roots: Vec<PathBuf> = Vec::new();
+
+        // Try to find source roots from .cabal file
+        let found_cabal = std::fs::read_dir(root).ok().and_then(|entries| {
+            entries.flatten().find(|e| {
+                e.path()
+                    .extension()
+                    .and_then(|x| x.to_str())
+                    .map(|x| x == "cabal")
+                    .unwrap_or(false)
+            })
+        });
+
+        if let Some(cabal_entry) = found_cabal
+            && let Ok(content) = std::fs::read_to_string(cabal_entry.path())
+        {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if let Some(rest) = trimmed.strip_prefix("hs-source-dirs:") {
+                    for dir in rest.split_whitespace() {
+                        let candidate = root.join(dir.trim_matches(','));
+                        if candidate.is_dir() {
+                            search_roots.push(candidate);
+                        }
+                    }
+                }
+            }
+        }
+
+        if search_roots.is_empty() {
+            // Default source roots
+            let src = root.join("src");
+            if src.is_dir() {
+                search_roots.push(src);
+            }
+            search_roots.push(root.to_path_buf());
+        }
+
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots,
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "hs" && ext != "lhs" {
+            return Vec::new();
+        }
+        for search_root in &cfg.search_roots {
+            if let Ok(rel) = file.strip_prefix(search_root) {
+                let module_path = rel
+                    .to_str()
+                    .unwrap_or("")
+                    .trim_end_matches(".lhs")
+                    .trim_end_matches(".hs")
+                    .replace(['/', '\\'], ".");
+                if !module_path.is_empty() {
+                    return vec![ModuleId {
+                        canonical_path: module_path,
+                    }];
+                }
+            }
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "hs" && ext != "lhs" {
+            return Resolution::NotApplicable;
+        }
+        let raw = &spec.raw;
+        let path_part = raw.replace('.', "/");
+        let exported_name = raw.rsplit('.').next().unwrap_or(raw).to_string();
+
+        for search_root in &cfg.search_roots {
+            for ext_try in &["hs", "lhs"] {
+                let candidate = search_root.join(format!("{}.{}", path_part, ext_try));
+                if candidate.exists() {
+                    return Resolution::Resolved(candidate, exported_name.clone());
+                }
+            }
+        }
+        Resolution::NotFound
+    }
+}
 
 /// Extract a Haddock documentation comment preceding a definition node.
 ///

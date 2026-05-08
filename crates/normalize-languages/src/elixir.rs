@@ -1,6 +1,8 @@
 //! Elixir language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// Elixir language support.
@@ -188,9 +190,135 @@ impl Language for Elixir {
         }
         None
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: ElixirModuleResolver = ElixirModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Elixir {}
+
+// =============================================================================
+// Elixir Module Resolver
+// =============================================================================
+
+/// Module resolver for Elixir (Mix conventions).
+///
+/// Mix convention: `lib/my_app/utils.ex` contains module `MyApp.Utils`.
+/// Converts CamelCase module name ↔ snake_case path.
+pub struct ElixirModuleResolver;
+
+/// Convert a CamelCase module name component to snake_case.
+fn camel_to_snake(s: &str) -> String {
+    let mut out = String::new();
+    for (i, c) in s.chars().enumerate() {
+        if c.is_uppercase() && i > 0 {
+            out.push('_');
+        }
+        out.push(c.to_lowercase().next().unwrap_or(c));
+    }
+    out
+}
+
+/// Convert a snake_case path segment to CamelCase.
+fn snake_to_camel(s: &str) -> String {
+    s.split('_')
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+            }
+        })
+        .collect()
+}
+
+impl ModuleResolver for ElixirModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        let mut path_mappings: Vec<(String, PathBuf)> = Vec::new();
+
+        let mix_exs = root.join("mix.exs");
+        if let Ok(content) = std::fs::read_to_string(&mix_exs) {
+            // Parse `app: :my_app`
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if let Some(rest) = trimmed.strip_prefix("app:") {
+                    let rest = rest.trim();
+                    let app_atom = rest
+                        .trim_start_matches(':')
+                        .split(',')
+                        .next()
+                        .unwrap_or("")
+                        .trim();
+                    if !app_atom.is_empty() {
+                        // Convert my_app → MyApp for the module prefix
+                        let module_prefix = snake_to_camel(app_atom);
+                        path_mappings.push((module_prefix, root.join("lib")));
+                        break;
+                    }
+                }
+            }
+        }
+
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings,
+            search_roots: vec![root.join("lib"), root.join("test")],
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "ex" && ext != "exs" {
+            return Vec::new();
+        }
+        for search_root in &cfg.search_roots {
+            if let Ok(rel) = file.strip_prefix(search_root) {
+                let module_path: String = rel
+                    .to_str()
+                    .unwrap_or("")
+                    .trim_end_matches(".exs")
+                    .trim_end_matches(".ex")
+                    .split('/')
+                    .map(snake_to_camel)
+                    .collect::<Vec<_>>()
+                    .join(".");
+                if !module_path.is_empty() {
+                    return vec![ModuleId {
+                        canonical_path: module_path,
+                    }];
+                }
+            }
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "ex" && ext != "exs" {
+            return Resolution::NotApplicable;
+        }
+        let raw = &spec.raw;
+        // Convert MyApp.Utils → my_app/utils.ex
+        let path_part = raw
+            .split('.')
+            .map(camel_to_snake)
+            .collect::<Vec<_>>()
+            .join("/");
+        let exported_name = raw.rsplit('.').next().unwrap_or(raw).to_string();
+
+        for search_root in &cfg.search_roots {
+            for ext_try in &["ex", "exs"] {
+                let candidate = search_root.join(format!("{}.{}", path_part, ext_try));
+                if candidate.exists() {
+                    return Resolution::Resolved(candidate, exported_name);
+                }
+            }
+        }
+        Resolution::NotFound
+    }
+}
 
 impl Elixir {
     fn extract_module_name(&self, node: &Node, content: &str) -> Option<String> {
