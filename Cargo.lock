@@ -5585,6 +5585,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "normalize-module-resolve"
+version = "0.3.1"
+dependencies = [
+ "log",
+ "normalize-languages",
+ "normalize-path-resolve",
+]
+
+[[package]]
 name = "normalize-native-rules"
 version = "0.3.1"
 dependencies = [

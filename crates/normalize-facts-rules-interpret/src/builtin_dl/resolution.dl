@@ -1,0 +1,38 @@
+# ---
+# id = "resolution"
+# message = "Cross-file name resolution"
+# tags = ["semantic"]
+# enabled = false
+# ---
+#
+# Derives resolved_reference and resolved_call facts from resolved_import,
+# symbol, symbol_use, and reexport facts.
+#
+# These derived facts power cross-file find-references, rename, and call-graph
+# queries. Requires normalize structure rebuild with a language that has a
+# ModuleResolver implementation.
+
+// Direct import: name is imported directly from def_file
+resolved_reference(uf, ul, df, n, k) <--
+    symbol_use(uf, n, ul),
+    resolved_import(uf, df, n, _, kind),
+    symbol(df, n, k, _),
+    if kind == "direct";
+
+// Reexport chain: name is imported via a reexport
+resolved_reference(uf, ul, df, n, k) <--
+    symbol_use(uf, n, ul),
+    resolved_import(uf, mf, n, _, kind),
+    reexport(mf, df, n, _),
+    symbol(df, n, k, _),
+    if kind == "reexport";
+
+// Local definition: name is defined in the same file
+resolved_reference(uf, ul, uf, n, k) <--
+    symbol_use(uf, n, ul),
+    symbol(uf, n, k, _);
+
+// Derived: resolved_call from call + resolved_reference
+resolved_call(cf, cn, df, callee, ln) <--
+    call(cf, cn, callee, ln),
+    resolved_reference(cf, ln, df, callee, _);

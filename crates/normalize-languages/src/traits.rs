@@ -1,9 +1,63 @@
 //! Core trait for language support.
 
+use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 // Re-export core types from normalize-facts-core
 pub use normalize_facts_core::{Import, Symbol, SymbolKind, Visibility};
+
+/// Configuration discovered from workspace manifests for module resolution.
+pub struct ResolverConfig {
+    /// Workspace root used for relative path anchoring.
+    pub workspace_root: PathBuf,
+    /// Language-specific path mappings (e.g. tsconfig paths, Cargo workspace members).
+    pub path_mappings: Vec<(String, PathBuf)>,
+    /// Additional search roots (e.g. PYTHONPATH entries, Go module cache).
+    pub search_roots: Vec<PathBuf>,
+}
+
+/// A parsed import specifier.
+pub struct ImportSpec {
+    /// Raw specifier string (e.g. "std::collections::HashMap", "./utils", "numpy").
+    pub raw: String,
+    /// Whether this is a relative import (starts with ./ or ../).
+    pub is_relative: bool,
+    /// The imported names, if specified (e.g. `use foo::{bar, baz}` → ["bar", "baz"]).
+    /// Empty for glob/wildcard imports.
+    pub names: Vec<String>,
+    /// True if this is a glob/wildcard import (e.g. `use foo::*`, `from x import *`).
+    pub is_glob: bool,
+}
+
+/// A resolved module identifier.
+pub struct ModuleId {
+    pub canonical_path: String,
+}
+
+/// Result of resolving an import specifier to a file.
+pub enum Resolution {
+    /// Resolved to exactly one file + exported name.
+    Resolved(PathBuf, String),
+    /// Multiple possible resolutions (ambiguous).
+    Ambiguous(Vec<(PathBuf, String)>),
+    /// Could not resolve.
+    NotFound,
+    /// This language has no module system; resolution is not applicable.
+    NotApplicable,
+}
+
+/// Per-language module resolver.
+///
+/// Implements the Rust/TS/Python/etc-specific logic for turning an import
+/// specifier into a resolved file path.
+pub trait ModuleResolver: Send + Sync {
+    /// Read workspace config from the given root (e.g. Cargo.toml, tsconfig.json).
+    fn workspace_config(&self, root: &Path) -> ResolverConfig;
+    /// Return the canonical module identity/ies of a file within the workspace.
+    fn module_of_file(&self, root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId>;
+    /// Resolve an import specifier from `from_file` to a target file + name.
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution;
+}
 
 /// Location of a container's body (for prepend/append editing operations)
 #[derive(Debug)]
@@ -261,6 +315,17 @@ pub trait Language: Send + Sync {
     /// - JavaScript/TypeScript: leading `/** ... */` block comment at top of file
     /// - Ruby: leading `#` comment block (ignoring `# frozen_string_literal` lines)
     fn extract_module_doc(&self, _src: &str) -> Option<String> {
+        None
+    }
+
+    // === Module Resolution ===
+
+    /// Return the module resolver for this language, if it has one.
+    ///
+    /// Languages with a module system (Rust, TypeScript, Python, Go, etc.) implement
+    /// this to enable cross-file name resolution. Languages without a module system
+    /// (Bash, GLSL, etc.) return `None`.
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
         None
     }
 

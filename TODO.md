@@ -45,6 +45,26 @@ fact engine for semantic analysis, or stand up a new analysis layer? Datalog
 fits naturally for liveness/reachability/call-graph queries; less natural for
 type inference proper. Hybrid is plausible but complicates the story.
 
+### Phase 0 — Cross-file name resolution (in progress)
+
+**Scaffold committed (Commit 1):**
+- [x] New Datalog predicates: `resolved_import`, `module`, `export`, `reexport`, `symbol_use`, `resolved_reference`, `resolved_call`, `module_search_path`
+- [x] `ModuleResolver` trait in `normalize-languages::traits`
+- [x] New crate `normalize-module-resolve`
+- [x] `resolution.dl` Datalog rules
+
+**Follow-up language resolvers (not yet started):**
+- [ ] Rust `RustModuleResolver` (Commit 2) — workspace_config/module_of_file/resolve for Cargo workspaces
+- [ ] TypeScript/JavaScript resolver — tsconfig.json paths, node_modules, relative imports
+- [ ] Python resolver — sys.path, relative imports, `__init__.py` modules
+- [ ] Go resolver — go.mod module paths
+- [ ] Ruby resolver — require_relative, gem paths
+
+**After resolvers land:**
+- [ ] Wire resolvers into `normalize structure rebuild` pipeline (Commit 3)
+- [ ] `normalize find-references --cross-file` command
+- [ ] Cross-file rename using resolved references
+
 ## 0.3.x post-release follow-ups (advisory)
 
 Items that surfaced during the 0.3.1 release rodeo and may be worth a

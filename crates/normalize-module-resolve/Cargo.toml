@@ -1,0 +1,12 @@
+[package]
+name = "normalize-module-resolve"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Module resolution infrastructure for normalize cross-file analysis"
+
+[dependencies]
+normalize-languages = { path = "../normalize-languages", version = "0.3.1", default-features = false, features = ["langs-core"] }
+normalize-path-resolve = { path = "../normalize-path-resolve", version = "0.3.1" }
+log = "0.4"

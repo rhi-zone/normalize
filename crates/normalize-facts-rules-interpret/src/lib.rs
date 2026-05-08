@@ -33,6 +33,14 @@
 //! - `implements(file: String, name: String, interface: String)` — interface/trait implementation
 //! - `is_impl(file: String, name: String)` — symbol is a trait/interface implementation
 //! - `type_method(file: String, type_name: String, method_name: String)` — method signatures on types
+//! - `resolved_import(from_file: String, to_file: String, imported_name: String, local_alias: String, kind: String)` — Phase 0
+//! - `module(file: String, canonical_module_path: String)` — Phase 0
+//! - `export(file: String, name: String, kind: String)` — Phase 0
+//! - `reexport(from_file: String, original_file: String, original_name: String, exported_as: String)` — Phase 0
+//! - `symbol_use(file: String, name: String, line: u32)` — Phase 0
+//! - `resolved_reference(use_file: String, use_line: u32, def_file: String, def_name: String, def_kind: String)` — Phase 0
+//! - `resolved_call(caller_file: String, caller_name: String, callee_file: String, callee_name: String, line: u32)` — Phase 0
+//! - `module_search_path(workspace_root: String, language: String, kind: String, path: String)` — Phase 0
 //!
 //! Output relation — all diagnostics go here:
 //! - `diagnostic(severity, rule_id, file, line, message)` — severity = "warning"/"error"/"info"/"hint";
@@ -62,6 +70,14 @@ relation symbol_range(String, String, u32, u32);
 relation implements(String, String, String);
 relation is_impl(String, String);
 relation type_method(String, String, String);
+relation resolved_import(String, String, String, String, String);
+relation module(String, String);
+relation export(String, String, String);
+relation reexport(String, String, String, String);
+relation symbol_use(String, String, u32);
+relation resolved_reference(String, u32, String, String, String);
+relation resolved_call(String, String, String, String, u32);
+relation module_search_path(String, String, String, String);
 relation diagnostic(String, String, String, u32, String);
 "#;
 
@@ -187,6 +203,10 @@ const BUILTIN_RULES: &[BuiltinFactsRule] = &[
     BuiltinFactsRule {
         id: "stale-mock",
         content: include_str!("builtin_dl/stale_mock.dl"),
+    },
+    BuiltinFactsRule {
+        id: "resolution",
+        content: include_str!("builtin_dl/resolution.dl"),
     },
 ];
 
@@ -912,6 +932,157 @@ pub fn run_rule_incremental(
             dirty_input_relations.insert("type_method");
         }
     }
+    for s in new_relations.resolved_imports.iter() {
+        if changed_set.contains(s.from_file.as_str()) {
+            let sid = cached.engine.intern_source(s.from_file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "resolved_import",
+                    vec![
+                        Value::string(&s.from_file),
+                        Value::string(&s.to_file),
+                        Value::string(&s.imported_name),
+                        Value::string(&s.local_alias),
+                        Value::string(&s.kind),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("resolved_import");
+        }
+    }
+    for s in new_relations.modules.iter() {
+        if changed_set.contains(s.file.as_str()) {
+            let sid = cached.engine.intern_source(s.file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "module",
+                    vec![
+                        Value::string(&s.file),
+                        Value::string(&s.canonical_module_path),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("module");
+        }
+    }
+    for s in new_relations.exports.iter() {
+        if changed_set.contains(s.file.as_str()) {
+            let sid = cached.engine.intern_source(s.file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "export",
+                    vec![
+                        Value::string(&s.file),
+                        Value::string(&s.name),
+                        Value::string(&s.kind),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("export");
+        }
+    }
+    for s in new_relations.reexports.iter() {
+        if changed_set.contains(s.from_file.as_str()) {
+            let sid = cached.engine.intern_source(s.from_file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "reexport",
+                    vec![
+                        Value::string(&s.from_file),
+                        Value::string(&s.original_file),
+                        Value::string(&s.original_name),
+                        Value::string(&s.exported_as),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("reexport");
+        }
+    }
+    for s in new_relations.symbol_uses.iter() {
+        if changed_set.contains(s.file.as_str()) {
+            let sid = cached.engine.intern_source(s.file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "symbol_use",
+                    vec![
+                        Value::string(&s.file),
+                        Value::string(&s.name),
+                        Value::U32(s.line),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("symbol_use");
+        }
+    }
+    for s in new_relations.resolved_references.iter() {
+        if changed_set.contains(s.use_file.as_str()) {
+            let sid = cached.engine.intern_source(s.use_file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "resolved_reference",
+                    vec![
+                        Value::string(&s.use_file),
+                        Value::U32(s.use_line),
+                        Value::string(&s.def_file),
+                        Value::string(&s.def_name),
+                        Value::string(&s.def_kind),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("resolved_reference");
+        }
+    }
+    for s in new_relations.resolved_calls.iter() {
+        if changed_set.contains(s.caller_file.as_str()) {
+            let sid = cached.engine.intern_source(s.caller_file.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "resolved_call",
+                    vec![
+                        Value::string(&s.caller_file),
+                        Value::string(&s.caller_name),
+                        Value::string(&s.callee_file),
+                        Value::string(&s.callee_name),
+                        Value::U32(s.line),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("resolved_call");
+        }
+    }
+    for s in new_relations.module_search_paths.iter() {
+        if changed_set.contains(s.workspace_root.as_str()) {
+            let sid = cached.engine.intern_source(s.workspace_root.as_str());
+            cached
+                .engine
+                .insert_with_source(
+                    "module_search_path",
+                    vec![
+                        Value::string(&s.workspace_root),
+                        Value::string(&s.language),
+                        Value::string(&s.kind),
+                        Value::string(&s.path),
+                    ],
+                    sid,
+                )
+                .map_err(|e| InterpretError::Parse(e.to_string()))?;
+            dirty_input_relations.insert("module_search_path");
+        }
+    }
     // All dirty input relations are also retracted (we retracted + re-inserted).
     let dirty_vec: Vec<&str> = dirty_input_relations.iter().copied().collect();
     cached
@@ -1221,6 +1392,125 @@ fn populate_facts_with_sources(
             )
             .map_err(|e| InterpretError::Parse(e.to_string()))?;
     }
+    for ri in relations.resolved_imports.iter() {
+        let sid = engine.intern_source(ri.from_file.as_str());
+        engine
+            .insert_with_source(
+                "resolved_import",
+                vec![
+                    Value::string(&ri.from_file),
+                    Value::string(&ri.to_file),
+                    Value::string(&ri.imported_name),
+                    Value::string(&ri.local_alias),
+                    Value::string(&ri.kind),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for m in relations.modules.iter() {
+        let sid = engine.intern_source(m.file.as_str());
+        engine
+            .insert_with_source(
+                "module",
+                vec![
+                    Value::string(&m.file),
+                    Value::string(&m.canonical_module_path),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for ex in relations.exports.iter() {
+        let sid = engine.intern_source(ex.file.as_str());
+        engine
+            .insert_with_source(
+                "export",
+                vec![
+                    Value::string(&ex.file),
+                    Value::string(&ex.name),
+                    Value::string(&ex.kind),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for re_ in relations.reexports.iter() {
+        let sid = engine.intern_source(re_.from_file.as_str());
+        engine
+            .insert_with_source(
+                "reexport",
+                vec![
+                    Value::string(&re_.from_file),
+                    Value::string(&re_.original_file),
+                    Value::string(&re_.original_name),
+                    Value::string(&re_.exported_as),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for su in relations.symbol_uses.iter() {
+        let sid = engine.intern_source(su.file.as_str());
+        engine
+            .insert_with_source(
+                "symbol_use",
+                vec![
+                    Value::string(&su.file),
+                    Value::string(&su.name),
+                    Value::U32(su.line),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for rr in relations.resolved_references.iter() {
+        let sid = engine.intern_source(rr.use_file.as_str());
+        engine
+            .insert_with_source(
+                "resolved_reference",
+                vec![
+                    Value::string(&rr.use_file),
+                    Value::U32(rr.use_line),
+                    Value::string(&rr.def_file),
+                    Value::string(&rr.def_name),
+                    Value::string(&rr.def_kind),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for rc in relations.resolved_calls.iter() {
+        let sid = engine.intern_source(rc.caller_file.as_str());
+        engine
+            .insert_with_source(
+                "resolved_call",
+                vec![
+                    Value::string(&rc.caller_file),
+                    Value::string(&rc.caller_name),
+                    Value::string(&rc.callee_file),
+                    Value::string(&rc.callee_name),
+                    Value::U32(rc.line),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for msp in relations.module_search_paths.iter() {
+        let sid = engine.intern_source(msp.workspace_root.as_str());
+        engine
+            .insert_with_source(
+                "module_search_path",
+                vec![
+                    Value::string(&msp.workspace_root),
+                    Value::string(&msp.language),
+                    Value::string(&msp.kind),
+                    Value::string(&msp.path),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
     Ok(())
 }
 
@@ -1364,6 +1654,117 @@ fn populate_facts(engine: &mut Engine, relations: &Relations) -> Result<(), Inte
                     Value::string(&tm.file),
                     Value::string(&tm.type_name),
                     Value::string(&tm.method_name),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+
+    for ri in relations.resolved_imports.iter() {
+        engine
+            .insert(
+                "resolved_import",
+                vec![
+                    Value::string(&ri.from_file),
+                    Value::string(&ri.to_file),
+                    Value::string(&ri.imported_name),
+                    Value::string(&ri.local_alias),
+                    Value::string(&ri.kind),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+
+    for m in relations.modules.iter() {
+        engine
+            .insert(
+                "module",
+                vec![
+                    Value::string(&m.file),
+                    Value::string(&m.canonical_module_path),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+
+    for e in relations.exports.iter() {
+        engine
+            .insert(
+                "export",
+                vec![
+                    Value::string(&e.file),
+                    Value::string(&e.name),
+                    Value::string(&e.kind),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+
+    for re_ in relations.reexports.iter() {
+        engine
+            .insert(
+                "reexport",
+                vec![
+                    Value::string(&re_.from_file),
+                    Value::string(&re_.original_file),
+                    Value::string(&re_.original_name),
+                    Value::string(&re_.exported_as),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+
+    for su in relations.symbol_uses.iter() {
+        engine
+            .insert(
+                "symbol_use",
+                vec![
+                    Value::string(&su.file),
+                    Value::string(&su.name),
+                    Value::U32(su.line),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+
+    for rr in relations.resolved_references.iter() {
+        engine
+            .insert(
+                "resolved_reference",
+                vec![
+                    Value::string(&rr.use_file),
+                    Value::U32(rr.use_line),
+                    Value::string(&rr.def_file),
+                    Value::string(&rr.def_name),
+                    Value::string(&rr.def_kind),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+
+    for rc in relations.resolved_calls.iter() {
+        engine
+            .insert(
+                "resolved_call",
+                vec![
+                    Value::string(&rc.caller_file),
+                    Value::string(&rc.caller_name),
+                    Value::string(&rc.callee_file),
+                    Value::string(&rc.callee_name),
+                    Value::U32(rc.line),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+
+    for msp in relations.module_search_paths.iter() {
+        engine
+            .insert(
+                "module_search_path",
+                vec![
+                    Value::string(&msp.workspace_root),
+                    Value::string(&msp.language),
+                    Value::string(&msp.kind),
+                    Value::string(&msp.path),
                 ],
             )
             .map_err(|e| InterpretError::Parse(e.to_string()))?;
