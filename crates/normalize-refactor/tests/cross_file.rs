@@ -1,9 +1,10 @@
 //! Cross-file name resolution tests.
 //!
-//! Tests ModuleResolver implementations for Rust, TypeScript, Python, and Go
+//! Tests ModuleResolver implementations for Rust, TypeScript, Python, Go, and JS
 //! against fixture directories under `tests/fixtures/xfile/`.
 
 use normalize_languages::go::GoModuleResolver;
+use normalize_languages::javascript::JsModuleResolver;
 use normalize_languages::python::PythonModuleResolver;
 use normalize_languages::rust::RustModuleResolver;
 use normalize_languages::typescript::TsModuleResolver;
@@ -434,4 +435,74 @@ fn go_module_of_file() {
     let modules = resolver.module_of_file(&root, &file, &cfg);
     assert_eq!(modules.len(), 1);
     assert_eq!(modules[0].canonical_path, "example.com/myapp/utils");
+}
+
+// =============================================================================
+// JavaScript resolver tests
+// =============================================================================
+
+fn js_fixture_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/xfile/javascript")
+}
+
+#[test]
+fn js_resolve_relative_import() {
+    let root = js_fixture_root();
+    let resolver = JsModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let from = root.join("app.js");
+    let spec = ImportSpec {
+        raw: "./utils.js".to_string(),
+        is_relative: true,
+        names: vec!["sum".to_string()],
+        is_glob: false,
+    };
+    match resolver.resolve(&from, &spec, &cfg) {
+        Resolution::Resolved(path, _) => {
+            assert_eq!(path, root.join("utils.js"));
+        }
+        other => panic!(
+            "expected Resolved, got {:?}",
+            std::mem::discriminant(&other)
+        ),
+    }
+}
+
+#[test]
+fn js_not_applicable_for_non_js_file() {
+    let root = js_fixture_root();
+    let resolver = JsModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let from = root.join("main.ts");
+    let spec = ImportSpec {
+        raw: "./utils".to_string(),
+        is_relative: true,
+        names: Vec::new(),
+        is_glob: false,
+    };
+    assert!(matches!(
+        resolver.resolve(&from, &spec, &cfg),
+        Resolution::NotApplicable
+    ));
+}
+
+#[test]
+fn js_bare_specifier_is_not_found() {
+    let root = js_fixture_root();
+    let resolver = JsModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let from = root.join("app.js");
+    let spec = ImportSpec {
+        raw: "lodash".to_string(),
+        is_relative: false,
+        names: Vec::new(),
+        is_glob: false,
+    };
+    assert!(matches!(
+        resolver.resolve(&from, &spec, &cfg),
+        Resolution::NotFound
+    ));
 }
