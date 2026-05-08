@@ -1,6 +1,11 @@
 //! D language support.
 
-use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use std::path::{Path, PathBuf};
+
+use crate::{
+    ContainerBody, Import, ImportSpec, Language, LanguageSymbols, ModuleId, ModuleResolver,
+    Resolution, ResolverConfig, Visibility,
+};
 use tree_sitter::Node;
 
 /// D language support.
@@ -242,9 +247,104 @@ impl Language for D {
         }
         None
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: DModuleResolver = DModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for D {}
+
+// =============================================================================
+// D Module Resolver
+// =============================================================================
+
+/// Module resolver for D.
+///
+/// Uses `dub.json` at the workspace root to find source paths (`sourcePaths`,
+/// default `["source"]`). Module names map to file paths: `mypackage.utils` →
+/// `mypackage/utils.d` under a source root.
+pub struct DModuleResolver;
+
+impl ModuleResolver for DModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        let mut search_roots: Vec<PathBuf> = Vec::new();
+
+        // Try dub.json first
+        let dub_json = root.join("dub.json");
+        if let Ok(content) = std::fs::read_to_string(&dub_json)
+            && let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content)
+            && let Some(paths) = parsed.get("sourcePaths").and_then(|v| v.as_array())
+        {
+            for path in paths {
+                if let Some(s) = path.as_str() {
+                    search_roots.push(root.join(s));
+                }
+            }
+        }
+
+        // Default to source/ (dub convention) if not found in config
+        if search_roots.is_empty() {
+            search_roots.push(root.join("source"));
+        }
+
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots,
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "d" && ext != "di" {
+            return Vec::new();
+        }
+
+        for root in &cfg.search_roots {
+            if let Ok(rel) = file.strip_prefix(root) {
+                let rel_str = rel.to_string_lossy();
+                // Strip .d/.di extension and replace / with .
+                let base = rel_str
+                    .strip_suffix(".di")
+                    .or_else(|| rel_str.strip_suffix(".d"))
+                    .unwrap_or(&rel_str);
+                let canonical = if cfg!(windows) {
+                    base.replace('\\', ".")
+                } else {
+                    base.replace('/', ".")
+                };
+                if !canonical.is_empty() {
+                    return vec![ModuleId {
+                        canonical_path: canonical,
+                    }];
+                }
+            }
+        }
+
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "d" && ext != "di" {
+            return Resolution::NotApplicable;
+        }
+
+        // `mypackage.utils` → `mypackage/utils.d`
+        let file_path = spec.raw.replace('.', "/") + ".d";
+
+        for root in &cfg.search_roots {
+            let candidate = root.join(&file_path);
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, String::new());
+            }
+        }
+
+        Resolution::NotFound
+    }
+}
 
 #[cfg(test)]
 mod tests {

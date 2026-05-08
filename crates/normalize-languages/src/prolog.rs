@@ -1,6 +1,11 @@
 //! Prolog language support.
 
-use crate::{Import, Language, LanguageSymbols};
+use std::path::Path;
+
+use crate::{
+    Import, ImportSpec, Language, LanguageSymbols, ModuleId, ModuleResolver, Resolution,
+    ResolverConfig,
+};
 use tree_sitter::Node;
 
 /// Prolog language support.
@@ -98,9 +103,87 @@ impl Language for Prolog {
         }
         None
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: PrologModuleResolver = PrologModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Prolog {}
+
+// =============================================================================
+// Prolog Module Resolver
+// =============================================================================
+
+/// Module resolver for Prolog.
+///
+/// Handles `:- use_module('./utils')` (relative path) and bare module names
+/// (searched in workspace root). `library(lists)` form returns `NotFound`
+/// because it requires the Prolog system library to resolve.
+pub struct PrologModuleResolver;
+
+impl ModuleResolver for PrologModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: Vec::new(),
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, _cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "pl" && ext != "pro" && ext != "prolog" {
+            return Vec::new();
+        }
+
+        if let Some(stem) = file.file_stem().and_then(|s| s.to_str()) {
+            return vec![ModuleId {
+                canonical_path: stem.to_string(),
+            }];
+        }
+
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "pl" && ext != "pro" && ext != "prolog" {
+            return Resolution::NotApplicable;
+        }
+
+        let raw = &spec.raw;
+
+        // library(...) form — system library, not resolvable
+        if raw.starts_with("library(") {
+            return Resolution::NotFound;
+        }
+
+        // Relative paths: ./utils or ../lib/helpers
+        if raw.starts_with("./") || raw.starts_with("../") {
+            let base_dir = from_file.parent().unwrap_or(&cfg.workspace_root);
+            // Try raw as-is, then with .pl and .pro extensions
+            for suffix in &["", ".pl", ".pro"] {
+                let candidate = base_dir.join(format!("{}{}", raw, suffix));
+                if candidate.exists() {
+                    return Resolution::Resolved(candidate, String::new());
+                }
+            }
+            return Resolution::NotFound;
+        }
+
+        // Bare module name — search workspace root
+        for suffix in &[".pl", ".pro"] {
+            let candidate = cfg.workspace_root.join(format!("{}{}", raw, suffix));
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, String::new());
+            }
+        }
+
+        Resolution::NotFound
+    }
+}
 
 #[cfg(test)]
 mod tests {
