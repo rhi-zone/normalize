@@ -56,6 +56,23 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y musl-tools patchelf
+          # rust's musl target with crt-static=false emits `-lgcc_s` in the
+          # linker command, but musl ships only static libgcc.a — there is no
+          # libgcc_s.so in musl-gcc's sysroot. Copy glibc's libgcc_s.so.1 into
+          # musl-gcc's library search path so the linker finds something.
+          # libgcc_s only contains compiler builtins (__divti3, __udivdi3,
+          # etc.) which are ABI-compatible across libc implementations, so
+          # mixing glibc's libgcc_s with musl libc is safe at runtime.
+          # The .so is bundled into the release tarball (Prepare artifact step
+          # below) so end users don't need glibc.
+          GLIBC_LIBGCC=$(ls /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 2>/dev/null || echo "")
+          if [ -z "$GLIBC_LIBGCC" ]; then
+            echo "ERROR: libgcc_s.so.1 not found on the runner" >&2
+            exit 1
+          fi
+          sudo mkdir -p /usr/lib/x86_64-linux-musl
+          sudo cp "$GLIBC_LIBGCC" /usr/lib/x86_64-linux-musl/libgcc_s.so.1
+          sudo ln -sf libgcc_s.so.1 /usr/lib/x86_64-linux-musl/libgcc_s.so
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -86,14 +103,12 @@ jobs:
           # Use musl-gcc as the linker (not the default `cc`, which is glibc gcc
           # on Ubuntu and doesn't synthesise musl-specific link flags). musl-gcc
           # knows libm folds into libc on musl and handles math symbol resolution
-          # correctly without manual `-lm`.
-          # `-static-libgcc`: rust's musl target emits `-lgcc_s` after the
-          # dynamic-section marker; musl ships only static libgcc, no
-          # libgcc_s.so. Telling gcc to statically link libgcc resolves
-          # `-lgcc_s` against `libgcc.a` and avoids the missing-shared-lib
-          # error. Everything else stays dynamic via crt-static=false.
+          # correctly without manual `-lm`. The "Install musl-tools" step above
+          # also seeds glibc's libgcc_s.so.1 into musl-gcc's library search
+          # path so the rust-emitted `-lgcc_s` resolves correctly (musl itself
+          # ships no libgcc_s.so).
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
-          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN -C link-arg=-static-libgcc"
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN"
 
       - name: Fetch normalize-grammars deps
         # `cargo build -p normalize` only fetches `normalize`'s dep tree.
@@ -184,6 +199,11 @@ jobs:
           cp "$MUSL_LIBC" dist/runtime/ld-musl-x86_64.so.1
           cp "$MUSL_LIBC" dist/runtime/libc.musl-x86_64.so.1
           chmod +x dist/runtime/ld-musl-x86_64.so.1
+          # Also bundle libgcc_s.so.1 (compiler builtins). Linked from glibc's
+          # copy at link time (musl doesn't ship libgcc_s); needs to ship with
+          # the binary for the wrapper's --library-path to resolve it. Pure
+          # builtins, no glibc-vs-musl ABI tension at runtime.
+          cp /usr/lib/x86_64-linux-musl/libgcc_s.so.1 dist/runtime/libgcc_s.so.1
 
           # Also patch the ELF's PT_INTERP to a relative path so anyone
           # who invokes `runtime/normalize.elf` directly (without the
