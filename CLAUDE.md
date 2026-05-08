@@ -43,6 +43,8 @@ The test for extraction: is this domain logic (algorithms, data models, extracti
 
 **Write it down now.** Bugs, decisions, future work, insights → edit the file (TODO.md, docs/, CLAUDE.md) before responding. "I'll note that later" is the failure mode. This includes negative decisions — when you investigate something and decide NOT to do it, write down why (e.g. "GraphQL has no import syntax in the grammar — directive nodes exist but contain no file/module path").
 
+**Roadmaps and plans live in TODO.md, not in docs/.** Do not create `docs/roadmap-*.md`, `docs/plan-*.md`, or similar planning documents. `docs/` is for stable reference material (architecture decisions, design tenets, CLI design). Active roadmaps belong in `TODO.md` where they're maintained alongside the work. A planning doc written for a session and never updated is worse than nothing.
+
 **Keep docs in sync.** CLI changes → update `docs/cli/`, `README.md`, `LLMS.md`, `docs/cli-design.md` in the same commit.
 
 **Verify before asserting.** Read the code before modifying it. Check how similar things work in the codebase before adding new patterns. Don't assert node types, API behavior, or codebase facts from memory — check the source.

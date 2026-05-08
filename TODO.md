@@ -27,7 +27,7 @@ The 0.3.x line shipped the recipe scaffolding (rename, move, inline-variable,
 inline-function, introduce-variable, add-parameter) but the harder recipes —
 extract-function in particular — stalled because they need real semantic
 infrastructure. 0.4 builds that infrastructure in five phases and surfaces it
-via LSP. See `docs/roadmap-0.4.md` for the full phase design.
+via LSP. Phase design is in the sections below.
 
 ### Phase 0 — Cross-file name resolution (in progress)
 
