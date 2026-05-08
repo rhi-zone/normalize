@@ -95,9 +95,9 @@ jobs:
         # `normalize-grammars` is publish=false and not in `normalize`'s tree,
         # so its `arborium-*` deps (the grammar source crates that
         # `xtask build-grammars` walks the registry for) wouldn't be fetched
-        # otherwise. (`cargo fetch` does not accept `--workspace`; targeting
-        # `normalize-grammars` specifically pulls all 98 arborium crates.)
-        run: cargo fetch -p normalize-grammars
+        # otherwise. (`cargo fetch` accepts neither `--workspace` nor `-p`;
+        # use `--manifest-path` to scope to the specific crate.)
+        run: cargo fetch --manifest-path crates/normalize-grammars/Cargo.toml
 
       - name: Build grammars (host)
         # Skip cross-compiled targets (aarch64-linux-gnu) and musl, which
