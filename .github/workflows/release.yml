@@ -83,7 +83,18 @@ jobs:
           # The release tarball ships a wrapper script + bundled
           # `ld-musl-x86_64.so.1` / `libc.musl-x86_64.so.1`, so the artifact
           # is fully self-contained — no system musl required.
-          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN"
+          # `-lm` is required when crt-static is off: musl folds libm into libc.a,
+          # but the dynamic split has libm in a separate libm.so that rustc does
+          # not auto-link. Without it we get undefined references to log/pow/exp.
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN -C link-arg=-lm"
+
+      - name: Fetch all workspace deps
+        # `cargo build -p normalize` only fetches `normalize`'s dep tree.
+        # `normalize-grammars` is publish=false and not in `normalize`'s tree,
+        # so its `arborium-*` deps (the grammar source crates that
+        # `xtask build-grammars` walks the registry for) wouldn't be fetched.
+        # `cargo fetch --workspace` populates the registry for all members.
+        run: cargo fetch --workspace
 
       - name: Build grammars (host)
         # Skip cross-compiled targets (aarch64-linux-gnu) and musl, which
