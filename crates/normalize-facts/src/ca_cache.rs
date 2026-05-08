@@ -59,37 +59,57 @@ impl Inner {
     }
 }
 
-/// Drive `fut` to completion, choosing a strategy that works regardless of whether
-/// we are inside a tokio runtime and what its flavor is.
+/// Drive `fut` to completion, choosing a strategy based on the *current* thread's
+/// tokio context — not the context at cache-construction time.
 ///
-/// - If we own a runtime (`Some`), use it.
-/// - If we are inside a multi-threaded runtime, use `block_in_place` + the current handle.
-/// - If we are inside a current-thread runtime (where `block_in_place` panics), spawn
-///   a fresh OS thread that hosts its own current-thread runtime to drive the future.
+/// Why we ignore the cached `runtime` when we're already inside a tokio runtime:
+/// the cache may have been opened from a sync context (so it owns a current-thread
+/// runtime), then later called from a `#[tokio::test]` or any other tokio task on
+/// a different thread. Calling `cached_rt.block_on(...)` from inside another runtime
+/// panics with "Cannot start a runtime from within a runtime". So the call-site
+/// context always wins:
+///
+/// - Inside a multi-threaded runtime: `block_in_place` + `Handle::current().block_on`.
+/// - Inside a current-thread runtime: spawn a scoped OS thread with its own runtime
+///   (block_in_place would panic on a current-thread runtime).
+/// - Not inside any runtime: use the cached owned runtime if we have one; otherwise
+///   spawn a scoped OS thread.
 fn block_on_helper<F: Future + Send>(runtime: &Option<Runtime>, fut: F) -> F::Output
 where
     F::Output: Send,
 {
+    if let Ok(handle) = Handle::try_current() {
+        return match handle.runtime_flavor() {
+            tokio::runtime::RuntimeFlavor::MultiThread => {
+                tokio::task::block_in_place(|| handle.block_on(fut))
+            }
+            _ => spawn_scoped_runtime(fut),
+        };
+    }
     if let Some(rt) = runtime {
         return rt.block_on(fut);
     }
-    let handle = Handle::current();
-    match handle.runtime_flavor() {
-        tokio::runtime::RuntimeFlavor::MultiThread => {
-            tokio::task::block_in_place(|| handle.block_on(fut))
-        }
-        _ => std::thread::scope(|s| {
-            s.spawn(|| {
-                let rt = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .expect("failed to build tokio runtime worker thread");
-                rt.block_on(fut)
-            })
-            .join()
-            .expect("libsql worker thread panicked")
-        }),
-    }
+    spawn_scoped_runtime(fut)
+}
+
+/// Drive `fut` on a freshly-built current-thread runtime hosted on a scoped OS thread.
+/// Used when the calling thread is unsuitable (already inside a current-thread runtime,
+/// or we have no cached runtime to fall back on).
+fn spawn_scoped_runtime<F: Future + Send>(fut: F) -> F::Output
+where
+    F::Output: Send,
+{
+    std::thread::scope(|s| {
+        s.spawn(|| {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("failed to build tokio runtime worker thread");
+            rt.block_on(fut)
+        })
+        .join()
+        .expect("libsql worker thread panicked")
+    })
 }
 
 /// Build a current-thread tokio runtime if we are not already inside one.

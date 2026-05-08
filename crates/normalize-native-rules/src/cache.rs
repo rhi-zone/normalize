@@ -38,32 +38,44 @@ impl FindingsCache {
     }
 }
 
-/// Drive `fut` to completion, choosing a strategy that works regardless of whether
-/// we are inside a tokio runtime and what its flavor is.
+/// Drive `fut` to completion, choosing a strategy based on the *current* thread's
+/// tokio context — not the context at cache-construction time. The cached `runtime`
+/// (set when the cache was opened from a sync context) is only used as a fallback
+/// when we are not currently inside any runtime; calling `cached_rt.block_on()` from
+/// inside another runtime panics with "Cannot start a runtime from within a runtime".
 fn block_on_helper<F: Future + Send>(runtime: &Option<Runtime>, fut: F) -> F::Output
 where
     F::Output: Send,
 {
+    if let Ok(handle) = Handle::try_current() {
+        return match handle.runtime_flavor() {
+            tokio::runtime::RuntimeFlavor::MultiThread => {
+                tokio::task::block_in_place(|| handle.block_on(fut))
+            }
+            _ => spawn_scoped_runtime(fut),
+        };
+    }
     if let Some(rt) = runtime {
         return rt.block_on(fut);
     }
-    let handle = Handle::current();
-    match handle.runtime_flavor() {
-        tokio::runtime::RuntimeFlavor::MultiThread => {
-            tokio::task::block_in_place(|| handle.block_on(fut))
-        }
-        _ => std::thread::scope(|s| {
-            s.spawn(|| {
-                let rt = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .expect("failed to build tokio runtime worker thread");
-                rt.block_on(fut)
-            })
-            .join()
-            .expect("libsql worker thread panicked")
-        }),
-    }
+    spawn_scoped_runtime(fut)
+}
+
+fn spawn_scoped_runtime<F: Future + Send>(fut: F) -> F::Output
+where
+    F::Output: Send,
+{
+    std::thread::scope(|s| {
+        s.spawn(|| {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("failed to build tokio runtime worker thread");
+            rt.block_on(fut)
+        })
+        .join()
+        .expect("libsql worker thread panicked")
+    })
 }
 
 impl FindingsCache {
