@@ -126,9 +126,12 @@ jobs:
                 # Parse the date if present and sleep until then; else fall
                 # back to exponential backoff (60s, 120s, 240s, 480s, 960s).
                 local retry_after
+                # crates.io 429 body looks like:
+                #   "...Please try again after Fri, 08 May 2026 10:29:33 GMT and see https://crates.io/..."
+                # Extract just the RFC 1123 timestamp (`<Day>, <D> <Mon> <Year> HH:MM:SS GMT`).
                 retry_after=$(echo "$output" \
-                  | grep -oE "Please try again after [^.]+\." \
-                  | sed -E 's/^Please try again after //; s/\.$//')
+                  | grep -oE "Please try again after [A-Z][a-z]+, [0-9]+ [A-Z][a-z]+ [0-9]+ [0-9:]+ GMT" \
+                  | sed -E 's/^Please try again after //')
                 local sleep_secs
                 if [ -n "$retry_after" ]; then
                   local target_epoch now_epoch
