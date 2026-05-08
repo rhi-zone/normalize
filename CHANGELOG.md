@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **musl release build is now dynamically linked.** Previously the `x86_64-unknown-linux-musl` artifact was a static-pie binary, which meant `dlopen()` was unavailable at runtime and musl users (NixOS via `install.sh`, Alpine, distroless) were limited to the 6 grammars statically linked via `arborium-*` crates. The release workflow now passes `-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN` for the musl target, producing a dynamic binary that can load tree-sitter grammar `.so` files at runtime. **Runtime requirement:** `ld-musl-x86_64.so.1` and `libc.musl-x86_64.so.1` must be present. Available out of the box on Alpine Linux, distroless musl images, and NixOS with `pkgs.musl` in the environment. `install.sh` was updated to detect the musl loader explicitly and emit a warning on NixOS systems where it is missing.
+
 ### Fixed
 
 - **libsql `block_on` shim no longer deadlocks/panics when called from a tokio worker.** The cache layers in `normalize-facts`, `normalize-native-rules`, and `normalize-syntax-rules` cache an owned current-thread runtime when constructed from sync code (the common case). Previously the helper used that cached runtime unconditionally, which caused `Cannot start a runtime from within a runtime` panics whenever a `#[tokio::test]` (or any other tokio task) hit a cache that had been initialized earlier from a sync test in the same process. The helper now inspects the call site's tokio context first — only falling back to the cached runtime when not already inside one — so the public API stays synchronous while remaining safe to call from any context.

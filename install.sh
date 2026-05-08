@@ -21,12 +21,28 @@ case "$OS" in
     Linux)
         case "$ARCH" in
             x86_64)
-                # NixOS and other non-standard glibc environments lack the dynamic linker
-                # at the conventional path. Fall back to the musl static binary.
-                if [ -f /etc/NIXOS ] || ! [ -e /lib64/ld-linux-x86-64.so.2 ]; then
+                # The musl release build is now dynamically linked so it can
+                # `dlopen()` tree-sitter grammar `.so` files at runtime. It
+                # therefore requires the musl loader (`ld-musl-x86_64.so.1`)
+                # to be present. Prefer musl when:
+                #   - The musl loader is on the system (Alpine, distroless musl), OR
+                #   - This is NixOS (the user is expected to have `pkgs.musl`
+                #     available — `/lib64/ld-linux-x86-64.so.2` on NixOS is
+                #     usually a stub that doesn't actually work for foreign
+                #     dynamic glibc binaries).
+                # Otherwise fall back to the gnu build.
+                if [ -e /lib/ld-musl-x86_64.so.1 ] || [ -e /lib64/ld-musl-x86_64.so.1 ]; then
                     TARGET="x86_64-unknown-linux-musl"
-                else
+                elif [ -f /etc/NIXOS ]; then
+                    # NixOS without musl on the system path — warn the user.
+                    echo "Warning: NixOS detected but musl loader (ld-musl-x86_64.so.1) not found." >&2
+                    echo "Add 'pkgs.musl' to your environment, or the binary will fail to start." >&2
+                    TARGET="x86_64-unknown-linux-musl"
+                elif [ -e /lib64/ld-linux-x86-64.so.2 ]; then
                     TARGET="x86_64-unknown-linux-gnu"
+                else
+                    echo "No suitable dynamic linker found (neither glibc nor musl)." >&2
+                    exit 1
                 fi
                 ;;
             aarch64|arm64) TARGET="aarch64-unknown-linux-gnu" ;;

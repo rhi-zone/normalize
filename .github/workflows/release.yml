@@ -73,6 +73,17 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }} -p normalize --features sessions-web
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          # musl: produce a dynamically-linked binary so `dlopen()` works for
+          # tree-sitter grammar `.so` files. The default for *-linux-musl is
+          # `+crt-static`, which produces a static-pie binary that cannot
+          # dlopen at runtime — that limited musl users to the 6 grammars
+          # statically linked via `arborium-*` crates. We disable crt-static
+          # and add `$ORIGIN` rpath so the binary can find bundled grammar
+          # libraries next to itself.
+          # Runtime requirement: musl libc (`ld-musl-x86_64.so.1` and
+          # `libc.musl-x86_64.so.1`). Available out of the box on Alpine,
+          # distroless musl images, and NixOS (with `pkgs.musl` in the env).
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN"
 
       - name: Build grammars
         if: matrix.target != 'aarch64-unknown-linux-gnu'  # Skip cross-compiled targets
