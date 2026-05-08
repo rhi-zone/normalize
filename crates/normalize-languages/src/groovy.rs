@@ -1,6 +1,8 @@
 //! Groovy language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use std::path::Path;
 use tree_sitter::Node;
 
 /// Groovy language support.
@@ -128,9 +130,76 @@ impl Language for Groovy {
     ) -> Option<ContainerBody> {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: GroovyModuleResolver = GroovyModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Groovy {}
+
+// =============================================================================
+// Groovy Module Resolver
+// =============================================================================
+
+/// Module resolver for Groovy (Maven/Gradle conventions).
+pub struct GroovyModuleResolver;
+
+const GROOVY_SRC_DIRS: &[&str] = &["src/main/groovy", "src/test/groovy", ""];
+
+impl ModuleResolver for GroovyModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: GROOVY_SRC_DIRS.iter().map(|d| root.join(d)).collect(),
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "groovy" && ext != "gradle" && ext != "gvy" && ext != "gy" && ext != "gsh" {
+            return Vec::new();
+        }
+        for search_root in &cfg.search_roots {
+            if let Ok(rel) = file.strip_prefix(search_root) {
+                let rel_str = rel.to_str().unwrap_or("");
+                // Strip known extensions
+                let stripped = rel_str
+                    .trim_end_matches(".groovy")
+                    .trim_end_matches(".gradle")
+                    .trim_end_matches(".gvy")
+                    .trim_end_matches(".gy")
+                    .trim_end_matches(".gsh");
+                let canonical = stripped.replace(['/', '\\'], ".");
+                if !canonical.is_empty() {
+                    return vec![ModuleId {
+                        canonical_path: canonical,
+                    }];
+                }
+            }
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "groovy" && ext != "gradle" && ext != "gvy" && ext != "gy" && ext != "gsh" {
+            return Resolution::NotApplicable;
+        }
+        let raw = &spec.raw;
+        let path_part = raw.replace('.', "/");
+        let exported_name = raw.rsplit('.').next().unwrap_or(raw).to_string();
+        for search_root in &cfg.search_roots {
+            let candidate = search_root.join(format!("{}.groovy", path_part));
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, exported_name);
+            }
+        }
+        Resolution::NotFound
+    }
+}
 
 /// Extract a GroovyDoc comment from a node.
 ///

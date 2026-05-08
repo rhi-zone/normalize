@@ -1,6 +1,8 @@
 //! Kotlin language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use std::path::Path;
 use tree_sitter::Node;
 
 /// Kotlin language support.
@@ -256,9 +258,80 @@ impl Language for Kotlin {
         // Kotlin default is public (unlike Java's package-private)
         Visibility::Public
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: KotlinModuleResolver = KotlinModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Kotlin {}
+
+// =============================================================================
+// Kotlin Module Resolver
+// =============================================================================
+
+/// Module resolver for Kotlin (Maven/Gradle conventions).
+///
+/// Kotlin package = directory hierarchy. `com.example.Foo` lives at
+/// `src/main/kotlin/com/example/Foo.kt` (or `src/test/kotlin/...`).
+pub struct KotlinModuleResolver;
+
+const KOTLIN_SRC_DIRS: &[&str] = &["src/main/kotlin", "src/test/kotlin", ""];
+
+impl ModuleResolver for KotlinModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: KOTLIN_SRC_DIRS.iter().map(|d| root.join(d)).collect(),
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "kt" && ext != "kts" {
+            return Vec::new();
+        }
+        for search_root in &cfg.search_roots {
+            if let Ok(rel) = file.strip_prefix(search_root) {
+                let rel_str = rel
+                    .to_str()
+                    .unwrap_or("")
+                    .trim_end_matches(".kts")
+                    .trim_end_matches(".kt")
+                    .replace(['/', '\\'], ".");
+                if !rel_str.is_empty() {
+                    return vec![ModuleId {
+                        canonical_path: rel_str,
+                    }];
+                }
+            }
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "kt" && ext != "kts" {
+            return Resolution::NotApplicable;
+        }
+        let raw = &spec.raw;
+        let path_part = raw.replace('.', "/");
+        let exported_name = raw.rsplit('.').next().unwrap_or(raw).to_string();
+        for search_root in &cfg.search_roots {
+            let candidate = search_root.join(format!("{}.kt", path_part));
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, exported_name.clone());
+            }
+            let candidate = search_root.join(format!("{}.kts", path_part));
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, exported_name.clone());
+            }
+        }
+        Resolution::NotFound
+    }
+}
 
 /// Extract a KDoc comment (`/** ... */`) preceding a node.
 ///

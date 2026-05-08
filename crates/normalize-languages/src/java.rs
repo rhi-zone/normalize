@@ -1,6 +1,8 @@
 //! Java language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use std::path::Path;
 use tree_sitter::Node;
 
 /// Java language support.
@@ -205,9 +207,81 @@ impl Language for Java {
         // No modifier = package-private, but still visible for skeleton purposes
         Visibility::Public
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: JavaModuleResolver = JavaModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Java {}
+
+// =============================================================================
+// Java Module Resolver
+// =============================================================================
+
+/// Module resolver for Java (Maven/Gradle conventions).
+///
+/// Java package = directory hierarchy. `com.example.Foo` lives at
+/// `src/main/java/com/example/Foo.java` (or `src/test/java/...`).
+pub struct JavaModuleResolver;
+
+/// Source directory prefixes to search under workspace root.
+const JAVA_SRC_DIRS: &[&str] = &["src/main/java", "src/test/java", ""];
+
+impl ModuleResolver for JavaModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: JAVA_SRC_DIRS.iter().map(|d| root.join(d)).collect(),
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "java" {
+            return Vec::new();
+        }
+        for search_root in &cfg.search_roots {
+            if let Ok(rel) = file.strip_prefix(search_root) {
+                let rel_str = rel
+                    .to_str()
+                    .unwrap_or("")
+                    .trim_end_matches(".java")
+                    .replace(['/', '\\'], ".");
+                if !rel_str.is_empty() {
+                    return vec![ModuleId {
+                        canonical_path: rel_str,
+                    }];
+                }
+            }
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "java" {
+            return Resolution::NotApplicable;
+        }
+
+        let raw = &spec.raw;
+        // Convert dotted package to path: com.example.Foo → com/example/Foo.java
+        let path_part = raw.replace('.', "/");
+        let file_name = format!("{}.java", path_part);
+        let exported_name = raw.rsplit('.').next().unwrap_or(raw).to_string();
+
+        for search_root in &cfg.search_roots {
+            let candidate = search_root.join(&file_name);
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, exported_name);
+            }
+        }
+
+        Resolution::NotFound
+    }
+}
 
 /// Extract a JavaDoc comment (`/** ... */`) preceding a node.
 ///
