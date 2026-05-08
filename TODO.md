@@ -54,7 +54,7 @@ type inference proper. Hybrid is plausible but complicates the story.
 - [x] `resolution.dl` Datalog rules
 
 **Follow-up language resolvers (not yet started):**
-- [ ] Rust `RustModuleResolver` (Commit 2) — workspace_config/module_of_file/resolve for Cargo workspaces
+- [x] Rust `RustModuleResolver` (Commit 2) — workspace_config/module_of_file/resolve for Cargo workspaces
 - [ ] TypeScript/JavaScript resolver — tsconfig.json paths, node_modules, relative imports
 - [ ] Python resolver — sys.path, relative imports, `__init__.py` modules
 - [ ] Go resolver — go.mod module paths

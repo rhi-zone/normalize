@@ -9,6 +9,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - **Phase 0 scaffold: cross-file name resolution infrastructure.** New Datalog predicates in `normalize-facts-rules-api`: `resolved_import`, `module`, `export`, `reexport`, `symbol_use`, `resolved_reference`, `resolved_call`, `module_search_path`. New `ModuleResolver` trait in `normalize-languages::traits` for per-language import resolution, with supporting types `ImportSpec`, `ModuleId`, `Resolution`, `ResolverConfig`. New crate `normalize-module-resolve` re-exporting the trait and types. New `resolution.dl` Datalog rules deriving `resolved_reference` and `resolved_call` (disabled by default, requires `normalize structure rebuild`).
+- **Rust `ModuleResolver` (`RustModuleResolver`).** Resolves `use`/`mod` import specifiers to file paths within Cargo workspaces. Handles `workspace_config` (parses `Cargo.toml` for workspace members and crate names), `module_of_file` (derives canonical module path from file's position under `src/`), and `resolve` (maps `crate::module::name` to the `.rs` file, handles `super::`/`self::` relative paths, returns `NotFound` for stdlib and external crates). Tested with a 3-file fixture in `normalize-refactor/tests/`.
 
 ## [0.3.1] — 2026-05-08
 

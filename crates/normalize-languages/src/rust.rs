@@ -1,6 +1,11 @@
 //! Rust language support.
 
-use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use std::path::{Path, PathBuf};
+
+use crate::{
+    ContainerBody, Import, ImportSpec, Language, LanguageSymbols, ModuleId, ModuleResolver,
+    Resolution, ResolverConfig, Visibility,
+};
 use tree_sitter::Node;
 
 /// Rust language support.
@@ -299,9 +304,287 @@ impl Language for Rust {
     fn extract_module_doc(&self, src: &str) -> Option<String> {
         extract_rust_module_doc(src)
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: RustModuleResolver = RustModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Rust {}
+
+/// Module resolver for Rust (Cargo workspace).
+pub struct RustModuleResolver;
+
+impl ModuleResolver for RustModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        let cargo_toml = root.join("Cargo.toml");
+        let mut path_mappings: Vec<(String, PathBuf)> = Vec::new();
+
+        if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
+            // Try workspace members
+            if let Ok(val) = content.parse::<toml::Value>() {
+                if let Some(members) = val
+                    .get("workspace")
+                    .and_then(|w| w.get("members"))
+                    .and_then(|m| m.as_array())
+                {
+                    for member in members {
+                        if let Some(member_str) = member.as_str() {
+                            // Expand glob patterns (simple case: no actual glob, just list)
+                            let member_path = root.join(member_str);
+                            let member_cargo = member_path.join("Cargo.toml");
+                            if let Ok(mc) = std::fs::read_to_string(&member_cargo)
+                                && let Ok(mv) = mc.parse::<toml::Value>()
+                                && let Some(name) = mv
+                                    .get("package")
+                                    .and_then(|p| p.get("name"))
+                                    .and_then(|n| n.as_str())
+                            {
+                                path_mappings.push((name.to_string(), member_path));
+                            }
+                        }
+                    }
+                }
+
+                // Single-crate: read package name from root Cargo.toml
+                if path_mappings.is_empty()
+                    && let Some(name) = val
+                        .get("package")
+                        .and_then(|p| p.get("name"))
+                        .and_then(|n| n.as_str())
+                {
+                    path_mappings.push((name.to_string(), root.to_path_buf()));
+                }
+            }
+        }
+
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings,
+            search_roots: Vec::new(),
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        // Find the crate this file belongs to
+        for (crate_name, crate_dir) in &cfg.path_mappings {
+            let src_dir = crate_dir.join("src");
+            if let Ok(rel) = file.strip_prefix(&src_dir) {
+                let components: Vec<&str> = rel
+                    .components()
+                    .filter_map(|c| {
+                        if let std::path::Component::Normal(s) = c {
+                            s.to_str()
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                if components.is_empty() {
+                    continue;
+                }
+
+                let last = *components.last().unwrap();
+                let module_path =
+                    if components.len() == 1 && (last == "lib.rs" || last == "main.rs") {
+                        // Crate root
+                        crate_name.clone()
+                    } else {
+                        // Build module path from components
+                        let mut parts = vec![crate_name.as_str()];
+                        for c in &components[..components.len() - 1] {
+                            parts.push(c);
+                        }
+                        // Last component: strip .rs, handle mod.rs
+                        let stem = if last == "mod.rs" {
+                            // mod.rs is the module named by its parent directory
+                            // (already included in parts above)
+                            None
+                        } else {
+                            last.strip_suffix(".rs")
+                        };
+                        if let Some(s) = stem {
+                            parts.push(s);
+                        }
+                        parts.join("::")
+                    };
+
+                return vec![ModuleId {
+                    canonical_path: module_path,
+                }];
+            }
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        // Only handle .rs files
+        if from_file.extension().and_then(|e| e.to_str()) != Some("rs") {
+            return Resolution::NotApplicable;
+        }
+
+        let raw = &spec.raw;
+
+        // Handle super:: and self:: relative paths
+        let resolved_raw = if raw.starts_with("super::") || raw.starts_with("self::") {
+            // Resolve relative to from_file's module
+            let crate_name = self.crate_name_for_file(from_file, cfg);
+            if let Some(cn) = crate_name {
+                let module_path = self.module_path_for_file(from_file, cfg);
+                if let Some(suffix) = raw.strip_prefix("super::") {
+                    // Pop one level from module path
+                    let parent = module_path
+                        .rsplit_once("::")
+                        .map(|(p, _)| p.to_string())
+                        .unwrap_or_else(|| cn.clone());
+                    format!("{}::{}", parent, suffix)
+                } else {
+                    let suffix = raw.strip_prefix("self::").unwrap_or(raw);
+                    format!("{}::{}", module_path, suffix)
+                }
+            } else {
+                return Resolution::NotFound;
+            }
+        } else {
+            raw.clone()
+        };
+
+        // Try to find the crate for this path
+        let (crate_name, rest) = if let Some(pos) = resolved_raw.find("::") {
+            let cn = &resolved_raw[..pos];
+            let rest = &resolved_raw[pos + 2..];
+            (cn.to_string(), rest.to_string())
+        } else {
+            (resolved_raw.clone(), String::new())
+        };
+
+        // Look up crate in workspace
+        let crate_dir = cfg
+            .path_mappings
+            .iter()
+            .find(|(name, _)| name == &crate_name)
+            .map(|(_, dir)| dir.clone());
+
+        let crate_dir = match crate_dir {
+            Some(d) => d,
+            None => {
+                // Could be stdlib or external — not resolvable
+                return Resolution::NotFound;
+            }
+        };
+
+        // Convert module path to file path
+        let exported_name = if let Some(pos) = rest.rfind("::") {
+            rest[pos + 2..].to_string()
+        } else {
+            rest.clone()
+        };
+
+        let module_part = if let Some(pos) = rest.rfind("::") {
+            rest[..pos].to_string()
+        } else {
+            String::new()
+        };
+
+        let candidate = self.module_to_file(&crate_dir, &module_part);
+        if let Some(path) = candidate {
+            Resolution::Resolved(path, exported_name)
+        } else {
+            Resolution::NotFound
+        }
+    }
+}
+
+impl RustModuleResolver {
+    /// Get the crate name for a file.
+    fn crate_name_for_file(&self, file: &Path, cfg: &ResolverConfig) -> Option<String> {
+        for (crate_name, crate_dir) in &cfg.path_mappings {
+            if file.starts_with(crate_dir) {
+                return Some(crate_name.clone());
+            }
+        }
+        None
+    }
+
+    /// Get the module path string for a file.
+    fn module_path_for_file(&self, file: &Path, cfg: &ResolverConfig) -> String {
+        for (crate_name, crate_dir) in &cfg.path_mappings {
+            let src_dir = crate_dir.join("src");
+            if let Ok(rel) = file.strip_prefix(&src_dir) {
+                let components: Vec<&str> = rel
+                    .components()
+                    .filter_map(|c| {
+                        if let std::path::Component::Normal(s) = c {
+                            s.to_str()
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if components.is_empty() {
+                    return crate_name.clone();
+                }
+                let last = *components.last().unwrap();
+                if components.len() == 1 && (last == "lib.rs" || last == "main.rs") {
+                    return crate_name.clone();
+                }
+                let mut parts = vec![crate_name.as_str()];
+                for c in &components[..components.len() - 1] {
+                    parts.push(c);
+                }
+                if last != "mod.rs"
+                    && let Some(s) = last.strip_suffix(".rs")
+                {
+                    parts.push(s);
+                }
+                return parts.join("::");
+            }
+        }
+        String::new()
+    }
+
+    /// Convert a module path to a file path within a crate directory.
+    ///
+    /// e.g. "foo::bar" → tries `src/foo/bar.rs` and `src/foo/bar/mod.rs`
+    fn module_to_file(&self, crate_dir: &Path, module_path: &str) -> Option<PathBuf> {
+        let src_dir = crate_dir.join("src");
+
+        if module_path.is_empty() {
+            // Refers to the crate root
+            let lib = src_dir.join("lib.rs");
+            if lib.exists() {
+                return Some(lib);
+            }
+            let main = src_dir.join("main.rs");
+            if main.exists() {
+                return Some(main);
+            }
+            return None;
+        }
+
+        let parts: Vec<&str> = module_path.split("::").collect();
+        let mut path = src_dir.clone();
+        for part in &parts {
+            path = path.join(part);
+        }
+
+        // Try path.rs first
+        let rs_path = path.with_extension("rs");
+        if rs_path.exists() {
+            return Some(rs_path);
+        }
+
+        // Try path/mod.rs
+        let mod_path = path.join("mod.rs");
+        if mod_path.exists() {
+            return Some(mod_path);
+        }
+
+        None
+    }
+}
 
 impl Rust {
     fn extract_visibility_prefix(&self, node: &Node, content: &str) -> String {

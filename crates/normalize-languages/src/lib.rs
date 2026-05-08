@@ -395,7 +395,7 @@ pub use ron::Ron;
 #[cfg(feature = "lang-ruby")]
 pub use ruby::Ruby;
 #[cfg(feature = "lang-rust")]
-pub use rust::Rust;
+pub use rust::{Rust, RustModuleResolver};
 #[cfg(feature = "lang-scala")]
 pub use scala::Scala;
 #[cfg(feature = "lang-scheme")]
