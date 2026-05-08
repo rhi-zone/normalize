@@ -85,9 +85,18 @@ type inference proper. Hybrid is plausible but complicates the story.
 - [x] ReScript (`ReScriptModuleResolver` — bsconfig.json sources)
 - [x] Language matrix test in `normalize-refactor/tests/cross_file.rs` — asserts resolver presence for all GP languages
 
-**Phase 0 complete. Remaining open questions:**
+**Phase 0 blockers — must be resolved before 0.4.0:**
 - [ ] `normalize find-references --cross-file` command (depends on `structure rebuild`)
 - [ ] Cross-file rename using resolved references (depends on confidence-tagged references)
+- [ ] **C/C++/ObjC resolvers** — `#include` resolution requires `compile_commands.json` (compiler `-I` flags). Design needed: read `compile_commands.json` at workspace root; map each source file's include search paths; resolve `#include "foo.h"` against them. Blocking because C/C++ are among the most-used supported languages.
+- [ ] **Elm resolver** — simple module system (`import Html.Attributes` → `Html/Attributes.elm` under `src/`). No design unknowns, just not done.
+- [ ] **D resolver** — `import mypackage.utils` → `mypackage/utils.d` under `source/` or `src/`. Dub package manager (`dub.json`/`dub.sdl`).
+- [ ] **R resolver** — `source("./utils.R")` (relative, like Ruby `require_relative`) + `library(pkg)` (NotFound). Simple.
+- [ ] **Julia resolver** — `include("utils.jl")` (relative file include) + `using MyModule` (package, NotFound unless in workspace). Simple relative case only.
+- [ ] **MATLAB resolver** — `addpath`/function-file convention (one function per `.m` file, filename = function name). No explicit import syntax; `module_of_file` maps filename stem to function name.
+- [ ] **Ada, Agda, Idris, Lean** — niche; design needs investigation. Add resolvers or explicitly document as NotApplicable with rationale. Not NotApplicable by default silence.
+- [ ] **Prolog** — `:- use_module(library(lists))` / `:- use_module('./utils')`. Relative case is tractable; library case is NotFound.
+- [ ] **Nix** — `import ./utils.nix` is a direct file path (trivially resolvable); `builtins.fetchGit` etc. are NotFound. The simple relative case is easy.
 
 ## 0.3.x post-release follow-ups (advisory)
 
