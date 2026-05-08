@@ -244,7 +244,7 @@ pub mod zig;
 pub mod zsh;
 
 // Re-exports (always available)
-pub use grammar_loader::GrammarLoader;
+pub use grammar_loader::{GrammarLoadError, GrammarLoader};
 pub use normalize_facts_core::Export;
 pub use query_predicates::satisfies_predicates;
 pub use registry::{

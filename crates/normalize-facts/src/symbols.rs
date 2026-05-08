@@ -45,10 +45,9 @@ impl SymbolParser {
 
         // Check that the grammar .so is actually loadable before attempting extraction.
         // If not, return None so callers can warn and skip rather than caching empty results.
-        let loader = normalize_languages::parsers::grammar_loader();
-        if loader.get(support.grammar_name()).is_err() {
-            return None; // grammar known but .so unavailable
-        }
+        // `try_get_grammar` emits a one-shot stderr warning and records the failure in
+        // the missing-grammar tracker (so `normalize structure rebuild` can summarise).
+        normalize_languages::parsers::try_get_grammar(support.grammar_name())?;
 
         // Use shared extractor for symbol extraction
         let result = self.extractor.extract(path, content);

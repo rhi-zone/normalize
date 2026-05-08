@@ -15,7 +15,8 @@
 use std::sync::Arc;
 
 pub use normalize_languages::parsers::{
-    available_external_grammars, parse_with_grammar, parser_for,
+    MissingGrammar, available_external_grammars, parse_with_grammar, parser_for,
+    peek_missing_grammars, report_missing_grammar, take_missing_grammars, try_get_grammar,
 };
 
 /// Get the global grammar loader singleton (canonical instance from `normalize-languages`).

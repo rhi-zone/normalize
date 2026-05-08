@@ -32,6 +32,17 @@ impl FactsService {
     }
 }
 
+/// One missing-grammar entry on a `RebuildReport`.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct MissingGrammarEntry {
+    /// Grammar name (e.g. `"go"`, `"kotlin"`).
+    pub grammar: String,
+    /// Number of files that requested this grammar and were skipped.
+    pub files: usize,
+    /// Human-readable error detail.
+    pub detail: String,
+}
+
 /// Report for `normalize structure rebuild`: counts of indexed entities.
 ///
 /// `files` is always populated. `symbols`, `calls`, and `imports` are only set when the
@@ -51,6 +62,10 @@ pub struct RebuildReport {
     /// Whether this was an incremental rebuild (true) or a full rebuild (false).
     #[serde(skip_serializing_if = "is_false")]
     pub incremental: bool,
+    /// Grammars that failed to load during this rebuild (one entry per grammar).
+    /// Files needing those grammars were skipped, leaving the index incomplete.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub missing_grammars: Vec<MissingGrammarEntry>,
 }
 
 impl OutputFormatter for RebuildReport {
@@ -87,6 +102,21 @@ impl OutputFormatter for RebuildReport {
         }
         if !parts.is_empty() {
             out.push_str(&format!("\nIndexed {}", parts.join(", ")));
+        }
+        if !self.missing_grammars.is_empty() {
+            let total: usize = self.missing_grammars.iter().map(|m| m.files).sum();
+            let breakdown = self
+                .missing_grammars
+                .iter()
+                .map(|m| {
+                    let noun = if m.files == 1 { "file" } else { "files" };
+                    format!("{} ({} {})", m.grammar, m.files, noun)
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            out.push_str(&format!(
+                "\nSkipped {total} files due to missing grammars: {breakdown}\nRun `normalize grammars install` to extract all languages."
+            ));
         }
         out
     }
@@ -489,7 +519,11 @@ async fn rebuild_data(
     only: &[String],
     exclude: &[String],
     full: bool,
+    strict: bool,
 ) -> Result<RebuildReport, String> {
+    // Reset the missing-grammar tracker so this rebuild starts fresh — any
+    // missing grammars surfaced below belong to *this* rebuild only.
+    let _ = normalize_facts::take_missing_grammars();
     let root = root
         .map(|p| p.to_path_buf())
         .map(Ok)
@@ -550,6 +584,7 @@ async fn rebuild_data(
         imports: None,
         co_change_edges: None,
         incremental: !full,
+        missing_grammars: Vec::new(),
     };
 
     if !include.is_empty() && !include.contains(&FactsContent::None) {
@@ -599,6 +634,38 @@ async fn rebuild_data(
             tracing::warn!("co-change edge rebuild failed (non-fatal): {}", e);
         }
     }
+
+    // Drain missing-grammar tracker into the report so users see (and can
+    // act on) which languages were silently skipped.
+    let mut missing: Vec<MissingGrammarEntry> = normalize_facts::take_missing_grammars()
+        .into_iter()
+        .map(|m| MissingGrammarEntry {
+            grammar: m.name,
+            files: m.count,
+            detail: m.detail,
+        })
+        .collect();
+    missing.sort_by(|a, b| {
+        b.files
+            .cmp(&a.files)
+            .then_with(|| a.grammar.cmp(&b.grammar))
+    });
+
+    if strict && !missing.is_empty() {
+        let breakdown = missing
+            .iter()
+            .map(|m| {
+                let noun = if m.files == 1 { "file" } else { "files" };
+                format!("{} ({} {})", m.grammar, m.files, noun)
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(format!(
+            "missing grammars (strict mode): {breakdown}. Run `normalize grammars install`."
+        ));
+    }
+
+    result.missing_grammars = missing;
 
     Ok(result)
 }
@@ -820,6 +887,10 @@ impl FactsService {
         #[param(help = "Only include files matching glob patterns")] only: Vec<String>,
         #[param(help = "Exclude files matching glob patterns")] exclude: Vec<String>,
         #[param(help = "Force full rebuild even if incremental is possible")] full: bool,
+        #[param(
+            help = "Exit non-zero if any tree-sitter grammar is missing (instead of warning and continuing)"
+        )]
+        strict: bool,
     ) -> Result<RebuildReport, String> {
         let include: Vec<FactsContent> = if include.is_empty() {
             vec![
@@ -834,7 +905,15 @@ impl FactsService {
                 .collect::<Result<Vec<_>, _>>()?
         };
         let root_path = root.map(PathBuf::from);
-        rebuild_data(root_path.as_deref(), &include, &only, &exclude, full).await
+        rebuild_data(
+            root_path.as_deref(),
+            &include,
+            &only,
+            &exclude,
+            full,
+            strict,
+        )
+        .await
     }
 
     /// Show index statistics (DB size vs codebase size)

@@ -18,7 +18,10 @@ pub mod service;
 
 pub use extract::{ExtractOptions, ExtractResult, Extractor, InterfaceResolver, OnDemandResolver};
 pub use index::{CallGraphStats, ChangedFiles, FileIndex, IndexedFile, SymbolMatch};
-pub use parsers::{available_external_grammars, grammar_loader, parse_with_grammar, parser_for};
+pub use parsers::{
+    MissingGrammar, available_external_grammars, grammar_loader, parse_with_grammar, parser_for,
+    peek_missing_grammars, report_missing_grammar, take_missing_grammars, try_get_grammar,
+};
 pub use symbols::SymbolParser;
 
 // Re-export core types for convenience
