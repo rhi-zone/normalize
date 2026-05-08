@@ -12,9 +12,11 @@
 //! Set `UPDATE_FIXTURES=1` to regenerate all `expected/` files from actual output.
 
 use normalize_facts::SymbolParser;
+use normalize_languages::{GrammarLoader, support_for_path};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::OnceLock;
 
 // ---------------------------------------------------------------------------
 // Fixture discovery
@@ -64,6 +66,86 @@ fn lang_from_case(case_dir: &Path) -> String {
         .to_str()
         .unwrap()
         .to_string()
+}
+
+// ---------------------------------------------------------------------------
+// Grammar availability probe
+// ---------------------------------------------------------------------------
+
+fn grammar_loader() -> &'static GrammarLoader {
+    static LOADER: OnceLock<GrammarLoader> = OnceLock::new();
+    LOADER.get_or_init(GrammarLoader::new)
+}
+
+/// Map a fixture directory name to the tree-sitter grammar name.
+///
+/// Most fixture dir names match the grammar name directly. For the few that
+/// don't, look up a `Language` by trying the dir name as both a grammar name
+/// and (failing that) a sample extension. We deliberately probe the *primary*
+/// language of the fixture (its directory name), not every recognized file in
+/// the project — fixtures often include `SUMMARY.md`, `Cargo.toml`, etc., and
+/// we don't want missing markdown/toml grammars to skip a Python or Rust case.
+fn fixture_grammar_name(case_dir: &Path) -> Option<&'static str> {
+    let lang_dir = lang_from_case(case_dir);
+    // Direct grammar name match (covers `rust`, `python`, `go`, `cpp`, etc.).
+    if let Some(lang) = normalize_languages::support_for_grammar(&lang_dir) {
+        return Some(lang.grammar_name());
+    }
+    // Fixture dir aliases for grammars whose canonical name differs.
+    let alias = match lang_dir.as_str() {
+        "csharp" => Some("c-sharp"),
+        _ => None,
+    };
+    if let Some(name) = alias
+        && normalize_languages::support_for_grammar(name).is_some()
+    {
+        return Some(name);
+    }
+    // Last resort: probe a known source file in the project.
+    for path in collect_source_files(&case_dir.join("project")) {
+        if let Some(lang) = support_for_path(&path) {
+            // Skip docs/manifests — they're incidental, not the fixture's lang.
+            let g = lang.grammar_name();
+            if !matches!(g, "markdown" | "toml" | "json" | "yaml") {
+                return Some(g);
+            }
+        }
+    }
+    None
+}
+
+/// Collect every distinct grammar name needed to extract from this fixture.
+///
+/// Includes the fixture's primary grammar plus any grammar referenced by other
+/// recognized files in the project (e.g. `SUMMARY.md` requires markdown). This
+/// ensures we skip the fixture if *any* required grammar is missing locally —
+/// otherwise an `expected/symbols.json` containing markdown headings would
+/// false-fail when run on a machine without the markdown grammar installed.
+fn required_grammars(case_dir: &Path) -> Vec<&'static str> {
+    let mut grammars: Vec<&'static str> = Vec::new();
+    if let Some(g) = fixture_grammar_name(case_dir) {
+        grammars.push(g);
+    }
+    for path in collect_source_files(&case_dir.join("project")) {
+        if let Some(lang) = support_for_path(&path) {
+            let g = lang.grammar_name();
+            if !grammars.contains(&g) {
+                grammars.push(g);
+            }
+        }
+    }
+    grammars
+}
+
+/// Returns `Ok(())` if every grammar needed by the fixture loads, else
+/// `Err(missing_grammar_name)`.
+fn grammar_available(case_dir: &Path) -> Result<(), &'static str> {
+    for grammar in required_grammars(case_dir) {
+        if grammar_loader().get(grammar).is_err() {
+            return Err(grammar);
+        }
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -307,6 +389,7 @@ fn extract_fixtures() {
 
     let mut passed = 0;
     let mut skipped_exec = 0;
+    let mut skipped_grammar = 0;
 
     for case_dir in &cases {
         let lang = lang_from_case(case_dir);
@@ -316,6 +399,18 @@ fn extract_fixtures() {
 
         let label = format!("{lang}/{case_name}");
         eprintln!("Testing {label}...");
+
+        // Skip cases whose tree-sitter grammar isn't installed on this machine.
+        // CI builds all grammars via `cargo xtask build-grammars`; on dev machines
+        // we typically only have a handful, so unrecognized fixtures (e.g. ada)
+        // would otherwise produce empty extraction output and false-fail the
+        // expected-file comparison. We probe the grammar separately so a real
+        // bug (grammar present, extraction wrong) still fails the test.
+        if let Err(missing) = grammar_available(case_dir) {
+            eprintln!("  SKIP {label}: tree-sitter grammar `{missing}` not available locally");
+            skipped_grammar += 1;
+            continue;
+        }
 
         // --- symbols ---
         let symbols_expected = expected_dir.join("symbols.json");
@@ -354,7 +449,8 @@ fn extract_fixtures() {
     }
 
     eprintln!(
-        "\nextract_fixtures: {passed} cases, {skipped_exec} execution tests skipped (missing runtime)"
+        "\nextract_fixtures: {passed} cases, {skipped_grammar} skipped (missing grammar), \
+         {skipped_exec} execution tests skipped (missing runtime)"
     );
 }
 
