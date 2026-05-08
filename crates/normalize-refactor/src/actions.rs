@@ -220,6 +220,10 @@ fn finalize(
 /// Find all cross-file references to a symbol (callers + importers).
 ///
 /// Returns empty references if no index is available.
+///
+/// Each reference is tagged with a `confidence` field:
+/// - `"resolved"` — backed by `ModuleResolver` import resolution (accurate)
+/// - `"heuristic"` — found via import-name matching without full resolution (may have false positives)
 pub async fn find_references(
     ctx: &RefactoringContext,
     symbol_name: &str,
@@ -232,6 +236,21 @@ pub async fn find_references(
         };
     };
 
+    // Determine confidence level based on whether the def_file's language has a resolver.
+    // If it does, imports for that language were resolved via ModuleResolver; results are
+    // accurate. If not, results are heuristic (import-name matching only).
+    let confidence: &'static str = {
+        let def_path = ctx.root.join(def_file);
+        if support_for_path(&def_path)
+            .and_then(|lang| lang.module_resolver())
+            .is_some()
+        {
+            "resolved"
+        } else {
+            "heuristic"
+        }
+    };
+
     let callers = idx
         .find_callers(symbol_name, def_file)
         .await
@@ -242,6 +261,7 @@ pub async fn find_references(
             caller,
             line,
             access,
+            confidence,
         })
         .collect();
 
@@ -255,6 +275,7 @@ pub async fn find_references(
             name,
             alias,
             line,
+            confidence,
         })
         .collect();
 

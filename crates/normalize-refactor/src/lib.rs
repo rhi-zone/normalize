@@ -53,6 +53,9 @@ pub struct CallerRef {
     pub line: usize,
     #[allow(dead_code)]
     pub access: Option<String>,
+    /// Resolution confidence: `"resolved"` when backed by ModuleResolver facts,
+    /// `"heuristic"` when found via import-name matching without full resolution.
+    pub confidence: &'static str,
 }
 
 /// An import-site reference.
@@ -62,6 +65,9 @@ pub struct ImportRef {
     #[allow(dead_code)]
     pub alias: Option<String>,
     pub line: usize,
+    /// Resolution confidence: `"resolved"` when backed by ModuleResolver facts,
+    /// `"heuristic"` when found via import-name matching without full resolution.
+    pub confidence: &'static str,
 }
 
 /// Executes a `RefactoringPlan`: writes files, manages shadow snapshots.
