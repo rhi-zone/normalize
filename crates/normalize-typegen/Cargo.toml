@@ -31,9 +31,9 @@ backend-jsonschema = []
 backend-graphql = []
 backend-proto = []
 
-# Input parsers
-input-typescript = ["dep:arborium-typescript", "dep:tree-sitter"]
-input-graphql = ["dep:arborium-graphql", "dep:tree-sitter"]
+# Input parsers — grammars load dynamically via `normalize-languages`.
+input-typescript = ["dep:normalize-languages", "dep:tree-sitter"]
+input-graphql = ["dep:normalize-languages", "dep:tree-sitter"]
 
 # Legacy aliases (for backwards compatibility)
 typescript-types = ["backend-typescript"]
@@ -49,8 +49,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = "2"
 tree-sitter = { version = "0.26", optional = true }
-arborium-typescript = { version = "2", optional = true }
-arborium-graphql = { version = "2", optional = true }
+normalize-languages = { path = "../normalize-languages", version = "0.3.0", default-features = false, optional = true }
 
 [dev-dependencies]
 insta = { version = "1", features = ["json"] }

@@ -8,6 +8,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **All tree-sitter grammars now load uniformly via `dlopen()`.** Previously
+  `normalize-surface-syntax` and `normalize-typegen` statically linked four
+  `arborium-*` grammar crates (TypeScript, JavaScript, Lua, Python — and
+  GraphQL in typegen), while every other grammar loaded dynamically through
+  the shared `GrammarLoader`. The static linking is gone: those readers now
+  request grammars from the process-wide `grammar_loader()` singleton like
+  the rest of the codebase. Net effect on the binary: the four (five for
+  typegen) compiled-in parsers are removed; the runtime requirement that
+  the relevant `.so` files live in a search path was already true for all
+  other languages and is unchanged. Cargo features `read-typescript`,
+  `read-javascript`, `read-lua`, `read-python`, `input-typescript`, and
+  `input-graphql` continue to work — they now gate the reader source code,
+  not a grammar dependency.
 - **musl release build is now fully self-contained — no system runtime dependencies.** Previously the `x86_64-unknown-linux-musl` artifact was a static-pie binary (couldn't `dlopen()` grammar `.so` files), then briefly a dynamic binary that required the system to provide `ld-musl-x86_64.so.1` and `libc.musl-x86_64.so.1`. The release tarball now bundles its own musl loader and libc alongside a tiny POSIX-sh wrapper script that invokes the bundled loader explicitly (`exec "$DIR/runtime/ld-musl-x86_64.so.1" --library-path "$DIR/runtime" "$DIR/runtime/normalize.elf" "$@"`). The artifact runs on any Linux x86_64 system — Alpine, distroless, NixOS without `pkgs.musl`, glibc-only distros — with no installed musl required. `install.sh` extracts the tarball under `~/.local/share/normalize/` and symlinks the wrapper into `~/.local/bin/`. The musl artifact is now also the safe default on systems without glibc (and the only choice on NixOS).
 
 ### Fixed

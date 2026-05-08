@@ -9,11 +9,13 @@ description = "Surface-level syntax translation between languages via a common I
 [features]
 default = ["read-typescript", "write-lua"]
 
-# Readers
-read-typescript = ["tree-sitter", "arborium-typescript"]
-read-javascript = ["tree-sitter", "arborium-javascript", "read-typescript"]
-read-lua = ["tree-sitter", "arborium-lua"]
-read-python = ["tree-sitter", "arborium-python"]
+# Readers — grammars are loaded dynamically via `normalize-languages` at runtime.
+# These flags now only gate the reader source code (the grammar itself loads
+# uniformly through `GrammarLoader`).
+read-typescript = ["dep:tree-sitter", "dep:normalize-languages"]
+read-javascript = ["read-typescript"]
+read-lua = ["dep:tree-sitter", "dep:normalize-languages"]
+read-python = ["dep:tree-sitter", "dep:normalize-languages"]
 
 # Writers
 write-lua = []
@@ -29,10 +31,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = "2"
 tree-sitter = { version = "0.26", optional = true }
-arborium-typescript = { version = "2", optional = true }
-arborium-javascript = { version = "2", optional = true }
-arborium-lua = { version = "2", optional = true }
-arborium-python = { version = "2", optional = true }
+normalize-languages = { path = "../normalize-languages", version = "0.3.0", default-features = false, optional = true }
 
 [dev-dependencies]
 insta = { version = "1", features = ["json"] }

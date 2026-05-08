@@ -12,9 +12,12 @@ use tree_sitter::{Node, Parser, Tree};
 
 /// Parse TypeScript source and extract type definitions into IR.
 pub fn parse_typescript_types(source: &str) -> Result<Schema, ParseError> {
+    let language = normalize_languages::parsers::grammar_loader()
+        .get("typescript")
+        .map_err(|e| ParseError::Unsupported(format!("load typescript grammar: {e}")))?;
     let mut parser = Parser::new();
     parser
-        .set_language(&arborium_typescript::language().into())
+        .set_language(&language)
         .map_err(|e| ParseError::Unsupported(format!("tree-sitter init: {}", e)))?;
 
     let tree = parser

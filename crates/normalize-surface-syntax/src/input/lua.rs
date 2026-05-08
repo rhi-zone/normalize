@@ -26,9 +26,12 @@ impl Reader for LuaReader {
 
 /// Parse Lua source into surface-syntax IR.
 pub fn read_lua(source: &str) -> Result<Program, ReadError> {
+    let language = normalize_languages::parsers::grammar_loader()
+        .get("lua")
+        .map_err(|e| ReadError::Parse(format!("load lua grammar: {e}")))?;
     let mut parser = Parser::new();
     parser
-        .set_language(&arborium_lua::language().into())
+        .set_language(&language)
         .map_err(|err| ReadError::Parse(err.to_string()))?;
 
     let tree = parser

@@ -12,9 +12,12 @@ use tree_sitter::{Node, Parser, Tree};
 
 /// Parse a GraphQL SDL string and extract type definitions into IR.
 pub fn parse_graphql_schema(source: &str) -> Result<Schema, ParseError> {
+    let language = normalize_languages::parsers::grammar_loader()
+        .get("graphql")
+        .map_err(|e| ParseError::Unsupported(format!("load graphql grammar: {e}")))?;
     let mut parser = Parser::new();
     parser
-        .set_language(&arborium_graphql::language().into())
+        .set_language(&language)
         .map_err(|e| ParseError::Unsupported(format!("tree-sitter init: {}", e)))?;
 
     let tree = parser

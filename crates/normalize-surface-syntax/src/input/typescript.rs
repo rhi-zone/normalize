@@ -29,7 +29,10 @@ impl Reader for TypeScriptReader {
 
 /// Parse TypeScript source into surface-syntax IR.
 pub fn read_typescript(source: &str) -> Result<Program, ReadError> {
-    read_with_language(source, arborium_typescript::language().into())
+    let language = normalize_languages::parsers::grammar_loader()
+        .get("typescript")
+        .map_err(|e| ReadError::Parse(format!("load typescript grammar: {e}")))?;
+    read_with_language(source, language)
 }
 
 /// Parse source into surface-syntax IR using the given tree-sitter language.

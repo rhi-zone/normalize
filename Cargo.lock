@@ -5797,11 +5797,8 @@ dependencies = [
 name = "normalize-surface-syntax"
 version = "0.3.0"
 dependencies = [
- "arborium-javascript",
- "arborium-lua",
- "arborium-python",
- "arborium-typescript",
  "insta",
+ "normalize-languages",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -5851,9 +5848,8 @@ dependencies = [
 name = "normalize-typegen"
 version = "0.3.0"
 dependencies = [
- "arborium-graphql",
- "arborium-typescript",
  "insta",
+ "normalize-languages",
  "serde",
  "serde_json",
  "thiserror 2.0.18",

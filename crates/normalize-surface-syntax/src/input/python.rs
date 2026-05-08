@@ -26,9 +26,12 @@ impl Reader for PythonReader {
 
 /// Parse Python source into surface-syntax IR.
 pub fn read_python(source: &str) -> Result<Program, ReadError> {
+    let language = normalize_languages::parsers::grammar_loader()
+        .get("python")
+        .map_err(|e| ReadError::Parse(format!("load python grammar: {e}")))?;
     let mut parser = Parser::new();
     parser
-        .set_language(&arborium_python::language().into())
+        .set_language(&language)
         .map_err(|err| ReadError::Parse(err.to_string()))?;
 
     let tree = parser

@@ -34,7 +34,10 @@ impl Reader for JavaScriptReader {
 
 /// Parse JavaScript source into surface-syntax IR.
 pub fn read_javascript(source: &str) -> Result<Program, ReadError> {
-    read_with_language(source, arborium_javascript::language().into())
+    let language = normalize_languages::parsers::grammar_loader()
+        .get("javascript")
+        .map_err(|e| ReadError::Parse(format!("load javascript grammar: {e}")))?;
+    read_with_language(source, language)
 }
 
 #[cfg(test)]
