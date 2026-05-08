@@ -65,6 +65,26 @@ type inference proper. Hybrid is plausible but complicates the story.
 - [x] Wire resolvers into `normalize structure rebuild` pipeline — `resolve_imports_via_module_resolver()` pass after `resolve_all_imports()` in full rebuild and incremental update
 - [x] Tag `find_references` results with `confidence: "resolved" | "heuristic"` based on language resolver availability
 
+**Extended language resolver coverage (committed):**
+- [x] JVM languages: Java, Kotlin, Groovy, Scala (Maven/Gradle `src/main/<lang>` path conventions)
+- [x] .NET languages: C#, VB, F# (namespace→file path mapping)
+- [x] Swift (`SwiftModuleResolver` — SPM `Sources/<target>` directory targets)
+- [x] Dart (`DartModuleResolver` — pubspec.yaml `package:` import resolution)
+- [x] Zig (`ZigModuleResolver` — `@import` relative path resolution)
+- [x] Elixir (`ElixirModuleResolver` — Mix `lib/` CamelCase↔snake_case)
+- [x] Erlang (`ErlangModuleResolver` — 1:1 module=file)
+- [x] Haskell (`HaskellModuleResolver` — Cabal `hs-source-dirs`)
+- [x] OCaml (`OCamlModuleResolver` — capitalized stem convention)
+- [x] Lua (`LuaModuleResolver` — `require` dot-path)
+- [x] PHP (`PhpModuleResolver` — composer.json PSR-4 autoload)
+- [x] Perl (`PerlModuleResolver` — `lib/` `::` path)
+- [x] Clojure (`ClojureModuleResolver` — `src/` dot-namespace)
+- [x] Common Lisp (`CommonLispModuleResolver` — workspace stem)
+- [x] Scheme (`SchemeModuleResolver` — R7RS `.sld`/`.scm`)
+- [x] Gleam (`GleamModuleResolver` — `gleam.toml` src/)
+- [x] ReScript (`ReScriptModuleResolver` — bsconfig.json sources)
+- [x] Language matrix test in `normalize-refactor/tests/cross_file.rs` — asserts resolver presence for all GP languages
+
 **Phase 0 complete. Remaining open questions:**
 - [ ] `normalize find-references --cross-file` command (depends on `structure rebuild`)
 - [ ] Cross-file rename using resolved references (depends on confidence-tagged references)

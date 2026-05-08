@@ -623,3 +623,136 @@ fn find_references_confidence_tag_no_index() {
         .is_some();
     assert!(!has_sh_resolver, "Bash should NOT have a module_resolver");
 }
+
+/// Matrix test: assert that every language with a module system returns Some(&dyn ModuleResolver),
+/// and that data/scripting/template languages return None.
+///
+/// HAS_RESOLVER: languages that implement ModuleResolver
+/// NOT_APPLICABLE: languages without a module system (returns None by design)
+#[test]
+fn module_resolver_coverage_matrix() {
+    use normalize_languages::Language;
+
+    // Languages that MUST have a resolver
+    let has_resolver: &[(&dyn Language, &str)] = &[
+        #[cfg(feature = "lang-rust")]
+        (&normalize_languages::Rust, "Rust"),
+        #[cfg(feature = "lang-typescript")]
+        (&normalize_languages::TypeScript, "TypeScript"),
+        #[cfg(feature = "lang-typescript")]
+        (&normalize_languages::Tsx, "TSX"),
+        #[cfg(feature = "lang-javascript")]
+        (&normalize_languages::JavaScript, "JavaScript"),
+        #[cfg(feature = "lang-python")]
+        (&normalize_languages::Python, "Python"),
+        #[cfg(feature = "lang-go")]
+        (&normalize_languages::Go, "Go"),
+        #[cfg(feature = "lang-ruby")]
+        (&normalize_languages::Ruby, "Ruby"),
+        #[cfg(feature = "lang-java")]
+        (&normalize_languages::Java, "Java"),
+        #[cfg(feature = "lang-kotlin")]
+        (&normalize_languages::Kotlin, "Kotlin"),
+        #[cfg(feature = "lang-groovy")]
+        (&normalize_languages::Groovy, "Groovy"),
+        #[cfg(feature = "lang-scala")]
+        (&normalize_languages::Scala, "Scala"),
+        #[cfg(feature = "lang-csharp")]
+        (&normalize_languages::CSharp, "C#"),
+        #[cfg(feature = "lang-vb")]
+        (&normalize_languages::VB, "VB"),
+        #[cfg(feature = "lang-fsharp")]
+        (&normalize_languages::FSharp, "F#"),
+        #[cfg(feature = "lang-swift")]
+        (&normalize_languages::Swift, "Swift"),
+        #[cfg(feature = "lang-dart")]
+        (&normalize_languages::Dart, "Dart"),
+        #[cfg(feature = "lang-zig")]
+        (&normalize_languages::Zig, "Zig"),
+        #[cfg(feature = "lang-elixir")]
+        (&normalize_languages::Elixir, "Elixir"),
+        #[cfg(feature = "lang-erlang")]
+        (&normalize_languages::Erlang, "Erlang"),
+        #[cfg(feature = "lang-haskell")]
+        (&normalize_languages::Haskell, "Haskell"),
+        #[cfg(feature = "lang-ocaml")]
+        (&normalize_languages::OCaml, "OCaml"),
+        #[cfg(feature = "lang-lua")]
+        (&normalize_languages::Lua, "Lua"),
+        #[cfg(feature = "lang-php")]
+        (&normalize_languages::Php, "PHP"),
+        #[cfg(feature = "lang-perl")]
+        (&normalize_languages::Perl, "Perl"),
+        #[cfg(feature = "lang-clojure")]
+        (&normalize_languages::Clojure, "Clojure"),
+        #[cfg(feature = "lang-commonlisp")]
+        (&normalize_languages::CommonLisp, "Common Lisp"),
+        #[cfg(feature = "lang-scheme")]
+        (&normalize_languages::Scheme, "Scheme"),
+        #[cfg(feature = "lang-gleam")]
+        (&normalize_languages::Gleam, "Gleam"),
+        #[cfg(feature = "lang-rescript")]
+        (&normalize_languages::ReScript, "ReScript"),
+    ];
+
+    for (lang, name) in has_resolver {
+        assert!(
+            lang.module_resolver().is_some(),
+            "{} should have a module_resolver (returns Some)",
+            name
+        );
+    }
+
+    // Languages that must NOT have a resolver (no module system)
+    let not_applicable: &[(&dyn Language, &str)] = &[
+        #[cfg(feature = "lang-css")]
+        (&normalize_languages::Css, "CSS"),
+        #[cfg(feature = "lang-scss")]
+        (&normalize_languages::Scss, "SCSS"),
+        #[cfg(feature = "lang-json")]
+        (&normalize_languages::Json, "JSON"),
+        #[cfg(feature = "lang-yaml")]
+        (&normalize_languages::Yaml, "YAML"),
+        #[cfg(feature = "lang-toml")]
+        (&normalize_languages::Toml, "TOML"),
+        #[cfg(feature = "lang-xml")]
+        (&normalize_languages::Xml, "XML"),
+        #[cfg(feature = "lang-html")]
+        (&normalize_languages::Html, "HTML"),
+        #[cfg(feature = "lang-markdown")]
+        (&normalize_languages::Markdown, "Markdown"),
+        #[cfg(feature = "lang-sql")]
+        (&normalize_languages::Sql, "SQL"),
+        #[cfg(feature = "lang-graphql")]
+        (&normalize_languages::GraphQL, "GraphQL"),
+        #[cfg(feature = "lang-bash")]
+        (&normalize_languages::Bash, "Bash"),
+        #[cfg(feature = "lang-fish")]
+        (&normalize_languages::Fish, "Fish"),
+        #[cfg(feature = "lang-awk")]
+        (&normalize_languages::Awk, "Awk"),
+        #[cfg(feature = "lang-powershell")]
+        (&normalize_languages::PowerShell, "PowerShell"),
+        #[cfg(feature = "lang-glsl")]
+        (&normalize_languages::Glsl, "GLSL"),
+        #[cfg(feature = "lang-hlsl")]
+        (&normalize_languages::Hlsl, "HLSL"),
+        #[cfg(feature = "lang-dockerfile")]
+        (&normalize_languages::Dockerfile, "Dockerfile"),
+    ];
+
+    for (lang, name) in not_applicable {
+        assert!(
+            lang.module_resolver().is_none(),
+            "{} should NOT have a module_resolver (returns None — no module system)",
+            name
+        );
+    }
+
+    // DEFERRED languages (module system exists but resolver is None for now):
+    // C, C++, ObjC — preprocessor #include; no standard package mapping without toolchain
+    // Nix — flake/nixpkgs paths require nix evaluation
+    // D, Ada, Agda, Idris, Lean, Elm — niche; resolver not yet implemented
+    // R, Julia, MATLAB — language server typically handles imports; file paths vary
+    // Prolog — module system varies by implementation
+}
