@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **libsql `block_on` shim no longer deadlocks/panics when called from a tokio worker.** The cache layers in `normalize-facts`, `normalize-native-rules`, and `normalize-syntax-rules` cache an owned current-thread runtime when constructed from sync code (the common case). Previously the helper used that cached runtime unconditionally, which caused `Cannot start a runtime from within a runtime` panics whenever a `#[tokio::test]` (or any other tokio task) hit a cache that had been initialized earlier from a sync test in the same process. The helper now inspects the call site's tokio context first — only falling back to the cached runtime when not already inside one — so the public API stays synchronous while remaining safe to call from any context.
+
 ## [0.3.1] — 2026-05-08
 
 ### Removed
