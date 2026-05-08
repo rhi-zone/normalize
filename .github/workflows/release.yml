@@ -83,10 +83,12 @@ jobs:
           # The release tarball ships a wrapper script + bundled
           # `ld-musl-x86_64.so.1` / `libc.musl-x86_64.so.1`, so the artifact
           # is fully self-contained — no system musl required.
-          # `-lm` is required when crt-static is off: musl folds libm into libc.a,
-          # but the dynamic split has libm in a separate libm.so that rustc does
-          # not auto-link. Without it we get undefined references to log/pow/exp.
-          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN -C link-arg=-lm"
+          # Use musl-gcc as the linker (not the default `cc`, which is glibc gcc
+          # on Ubuntu and doesn't synthesise musl-specific link flags). musl-gcc
+          # knows libm folds into libc on musl and handles math symbol resolution
+          # correctly without manual `-lm`.
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN"
 
       - name: Fetch all workspace deps
         # `cargo build -p normalize` only fetches `normalize`'s dep tree.
