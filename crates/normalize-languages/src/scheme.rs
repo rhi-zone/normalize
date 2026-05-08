@@ -1,6 +1,8 @@
 //! Scheme language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{ContainerBody, Import, Language, LanguageSymbols};
+use std::path::Path;
 use tree_sitter::Node;
 
 /// Scheme language support.
@@ -122,9 +124,88 @@ impl Language for Scheme {
         }
         None
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: SchemeModuleResolver = SchemeModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Scheme {}
+
+// =============================================================================
+// Scheme Module Resolver
+// =============================================================================
+
+/// Module resolver for Scheme (R7RS library conventions).
+///
+/// `(import (mylib utils))` → `mylib/utils.sld` or `mylib/utils.scm`.
+/// The `ImportSpec.raw` is stored as "import" by the current extractor (too basic),
+/// so for now we only resolve when a proper module path is passed.
+pub struct SchemeModuleResolver;
+
+impl ModuleResolver for SchemeModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: vec![root.to_path_buf()],
+        }
+    }
+
+    fn module_of_file(&self, root: &Path, file: &Path, _cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "scm" && ext != "ss" && ext != "sld" {
+            return Vec::new();
+        }
+        if let Ok(rel) = file.strip_prefix(root) {
+            let rel_str = rel.to_str().unwrap_or("");
+            let module = rel_str
+                .trim_end_matches(".sld")
+                .trim_end_matches(".scm")
+                .trim_end_matches(".ss")
+                .replace('/', " ");
+            if !module.is_empty() {
+                return vec![ModuleId {
+                    canonical_path: format!("({})", module),
+                }];
+            }
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "scm" && ext != "ss" && ext != "sld" && ext != "rkt" {
+            return Resolution::NotApplicable;
+        }
+        let raw = &spec.raw;
+
+        // The current extractor stores "import" as raw — not resolvable
+        if raw == "import" || raw == "require" {
+            return Resolution::NotFound;
+        }
+
+        // Try to handle R7RS-style: "(mylib utils)" → mylib/utils.sld or .scm
+        let normalized = raw.trim_start_matches('(').trim_end_matches(')');
+        let path_part = normalized.replace(' ', "/");
+        let exported_name = normalized
+            .rsplit(' ')
+            .next()
+            .unwrap_or(normalized)
+            .to_string();
+
+        for ext_try in &["sld", "scm", "ss"] {
+            let candidate = cfg
+                .workspace_root
+                .join(format!("{}.{}", path_part, ext_try));
+            if candidate.exists() {
+                return Resolution::Resolved(candidate, exported_name.clone());
+            }
+        }
+        Resolution::NotFound
+    }
+}
 
 #[cfg(test)]
 mod tests {

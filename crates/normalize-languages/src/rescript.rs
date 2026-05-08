@@ -1,6 +1,8 @@
 //! ReScript language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{ContainerBody, Import, Language, LanguageSymbols};
+use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// ReScript language support.
@@ -63,9 +65,124 @@ impl Language for ReScript {
     ) -> Option<ContainerBody> {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: ReScriptModuleResolver = ReScriptModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for ReScript {}
+
+// =============================================================================
+// ReScript Module Resolver
+// =============================================================================
+
+/// Module resolver for ReScript (BuckleScript/rescript-lang conventions).
+///
+/// ReScript module name = capitalized filename stem.
+/// `open MyModule` → `MyModule.res` or `MyModule.resi` in source directories.
+pub struct ReScriptModuleResolver;
+
+impl ModuleResolver for ReScriptModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        let mut search_roots: Vec<PathBuf> = Vec::new();
+
+        // Parse bsconfig.json or rescript.json for "sources"
+        for config_name in &["bsconfig.json", "rescript.json"] {
+            let config_path = root.join(config_name);
+            if let Ok(content) = std::fs::read_to_string(&config_path)
+                && let Ok(json) = serde_json::from_str::<serde_json::Value>(&content)
+                && let Some(sources) = json.get("sources")
+            {
+                match sources {
+                    serde_json::Value::String(s) => {
+                        let dir = root.join(s);
+                        if dir.is_dir() {
+                            search_roots.push(dir);
+                        }
+                    }
+                    serde_json::Value::Array(arr) => {
+                        for item in arr {
+                            let dir_str = item
+                                .as_str()
+                                .or_else(|| item.get("dir").and_then(|d| d.as_str()));
+                            if let Some(dir_s) = dir_str {
+                                let dir = root.join(dir_s);
+                                if dir.is_dir() {
+                                    search_roots.push(dir);
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                break;
+            }
+        }
+
+        if search_roots.is_empty() {
+            // Defaults: src/, lib/, root
+            for d in &["src", "lib"] {
+                let dir = root.join(d);
+                if dir.is_dir() {
+                    search_roots.push(dir);
+                }
+            }
+            search_roots.push(root.to_path_buf());
+        }
+
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots,
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, _cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "res" && ext != "resi" {
+            return Vec::new();
+        }
+        if let Some(stem) = file.file_stem().and_then(|s| s.to_str()) {
+            // Capitalize first letter for module name
+            let module_name = {
+                let mut chars = stem.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+                }
+            };
+            return vec![ModuleId {
+                canonical_path: module_name,
+            }];
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "res" && ext != "resi" {
+            return Resolution::NotApplicable;
+        }
+        let raw = &spec.raw;
+        // Strip "open " prefix
+        let module_name = raw.strip_prefix("open ").unwrap_or(raw).trim();
+        if module_name.is_empty() {
+            return Resolution::NotFound;
+        }
+
+        for search_root in &cfg.search_roots {
+            for ext_try in &["res", "resi"] {
+                let candidate = search_root.join(format!("{}.{}", module_name, ext_try));
+                if candidate.exists() {
+                    return Resolution::Resolved(candidate, module_name.to_string());
+                }
+            }
+        }
+        Resolution::NotFound
+    }
+}
 
 #[cfg(test)]
 mod tests {

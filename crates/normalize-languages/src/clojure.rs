@@ -1,6 +1,8 @@
 //! Clojure language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use std::path::Path;
 use tree_sitter::Node;
 
 /// Clojure language support.
@@ -121,9 +123,84 @@ impl Language for Clojure {
         }
         None
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: ClojureModuleResolver = ClojureModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Clojure {}
+
+// =============================================================================
+// Clojure Module Resolver
+// =============================================================================
+
+/// Module resolver for Clojure.
+///
+/// `(ns myapp.core (:require [myapp.utils :as u]))` → `raw = "myapp.utils"`.
+/// `myapp.utils` → `myapp/utils.clj` (or `.cljs`, `.cljc`) under `src/` or `test/`.
+pub struct ClojureModuleResolver;
+
+impl ModuleResolver for ClojureModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: vec![root.join("src"), root.join("test"), root.to_path_buf()],
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "clj" && ext != "cljs" && ext != "cljc" {
+            return Vec::new();
+        }
+        for search_root in &cfg.search_roots {
+            if let Ok(rel) = file.strip_prefix(search_root) {
+                let module = rel
+                    .to_str()
+                    .unwrap_or("")
+                    .trim_end_matches(".cljc")
+                    .trim_end_matches(".cljs")
+                    .trim_end_matches(".clj")
+                    .replace('/', ".")
+                    .replace('_', "-"); // Clojure: my_utils.clj → my-utils
+                if !module.is_empty() {
+                    return vec![ModuleId {
+                        canonical_path: module,
+                    }];
+                }
+            }
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "clj" && ext != "cljs" && ext != "cljc" {
+            return Resolution::NotApplicable;
+        }
+        let raw = &spec.raw;
+        // Skip generic form names
+        if raw == "require" || raw == "use" || raw == "import" || raw == "ns" {
+            return Resolution::NotFound;
+        }
+        // Convert namespace to path: myapp.utils → myapp/utils.clj
+        let path_part = raw.replace('.', "/").replace('-', "_");
+        let exported_name = raw.rsplit('.').next().unwrap_or(raw).to_string();
+
+        for search_root in &cfg.search_roots {
+            for ext_try in &["clj", "cljs", "cljc"] {
+                let candidate = search_root.join(format!("{}.{}", path_part, ext_try));
+                if candidate.exists() {
+                    return Resolution::Resolved(candidate, exported_name);
+                }
+            }
+        }
+        Resolution::NotFound
+    }
+}
 
 impl Clojure {
     /// Extract the form name and symbol name from a list like (defn foo ...)
