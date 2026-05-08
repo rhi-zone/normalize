@@ -1,7 +1,9 @@
 //! Dart language support.
 
 use crate::docstring::extract_preceding_prefix_comments;
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// Dart language support.
@@ -231,9 +233,133 @@ impl Language for Dart {
     ) -> Option<ContainerBody> {
         crate::body::analyze_brace_body(body_node, content, inner_indent)
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: DartModuleResolver = DartModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Dart {}
+
+// =============================================================================
+// Dart Module Resolver
+// =============================================================================
+
+/// Module resolver for Dart (pub package conventions).
+///
+/// Reads `pubspec.yaml` to find the package name. Resolves:
+/// - `package:mypackage/src/foo.dart` → `lib/src/foo.dart`
+/// - `dart:core` etc. → `NotFound` (SDK)
+/// - relative imports → resolved relative to `from_file`
+pub struct DartModuleResolver;
+
+impl ModuleResolver for DartModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        let mut path_mappings: Vec<(String, PathBuf)> = Vec::new();
+
+        let pubspec = root.join("pubspec.yaml");
+        if let Ok(content) = std::fs::read_to_string(&pubspec) {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if let Some(rest) = trimmed.strip_prefix("name:") {
+                    let name = rest.trim().trim_matches('"').trim_matches('\'');
+                    if !name.is_empty() {
+                        path_mappings.push((name.to_string(), root.join("lib")));
+                        break;
+                    }
+                }
+            }
+        }
+
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings,
+            search_roots: vec![root.join("lib")],
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "dart" {
+            return Vec::new();
+        }
+        for (pkg_name, lib_dir) in &cfg.path_mappings {
+            if let Ok(rel) = file.strip_prefix(lib_dir) {
+                let rel_str = rel.to_str().unwrap_or("").replace('\\', "/");
+                let canonical = format!("package:{}/{}", pkg_name, rel_str);
+                return vec![ModuleId {
+                    canonical_path: canonical,
+                }];
+            }
+        }
+        // file under workspace root but not lib/
+        if let Ok(rel) = file.strip_prefix(&cfg.workspace_root) {
+            return vec![ModuleId {
+                canonical_path: rel.to_str().unwrap_or("").replace('\\', "/"),
+            }];
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "dart" {
+            return Resolution::NotApplicable;
+        }
+        let raw = &spec.raw;
+
+        // dart: SDK imports
+        if raw.starts_with("dart:") {
+            return Resolution::NotFound;
+        }
+
+        // Relative imports
+        if raw.starts_with('.') {
+            if let Some(parent) = from_file.parent() {
+                let resolved = parent.join(raw);
+                if resolved.exists() {
+                    let name = resolved
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("")
+                        .to_string();
+                    return Resolution::Resolved(resolved, name);
+                }
+            }
+            return Resolution::NotFound;
+        }
+
+        // package: imports
+        if let Some(rest) = raw.strip_prefix("package:") {
+            // package:pkgname/path/to/file.dart
+            let slash = rest.find('/');
+            let (pkg, path_in_pkg) = if let Some(idx) = slash {
+                (&rest[..idx], &rest[idx + 1..])
+            } else {
+                (rest, "")
+            };
+
+            // Check if it's our own package
+            for (own_pkg, lib_dir) in &cfg.path_mappings {
+                if pkg == own_pkg {
+                    let candidate = lib_dir.join(path_in_pkg);
+                    if candidate.exists() {
+                        let name = candidate
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("")
+                            .to_string();
+                        return Resolution::Resolved(candidate, name);
+                    }
+                    return Resolution::NotFound;
+                }
+            }
+        }
+
+        Resolution::NotFound
+    }
+}
 
 /// Extract Dart annotations from child and preceding sibling nodes.
 fn extract_dart_annotations(node: &Node, content: &str) -> Vec<String> {

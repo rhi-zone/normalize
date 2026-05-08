@@ -1,6 +1,8 @@
 //! Swift language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{ContainerBody, Import, Language, LanguageSymbols, Visibility};
+use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 /// Swift language support.
@@ -283,9 +285,100 @@ impl Language for Swift {
     fn test_file_globs(&self) -> &'static [&'static str] {
         &["**/*Tests.swift", "**/*Test.swift"]
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: SwiftModuleResolver = SwiftModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Swift {}
+
+// =============================================================================
+// Swift Module Resolver
+// =============================================================================
+
+/// Module resolver for Swift (Swift Package Manager conventions).
+///
+/// Each target in `Sources/<TargetName>/` is a module.
+/// `import TargetName` → `Sources/TargetName/` directory.
+pub struct SwiftModuleResolver;
+
+impl ModuleResolver for SwiftModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        let mut path_mappings: Vec<(String, PathBuf)> = Vec::new();
+
+        let package_swift = root.join("Package.swift");
+        if let Ok(content) = std::fs::read_to_string(&package_swift) {
+            // Parse `.target(name: "TargetName"` patterns
+            let mut search_start = 0;
+            while let Some(pos) = content[search_start..].find(".target(name:") {
+                let abs_pos = search_start + pos;
+                let after = &content[abs_pos + 13..]; // after ".target(name:"
+                // Find the quoted name
+                if let Some(q_start) = after.find('"') {
+                    let rest = &after[q_start + 1..];
+                    if let Some(q_end) = rest.find('"') {
+                        let target_name = &rest[..q_end];
+                        let target_dir = root.join("Sources").join(target_name);
+                        path_mappings.push((target_name.to_string(), target_dir));
+                    }
+                }
+                search_start = abs_pos + 13;
+            }
+        }
+
+        // If no Package.swift or no targets found, scan Sources/ for directories
+        if path_mappings.is_empty() {
+            let sources_dir = root.join("Sources");
+            if let Ok(entries) = std::fs::read_dir(&sources_dir) {
+                for entry in entries.flatten() {
+                    if entry.path().is_dir()
+                        && let Some(name) = entry.file_name().to_str()
+                    {
+                        path_mappings.push((name.to_string(), entry.path()));
+                    }
+                }
+            }
+        }
+
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings,
+            search_roots: vec![root.join("Sources")],
+        }
+    }
+
+    fn module_of_file(&self, _root: &Path, file: &Path, cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "swift" {
+            return Vec::new();
+        }
+        for (target_name, target_dir) in &cfg.path_mappings {
+            if file.starts_with(target_dir) {
+                return vec![ModuleId {
+                    canonical_path: target_name.clone(),
+                }];
+            }
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "swift" {
+            return Resolution::NotApplicable;
+        }
+        let raw = &spec.raw;
+        // Swift `import TargetName` → look in path_mappings
+        for (target_name, target_dir) in &cfg.path_mappings {
+            if target_name == raw {
+                return Resolution::Resolved(target_dir.clone(), String::new());
+            }
+        }
+        Resolution::NotFound
+    }
+}
 
 #[cfg(test)]
 mod tests {

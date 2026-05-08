@@ -1,6 +1,8 @@
 //! Zig language support.
 
+use crate::traits::{ImportSpec, ModuleId, ModuleResolver, Resolution, ResolverConfig};
 use crate::{Import, Language, LanguageSymbols, Visibility};
+use std::path::Path;
 use tree_sitter::Node;
 
 /// Zig language support.
@@ -95,9 +97,74 @@ impl Language for Zig {
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")
     }
+
+    fn module_resolver(&self) -> Option<&dyn ModuleResolver> {
+        static RESOLVER: ZigModuleResolver = ZigModuleResolver;
+        Some(&RESOLVER)
+    }
 }
 
 impl LanguageSymbols for Zig {}
+
+// =============================================================================
+// Zig Module Resolver
+// =============================================================================
+
+/// Module resolver for Zig.
+///
+/// Zig uses `@import("path.zig")` for file imports. Relative paths are resolved
+/// relative to the importing file. `@import("std")` and other named imports
+/// return `NotFound`.
+pub struct ZigModuleResolver;
+
+impl ModuleResolver for ZigModuleResolver {
+    fn workspace_config(&self, root: &Path) -> ResolverConfig {
+        ResolverConfig {
+            workspace_root: root.to_path_buf(),
+            path_mappings: Vec::new(),
+            search_roots: vec![root.to_path_buf()],
+        }
+    }
+
+    fn module_of_file(&self, root: &Path, file: &Path, _cfg: &ResolverConfig) -> Vec<ModuleId> {
+        let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "zig" {
+            return Vec::new();
+        }
+        if let Ok(rel) = file.strip_prefix(root) {
+            let rel_str = rel.to_str().unwrap_or("").replace('\\', "/");
+            return vec![ModuleId {
+                canonical_path: rel_str,
+            }];
+        }
+        Vec::new()
+    }
+
+    fn resolve(&self, from_file: &Path, spec: &ImportSpec, _cfg: &ResolverConfig) -> Resolution {
+        let ext = from_file.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "zig" {
+            return Resolution::NotApplicable;
+        }
+        let raw = &spec.raw;
+        // Named imports (std, builtin, etc.) — not resolvable to files
+        if !raw.starts_with('.') && !raw.ends_with(".zig") {
+            return Resolution::NotFound;
+        }
+        // Relative path import
+        if let Some(parent) = from_file.parent() {
+            let resolved = parent.join(raw);
+            if resolved.exists() {
+                let name = resolved
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string();
+                return Resolution::Resolved(resolved, name);
+            }
+        }
+        Resolution::NotFound
+    }
+}
 
 #[cfg(test)]
 mod tests {
