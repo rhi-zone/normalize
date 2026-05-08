@@ -1953,6 +1953,91 @@ impl FileIndex {
         Ok(resolved_count)
     }
 
+    /// Resolve import specifiers using per-language `ModuleResolver` implementations.
+    ///
+    /// Runs after `resolve_all_imports` as a second pass: for any import row that still
+    /// has `resolved_file IS NULL`, look up the language's `ModuleResolver` and call
+    /// `resolve()` directly. Updates `resolved_file` on successful resolutions.
+    ///
+    /// Uses the workspace root to build `ResolverConfig` once per language, then
+    /// resolves all pending imports for that language's files.
+    pub async fn resolve_imports_via_module_resolver(&self) -> Result<usize, libsql::Error> {
+        use normalize_languages::{ImportSpec, Resolution, support_for_path};
+        use std::collections::HashMap;
+
+        // Collect pending imports: (file, module, name)
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT file, module, name FROM imports WHERE module IS NOT NULL AND resolved_file IS NULL",
+                (),
+            )
+            .await?;
+        let mut pending: Vec<(String, String, String)> = Vec::new();
+        while let Some(row) = rows.next().await? {
+            let module: Option<String> = row.get(1)?;
+            if let Some(module) = module {
+                pending.push((row.get(0)?, module, row.get(2)?));
+            }
+        }
+
+        if pending.is_empty() {
+            return Ok(0);
+        }
+
+        // Build resolver configs keyed by language name (cache per workspace)
+        let mut resolver_configs: HashMap<&'static str, normalize_languages::ResolverConfig> =
+            HashMap::new();
+
+        let mut resolved_count = 0usize;
+        for (file_str, module_str, name_str) in &pending {
+            let file_path = self.root.join(file_str);
+            let lang = match support_for_path(&file_path) {
+                Some(l) => l,
+                None => continue,
+            };
+            let resolver = match lang.module_resolver() {
+                Some(r) => r,
+                None => continue,
+            };
+
+            let cfg = resolver_configs
+                .entry(lang.name())
+                .or_insert_with(|| resolver.workspace_config(&self.root));
+
+            let spec = ImportSpec {
+                raw: module_str.clone(),
+                is_relative: module_str.starts_with('.'),
+                names: if name_str == "*" {
+                    Vec::new()
+                } else {
+                    vec![name_str.clone()]
+                },
+                is_glob: name_str == "*",
+            };
+
+            if let Resolution::Resolved(resolved_path, _) = resolver.resolve(&file_path, &spec, cfg)
+            {
+                // Convert absolute resolved path to root-relative string
+                let resolved_rel = resolved_path
+                    .strip_prefix(&self.root)
+                    .unwrap_or(&resolved_path)
+                    .to_string_lossy()
+                    .to_string();
+
+                self.conn
+                    .execute(
+                        "UPDATE imports SET resolved_file = ?1 WHERE file = ?2 AND module = ?3 AND name = ?4 AND resolved_file IS NULL",
+                        libsql::params![resolved_rel, file_str.clone(), module_str.clone(), name_str.clone()],
+                    )
+                    .await?;
+                resolved_count += 1;
+            }
+        }
+
+        Ok(resolved_count)
+    }
+
     /// Follow re-export chains to resolve imports to their ultimate source file.
     ///
     /// When file A imports `Foo` from file B, but file B re-exports `Foo` from file C
@@ -2641,6 +2726,16 @@ impl FileIndex {
             tracing::warn!("normalize-facts: resolve_all_imports error: {}", e);
             0
         });
+        // Second pass: use per-language ModuleResolver for remaining unresolved imports.
+        self.resolve_imports_via_module_resolver()
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!(
+                    "normalize-facts: resolve_imports_via_module_resolver error: {}",
+                    e
+                );
+                0
+            });
         // Follow re-export chains so imports resolve to ultimate source files.
         self.trace_reexports().await.unwrap_or_else(|e| {
             tracing::warn!("normalize-facts: trace_reexports error: {}", e);
@@ -2913,6 +3008,16 @@ impl FileIndex {
             tracing::warn!("normalize-facts: resolve_all_imports error: {}", e);
             0
         });
+        // Second pass: use per-language ModuleResolver for remaining unresolved imports.
+        self.resolve_imports_via_module_resolver()
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!(
+                    "normalize-facts: resolve_imports_via_module_resolver error: {}",
+                    e
+                );
+                0
+            });
         // Follow re-export chains so imports resolve to ultimate source files.
         self.trace_reexports().await.unwrap_or_else(|e| {
             tracing::warn!("normalize-facts: trace_reexports error: {}", e);
@@ -2965,6 +3070,15 @@ impl FileIndex {
             tracing::warn!("normalize-facts: resolve_all_imports error: {}", e);
             0
         });
+        self.resolve_imports_via_module_resolver()
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!(
+                    "normalize-facts: resolve_imports_via_module_resolver error: {}",
+                    e
+                );
+                0
+            });
         self.trace_reexports().await.unwrap_or_else(|e| {
             tracing::warn!("normalize-facts: trace_reexports error: {}", e);
             0
