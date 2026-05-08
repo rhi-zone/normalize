@@ -73,14 +73,14 @@ via LSP. Phase design is in the sections below.
 - [ ] `normalize find-references --cross-file` command (depends on `structure rebuild`)
 - [ ] Cross-file rename using resolved references (depends on confidence-tagged references)
 - [ ] **C/C++/ObjC resolvers** — `#include` resolution requires `compile_commands.json` (compiler `-I` flags). Design needed: read `compile_commands.json` at workspace root; map each source file's include search paths; resolve `#include "foo.h"` against them. Blocking because C/C++ are among the most-used supported languages.
-- [ ] **Elm resolver** — simple module system (`import Html.Attributes` → `Html/Attributes.elm` under `src/`). No design unknowns, just not done.
-- [ ] **D resolver** — `import mypackage.utils` → `mypackage/utils.d` under `source/` or `src/`. Dub package manager (`dub.json`/`dub.sdl`).
-- [ ] **R resolver** — `source("./utils.R")` (relative, like Ruby `require_relative`) + `library(pkg)` (NotFound). Simple.
-- [ ] **Julia resolver** — `include("utils.jl")` (relative file include) + `using MyModule` (package, NotFound unless in workspace). Simple relative case only.
-- [ ] **MATLAB resolver** — `addpath`/function-file convention (one function per `.m` file, filename = function name). No explicit import syntax; `module_of_file` maps filename stem to function name.
+- [x] **Elm resolver** — `import Html.Attributes` → `Html/Attributes.elm` under source dirs from `elm.json`.
+- [x] **D resolver** — `import mypackage.utils` → `mypackage/utils.d` under `source/` or `src/`. Reads `dub.json` `sourcePaths`.
+- [x] **R resolver** — `source("./utils.R")` (relative file load) + `library(pkg)` (NotFound).
+- [x] **Julia resolver** — `include("utils.jl")` (relative file include) + `using MyModule` (workspace package lookup via `Project.toml`).
+- [x] **MATLAB resolver** — filename stem = function name; searches workspace root + `src/` + `lib/`.
+- [x] **Prolog resolver** — relative `use_module('./utils')`, bare name search, `library(...)` → NotFound.
+- [x] **Nix resolver** — `import ./utils.nix` relative path resolution; `<nixpkgs>` → NotFound.
 - [ ] **Ada, Agda, Idris, Lean** — niche; design needs investigation. Add resolvers or explicitly document as NotApplicable with rationale. Not NotApplicable by default silence.
-- [ ] **Prolog** — `:- use_module(library(lists))` / `:- use_module('./utils')`. Relative case is tractable; library case is NotFound.
-- [ ] **Nix** — `import ./utils.nix` is a direct file path (trivially resolvable); `builtins.fetchGit` etc. are NotFound. The simple relative case is easy.
 
 ## 0.3.x post-release follow-ups (advisory)
 

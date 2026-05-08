@@ -693,6 +693,20 @@ fn module_resolver_coverage_matrix() {
         (&normalize_languages::Gleam, "Gleam"),
         #[cfg(feature = "lang-rescript")]
         (&normalize_languages::ReScript, "ReScript"),
+        #[cfg(feature = "lang-elm")]
+        (&normalize_languages::Elm, "Elm"),
+        #[cfg(feature = "lang-nix")]
+        (&normalize_languages::Nix, "Nix"),
+        #[cfg(feature = "lang-r")]
+        (&normalize_languages::R, "R"),
+        #[cfg(feature = "lang-julia")]
+        (&normalize_languages::Julia, "Julia"),
+        #[cfg(feature = "lang-matlab")]
+        (&normalize_languages::Matlab, "MATLAB"),
+        #[cfg(feature = "lang-prolog")]
+        (&normalize_languages::Prolog, "Prolog"),
+        #[cfg(feature = "lang-d")]
+        (&normalize_languages::D, "D"),
     ];
 
     for (lang, name) in has_resolver {
@@ -751,8 +765,5 @@ fn module_resolver_coverage_matrix() {
 
     // DEFERRED languages (module system exists but resolver is None for now):
     // C, C++, ObjC — preprocessor #include; no standard package mapping without toolchain
-    // Nix — flake/nixpkgs paths require nix evaluation
-    // D, Ada, Agda, Idris, Lean, Elm — niche; resolver not yet implemented
-    // R, Julia, MATLAB — language server typically handles imports; file paths vary
-    // Prolog — module system varies by implementation
+    // Ada, Agda, Idris, Lean — niche; resolver not yet implemented
 }
