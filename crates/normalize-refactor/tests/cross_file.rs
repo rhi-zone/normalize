@@ -1,10 +1,10 @@
-//! Cross-file name resolution tests using RustModuleResolver.
+//! Cross-file name resolution tests.
 //!
-//! These tests exercise the ModuleResolver trait directly against the
-//! `tests/fixtures/xfile/rust/` fixture: a 3-file Cargo crate with
-//! `utils.rs`, `models.rs`, and `main.rs`.
+//! Tests ModuleResolver implementations for Rust and TypeScript
+//! against fixture directories under `tests/fixtures/xfile/`.
 
 use normalize_languages::rust::RustModuleResolver;
+use normalize_languages::typescript::TsModuleResolver;
 use normalize_languages::{ImportSpec, ModuleResolver, Resolution};
 use std::path::PathBuf;
 
@@ -195,4 +195,92 @@ fn resolve_non_rs_file_returns_not_applicable() {
     };
     let resolution = resolver.resolve(&from, &spec, &cfg);
     assert!(matches!(resolution, Resolution::NotApplicable));
+}
+
+// =============================================================================
+// TypeScript resolver tests
+// =============================================================================
+
+fn ts_fixture_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/xfile/typescript")
+}
+
+#[test]
+fn ts_resolve_relative_import() {
+    let root = ts_fixture_root();
+    let resolver = TsModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let from = root.join("models.ts");
+    let spec = ImportSpec {
+        raw: "./utils".to_string(),
+        is_relative: true,
+        names: vec!["greet".to_string()],
+        is_glob: false,
+    };
+    match resolver.resolve(&from, &spec, &cfg) {
+        Resolution::Resolved(path, _) => {
+            assert_eq!(path, root.join("utils.ts"));
+        }
+        other => panic!(
+            "expected Resolved, got {:?}",
+            std::mem::discriminant(&other)
+        ),
+    }
+}
+
+#[test]
+fn ts_resolve_js_extension_elision() {
+    // TypeScript allows importing ./utils.js which resolves to ./utils.ts
+    let root = ts_fixture_root();
+    let resolver = TsModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let from = root.join("index.ts");
+    let spec = ImportSpec {
+        raw: "./utils.js".to_string(),
+        is_relative: true,
+        names: vec!["greet".to_string()],
+        is_glob: false,
+    };
+    match resolver.resolve(&from, &spec, &cfg) {
+        Resolution::Resolved(path, _) => {
+            assert_eq!(path, root.join("utils.ts"));
+        }
+        other => panic!(
+            "expected Resolved (via .js elision), got {:?}",
+            std::mem::discriminant(&other)
+        ),
+    }
+}
+
+#[test]
+fn ts_not_applicable_for_non_ts_file() {
+    let root = ts_fixture_root();
+    let resolver = TsModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let from = root.join("app.js");
+    let spec = ImportSpec {
+        raw: "./utils".to_string(),
+        is_relative: true,
+        names: Vec::new(),
+        is_glob: false,
+    };
+    assert!(matches!(
+        resolver.resolve(&from, &spec, &cfg),
+        Resolution::NotApplicable
+    ));
+}
+
+#[test]
+fn ts_module_of_file() {
+    let root = ts_fixture_root();
+    let resolver = TsModuleResolver;
+    let cfg = resolver.workspace_config(&root);
+
+    let file = root.join("utils.ts");
+    let modules = resolver.module_of_file(&root, &file, &cfg);
+    assert_eq!(modules.len(), 1);
+    assert_eq!(modules[0].canonical_path, "utils");
 }

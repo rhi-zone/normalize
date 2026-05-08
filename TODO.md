@@ -53,17 +53,21 @@ type inference proper. Hybrid is plausible but complicates the story.
 - [x] New crate `normalize-module-resolve`
 - [x] `resolution.dl` Datalog rules
 
-**Follow-up language resolvers (not yet started):**
+**Follow-up language resolvers (committed):**
 - [x] Rust `RustModuleResolver` (Commit 2) — workspace_config/module_of_file/resolve for Cargo workspaces
-- [ ] TypeScript/JavaScript resolver — tsconfig.json paths, node_modules, relative imports
-- [ ] Python resolver — sys.path, relative imports, `__init__.py` modules
-- [ ] Go resolver — go.mod module paths
-- [ ] Ruby resolver — require_relative, gem paths
+- [x] TypeScript/TSX `TsModuleResolver` — relative imports, tsconfig.json paths/baseUrl, .js→.ts elision
+- [x] JavaScript `JsModuleResolver` — relative imports, jsconfig.json paths, ESM/CJS
+- [x] Python `PythonModuleResolver` — relative imports, src/ layout, `__init__.py` package detection
+- [x] Go `GoModuleResolver` — go.mod module path, directory-based package resolution
+- [x] Ruby `RubyModuleResolver` — require_relative, NotFound for bare require (gems)
 
-**After resolvers land:**
-- [ ] Wire resolvers into `normalize structure rebuild` pipeline (Commit 3)
-- [ ] `normalize find-references --cross-file` command
-- [ ] Cross-file rename using resolved references
+**Pipeline and refactor integration (committed):**
+- [x] Wire resolvers into `normalize structure rebuild` pipeline — `resolve_imports_via_module_resolver()` pass after `resolve_all_imports()` in full rebuild and incremental update
+- [x] Tag `find_references` results with `confidence: "resolved" | "heuristic"` based on language resolver availability
+
+**Phase 0 complete. Remaining open questions:**
+- [ ] `normalize find-references --cross-file` command (depends on `structure rebuild`)
+- [ ] Cross-file rename using resolved references (depends on confidence-tagged references)
 
 ## 0.3.x post-release follow-ups (advisory)
 
