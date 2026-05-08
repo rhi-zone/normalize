@@ -128,6 +128,51 @@ exclude = [
     let gitignore_changes = update_gitignore(&gitignore_path);
     changes.extend(gitignore_changes);
 
+    // 3b. First-run grammar install. Always attempted from `init`; the
+    //     helper short-circuits if the stamp already exists or the user
+    //     already has grammars in place. In TTY mode where the helper would
+    //     normally defer, we treat `init` as the explicit prompt point and
+    //     trigger an install here too.
+    use crate::commands::grammars::{GrammarsFirstRun, ensure_grammars_first_use};
+    let mut outcome = ensure_grammars_first_use();
+    if matches!(outcome, GrammarsFirstRun::SkippedInteractive) {
+        eprintln!("Installing tree-sitter grammars (first-time setup)...");
+        let pretty = std::cell::Cell::new(false);
+        let service = crate::service::grammars::GrammarService::new(&pretty);
+        outcome = match service.install(None, false, false) {
+            Ok(report) => {
+                let dir = dirs::config_dir().map(|c| c.join("normalize/grammars"));
+                if let Some(dir) = dir {
+                    let _ = fs::create_dir_all(&dir);
+                    let _ = fs::write(
+                        dir.join(".installed-version"),
+                        format!(
+                            "{}\n",
+                            report.version.clone().unwrap_or_else(|| "unknown".into())
+                        ),
+                    );
+                }
+                GrammarsFirstRun::AutoInstalled {
+                    count: report.count,
+                }
+            }
+            Err(error) => GrammarsFirstRun::Failed { error },
+        };
+    }
+    match outcome {
+        GrammarsFirstRun::AutoInstalled { count } => {
+            changes.push(format!("Installed {count} tree-sitter grammars"));
+        }
+        GrammarsFirstRun::PreInstalled => {
+            changes.push("Detected existing tree-sitter grammars".to_string());
+        }
+        GrammarsFirstRun::Failed { error } => {
+            eprintln!("warning: grammar install failed: {error}");
+            eprintln!("    Run `normalize grammars install` manually to retry.");
+        }
+        _ => {}
+    }
+
     // 4. Report changes
     if changes.is_empty() {
         println!("Already initialized.");

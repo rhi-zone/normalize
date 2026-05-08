@@ -6,6 +6,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **First-run grammar install.** The first time a user runs any
+  `normalize` subcommand other than `grammars`/`--help`/`--version`,
+  `normalize` checks whether tree-sitter grammars are installed in the
+  user's config directory (`~/.config/normalize/grammars/`). If not, and
+  the session is non-interactive (piped or driven by an agent), grammars
+  are downloaded and installed automatically with a stderr notice. In an
+  interactive session the check is deferred to `normalize init`, which
+  prompts implicitly by installing on first invocation. Subsequent
+  invocations short-circuit on a `.installed-version` stamp file, so the
+  check has zero cost after first use. Users who already have a populated
+  grammar directory (e.g. from `cargo xtask build-grammars` or
+  `NORMALIZE_GRAMMAR_PATH`) are detected and stamped without a download.
+
 ### Changed
 
 - **All tree-sitter grammars now load uniformly via `dlopen()`.** Previously

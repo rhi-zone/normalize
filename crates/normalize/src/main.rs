@@ -1,3 +1,25 @@
+/// Return true if the first-run grammar check should be skipped for this
+/// invocation. Skips for `grammars` subcommands (they manage their own
+/// install) and for help/version/schema flags.
+fn should_skip_grammar_check(argv: &[std::ffi::OsString]) -> bool {
+    let sub = argv.get(1).and_then(|s| s.to_str()).unwrap_or("");
+    if matches!(sub, "grammars") {
+        return true;
+    }
+    argv.iter().skip(1).filter_map(|s| s.to_str()).any(|s| {
+        matches!(
+            s,
+            "--help"
+                | "-h"
+                | "--version"
+                | "-V"
+                | "--input-schema"
+                | "--output-schema"
+                | "--schema"
+        )
+    })
+}
+
 /// Return true if daemon auto-start should be skipped for this invocation.
 ///
 /// Skips when:
@@ -165,6 +187,15 @@ async fn main() -> std::process::ExitCode {
     if !should_skip_daemon_autostart(&argv) {
         let root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
         normalize::daemon::maybe_start_daemon(&root);
+    }
+
+    // First-run grammar check: if grammars have never been installed and
+    // we're running non-interactively, auto-install. The check is gated on
+    // a stamp file so it runs at most once per user. Skipped for the
+    // grammars subcommand itself (it manages its own install) and for
+    // informational flags.
+    if !should_skip_grammar_check(&argv) {
+        let _ = normalize::commands::grammars::ensure_grammars_first_use();
     }
 
     // Rewrite command aliases so users from other tools find what they expect.

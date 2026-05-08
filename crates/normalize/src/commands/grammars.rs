@@ -2,7 +2,8 @@
 
 use crate::output::OutputFormatter;
 use serde::Serialize;
-use std::path::PathBuf;
+use std::io::IsTerminal;
+use std::path::{Path, PathBuf};
 
 /// A single grammar entry with its name and file path.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -73,6 +74,120 @@ impl OutputFormatter for GrammarPathsReport {
             lines.push(format!("  [{}] {}{}", item.source, item.path, exists));
         }
         lines.join("\n")
+    }
+}
+
+/// Stamp file written to the user's grammar install directory once we've
+/// either downloaded grammars on the user's behalf, or confirmed an existing
+/// install. Its presence is the signal "we've checked; don't auto-install
+/// again on every command." Format: a single line containing the version (or
+/// `prebuilt` when the dir was already populated by `xtask build-grammars`).
+const INSTALLED_STAMP: &str = ".installed-version";
+
+/// Where grammars are auto-installed for the current user.
+fn user_grammars_dir() -> Option<PathBuf> {
+    dirs::config_dir().map(|c| c.join("normalize/grammars"))
+}
+
+/// Returns true if the user grammars directory has at least one `.so`/`.dylib`/`.dll`.
+fn dir_has_grammars(dir: &Path) -> bool {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return false;
+    };
+    entries.flatten().any(|e| {
+        e.path()
+            .extension()
+            .and_then(|s| s.to_str())
+            .is_some_and(|ext| matches!(ext, "so" | "dylib" | "dll"))
+    })
+}
+
+/// Mark the user grammar install dir as "checked" so we don't re-attempt
+/// auto-install on every invocation. Best-effort; failures are silent because
+/// the worst case is "we re-check next time."
+fn write_installed_stamp(dir: &Path, marker: &str) {
+    let _ = std::fs::create_dir_all(dir);
+    let _ = std::fs::write(dir.join(INSTALLED_STAMP), marker);
+}
+
+/// Outcome of a first-run grammar check, reported back to the caller so it
+/// can decide whether to proceed (e.g. `init` may want to print a notice).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GrammarsFirstRun {
+    /// Stamp file existed; nothing to do.
+    AlreadyChecked,
+    /// Grammars were already in place (e.g. from a workspace build); we
+    /// only wrote the stamp file so future invocations short-circuit.
+    PreInstalled,
+    /// We auto-installed grammars on the user's behalf (non-TTY mode).
+    AutoInstalled { count: usize },
+    /// Grammars are missing and we did not install (TTY mode — leave it to
+    /// the user / `init` to prompt).
+    SkippedInteractive,
+    /// Auto-install was attempted but failed; the user will see the usual
+    /// "run `normalize grammars install`" warning later.
+    Failed { error: String },
+    /// User config dir could not be determined.
+    NoConfigDir,
+}
+
+/// Lightweight first-use grammar check.
+///
+/// Behaviour:
+/// 1. If the install stamp exists, returns immediately.
+/// 2. Otherwise, if the grammar dir already contains shared libraries (e.g.
+///    a developer ran `cargo xtask build-grammars`), write the stamp and
+///    return `PreInstalled`.
+/// 3. Otherwise, in non-interactive sessions auto-install with a stderr
+///    notice.
+/// 4. Otherwise (TTY), do nothing — `normalize init` and missing-grammar
+///    warnings will guide the user.
+///
+/// This is meant to be called at most once per process, before any command
+/// that needs grammars runs. Calling it on `--help`, `--version`, etc. is
+/// harmless but pointless.
+pub fn ensure_grammars_first_use() -> GrammarsFirstRun {
+    let Some(dir) = user_grammars_dir() else {
+        return GrammarsFirstRun::NoConfigDir;
+    };
+
+    if dir.join(INSTALLED_STAMP).exists() {
+        return GrammarsFirstRun::AlreadyChecked;
+    }
+
+    // If a NORMALIZE_GRAMMAR_PATH is set and points at a populated directory,
+    // treat that as a pre-install too — write the stamp so we don't pester.
+    let env_has_grammars = std::env::var("NORMALIZE_GRAMMAR_PATH")
+        .ok()
+        .map(|p| {
+            p.split(':')
+                .filter(|s| !s.is_empty())
+                .any(|p| dir_has_grammars(Path::new(p)))
+        })
+        .unwrap_or(false);
+
+    if env_has_grammars || dir_has_grammars(&dir) {
+        write_installed_stamp(&dir, "prebuilt\n");
+        return GrammarsFirstRun::PreInstalled;
+    }
+
+    // Non-TTY: auto-install. TTY: leave it for the user / init wizard.
+    if std::io::stdin().is_terminal() {
+        return GrammarsFirstRun::SkippedInteractive;
+    }
+
+    eprintln!("Auto-installing grammars on first use...");
+    let pretty = std::cell::Cell::new(false);
+    let service = crate::service::grammars::GrammarService::new(&pretty);
+    match service.install(None, false, false) {
+        Ok(report) => {
+            let version = report.version.clone().unwrap_or_else(|| "unknown".into());
+            write_installed_stamp(&dir, &format!("{version}\n"));
+            GrammarsFirstRun::AutoInstalled {
+                count: report.count,
+            }
+        }
+        Err(error) => GrammarsFirstRun::Failed { error },
     }
 }
 
