@@ -66,3 +66,21 @@
     (identifier) @cfg.def.name
   )
 ) @cfg.def
+
+; ---------------------------------------------------------------------------
+; Effects
+; ---------------------------------------------------------------------------
+
+; defer statement — deferred call registered, runs on function exit
+(defer_statement) @cfg.effect.defer
+
+; go statement — goroutine spawn (modelled as channel send analogue)
+(go_statement) @cfg.effect.send
+
+; send statement: ch <- val
+(send_statement) @cfg.effect.send
+
+; channel receive in expression context: <-ch
+(unary_expression
+  operator: "<-"
+) @cfg.effect.receive

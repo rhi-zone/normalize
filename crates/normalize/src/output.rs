@@ -35,6 +35,7 @@ mod tests {
         use crate::commands::analyze::docs::DocCoverageReport;
         use crate::commands::analyze::duplicates::DuplicateTypesReport;
         use crate::commands::analyze::duplicates_views::DuplicatesReport;
+        use crate::commands::analyze::effects::EffectsReport;
         use crate::commands::analyze::files::FileLengthReport;
         use crate::commands::analyze::fragments::FragmentsReport;
         use crate::commands::analyze::graph::{DependentsReport, GraphReport};
@@ -94,6 +95,7 @@ mod tests {
         assert_output_formatter::<CouplingReport>();
         assert_output_formatter::<CrossRepoHealthReport>();
         assert_output_formatter::<DocCoverageReport>();
+        assert_output_formatter::<EffectsReport>();
         assert_output_formatter::<DuplicateTypesReport>();
         assert_output_formatter::<DuplicatesReport>();
         assert_output_formatter::<FileLengthReport>();

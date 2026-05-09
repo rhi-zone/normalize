@@ -95,3 +95,17 @@
 (continue_statement) @cfg.exit.continue
 
 (throw_statement) @cfg.exit.throw
+
+; ---------------------------------------------------------------------------
+; Def/use sites
+; ---------------------------------------------------------------------------
+
+; ---------------------------------------------------------------------------
+; Effects
+; ---------------------------------------------------------------------------
+
+; await expressions — execution suspends until the Promise resolves
+(await_expression) @cfg.effect.await
+
+; yield expressions — generator yield point
+(yield_expression) @cfg.effect.yield

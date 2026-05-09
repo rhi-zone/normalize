@@ -9,7 +9,10 @@
 //! - `@cfg.exit.*` nodes terminate the current block and open an `Unreachable` continuation.
 //! - All other statement nodes are appended to the current sequential block.
 
-use crate::{BasicBlock, BlockId, BlockKind, Cfg, DefSite, Edge, EdgeKind, FunctionId, UseSite};
+use crate::{
+    BasicBlock, BlockId, BlockKind, Cfg, DefSite, Edge, EdgeKind, Effect, EffectKind, FunctionId,
+    UseSite,
+};
 use std::ops::Range;
 use streaming_iterator::StreamingIterator;
 
@@ -57,6 +60,7 @@ impl Builder {
             kind,
             defs: Vec::new(),
             uses: Vec::new(),
+            effects: Vec::new(),
         });
         id
     }
@@ -106,6 +110,14 @@ enum CaptureKind {
     Use,
     /// The identifier name node for a use (`@cfg.use.name`).
     UseName,
+    // Effect captures — @cfg.effect.*
+    EffectAwait,
+    EffectDefer,
+    EffectYield,
+    EffectAcquire,
+    EffectRelease,
+    EffectSend,
+    EffectReceive,
 }
 
 fn parse_capture_name(name: &str) -> Option<CaptureKind> {
@@ -132,6 +144,13 @@ fn parse_capture_name(name: &str) -> Option<CaptureKind> {
         "cfg.def.name" => Some(CaptureKind::DefName),
         "cfg.use" => Some(CaptureKind::Use),
         "cfg.use.name" => Some(CaptureKind::UseName),
+        "cfg.effect.await" => Some(CaptureKind::EffectAwait),
+        "cfg.effect.defer" => Some(CaptureKind::EffectDefer),
+        "cfg.effect.yield" => Some(CaptureKind::EffectYield),
+        "cfg.effect.acquire" => Some(CaptureKind::EffectAcquire),
+        "cfg.effect.release" => Some(CaptureKind::EffectRelease),
+        "cfg.effect.send" => Some(CaptureKind::EffectSend),
+        "cfg.effect.receive" => Some(CaptureKind::EffectReceive),
         _ => None,
     }
 }
@@ -460,6 +479,97 @@ pub fn build(
                 name: du.name,
                 byte_offset: du.byte_offset,
                 line: du.line,
+            });
+        }
+    }
+
+    // --- Effects pass ---
+    // Collect effect captures and assign them to blocks by byte range.
+    let has_effects = capture_names.iter().any(|n| n.starts_with("cfg.effect."));
+
+    if has_effects {
+        struct RawEffect {
+            kind: EffectKind,
+            byte_offset: usize,
+            line: u32,
+            label: Option<String>,
+        }
+        let mut raw_effects: Vec<RawEffect> = Vec::new();
+
+        let mut eff_cursor = tree_sitter::QueryCursor::new();
+        eff_cursor.set_byte_range(body_range.start..body_range.end);
+
+        // Collect all effect captures as owned data.
+        struct EffMatchData {
+            name_idx: usize,
+            start_byte: usize,
+            end_byte: usize,
+            start_row: usize,
+        }
+        let mut eff_matches: Vec<EffMatchData> = Vec::new();
+        let mut eff_iter = eff_cursor.matches(&query, tree.root_node(), source);
+        while let Some(m) = eff_iter.next() {
+            for cap in m.captures {
+                let cap_name = capture_names[cap.index as usize];
+                if cap_name.starts_with("cfg.effect.") {
+                    eff_matches.push(EffMatchData {
+                        name_idx: cap.index as usize,
+                        start_byte: cap.node.start_byte(),
+                        end_byte: cap.node.end_byte(),
+                        start_row: cap.node.start_position().row,
+                    });
+                }
+            }
+        }
+        drop(eff_iter);
+
+        for mat in &eff_matches {
+            if mat.start_byte < body_range.start || mat.end_byte > body_range.end {
+                continue;
+            }
+            let cap_name = capture_names[mat.name_idx];
+            let kind = match cap_name {
+                "cfg.effect.await" => EffectKind::Await,
+                "cfg.effect.defer" => EffectKind::Defer,
+                "cfg.effect.yield" => EffectKind::Yield,
+                "cfg.effect.acquire" => EffectKind::Acquire,
+                "cfg.effect.release" => EffectKind::Release,
+                "cfg.effect.send" => EffectKind::Send,
+                "cfg.effect.receive" => EffectKind::Receive,
+                _ => continue,
+            };
+            let text = String::from_utf8_lossy(&source[mat.start_byte..mat.end_byte]).into_owned();
+            // Truncate label to 120 chars so it stays useful without bloating the DB.
+            let label = if text.len() > 120 {
+                Some(format!("{}…", &text[..120]))
+            } else {
+                Some(text)
+            };
+            raw_effects.push(RawEffect {
+                kind,
+                byte_offset: mat.start_byte,
+                line: row_to_line(mat.start_row),
+                label,
+            });
+        }
+
+        // Assign effects to blocks.
+        for eff in raw_effects {
+            let block_id = b
+                .blocks
+                .iter()
+                .find(|blk| {
+                    !blk.byte_range.is_empty()
+                        && blk.byte_range.start <= eff.byte_offset
+                        && eff.byte_offset < blk.byte_range.end
+                })
+                .map(|blk| blk.id)
+                .unwrap_or(entry);
+            b.block_mut(block_id).effects.push(Effect {
+                kind: eff.kind,
+                byte_offset: eff.byte_offset,
+                line: eff.line,
+                label: eff.label,
             });
         }
     }

@@ -1,0 +1,49 @@
+# ---
+# id = "effects"
+# message = "Control-flow effect analysis: async/await, defer, yield, resource acquire/release"
+# tags = ["cfg", "effects", "async", "resources"]
+# enabled = false
+# ---
+#
+# Derives higher-level facts about side-effecting constructs in functions.
+#
+# Input relation (Phase 3):
+#   cfg_effect(file, func, func_line, block, kind, line, label)
+#
+# Derived relations (no diagnostics by default — query these from other rules):
+#   async_function(file, func, func_line)    — function contains at least one await
+#   defer_function(file, func, func_line)    — function registers at least one defer
+#   generator_function(file, func, func_line) — function contains at least one yield
+#   resource_acquire(file, func, func_line, label) — resource acquired in function
+#   resource_leak(file, func, func_line, label)    — resource acquired but never released
+#
+# Enable this rule and reference the derived relations from other rules, or
+# query the derived relations directly via `normalize rules run`.
+
+relation async_function(String, String, u32);
+relation defer_function(String, String, u32);
+relation generator_function(String, String, u32);
+relation resource_acquire(String, String, u32, String);
+relation resource_leak(String, String, u32, String);
+
+// async_function: function contains at least one await suspension point
+async_function(F, Fn, FL) <--
+    cfg_effect(F, Fn, FL, _, "await", _, _);
+
+// defer_function: function registers at least one deferred call
+defer_function(F, Fn, FL) <--
+    cfg_effect(F, Fn, FL, _, "defer", _, _);
+
+// generator_function: function yields at least once
+generator_function(F, Fn, FL) <--
+    cfg_effect(F, Fn, FL, _, "yield", _, _);
+
+// resource_acquire: a named resource is acquired in this function
+resource_acquire(F, Fn, FL, Label) <--
+    cfg_effect(F, Fn, FL, _, "acquire", _, Label),
+    if !Label.is_empty();
+
+// resource_leak: resource acquired but no matching release anywhere in the function
+resource_leak(F, Fn, FL, Label) <--
+    resource_acquire(F, Fn, FL, Label),
+    !cfg_effect(F, Fn, FL, _, "release", _, Label);

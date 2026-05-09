@@ -30,7 +30,10 @@ pub fn render(cfg: &Cfg) -> String {
             BlockKind::Statement
             | BlockKind::LoopBody
             | BlockKind::LoopExit
-            | BlockKind::Unreachable => {
+            | BlockKind::Unreachable
+            | BlockKind::Deferred
+            | BlockKind::Acquire
+            | BlockKind::Release => {
                 format!("    {}[\"{}\"]\n", block_node_id(block.id), label)
             }
         };
@@ -69,6 +72,9 @@ fn block_label(block: &BasicBlock) -> String {
         BlockKind::LoopExit => "LoopExit",
         BlockKind::Catch => "Catch",
         BlockKind::Unreachable => "Unreachable",
+        BlockKind::Deferred => "Deferred",
+        BlockKind::Acquire => "Acquire",
+        BlockKind::Release => "Release",
     };
 
     if block.start_line == block.end_line {
@@ -91,5 +97,7 @@ fn edge_label(kind: &EdgeKind) -> &'static str {
         EdgeKind::Continue => "continue",
         EdgeKind::Return => "return",
         EdgeKind::Exception => "exception",
+        EdgeKind::Suspend => "suspend",
+        EdgeKind::Resume => "resume",
     }
 }

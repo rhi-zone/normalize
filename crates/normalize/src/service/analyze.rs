@@ -5,6 +5,7 @@ use crate::commands::analyze::architecture::ArchitectureReport;
 use crate::commands::analyze::coupling_clusters::CouplingClustersReport;
 use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
 use crate::commands::analyze::docs::DocCoverageReport;
+use crate::commands::analyze::effects::EffectsReport;
 use crate::commands::analyze::liveness::LivenessReport;
 use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
@@ -475,6 +476,42 @@ impl AnalyzeService {
             file.clone()
         };
         crate::commands::analyze::liveness::analyze_liveness(&idx, &rel_file, &function)
+            .await
+            .map_err(AnalyzeError::from)
+    }
+
+    /// Show all side-effecting constructs (await, defer, yield, resource acquire/release,
+    /// channel send/receive) for functions in a source file.
+    ///
+    /// Uses the CFG data stored in the index (populated by `normalize structure rebuild`)
+    /// to report suspension points, deferred calls, generator yields, and resource operations.
+    /// Requires the facts index.
+    #[cli(display_with = "display_output")]
+    pub async fn effects(
+        &self,
+        #[param(positional, help = "Source file path")] file: String,
+        #[param(
+            short = 'f',
+            help = "Function name to analyse (defaults to all functions)"
+        )]
+        function: Option<String>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+    ) -> Result<EffectsReport, AnalyzeError> {
+        let root_path = Self::root_path(root)?;
+        let idx = crate::index::ensure_ready(&root_path).await?;
+        // Resolve file to a root-relative path for the index query.
+        let abs_file = std::path::Path::new(&file);
+        let rel_file = if abs_file.is_absolute() {
+            abs_file
+                .strip_prefix(&root_path)
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or(file.clone())
+        } else {
+            file.clone()
+        };
+        crate::commands::analyze::effects::analyze_effects(&idx, &rel_file, function.as_deref())
             .await
             .map_err(AnalyzeError::from)
     }

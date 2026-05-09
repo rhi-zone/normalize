@@ -82,6 +82,7 @@ relation cfg_block(String, String, u32, u32, String);
 relation cfg_edge(String, String, u32, u32, u32, String);
 relation cfg_def(String, String, u32, u32, String);
 relation cfg_use(String, String, u32, u32, String);
+relation cfg_effect(String, String, u32, u32, String, u32, String);
 relation diagnostic(String, String, String, u32, String);
 "#;
 
@@ -215,6 +216,10 @@ const BUILTIN_RULES: &[BuiltinFactsRule] = &[
     BuiltinFactsRule {
         id: "liveness",
         content: include_str!("builtin_dl/liveness.dl"),
+    },
+    BuiltinFactsRule {
+        id: "effects",
+        content: include_str!("builtin_dl/effects.dl"),
     },
 ];
 
@@ -1584,6 +1589,24 @@ fn populate_facts_with_sources(
             )
             .map_err(|e| InterpretError::Parse(e.to_string()))?;
     }
+    for eff in relations.cfg_effects.iter() {
+        let sid = engine.intern_source(eff.file.as_str());
+        engine
+            .insert_with_source(
+                "cfg_effect",
+                vec![
+                    Value::string(&eff.file),
+                    Value::string(&eff.func),
+                    Value::U32(eff.func_line),
+                    Value::U32(eff.block),
+                    Value::string(&eff.kind),
+                    Value::U32(eff.line),
+                    Value::string(&eff.label),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
     Ok(())
 }
 
@@ -1899,6 +1922,23 @@ fn populate_facts(engine: &mut Engine, relations: &Relations) -> Result<(), Inte
                     Value::U32(use_.func_line),
                     Value::U32(use_.block),
                     Value::string(&use_.name),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+
+    for eff in relations.cfg_effects.iter() {
+        engine
+            .insert(
+                "cfg_effect",
+                vec![
+                    Value::string(&eff.file),
+                    Value::string(&eff.func),
+                    Value::U32(eff.func_line),
+                    Value::U32(eff.block),
+                    Value::string(&eff.kind),
+                    Value::U32(eff.line),
+                    Value::string(&eff.label),
                 ],
             )
             .map_err(|e| InterpretError::Parse(e.to_string()))?;

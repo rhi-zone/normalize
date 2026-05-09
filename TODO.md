@@ -10,10 +10,11 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ---
 
-## CFG (Control Flow Graph) — Phase 1 ✓ + Phase 2 ✓
+## CFG (Control Flow Graph) — Phase 1 ✓ + Phase 2 ✓ + Phase 3 ✓
 
 **Goal:** `normalize cfg <file> -f <function>` renders a Mermaid flowchart of a function's control flow.
 **Phase 2 Goal:** def/use sites, SQLite persistence, Datalog facts, liveness analysis CLI.
+**Phase 3 Goal:** Effects tracking — await, defer, yield, acquire/release, send/receive; `normalize analyze effects`.
 
 **Commits 1–4 (scaffold, builder, mermaid, CLI): committed 2026-05-09**
 
@@ -30,6 +31,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] Commit 11 (partial): Fixed pre-existing clippy error in all CFG test helpers (`is_some_and` collapse)
 - [x] Commit 12: CFG Phase 1 batch — 69 additional `.cfg.scm` queries (C-family, JVM/functional, scripting, systems, domain/config); coverage matrix updated to 76 HAS_CFG; Lua + Jinja2 snapshot tests; dockerfile/query moved to NOT_APPLICABLE; asm/x86asm/uiua remain DEFERRED
 - [x] Phase 2: `DefSite`/`UseSite` on `BasicBlock`; `@cfg.def`/`@cfg.use` captures (Rust/Python/Go); SQLite `cfg_blocks`/`cfg_edges`/`cfg_defs`/`cfg_uses` tables (schema v13); wired into `refresh_call_graph` and `reindex_files`; Datalog `cfg_block`/`cfg_edge`/`cfg_def`/`cfg_use` relations; `liveness.dl` builtin; `normalize analyze liveness <file> --function <name>` CLI command
+- [x] Phase 3: `Effect`/`EffectKind` on `BasicBlock`; `BlockKind::Deferred/Acquire/Release`; `EdgeKind::Suspend/Resume`; `@cfg.effect.*` captures (Rust/Python/TS/JS/Go); SQLite `cfg_effects` table (schema v14); `CfgEffectFact` Datalog relation; `effects.dl` builtin; `normalize analyze effects <file> [--function <name>]` CLI command
 
 **Remaining DEFERRED (Phase 1 cleanup):**
 - asm, x86asm — assembly branches (jmp/je/jne) are at instruction level; need grammar inspection (not installed)
@@ -343,9 +345,9 @@ with language-specific overrides for things the generic tree-sitter model can't 
 Correct recipes (especially extract/inline) need semantic infrastructure normalize doesn't have:
 
 1. **Name resolution** — ~80% there via `locals.scm`. Gap: cross-file module-level resolution. Builds on the facts index. Tractable.
-2. **Control flow graph** — Phase 1+2 complete. `.cfg.scm` queries for 76 languages; `BasicBlock` with `DefSite`/`UseSite`; SQLite persistence; Datalog `cfg_block`/`cfg_edge`/`cfg_def`/`cfg_use` relations. See CFG section above.
+2. **Control flow graph** — Phase 1+2+3 complete. `.cfg.scm` queries for 76 languages; `BasicBlock` with `DefSite`/`UseSite`/`effects`; SQLite persistence including `cfg_effects`; Datalog relations. See CFG section above.
 3. **Liveness analysis** — Phase 2 complete. `liveness.dl` builtin Datalog rule; `normalize analyze liveness <file> --function <name>` CLI command. Backward-dataflow fixed-point over CFG blocks from the index.
-4. **Effect/mutation tracking** — conservative approximation via call graph ("does this call any function") is easy. Precise tracking (Rust `&mut` vs `&`) probably needs compiler integration; accept conservative approximation as the ceiling.
+4. **Effect/mutation tracking** — Phase 3 complete for structural effects (await, defer, yield, acquire/release, send/receive). `normalize analyze effects <file>` command. Precise mutation tracking (Rust `&mut` vs `&`) still needs compiler integration.
 5. **Type information** — tiered strategy:
    - **Tier A (in-house):** Syntactic extraction from declarations (struct fields, function signatures, typed lets). Mechanical.
    - **Tier B (in-house):** Type-flow across the call graph — `let x = foo()` resolves to `foo`'s declared return type. Datalog-friendly once Tier A exists.

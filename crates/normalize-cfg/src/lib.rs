@@ -76,6 +76,13 @@ pub enum BlockKind {
     Catch,
     /// Code after an unconditional exit (return/break/continue/throw).
     Unreachable,
+    /// A deferred call block (Go `defer`, Swift `defer`, Zig `defer`/`errdefer`).
+    /// Runs on exit paths from the enclosing function.
+    Deferred,
+    /// Resource acquisition point (e.g. `with`/`using` statement head, RAII constructor).
+    Acquire,
+    /// Resource release point (e.g. `with` block exit, `using` finalizer, RAII destructor).
+    Release,
 }
 
 // ---------------------------------------------------------------------------
@@ -104,11 +111,54 @@ pub enum EdgeKind {
     Return,
     /// Exception thrown.
     Exception,
+    /// Execution suspends at an `await` point.
+    Suspend,
+    /// Execution resumes after an `await` resolves.
+    Resume,
 }
 
 // ---------------------------------------------------------------------------
 // Basic block
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Effect tracking
+// ---------------------------------------------------------------------------
+
+/// The kind of side-effecting control-flow construct.
+#[derive(
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum EffectKind {
+    /// Suspension point: an `await` expression. Execution suspends until the future resolves.
+    Await,
+    /// A deferred call is registered (Go/Swift/Zig `defer`).
+    Defer,
+    /// Generator `yield`: execution suspends and a value is produced.
+    Yield,
+    /// Resource acquisition (`with`/`using` statement head, RAII constructor).
+    Acquire,
+    /// Explicit resource release (`with` exit, `using` finalizer, RAII destructor).
+    Release,
+    /// Channel/actor send (Go channel send, Elixir `send`).
+    Send,
+    /// Channel/actor receive (Go channel receive).
+    Receive,
+}
+
+/// A side-effecting construct within a basic block.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct Effect {
+    /// Kind of the effect.
+    pub kind: EffectKind,
+    /// Byte offset of the effect node in the source file (0-indexed).
+    pub byte_offset: usize,
+    /// Source line of the effect (1-indexed).
+    pub line: u32,
+    /// Optional label: resource name, coroutine expression text, channel name, etc.
+    pub label: Option<String>,
+}
 
 /// A variable/binding definition site within a basic block.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
@@ -149,6 +199,8 @@ pub struct BasicBlock {
     pub defs: Vec<DefSite>,
     /// Variable use sites within this block.
     pub uses: Vec<UseSite>,
+    /// Side-effecting constructs within this block (await, defer, yield, acquire, release, send, receive).
+    pub effects: Vec<Effect>,
 }
 
 // ---------------------------------------------------------------------------

@@ -50,12 +50,24 @@ struct CfgUseRow {
     line: u32,
 }
 
+/// A single CFG effect row ready for DB insertion.
+struct CfgEffectRow {
+    function_qname: String,
+    function_start_line: u32,
+    block_id: u32,
+    kind: String,
+    byte_offset: usize,
+    line: u32,
+    label: Option<String>,
+}
+
 /// CFG rows for a single file, ready for DB insertion.
 struct CfgData {
     blocks: Vec<CfgBlockRow>,
     edges: Vec<CfgEdgeRow>,
     defs: Vec<CfgDefRow>,
     uses: Vec<CfgUseRow>,
+    effects: Vec<CfgEffectRow>,
 }
 
 /// A parsed symbol ready for database insertion.
@@ -103,7 +115,7 @@ struct CachedFileData {
 }
 
 // Not yet public - just delete .normalize/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 13;
+const SCHEMA_VERSION: i64 = 14;
 
 /// Bump when extraction logic changes to invalidate cached results.
 /// Bumped to "2" (2026-04-27): purge CA cache entries that may have been poisoned
@@ -511,6 +523,7 @@ impl FileIndex {
             conn.execute("DELETE FROM cfg_edges", ()).await.ok();
             conn.execute("DELETE FROM cfg_defs", ()).await.ok();
             conn.execute("DELETE FROM cfg_uses", ()).await.ok();
+            conn.execute("DELETE FROM cfg_effects", ()).await.ok();
             // Both diagnostic tables get dropped + recreated on every schema bump
             // (column shape has changed in past bumps and may again — simplest path).
             conn.execute("DROP TABLE IF EXISTS daemon_diagnostics", ())
@@ -688,6 +701,27 @@ impl FileIndex {
         .await?;
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_cfg_uses_func ON cfg_uses(file, function_qname, function_start_line)",
+            (),
+        )
+        .await?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cfg_effects (
+                id INTEGER PRIMARY KEY,
+                file TEXT NOT NULL,
+                function_qname TEXT NOT NULL,
+                function_start_line INTEGER NOT NULL,
+                block_id INTEGER NOT NULL,
+                kind TEXT NOT NULL,
+                byte_offset INTEGER NOT NULL,
+                line INTEGER NOT NULL,
+                label TEXT
+            )",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_cfg_effects_func ON cfg_effects(file, function_qname, function_start_line)",
             (),
         )
         .await?;
@@ -2001,6 +2035,32 @@ impl FileIndex {
         Ok(calls)
     }
 
+    /// Return all CFG effect rows: (file, function_qname, function_start_line, block_id, kind, line, label).
+    pub async fn all_cfg_effects(
+        &self,
+    ) -> Result<Vec<(String, String, u32, u32, String, u32, String)>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT file, function_qname, function_start_line, block_id, kind, line, COALESCE(label, '') FROM cfg_effects",
+                (),
+            )
+            .await?;
+        let mut effects = Vec::new();
+        while let Some(row) = rows.next().await? {
+            effects.push((
+                row.get::<String>(0)?,
+                row.get::<String>(1)?,
+                u32::try_from(row.get::<i64>(2)?).unwrap_or(0),
+                u32::try_from(row.get::<i64>(3)?).unwrap_or(0),
+                row.get::<String>(4)?,
+                u32::try_from(row.get::<i64>(5)?).unwrap_or(0),
+                row.get::<String>(6)?,
+            ));
+        }
+        Ok(effects)
+    }
+
     /// Convert a module name to possible file paths using the language's trait method.
     /// Returns only paths that exist in the index.
     pub async fn module_to_files(&self, module: &str, source_file: &str) -> Vec<String> {
@@ -2616,6 +2676,7 @@ impl FileIndex {
                                 edges: Vec::new(),
                                 defs: Vec::new(),
                                 uses: Vec::new(),
+                                effects: Vec::new(),
                             },
                         });
                         continue;
@@ -2841,6 +2902,7 @@ impl FileIndex {
         self.conn.execute("DELETE FROM cfg_edges", ()).await?;
         self.conn.execute("DELETE FROM cfg_defs", ()).await?;
         self.conn.execute("DELETE FROM cfg_uses", ()).await?;
+        self.conn.execute("DELETE FROM cfg_effects", ()).await?;
 
         let mut symbol_count = 0;
         let mut call_count = 0;
@@ -2964,6 +3026,22 @@ impl FileIndex {
                     ],
                 ).await?;
             }
+            // Insert CFG effects
+            for eff in &data.cfg.effects {
+                self.conn.execute(
+                    "INSERT INTO cfg_effects (file, function_qname, function_start_line, block_id, kind, byte_offset, line, label) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    params![
+                        data.file_path.clone(),
+                        eff.function_qname.clone(),
+                        eff.function_start_line as i64,
+                        eff.block_id as i64,
+                        eff.kind.clone(),
+                        eff.byte_offset as i64,
+                        eff.line as i64,
+                        eff.label.clone(),
+                    ],
+                ).await?;
+            }
 
             pb_insert.inc(1);
         }
@@ -3066,6 +3144,12 @@ impl FileIndex {
             self.conn
                 .execute(
                     "DELETE FROM cfg_uses WHERE file = ?1",
+                    params![path.clone()],
+                )
+                .await?;
+            self.conn
+                .execute(
+                    "DELETE FROM cfg_effects WHERE file = ?1",
                     params![path.clone()],
                 )
                 .await?;
@@ -3313,6 +3397,21 @@ impl FileIndex {
                             use_.name.clone(),
                             use_.byte_offset as i64,
                             use_.line as i64,
+                        ],
+                    ).await?;
+                }
+                for eff in &cfg_data.effects {
+                    self.conn.execute(
+                        "INSERT INTO cfg_effects (file, function_qname, function_start_line, block_id, kind, byte_offset, line, label) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                        params![
+                            file_path.clone(),
+                            eff.function_qname.clone(),
+                            eff.function_start_line as i64,
+                            eff.block_id as i64,
+                            eff.kind.clone(),
+                            eff.byte_offset as i64,
+                            eff.line as i64,
+                            eff.label.clone(),
                         ],
                     ).await?;
                 }
@@ -3942,63 +4041,44 @@ fn build_cfg_data_for_file(
     let mut all_edges: Vec<CfgEdgeRow> = Vec::new();
     let mut all_defs: Vec<CfgDefRow> = Vec::new();
     let mut all_uses: Vec<CfgUseRow> = Vec::new();
+    let mut all_effects: Vec<CfgEffectRow> = Vec::new();
+
+    // Helper macro to construct an early-return CfgData.
+    macro_rules! empty_cfg_data {
+        () => {
+            CfgData {
+                blocks: all_blocks,
+                edges: all_edges,
+                defs: all_defs,
+                uses: all_uses,
+                effects: all_effects,
+            }
+        };
+    }
 
     // Only proceed if the language has a CFG query.
     let loader = normalize_languages::parsers::grammar_loader();
     let cfg_query_src = match loader.get_cfg(grammar_name) {
         Some(q) => q,
-        None => {
-            return CfgData {
-                blocks: all_blocks,
-                edges: all_edges,
-                defs: all_defs,
-                uses: all_uses,
-            };
-        }
+        None => return empty_cfg_data!(),
     };
     let ts_language = match loader.get(grammar_name) {
         Ok(l) => l,
-        Err(_) => {
-            return CfgData {
-                blocks: all_blocks,
-                edges: all_edges,
-                defs: all_defs,
-                uses: all_uses,
-            };
-        }
+        Err(_) => return empty_cfg_data!(),
     };
     let tags_query_src = match loader.get_tags(grammar_name) {
         Some(q) => q,
-        None => {
-            return CfgData {
-                blocks: all_blocks,
-                edges: all_edges,
-                defs: all_defs,
-                uses: all_uses,
-            };
-        }
+        None => return empty_cfg_data!(),
     };
 
     // Parse the file.
     let mut parser = tree_sitter::Parser::new();
     if parser.set_language(&ts_language).is_err() {
-        return CfgData {
-            blocks: all_blocks,
-            edges: all_edges,
-            defs: all_defs,
-            uses: all_uses,
-        };
+        return empty_cfg_data!();
     }
     let tree = match parser.parse(source_bytes, None) {
         Some(t) => t,
-        None => {
-            return CfgData {
-                blocks: all_blocks,
-                edges: all_edges,
-                defs: all_defs,
-                uses: all_uses,
-            };
-        }
+        None => return empty_cfg_data!(),
     };
 
     // Build a set of (name, start_line) for function/method symbols.
@@ -4015,25 +4095,13 @@ fn build_cfg_data_for_file(
         .collect();
 
     if func_symbols.is_empty() {
-        return CfgData {
-            blocks: all_blocks,
-            edges: all_edges,
-            defs: all_defs,
-            uses: all_uses,
-        };
+        return empty_cfg_data!();
     }
 
     // Find function body byte ranges using the tags query.
     let tags_query = match tree_sitter::Query::new(&ts_language, &tags_query_src) {
         Ok(q) => q,
-        Err(_) => {
-            return CfgData {
-                blocks: all_blocks,
-                edges: all_edges,
-                defs: all_defs,
-                uses: all_uses,
-            };
-        }
+        Err(_) => return empty_cfg_data!(),
     };
     let capture_names = tags_query.capture_names().to_vec();
     let mut cursor = tree_sitter::QueryCursor::new();
@@ -4136,6 +4204,17 @@ fn build_cfg_data_for_file(
                     line: use_.line,
                 });
             }
+            for eff in &blk.effects {
+                all_effects.push(CfgEffectRow {
+                    function_qname: qname.clone(),
+                    function_start_line: fsl,
+                    block_id: blk.id.0,
+                    kind: format!("{:?}", eff.kind).to_lowercase(),
+                    byte_offset: eff.byte_offset,
+                    line: eff.line,
+                    label: eff.label.clone(),
+                });
+            }
         }
         for edge in &cfg.edges {
             all_edges.push(CfgEdgeRow {
@@ -4153,6 +4232,7 @@ fn build_cfg_data_for_file(
         edges: all_edges,
         defs: all_defs,
         uses: all_uses,
+        effects: all_effects,
     }
 }
 

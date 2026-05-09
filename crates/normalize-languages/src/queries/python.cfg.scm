@@ -85,3 +85,16 @@
 (augmented_assignment
   left: (identifier) @cfg.def.name
 ) @cfg.def
+
+; ---------------------------------------------------------------------------
+; Effects
+; ---------------------------------------------------------------------------
+
+; await expressions — execution suspends until the coroutine resolves
+(await) @cfg.effect.await
+
+; yield / yield from — generator yield point
+(yield) @cfg.effect.yield
+
+; with statement head — resource acquisition
+(with_statement) @cfg.effect.acquire

@@ -123,5 +123,15 @@ pub async fn build_relations_from_index(root: &Path) -> Result<Relations, String
         }
     }
 
+    // Get CFG effects (Phase 3)
+    let cfg_effects = idx
+        .all_cfg_effects()
+        .await
+        .map_err(|e| format!("Failed to get CFG effects: {}", e))?;
+
+    for (file, func, func_line, block, kind, line, label) in &cfg_effects {
+        relations.add_cfg_effect(file, func, *func_line, *block, kind, *line, label);
+    }
+
     Ok(relations)
 }

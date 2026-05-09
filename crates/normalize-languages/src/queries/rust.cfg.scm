@@ -91,3 +91,10 @@
 (assignment_expression
   left: (identifier) @cfg.def.name
 ) @cfg.def
+
+; ---------------------------------------------------------------------------
+; Effects
+; ---------------------------------------------------------------------------
+
+; await expressions — execution suspends until the future resolves
+(await_expression) @cfg.effect.await

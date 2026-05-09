@@ -400,6 +400,31 @@ pub struct CfgUseFact {
     pub name: String,
 }
 
+/// A CFG side-effect fact.
+///
+/// Maps to Datalog: `cfg_effect(file, func, func_line, block, kind, line, label)`
+///
+/// `kind` is one of: `"await"`, `"defer"`, `"yield"`, `"acquire"`, `"release"`, `"send"`, `"receive"`.
+/// `label` is an optional text label (resource name, expression text, etc.; empty string if absent).
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
+pub struct CfgEffectFact {
+    /// Source file path
+    pub file: String,
+    /// Qualified function name
+    pub func: String,
+    /// Function start line (1-based)
+    pub func_line: u32,
+    /// Block ID this effect occurs in
+    pub block: u32,
+    /// Effect kind string (e.g. "await", "defer", "yield")
+    pub kind: String,
+    /// Source line of the effect (1-based)
+    pub line: u32,
+    /// Optional label (resource name, expression text). Empty string if absent.
+    pub label: String,
+}
+
 /// All relations (facts) available to rules.
 ///
 /// This is the complete set of facts extracted from a codebase.
@@ -453,6 +478,8 @@ pub struct Relations {
     pub cfg_defs: Vec<CfgDefFact>,
     /// CFG variable use facts (one per use site per block)
     pub cfg_uses: Vec<CfgUseFact>,
+    /// CFG side-effect facts (await, defer, yield, acquire, release, send, receive)
+    pub cfg_effects: Vec<CfgEffectFact>,
 }
 
 impl Relations {
@@ -738,6 +765,29 @@ impl Relations {
             func_line,
             block,
             name: name.into(),
+        });
+    }
+
+    /// Add a CFG side-effect fact
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_cfg_effect(
+        &mut self,
+        file: &str,
+        func: &str,
+        func_line: u32,
+        block: u32,
+        kind: &str,
+        line: u32,
+        label: &str,
+    ) {
+        self.cfg_effects.push(CfgEffectFact {
+            file: file.into(),
+            func: func.into(),
+            func_line,
+            block,
+            kind: kind.into(),
+            line,
+            label: label.into(),
         });
     }
 }

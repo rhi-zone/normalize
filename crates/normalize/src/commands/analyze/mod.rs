@@ -18,6 +18,7 @@ pub mod depth_map;
 pub mod docs;
 pub mod duplicates;
 pub mod duplicates_views;
+pub mod effects;
 pub mod files;
 pub mod fragments;
 pub mod git_history;
