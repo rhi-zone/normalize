@@ -192,7 +192,44 @@ impl ContextService {
 
 #[cli(
     name = "context",
-    description = "Inject project context into LLM prompts. Use to provide per-project instructions to agents.",
+    description = "Inject project context into LLM prompts.\n\
+        \n\
+        Resolves Markdown files from .normalize/context/ directories, walked bottom-up\n\
+        (project → parent → ~/.normalize/context/). Each .md file may have YAML frontmatter;\n\
+        blocks whose frontmatter matches the caller context are included. Bare files (no\n\
+        frontmatter) always match.\n\
+        \n\
+        FRONTMATTER FORMAT\n\
+          ---\n\
+          claudecode:\n\
+            hook: UserPromptSubmit\n\
+          scope:\n\
+            language: rust\n\
+          ---\n\
+          Body text included when caller context matches.\n\
+        \n\
+          Multiple blocks per file are separated by ---. Frontmatter is arbitrary nested YAML.\n\
+        \n\
+        --match SYNTAX\n\
+          Dot-path KEY=VALUE pairs matched against frontmatter.\n\
+          Simple:  --match hook=UserPromptSubmit\n\
+          Nested:  --match claudecode.hook=UserPromptSubmit\n\
+          Multiple --match flags are ANDed together.\n\
+        \n\
+        --stdin / --prefix\n\
+          Read caller context as JSON from stdin. --prefix namespaces it.\n\
+          echo '{\"hook\":\"UserPromptSubmit\"}' | normalize context --stdin --prefix claudecode\n\
+        \n\
+        --file PREFIX=PATH\n\
+          Load a structured file (.json/.toml/.yaml/.yml) into caller context under PREFIX.\n\
+          normalize context --file cfg=config.toml\n\
+        \n\
+        EXAMPLES\n\
+          normalize context                                              # all matching (no filter)\n\
+          normalize context --match claudecode.hook=UserPromptSubmit    # Claude Code hook shim\n\
+          cat | normalize context --stdin --prefix claudecode           # pipe stdin as context\n\
+          normalize context --all --list                                # list all source files\n\
+          normalize context migrate --apply                             # migrate old .context.md",
     global = [
         pretty = "Human-friendly output with colors and formatting",
         compact = "Compact output without colors (overrides TTY detection)",

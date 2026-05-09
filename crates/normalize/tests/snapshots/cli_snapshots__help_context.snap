@@ -31,3 +31,29 @@ Options:
       --file <file>                Load a structured file into caller context as PREFIX=PATH (repeatable; supports .json, .toml, .yaml/.yml)
   -h, --help                       Print help
   -V, --version                    Print version
+
+Resolves Markdown files from .normalize/context/ directories, walked bottom-up
+(project → parent → ~/.normalize/context/). Each .md file may have YAML frontmatter;
+blocks whose frontmatter matches the caller context are included. Bare files always match.
+
+FRONTMATTER FORMAT (.normalize/context/hints.md):
+--- / claudecode: / hook: UserPromptSubmit / scope: / language: rust / ---
+Body text included when caller context matches.
+Multiple blocks per file separated by ---. Frontmatter is arbitrary nested YAML.
+
+--match SYNTAX (dot-path KEY=VALUE, repeatable, ANDed):
+--match hook=UserPromptSubmit            (simple key)
+--match claudecode.hook=UserPromptSubmit (nested dot-path)
+
+--stdin / --prefix (pipe JSON as caller context):
+echo '{"hook":"UserPromptSubmit"}' | normalize context --stdin --prefix claudecode
+
+--file PREFIX=PATH (load .json/.toml/.yaml into context):
+normalize context --file cfg=config.toml
+
+EXAMPLES:
+normalize context                                             (all matching, no filter)
+normalize context --match claudecode.hook=UserPromptSubmit   (Claude Code hook shim)
+cat | normalize context --stdin --prefix claudecode          (pipe stdin as context)
+normalize context --all --list                               (list all source files)
+normalize context migrate --apply                            (migrate .context.md files)

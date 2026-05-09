@@ -223,6 +223,14 @@ as a niche escape hatch, but not in the default path.
 
 ## P0 — Blocking / Broken / Incoherent
 
+### `normalize context context` duplicate subcommand — fixed in server-less, pending publish
+
+`normalize context --help` shows `context` as a named subcommand (duplicate of the service itself).
+Root cause: server-less registered `#[cli(default)]` methods as BOTH the default action AND a
+named subcommand. Fixed in server-less (commit f7bc30b): default methods are now suppressed from
+the subcommand list entirely. Will be resolved in normalize once server-less is next published
+and the version bumped in Cargo.toml.
+
 ### server-less UX issues — ~~all fixed~~ (server-less commit 9c294b2)
 
 1. ~~**`name` attribute ignored for nested services**~~: Fixed — `#[cli(name = "...")]` now works on individual methods (leaf and mount). `get_cli_name()` helper added.

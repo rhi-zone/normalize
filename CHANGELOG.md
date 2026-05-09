@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **`normalize context --help` now shows comprehensive inline reference.** The help output
+  includes frontmatter format, `--match` dot-path syntax, `--stdin`/`--prefix` JSON injection,
+  `--file` structured file loading, and examples. Previously the description was a one-liner.
+
 ### Fixed
 
 - **`cargo xtask build-grammars --cc "zig cc -target x86_64-linux-musl"` now works.**
