@@ -19,6 +19,7 @@ fn cfg_has_cfg_languages_return_some() {
     let loader = grammar_loader();
 
     let has_cfg: &[&str] = &[
+        // Seed languages
         "rust",
         "python",
         "go",
@@ -26,6 +27,68 @@ fn cfg_has_cfg_languages_return_some() {
         "tsx",
         "javascript",
         "java",
+        // Batch A: C-family
+        "c",
+        "cpp",
+        "objc",
+        "c-sharp",
+        "kotlin",
+        "swift",
+        "dart",
+        // Batch B: JVM/functional
+        "scala",
+        "groovy",
+        "vb",
+        "haskell",
+        "ocaml",
+        "fsharp",
+        "elixir",
+        "erlang",
+        "clojure",
+        "gleam",
+        "rescript",
+        "idris",
+        "agda",
+        "lean",
+        "commonlisp",
+        "scheme",
+        "elisp",
+        // Batch C: Scripting
+        "ruby",
+        "lua",
+        "php",
+        "perl",
+        "bash",
+        "fish",
+        "awk",
+        "zsh",
+        "powershell",
+        "batch",
+        "vim",
+        // Batch D: Systems/other
+        "zig",
+        "ada",
+        "d",
+        "prolog",
+        "r",
+        "julia",
+        "matlab",
+        "glsl",
+        "hlsl",
+        "verilog",
+        "vhdl",
+        // Batch E: Domain/config
+        "nix",
+        "hcl",
+        "starlark",
+        "elm",
+        "jinja2",
+        "svelte",
+        "vue",
+        "cmake",
+        "meson",
+        "tlaplus",
+        "jq",
     ];
 
     for &grammar in has_cfg {
@@ -52,6 +115,7 @@ fn cfg_coverage_matrix() {
 
     // HAS_CFG — bundled query present and verified in cfg_has_cfg_languages_return_some
     let has_cfg: &[(&dyn Language, &str)] = &[
+        // Seed languages
         (&normalize_languages::Rust, "rust"),
         (&normalize_languages::Python, "python"),
         (&normalize_languages::Go, "go"),
@@ -59,6 +123,68 @@ fn cfg_coverage_matrix() {
         (&normalize_languages::Tsx, "tsx"),
         (&normalize_languages::JavaScript, "javascript"),
         (&normalize_languages::Java, "java"),
+        // Batch A: C-family
+        (&normalize_languages::C, "c"),
+        (&normalize_languages::Cpp, "cpp"),
+        (&normalize_languages::ObjC, "objc"),
+        (&normalize_languages::CSharp, "c-sharp"),
+        (&normalize_languages::Kotlin, "kotlin"),
+        (&normalize_languages::Swift, "swift"),
+        (&normalize_languages::Dart, "dart"),
+        // Batch B: JVM/functional
+        (&normalize_languages::Scala, "scala"),
+        (&normalize_languages::Groovy, "groovy"),
+        (&normalize_languages::VB, "vb"),
+        (&normalize_languages::Haskell, "haskell"),
+        (&normalize_languages::OCaml, "ocaml"),
+        (&normalize_languages::FSharp, "fsharp"),
+        (&normalize_languages::Elixir, "elixir"),
+        (&normalize_languages::Erlang, "erlang"),
+        (&normalize_languages::Clojure, "clojure"),
+        (&normalize_languages::Gleam, "gleam"),
+        (&normalize_languages::ReScript, "rescript"),
+        (&normalize_languages::Idris, "idris"),
+        (&normalize_languages::Agda, "agda"),
+        (&normalize_languages::Lean, "lean"),
+        (&normalize_languages::CommonLisp, "commonlisp"),
+        (&normalize_languages::Scheme, "scheme"),
+        (&normalize_languages::Elisp, "elisp"),
+        // Batch C: Scripting
+        (&normalize_languages::Ruby, "ruby"),
+        (&normalize_languages::Lua, "lua"),
+        (&normalize_languages::Php, "php"),
+        (&normalize_languages::Perl, "perl"),
+        (&normalize_languages::Bash, "bash"),
+        (&normalize_languages::Fish, "fish"),
+        (&normalize_languages::Awk, "awk"),
+        (&normalize_languages::Zsh, "zsh"),
+        (&normalize_languages::PowerShell, "powershell"),
+        (&normalize_languages::Batch, "batch"),
+        (&normalize_languages::Vim, "vim"),
+        // Batch D: Systems/other
+        (&normalize_languages::Zig, "zig"),
+        (&normalize_languages::Ada, "ada"),
+        (&normalize_languages::D, "d"),
+        (&normalize_languages::Prolog, "prolog"),
+        (&normalize_languages::R, "r"),
+        (&normalize_languages::Julia, "julia"),
+        (&normalize_languages::Matlab, "matlab"),
+        (&normalize_languages::Glsl, "glsl"),
+        (&normalize_languages::Hlsl, "hlsl"),
+        (&normalize_languages::Verilog, "verilog"),
+        (&normalize_languages::Vhdl, "vhdl"),
+        // Batch E: Domain/config
+        (&normalize_languages::Nix, "nix"),
+        (&normalize_languages::Hcl, "hcl"),
+        (&normalize_languages::Starlark, "starlark"),
+        (&normalize_languages::Elm, "elm"),
+        (&normalize_languages::Jinja2, "jinja2"),
+        (&normalize_languages::Svelte, "svelte"),
+        (&normalize_languages::Vue, "vue"),
+        (&normalize_languages::CMake, "cmake"),
+        (&normalize_languages::Meson, "meson"),
+        (&normalize_languages::TlaPlus, "tlaplus"),
+        (&normalize_languages::Jq, "jq"),
     ];
 
     // NOT_APPLICABLE — data/markup/config/query formats with no imperative control flow
@@ -97,40 +223,21 @@ fn cfg_coverage_matrix() {
         (&normalize_languages::PostScript, "postscript"),
         (&normalize_languages::Ninja, "ninja"),
         (&normalize_languages::Yuri, "yuri"),
+        // tree-sitter query language — not an imperative language
+        (&normalize_languages::Query, "query"),
+        // Dockerfile — declarative build instructions, no control flow
+        (&normalize_languages::Dockerfile, "dockerfile"),
     ];
 
-    // DEFERRED — has control flow but .cfg.scm not yet authored
+    // DEFERRED — has control flow but .cfg.scm not yet authored, or grammar
+    // cannot be inspected without the grammar being installed.
     //
-    // C-family:
-    //   C (c), C++ (cpp), ObjC (objc), C# (csharp), Kotlin (kotlin),
-    //   Swift (swift), Dart (dart)
+    // Assembly languages: asm, x86asm — branches exist (jmp/je/jne) at the
+    //   instruction level but the grammar structure needs inspection to write
+    //   correct queries. Grammar not available in the current arborium install.
     //
-    // Scripting:
-    //   Ruby (ruby), Lua (lua), PHP (php), Perl (perl), Bash (bash),
-    //   Fish (fish), Awk (awk), Zsh (zsh), PowerShell (powershell),
-    //   Batch (batch), Vim (vim)
-    //
-    // JVM / .NET:
-    //   Groovy (groovy), Scala (scala), F# (fsharp), VB (vb)
-    //
-    // Functional:
-    //   Haskell (haskell), OCaml (ocaml), Elixir (elixir), Erlang (erlang),
-    //   Elm (elm), Gleam (gleam), Clojure (clojure), CommonLisp (commonlisp),
-    //   Scheme (scheme), Emacs Lisp (elisp), Idris (idris), Agda (agda),
-    //   Lean (lean), ReScript (rescript)
-    //
-    // Systems:
-    //   Zig (zig), Ada (ada)
-    //
-    // Scientific / niche scripting:
-    //   R (r), Julia (julia), MATLAB (matlab)
-    //
-    // Logic / specialized:
-    //   Prolog (prolog), D (d), Nix (nix), HCL (hcl), Starlark (starlark),
-    //   Jinja2 (jinja2), Svelte (svelte), Vue (vue), Meson (meson), CMake (cmake),
-    //   GLSL (glsl), HLSL (hlsl), Verilog (verilog), VHDL (vhdl), TLA+ (tlaplus),
-    //   Uiua (uiua), jq (jq), Assembly (asm), x86 Assembly (x86asm),
-    //   tree-sitter query (query), Dockerfile (dockerfile)
+    // Uiua (uiua) — array programming language with non-standard control flow;
+    //   grammar has no query files yet; defer until grammar inspection is possible.
 
     // Suppress unused-variable warnings; the arrays serve as documentation.
     let _ = has_cfg;

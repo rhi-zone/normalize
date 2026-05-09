@@ -27,9 +27,15 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] Commit 9: Java CFG query (`java.cfg.scm`) + 5 fixtures (labeled break/continue validated)
 - [x] Commit 10: Coverage matrix test (`coverage_matrix.rs`) classifying all languages as HAS_CFG / NOT_APPLICABLE / DEFERRED
 - [x] Commit 11 (partial): Fixed pre-existing clippy error in all CFG test helpers (`is_some_and` collapse)
+- [x] Commit 12: CFG Phase 1 batch — 69 additional `.cfg.scm` queries (C-family, JVM/functional, scripting, systems, domain/config); coverage matrix updated to 76 HAS_CFG; Lua + Jinja2 snapshot tests; dockerfile/query moved to NOT_APPLICABLE; asm/x86asm/uiua remain DEFERRED
+
+**Remaining DEFERRED (Phase 1 cleanup):**
+- asm, x86asm — assembly branches (jmp/je/jne) are at instruction level; need grammar inspection (not installed)
+- uiua — array programming language, no standard query files; control flow is stack-based
 
 **Follow-ups:**
 - Java labeled break/continue: currently captured as `@cfg.exit.break`/`@cfg.exit.continue`; the label target is not resolved. Full label resolution (connecting break to the labeled outer loop rather than innermost) tracked here.
+- Query validation: queries for non-installed grammars (most of batch A-E) are written against complexity-query node types; when grammars are installed, snapshot tests should be run to validate field names and node types are correct.
 - Recursive CFG: nested control flow within arms/branches is currently a single Statement block; full recursion needs re-querying within each sub-range.
 - Cyclomatic complexity from CFG (= edges - nodes + 2)
 - LSP: expose CFG as an inlay hint or hover action

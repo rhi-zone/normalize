@@ -1,0 +1,5 @@
+---
+source: crates/normalize-cfg/tests/lua_cfg.rs
+expression: mermaid
+---
+lua tags query incompatible with installed grammar — skipped
