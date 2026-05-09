@@ -56,6 +56,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y musl-tools patchelf
+          # musl-gcc emits -lgcc_s; the linker needs libgcc_s.so in its search
+          # path at link time. Copy glibc's copy into the musl sysroot — the
+          # linker only reads it to record the SONAME in NEEDED. The runtime
+          # artifact bundles Alpine's musl-linked libgcc_s.so.1 instead, so the
+          # glibc copy never runs on end-user systems.
+          GLIBC_LIBGCC=$(ls /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 2>/dev/null)
+          sudo mkdir -p /usr/lib/x86_64-linux-musl
+          sudo cp "$GLIBC_LIBGCC" /usr/lib/x86_64-linux-musl/libgcc_s.so.1
+          sudo ln -sf libgcc_s.so.1 /usr/lib/x86_64-linux-musl/libgcc_s.so
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
