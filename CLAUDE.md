@@ -8,6 +8,8 @@ Behavioral rules for Claude Code in this repository.
 
 **Published on [crates.io](https://crates.io/crates/normalize)** as 38 crates (+ 2 `publish = false`: `normalize-grammars`, `xtask`). All at v0.3.1 (early, in active development).
 
+**Installer URL:** `curl -fsSL https://rhi.zone/normalize/install.sh | sh` — canonical copy lives at `https://github.com/rhi-zone/rhi.zone/blob/master/normalize/install.sh`; the in-repo `install.sh` is a synced copy.
+
 ## API-first
 
 **normalize is an API that happens to have a CLI.** The service layer returns typed data; the CLI renders it. When designing a command, start with the data model — what shape does the result have? The CLI surface (subcommand name, flags, positional layout) follows from that. Never let CLI aesthetics drive data shape decisions.
