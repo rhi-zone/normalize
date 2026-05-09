@@ -1,0 +1,5 @@
+---
+source: crates/normalize-cfg/tests/go_cfg.rs
+expression: mermaid
+---
+go grammar not installed — skipped

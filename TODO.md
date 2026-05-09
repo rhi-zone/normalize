@@ -20,8 +20,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] Commit 2: Structured-CFG builder + `rust.cfg.scm` query; snapshot tests
 - [x] Commit 3: Mermaid renderer `Cfg::to_mermaid()` (included in commit 1)
 - [x] Commit 4: `CfgService` + `normalize cfg` CLI; help snapshot; `docs/cli/cfg.md`
-- [ ] Commit 5: Python CFG query + fixtures
-- [ ] Commit 6: Go CFG query + fixtures
+- [x] Commit 5: Python CFG query + fixtures
+- [x] Commit 6: Go CFG query + fixtures
 
 **Follow-ups:**
 - Recursive CFG: nested control flow within arms/branches is currently a single Statement block; full recursion needs re-querying within each sub-range.

@@ -1,0 +1,9 @@
+---
+source: crates/normalize-cfg/tests/python_cfg.rs
+expression: mermaid
+---
+flowchart TD
+    b0(["entry"])
+    b1(["exit"])
+
+    b0 -->|"return"| b1
