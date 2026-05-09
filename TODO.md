@@ -18,8 +18,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 - [x] Commit 1: Scaffold `normalize-cfg` crate with data model, empty builder, `GrammarLoader::get_cfg()`, SUMMARY.md
 - [x] Commit 2: Structured-CFG builder + `rust.cfg.scm` query; snapshot tests
-- [x] Commit 3: Mermaid renderer `Cfg::to_mermaid()`; snapshot tests
-- [x] Commit 4: `CfgService` + `normalize cfg` CLI; help snapshot
+- [x] Commit 3: Mermaid renderer `Cfg::to_mermaid()` (included in commit 1)
+- [x] Commit 4: `CfgService` + `normalize cfg` CLI; help snapshot; `docs/cli/cfg.md`
 - [ ] Commit 5: Python CFG query + fixtures
 - [ ] Commit 6: Go CFG query + fixtures
 

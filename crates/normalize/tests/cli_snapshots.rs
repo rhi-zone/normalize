@@ -473,3 +473,14 @@ fn test_help_trend_density() {
 fn test_help_trend_test_ratio() {
     insta::assert_snapshot!(snapshot_help(&["trend", "test-ratio"]));
 }
+
+// cfg command
+#[test]
+fn test_help_cfg() {
+    insta::assert_snapshot!(snapshot_help(&["cfg"]));
+}
+
+#[test]
+fn test_help_cfg_cfg() {
+    insta::assert_snapshot!(snapshot_help(&["cfg", "cfg"]));
+}
