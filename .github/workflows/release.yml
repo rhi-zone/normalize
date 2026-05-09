@@ -51,14 +51,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
-      - name: Install musl-tools
+      - name: Install zig (musl target)
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools patchelf
-          # -static-libgcc in RUSTFLAGS links libgcc builtins from libgcc.a
-          # (the static archive, which musl-tools ships) rather than emitting
-          # -lgcc_s. No glibc libgcc_s.so.1 copy needed.
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: "0.14.0"
+
+      - name: Install cargo-zigbuild (musl target)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: cargo install cargo-zigbuild --locked
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -73,28 +74,19 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Build CLI
-        run: cargo build --release --target ${{ matrix.target }} -p normalize --features sessions-web
+        # musl target uses cargo-zigbuild: zig's musl toolchain emits no
+        # -lgcc_s (uses static compiler_rt instead), so the binary has no
+        # libgcc_s.so.1 dependency. -crt-static=false keeps dlopen working
+        # for grammar .so files. All other targets use plain cargo build.
+        run: |
+          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
+            cargo zigbuild --release --target ${{ matrix.target }} -p normalize --features sessions-web
+          else
+            cargo build --release --target ${{ matrix.target }} -p normalize --features sessions-web
+          fi
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-          # musl: produce a dynamically-linked binary so `dlopen()` works for
-          # tree-sitter grammar `.so` files. The default for *-linux-musl is
-          # `+crt-static`, which produces a static-pie binary that cannot
-          # dlopen at runtime — that limited musl users to the 6 grammars
-          # statically linked via `arborium-*` crates. We disable crt-static
-          # and add `$ORIGIN` rpath so the binary can find bundled grammar
-          # libraries (and the bundled libc) next to itself.
-          # The release tarball ships a wrapper script + bundled
-          # `ld-musl-x86_64.so.1` / `libc.musl-x86_64.so.1`, so the artifact
-          # is fully self-contained — no system musl required.
-          # Use musl-gcc as the linker (not the default `cc`, which is glibc gcc
-          # on Ubuntu and doesn't synthesise musl-specific link flags). musl-gcc
-          # knows libm folds into libc on musl and handles math symbol resolution
-          # correctly without manual `-lm`. The "Install musl-tools" step above
-          # also seeds glibc's libgcc_s.so.1 into musl-gcc's library search
-          # path so the rust-emitted `-lgcc_s` resolves correctly (musl itself
-          # ships no libgcc_s.so).
-          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
-          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN -C link-arg=-static-libgcc"
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN"
 
       - name: Fetch normalize-grammars deps
         # `cargo build -p normalize` only fetches `normalize`'s dep tree.
@@ -113,15 +105,14 @@ jobs:
         run: cargo xtask build-grammars
 
       - name: Build grammars (musl target)
-        # Build grammars with musl-gcc so the resulting .so files link against
-        # musl libc, matching the binary in the musl tarball. Glibc-linked
-        # grammars cannot be dlopen'd by a musl-linked normalize binary
-        # (different loader, different libc soname).
+        # Build grammars with zig cc targeting musl so the .so files link
+        # against musl libc, matching the zigbuild binary. Glibc-linked
+        # grammars cannot be dlopen'd by a musl-linked normalize binary.
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
           cargo xtask build-grammars \
             --target x86_64-unknown-linux-musl \
-            --cc musl-gcc \
+            --cc "zig cc -target x86_64-linux-musl" \
             --out target/x86_64-unknown-linux-musl/grammars
           # Sanity-check: the first grammar should depend on libc.musl-*, not libc.so.6.
           FIRST_GRAMMAR=$(ls target/x86_64-unknown-linux-musl/grammars/*.so | head -1)

@@ -8,6 +8,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`cargo xtask build-grammars --cc "zig cc -target x86_64-linux-musl"` now works.**
+  The `--cc` argument is split on whitespace so compound compilers like `zig cc -target
+  x86_64-linux-musl` are correctly parsed into program + arguments. Previously `Command::new`
+  was called with the entire string as the binary name, causing "No such file or directory"
+  for every grammar. zig's lld linker also requires `--allow-shlib-undefined` instead of
+  `--unresolved-symbols=ignore-in-shared-libs`; the xtask now detects zig cc and emits the
+  correct flag.
+
 - **Grammar ABI mismatch after `normalize update`.** `ensure_grammars_first_use` now
   reads the `.installed-version` stamp and compares it against the running binary's
   version. If they differ (e.g. after a self-update), the stamp is deleted and grammars

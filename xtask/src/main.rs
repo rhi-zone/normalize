@@ -55,7 +55,7 @@ fn build_grammars(args: &[String]) {
     if let Some(t) = target {
         println!("Target triple: {t}");
     }
-    println!("C compiler: {}", resolve_cc(target, cc));
+    println!("C compiler: {}", resolve_cc(target, cc).join(" "));
 
     let registry_src = find_cargo_registry_src();
     let grammars = find_arborium_grammars(&registry_src);
@@ -220,15 +220,32 @@ fn is_apple_target(target: Option<&str>) -> bool {
     }
 }
 
+/// Split a CC string into `[program, arg1, arg2, ...]`.
+/// Handles compound compilers like `"zig cc -target x86_64-linux-musl"`.
+/// Simple whitespace split — no quote handling needed for our use cases.
+fn split_cc(cc: &str) -> Vec<String> {
+    cc.split_whitespace().map(|s| s.to_string()).collect()
+}
+
+/// True if the resolved CC is zig-based (zig cc / zig c++).
+fn is_zig_cc(parts: &[String]) -> bool {
+    parts.first().map(|p| p.ends_with("zig")).unwrap_or(false)
+        && parts
+            .get(1)
+            .map(|p| p == "cc" || p == "c++")
+            .unwrap_or(false)
+}
+
 /// Resolve the C compiler to use for grammar compilation.
 /// Priority: explicit `--cc` > `$CC` env var > target-specific default > `cc`.
-fn resolve_cc(target: Option<&str>, cc: Option<&str>) -> String {
+/// Returns `[program, extra_args...]` split from the CC string.
+fn resolve_cc(target: Option<&str>, cc: Option<&str>) -> Vec<String> {
     if let Some(c) = cc {
-        return c.to_string();
+        return split_cc(c);
     }
     if let Ok(c) = env::var("CC") {
         if !c.is_empty() {
-            return c;
+            return split_cc(&c);
         }
     }
     if let Some(t) = target {
@@ -238,20 +255,20 @@ fn resolve_cc(target: Option<&str>, cc: Option<&str>) -> String {
             // Prefer the prefixed cross-compiler if available; otherwise musl-gcc
             // (as installed by Ubuntu's `musl-tools`).
             if which("x86_64-linux-musl-gcc") {
-                return "x86_64-linux-musl-gcc".to_string();
+                return vec!["x86_64-linux-musl-gcc".to_string()];
             }
             if which("musl-gcc") {
-                return "musl-gcc".to_string();
+                return vec!["musl-gcc".to_string()];
             }
         }
         if t == "aarch64-unknown-linux-musl" && which("aarch64-linux-musl-gcc") {
-            return "aarch64-linux-musl-gcc".to_string();
+            return vec!["aarch64-linux-musl-gcc".to_string()];
         }
         if t == "aarch64-unknown-linux-gnu" && which("aarch64-linux-gnu-gcc") {
-            return "aarch64-linux-gnu-gcc".to_string();
+            return vec!["aarch64-linux-gnu-gcc".to_string()];
         }
     }
-    "cc".to_string()
+    vec!["cc".to_string()]
 }
 
 fn which(prog: &str) -> bool {
@@ -387,8 +404,10 @@ fn compile_local_grammar(
     let scanner_c = grammar_dir.join("src/scanner.c");
     let out_file = out_dir.join(format!("{lang}.{}", lib_extension(target)));
 
-    let compiler = resolve_cc(target, cc);
-    let mut cmd = Command::new(&compiler);
+    let cc_parts = resolve_cc(target, cc);
+    let compiler_display = cc_parts.join(" ");
+    let mut cmd = Command::new(&cc_parts[0]);
+    cmd.args(&cc_parts[1..]);
     cmd.arg("-shared")
         .arg("-fPIC")
         .arg("-O2")
@@ -401,7 +420,12 @@ fn compile_local_grammar(
     }
 
     if is_linux_target(target) {
-        cmd.arg("-Wl,--unresolved-symbols=ignore-in-shared-libs");
+        // zig's lld doesn't support --unresolved-symbols; use --allow-shlib-undefined instead.
+        if is_zig_cc(&cc_parts) {
+            cmd.arg("-Wl,--allow-shlib-undefined");
+        } else {
+            cmd.arg("-Wl,--unresolved-symbols=ignore-in-shared-libs");
+        }
     }
     if is_apple_target(target) {
         cmd.arg("-undefined").arg("dynamic_lookup");
@@ -411,7 +435,7 @@ fn compile_local_grammar(
 
     let output = cmd
         .output()
-        .map_err(|e| format!("Failed to run {compiler}: {e}"))?;
+        .map_err(|e| format!("Failed to run {compiler_display}: {e}"))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -488,8 +512,10 @@ fn compile_grammar(
 
     let out_file = out_dir.join(format!("{lang}.{}", lib_extension(target)));
 
-    let compiler = resolve_cc(target, cc);
-    let mut cmd = Command::new(&compiler);
+    let cc_parts = resolve_cc(target, cc);
+    let compiler_display = cc_parts.join(" ");
+    let mut cmd = Command::new(&cc_parts[0]);
+    cmd.args(&cc_parts[1..]);
     cmd.arg("-shared")
         .arg("-fPIC")
         .arg("-O2")
@@ -509,7 +535,12 @@ fn compile_grammar(
 
     // Scanner uses ts_calloc/ts_free - resolved at runtime
     if is_linux_target(target) {
-        cmd.arg("-Wl,--unresolved-symbols=ignore-in-shared-libs");
+        // zig's lld doesn't support --unresolved-symbols; use --allow-shlib-undefined instead.
+        if is_zig_cc(&cc_parts) {
+            cmd.arg("-Wl,--allow-shlib-undefined");
+        } else {
+            cmd.arg("-Wl,--unresolved-symbols=ignore-in-shared-libs");
+        }
     }
     if is_apple_target(target) {
         cmd.arg("-undefined").arg("dynamic_lookup");
@@ -519,7 +550,7 @@ fn compile_grammar(
 
     let output = cmd
         .output()
-        .map_err(|e| format!("Failed to run {compiler}: {e}"))?;
+        .map_err(|e| format!("Failed to run {compiler_display}: {e}"))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

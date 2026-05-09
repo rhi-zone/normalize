@@ -130,11 +130,11 @@ Items that surfaced during the 0.3.1 release rodeo and may be worth a
 second look — none are blocking, none are strictly committed:
 
 - **Musl artifact end-to-end install never validated on a clean machine.**
-  CI builds it cleanly and the wrapper script + bundled loader/libc/libgcc
-  approach is principled, but no one has actually `tar xzf`'d the release
-  on a fresh NixOS / Alpine / distroless container and verified the wrapper
-  resolves correctly under `~/.local/bin/`-via-symlink, PATH lookups, etc.
-  First user to install will be the integration test.
+  CI builds it cleanly and the wrapper script + bundled musl loader approach
+  is principled, but no one has actually `tar xzf`'d the release on a fresh
+  NixOS / Alpine / distroless container and verified the wrapper resolves
+  correctly under `~/.local/bin/`-via-symlink, PATH lookups, etc. First user
+  to install will be the integration test.
 
 - **Crates.io rate-limit handling works but is slow.** publish.yml has
   Retry-After-aware retry; new-crate publishes still take 1-2 hours total
@@ -142,11 +142,14 @@ second look — none are blocking, none are strictly committed:
   crates.io to raise our limit (their docs invite this for legitimate
   workspaces) — would shrink publish time to minutes.
 
-- **Musl grammar build uses glibc libgcc_s.so.1.** We copy it from the
-  Ubuntu runner into musl-gcc's sysroot at link time and bundle it into the
-  release tarball. libgcc_s contains only compiler builtins, so the
-  glibc-into-musl mixing is safe in theory — but worth keeping an eye on
-  if anyone reports `__divti3`/`__udivdi3` ABI surprises on musl.
+- **Musl grammar build: switched to zig cc toolchain (libgcc_s issue resolved).**
+  The zig toolchain uses its own static compiler-rt instead of emitting `-lgcc_s`,
+  so the binary has no `libgcc_s.so.1` dependency. The CI and xtask grammar build
+  now use `zig cc -target x86_64-linux-musl` consistently.
+  NOTE: fully static musl binaries (crt-static=true) cannot dlopen — musl's static
+  libc provides only a stub dlopen that returns ENOSYS. The release binary must
+  remain dynamically linked to musl (crt-static=false) with the bundled loader
+  wrapper to support grammar dlopen.
 
 - **Some commits in this release line had to be retried 6+ times in CI**
   because each push surfaced a different latent bug (musl libm, libgcc_s,
