@@ -110,6 +110,28 @@ pub enum EdgeKind {
 // Basic block
 // ---------------------------------------------------------------------------
 
+/// A variable/binding definition site within a basic block.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct DefSite {
+    /// Name of the variable or binding being defined.
+    pub name: String,
+    /// Byte offset of the definition in the source file (0-indexed).
+    pub byte_offset: usize,
+    /// Source line of the definition (1-indexed).
+    pub line: u32,
+}
+
+/// A variable use site within a basic block.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct UseSite {
+    /// Name of the variable being used.
+    pub name: String,
+    /// Byte offset of the use in the source file (0-indexed).
+    pub byte_offset: usize,
+    /// Source line of the use (1-indexed).
+    pub line: u32,
+}
+
 /// A basic block in the CFG: a maximal linear sequence of statements.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct BasicBlock {
@@ -123,6 +145,10 @@ pub struct BasicBlock {
     pub end_line: u32,
     /// Structural role of this block.
     pub kind: BlockKind,
+    /// Variable/binding definition sites within this block.
+    pub defs: Vec<DefSite>,
+    /// Variable use sites within this block.
+    pub uses: Vec<UseSite>,
 }
 
 // ---------------------------------------------------------------------------

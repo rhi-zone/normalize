@@ -9,7 +9,7 @@
 //! - `@cfg.exit.*` nodes terminate the current block and open an `Unreachable` continuation.
 //! - All other statement nodes are appended to the current sequential block.
 
-use crate::{BasicBlock, BlockId, BlockKind, Cfg, Edge, EdgeKind, FunctionId};
+use crate::{BasicBlock, BlockId, BlockKind, Cfg, DefSite, Edge, EdgeKind, FunctionId, UseSite};
 use std::ops::Range;
 use streaming_iterator::StreamingIterator;
 
@@ -55,6 +55,8 @@ impl Builder {
             start_line: line,
             end_line: line,
             kind,
+            defs: Vec::new(),
+            uses: Vec::new(),
         });
         id
     }
@@ -96,6 +98,14 @@ enum CaptureKind {
     ExitBreak,
     ExitContinue,
     ExitThrow,
+    /// Variable/binding definition site (`@cfg.def`).
+    Def,
+    /// The identifier name node for a def (`@cfg.def.name`).
+    DefName,
+    /// Variable use site (`@cfg.use`).
+    Use,
+    /// The identifier name node for a use (`@cfg.use.name`).
+    UseName,
 }
 
 fn parse_capture_name(name: &str) -> Option<CaptureKind> {
@@ -118,6 +128,10 @@ fn parse_capture_name(name: &str) -> Option<CaptureKind> {
         "cfg.exit.break" => Some(CaptureKind::ExitBreak),
         "cfg.exit.continue" => Some(CaptureKind::ExitContinue),
         "cfg.exit.throw" => Some(CaptureKind::ExitThrow),
+        "cfg.def" => Some(CaptureKind::Def),
+        "cfg.def.name" => Some(CaptureKind::DefName),
+        "cfg.use" => Some(CaptureKind::Use),
+        "cfg.use.name" => Some(CaptureKind::UseName),
         _ => None,
     }
 }
@@ -300,6 +314,113 @@ pub fn build(
     // A node is top-level if no other structural node's range fully contains it.
     let top_level = filter_top_level(structural_nodes);
 
+    // --- Second pass: collect def/use sites ---
+    // Raw (byte_offset, name, line, is_def) tuples, collected before building blocks.
+    struct RawDefUse {
+        byte_offset: usize,
+        name: String,
+        line: u32,
+        is_def: bool,
+    }
+    let mut raw_def_use: Vec<RawDefUse> = Vec::new();
+
+    // We need to check if the query has any def/use captures at all.
+    let has_def_use = capture_names
+        .iter()
+        .any(|n| matches!(*n, "cfg.def" | "cfg.def.name" | "cfg.use" | "cfg.use.name"));
+
+    if has_def_use {
+        let mut cursor2 = tree_sitter::QueryCursor::new();
+        cursor2.set_byte_range(body_range.start..body_range.end);
+
+        // Collect raw matches for def/use
+        struct DefUseMatchData {
+            // Primary capture: cfg.def or cfg.use
+            primary_start: usize,
+            primary_end: usize,
+            primary_start_row: usize,
+            is_def: bool,
+            // Optional name sub-capture
+            name_start: usize,
+            name_end: usize,
+            name_start_row: usize,
+            has_name: bool,
+        }
+        let mut du_matches: Vec<DefUseMatchData> = Vec::new();
+
+        let mut du_iter = cursor2.matches(&query, tree.root_node(), source);
+        while let Some(m) = du_iter.next() {
+            let primary = m.captures.iter().find(|c| {
+                let name = capture_names[c.index as usize];
+                matches!(name, "cfg.def" | "cfg.use")
+            });
+            let Some(primary_cap) = primary else {
+                continue;
+            };
+            let is_def = capture_names[primary_cap.index as usize] == "cfg.def";
+            let pnode = primary_cap.node;
+
+            // Look for the .name sub-capture
+            let name_cap = m.captures.iter().find(|c| {
+                let n = capture_names[c.index as usize];
+                (is_def && n == "cfg.def.name") || (!is_def && n == "cfg.use.name")
+            });
+
+            let (name_start, name_end, name_start_row, has_name) = if let Some(nc) = name_cap {
+                (
+                    nc.node.start_byte(),
+                    nc.node.end_byte(),
+                    nc.node.start_position().row,
+                    true,
+                )
+            } else {
+                (
+                    pnode.start_byte(),
+                    pnode.end_byte(),
+                    pnode.start_position().row,
+                    false,
+                )
+            };
+
+            du_matches.push(DefUseMatchData {
+                primary_start: pnode.start_byte(),
+                primary_end: pnode.end_byte(),
+                primary_start_row: pnode.start_position().row,
+                is_def,
+                name_start,
+                name_end,
+                name_start_row,
+                has_name,
+            });
+        }
+        drop(du_iter);
+
+        for mat in &du_matches {
+            // Skip nodes outside body range
+            if mat.primary_start < body_range.start || mat.primary_end > body_range.end {
+                continue;
+            }
+            let byte_offset = if mat.has_name {
+                mat.name_start
+            } else {
+                mat.primary_start
+            };
+            let line = if mat.has_name {
+                row_to_line(mat.name_start_row)
+            } else {
+                row_to_line(mat.primary_start_row)
+            };
+            let name_bytes = &source[mat.name_start..mat.name_end];
+            let name = String::from_utf8_lossy(name_bytes).into_owned();
+            raw_def_use.push(RawDefUse {
+                byte_offset,
+                name,
+                line,
+                is_def: mat.is_def,
+            });
+        }
+    }
+
     // Build CFG from the top-level structural nodes.
     let mut b = Builder::new();
 
@@ -312,6 +433,35 @@ pub fn build(
 
     if !seq.terminated {
         b.add_edge(seq.tail, exit, EdgeKind::Fallthrough);
+    }
+
+    // Assign def/use sites to blocks: each site goes to the block whose byte_range
+    // contains the site's byte_offset. Falls back to entry block if none found.
+    for du in raw_def_use {
+        let block_id = b
+            .blocks
+            .iter()
+            .find(|blk| {
+                !blk.byte_range.is_empty()
+                    && blk.byte_range.start <= du.byte_offset
+                    && du.byte_offset < blk.byte_range.end
+            })
+            .map(|blk| blk.id)
+            .unwrap_or(entry);
+        let blk = b.block_mut(block_id);
+        if du.is_def {
+            blk.defs.push(DefSite {
+                name: du.name,
+                byte_offset: du.byte_offset,
+                line: du.line,
+            });
+        } else {
+            blk.uses.push(UseSite {
+                name: du.name,
+                byte_offset: du.byte_offset,
+                line: du.line,
+            });
+        }
     }
 
     Ok(Cfg {

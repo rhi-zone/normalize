@@ -1,0 +1,40 @@
+# ---
+# id = "liveness"
+# message = "Control-flow liveness analysis: live-in and live-out variable sets per block"
+# tags = ["cfg", "dataflow"]
+# enabled = false
+# ---
+#
+# Computes live-in and live-out variable sets for each basic block using standard
+# backward dataflow analysis.
+#
+# A variable is **live-out** of a block B if it is live-in of at least one
+# successor of B (following cfg_edge).
+#
+# A variable is **live-in** of a block B if it is:
+# - used in B (cfg_use), OR
+# - live-out of B and not defined in B (cfg_def)
+#
+# This rule set produces `live_in` and `live_out` facts but no diagnostics by
+# default (enabled = false). Enable it and reference it from other rules, or
+# query the derived `live_in`/`live_out` relations directly.
+
+relation live_out(String, String, u32, u32, String);
+relation live_in(String, String, u32, u32, String);
+
+// live_out(file, func, func_line, block, var):
+//   A variable is live-out of block B if it is live-in of any successor of B.
+live_out(F, Fn, FL, B, V) <--
+    cfg_edge(F, Fn, FL, B, S, _),
+    live_in(F, Fn, FL, S, V);
+
+// live_in(file, func, func_line, block, var):
+//   A variable is live-in of B if it is used in B.
+live_in(F, Fn, FL, B, V) <--
+    cfg_use(F, Fn, FL, B, V);
+
+// A variable is live-in of B if it is live-out of B and not killed (defined) in B.
+live_in(F, Fn, FL, B, V) <--
+    live_out(F, Fn, FL, B, V),
+    cfg_block(F, Fn, FL, B, _),
+    !cfg_def(F, Fn, FL, B, V);

@@ -71,3 +71,23 @@
   macro: (identifier) @_macro_name
   (#match? @_macro_name "^(panic|todo|unreachable|unimplemented)$")
 ) @cfg.exit.throw
+
+; ---------------------------------------------------------------------------
+; Def/use sites
+; ---------------------------------------------------------------------------
+
+; let x = ... — immutable local variable definition
+(let_declaration
+  pattern: (identifier) @cfg.def.name
+) @cfg.def
+
+; let mut x = ... — mutable local variable definition
+(let_declaration
+  (mutable_specifier)
+  (identifier) @cfg.def.name
+) @cfg.def
+
+; x = ... — assignment (re-definition)
+(assignment_expression
+  left: (identifier) @cfg.def.name
+) @cfg.def

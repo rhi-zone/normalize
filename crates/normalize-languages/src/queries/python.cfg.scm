@@ -71,3 +71,17 @@
 (continue_statement) @cfg.exit.continue
 
 (raise_statement) @cfg.exit.throw
+
+; ---------------------------------------------------------------------------
+; Def/use sites
+; ---------------------------------------------------------------------------
+
+; y = expr — assignment definition
+(assignment
+  left: (identifier) @cfg.def.name
+) @cfg.def
+
+; y: type = expr — annotated assignment definition
+(augmented_assignment
+  left: (identifier) @cfg.def.name
+) @cfg.def

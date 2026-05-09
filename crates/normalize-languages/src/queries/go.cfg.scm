@@ -48,3 +48,21 @@
 (break_statement) @cfg.exit.break
 
 (continue_statement) @cfg.exit.continue
+
+; ---------------------------------------------------------------------------
+; Def/use sites
+; ---------------------------------------------------------------------------
+
+; y := expr — short variable declaration
+(short_var_declaration
+  left: (expression_list
+    (identifier) @cfg.def.name
+  )
+) @cfg.def
+
+; y = expr — assignment
+(assignment_statement
+  left: (expression_list
+    (identifier) @cfg.def.name
+  )
+) @cfg.def

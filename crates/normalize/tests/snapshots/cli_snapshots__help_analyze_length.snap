@@ -29,6 +29,7 @@ Commands:
   health             Run health analysis (file counts, complexity stats, large file warnings)
   all                Run all analysis passes
   summary            Auto-generated single-page codebase overview
+  liveness           Compute live-in and live-out variable sets for each basic block in a function.
 
 Repository:
   docs               Measure documentation coverage: which public symbols lack doc comments.

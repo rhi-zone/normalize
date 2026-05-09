@@ -28,6 +28,7 @@ pub mod import_path;
 pub mod imports;
 pub mod layering;
 pub mod length;
+pub mod liveness;
 pub mod module_health;
 pub mod ownership;
 pub mod provenance;

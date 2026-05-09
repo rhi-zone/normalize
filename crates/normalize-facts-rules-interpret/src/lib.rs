@@ -78,6 +78,10 @@ relation symbol_use(String, String, u32);
 relation resolved_reference(String, u32, String, String, String);
 relation resolved_call(String, String, String, String, u32);
 relation module_search_path(String, String, String, String);
+relation cfg_block(String, String, u32, u32, String);
+relation cfg_edge(String, String, u32, u32, u32, String);
+relation cfg_def(String, String, u32, u32, String);
+relation cfg_use(String, String, u32, u32, String);
 relation diagnostic(String, String, String, u32, String);
 "#;
 
@@ -207,6 +211,10 @@ const BUILTIN_RULES: &[BuiltinFactsRule] = &[
     BuiltinFactsRule {
         id: "resolution",
         content: include_str!("builtin_dl/resolution.dl"),
+    },
+    BuiltinFactsRule {
+        id: "liveness",
+        content: include_str!("builtin_dl/liveness.dl"),
     },
 ];
 
@@ -1511,6 +1519,71 @@ fn populate_facts_with_sources(
             )
             .map_err(|e| InterpretError::Parse(e.to_string()))?;
     }
+    for blk in relations.cfg_blocks.iter() {
+        let sid = engine.intern_source(blk.file.as_str());
+        engine
+            .insert_with_source(
+                "cfg_block",
+                vec![
+                    Value::string(&blk.file),
+                    Value::string(&blk.func),
+                    Value::U32(blk.func_line),
+                    Value::U32(blk.block),
+                    Value::string(&blk.kind),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for edge in relations.cfg_edges.iter() {
+        let sid = engine.intern_source(edge.file.as_str());
+        engine
+            .insert_with_source(
+                "cfg_edge",
+                vec![
+                    Value::string(&edge.file),
+                    Value::string(&edge.func),
+                    Value::U32(edge.func_line),
+                    Value::U32(edge.from),
+                    Value::U32(edge.to),
+                    Value::string(&edge.kind),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for def in relations.cfg_defs.iter() {
+        let sid = engine.intern_source(def.file.as_str());
+        engine
+            .insert_with_source(
+                "cfg_def",
+                vec![
+                    Value::string(&def.file),
+                    Value::string(&def.func),
+                    Value::U32(def.func_line),
+                    Value::U32(def.block),
+                    Value::string(&def.name),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+    for use_ in relations.cfg_uses.iter() {
+        let sid = engine.intern_source(use_.file.as_str());
+        engine
+            .insert_with_source(
+                "cfg_use",
+                vec![
+                    Value::string(&use_.file),
+                    Value::string(&use_.func),
+                    Value::U32(use_.func_line),
+                    Value::U32(use_.block),
+                    Value::string(&use_.name),
+                ],
+                sid,
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
     Ok(())
 }
 
@@ -1765,6 +1838,67 @@ fn populate_facts(engine: &mut Engine, relations: &Relations) -> Result<(), Inte
                     Value::string(&msp.language),
                     Value::string(&msp.kind),
                     Value::string(&msp.path),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+
+    for blk in relations.cfg_blocks.iter() {
+        engine
+            .insert(
+                "cfg_block",
+                vec![
+                    Value::string(&blk.file),
+                    Value::string(&blk.func),
+                    Value::U32(blk.func_line),
+                    Value::U32(blk.block),
+                    Value::string(&blk.kind),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+
+    for edge in relations.cfg_edges.iter() {
+        engine
+            .insert(
+                "cfg_edge",
+                vec![
+                    Value::string(&edge.file),
+                    Value::string(&edge.func),
+                    Value::U32(edge.func_line),
+                    Value::U32(edge.from),
+                    Value::U32(edge.to),
+                    Value::string(&edge.kind),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+
+    for def in relations.cfg_defs.iter() {
+        engine
+            .insert(
+                "cfg_def",
+                vec![
+                    Value::string(&def.file),
+                    Value::string(&def.func),
+                    Value::U32(def.func_line),
+                    Value::U32(def.block),
+                    Value::string(&def.name),
+                ],
+            )
+            .map_err(|e| InterpretError::Parse(e.to_string()))?;
+    }
+
+    for use_ in relations.cfg_uses.iter() {
+        engine
+            .insert(
+                "cfg_use",
+                vec![
+                    Value::string(&use_.file),
+                    Value::string(&use_.func),
+                    Value::U32(use_.func_line),
+                    Value::U32(use_.block),
+                    Value::string(&use_.name),
                 ],
             )
             .map_err(|e| InterpretError::Parse(e.to_string()))?;

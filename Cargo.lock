@@ -5364,6 +5364,7 @@ dependencies = [
  "ignore",
  "indicatif",
  "libsql",
+ "normalize-cfg",
  "normalize-facts-core",
  "normalize-languages",
  "normalize-local-deps",

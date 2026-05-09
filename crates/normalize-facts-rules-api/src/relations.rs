@@ -326,6 +326,80 @@ pub struct ModuleSearchPathFact {
     pub path: String,
 }
 
+/// A CFG block fact.
+///
+/// Maps to Datalog: `cfg_block(file, func, func_line, block, kind)`
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
+pub struct CfgBlockFact {
+    /// Source file path
+    pub file: String,
+    /// Qualified function name
+    pub func: String,
+    /// Function start line (1-based)
+    pub func_line: u32,
+    /// Block ID (0-based, unique within function)
+    pub block: u32,
+    /// Block kind (e.g. "entry", "exit", "branch", "loophead")
+    pub kind: String,
+}
+
+/// A CFG edge fact.
+///
+/// Maps to Datalog: `cfg_edge(file, func, func_line, from, to, kind)`
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
+pub struct CfgEdgeFact {
+    /// Source file path
+    pub file: String,
+    /// Qualified function name
+    pub func: String,
+    /// Function start line (1-based)
+    pub func_line: u32,
+    /// Source block ID
+    pub from: u32,
+    /// Target block ID
+    pub to: u32,
+    /// Edge kind (e.g. "fallthrough", "conditionaltrue", "backedge")
+    pub kind: String,
+}
+
+/// A CFG variable definition fact.
+///
+/// Maps to Datalog: `cfg_def(file, func, func_line, block, name)`
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
+pub struct CfgDefFact {
+    /// Source file path
+    pub file: String,
+    /// Qualified function name
+    pub func: String,
+    /// Function start line (1-based)
+    pub func_line: u32,
+    /// Block ID this def occurs in
+    pub block: u32,
+    /// Name of the variable being defined
+    pub name: String,
+}
+
+/// A CFG variable use fact.
+///
+/// Maps to Datalog: `cfg_use(file, func, func_line, block, name)`
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[rkyv(derive(Debug))]
+pub struct CfgUseFact {
+    /// Source file path
+    pub file: String,
+    /// Qualified function name
+    pub func: String,
+    /// Function start line (1-based)
+    pub func_line: u32,
+    /// Block ID this use occurs in
+    pub block: u32,
+    /// Name of the variable being used
+    pub name: String,
+}
+
 /// All relations (facts) available to rules.
 ///
 /// This is the complete set of facts extracted from a codebase.
@@ -371,6 +445,14 @@ pub struct Relations {
     pub resolved_calls: Vec<ResolvedCallFact>,
     /// Module search path facts (directories to search for modules)
     pub module_search_paths: Vec<ModuleSearchPathFact>,
+    /// CFG block facts (one per basic block per function)
+    pub cfg_blocks: Vec<CfgBlockFact>,
+    /// CFG edge facts (one per control-flow edge per function)
+    pub cfg_edges: Vec<CfgEdgeFact>,
+    /// CFG variable definition facts (one per def site per block)
+    pub cfg_defs: Vec<CfgDefFact>,
+    /// CFG variable use facts (one per use site per block)
+    pub cfg_uses: Vec<CfgUseFact>,
 }
 
 impl Relations {
@@ -596,6 +678,66 @@ impl Relations {
             language: language.into(),
             kind: kind.into(),
             path: path.into(),
+        });
+    }
+
+    /// Add a CFG block fact
+    pub fn add_cfg_block(
+        &mut self,
+        file: &str,
+        func: &str,
+        func_line: u32,
+        block: u32,
+        kind: &str,
+    ) {
+        self.cfg_blocks.push(CfgBlockFact {
+            file: file.into(),
+            func: func.into(),
+            func_line,
+            block,
+            kind: kind.into(),
+        });
+    }
+
+    /// Add a CFG edge fact
+    pub fn add_cfg_edge(
+        &mut self,
+        file: &str,
+        func: &str,
+        func_line: u32,
+        from: u32,
+        to: u32,
+        kind: &str,
+    ) {
+        self.cfg_edges.push(CfgEdgeFact {
+            file: file.into(),
+            func: func.into(),
+            func_line,
+            from,
+            to,
+            kind: kind.into(),
+        });
+    }
+
+    /// Add a CFG variable definition fact
+    pub fn add_cfg_def(&mut self, file: &str, func: &str, func_line: u32, block: u32, name: &str) {
+        self.cfg_defs.push(CfgDefFact {
+            file: file.into(),
+            func: func.into(),
+            func_line,
+            block,
+            name: name.into(),
+        });
+    }
+
+    /// Add a CFG variable use fact
+    pub fn add_cfg_use(&mut self, file: &str, func: &str, func_line: u32, block: u32, name: &str) {
+        self.cfg_uses.push(CfgUseFact {
+            file: file.into(),
+            func: func.into(),
+            func_line,
+            block,
+            name: name.into(),
         });
     }
 }

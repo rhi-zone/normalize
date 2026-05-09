@@ -25,6 +25,7 @@ normalize-output = { path = "../normalize-output", version = "0.3.1", optional =
 normalize-facts-core = { path = "../normalize-facts-core", version = "0.3.1" }
 normalize-languages = { path = "../normalize-languages", version = "0.3.1" }
 normalize-local-deps = { path = "../normalize-local-deps", version = "0.3.1" }
+normalize-cfg = { path = "../normalize-cfg", version = "0.3.1", default-features = false }
 
 # Parsing
 tree-sitter = "0.26"

@@ -9,6 +9,55 @@ use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// A single CFG block row ready for DB insertion.
+struct CfgBlockRow {
+    function_qname: String,
+    function_start_line: u32,
+    block_id: u32,
+    kind: String,
+    byte_start: usize,
+    byte_end: usize,
+    start_line: u32,
+    end_line: u32,
+}
+
+/// A single CFG edge row ready for DB insertion.
+struct CfgEdgeRow {
+    function_qname: String,
+    function_start_line: u32,
+    from_block: u32,
+    to_block: u32,
+    kind: String,
+}
+
+/// A single CFG def row ready for DB insertion.
+struct CfgDefRow {
+    function_qname: String,
+    function_start_line: u32,
+    block_id: u32,
+    name: String,
+    byte_offset: usize,
+    line: u32,
+}
+
+/// A single CFG use row ready for DB insertion.
+struct CfgUseRow {
+    function_qname: String,
+    function_start_line: u32,
+    block_id: u32,
+    name: String,
+    byte_offset: usize,
+    line: u32,
+}
+
+/// CFG rows for a single file, ready for DB insertion.
+struct CfgData {
+    blocks: Vec<CfgBlockRow>,
+    edges: Vec<CfgEdgeRow>,
+    defs: Vec<CfgDefRow>,
+    uses: Vec<CfgUseRow>,
+}
+
 /// A parsed symbol ready for database insertion.
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ParsedSymbol {
@@ -38,6 +87,8 @@ struct ParsedFileData {
     type_methods: Vec<(String, String)>,
     /// Type-to-type references (field types, param types, extends, etc.)
     type_refs: Vec<TypeRef>,
+    /// CFG data (blocks, edges, defs, uses) for function-level analysis.
+    cfg: CfgData,
 }
 
 /// CA-cache payload: all extracted data for a single file, keyed by content hash.
@@ -52,7 +103,7 @@ struct CachedFileData {
 }
 
 // Not yet public - just delete .normalize/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 12;
+const SCHEMA_VERSION: i64 = 13;
 
 /// Bump when extraction logic changes to invalidate cached results.
 /// Bumped to "2" (2026-04-27): purge CA cache entries that may have been poisoned
@@ -455,6 +506,11 @@ impl FileIndex {
             conn.execute("DELETE FROM meta WHERE key = 'co_change_last_commit'", ())
                 .await
                 .ok();
+            // CFG tables: clear so next rebuild repopulates them.
+            conn.execute("DELETE FROM cfg_blocks", ()).await.ok();
+            conn.execute("DELETE FROM cfg_edges", ()).await.ok();
+            conn.execute("DELETE FROM cfg_defs", ()).await.ok();
+            conn.execute("DELETE FROM cfg_uses", ()).await.ok();
             // Both diagnostic tables get dropped + recreated on every schema bump
             // (column shape has changed in past bumps and may again — simplest path).
             conn.execute("DROP TABLE IF EXISTS daemon_diagnostics", ())
@@ -544,6 +600,94 @@ impl FileIndex {
         .await?;
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_co_change_file_b ON co_change_edges(file_b)",
+            (),
+        )
+        .await?;
+
+        // CFG blocks, edges, defs, and uses for control-flow analysis.
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cfg_blocks (
+                id INTEGER PRIMARY KEY,
+                file TEXT NOT NULL,
+                function_qname TEXT NOT NULL,
+                function_start_line INTEGER NOT NULL,
+                block_id INTEGER NOT NULL,
+                kind TEXT NOT NULL,
+                byte_start INTEGER NOT NULL,
+                byte_end INTEGER NOT NULL,
+                start_line INTEGER NOT NULL,
+                end_line INTEGER NOT NULL,
+                UNIQUE(file, function_qname, function_start_line, block_id)
+            )",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_cfg_blocks_file ON cfg_blocks(file)",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_cfg_blocks_func ON cfg_blocks(file, function_qname, function_start_line)",
+            (),
+        )
+        .await?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cfg_edges (
+                id INTEGER PRIMARY KEY,
+                file TEXT NOT NULL,
+                function_qname TEXT NOT NULL,
+                function_start_line INTEGER NOT NULL,
+                from_block INTEGER NOT NULL,
+                to_block INTEGER NOT NULL,
+                kind TEXT NOT NULL
+            )",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_cfg_edges_func ON cfg_edges(file, function_qname, function_start_line)",
+            (),
+        )
+        .await?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cfg_defs (
+                id INTEGER PRIMARY KEY,
+                file TEXT NOT NULL,
+                function_qname TEXT NOT NULL,
+                function_start_line INTEGER NOT NULL,
+                block_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                byte_offset INTEGER NOT NULL,
+                line INTEGER NOT NULL
+            )",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_cfg_defs_func ON cfg_defs(file, function_qname, function_start_line)",
+            (),
+        )
+        .await?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cfg_uses (
+                id INTEGER PRIMARY KEY,
+                file TEXT NOT NULL,
+                function_qname TEXT NOT NULL,
+                function_start_line INTEGER NOT NULL,
+                block_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                byte_offset INTEGER NOT NULL,
+                line INTEGER NOT NULL
+            )",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_cfg_uses_func ON cfg_uses(file, function_qname, function_start_line)",
             (),
         )
         .await?;
@@ -2435,6 +2579,8 @@ impl FileIndex {
         // Pre-pass: check CA cache for all files (serial, fast disk reads)
         let mut cached_data: Vec<ParsedFileData> = Vec::new();
         let mut uncached_files: Vec<String> = Vec::new();
+        // Files whose symbol data came from CA cache: need CFG rebuilt separately.
+        let mut ca_cached_files: Vec<String> = Vec::new();
 
         for file_path in &files {
             let full_path = root.join(file_path);
@@ -2456,6 +2602,7 @@ impl FileIndex {
             if let Some(ca) = &self.ca_cache {
                 match ca.get::<CachedFileData>(hash.as_bytes(), EXTRACTOR_VERSION, &grammar) {
                     Ok(Some(cached)) => {
+                        ca_cached_files.push(file_path.clone());
                         cached_data.push(ParsedFileData {
                             file_path: file_path.clone(),
                             symbols: cached.symbols,
@@ -2463,6 +2610,13 @@ impl FileIndex {
                             imports: cached.imports,
                             type_methods: cached.type_methods,
                             type_refs: cached.type_refs,
+                            // CFG data is not CA-cached — always rebuilt during parse.
+                            cfg: CfgData {
+                                blocks: Vec::new(),
+                                edges: Vec::new(),
+                                defs: Vec::new(),
+                                uses: Vec::new(),
+                            },
                         });
                         continue;
                     }
@@ -2576,6 +2730,9 @@ impl FileIndex {
                 // Extract type references using tree-sitter queries
                 let type_refs = parser.find_type_refs(&full_path, &content);
 
+                // Build CFGs for function/method symbols (best-effort — errors are non-fatal).
+                let cfg = build_cfg_data_for_file(&full_path, &bytes, grammar.as_str(), &symbols);
+
                 // Store result in CA cache (best-effort).
                 // Grammar availability is already guaranteed above (parse_file returned Some),
                 // so empty results here are legitimate and safe to cache.
@@ -2615,12 +2772,40 @@ impl FileIndex {
                     imports,
                     type_methods,
                     type_refs,
+                    cfg,
                 })
             })
             .collect();
 
         // Merge CA-cached results
         parsed_data.extend(cached_data);
+
+        // Build CFG data for files that came from the CA cache (their cfg vecs are empty).
+        if !ca_cached_files.is_empty() {
+            // For each cached file, rebuild CFG data using a fresh parser (re-reads the file).
+            let cfg_updates: Vec<(String, CfgData)> = ca_cached_files
+                .par_iter()
+                .filter_map(|file_path| {
+                    let full_path = root.join(file_path);
+                    let bytes = std::fs::read(&full_path).ok()?;
+                    let lang_support = support_for_path(&full_path)?;
+                    let grammar_name = lang_support.grammar_name();
+                    let symbols: Vec<FlatSymbol> = {
+                        let p = SymbolParser::new();
+                        let content = String::from_utf8_lossy(&bytes).into_owned();
+                        p.parse_file(&full_path, &content)?
+                    };
+                    let cfg = build_cfg_data_for_file(&full_path, &bytes, grammar_name, &symbols);
+                    Some((file_path.clone(), cfg))
+                })
+                .collect();
+            // Patch cfg into parsed_data.
+            for (fpath, cfg) in cfg_updates {
+                if let Some(data) = parsed_data.iter_mut().find(|d| d.file_path == fpath) {
+                    data.cfg = cfg;
+                }
+            }
+        }
 
         pb.finish_and_clear();
 
@@ -2652,6 +2837,10 @@ impl FileIndex {
         self.conn
             .execute("DELETE FROM symbol_implements", ())
             .await?;
+        self.conn.execute("DELETE FROM cfg_blocks", ()).await?;
+        self.conn.execute("DELETE FROM cfg_edges", ()).await?;
+        self.conn.execute("DELETE FROM cfg_defs", ()).await?;
+        self.conn.execute("DELETE FROM cfg_uses", ()).await?;
 
         let mut symbol_count = 0;
         let mut call_count = 0;
@@ -2713,6 +2902,69 @@ impl FileIndex {
                     params![data.file_path.clone(), tr.source_symbol.clone(), tr.target_type.clone(), tr.kind.as_str(), tr.line as i64],
                 ).await?;
             }
+
+            // Insert CFG blocks
+            for blk in &data.cfg.blocks {
+                self.conn.execute(
+                    "INSERT OR IGNORE INTO cfg_blocks (file, function_qname, function_start_line, block_id, kind, byte_start, byte_end, start_line, end_line) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                    params![
+                        data.file_path.clone(),
+                        blk.function_qname.clone(),
+                        blk.function_start_line as i64,
+                        blk.block_id as i64,
+                        blk.kind.clone(),
+                        blk.byte_start as i64,
+                        blk.byte_end as i64,
+                        blk.start_line as i64,
+                        blk.end_line as i64,
+                    ],
+                ).await?;
+            }
+            // Insert CFG edges
+            for edge in &data.cfg.edges {
+                self.conn.execute(
+                    "INSERT INTO cfg_edges (file, function_qname, function_start_line, from_block, to_block, kind) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![
+                        data.file_path.clone(),
+                        edge.function_qname.clone(),
+                        edge.function_start_line as i64,
+                        edge.from_block as i64,
+                        edge.to_block as i64,
+                        edge.kind.clone(),
+                    ],
+                ).await?;
+            }
+            // Insert CFG defs
+            for def in &data.cfg.defs {
+                self.conn.execute(
+                    "INSERT INTO cfg_defs (file, function_qname, function_start_line, block_id, name, byte_offset, line) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    params![
+                        data.file_path.clone(),
+                        def.function_qname.clone(),
+                        def.function_start_line as i64,
+                        def.block_id as i64,
+                        def.name.clone(),
+                        def.byte_offset as i64,
+                        def.line as i64,
+                    ],
+                ).await?;
+            }
+            // Insert CFG uses
+            for use_ in &data.cfg.uses {
+                self.conn.execute(
+                    "INSERT INTO cfg_uses (file, function_qname, function_start_line, block_id, name, byte_offset, line) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    params![
+                        data.file_path.clone(),
+                        use_.function_qname.clone(),
+                        use_.function_start_line as i64,
+                        use_.block_id as i64,
+                        use_.name.clone(),
+                        use_.byte_offset as i64,
+                        use_.line as i64,
+                    ],
+                ).await?;
+            }
+
             pb_insert.inc(1);
         }
 
@@ -2790,6 +3042,30 @@ impl FileIndex {
             self.conn
                 .execute(
                     "DELETE FROM type_refs WHERE file = ?1",
+                    params![path.clone()],
+                )
+                .await?;
+            self.conn
+                .execute(
+                    "DELETE FROM cfg_blocks WHERE file = ?1",
+                    params![path.clone()],
+                )
+                .await?;
+            self.conn
+                .execute(
+                    "DELETE FROM cfg_edges WHERE file = ?1",
+                    params![path.clone()],
+                )
+                .await?;
+            self.conn
+                .execute(
+                    "DELETE FROM cfg_defs WHERE file = ?1",
+                    params![path.clone()],
+                )
+                .await?;
+            self.conn
+                .execute(
+                    "DELETE FROM cfg_uses WHERE file = ?1",
                     params![path.clone()],
                 )
                 .await?;
@@ -2962,6 +3238,84 @@ impl FileIndex {
                     "INSERT INTO type_refs (file, source_symbol, target_type, kind, line) VALUES (?1, ?2, ?3, ?4, ?5)",
                     params![file_path.clone(), tr.source_symbol.clone(), tr.target_type.clone(), tr.kind.as_str(), tr.line as i64],
                 ).await?;
+            }
+
+            // Build and insert CFG data (best-effort).
+            let full_path_for_cfg = self.root.join(file_path);
+            let grammar_for_cfg = support_for_path(&full_path_for_cfg)
+                .map(|s| s.grammar_name().to_string())
+                .unwrap_or_default();
+            if !grammar_for_cfg.is_empty() {
+                // Parse FlatSymbol list to get function symbols (needed for CFG building).
+                let flat_symbols: Vec<FlatSymbol> = {
+                    let p = SymbolParser::new();
+                    let content = String::from_utf8_lossy(&bytes).into_owned();
+                    p.parse_file(&full_path_for_cfg, &content)
+                        .unwrap_or_default()
+                };
+                let cfg_data = build_cfg_data_for_file(
+                    &full_path_for_cfg,
+                    &bytes,
+                    &grammar_for_cfg,
+                    &flat_symbols,
+                );
+                for blk in &cfg_data.blocks {
+                    self.conn.execute(
+                        "INSERT OR IGNORE INTO cfg_blocks (file, function_qname, function_start_line, block_id, kind, byte_start, byte_end, start_line, end_line) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                        params![
+                            file_path.clone(),
+                            blk.function_qname.clone(),
+                            blk.function_start_line as i64,
+                            blk.block_id as i64,
+                            blk.kind.clone(),
+                            blk.byte_start as i64,
+                            blk.byte_end as i64,
+                            blk.start_line as i64,
+                            blk.end_line as i64,
+                        ],
+                    ).await?;
+                }
+                for edge in &cfg_data.edges {
+                    self.conn.execute(
+                        "INSERT INTO cfg_edges (file, function_qname, function_start_line, from_block, to_block, kind) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                        params![
+                            file_path.clone(),
+                            edge.function_qname.clone(),
+                            edge.function_start_line as i64,
+                            edge.from_block as i64,
+                            edge.to_block as i64,
+                            edge.kind.clone(),
+                        ],
+                    ).await?;
+                }
+                for def in &cfg_data.defs {
+                    self.conn.execute(
+                        "INSERT INTO cfg_defs (file, function_qname, function_start_line, block_id, name, byte_offset, line) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                        params![
+                            file_path.clone(),
+                            def.function_qname.clone(),
+                            def.function_start_line as i64,
+                            def.block_id as i64,
+                            def.name.clone(),
+                            def.byte_offset as i64,
+                            def.line as i64,
+                        ],
+                    ).await?;
+                }
+                for use_ in &cfg_data.uses {
+                    self.conn.execute(
+                        "INSERT INTO cfg_uses (file, function_qname, function_start_line, block_id, name, byte_offset, line) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                        params![
+                            file_path.clone(),
+                            use_.function_qname.clone(),
+                            use_.function_start_line as i64,
+                            use_.block_id as i64,
+                            use_.name.clone(),
+                            use_.byte_offset as i64,
+                            use_.line as i64,
+                        ],
+                    ).await?;
+                }
             }
         }
 
@@ -3567,6 +3921,238 @@ impl FileIndex {
             out.push(row.get(0)?);
         }
         Ok(out)
+    }
+}
+
+// =============================================================================
+// CFG building helpers
+// =============================================================================
+
+/// Build CFG data (blocks, edges, defs, uses) for all function/method symbols in a file.
+///
+/// Returns four vecs of rows ready for DB insertion. Errors from individual function builds
+/// are silently ignored (best-effort) so a broken CFG query doesn't abort the whole index.
+fn build_cfg_data_for_file(
+    full_path: &Path,
+    source_bytes: &[u8],
+    grammar_name: &str,
+    symbols: &[FlatSymbol],
+) -> CfgData {
+    let mut all_blocks: Vec<CfgBlockRow> = Vec::new();
+    let mut all_edges: Vec<CfgEdgeRow> = Vec::new();
+    let mut all_defs: Vec<CfgDefRow> = Vec::new();
+    let mut all_uses: Vec<CfgUseRow> = Vec::new();
+
+    // Only proceed if the language has a CFG query.
+    let loader = normalize_languages::parsers::grammar_loader();
+    let cfg_query_src = match loader.get_cfg(grammar_name) {
+        Some(q) => q,
+        None => {
+            return CfgData {
+                blocks: all_blocks,
+                edges: all_edges,
+                defs: all_defs,
+                uses: all_uses,
+            };
+        }
+    };
+    let ts_language = match loader.get(grammar_name) {
+        Ok(l) => l,
+        Err(_) => {
+            return CfgData {
+                blocks: all_blocks,
+                edges: all_edges,
+                defs: all_defs,
+                uses: all_uses,
+            };
+        }
+    };
+    let tags_query_src = match loader.get_tags(grammar_name) {
+        Some(q) => q,
+        None => {
+            return CfgData {
+                blocks: all_blocks,
+                edges: all_edges,
+                defs: all_defs,
+                uses: all_uses,
+            };
+        }
+    };
+
+    // Parse the file.
+    let mut parser = tree_sitter::Parser::new();
+    if parser.set_language(&ts_language).is_err() {
+        return CfgData {
+            blocks: all_blocks,
+            edges: all_edges,
+            defs: all_defs,
+            uses: all_uses,
+        };
+    }
+    let tree = match parser.parse(source_bytes, None) {
+        Some(t) => t,
+        None => {
+            return CfgData {
+                blocks: all_blocks,
+                edges: all_edges,
+                defs: all_defs,
+                uses: all_uses,
+            };
+        }
+    };
+
+    // Build a set of (name, start_line) for function/method symbols.
+    let func_symbols: Vec<(&FlatSymbol, u32)> = symbols
+        .iter()
+        .filter_map(|s| {
+            let kind = s.kind.as_str();
+            if kind == "function" || kind == "method" {
+                Some((s, s.start_line as u32))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if func_symbols.is_empty() {
+        return CfgData {
+            blocks: all_blocks,
+            edges: all_edges,
+            defs: all_defs,
+            uses: all_uses,
+        };
+    }
+
+    // Find function body byte ranges using the tags query.
+    let tags_query = match tree_sitter::Query::new(&ts_language, &tags_query_src) {
+        Ok(q) => q,
+        Err(_) => {
+            return CfgData {
+                blocks: all_blocks,
+                edges: all_edges,
+                defs: all_defs,
+                uses: all_uses,
+            };
+        }
+    };
+    let capture_names = tags_query.capture_names().to_vec();
+    let mut cursor = tree_sitter::QueryCursor::new();
+    let mut matches_iter = cursor.matches(&tags_query, tree.root_node(), source_bytes);
+
+    // Collect (func_name, def_start, def_end, start_line).
+    struct FuncCandidate {
+        name: String,
+        start_byte: usize,
+        end_byte: usize,
+        start_line: u32,
+    }
+    let mut candidates: Vec<FuncCandidate> = Vec::new();
+    use streaming_iterator::StreamingIterator as _;
+    while let Some(mat) = matches_iter.next() {
+        for cap in mat.captures {
+            let cap_name = capture_names[cap.index as usize];
+            if cap_name.starts_with("name.definition.function")
+                || cap_name.starts_with("name.definition.method")
+                || cap_name == "name.definition"
+            {
+                let func_name = cap
+                    .node
+                    .utf8_text(source_bytes)
+                    .unwrap_or("<unknown>")
+                    .to_string();
+                let def_node = cap.node.parent().unwrap_or(cap.node);
+                candidates.push(FuncCandidate {
+                    name: func_name,
+                    start_byte: def_node.start_byte(),
+                    end_byte: def_node.end_byte(),
+                    start_line: def_node.start_position().row as u32 + 1,
+                });
+            }
+        }
+    }
+    drop(matches_iter);
+
+    // For each function symbol, find matching candidate by name + start_line proximity.
+    for (sym, sym_start_line) in &func_symbols {
+        // Find the candidate whose name matches and start_line is close.
+        let candidate = candidates
+            .iter()
+            .filter(|c| c.name == sym.name)
+            .min_by_key(|c| (*sym_start_line as i64 - c.start_line as i64).unsigned_abs());
+        let candidate = match candidate {
+            Some(c) => c,
+            None => continue,
+        };
+
+        let body_range = candidate.start_byte..candidate.end_byte;
+        let function_id = normalize_cfg::FunctionId {
+            file: full_path.to_string_lossy().into_owned(),
+            qualified_name: sym.name.clone(),
+            start_line: candidate.start_line,
+        };
+
+        let cfg = match normalize_cfg::builder::build(
+            &tree,
+            &cfg_query_src,
+            source_bytes,
+            function_id,
+            body_range,
+        ) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let qname = &sym.name;
+        let fsl = candidate.start_line;
+
+        for blk in &cfg.blocks {
+            all_blocks.push(CfgBlockRow {
+                function_qname: qname.clone(),
+                function_start_line: fsl,
+                block_id: blk.id.0,
+                kind: format!("{:?}", blk.kind).to_lowercase(),
+                byte_start: blk.byte_range.start,
+                byte_end: blk.byte_range.end,
+                start_line: blk.start_line,
+                end_line: blk.end_line,
+            });
+            for def in &blk.defs {
+                all_defs.push(CfgDefRow {
+                    function_qname: qname.clone(),
+                    function_start_line: fsl,
+                    block_id: blk.id.0,
+                    name: def.name.clone(),
+                    byte_offset: def.byte_offset,
+                    line: def.line,
+                });
+            }
+            for use_ in &blk.uses {
+                all_uses.push(CfgUseRow {
+                    function_qname: qname.clone(),
+                    function_start_line: fsl,
+                    block_id: blk.id.0,
+                    name: use_.name.clone(),
+                    byte_offset: use_.byte_offset,
+                    line: use_.line,
+                });
+            }
+        }
+        for edge in &cfg.edges {
+            all_edges.push(CfgEdgeRow {
+                function_qname: qname.clone(),
+                function_start_line: fsl,
+                from_block: edge.from.0,
+                to_block: edge.to.0,
+                kind: format!("{:?}", edge.kind).to_lowercase(),
+            });
+        }
+    }
+
+    CfgData {
+        blocks: all_blocks,
+        edges: all_edges,
+        defs: all_defs,
+        uses: all_uses,
     }
 }
 

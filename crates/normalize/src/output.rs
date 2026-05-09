@@ -41,6 +41,7 @@ mod tests {
         use crate::commands::analyze::hotspots::HotspotsReport;
         use crate::commands::analyze::imports::ImportCentralityReport;
         use crate::commands::analyze::layering::LayeringReport;
+        use crate::commands::analyze::liveness::LivenessReport;
         use crate::commands::analyze::module_health::ModuleHealthReport;
         use crate::commands::analyze::ownership::OwnershipReport;
         use crate::commands::analyze::provenance::ProvenanceReport;
@@ -292,5 +293,6 @@ mod tests {
         assert_output_formatter::<PackageWhyReport>();
         assert_output_formatter::<PackageOutdatedReport>();
         assert_output_formatter::<PackageAuditReport>();
+        assert_output_formatter::<LivenessReport>();
     }
 }
