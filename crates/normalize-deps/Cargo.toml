@@ -8,5 +8,5 @@ description = "Module dependency extraction (imports, exports, re-exports) for n
 
 [dependencies]
 tree-sitter = "0.26"
-normalize-languages = { path = "../normalize-languages", version = "0.3.1" }
+normalize-languages = { path = "../normalize-languages", version = "0.3.2" }
 streaming-iterator = "0.1"

@@ -17,15 +17,15 @@ serde_json = { workspace = true }
 rkyv = { workspace = true }
 tokio = { workspace = true }
 server-less = { workspace = true, optional = true }
-normalize-core = { path = "../normalize-core", version = "0.3.1" }
-normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.1" }
-normalize-output = { path = "../normalize-output", version = "0.3.1" }
-normalize-syntax-rules = { path = "../normalize-syntax-rules", version = "0.3.1" }
-normalize-facts-rules-interpret = { path = "../normalize-facts-rules-interpret", version = "0.3.1" }
-normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.3.1" }
-normalize-native-rules = { path = "../normalize-native-rules", version = "0.3.1" }
-normalize-facts = { path = "../normalize-facts", version = "0.3.1" }
-normalize-languages = { path = "../normalize-languages", version = "0.3.1" }
+normalize-core = { path = "../normalize-core", version = "0.3.2" }
+normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.2" }
+normalize-output = { path = "../normalize-output", version = "0.3.2" }
+normalize-syntax-rules = { path = "../normalize-syntax-rules", version = "0.3.2" }
+normalize-facts-rules-interpret = { path = "../normalize-facts-rules-interpret", version = "0.3.2" }
+normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.3.2" }
+normalize-native-rules = { path = "../normalize-native-rules", version = "0.3.2" }
+normalize-facts = { path = "../normalize-facts", version = "0.3.2" }
+normalize-languages = { path = "../normalize-languages", version = "0.3.2" }
 glob = "0.3.3"
 ignore = { workspace = true }
 tracing = "0.1"

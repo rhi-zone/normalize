@@ -180,8 +180,8 @@ log = "0.4"
 serde_json = { workspace = true }
 thiserror = "2"
 ast-grep-core = "0.40.5"
-normalize-facts-core = { path = "../normalize-facts-core", version = "0.3.1" }
-normalize-language-meta = { path = "../normalize-language-meta", version = "0.3.1" }
+normalize-facts-core = { path = "../normalize-facts-core", version = "0.3.2" }
+normalize-language-meta = { path = "../normalize-language-meta", version = "0.3.2" }
 regex = "1"
 toml = { workspace = true }
 

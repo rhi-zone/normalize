@@ -49,7 +49,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = "2"
 tree-sitter = { version = "0.26", optional = true }
-normalize-languages = { path = "../normalize-languages", version = "0.3.1", default-features = false, optional = true }
+normalize-languages = { path = "../normalize-languages", version = "0.3.2", default-features = false, optional = true }
 
 [dev-dependencies]
 insta = { version = "1", features = ["json"] }

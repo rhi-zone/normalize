@@ -11,8 +11,8 @@ default = []
 cli = ["dep:server-less", "dep:schemars"]
 
 [dependencies]
-normalize-facts = { path = "../normalize-facts", version = "0.3.1" }
-normalize-output = { path = "../normalize-output", version = "0.3.1" }
+normalize-facts = { path = "../normalize-facts", version = "0.3.2" }
+normalize-output = { path = "../normalize-output", version = "0.3.2" }
 
 serde = { workspace = true }
 serde_json = { workspace = true }

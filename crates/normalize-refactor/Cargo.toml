@@ -7,10 +7,10 @@ repository.workspace = true
 description = "Composable refactoring engine for normalize"
 
 [dependencies]
-normalize-edit = { path = "../normalize-edit", version = "0.3.1" }
-normalize-facts = { path = "../normalize-facts", version = "0.3.1" }
-normalize-languages = { path = "../normalize-languages", version = "0.3.1" }
-normalize-shadow = { path = "../normalize-shadow", version = "0.3.1" }
+normalize-edit = { path = "../normalize-edit", version = "0.3.2" }
+normalize-facts = { path = "../normalize-facts", version = "0.3.2" }
+normalize-languages = { path = "../normalize-languages", version = "0.3.2" }
+normalize-shadow = { path = "../normalize-shadow", version = "0.3.2" }
 tree-sitter = "0.26"
 libsql.workspace = true
 
