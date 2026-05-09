@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **musl release binary now runs on NixOS and non-FHS distros.** The bundled
+  `runtime/libgcc_s.so.1` was previously Ubuntu's glibc-linked copy, which
+  depends on `ld-linux-x86-64.so.2` — absent on NixOS. The release workflow
+  now sources `libgcc_s.so.1` from Alpine Linux (a musl-based distro), so the
+  library depends on `libc.so` (musl) instead. The zig/cargo-zigbuild approach
+  introduced to work around this is reverted; the build uses `musl-gcc` again.
+
 ### Changed
 
 - **`normalize context --help` now shows comprehensive inline reference.** The help output

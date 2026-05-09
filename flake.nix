@@ -45,10 +45,10 @@
         # loader then needs ld-linux-x86-64.so.2. pkgsStatic avoids this by
         # statically linking everything — no shared lib deps at all.
         #
-        # The CI release workflow uses cargo-zigbuild (zig's musl toolchain
-        # with static compiler_rt) to produce a dynamic binary that can dlopen
-        # grammar .so files but has no libgcc_s dependency. pkgsStatic mirrors
-        # the "no libgcc_s" invariant for local validation.
+        # The CI release workflow uses musl-gcc with -crt-static=false to produce
+        # a dynamic binary that can dlopen grammar .so files. libgcc_s.so.1 is
+        # bundled from Alpine Linux (musl-linked, not glibc-linked). pkgsStatic
+        # validates the musl target locally without needing Alpine's libgcc_s.
         packages.normalize-musl = pkgs.pkgsStatic.rustPlatform.buildRustPackage {
           pname = "normalize-musl";
           version = "0.3.1";
@@ -66,10 +66,8 @@
             # Rust toolchain (fenix — includes x86_64-unknown-linux-musl std)
             rustToolchain
             rust-analyzer
-            # musl cross-compilation: cargo-zigbuild uses zig's musl toolchain
-            # (static compiler_rt, no libgcc_s dependency) matching release.yml
-            cargo-zigbuild
-            zig
+            # musl cross-compilation (musl-gcc, matches release.yml)
+            musl.dev
             # Fast linker for incremental builds
             mold
             clang

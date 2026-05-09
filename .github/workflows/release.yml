@@ -51,15 +51,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
-      - name: Install zig (musl target)
+      - name: Install musl-tools (musl target)
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        uses: goto-bus-stop/setup-zig@v2
-        with:
-          version: "0.14.0"
-
-      - name: Install cargo-zigbuild (musl target)
-        if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: cargo install cargo-zigbuild --locked
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools patchelf
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -74,18 +70,10 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Build CLI
-        # musl target uses cargo-zigbuild: zig's musl toolchain emits no
-        # -lgcc_s (uses static compiler_rt instead), so the binary has no
-        # libgcc_s.so.1 dependency. -crt-static=false keeps dlopen working
-        # for grammar .so files. All other targets use plain cargo build.
-        run: |
-          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
-            cargo zigbuild --release --target ${{ matrix.target }} -p normalize --features sessions-web
-          else
-            cargo build --release --target ${{ matrix.target }} -p normalize --features sessions-web
-          fi
+        run: cargo build --release --target ${{ matrix.target }} -p normalize --features sessions-web
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static -C link-arg=-Wl,-rpath,$ORIGIN"
 
       - name: Fetch normalize-grammars deps
@@ -105,14 +93,14 @@ jobs:
         run: cargo xtask build-grammars
 
       - name: Build grammars (musl target)
-        # Build grammars with zig cc targeting musl so the .so files link
-        # against musl libc, matching the zigbuild binary. Glibc-linked
-        # grammars cannot be dlopen'd by a musl-linked normalize binary.
+        # Build grammars with musl-gcc so the .so files link against musl libc,
+        # matching the musl-linked normalize binary. Glibc-linked grammars
+        # cannot be dlopen'd by a musl-linked binary.
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
           cargo xtask build-grammars \
             --target x86_64-unknown-linux-musl \
-            --cc "zig cc -target x86_64-linux-musl" \
+            --cc musl-gcc \
             --out target/x86_64-unknown-linux-musl/grammars
           # Sanity-check: the first grammar should depend on libc.musl-*, not libc.so.6.
           FIRST_GRAMMAR=$(ls target/x86_64-unknown-linux-musl/grammars/*.so | head -1)
@@ -176,11 +164,23 @@ jobs:
           cp "$MUSL_LIBC" dist/runtime/ld-musl-x86_64.so.1
           cp "$MUSL_LIBC" dist/runtime/libc.musl-x86_64.so.1
           chmod +x dist/runtime/ld-musl-x86_64.so.1
-          # libgcc_s is statically linked (-static-libgcc in RUSTFLAGS) so
-          # there is no libgcc_s.so.1 to bundle. Bundling glibc's copy caused
-          # failures on NixOS: glibc's libgcc_s.so.1 depends on
-          # ld-linux-x86-64.so.2 which doesn't exist at a standard path on
-          # NixOS (or any non-FHS distro).
+
+          # Bundle musl-linked libgcc_s.so.1 from Alpine Linux.
+          # Alpine is musl-based, so its libgcc_s.so.1 depends on libc.so (musl),
+          # not libc.so.6 (glibc). Bundling glibc's libgcc_s.so.1 (from Ubuntu)
+          # fails on NixOS because glibc's copy depends on ld-linux-x86-64.so.2
+          # which doesn't exist on musl/non-FHS systems.
+          # Alpine APKs are gzipped tarballs; extract the .so directly via tar.
+          curl -fsSL "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/libgcc-14.2.0-r4.apk" | \
+            tar xzO ./usr/lib/libgcc_s.so.1 > dist/runtime/libgcc_s.so.1
+          # Sanity-check: the bundled libgcc_s.so.1 must NOT depend on glibc.
+          if readelf -d dist/runtime/libgcc_s.so.1 | grep -q 'libc.so.6'; then
+            echo "ERROR: bundled libgcc_s.so.1 is glibc-linked — will fail on NixOS" >&2
+            readelf -d dist/runtime/libgcc_s.so.1 | grep NEEDED >&2
+            exit 1
+          fi
+          echo "libgcc_s.so.1 dependencies (should reference musl libc.so, not libc.so.6):"
+          readelf -d dist/runtime/libgcc_s.so.1 | grep NEEDED
 
           # Also patch the ELF's PT_INTERP to a relative path so anyone
           # who invokes `runtime/normalize.elf` directly (without the
