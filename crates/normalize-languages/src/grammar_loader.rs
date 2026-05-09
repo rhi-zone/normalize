@@ -101,6 +101,8 @@ pub struct GrammarLoader {
     decorations_cache: RwLock<HashMap<String, Arc<String>>>,
     /// Cached test-regions queries.
     test_regions_cache: RwLock<HashMap<String, Arc<String>>>,
+    /// Cached CFG queries.
+    cfg_cache: RwLock<HashMap<String, Arc<String>>>,
     /// Cached compiled tree-sitter queries (keyed by "grammar:query_type").
     compiled_query_cache: RwLock<HashMap<String, Arc<tree_sitter::Query>>>,
 }
@@ -141,6 +143,7 @@ impl GrammarLoader {
             imports_cache: RwLock::new(HashMap::new()),
             decorations_cache: RwLock::new(HashMap::new()),
             test_regions_cache: RwLock::new(HashMap::new()),
+            cfg_cache: RwLock::new(HashMap::new()),
             compiled_query_cache: RwLock::new(HashMap::new()),
         }
     }
@@ -160,6 +163,7 @@ impl GrammarLoader {
             imports_cache: RwLock::new(HashMap::new()),
             decorations_cache: RwLock::new(HashMap::new()),
             test_regions_cache: RwLock::new(HashMap::new()),
+            cfg_cache: RwLock::new(HashMap::new()),
             compiled_query_cache: RwLock::new(HashMap::new()),
         }
     }
@@ -462,6 +466,34 @@ impl GrammarLoader {
             .unwrap_or_else(|e| e.into_inner())
             .insert(name.to_string(), Arc::clone(&query));
         Some(query)
+    }
+
+    /// Get the CFG query for a grammar.
+    ///
+    /// Returns `None` if no CFG query is found for the grammar.
+    /// Query files are `{name}.cfg.scm` in the grammar search paths.
+    /// Uses `@cfg.*` captures for control flow nodes (see `normalize-cfg` documentation).
+    pub fn get_cfg(&self, name: &str) -> Option<Arc<String>> {
+        // Check cache first
+        if let Some(query) = self
+            .cfg_cache
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+        {
+            return Some(Arc::clone(query));
+        }
+
+        // Try external files, then fall back to bundled queries
+        self.load_query(name, "cfg", &self.cfg_cache).or_else(|| {
+            let content = bundled_cfg_query(name)?;
+            let query = Arc::new(content.to_string());
+            self.cfg_cache
+                .write()
+                .unwrap_or_else(|e| e.into_inner())
+                .insert(name.to_string(), Arc::clone(&query));
+            Some(query)
+        })
     }
 
     /// Load a query file (.scm) from external file.
@@ -1144,6 +1176,19 @@ fn bundled_decorations_query(name: &str) -> Option<&'static str> {
 fn bundled_test_regions_query(name: &str) -> Option<&'static str> {
     match name {
         "rust" => Some(include_str!("queries/rust.test_regions.scm")),
+        _ => None,
+    }
+}
+
+/// Return a bundled CFG query for a grammar, if available.
+///
+/// CFG queries use `@cfg.*` captures to identify control flow nodes
+/// (branches, loops, exits). See `normalize-cfg` for the full capture vocabulary.
+fn bundled_cfg_query(name: &str) -> Option<&'static str> {
+    match name {
+        "rust" => Some(include_str!("queries/rust.cfg.scm")),
+        "python" => Some(include_str!("queries/python.cfg.scm")),
+        "go" => Some(include_str!("queries/go.cfg.scm")),
         _ => None,
     }
 }

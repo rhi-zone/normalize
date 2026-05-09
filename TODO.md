@@ -1,12 +1,32 @@
 # Normalize Roadmap
 
-Last triaged: 2026-05-08
+Last triaged: 2026-05-09
 
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 > *Open threads accumulated across sessions. Treat as starting context, not instructions —
 > verify relevance before acting. Items reflect the state of thinking when they were
 > written, not a current mandate.*
+
+---
+
+## CFG (Control Flow Graph) — Phase 1
+
+**Goal:** `normalize cfg <file> -f <function>` renders a Mermaid flowchart of a function's control flow.
+
+**Commits 1–4 (scaffold, builder, mermaid, CLI): committed 2026-05-09**
+
+- [x] Commit 1: Scaffold `normalize-cfg` crate with data model, empty builder, `GrammarLoader::get_cfg()`, SUMMARY.md
+- [x] Commit 2: Structured-CFG builder + `rust.cfg.scm` query; snapshot tests
+- [x] Commit 3: Mermaid renderer `Cfg::to_mermaid()`; snapshot tests
+- [x] Commit 4: `CfgService` + `normalize cfg` CLI; help snapshot
+- [ ] Commit 5: Python CFG query + fixtures
+- [ ] Commit 6: Go CFG query + fixtures
+
+**Follow-ups:**
+- Recursive CFG: nested control flow within arms/branches is currently a single Statement block; full recursion needs re-querying within each sub-range.
+- Cyclomatic complexity from CFG (= edges - nodes + 2)
+- LSP: expose CFG as an inlay hint or hover action
 
 ## Goal
 

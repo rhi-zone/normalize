@@ -47,6 +47,7 @@ members = [
     "crates/normalize-context",
     "crates/normalize-semantic",
     "crates/normalize-module-resolve",
+    "crates/normalize-cfg",
     "xtask",
     "benches",
 ]

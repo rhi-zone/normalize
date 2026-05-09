@@ -64,6 +64,7 @@ pub struct NormalizeService {
     package: package::PackageService,
     rank: rank::RankService,
     budget: normalize_budget::service::BudgetService,
+    cfg: normalize_cfg::service::CfgService,
     ratchet: normalize_ratchet::service::RatchetService,
     rules: normalize_rules::RulesService,
     serve: serve::ServeService,
@@ -110,6 +111,7 @@ impl NormalizeService {
             package: package::PackageService::new(&pretty),
             rank: rank::RankService::new(&pretty),
             budget: normalize_budget::service::BudgetService::new(pretty.get()),
+            cfg: normalize_cfg::service::CfgService::new(),
             ratchet: normalize_ratchet::service::RatchetService::new(pretty.get()),
             rules: normalize_rules::RulesService::new(&pretty),
             serve: serve::ServeService,
@@ -1013,6 +1015,12 @@ impl NormalizeService {
     #[server(group = "analysis")]
     pub fn budget(&self) -> &normalize_budget::service::BudgetService {
         &self.budget
+    }
+
+    /// Build and render the control flow graph for a function. Use to visualize execution paths, branches, and loops.
+    #[server(group = "analysis")]
+    pub fn cfg(&self) -> &normalize_cfg::service::CfgService {
+        &self.cfg
     }
 
     /// Prevent metric regressions. Records a baseline and fails CI if metrics get worse.

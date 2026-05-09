@@ -1,0 +1,24 @@
+[package]
+name = "normalize-cfg"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Control flow graph builder for normalize"
+
+[features]
+default = ["cli"]
+cli = ["dep:server-less"]
+
+[dependencies]
+normalize-languages = { path = "../normalize-languages", version = "0.3.1" }
+normalize-output = { path = "../normalize-output", version = "0.3.1" }
+tree-sitter = "0.26"
+streaming-iterator = "0.1"
+serde = { workspace = true }
+schemars = "1"
+thiserror = "2"
+server-less = { version = "0.4.9", default-features = false, features = ["cli", "jsonschema", "config"], optional = true }
+
+[dev-dependencies]
+insta = "1"

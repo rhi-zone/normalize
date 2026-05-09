@@ -5122,6 +5122,7 @@ dependencies = [
  "normalize-analyze",
  "normalize-architecture",
  "normalize-budget",
+ "normalize-cfg",
  "normalize-chat-sessions",
  "normalize-cli-parser",
  "normalize-code-similarity",
@@ -5238,6 +5239,21 @@ dependencies = [
  "thiserror 2.0.18",
  "toml",
  "tracing",
+ "tree-sitter",
+]
+
+[[package]]
+name = "normalize-cfg"
+version = "0.3.1"
+dependencies = [
+ "insta",
+ "normalize-languages",
+ "normalize-output",
+ "schemars",
+ "serde",
+ "server-less",
+ "streaming-iterator",
+ "thiserror 2.0.18",
  "tree-sitter",
 ]
 

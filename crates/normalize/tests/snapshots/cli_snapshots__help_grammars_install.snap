@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 211
 expression: "snapshot_help(&[\"grammars\", \"install\"])"
 ---
 Install grammars from GitHub release
@@ -10,7 +9,7 @@ Usage: normalize grammars install [OPTIONS]
 Options:
       --jsonl                      Output one JSON object per line (for arrays)
       --pretty                     Human-friendly output with colors and formatting
-      --version <version>          Specific version to install (default: latest)
+      --version <version>          Specific version to install (default: this binary's version)
       --compact                    Compact output without colors (overrides TTY detection)
       --force                      Force reinstall even if grammars exist
       --json                       Output machine-readable JSON
