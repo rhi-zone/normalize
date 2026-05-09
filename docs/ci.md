@@ -10,7 +10,7 @@ Add two steps to any CI pipeline:
 
 ```bash
 # 1. Install normalize
-curl -fsSL https://raw.githubusercontent.com/rhi-zone/normalize/master/install.sh | sh
+curl -fsSL https://rhi.zone/normalize/install.sh | sh
 
 # 2. Run all checks
 normalize ci
@@ -75,9 +75,9 @@ jobs:
 
       - name: Install normalize
         run: |
-          curl -fsSL https://raw.githubusercontent.com/rhi-zone/normalize/master/install.sh | sh
+          curl -fsSL https://rhi.zone/normalize/install.sh | sh
         env:
-          NORMALIZE_VERSION: "0.2.0"
+          NORMALIZE_VERSION: "0.3.1"
           INSTALL_DIR: /usr/local/bin
 
       - name: Run normalize ci
@@ -115,7 +115,7 @@ normalize:
   stage: test
   before_script:
     - apt-get update -qq && apt-get install -y -qq curl
-    - curl -fsSL https://raw.githubusercontent.com/rhi-zone/normalize/master/install.sh | sh
+    - curl -fsSL https://rhi.zone/normalize/install.sh | sh
   script:
     - normalize ci
   artifacts:
@@ -130,7 +130,7 @@ To pin the version:
 
 ```yaml
   variables:
-    NORMALIZE_VERSION: "0.2.0"
+    NORMALIZE_VERSION: "0.3.1"
     INSTALL_DIR: /usr/local/bin
 ```
 
@@ -214,7 +214,7 @@ Pin to a specific version for reproducible CI:
 
 ```bash
 # Via install script (fast — downloads a prebuilt binary)
-NORMALIZE_VERSION=0.2.0 curl -fsSL https://raw.githubusercontent.com/rhi-zone/normalize/master/install.sh | sh
+NORMALIZE_VERSION=0.3.1 curl -fsSL https://rhi.zone/normalize/install.sh | sh
 
 # Via cargo (slower — compiles from source)
 cargo install normalize --version "0.2.0" --locked
