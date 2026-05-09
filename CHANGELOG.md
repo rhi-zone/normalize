@@ -14,6 +14,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`normalize context --help` no longer shows a duplicate `context` subcommand.**
+  The default action method was named `context` (same as the parent service), causing
+  `normalize context context` to appear in help output. The method is now hidden from
+  the subcommand list (`#[cli(hidden)]`); `normalize context` continues to work as
+  the default action with all flags hoisted to the parent command.
+
 - **`cargo xtask build-grammars --cc "zig cc -target x86_64-linux-musl"` now works.**
   The `--cc` argument is split on whitespace so compound compilers like `zig cc -target
   x86_64-linux-musl` are correctly parsed into program + arguments. Previously `Command::new`

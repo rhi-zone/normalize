@@ -254,7 +254,7 @@ impl ContextService {
     ///   normalize context --file cfg=config.toml                  # load file under prefix
     ///   normalize context migrate                                  # migrate old .context.md files
     ///   normalize context migrate --apply                         # apply migration
-    #[cli(default, display_with = "display_context")]
+    #[cli(default, hidden, display_with = "display_context")]
     #[allow(clippy::too_many_arguments)]
     pub async fn context(
         &self,
