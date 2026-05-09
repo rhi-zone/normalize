@@ -1,0 +1,13 @@
+---
+source: crates/normalize-cfg/tests/rust_cfg.rs
+expression: mermaid
+---
+flowchart TD
+    b0{"Branch<br/>lines 1-2"}
+    b1(["exit"])
+    b2["Statement<br/>lines 7-8"]
+    b3["Statement<br/>line 3"]
+
+    b0 -->|"true"| b3
+    b3 --> b2
+    b2 --> b1
