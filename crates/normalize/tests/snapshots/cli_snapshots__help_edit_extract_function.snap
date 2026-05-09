@@ -1,0 +1,33 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+expression: "snapshot_help(&[\"edit\", \"extract-function\"])"
+---
+Extract a block of code into a new function.
+
+Usage: normalize edit extract-function [OPTIONS] [file]
+
+Arguments:
+  [file]  File path
+
+Options:
+      --jsonl                      Output one JSON object per line (for arrays)
+      --lines <lines>              Line range to extract, e.g. 10-25 (1-based, inclusive)
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
+      --json                       Output machine-readable JSON
+      --name <name>                Name for the new function
+      --apply                      Apply the changes (default: dry-run)
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+  -m, --message <message>          Message for shadow history
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+  -r, --root <root>                Root directory
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help
+
+Uses CFG liveness analysis to infer the correct parameters and return type.
+By default this is a dry-run; pass `--apply` to write the changes.
+
+Examples:
+normalize edit extract-function src/lib.rs --lines 10-25 --name process_batch
+normalize edit extract-function src/lib.rs --lines 10-25 --name process_batch --apply

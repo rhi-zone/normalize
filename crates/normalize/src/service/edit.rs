@@ -952,6 +952,10 @@ impl EditService {
     fn display_inline_function(&self, report: &InlineFunctionReport) -> String {
         report.format_text()
     }
+
+    fn display_extract_function(&self, report: &ExtractFunctionReport) -> String {
+        report.format_text()
+    }
 }
 
 #[cli(
@@ -1565,6 +1569,35 @@ impl EditService {
             root.as_deref().map(Path::new),
             dry_run,
             force,
+            message.as_deref(),
+        )
+        .await
+    }
+
+    /// Extract a block of code into a new function.
+    ///
+    /// Uses CFG liveness analysis to infer the correct parameters and return type.
+    /// By default this is a dry-run; pass `--apply` to write the changes.
+    ///
+    /// Examples:
+    ///   normalize edit extract-function src/lib.rs --lines 10-25 --name process_batch
+    ///   normalize edit extract-function src/lib.rs --lines 10-25 --name process_batch --apply
+    #[cli(name = "extract-function", display_with = "display_extract_function")]
+    pub async fn extract_function(
+        &self,
+        #[param(positional, help = "File path")] file: String,
+        #[param(help = "Line range to extract, e.g. 10-25 (1-based, inclusive)")] lines: String,
+        #[param(help = "Name for the new function")] name: String,
+        #[param(help = "Apply the changes (default: dry-run)")] apply: bool,
+        #[param(short = 'm', help = "Message for shadow history")] message: Option<String>,
+        #[param(short = 'r', help = "Root directory")] root: Option<String>,
+    ) -> Result<ExtractFunctionReport, String> {
+        do_extract_function(
+            &file,
+            &lines,
+            &name,
+            root.as_deref().map(Path::new),
+            !apply,
             message.as_deref(),
         )
         .await
@@ -2477,6 +2510,191 @@ async fn do_inline_function(
 }
 
 /// Parse a `"line:col"` or `"line"` string into (line, col), both 1-based.
+// ─── ExtractFunctionReport ────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ExtractFunctionReport {
+    pub function_name: String,
+    pub file: String,
+    pub call_site_line: u32,
+    pub parameters: Vec<String>,
+    pub return_type: String,
+    pub is_async: bool,
+    pub is_generator: bool,
+    pub warnings: Vec<String>,
+    pub dry_run: bool,
+    pub files: Vec<String>,
+}
+
+impl OutputFormatter for ExtractFunctionReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let verb = if self.dry_run {
+            "Would extract"
+        } else {
+            "Extracted"
+        };
+        let _ = writeln!(
+            out,
+            "{} function '{}' from {}:{}",
+            verb, self.function_name, self.file, self.call_site_line
+        );
+        if !self.parameters.is_empty() {
+            let _ = writeln!(out, "  parameters: {}", self.parameters.join(", "));
+        }
+        if self.return_type != "()" {
+            let _ = writeln!(out, "  return: {}", self.return_type);
+        }
+        if self.is_async {
+            let _ = writeln!(out, "  async: yes");
+        }
+        if self.is_generator {
+            let _ = writeln!(out, "  generator: yes");
+        }
+        for w in &self.warnings {
+            let _ = writeln!(out, "  warning: {}", w);
+        }
+        if !self.files.is_empty() {
+            let _ = writeln!(out, "  files: {}", self.files.join(", "));
+        }
+        out
+    }
+
+    fn format_pretty(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        let verb = if self.dry_run {
+            "\x1b[1;33mWould extract\x1b[0m"
+        } else {
+            "\x1b[1;32mExtracted\x1b[0m"
+        };
+        let _ = writeln!(
+            out,
+            "{} function '\x1b[1m{}\x1b[0m' from \x1b[2m{}:{}\x1b[0m",
+            verb, self.function_name, self.file, self.call_site_line
+        );
+        if !self.parameters.is_empty() {
+            let _ = writeln!(out, "  parameters: {}", self.parameters.join(", "));
+        }
+        if self.return_type != "()" {
+            let _ = writeln!(out, "  return: {}", self.return_type);
+        }
+        if self.is_async {
+            let _ = writeln!(out, "  async: yes");
+        }
+        if self.is_generator {
+            let _ = writeln!(out, "  generator: yes");
+        }
+        for w in &self.warnings {
+            let _ = writeln!(out, "  \x1b[1;33mwarning:\x1b[0m {}", w);
+        }
+        if !self.files.is_empty() {
+            let _ = writeln!(out, "  files: {}", self.files.join(", "));
+        }
+        out
+    }
+}
+
+async fn do_extract_function(
+    file: &str,
+    lines_arg: &str,
+    function_name: &str,
+    root: Option<&Path>,
+    dry_run: bool,
+    message: Option<&str>,
+) -> Result<ExtractFunctionReport, String> {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+
+    let config = NormalizeConfig::load(&root);
+    let shadow_enabled = config.shadow.enabled();
+
+    let (start_line, end_line) = normalize_refactor::extract_function::parse_line_range(lines_arg)?;
+
+    let file_abs = if Path::new(file).is_absolute() {
+        PathBuf::from(file)
+    } else {
+        root.join(file)
+    };
+    let rel_path = file_abs
+        .strip_prefix(&root)
+        .unwrap_or(&file_abs)
+        .to_string_lossy()
+        .to_string();
+
+    let content = std::fs::read_to_string(&file_abs)
+        .map_err(|e| format!("Error reading {}: {}", rel_path, e))?;
+
+    let index = match crate::index::ensure_ready(&root).await {
+        Ok(idx) => idx,
+        Err(e) => {
+            return Err(format!(
+                "extract-function requires the facts index: {}; run `normalize structure rebuild` first",
+                e
+            ));
+        }
+    };
+
+    let ctx = normalize_refactor::RefactoringContext {
+        root: root.clone(),
+        editor: edit::Editor::new(),
+        index: Some(index),
+        loader: normalize_languages::GrammarLoader::new(),
+    };
+
+    let outcome = normalize_refactor::extract_function::plan_extract_function(
+        &ctx,
+        &file_abs,
+        &content,
+        start_line,
+        end_line,
+        function_name,
+    )
+    .await?;
+
+    for warning in &outcome.plan.warnings {
+        eprintln!("warning: {}", warning);
+    }
+
+    let executor = normalize_refactor::RefactoringExecutor {
+        root: root.clone(),
+        dry_run,
+        shadow_enabled,
+        message: message.map(String::from),
+    };
+    let modified = executor.apply(&outcome.plan)?;
+
+    if !dry_run {
+        notify_daemon_after_edit(&root, &modified);
+    }
+
+    let return_type_str = match &outcome.return_type {
+        normalize_refactor::extract_function::ReturnType::Unit => "()".to_string(),
+        normalize_refactor::extract_function::ReturnType::Single(v) => v.clone(),
+        normalize_refactor::extract_function::ReturnType::Tuple(vs) => {
+            format!("({})", vs.join(", "))
+        }
+        normalize_refactor::extract_function::ReturnType::Result(ok, err) => {
+            format!("Result<{}, {}>", ok, err)
+        }
+    };
+
+    Ok(ExtractFunctionReport {
+        function_name: outcome.function_name,
+        file: rel_path,
+        call_site_line: outcome.call_site_line,
+        parameters: outcome.parameters.iter().map(|p| p.name.clone()).collect(),
+        return_type: return_type_str,
+        is_async: outcome.is_async,
+        is_generator: outcome.is_generator,
+        warnings: outcome.plan.warnings,
+        dry_run,
+        files: modified,
+    })
+}
+
 fn parse_line_col(s: &str) -> Result<(usize, usize), String> {
     match s.split_once(':') {
         Some((l, c)) => {

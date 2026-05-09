@@ -143,6 +143,11 @@ fn test_help_edit_insert() {
     insta::assert_snapshot!(snapshot_help(&["edit", "insert"]));
 }
 
+#[test]
+fn test_help_edit_extract_function() {
+    insta::assert_snapshot!(snapshot_help(&["edit", "extract-function"]));
+}
+
 // structure subcommands
 #[test]
 fn test_help_structure_rebuild() {

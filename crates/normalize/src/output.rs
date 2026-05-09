@@ -260,7 +260,7 @@ mod tests {
         assert_output_formatter::<RenameReport>();
 
         use crate::service::edit::{
-            AddParameterReport, InlineFunctionReport, InlineVariableReport,
+            AddParameterReport, ExtractFunctionReport, InlineFunctionReport, InlineVariableReport,
             IntroduceVariableReport, MoveReport,
         };
         assert_output_formatter::<MoveReport>();
@@ -268,6 +268,7 @@ mod tests {
         assert_output_formatter::<InlineVariableReport>();
         assert_output_formatter::<AddParameterReport>();
         assert_output_formatter::<InlineFunctionReport>();
+        assert_output_formatter::<ExtractFunctionReport>();
 
         use normalize_rules::{RuleInfoReport, RuleShowReport, RulesTagsReport};
         assert_output_formatter::<RuleShowReport>();
