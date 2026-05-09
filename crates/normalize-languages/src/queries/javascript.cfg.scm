@@ -96,6 +96,18 @@
 (throw_statement) @cfg.exit.throw
 
 ; ---------------------------------------------------------------------------
+; Exception type captures (Phase 4: type-refined exception flow)
+; ---------------------------------------------------------------------------
+
+; Thrown type: throw new TypeError("msg") → captures "TypeError"
+(throw_statement
+  (new_expression
+    constructor: (identifier) @cfg.exit.throw.type))
+
+; JS catch clauses are untyped — no cfg.try.catch.type capture here.
+; The catch block is conservative (catches all exceptions).
+
+; ---------------------------------------------------------------------------
 ; Effects
 ; ---------------------------------------------------------------------------
 

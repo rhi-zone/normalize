@@ -79,7 +79,7 @@ relation resolved_reference(String, u32, String, String, String);
 relation resolved_call(String, String, String, String, u32);
 relation module_search_path(String, String, String, String);
 relation cfg_block(String, String, u32, u32, String);
-relation cfg_edge(String, String, u32, u32, u32, String);
+relation cfg_edge(String, String, u32, u32, u32, String, String);
 relation cfg_def(String, String, u32, u32, String);
 relation cfg_use(String, String, u32, u32, String);
 relation cfg_effect(String, String, u32, u32, String, u32, String);
@@ -220,6 +220,10 @@ const BUILTIN_RULES: &[BuiltinFactsRule] = &[
     BuiltinFactsRule {
         id: "effects",
         content: include_str!("builtin_dl/effects.dl"),
+    },
+    BuiltinFactsRule {
+        id: "exception_flow",
+        content: include_str!("builtin_dl/exception_flow.dl"),
     },
 ];
 
@@ -1552,6 +1556,7 @@ fn populate_facts_with_sources(
                     Value::U32(edge.from),
                     Value::U32(edge.to),
                     Value::string(&edge.kind),
+                    Value::string(&edge.exception_type),
                 ],
                 sid,
             )
@@ -1892,6 +1897,7 @@ fn populate_facts(engine: &mut Engine, relations: &Relations) -> Result<(), Inte
                     Value::U32(edge.from),
                     Value::U32(edge.to),
                     Value::string(&edge.kind),
+                    Value::string(&edge.exception_type),
                 ],
             )
             .map_err(|e| InterpretError::Parse(e.to_string()))?;

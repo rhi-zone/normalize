@@ -25,7 +25,7 @@ relation live_in(String, String, u32, u32, String);
 // live_out(file, func, func_line, block, var):
 //   A variable is live-out of block B if it is live-in of any successor of B.
 live_out(F, Fn, FL, B, V) <--
-    cfg_edge(F, Fn, FL, B, S, _),
+    cfg_edge(F, Fn, FL, B, S, _, _),
     live_in(F, Fn, FL, S, V);
 
 // live_in(file, func, func_line, block, var):

@@ -66,7 +66,21 @@ impl Builder {
     }
 
     fn add_edge(&mut self, from: BlockId, to: BlockId, kind: EdgeKind) {
-        self.edges.push(Edge { from, to, kind });
+        self.edges.push(Edge {
+            from,
+            to,
+            kind,
+            exception_type: None,
+        });
+    }
+
+    fn add_exception_edge(&mut self, from: BlockId, to: BlockId, exception_type: Option<String>) {
+        self.edges.push(Edge {
+            from,
+            to,
+            kind: EdgeKind::Exception,
+            exception_type,
+        });
     }
 
     fn block_mut(&mut self, id: BlockId) -> &mut BasicBlock {
@@ -102,6 +116,10 @@ enum CaptureKind {
     ExitBreak,
     ExitContinue,
     ExitThrow,
+    /// Type node of the thrown exception (`@cfg.exit.throw.type`).
+    ExitThrowType,
+    /// Type node of a caught exception per catch clause (`@cfg.try.catch.type`).
+    TryCatchType,
     /// Variable/binding definition site (`@cfg.def`).
     Def,
     /// The identifier name node for a def (`@cfg.def.name`).
@@ -140,6 +158,8 @@ fn parse_capture_name(name: &str) -> Option<CaptureKind> {
         "cfg.exit.break" => Some(CaptureKind::ExitBreak),
         "cfg.exit.continue" => Some(CaptureKind::ExitContinue),
         "cfg.exit.throw" => Some(CaptureKind::ExitThrow),
+        "cfg.exit.throw.type" => Some(CaptureKind::ExitThrowType),
+        "cfg.try.catch.type" => Some(CaptureKind::TryCatchType),
         "cfg.def" => Some(CaptureKind::Def),
         "cfg.def.name" => Some(CaptureKind::DefName),
         "cfg.use" => Some(CaptureKind::Use),
@@ -178,6 +198,11 @@ struct ClassifiedNode {
     try_body: Option<Range<usize>>,
     try_catches: Vec<Range<usize>>,
     try_finally: Option<Range<usize>>,
+    /// For ExitThrow: thrown exception type string (from @cfg.exit.throw.type), if captured.
+    throw_type: Option<String>,
+    /// For Try: catch type strings per catch clause (indexed parallel to try_catches).
+    /// Each entry holds the set of type names for the corresponding catch block.
+    try_catch_types: Vec<Vec<String>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -302,6 +327,8 @@ pub fn build(
             try_body: None,
             try_catches: Vec::new(),
             try_finally: None,
+            throw_type: None,
+            try_catch_types: Vec::new(),
         };
 
         // Collect sub-captures
@@ -316,8 +343,25 @@ pub fn build(
                 "cfg.loop.body" => cn.loop_body = Some(cr),
                 "cfg.match.arm" => cn.match_arms.push(cr),
                 "cfg.try.body" => cn.try_body = Some(cr),
-                "cfg.try.catch" => cn.try_catches.push(cr),
+                "cfg.try.catch" => {
+                    cn.try_catches.push(cr);
+                    // Ensure parallel try_catch_types has an entry for this catch block.
+                    cn.try_catch_types.push(Vec::new());
+                }
                 "cfg.try.finally" => cn.try_finally = Some(cr),
+                "cfg.exit.throw.type" => {
+                    let type_text =
+                        String::from_utf8_lossy(&source[sub_start..sub_end]).into_owned();
+                    cn.throw_type = Some(type_text);
+                }
+                "cfg.try.catch.type" => {
+                    // Associate with the most recently seen catch block.
+                    let type_text =
+                        String::from_utf8_lossy(&source[sub_start..sub_end]).into_owned();
+                    if let Some(last) = cn.try_catch_types.last_mut() {
+                        last.push(type_text);
+                    }
+                }
                 _ => {}
             }
         }
@@ -732,7 +776,10 @@ fn build_sequence(
                     cur_block.byte_range.end = node.byte_range.end;
                     cur_block.end_line = node.end_line;
                 }
-                b.add_edge(current, exit, EdgeKind::Exception);
+                // Conservative: edge to function exit with the thrown type (if known).
+                // build_try handles the try-context matching; this fallthrough covers
+                // throws outside any enclosing try block.
+                b.add_exception_edge(current, exit, node.throw_type.clone());
                 terminated = true;
             }
             _ => {}
@@ -981,10 +1028,25 @@ fn build_try(
     }
 
     // Catch blocks.
-    for catch_range in &node.try_catches {
+    for (i, catch_range) in node.try_catches.iter().enumerate() {
         let catch_line = byte_offset_to_line(source, catch_range.start);
         let catch_block = b.alloc_block(BlockKind::Catch, 0..0, catch_line);
-        b.add_edge(try_block, catch_block, EdgeKind::Exception);
+
+        // Type-refined exception edge: if catch types were captured, emit one edge per
+        // caught type. If no types were captured, emit a single conservative edge (None).
+        let catch_types = node
+            .try_catch_types
+            .get(i)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[]);
+        if catch_types.is_empty() {
+            b.add_exception_edge(try_block, catch_block, None);
+        } else {
+            for catch_type in catch_types {
+                b.add_exception_edge(try_block, catch_block, Some(catch_type.clone()));
+            }
+        }
+
         let catch_seq = build_sequence(b, &[], catch_block, catch_range, source, exit);
         if !catch_seq.terminated {
             b.add_edge(catch_seq.tail, join, EdgeKind::Fallthrough);

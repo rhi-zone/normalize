@@ -8,7 +8,7 @@
 //! - `((label))` — (not used currently)
 //! - `[/label\]` — catch block
 
-use crate::{BasicBlock, BlockId, BlockKind, Cfg, EdgeKind};
+use crate::{BasicBlock, BlockId, BlockKind, Cfg, Edge, EdgeKind};
 
 /// Render a [`Cfg`] as a Mermaid `flowchart TD` string.
 pub fn render(cfg: &Cfg) -> String {
@@ -46,7 +46,7 @@ pub fn render(cfg: &Cfg) -> String {
     for edge in &cfg.edges {
         let from = block_node_id(edge.from);
         let to = block_node_id(edge.to);
-        let label_str = edge_label(&edge.kind);
+        let label_str = exception_edge_label(edge);
         if label_str.is_empty() {
             out.push_str(&format!("    {} --> {}\n", from, to));
         } else {
@@ -99,5 +99,16 @@ fn edge_label(kind: &EdgeKind) -> &'static str {
         EdgeKind::Exception => "exception",
         EdgeKind::Suspend => "suspend",
         EdgeKind::Resume => "resume",
+    }
+}
+
+/// Produce the edge label string for an edge, incorporating exception type when present.
+fn exception_edge_label(edge: &Edge) -> String {
+    match edge.kind {
+        EdgeKind::Exception => match &edge.exception_type {
+            Some(t) if !t.is_empty() => format!("exception: {}", t),
+            _ => "exception".to_string(),
+        },
+        ref kind => edge_label(kind).to_string(),
     }
 }

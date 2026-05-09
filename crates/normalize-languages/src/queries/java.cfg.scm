@@ -112,3 +112,19 @@
 (continue_statement) @cfg.exit.continue
 
 (throw_statement) @cfg.exit.throw
+
+; ---------------------------------------------------------------------------
+; Exception type captures (Phase 4: type-refined exception flow)
+; ---------------------------------------------------------------------------
+
+; Thrown type: throw new IOException("msg") → captures "IOException"
+(throw_statement
+  (object_creation_expression
+    type: (type_identifier) @cfg.exit.throw.type))
+
+; Catch type (single or multi-catch): catch (IOException e) or catch (IOException | SQLException e)
+; Each type_identifier child of catch_type is captured individually.
+(catch_clause
+  (catch_formal_parameter
+    (catch_type
+      (type_identifier) @cfg.try.catch.type)))

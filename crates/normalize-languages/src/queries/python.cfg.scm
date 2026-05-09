@@ -73,6 +73,25 @@
 (raise_statement) @cfg.exit.throw
 
 ; ---------------------------------------------------------------------------
+; Exception type captures (Phase 4: type-refined exception flow)
+; ---------------------------------------------------------------------------
+
+; Thrown type: raise ValueError("msg") → captures "ValueError"
+(raise_statement
+  (call
+    function: (identifier) @cfg.exit.throw.type))
+
+; Catch type (single): except Exception → captures "Exception"
+(except_clause
+  (identifier) @cfg.try.catch.type)
+
+; Catch type (multi): except (TypeError, ValueError) → captures each identifier
+(except_clause
+  (as_pattern
+    (tuple
+      (identifier) @cfg.try.catch.type)))
+
+; ---------------------------------------------------------------------------
 ; Def/use sites
 ; ---------------------------------------------------------------------------
 

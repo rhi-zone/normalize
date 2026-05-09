@@ -94,3 +94,14 @@
 (continue_statement) @cfg.exit.continue
 
 (throw_statement) @cfg.exit.throw
+
+; ---------------------------------------------------------------------------
+; Exception type captures (Phase 4: type-refined exception flow)
+; ---------------------------------------------------------------------------
+
+; Thrown type: throw new TypeError("msg") → captures "TypeError"
+(throw_statement
+  (new_expression
+    constructor: (identifier) @cfg.exit.throw.type))
+
+; TSX catch clauses are untyped — no cfg.try.catch.type capture here.

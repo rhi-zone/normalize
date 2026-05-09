@@ -1,0 +1,41 @@
+# ---
+# id = "exception_flow"
+# message = "Control-flow exception analysis: typed throw→catch reachability and unhandled throws"
+# tags = ["cfg", "exceptions", "dataflow"]
+# enabled = false
+# ---
+#
+# Derives higher-level facts about exception flow in functions.
+#
+# Input relation (Phase 4):
+#   cfg_edge(file, func, func_line, from, to, "exception", exception_type)
+#   cfg_block(file, func, func_line, block, kind)
+#
+# Derived relations (no diagnostics by default — query these from other rules):
+#   exception_reaches(file, func, func_line, throw_block, catch_block, type)
+#     — a typed exception edge reaches a catch block
+#   unhandled_exception(file, func, func_line, throw_block, type)
+#     — a throw reaches the function exit block (unhandled)
+#   can_throw(file, func, func_line)
+#     — function has at least one unhandled exception
+#
+# Enable this rule and reference the derived relations from other rules, or
+# query the derived relations directly via `normalize rules run`.
+
+relation exception_reaches(String, String, u32, u32, u32, String);
+relation unhandled_exception(String, String, u32, u32, String);
+relation can_throw(String, String, u32);
+
+// exception_reaches: a typed exception edge connects a throw-containing block to a catch block
+exception_reaches(F, Fn, FL, ThrowBlock, CatchBlock, Type) <--
+    cfg_edge(F, Fn, FL, ThrowBlock, CatchBlock, "exception", Type),
+    if !Type.is_empty();
+
+// unhandled_exception: a throw escapes to the function exit block
+unhandled_exception(F, Fn, FL, ThrowBlock, Type) <--
+    cfg_edge(F, Fn, FL, ThrowBlock, ExitBlock, "exception", Type),
+    cfg_block(F, Fn, FL, ExitBlock, "exit");
+
+// can_throw: function has at least one unhandled throw
+can_throw(F, Fn, FL) <--
+    unhandled_exception(F, Fn, FL, _, _);

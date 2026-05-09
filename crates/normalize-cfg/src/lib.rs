@@ -216,6 +216,10 @@ pub struct Edge {
     pub to: BlockId,
     /// Kind of control flow this edge represents.
     pub kind: EdgeKind,
+    /// For `EdgeKind::Exception` edges: the thrown exception type name (e.g. `"IOException"`).
+    /// `None` means conservative — type unknown, edge applies to any exception.
+    /// `Some("*")` means catch-all (e.g. JS/TS untyped catch, C++ `catch (...)`).
+    pub exception_type: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -244,6 +248,11 @@ impl Cfg {
             .iter()
             .find(|b| b.id == id)
             .unwrap_or_else(|| panic!("CFG internal error: block {:?} not found", id))
+    }
+
+    /// Iterate over all exception edges (EdgeKind::Exception) in this CFG.
+    pub fn throw_edges(&self) -> impl Iterator<Item = &Edge> {
+        self.edges.iter().filter(|e| e.kind == EdgeKind::Exception)
     }
 
     /// Render this CFG as a Mermaid flowchart string.

@@ -102,3 +102,17 @@
 (continue_statement) @cfg.exit.continue
 
 (throw_statement) @cfg.exit.throw
+
+; ---------------------------------------------------------------------------
+; Exception type captures (Phase 4: type-refined exception flow)
+; ---------------------------------------------------------------------------
+
+; Thrown type: throw new InvalidOperationException() → captures "InvalidOperationException"
+(throw_statement
+  (object_creation_expression
+    type: (identifier) @cfg.exit.throw.type))
+
+; Catch type: catch (InvalidOperationException e) → captures "InvalidOperationException"
+(catch_clause
+  (catch_declaration
+    type: (_) @cfg.try.catch.type))

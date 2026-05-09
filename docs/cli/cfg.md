@@ -25,7 +25,7 @@ Renders a Mermaid `flowchart TD` diagram of the function's control flow. Block s
 | `{label}` | Branch (if/match head), LoopHead |
 | `[/label\]` | Catch/except block |
 
-Edge labels: `true`, `false`, `back`, `break`, `continue`, `return`, `exception`.
+Edge labels: `true`, `false`, `back`, `break`, `continue`, `return`, `exception`, `exception: <Type>` (when exception type is known).
 
 ## Supported languages
 

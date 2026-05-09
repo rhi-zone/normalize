@@ -346,7 +346,11 @@ pub struct CfgBlockFact {
 
 /// A CFG edge fact.
 ///
-/// Maps to Datalog: `cfg_edge(file, func, func_line, from, to, kind)`
+/// Maps to Datalog: `cfg_edge(file, func, func_line, from, to, kind, exception_type)`
+///
+/// `exception_type` is only meaningful for `kind == "exception"` edges:
+/// - Empty string = conservative (type unknown, applies to any exception).
+/// - Non-empty string = the exception type name (e.g. `"IOException"`).
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 #[rkyv(derive(Debug))]
 pub struct CfgEdgeFact {
@@ -360,8 +364,10 @@ pub struct CfgEdgeFact {
     pub from: u32,
     /// Target block ID
     pub to: u32,
-    /// Edge kind (e.g. "fallthrough", "conditionaltrue", "backedge")
+    /// Edge kind (e.g. "fallthrough", "conditionaltrue", "backedge", "exception")
     pub kind: String,
+    /// Exception type for `kind == "exception"` edges. Empty string = conservative.
+    pub exception_type: String,
 }
 
 /// A CFG variable definition fact.
@@ -727,6 +733,7 @@ impl Relations {
     }
 
     /// Add a CFG edge fact
+    #[allow(clippy::too_many_arguments)]
     pub fn add_cfg_edge(
         &mut self,
         file: &str,
@@ -735,6 +742,7 @@ impl Relations {
         from: u32,
         to: u32,
         kind: &str,
+        exception_type: &str,
     ) {
         self.cfg_edges.push(CfgEdgeFact {
             file: file.into(),
@@ -743,6 +751,7 @@ impl Relations {
             from,
             to,
             kind: kind.into(),
+            exception_type: exception_type.into(),
         });
     }
 

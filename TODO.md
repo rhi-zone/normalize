@@ -10,11 +10,12 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ---
 
-## CFG (Control Flow Graph) — Phase 1 ✓ + Phase 2 ✓ + Phase 3 ✓
+## CFG (Control Flow Graph) — Phase 1 ✓ + Phase 2 ✓ + Phase 3 ✓ + Phase 4 ✓
 
 **Goal:** `normalize cfg <file> -f <function>` renders a Mermaid flowchart of a function's control flow.
 **Phase 2 Goal:** def/use sites, SQLite persistence, Datalog facts, liveness analysis CLI.
 **Phase 3 Goal:** Effects tracking — await, defer, yield, acquire/release, send/receive; `normalize analyze effects`.
+**Phase 4 Goal:** Type-refined exception flow — `@cfg.exit.throw.type`/`@cfg.try.catch.type` captures; typed edges; `normalize analyze exceptions`.
 
 **Commits 1–4 (scaffold, builder, mermaid, CLI): committed 2026-05-09**
 
@@ -32,6 +33,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] Commit 12: CFG Phase 1 batch — 69 additional `.cfg.scm` queries (C-family, JVM/functional, scripting, systems, domain/config); coverage matrix updated to 76 HAS_CFG; Lua + Jinja2 snapshot tests; dockerfile/query moved to NOT_APPLICABLE; asm/x86asm/uiua remain DEFERRED
 - [x] Phase 2: `DefSite`/`UseSite` on `BasicBlock`; `@cfg.def`/`@cfg.use` captures (Rust/Python/Go); SQLite `cfg_blocks`/`cfg_edges`/`cfg_defs`/`cfg_uses` tables (schema v13); wired into `refresh_call_graph` and `reindex_files`; Datalog `cfg_block`/`cfg_edge`/`cfg_def`/`cfg_use` relations; `liveness.dl` builtin; `normalize analyze liveness <file> --function <name>` CLI command
 - [x] Phase 3: `Effect`/`EffectKind` on `BasicBlock`; `BlockKind::Deferred/Acquire/Release`; `EdgeKind::Suspend/Resume`; `@cfg.effect.*` captures (Rust/Python/TS/JS/Go); SQLite `cfg_effects` table (schema v14); `CfgEffectFact` Datalog relation; `effects.dl` builtin; `normalize analyze effects <file> [--function <name>]` CLI command
+- [x] Phase 4: `Edge.exception_type: Option<String>`; `@cfg.exit.throw.type`/`@cfg.try.catch.type` captures (Java, Python, JS/TS/TSX, C++, C#); `cfg_edges.exception_type` SQL column (schema v15); `cfg_edge` Datalog relation extended to 7 fields; `exception_flow.dl` builtin; Mermaid type labels; `normalize analyze exceptions <file> [--function <name>]` CLI command
 
 **Remaining DEFERRED (Phase 1 cleanup):**
 - asm, x86asm — assembly branches (jmp/je/jne) are at instruction level; need grammar inspection (not installed)
@@ -45,6 +47,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - LSP: expose CFG as an inlay hint or hover action
 - Phase 2 follow-up: `@cfg.use` captures not yet written (only `@cfg.def` for Rust/Python/Go); add use captures to identify variables being read in each block
 - Phase 2 follow-up: CFG data is not CA-cached — each `structure rebuild` re-builds CFGs for all files. Consider caching or making CFG rebuild optional.
+- Phase 4 follow-up (Phase 5 territory): subtype hierarchy for exception type matching (e.g. `IOException extends Exception`). Phase 4 uses exact-match only; a throw of `IOException` won't match a `catch (Exception e)` unless Exception is the thrown type. Full subtype-aware matching needs type hierarchy facts.
+- Phase 4 follow-up: add `@cfg.exit.throw.type` captures to more languages (currently Java, Python, JS/TS/TSX, C++, C#).
 
 ## Goal
 

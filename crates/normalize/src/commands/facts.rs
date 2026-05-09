@@ -123,6 +123,16 @@ pub async fn build_relations_from_index(root: &Path) -> Result<Relations, String
         }
     }
 
+    // Get CFG edges (Phase 4)
+    let cfg_edges = idx
+        .all_cfg_edges()
+        .await
+        .map_err(|e| format!("Failed to get CFG edges: {}", e))?;
+
+    for (file, func, func_line, from, to, kind, exception_type) in &cfg_edges {
+        relations.add_cfg_edge(file, func, *func_line, *from, *to, kind, exception_type);
+    }
+
     // Get CFG effects (Phase 3)
     let cfg_effects = idx
         .all_cfg_effects()

@@ -32,6 +32,7 @@ Commands:
   liveness           Compute live-in and live-out variable sets for each basic block in a function.
   effects            Show all side-effecting constructs (await, defer, yield, resource acquire/release,
 channel send/receive) for functions in a source file.
+  exceptions         Show type-refined exception flow for functions in a source file.
 
 Repository:
   docs               Measure documentation coverage: which public symbols lack doc comments.

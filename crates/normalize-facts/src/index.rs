@@ -28,6 +28,8 @@ struct CfgEdgeRow {
     from_block: u32,
     to_block: u32,
     kind: String,
+    /// Exception type for EdgeKind::Exception edges (None = conservative).
+    exception_type: Option<String>,
 }
 
 /// A single CFG def row ready for DB insertion.
@@ -115,7 +117,7 @@ struct CachedFileData {
 }
 
 // Not yet public - just delete .normalize/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 14;
+const SCHEMA_VERSION: i64 = 15;
 
 /// Bump when extraction logic changes to invalidate cached results.
 /// Bumped to "2" (2026-04-27): purge CA cache entries that may have been poisoned
@@ -654,7 +656,8 @@ impl FileIndex {
                 function_start_line INTEGER NOT NULL,
                 from_block INTEGER NOT NULL,
                 to_block INTEGER NOT NULL,
-                kind TEXT NOT NULL
+                kind TEXT NOT NULL,
+                exception_type TEXT
             )",
             (),
         )
@@ -2036,6 +2039,33 @@ impl FileIndex {
     }
 
     /// Return all CFG effect rows: (file, function_qname, function_start_line, block_id, kind, line, label).
+    /// Query all CFG edge facts from the index.
+    /// Returns tuples of (file, function_qname, function_start_line, from_block, to_block, kind, exception_type).
+    pub async fn all_cfg_edges(
+        &self,
+    ) -> Result<Vec<(String, String, u32, u32, u32, String, String)>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT file, function_qname, function_start_line, from_block, to_block, kind, COALESCE(exception_type, '') FROM cfg_edges",
+                (),
+            )
+            .await?;
+        let mut edges = Vec::new();
+        while let Some(row) = rows.next().await? {
+            edges.push((
+                row.get::<String>(0)?,
+                row.get::<String>(1)?,
+                u32::try_from(row.get::<i64>(2)?).unwrap_or(0),
+                u32::try_from(row.get::<i64>(3)?).unwrap_or(0),
+                u32::try_from(row.get::<i64>(4)?).unwrap_or(0),
+                row.get::<String>(5)?,
+                row.get::<String>(6)?,
+            ));
+        }
+        Ok(edges)
+    }
+
     pub async fn all_cfg_effects(
         &self,
     ) -> Result<Vec<(String, String, u32, u32, String, u32, String)>, libsql::Error> {
@@ -2985,7 +3015,7 @@ impl FileIndex {
             // Insert CFG edges
             for edge in &data.cfg.edges {
                 self.conn.execute(
-                    "INSERT INTO cfg_edges (file, function_qname, function_start_line, from_block, to_block, kind) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    "INSERT INTO cfg_edges (file, function_qname, function_start_line, from_block, to_block, kind, exception_type) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                     params![
                         data.file_path.clone(),
                         edge.function_qname.clone(),
@@ -2993,6 +3023,7 @@ impl FileIndex {
                         edge.from_block as i64,
                         edge.to_block as i64,
                         edge.kind.clone(),
+                        edge.exception_type.clone(),
                     ],
                 ).await?;
             }
@@ -3361,7 +3392,7 @@ impl FileIndex {
                 }
                 for edge in &cfg_data.edges {
                     self.conn.execute(
-                        "INSERT INTO cfg_edges (file, function_qname, function_start_line, from_block, to_block, kind) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                        "INSERT INTO cfg_edges (file, function_qname, function_start_line, from_block, to_block, kind, exception_type) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                         params![
                             file_path.clone(),
                             edge.function_qname.clone(),
@@ -3369,6 +3400,7 @@ impl FileIndex {
                             edge.from_block as i64,
                             edge.to_block as i64,
                             edge.kind.clone(),
+                            edge.exception_type.clone(),
                         ],
                     ).await?;
                 }
@@ -4223,6 +4255,7 @@ fn build_cfg_data_for_file(
                 from_block: edge.from.0,
                 to_block: edge.to.0,
                 kind: format!("{:?}", edge.kind).to_lowercase(),
+                exception_type: edge.exception_type.clone(),
             });
         }
     }

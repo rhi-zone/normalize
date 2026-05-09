@@ -90,3 +90,23 @@
 (throw_statement) @cfg.exit.throw
 
 (goto_statement) @cfg.exit.throw
+
+; ---------------------------------------------------------------------------
+; Exception type captures (Phase 4: type-refined exception flow)
+; ---------------------------------------------------------------------------
+
+; Thrown type: throw std::runtime_error("msg") → captures "std::runtime_error"
+(throw_statement
+  (call_expression
+    function: (qualified_identifier) @cfg.exit.throw.type))
+
+; Thrown type: throw RuntimeError("msg") → captures "RuntimeError"
+(throw_statement
+  (call_expression
+    function: (identifier) @cfg.exit.throw.type))
+
+; Catch type: catch (const std::runtime_error& e) → captures "std::runtime_error"
+(catch_clause
+  (parameter_list
+    (parameter_declaration
+      type: (_) @cfg.try.catch.type)))

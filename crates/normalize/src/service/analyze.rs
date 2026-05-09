@@ -6,6 +6,7 @@ use crate::commands::analyze::coupling_clusters::CouplingClustersReport;
 use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
 use crate::commands::analyze::docs::DocCoverageReport;
 use crate::commands::analyze::effects::EffectsReport;
+use crate::commands::analyze::exceptions::ExceptionsReport;
 use crate::commands::analyze::liveness::LivenessReport;
 use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
@@ -514,6 +515,47 @@ impl AnalyzeService {
         crate::commands::analyze::effects::analyze_effects(&idx, &rel_file, function.as_deref())
             .await
             .map_err(AnalyzeError::from)
+    }
+
+    /// Show type-refined exception flow for functions in a source file.
+    ///
+    /// Uses the CFG data stored in the index (populated by `normalize structure rebuild`)
+    /// to report throw sites, the catch clauses they route to (by exception type), and any
+    /// unhandled throws that escape the function. Requires the facts index.
+    ///
+    /// Also known as: exception analysis, throw-catch mapping, unhandled exception detection.
+    #[cli(display_with = "display_output")]
+    pub async fn exceptions(
+        &self,
+        #[param(positional, help = "Source file path")] file: String,
+        #[param(
+            short = 'f',
+            help = "Function name to analyse (defaults to all functions)"
+        )]
+        function: Option<String>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+    ) -> Result<ExceptionsReport, AnalyzeError> {
+        let root_path = Self::root_path(root)?;
+        let idx = crate::index::ensure_ready(&root_path).await?;
+        // Resolve file to a root-relative path for the index query.
+        let abs_file = std::path::Path::new(&file);
+        let rel_file = if abs_file.is_absolute() {
+            abs_file
+                .strip_prefix(&root_path)
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or(file.clone())
+        } else {
+            file.clone()
+        };
+        crate::commands::analyze::exceptions::analyze_exceptions(
+            &idx,
+            &rel_file,
+            function.as_deref(),
+        )
+        .await
+        .map_err(AnalyzeError::from)
     }
 
     /// Show structural (skeleton) changes between a base ref and HEAD.
