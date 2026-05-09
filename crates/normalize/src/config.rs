@@ -198,6 +198,27 @@ impl NormalizeConfig {
             return Self::bootstrap();
         }
 
+        // Pre-parse check: if any config file contains [embeddings] (removed in
+        // 0.3.0), emit a clear migration error before the generic parse failure.
+        for path in [Some(&project_config), global_config.as_ref()]
+            .into_iter()
+            .flatten()
+            .filter(|p| p.exists())
+        {
+            if let Ok(raw) = std::fs::read_to_string(path)
+                && let Ok(value) = raw.parse::<toml::Value>()
+                && value.get("embeddings").is_some()
+            {
+                eprintln!(
+                    "error: {} contains [embeddings] which was removed in 0.3.0.\n\
+                     Remove the [embeddings] section from {} and try again.",
+                    path.display(),
+                    path.display()
+                );
+                std::process::exit(1);
+            }
+        }
+
         let mut sources = vec![server_less::ConfigSource::Defaults];
         if let Some(global_path) = global_config {
             sources.push(server_less::ConfigSource::File(global_path));
