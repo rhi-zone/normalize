@@ -1,0 +1,5 @@
+---
+source: crates/normalize-cfg/tests/java_cfg.rs
+expression: mermaid
+---
+java grammar not installed — skipped

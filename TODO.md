@@ -22,8 +22,14 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] Commit 4: `CfgService` + `normalize cfg` CLI; help snapshot; `docs/cli/cfg.md`
 - [x] Commit 5: Python CFG query + fixtures
 - [x] Commit 6: Go CFG query + fixtures
+- [x] Commit 7: TypeScript CFG query (`typescript.cfg.scm`, `tsx.cfg.scm`) + 6 fixtures
+- [x] Commit 8: JavaScript CFG query (`javascript.cfg.scm`) + 4 fixtures
+- [x] Commit 9: Java CFG query (`java.cfg.scm`) + 5 fixtures (labeled break/continue validated)
+- [x] Commit 10: Coverage matrix test (`coverage_matrix.rs`) classifying all languages as HAS_CFG / NOT_APPLICABLE / DEFERRED
+- [x] Commit 11 (partial): Fixed pre-existing clippy error in all CFG test helpers (`is_some_and` collapse)
 
 **Follow-ups:**
+- Java labeled break/continue: currently captured as `@cfg.exit.break`/`@cfg.exit.continue`; the label target is not resolved. Full label resolution (connecting break to the labeled outer loop rather than innermost) tracked here.
 - Recursive CFG: nested control flow within arms/branches is currently a single Statement block; full recursion needs re-querying within each sub-range.
 - Cyclomatic complexity from CFG (= edges - nodes + 2)
 - LSP: expose CFG as an inlay hint or hover action

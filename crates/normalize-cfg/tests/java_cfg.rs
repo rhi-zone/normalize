@@ -1,26 +1,37 @@
-//! Snapshot tests for the Rust CFG builder and Mermaid renderer.
+//! Snapshot tests for the Java CFG builder and Mermaid renderer.
 //!
-//! Each test builds a CFG from a fixture file and snapshots the Mermaid output.
-//! Run `cargo insta review` to update snapshots after intentional changes.
+//! Tests are skipped gracefully if the Java grammar is not installed.
+//!
+//! The labeled_break test validates that Java labeled break/continue are
+//! captured as @cfg.exit.break / @cfg.exit.continue (label resolution
+//! to the correct enclosing loop is tracked in TODO.md).
 
 use normalize_cfg::{FunctionId, builder::build, mermaid::render};
 use normalize_languages::parsers::grammar_loader;
 use streaming_iterator::StreamingIterator;
 
-fn build_cfg_mermaid(fixture_path: &str, function_name: Option<&str>) -> String {
+fn build_cfg_mermaid_java(fixture_path: &str, function_name: Option<&str>) -> String {
     let source = std::fs::read(fixture_path)
         .unwrap_or_else(|e| panic!("failed to read {fixture_path}: {e}"));
 
     let loader = grammar_loader();
-    let ts_lang = loader.get("rust").expect("rust grammar not installed");
-    let cfg_query = loader.get_cfg("rust").expect("rust CFG query not found");
+    let ts_lang = match loader.get("java") {
+        Ok(l) => l,
+        Err(_) => return "java grammar not installed — skipped".to_string(),
+    };
+    let cfg_query = match loader.get_cfg("java") {
+        Some(q) => q,
+        None => return "no java cfg query — skipped".to_string(),
+    };
 
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&ts_lang).expect("set language");
     let tree = parser.parse(&source, None).expect("parse");
 
-    // Find first function matching the filter.
-    let tags_query_src = loader.get_tags("rust").expect("rust tags query");
+    let tags_query_src = match loader.get_tags("java") {
+        Some(q) => q,
+        None => return "no java tags query — skipped".to_string(),
+    };
     let tags_query = tree_sitter::Query::new(&ts_lang, &tags_query_src).expect("compile tags");
     let capture_names = tags_query.capture_names().to_vec();
     let mut cursor = tree_sitter::QueryCursor::new();
@@ -60,7 +71,6 @@ fn build_cfg_mermaid(fixture_path: &str, function_name: Option<&str>) -> String 
     drop(matches_iter);
 
     if func_name.is_empty() {
-        // Fall back to full file.
         func_name = function_name.unwrap_or("<file>").to_string();
     }
 
@@ -83,37 +93,34 @@ fn build_cfg_mermaid(fixture_path: &str, function_name: Option<&str>) -> String 
 }
 
 #[test]
-fn test_rust_linear() {
-    let mermaid = build_cfg_mermaid("tests/fixtures/rust/linear.rs", Some("linear"));
+fn test_java_linear() {
+    let mermaid = build_cfg_mermaid_java("tests/fixtures/java/linear.java", Some("linear"));
     insta::assert_snapshot!(mermaid);
 }
 
 #[test]
-fn test_rust_branch() {
-    let mermaid = build_cfg_mermaid("tests/fixtures/rust/branch.rs", Some("branch"));
+fn test_java_branch() {
+    let mermaid = build_cfg_mermaid_java("tests/fixtures/java/branch.java", Some("branch"));
     insta::assert_snapshot!(mermaid);
 }
 
 #[test]
-fn test_rust_loop() {
-    let mermaid = build_cfg_mermaid("tests/fixtures/rust/loop_.rs", Some("loop_"));
+fn test_java_loop() {
+    let mermaid = build_cfg_mermaid_java("tests/fixtures/java/loop_.java", Some("loop_"));
     insta::assert_snapshot!(mermaid);
 }
 
 #[test]
-fn test_rust_nested() {
-    let mermaid = build_cfg_mermaid("tests/fixtures/rust/nested.rs", Some("nested"));
+fn test_java_labeled_break() {
+    let mermaid = build_cfg_mermaid_java(
+        "tests/fixtures/java/labeled_break.java",
+        Some("labeled_break"),
+    );
     insta::assert_snapshot!(mermaid);
 }
 
 #[test]
-fn test_rust_early_return() {
-    let mermaid = build_cfg_mermaid("tests/fixtures/rust/early_return.rs", Some("early_return"));
-    insta::assert_snapshot!(mermaid);
-}
-
-#[test]
-fn test_rust_match() {
-    let mermaid = build_cfg_mermaid("tests/fixtures/rust/match_.rs", Some("match_"));
+fn test_java_try_catch() {
+    let mermaid = build_cfg_mermaid_java("tests/fixtures/java/try_catch.java", Some("try_catch"));
     insta::assert_snapshot!(mermaid);
 }

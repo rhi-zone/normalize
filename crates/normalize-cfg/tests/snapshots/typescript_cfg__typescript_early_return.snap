@@ -1,0 +1,19 @@
+---
+source: crates/normalize-cfg/tests/typescript_cfg.rs
+expression: mermaid
+---
+flowchart TD
+    b0{"Branch<br/>lines 1-2"}
+    b1(["exit"])
+    b2["Statement<br/>lines 2-4"]
+    b3{"Branch<br/>lines 4-5"}
+    b4["Statement<br/>lines 5-7"]
+    b5["Statement<br/>lines 7-8"]
+
+    b0 -->|"true"| b2
+    b0 -->|"false"| b3
+    b2 --> b3
+    b3 -->|"true"| b4
+    b3 -->|"false"| b5
+    b4 --> b5
+    b5 -->|"return"| b1

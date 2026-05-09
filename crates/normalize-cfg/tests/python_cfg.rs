@@ -47,10 +47,8 @@ fn build_cfg_mermaid_python(fixture_path: &str, function_name: Option<&str>) -> 
                     .utf8_text(&source)
                     .unwrap_or("<unknown>")
                     .to_string();
-                if let Some(filter) = function_name {
-                    if candidate != filter {
-                        continue;
-                    }
+                if function_name.is_some_and(|f| candidate != f) {
+                    continue;
                 }
                 let def_node = cap.node.parent().unwrap_or(cap.node);
                 func_name = candidate;

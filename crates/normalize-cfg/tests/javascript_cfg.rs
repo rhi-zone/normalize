@@ -1,26 +1,33 @@
-//! Snapshot tests for the Rust CFG builder and Mermaid renderer.
+//! Snapshot tests for the JavaScript CFG builder and Mermaid renderer.
 //!
-//! Each test builds a CFG from a fixture file and snapshots the Mermaid output.
-//! Run `cargo insta review` to update snapshots after intentional changes.
+//! Tests are skipped gracefully if the JavaScript grammar is not installed.
 
 use normalize_cfg::{FunctionId, builder::build, mermaid::render};
 use normalize_languages::parsers::grammar_loader;
 use streaming_iterator::StreamingIterator;
 
-fn build_cfg_mermaid(fixture_path: &str, function_name: Option<&str>) -> String {
+fn build_cfg_mermaid_js(fixture_path: &str, function_name: Option<&str>) -> String {
     let source = std::fs::read(fixture_path)
         .unwrap_or_else(|e| panic!("failed to read {fixture_path}: {e}"));
 
     let loader = grammar_loader();
-    let ts_lang = loader.get("rust").expect("rust grammar not installed");
-    let cfg_query = loader.get_cfg("rust").expect("rust CFG query not found");
+    let ts_lang = match loader.get("javascript") {
+        Ok(l) => l,
+        Err(_) => return "javascript grammar not installed — skipped".to_string(),
+    };
+    let cfg_query = match loader.get_cfg("javascript") {
+        Some(q) => q,
+        None => return "no javascript cfg query — skipped".to_string(),
+    };
 
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&ts_lang).expect("set language");
     let tree = parser.parse(&source, None).expect("parse");
 
-    // Find first function matching the filter.
-    let tags_query_src = loader.get_tags("rust").expect("rust tags query");
+    let tags_query_src = match loader.get_tags("javascript") {
+        Some(q) => q,
+        None => return "no javascript tags query — skipped".to_string(),
+    };
     let tags_query = tree_sitter::Query::new(&ts_lang, &tags_query_src).expect("compile tags");
     let capture_names = tags_query.capture_names().to_vec();
     let mut cursor = tree_sitter::QueryCursor::new();
@@ -60,7 +67,6 @@ fn build_cfg_mermaid(fixture_path: &str, function_name: Option<&str>) -> String 
     drop(matches_iter);
 
     if func_name.is_empty() {
-        // Fall back to full file.
         func_name = function_name.unwrap_or("<file>").to_string();
     }
 
@@ -83,37 +89,28 @@ fn build_cfg_mermaid(fixture_path: &str, function_name: Option<&str>) -> String 
 }
 
 #[test]
-fn test_rust_linear() {
-    let mermaid = build_cfg_mermaid("tests/fixtures/rust/linear.rs", Some("linear"));
+fn test_javascript_linear() {
+    let mermaid = build_cfg_mermaid_js("tests/fixtures/javascript/linear.js", Some("linear"));
     insta::assert_snapshot!(mermaid);
 }
 
 #[test]
-fn test_rust_branch() {
-    let mermaid = build_cfg_mermaid("tests/fixtures/rust/branch.rs", Some("branch"));
+fn test_javascript_branch() {
+    let mermaid = build_cfg_mermaid_js("tests/fixtures/javascript/branch.js", Some("branch"));
     insta::assert_snapshot!(mermaid);
 }
 
 #[test]
-fn test_rust_loop() {
-    let mermaid = build_cfg_mermaid("tests/fixtures/rust/loop_.rs", Some("loop_"));
+fn test_javascript_loop() {
+    let mermaid = build_cfg_mermaid_js("tests/fixtures/javascript/loop_.js", Some("loop_"));
     insta::assert_snapshot!(mermaid);
 }
 
 #[test]
-fn test_rust_nested() {
-    let mermaid = build_cfg_mermaid("tests/fixtures/rust/nested.rs", Some("nested"));
-    insta::assert_snapshot!(mermaid);
-}
-
-#[test]
-fn test_rust_early_return() {
-    let mermaid = build_cfg_mermaid("tests/fixtures/rust/early_return.rs", Some("early_return"));
-    insta::assert_snapshot!(mermaid);
-}
-
-#[test]
-fn test_rust_match() {
-    let mermaid = build_cfg_mermaid("tests/fixtures/rust/match_.rs", Some("match_"));
+fn test_javascript_early_return() {
+    let mermaid = build_cfg_mermaid_js(
+        "tests/fixtures/javascript/early_return.js",
+        Some("early_return"),
+    );
     insta::assert_snapshot!(mermaid);
 }

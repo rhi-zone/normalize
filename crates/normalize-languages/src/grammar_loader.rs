@@ -1189,6 +1189,10 @@ fn bundled_cfg_query(name: &str) -> Option<&'static str> {
         "rust" => Some(include_str!("queries/rust.cfg.scm")),
         "python" => Some(include_str!("queries/python.cfg.scm")),
         "go" => Some(include_str!("queries/go.cfg.scm")),
+        "typescript" => Some(include_str!("queries/typescript.cfg.scm")),
+        "tsx" => Some(include_str!("queries/tsx.cfg.scm")),
+        "javascript" => Some(include_str!("queries/javascript.cfg.scm")),
+        "java" => Some(include_str!("queries/java.cfg.scm")),
         _ => None,
     }
 }
