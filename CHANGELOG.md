@@ -6,6 +6,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Grammar ABI mismatch after `normalize update`.** `ensure_grammars_first_use` now
+  reads the `.installed-version` stamp and compares it against the running binary's
+  version. If they differ (e.g. after a self-update), the stamp is deleted and grammars
+  are re-downloaded for the current binary before any command runs. Previously, an
+  existing stamp caused the check to short-circuit unconditionally, leaving stale 0.2.x
+  `.so` files loaded by a 0.3.x binary.
+- **`normalize update` now invalidates the grammar stamp** immediately after replacing
+  the binary, so the next invocation triggers a grammar re-download even if the process
+  exits before `ensure_grammars_first_use` runs.
+- **Friendly error for removed `[embeddings]` config key.** Loading `.normalize/config.toml`
+  now pre-checks for `[embeddings]` (removed in 0.3.0) and exits with a clear migration
+  message instead of a generic parse error.
+
 ### Added
 
 - **`normalize edit extract-function <file> --lines <start>-<end> --name <name> [--apply]` command.** Extracts a line range from a function into a new function using CFG liveness analysis. Infers parameters (variables live into the region from outside) and return values (variables defined inside the region and live after it) via backward-dataflow fixed-point over the facts index. Checks `cfg_effects` for async, generator, defer, and acquire/release semantics; emits warnings for defer crossing boundary, unbalanced resource lifetime, and escaping exception edges. Generates language-appropriate source for Rust, Python, Go, TypeScript/JavaScript, and Java. Default is dry-run; `--apply` writes the changes. Requires `normalize structure rebuild`.

@@ -367,9 +367,6 @@ enabled = false
 
 [aliases]
 todo = ["TODO.md"]
-[embeddings]
-enabled = true
-
 [analyze.duplicate-blocks]
 # Migrated from .normalize/duplicate-blocks-allow
 allow = [

@@ -134,7 +134,11 @@ pub enum GrammarsFirstRun {
 /// Lightweight first-use grammar check.
 ///
 /// Behaviour:
-/// 1. If the install stamp exists, returns immediately.
+/// 1. If the install stamp exists **and its version matches the running
+///    binary**, returns immediately.
+///    If the stamp is present but records a different version (e.g. after
+///    `normalize update`), the stamp is deleted and we fall through to
+///    re-download grammars for the current binary version.
 /// 2. Otherwise, if the grammar dir already contains shared libraries (e.g.
 ///    a developer ran `cargo xtask build-grammars`), write the stamp and
 ///    return `PreInstalled`.
@@ -151,8 +155,26 @@ pub fn ensure_grammars_first_use() -> GrammarsFirstRun {
         return GrammarsFirstRun::NoConfigDir;
     };
 
-    if dir.join(INSTALLED_STAMP).exists() {
-        return GrammarsFirstRun::AlreadyChecked;
+    let stamp_path = dir.join(INSTALLED_STAMP);
+    if stamp_path.exists() {
+        // Read the stamp and compare against the running binary's version.
+        // If they match (or the stamp says "prebuilt", which is a local
+        // developer build not tied to any release), we're done.
+        let stamp_content = std::fs::read_to_string(&stamp_path).unwrap_or_default();
+        let stamp_version = stamp_content.trim();
+        let binary_version = env!("CARGO_PKG_VERSION");
+
+        if stamp_version == "prebuilt" || stamp_version == binary_version {
+            return GrammarsFirstRun::AlreadyChecked;
+        }
+
+        // Version mismatch — the binary was updated but grammars were not.
+        // Delete the stale stamp so we fall through and reinstall.
+        eprintln!(
+            "Grammar version mismatch (installed: {}, binary: {}) — reinstalling grammars",
+            stamp_version, binary_version
+        );
+        let _ = std::fs::remove_file(&stamp_path);
     }
 
     // If a NORMALIZE_GRAMMAR_PATH is set and points at a populated directory,

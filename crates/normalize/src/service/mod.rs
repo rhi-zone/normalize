@@ -587,6 +587,14 @@ impl NormalizeService {
         tracing::info!("  installing...");
         commands::update::self_replace(&binary_data)?;
 
+        // Invalidate the grammar stamp so the next invocation re-downloads
+        // grammars matching the new binary version.  The stamp path mirrors
+        // what `commands::grammars::user_grammars_dir()` returns.
+        if let Some(grammar_dir) = dirs::config_dir().map(|c| c.join("normalize/grammars")) {
+            let stamp = grammar_dir.join(".installed-version");
+            let _ = std::fs::remove_file(&stamp);
+        }
+
         Ok(UpdateReport {
             current_version: CURRENT_VERSION.to_string(),
             latest_version,

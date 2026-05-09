@@ -17,6 +17,20 @@ nix develop
 cargo build --release
 ```
 
+## Upgrading
+
+```bash
+normalize update
+```
+
+`normalize update` downloads the latest binary **and** automatically re-downloads
+grammars on the next run so the grammar ABI always matches the binary.
+
+**Upgrading from 0.2.0:** the `[embeddings]` config section was removed in 0.3.0.
+If your `.normalize/config.toml` contains `[embeddings]`, remove that section
+before running the new binary — normalize will print a clear error message if it
+finds the stale key.
+
 ## Quick Start
 
 ```bash
