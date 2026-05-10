@@ -176,12 +176,12 @@ jobs:
 
           # Bundle musl-linked libgcc_s.so.1 from Alpine Linux.
           # Alpine is musl-based, so its libgcc_s.so.1 depends on libc.so (musl),
-          # not libc.so.6 (glibc). Bundling glibc's libgcc_s.so.1 (from Ubuntu)
-          # fails on NixOS because glibc's copy depends on ld-linux-x86-64.so.2
-          # which doesn't exist on musl/non-FHS systems.
-          # Alpine APKs are gzipped tarballs; extract the .so directly via tar.
-          curl -fsSL "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/libgcc-14.2.0-r4.apk" | \
-            tar xzO ./usr/lib/libgcc_s.so.1 > dist/runtime/libgcc_s.so.1
+          # not libc.so.6 (glibc). APK files are multi-stream gzip archives;
+          # docker cp is the reliable cross-platform extraction method.
+          docker pull alpine:3.21 --quiet
+          ALPINE_CID=$(docker create alpine:3.21)
+          docker cp "$ALPINE_CID:/usr/lib/libgcc_s.so.1" dist/runtime/libgcc_s.so.1
+          docker rm "$ALPINE_CID"
           # Sanity-check: the bundled libgcc_s.so.1 must NOT depend on glibc.
           if readelf -d dist/runtime/libgcc_s.so.1 | grep -q 'libc.so.6'; then
             echo "ERROR: bundled libgcc_s.so.1 is glibc-linked — will fail on NixOS" >&2
