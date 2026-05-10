@@ -175,21 +175,21 @@ jobs:
           chmod +x dist/runtime/ld-musl-x86_64.so.1
 
           # Bundle musl-linked libgcc_s.so.1 from Alpine Linux.
-          # Alpine is musl-based, so its libgcc_s.so.1 depends on libc.musl-x86_64.so.1,
-          # not libc.so.6 (glibc). APK files are two concatenated gzip streams:
-          # stream 0 = control section, stream 1 = data (actual files).
-          # Skip stream 0 by finding the second 0x1f8b magic and extract from there.
+          # Alpine is musl-based so its libgcc_s.so.1 depends on libc.musl-x86_64.so.1,
+          # not libc.so.6 (glibc). APK files are two concatenated gzip streams;
+          # skip the control stream by finding the second 0x1f8b magic.
           curl -fsSL "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/libgcc-14.2.0-r4.apk" \
-            | python3 -c "
-import gzip, io, tarfile, sys
-data = sys.stdin.buffer.read()
-i = 1
-while i < len(data)-1:
-    if data[i] == 0x1f and data[i+1] == 0x8b: break
-    i += 1
-with tarfile.open(fileobj=gzip.open(io.BytesIO(data[i:]))) as t:
-    sys.stdout.buffer.write(t.extractfile('usr/lib/libgcc_s.so.1').read())
-" > dist/runtime/libgcc_s.so.1
+            > /tmp/libgcc.apk
+          python3 - /tmp/libgcc.apk dist/runtime/libgcc_s.so.1 <<'PYEOF'
+          import gzip, io, tarfile, sys
+          data = open(sys.argv[1], 'rb').read()
+          i = 1
+          while i < len(data)-1:
+              if data[i] == 0x1f and data[i+1] == 0x8b: break
+              i += 1
+          with tarfile.open(fileobj=gzip.open(io.BytesIO(data[i:]))) as t:
+              open(sys.argv[2], 'wb').write(t.extractfile('usr/lib/libgcc_s.so.1').read())
+          PYEOF
           # Sanity-check: the bundled libgcc_s.so.1 must NOT depend on glibc.
           if readelf -d dist/runtime/libgcc_s.so.1 | grep -q 'libc.so.6'; then
             echo "ERROR: bundled libgcc_s.so.1 is glibc-linked — will fail on NixOS" >&2
