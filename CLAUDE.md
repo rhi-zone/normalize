@@ -115,10 +115,7 @@ When unsure of syntax: `normalize <cmd> --help`. Fall back to Read only for exac
 
 ## Context Management
 
-**Use subagents to protect the main context window.** When a task requires broad
-exploration (many files, deep search, multi-step research), delegate to an Explore or
-general-purpose subagent rather than running the searches inline. The subagent returns
-a distilled summary; raw tool output stays out of the main context.
+**All exploration goes in subagents.** Any tool call whose purpose is "find out what's here" — grep, find, broad reads, surveys, audits — runs in a subagent. Raw exploratory output in the main context is active context poisoning: it lingers in cache, shapes downstream reasoning, can't be unsent. The subagent returns a distilled summary; the noise stays in the subagent.
 
 **"Do it inline" poisons context.** Even a "small" edit that touches the service layer,
 snapshot tests, and help output is the same scope as any other agent task. The temptation
@@ -128,8 +125,8 @@ and crowds out the actual conversation. If it needs a test run, it needs an agen
 **Inline-vs-agent is not a rule of thumb. It's a hard rule:**
 - Any edit that requires `cargo test`, `cargo clippy`, or `cargo build` → **always** an agent. No exceptions for "this one's small". Building a single crate compiles the rest of the workspace and pollutes the main context with hundreds of lines of warnings; a `cargo test` failure produces dozens of test names. The cost is identical whether the edit was 10 lines or 1000.
 - Codebase-wide analysis (architecture, patterns, cross-crate survey) → always subagent.
-- Expect to search >5 files or run >3 rounds of grep/read → use a subagent.
-- Single targeted lookup (one file, one symbol) with no build step → inline is fine.
+- Any grep/read whose purpose is discovery rather than acting on a known result → always subagent. If you find yourself running a second grep to refine the first, you should have spawned a subagent.
+- Inline is reserved for: reading a known file at a known path, edits/writes you're committing to, a single targeted lookup whose result you'll act on immediately.
 
 The failure mode is "I'll just edit this one file and verify quickly" — which produces a 50-line clippy warning dump in the main context, then another 50 from the next inline edit, and within a few turns the conversation is unreadable. **If you find yourself about to run cargo, stop and delegate.**
 
@@ -140,7 +137,6 @@ Conventional commits: `type(scope): message`. Scope recommended for multi-crate 
 ## Negative Constraints
 
 Do not:
-- Use Claude Code's auto-memory system (`~/.claude/projects/.*./memory/`) — it is unversioned, invisible to the user, and can't be diffed or backed up. Write behavioral changes directly to CLAUDE.md instead
 - Hardcode file extensions — extension → language mapping belongs in the `Language` registry. Use `support_for_path(path)` or equivalent.
 - Ship mutating commands without `--dry-run`
 - Do half measures — when introducing a new abstraction, replace all existing ad-hoc code with it. "We'll clean it up later" means it never gets cleaned up.
