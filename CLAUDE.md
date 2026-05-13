@@ -113,28 +113,29 @@ When unsure of syntax: `normalize <cmd> --help`. Fall back to Read only for exac
 
 **Maintain CHANGELOG.md.** User-facing changes go in `CHANGELOG.md` (Keep a Changelog format) as they land — not in a batch at release time. Add entries under `## [Unreleased]` when committing the feature. At release, rename `[Unreleased]` to the version and add a new empty `[Unreleased]` section. The release workflow body should link to or excerpt the changelog rather than duplicating install instructions as the primary content.
 
-## Context Management
+## Context Is The Only Scarce Resource
 
-**All exploration goes in subagents.** Any tool call whose purpose is "find out what's here" — grep, find, broad reads, surveys, audits — runs in a subagent. Raw exploratory output in the main context is active context poisoning: it lingers in cache, shapes downstream reasoning, can't be unsent. The subagent returns a distilled summary; the noise stays in the subagent.
+Every byte that enters the main session stays in the main session for its entire lifetime. File contents, command output, search results — once read, it lingers in cache and shapes every downstream token. There is no "just looking."
 
-**"Do it inline" poisons context.** Even a "small" edit that touches the service layer,
-snapshot tests, and help output is the same scope as any other agent task. The temptation
-to do it inline is always wrong — inline work accumulates tool output in the main context
-and crowds out the actual conversation. If it needs a test run, it needs an agent.
+**All exploration runs in subagents.** Investigations, surveys, audits, "let me check," "let me find" — if the purpose of a tool sequence is to find out something you don't yet know, it runs in a subagent. Renaming the activity does not change what it is. The subagent returns a distilled summary; the raw output stays in the subagent.
 
-**Inline-vs-agent is not a rule of thumb. It's a hard rule:**
-- Any edit that requires `cargo test`, `cargo clippy`, or `cargo build` → **always** an agent. No exceptions for "this one's small". Building a single crate compiles the rest of the workspace and pollutes the main context with hundreds of lines of warnings; a `cargo test` failure produces dozens of test names. The cost is identical whether the edit was 10 lines or 1000.
+**Inline-vs-agent is a hard rule, not a rule of thumb:**
+- Any edit that requires `cargo test`, `cargo clippy`, or `cargo build` → **always** an agent. No exceptions for "this one's small." Building a single crate compiles the rest of the workspace and pollutes the main context with hundreds of lines of warnings; a `cargo test` failure produces dozens of test names. The cost is identical whether the edit was 10 lines or 1000.
 - Codebase-wide analysis (architecture, patterns, cross-crate survey) → always subagent.
 - Any grep/read whose purpose is discovery rather than acting on a known result → always subagent. If you find yourself running a second grep to refine the first, you should have spawned a subagent.
 - Inline is reserved for: reading a known file at a known path, edits/writes you're committing to, a single targeted lookup whose result you'll act on immediately.
 
-The failure mode is "I'll just edit this one file and verify quickly" — which produces a 50-line clippy warning dump in the main context, then another 50 from the next inline edit, and within a few turns the conversation is unreadable. **If you find yourself about to run cargo, stop and delegate.**
+The main session holds only the durable artifacts you are producing: the edit, the commit, the doc update.
 
 ## Commit Convention
 
 Conventional commits: `type(scope): message`. Scope recommended for multi-crate changes.
 
-## Negative Constraints
+## Discipline
+
+Corrections from the user are conversation, not material for new rules. A single correction does not warrant a CLAUDE.md edit. Rules are added when a failure mode is observed repeatedly and the rule names the failure it prevents.
+
+## Hard Constraints
 
 Do not:
 - Hardcode file extensions — extension → language mapping belongs in the `Language` registry. Use `support_for_path(path)` or equivalent.
@@ -178,18 +179,6 @@ interface serves both.
 **Non-interactive ≠ non-functional.** Every command must work without a TTY. When
 configuration is missing, print a clear actionable message to stderr and exit with a
 non-zero code. Never silently return empty results.
-
-## Design Principles
-
-**Unify, don't multiply.** One interface for multiple cases > separate interfaces. Plugin systems > hardcoded switches. When user says "WTF is X" - ask: naming issue or design issue?
-
-**Simplicity over cleverness.** HashMap > inventory crate. OnceLock > lazy_static. Functions > traits until you need the trait. Use ecosystem tooling (tree-sitter queries) over hand-rolling.
-
-**Explicit over implicit.** Log when skipping. Location-based allowlists > hash-based. Show what's at stake before refusing.
-
-**Separate niche from shared.** Don't bloat config.toml with feature-specific data. Use separate files for specialized data.
-
-**When stuck (2+ attempts):** Step back. Am I solving the right problem? Check docs/philosophy.md before questioning design.
 
 ## Code Conventions
 
