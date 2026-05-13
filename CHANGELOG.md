@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`normalize sessions ... --all-projects` now honors `CLAUDE_SESSIONS_DIR`.** The
+  `list_all_project_dirs` helper previously hardcoded `~/.claude/projects`, so
+  `--all-projects` ignored the env var that the rest of the session machinery
+  respects. `LogFormat` now exposes a `projects_root()` method (defaulting to
+  `None`); `ClaudeCodeFormat` overrides it to return `$CLAUDE_SESSIONS_DIR` when set.
+
 ## [0.3.2] - 2026-05-10
 
 ### Fixed

@@ -115,6 +115,20 @@ pub trait LogFormat: Send + Sync {
     /// Does NOT check if the directory exists - that's handled by list_sessions.
     fn sessions_dir(&self, project: Option<&Path>) -> PathBuf;
 
+    /// Root directory containing all project-scoped session directories for this format.
+    ///
+    /// Used by `--all-projects` listings. The returned path should be the parent under
+    /// which one directory exists per project (e.g. Claude Code's `~/.claude/projects/`,
+    /// honoring `CLAUDE_SESSIONS_DIR` when set).
+    ///
+    /// Returns `None` for formats whose sessions are not organized one-directory-per-project
+    /// (e.g. Codex stores everything under date-partitioned directories). In that case,
+    /// `--all-projects` is a no-op extra dimension — `list_sessions(None)` already returns
+    /// everything.
+    fn projects_root(&self) -> Option<PathBuf> {
+        None
+    }
+
     /// List all session files for this format.
     fn list_sessions(&self, project: Option<&Path>) -> Vec<SessionFile>;
 

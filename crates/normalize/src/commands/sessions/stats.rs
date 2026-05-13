@@ -467,14 +467,14 @@ pub fn build_stats_data(
     Ok(report)
 }
 
-/// List project directories under ~/.claude/projects/.
+/// List per-project session directories under the format's projects root.
+///
+/// Returns an empty vector for formats that do not organize sessions one-directory-per-project
+/// (those formats' `list_sessions(None)` already returns everything).
 pub(crate) fn list_all_project_dirs(format: &dyn LogFormat) -> Vec<PathBuf> {
-    let _ = format; // future: could use format to filter
-    let home = match std::env::var("HOME") {
-        Ok(h) => h,
-        Err(_) => return Vec::new(),
+    let Some(projects_dir) = format.projects_root() else {
+        return Vec::new();
     };
-    let projects_dir = PathBuf::from(home).join(".claude/projects");
     if !projects_dir.exists() {
         return Vec::new();
     }

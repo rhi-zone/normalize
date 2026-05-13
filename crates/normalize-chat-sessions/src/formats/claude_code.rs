@@ -13,18 +13,30 @@ use std::path::{Path, PathBuf};
 /// Claude Code session log format (JSONL).
 pub struct ClaudeCodeFormat;
 
+/// Resolve the Claude Code projects root, honoring `CLAUDE_SESSIONS_DIR`.
+///
+/// Returns `$CLAUDE_SESSIONS_DIR` when set, otherwise `~/.claude/projects`
+/// (falling back to `/tmp/.claude/projects` if `HOME` is unset).
+fn claude_projects_root() -> PathBuf {
+    if let Ok(dir) = std::env::var("CLAUDE_SESSIONS_DIR") {
+        PathBuf::from(dir)
+    } else {
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+        PathBuf::from(home).join(".claude/projects")
+    }
+}
+
 impl LogFormat for ClaudeCodeFormat {
     fn name(&self) -> &'static str {
         "claude"
     }
 
+    fn projects_root(&self) -> Option<PathBuf> {
+        Some(claude_projects_root())
+    }
+
     fn sessions_dir(&self, project: Option<&Path>) -> PathBuf {
-        let claude_dir = if let Ok(dir) = std::env::var("CLAUDE_SESSIONS_DIR") {
-            PathBuf::from(dir)
-        } else {
-            let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-            PathBuf::from(home).join(".claude/projects")
-        };
+        let claude_dir = claude_projects_root();
 
         // Claude encodes project paths - check which encoding variant exists
         let path_to_claude_dir = |path: &Path| -> PathBuf {
