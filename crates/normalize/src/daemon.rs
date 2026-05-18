@@ -334,6 +334,8 @@ mod unix_impl {
             .map_err(|e| format!("Failed to open lock file: {}", e))?;
 
         let fd = file.as_raw_fd();
+        // SAFETY: FFI to libc::flock; `fd` is a valid open file descriptor for the
+        // lifetime of this call and flock has no aliasing requirements.
         let ret = unsafe { libc::flock(fd, libc::LOCK_EX | libc::LOCK_NB) };
         if ret != 0 {
             return Err("Lock already held".to_string());

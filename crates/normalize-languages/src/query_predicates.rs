@@ -73,15 +73,10 @@ fn capture_text<'a>(m: &QueryMatch, capture_index: u32, source: &'a [u8]) -> &'a
         .unwrap_or("")
 }
 
-fn resolve_arg<'a>(arg: &QueryPredicateArg, m: &'a QueryMatch, source: &'a [u8]) -> &'a str {
+fn resolve_arg<'a>(arg: &'a QueryPredicateArg, m: &'a QueryMatch, source: &'a [u8]) -> &'a str {
     match arg {
         QueryPredicateArg::Capture(idx) => capture_text(m, *idx, source),
-        QueryPredicateArg::String(s) => {
-            // SAFETY: we extend the lifetime here — the string is borrowed from the
-            // predicate which lives as long as the Query, which outlives this call.
-            // Callers hold the Query for the duration of the loop so this is safe.
-            unsafe { std::mem::transmute::<&str, &'a str>(s.as_ref()) }
-        }
+        QueryPredicateArg::String(s) => s.as_ref(),
     }
 }
 
