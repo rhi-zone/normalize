@@ -12,6 +12,7 @@
 | `edit` | Structural code modifications (delete, replace, swap, insert, undo, redo, history) |
 | `rules` | Manage and run analysis rules (syntax + fact) |
 | `structure` | Manage structural index (symbols, imports, calls) |
+| `kg` | Knowledge graph (unit CRUD, edges, query, neighbors) |
 | `init` | Initialize normalize in a directory |
 
 ### Analysis

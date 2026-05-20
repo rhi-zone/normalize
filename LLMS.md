@@ -138,6 +138,23 @@ normalize ci --no-native           # skip ratchet/budget/stale-summary
 normalize ci --sarif               # SARIF output for GitHub Actions
 ```
 
+### kg - Knowledge Graph
+
+```bash
+echo "Design notes." | normalize kg create --id my-design --metadata tag=design
+normalize kg get my-design
+normalize kg set my-design --metadata status=approved
+echo "More notes." | normalize kg append my-design
+normalize kg link --from my-design --to api-spec --kind references
+normalize kg unlink --from my-design --to api-spec --kind references
+normalize kg edges --from my-design
+normalize kg query --match tag=design
+normalize kg query --match anchors.symbol=Frobnicator
+normalize kg neighbors my-design --depth 2
+normalize kg show my-design
+normalize kg delete my-design
+```
+
 ## Command Aliases
 
 Familiar names work: `search`/`find` → `grep`, `lint` → `rules run`, `check` → `ci`, `index` → `structure rebuild`, `refactor` → `edit`.

@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`normalize kg` knowledge graph** — new `normalize-knowledge-graph` crate with v0 primitives: unit CRUD (`create`/`get`/`set`/`append`/`delete`), edge management (`link`/`unlink`/`edges`), and query/traversal (`query`/`neighbors`/`show`). Filesystem-backed in `.normalize/kg/` with YAML frontmatter units and append-only `edges.jsonl` with tombstones. Dotted-path metadata matching (e.g. `--match anchors.symbol=Frobnicator`). BFS neighbor traversal at configurable depth.
+
 ### Fixed
 
 - **`normalize sessions ... --all-projects` now honors `CLAUDE_SESSIONS_DIR`.** The

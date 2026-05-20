@@ -2,7 +2,7 @@
 
 A persistent, addressable, queryable medium for structured thought adjacent to a codebase — implementing the primitive proposed in [`../introspection/graph-substrate-thesis.md`](../introspection/graph-substrate-thesis.md).
 
-**Caveat:** This document was drafted across a few rounds of a single Claude Code session. The primitives section is load-bearing and should survive scrutiny; the convention illustrations and CLI sketches are first guesses. Pre-implementation, every section here deserves a fresh look.
+**Status (2026-05-21):** v0 shipped as `normalize-knowledge-graph` crate, CLI noun `kg`. Decisions below marked **[LOCKED]** were settled by the approved plan and are implemented. Open questions that remain are unchanged.
 
 ## Motivation
 
@@ -147,14 +147,15 @@ Two convention sketches showing how the primitives compose. Neither is part of t
 
 Other plausible conventions (decision logs, investigation registries, daily journals, task trackers, research notebooks) build on the same primitives. The substrate doesn't care which exist.
 
-## Storage layout
+## Storage layout **[LOCKED: v0]**
 
 ```
-.normalize/substrate/
-├── <id>.md                       # one file per unit — source of truth
-├── <namespace>/<id>.md           # optional: namespace by convention
-└── edges.jsonl                   # edge log; one line per edge
+.normalize/kg/
+├── <id>.md                       # one file per unit — source of truth (ID grammar: [a-z0-9][a-z0-9-]*)
+└── edges.jsonl                   # edge log; one line per edge op
 ```
+
+**Locked decisions:** storage root is `.normalize/kg/` (not `.normalize/substrate/`); no namespace directories in v0; ID grammar is `[a-z0-9][a-z0-9-]*`; edge log format is `{"op":"add"|"remove","from":"...","to":"...","kind":"...","metadata":{...},"created":"ISO8601"}`.
 
 Source of truth: the filesystem. There is no parallel write target. Everything else is derived.
 
@@ -176,62 +177,47 @@ Edges live in a single append-friendly log rather than scattered through frontma
 
 Concurrency follows file granularity: concurrent writes to *different* units don't collide; concurrent writes to the *same* unit use file locking with last-writer-wins. Append-style operations are read-modify-write under that lock. v0 doesn't attempt finer-grained merges.
 
-## CLI surface
+## CLI surface **[LOCKED: v0]**
 
-Two layers.
-
-### Primitive layer
-
-Boring, complete, never grows. Output respects existing `--pretty/--compact/--json/--jsonl/--jq` conventions.
+Flat verbs under `normalize kg`. One nesting level, no sub-nouns. Output respects `--pretty/--compact/--json/--jsonl/--jq` automatically via server-less.
 
 ```bash
-# Units
-normalize substrate unit create [--id ID] [--metadata key=val ...] [body via stdin]
-normalize substrate unit get <id>
-normalize substrate unit set <id> --metadata key=val
-normalize substrate unit append <id> < new-content.md
-normalize substrate unit delete <id>
+normalize kg create   [--id ID] [--metadata key=val ...]   # body via stdin
+normalize kg get      <id>
+normalize kg set      <id> [--metadata key=val ...]
+normalize kg append   <id>                                  # body via stdin
+normalize kg delete   <id>
 
-# Edges
-normalize substrate edge add --from A --to B --kind K [--metadata key=val]
-normalize substrate edge remove --from A --to B --kind K
-normalize substrate edge list [--from A] [--to B] [--kind K]
+normalize kg link     --from A --to B --kind K [--metadata key=val ...]
+normalize kg unlink   --from A --to B --kind K
+normalize kg edges    [--from A] [--to B] [--kind K]
 
-# Query
-normalize substrate query --match metadata.X=Y --edge-kind K --connected-to Z
-normalize substrate neighbors <id> [--depth 1] [--edge-kind K]
+normalize kg query    [--match key=value ...] [--edge-kind K] [--connected-to ID]
+normalize kg neighbors <id> [--depth N] [--edge-kind K]
+normalize kg show     <id> [--depth N]                      # unit + neighbors
 ```
 
-### Convention layer
-
-Sugar over the primitives. Conventions can be added without touching the primitive layer; conventions can also live in wrapper scripts that don't ship with normalize.
-
-```bash
-normalize wiki <page>          # convention: kind=wiki-page with code anchors
-normalize design <topic>       # convention: design workspace
-# Future: normalize decisions, normalize investigations, etc.
-```
-
-The primitive layer is the contract. The convention layer is curated sugar that may evolve, fork, or live entirely outside the binary.
+No convention layer in v0. `normalize wiki`, `normalize design`, etc. are deferred — primitives are the surface.
 
 ## Open questions
 
-- **Edges in a log vs in frontmatter.** Both have trade-offs. Log is simpler for the substrate, worse for "what does this unit point at" at-a-glance; frontmatter is git-diff-friendly per-unit, worse for bulk edge ops. v0 picks log; revisit if it fights use.
-- **Anchor resolution lifecycle.** Who updates anchors when code changes? A hook on `normalize structure rebuild`, an explicit `normalize substrate anchors refresh`, both? What happens to stale anchors — surfaced, archived, ignored?
-- **Cross-substrate references.** Anchor schema admits URLs and could admit substrate-relative paths; whether substrates can reference each other as first-class is open for v0.
-- **Body encodings.** Markdown is convention. If a unit's body is binary, what does `unit get` print? Conventions around `content-type` need design.
-- **Where convention sugar lives.** Some conventions warrant being in the `normalize` binary (wiki, design); others might live entirely in user wrapper scripts. The cut isn't obvious.
-- **Continuous-sync ergonomics.** The substrate is durable, but writing into it still requires *something* (a command, a hook, an edit). What patterns make "the live mental model is in the substrate" actually true in practice, vs aspirational?
-- **History granularity.** Each unit's history is its git history at file granularity. Sub-unit changes (one metadata field changing) are visible only as whole-file diffs. Sufficient for v0; richer change-tracking is deferred.
+- **Edges in a log vs in frontmatter.** **[LOCKED: log]** v0 uses append-only `edges.jsonl` with tombstones. Current edge state is the projection (last add/remove per `(from, to, kind)` triple). Revisit if it fights real use.
+- **Anchor resolution lifecycle.** Who updates anchors when code changes? A hook on `normalize structure rebuild`, an explicit `normalize kg anchors refresh`, both? What happens to stale anchors — surfaced, archived, ignored? **[OPEN]**
+- **Cross-substrate references.** Anchor schema admits URLs and could admit substrate-relative paths; whether substrates can reference each other as first-class is open. **[OPEN]**
+- **Body encodings.** Markdown is convention. If a unit's body is binary, what does `kg get` print? Conventions around `content-type` need design. **[OPEN, deferred from v0]**
+- **Where convention sugar lives.** `normalize wiki`, `normalize design` etc. are explicitly **out of scope for v0** — no convention commands ship. Primitives are the surface. **[LOCKED: no convention sugar in v0]**
+- **Continuous-sync ergonomics.** The substrate is durable, but writing into it still requires *something* (a command, a hook, an edit). What patterns make "the live mental model is in the substrate" actually true in practice, vs aspirational? **[OPEN]**
+- **History granularity.** Each unit's history is its git history at file granularity. Sub-unit changes (one metadata field changing) are visible only as whole-file diffs. Sufficient for v0; richer change-tracking is deferred. **[OPEN]**
+- **CA cache.** v0 does NOT use a CA cache. Walk-the-tree on every read, per `normalize-context` pattern. Add the cache when read latency hurts. **[LOCKED: no cache in v0]**
 
-## Smallest viable prototype
+## Smallest viable prototype **[SHIPPED: v0]**
 
-The minimum working version is the three primitives:
+Shipped as `normalize-knowledge-graph` crate, mounted as `normalize kg`:
 
-- `normalize substrate unit create / get / set / append / delete`
-- `normalize substrate edge add / remove / list`
-- `normalize substrate query / neighbors`
-- Markdown-with-frontmatter storage + edge log, CA cache for index.
-- One convention layered on (probably wiki or design — pick the one with a real near-term use).
+- `normalize kg create / get / set / append / delete`
+- `normalize kg link / unlink / edges`
+- `normalize kg query / neighbors / show`
+- Markdown-with-frontmatter storage + append-only `edges.jsonl` log. No CA cache (walk-the-tree).
+- No convention layer — primitives are the surface.
 
 Friction discovered there shapes the convention layer and any harness integration. The primitives don't change.

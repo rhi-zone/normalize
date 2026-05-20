@@ -282,6 +282,19 @@ mod tests {
         use crate::commands::tools::lint::LintRunReport;
         assert_output_formatter::<LintRunReport>();
 
+        use normalize_knowledge_graph::reports::{
+            DeleteReport as KgDeleteReport, EdgeListReport as KgEdgeListReport,
+            EdgeReport as KgEdgeReport, NeighborsReport as KgNeighborsReport,
+            QueryReport as KgQueryReport, ShowReport as KgShowReport, UnitReport as KgUnitReport,
+        };
+        assert_output_formatter::<KgUnitReport>();
+        assert_output_formatter::<KgDeleteReport>();
+        assert_output_formatter::<KgEdgeReport>();
+        assert_output_formatter::<KgEdgeListReport>();
+        assert_output_formatter::<KgQueryReport>();
+        assert_output_formatter::<KgNeighborsReport>();
+        assert_output_formatter::<KgShowReport>();
+
         use crate::service::sessions::PlansReport;
         assert_output_formatter::<PlansReport>();
 

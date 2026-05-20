@@ -5211,6 +5211,7 @@ dependencies = [
  "normalize-facts-rules-interpret",
  "normalize-filter",
  "normalize-graph",
+ "normalize-knowledge-graph",
  "normalize-languages",
  "normalize-local-deps",
  "normalize-native-rules",
@@ -5619,6 +5620,21 @@ dependencies = [
  "nu-ansi-term",
  "schemars",
  "serde",
+]
+
+[[package]]
+name = "normalize-knowledge-graph"
+version = "0.3.2"
+dependencies = [
+ "chrono",
+ "dirs 5.0.1",
+ "normalize-output",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "server-less",
+ "tempfile",
 ]
 
 [[package]]

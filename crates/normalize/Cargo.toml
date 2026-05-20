@@ -83,6 +83,7 @@ normalize-cfg = { path = "../normalize-cfg", version = "0.3.2", features = ["cli
 normalize-rules = { path = "../normalize-rules", version = "0.3.2", features = ["cli"] }
 normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.2" }
 normalize-context = { path = "../normalize-context", version = "0.3.2", features = ["cli"] }
+normalize-knowledge-graph = { path = "../normalize-knowledge-graph", version = "0.3.2", features = ["cli"] }
 server-less = { workspace = true }
 normalize-cli-parser = { path = "../normalize-cli-parser", version = "0.3.2" }
 normalize-surface-syntax = { path = "../normalize-surface-syntax", version = "0.3.2", features = ["read-typescript", "read-lua", "read-python", "write-typescript", "write-lua", "write-python"] }

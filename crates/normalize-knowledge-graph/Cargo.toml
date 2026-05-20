@@ -1,0 +1,24 @@
+[package]
+name = "normalize-knowledge-graph"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Persistent, addressable, queryable knowledge graph adjacent to code — unit CRUD, edge management, BFS traversal"
+
+[features]
+default = []
+cli = ["dep:server-less", "dep:schemars", "dep:normalize-output", "dep:dirs", "dep:chrono"]
+
+[dependencies]
+server-less = { workspace = true, optional = true }
+schemars = { version = "1", optional = true }
+normalize-output = { path = "../normalize-output", version = "0.3.2", optional = true }
+dirs = { version = "5", optional = true }
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"], optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

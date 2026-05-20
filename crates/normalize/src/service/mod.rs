@@ -65,6 +65,7 @@ pub struct NormalizeService {
     rank: rank::RankService,
     budget: normalize_budget::service::BudgetService,
     cfg: normalize_cfg::service::CfgService,
+    kg: normalize_knowledge_graph::service::KgCliService,
     ratchet: normalize_ratchet::service::RatchetService,
     rules: normalize_rules::RulesService,
     serve: serve::ServeService,
@@ -112,6 +113,7 @@ impl NormalizeService {
             rank: rank::RankService::new(&pretty),
             budget: normalize_budget::service::BudgetService::new(pretty.get()),
             cfg: normalize_cfg::service::CfgService::new(),
+            kg: normalize_knowledge_graph::service::KgCliService::new(),
             ratchet: normalize_ratchet::service::RatchetService::new(pretty.get()),
             rules: normalize_rules::RulesService::new(&pretty),
             serve: serve::ServeService,
@@ -1067,6 +1069,21 @@ impl NormalizeService {
     #[server(group = "core")]
     pub fn rules(&self) -> &normalize_rules::RulesService {
         &self.rules
+    }
+
+    /// Persistent knowledge graph adjacent to code. Use to create units, link concepts, and query relationships.
+    ///
+    /// Units are addressable Markdown documents (YAML frontmatter + body) stored in `.normalize/kg/`.
+    /// Edges are directed typed relationships, stored append-only in `edges.jsonl`.
+    ///
+    /// Examples:
+    ///   echo "Design notes." | normalize kg create --id my-design --metadata tag=design
+    ///   normalize kg link --from my-design --to api-spec --kind references
+    ///   normalize kg query --match tag=design
+    ///   normalize kg show my-design
+    #[server(group = "core")]
+    pub fn kg(&self) -> &normalize_knowledge_graph::service::KgCliService {
+        &self.kg
     }
 
     /// Inspect and validate .normalize/config.toml. Use to debug config issues or see available options.
