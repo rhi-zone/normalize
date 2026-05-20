@@ -47,7 +47,12 @@ What this does NOT do: invent a new event log, dual-write to markdown and SQLite
 - **Plain `docs/` + `grep`.** Today's baseline. Fails the "queryable by metadata" goal and the "subagent reads neighbors in one call" goal.
 - **`normalize-context` as-is.** Closest existing thing. Missing: stable IDs, typed edges, neighbor traversal, write API. The substrate is what `normalize-context` becomes when those are added.
 
-The novel piece is not the file format or the graph algorithms — both are off-the-shelf. The novel piece is the *dispatch contract* (subagents read by id from a shared substrate instead of from prompt prose). That is the part worth building.
+The novel piece is not the file format or the graph algorithms — both are off-the-shelf. The novel piece is **continuous bidirectional sync between a live orchestrator and a persistent shared workspace**:
+
+- **Write side (the harder half).** The orchestrator's evolving mental model — current hypothesis, working decomposition, open questions, provisional decisions, what just got ruled out — must flush into the substrate *as it forms*, not at end-of-session and not only at dispatch boundaries. Conversation tokens are transient and poisoning-prone; the substrate is the durable representation of "what we currently think." If the substrate only catches the orchestrator's state when a subagent is spawned, it's already a stale projection of a context that has since drifted. The thesis's sub-claim 8 ("updates as side effect of doing the work") is this requirement.
+- **Read side (the dispatch contract).** Spawned subagents read by id from the substrate instead of receiving prompt-compressed prose. They see the orchestrator's latest committed mental model directly, at full fidelity.
+
+Continuous write-out is what makes context discard cheap (nothing is lost because the substrate already has it), makes compaction non-destructive (the substrate survives the compactor), and makes the read side meaningful (subagents read fresh state, not a snapshot from N turns ago). The dispatch contract is the easy half; continuous sync is the part the design has to actually earn.
 
 ## Data model
 
