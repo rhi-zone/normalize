@@ -71,8 +71,6 @@
             # Rust toolchain (fenix — includes x86_64-unknown-linux-musl std)
             rustToolchain
             rust-analyzer
-            # musl cross-compilation (musl-gcc, matches release.yml)
-            musl.dev
             # Fast linker for incremental builds
             mold
             clang
@@ -83,6 +81,9 @@
             nodejs
           ];
           LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath buildInputs}:$LD_LIBRARY_PATH";
+          shellHook = ''
+            export PATH="${pkgs.musl.dev}/bin:$PATH"
+          '';
         };
       }
     );
