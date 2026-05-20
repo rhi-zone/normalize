@@ -18,13 +18,18 @@
         # Rust toolchain with musl cross-compilation target included.
         # fenix gives us per-component control; nixpkgs's plain rustc doesn't
         # carry the musl target stdlib without overrides.
-        rustToolchain = fenix.packages.${system}.stable.withComponents [
-          "rustc"
-          "cargo"
-          "clippy"
-          "rustfmt"
-          "rust-src"
-          "rust-std-x86_64-unknown-linux-musl"
+        # `withComponents` only takes host components; target stdlibs live under
+        # `targets.<triple>.stable.rust-std` and must be merged via `combine`.
+        fenixPkgs = fenix.packages.${system};
+        rustToolchain = fenixPkgs.combine [
+          (fenixPkgs.stable.withComponents [
+            "rustc"
+            "cargo"
+            "clippy"
+            "rustfmt"
+            "rust-src"
+          ])
+          fenixPkgs.targets.x86_64-unknown-linux-musl.stable.rust-std
         ];
       in
       {
