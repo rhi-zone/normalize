@@ -5,6 +5,9 @@
 use crate::model::{Edge, Unit};
 use serde::Serialize;
 
+#[cfg(feature = "cli")]
+use schemars::JsonSchema;
+
 // ---------------------------------------------------------------------------
 // UnitReport
 // ---------------------------------------------------------------------------
@@ -124,7 +127,6 @@ impl normalize_output::OutputFormatter for EdgeListReport {
         if self.edges.is_empty() {
             return "No edges found.\n".to_string();
         }
-        use normalize_output::OutputFormatter as _;
         self.edges.iter().map(|e| e.format_text()).collect()
     }
 }
@@ -147,7 +149,6 @@ impl normalize_output::OutputFormatter for QueryReport {
         if self.units.is_empty() {
             return "No matching units.\n".to_string();
         }
-        use normalize_output::OutputFormatter as _;
         let mut out = String::new();
         for (i, unit) in self.units.iter().enumerate() {
             if i > 0 {
@@ -183,7 +184,6 @@ pub struct NeighborsReport {
 #[cfg(feature = "cli")]
 impl normalize_output::OutputFormatter for NeighborsReport {
     fn format_text(&self) -> String {
-        use normalize_output::OutputFormatter as _;
         let mut out = String::new();
         out.push_str(&format!("Center: {}\n", self.center.id));
         if self.neighbors.is_empty() {
@@ -215,7 +215,6 @@ pub struct ShowReport {
 #[cfg(feature = "cli")]
 impl normalize_output::OutputFormatter for ShowReport {
     fn format_text(&self) -> String {
-        use normalize_output::OutputFormatter as _;
         let mut out = self.unit.format_text();
         if !self.neighbors.is_empty() {
             out.push_str("\nNeighbors:\n");

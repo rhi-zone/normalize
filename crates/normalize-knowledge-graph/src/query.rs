@@ -37,7 +37,7 @@ impl MatchPredicate {
     /// Returns `true` if the unit's metadata satisfies this predicate.
     pub fn matches_unit(&self, unit: &Unit) -> bool {
         let values = dotted_lookup(&unit.metadata, &self.path);
-        values.iter().any(|v| *v == self.value.as_str())
+        values.contains(&self.value.as_str())
     }
 }
 
@@ -89,20 +89,20 @@ pub fn filter_edges<'a>(
 ) -> Vec<&'a Edge> {
     edges
         .filter(|e| {
-            if let Some(f) = from {
-                if e.from != f {
-                    return false;
-                }
+            if let Some(f) = from
+                && e.from != f
+            {
+                return false;
             }
-            if let Some(t) = to {
-                if e.to != t {
-                    return false;
-                }
+            if let Some(t) = to
+                && e.to != t
+            {
+                return false;
             }
-            if let Some(k) = kind {
-                if e.kind != k {
-                    return false;
-                }
+            if let Some(k) = kind
+                && e.kind != k
+            {
+                return false;
             }
             true
         })
@@ -142,10 +142,10 @@ pub fn bfs_neighbors<'a>(
         for current in &frontier {
             for edge in edges {
                 // Apply kind filter
-                if let Some(k) = edge_kind {
-                    if edge.kind != k {
-                        continue;
-                    }
+                if let Some(k) = edge_kind
+                    && edge.kind != k
+                {
+                    continue;
                 }
                 // Check if this edge is adjacent to `current`
                 let neighbor_id = if edge.from == current.as_str() {
@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn test_filter_edges() {
-        let edges = vec![
+        let edges = [
             make_edge("a", "b", "ref"),
             make_edge("a", "c", "uses"),
             make_edge("b", "c", "ref"),
