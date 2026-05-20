@@ -1,8 +1,8 @@
 # Graph Substrate: Design Sketch
 
-A sketch of the primitive proposed in [`../graph-substrate-thesis.md`](../graph-substrate-thesis.md).
+A sketch of the primitive proposed in [`../introspection/graph-substrate-thesis.md`](../introspection/graph-substrate-thesis.md).
 
-**Caveat:** This document was drafted in the same Claude Code session as the thesis it implements. It is informed by that session's reasoning but not independently validated. Treat it as a starting point for the actual design work, not a finished design. Specifically: the schema is a first guess, the API surface is sketchy, the storage decision is unresolved, and integration with the Claude Code harness is described at the wrapper level without verifying which hooks are actually available. Pre-implementation, every section here deserves a fresh look.
+**Caveat:** This document was drafted in the same Claude Code session as the thesis it implements. It is informed by that session's reasoning but not independently validated. Treat it as a starting point for the actual design work, not a finished design. Specifically: the schema is a first guess, the API surface is sketchy, the storage decision now follows the normalize-facts CA cache pattern, and integration with the Claude Code harness is described at the wrapper level without verifying which hooks are actually available. Pre-implementation, every section here deserves a fresh look.
 
 ## Goals (v0)
 
@@ -24,6 +24,30 @@ The minimum viable substrate must support:
 - A query language richer than `--match` filters + neighbor traversal. SPARQL-grade graph queries are out of scope for v0.
 - Cross-repo graphs. Each repo has its own `.normalize/graph/`. Cross-repo linking is deferred.
 - A general-purpose knowledge graph (with inference, semantic relations, etc.). This is a workflow substrate, not an ontology engine.
+
+## Architectural fit
+
+Three crates already exist that this substrate composes from rather than competes with:
+
+- **`normalize-context`** is a filesystem-walk-only store of markdown-with-frontmatter, parsed on every resolution call. No index, no cache, no staleness. That's the right pattern for human-edited content of modest scale.
+- **`normalize-facts`** runs a content-addressed cache keyed on `(blake3(bytes), extractor_version, …)`. That's the normalize pattern for "derived data from source of truth," and it's self-invalidating: if the source's hash matches a cache entry, reuse; otherwise re-derive. Mtime is not used.
+- **`normalize-graph`** is pure graph algorithms (Tarjan SCC, bridge-finding, dependents BFS, etc.) over abstract adjacency. Storage-agnostic.
+
+The substrate is therefore not a new storage paradigm. It is **`normalize-context` with addressable IDs and typed edges, indexed via the same content-addressed cache pattern as `normalize-facts`, fed into `normalize-graph` for queries**. The composition is the design.
+
+This also constrains where the code lives. Per the project's "own crate when standalone-useful or multi-consumer" rule, the substrate is a new crate (working name `normalize-substrate`) that depends on `normalize-context` (or generalizes it) and exposes its own `#[cli(...)]` service. The main `normalize` binary mounts it like any other feature crate. If usage shows the only consumer is a Claude Code wrapper, the substrate stays a crate but the binary mount can be reconsidered.
+
+What this does NOT do: invent a new event log, dual-write to markdown and SQLite as parallel sources of truth, or treat git as a transactional store. Git is the history because the files are git-tracked; that's incidental, not architectural.
+
+## Prior art and why not just use it
+
+- **Obsidian / Logseq / Foam.** Markdown-with-frontmatter graphs with wikilinks. Excellent for humans. Wrong shape for our use case: GUI-first, no CLI-first query language, no programmatic write API that subagents can invoke, and the link graph isn't queryable from the command line without a plugin.
+- **Datasette / sqlite-utils.** Strong CLI surface on SQLite. Wrong source of truth: structured rows, not markdown bodies. Humans don't edit it ergonomically; subagents would have to learn schemas instead of writing prose.
+- **`git-bug` / `git-appraise`.** Git-native append-only issue/review stores. Closest in spirit. Wrong scope: hard-coded to issues/reviews, not extensible to arbitrary node types.
+- **Plain `docs/` + `grep`.** Today's baseline. Fails the "queryable by metadata" goal and the "subagent reads neighbors in one call" goal.
+- **`normalize-context` as-is.** Closest existing thing. Missing: stable IDs, typed edges, neighbor traversal, write API. The substrate is what `normalize-context` becomes when those are added.
+
+The novel piece is not the file format or the graph algorithms — both are off-the-shelf. The novel piece is the *dispatch contract* (subagents read by id from a shared substrate instead of from prompt prose). That is the part worth building.
 
 ## Data model
 
@@ -96,13 +120,27 @@ Both are first-class. Frontmatter is for relationships you'd query; wikilinks ar
 
 ```
 .normalize/graph/
-├── <id>.md                       # one file per node
-├── <namespace>/<id>.md           # optional: namespace by type or convention
-└── .index/                       # generated SQLite cache (gitignored)
-    └── nodes.sqlite              # frontmatter + link index for fast queries
+├── <id>.md                       # one file per node — source of truth
+└── <namespace>/<id>.md           # optional: namespace by type or convention
 ```
 
-Filesystem is the source of truth. SQLite is a derived cache, rebuilt on-demand by `normalize graph index` or automatically when stale. This preserves git-friendliness while keeping queries fast at scale.
+Source of truth: the filesystem. There is no parallel write target. Everything else is derived.
+
+**Indexing follows the `normalize-facts` content-addressed pattern.** Per-node cache rows in `~/.config/normalize/ca-cache.sqlite` (the existing CA cache, extended with a new namespace) keyed on `(blake3(node_bytes), substrate_version)`. On any read:
+
+1. Hash each node file in the working tree.
+2. Look up `(hash, version)` in the CA cache. Hit → reuse parsed frontmatter + edge set. Miss → parse, store, return.
+3. Query the cache for the requested view (children of X, nodes with status=Y, etc.).
+
+Consequences:
+- **No staleness ambiguity.** If a hash matches a row, the row is correct by construction. If no row matches, parse cost is paid exactly once per content version.
+- **No mtime, no watch loops, no "rebuild on stale."** The cache is never wrong; at worst it's empty for new content.
+- **No gitignored generated SQLite inside the repo.** The cache lives in the user's config dir (per existing convention) and is fully reconstructible from the tree.
+- **Manual edits and CLI writes are indistinguishable.** Both produce a file change; the next read hashes and indexes it. Subagents and humans use the same write path semantically — write the file.
+
+`normalize-graph` consumes the adjacency built from the cached edge sets. Traversal, reachability, and structural queries reuse its existing algorithms; the substrate provides the adjacency, not new graph code.
+
+Concurrency falls out of file granularity: one file per node means concurrent subagent writes to *different* nodes don't collide; concurrent writes to the *same* node use file locking with last-writer-wins, and the substrate's append-style operations (e.g. `append`) are implemented as read-modify-write under that lock. v0 does not attempt finer-grained merges.
 
 ## CLI surface
 
