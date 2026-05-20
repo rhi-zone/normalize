@@ -1,311 +1,237 @@
 # Graph Substrate: Design Sketch
 
-A sketch of the primitive proposed in [`../introspection/graph-substrate-thesis.md`](../introspection/graph-substrate-thesis.md).
+A persistent, addressable, queryable medium for structured thought adjacent to a codebase — implementing the primitive proposed in [`../introspection/graph-substrate-thesis.md`](../introspection/graph-substrate-thesis.md).
 
-**Caveat:** This document was drafted in the same Claude Code session as the thesis it implements. It is informed by that session's reasoning but not independently validated. Treat it as a starting point for the actual design work, not a finished design. Specifically: the schema is a first guess, the API surface is sketchy, the storage decision now follows the normalize-facts CA cache pattern, and integration with the Claude Code harness is described at the wrapper level without verifying which hooks are actually available. Pre-implementation, every section here deserves a fresh look.
+**Caveat:** This document was drafted across a few rounds of a single Claude Code session. The primitives section is load-bearing and should survive scrutiny; the convention illustrations and CLI sketches are first guesses. Pre-implementation, every section here deserves a fresh look.
+
+## Motivation
+
+Two concrete gaps motivate building this, but the substrate is general — neither use case should drive the primitives.
+
+- **Codebases have no wiki.** Code has comments, READMEs, `docs/`, rustdoc — none compose into a queryable, cross-linkable medium of understanding adjacent to (and addressable from) the code itself. GitHub wikis exist but are second-class and dead. The understanding of a codebase — invariants, history, why a thing is the way it is, what's been tried and rejected — has no home.
+- **Large design tasks can't be one-shot, even by frontier models.** A complex typechecker is weeks of partial designs, contradictions, alternatives, dead-ends, refinements. Conversation can't host this (linear, transient). Code can't host this (too concrete, no room for what was rejected). `docs/` can't host this (not iterative, not editable mid-design). The medium for *iteratively constructing* a large design across sessions doesn't exist.
+
+These are evidence the gap is real, not the spec. Other plausible uses: decision logs, investigation registries, knowledge bases, daily journals, task trackers, research notebooks. The substrate doesn't bake any of them in. Generality at the primitive layer is the point; specificity lives in conventions on top.
 
 ## Goals (v0)
 
 The minimum viable substrate must support:
 
-1. **Addressable nodes** — every unit of state has a stable id that can be referenced from a prompt, a link, or a query.
-2. **Free-form body + structured metadata** — node content is markdown (so humans can write/edit); metadata is structured (so machines can query).
-3. **Explicit cross-references** — nodes link to other nodes; the link graph is queryable.
-4. **Filesystem-backed and git-friendly** — nodes are files; the graph is diffable, committable, branchable. No opaque database that breaks `git diff`.
-5. **Queryable** — "give me all pending children of node X with type=hypothesis" should be a single command, not a script.
-6. **Cheap to read for an LLM** — fetching a node + its immediate context (parents, children, linked nodes) should be one command with predictable output.
-7. **Cheap to update from a subagent** — appending a result to a node, changing its status, creating a child, should each be one command.
+1. **Addressable units** — every unit of state has a stable id that can be referenced from a prompt, a link, or a query.
+2. **Free-form body + structured metadata** — body is opaque to the substrate (markdown by convention); metadata is structured (so machines can query).
+3. **Typed cross-references** — units link to other units via edges with kinds; the link graph is queryable.
+4. **Filesystem-backed and git-friendly** — units are files; the graph is diffable, committable, branchable. No opaque database that breaks `git diff`.
+5. **Queryable** — "give me all units where `tag=hypothesis` and there's an edge of kind `evidence-for` to unit X" should be a single command, not a script.
+6. **Cheap to read for an LLM** — fetching a unit + its immediate neighbors should be one command with predictable output.
+7. **Cheap to update from any process** — appending, changing metadata, creating a unit, adding an edge — each should be one command.
 
 ## Non-goals (v0)
 
 - A new editor or UI. The substrate is read/written via CLI and a text editor.
-- Real-time multi-writer coordination. Concurrent writes are handled with simple file locking or last-writer-wins; richer concurrency is deferred.
-- Versioning beyond what git provides. Each node's history is its git history.
-- A query language richer than `--match` filters + neighbor traversal. SPARQL-grade graph queries are out of scope for v0.
-- Cross-repo graphs. Each repo has its own `.normalize/graph/`. Cross-repo linking is deferred.
-- A general-purpose knowledge graph (with inference, semantic relations, etc.). This is a workflow substrate, not an ontology engine.
+- Real-time multi-writer coordination. Concurrent writes are handled with file locking + last-writer-wins; richer concurrency is deferred.
+- Versioning beyond what git provides. Each unit's history is its git history.
+- A query language richer than predicate matching + neighbor traversal. SPARQL-grade graph queries are out of scope for v0.
+- Cross-repo graphs. Each repo has its own `.normalize/substrate/`. Cross-substrate references are an open question (see below); v0 assumes single substrate.
+- A general-purpose knowledge graph (inference, semantic relations, ontology). This is a workflow substrate, not an ontology engine.
 
 ## Architectural fit
 
 Three crates already exist that this substrate composes from rather than competes with:
 
-- **`normalize-context`** is a filesystem-walk-only store of markdown-with-frontmatter, parsed on every resolution call. No index, no cache, no staleness. That's the right pattern for human-edited content of modest scale.
-- **`normalize-facts`** runs a content-addressed cache keyed on `(blake3(bytes), extractor_version, …)`. That's the normalize pattern for "derived data from source of truth," and it's self-invalidating: if the source's hash matches a cache entry, reuse; otherwise re-derive. Mtime is not used.
-- **`normalize-graph`** is pure graph algorithms (Tarjan SCC, bridge-finding, dependents BFS, etc.) over abstract adjacency. Storage-agnostic.
+- **`normalize-context`** is a filesystem-walk-only store of markdown-with-frontmatter, parsed on every resolution call. No index, no cache, no staleness. The right pattern for human-edited content of modest scale.
+- **`normalize-facts`** runs a content-addressed cache keyed on `(blake3(bytes), extractor_version, …)`. The normalize pattern for "derived data from source of truth," self-invalidating: if the source's hash matches a cache entry, reuse; otherwise re-derive. Mtime is not used.
+- **`normalize-graph`** is pure graph algorithms (Tarjan SCC, bridge-finding, dependents BFS) over abstract adjacency. Storage-agnostic.
 
 The substrate is therefore not a new storage paradigm. It is **`normalize-context` with addressable IDs and typed edges, indexed via the same content-addressed cache pattern as `normalize-facts`, fed into `normalize-graph` for queries**. The composition is the design.
 
-This also constrains where the code lives. Per the project's "own crate when standalone-useful or multi-consumer" rule, the substrate is a new crate (working name `normalize-substrate`) that depends on `normalize-context` (or generalizes it) and exposes its own `#[cli(...)]` service. The main `normalize` binary mounts it like any other feature crate. If usage shows the only consumer is a Claude Code wrapper, the substrate stays a crate but the binary mount can be reconsidered.
+Per the project's "own crate when standalone-useful or multi-consumer" rule, the substrate is a new crate (working name `normalize-substrate`) that depends on `normalize-context` (or generalizes it) and exposes its own `#[cli(...)]` service. The main `normalize` binary mounts it like any other feature crate.
 
 What this does NOT do: invent a new event log, dual-write to markdown and SQLite as parallel sources of truth, or treat git as a transactional store. Git is the history because the files are git-tracked; that's incidental, not architectural.
 
 ## Prior art and why not just use it
 
-- **Obsidian / Logseq / Foam.** Markdown-with-frontmatter graphs with wikilinks. Excellent for humans. Wrong shape for our use case: GUI-first, no CLI-first query language, no programmatic write API that subagents can invoke, and the link graph isn't queryable from the command line without a plugin.
+- **Obsidian / Logseq / Foam.** Markdown-with-frontmatter graphs with wikilinks. Excellent for humans. Wrong shape: GUI-first, no CLI-first query language, no programmatic write API that subagents can invoke, no first-class anchors into code.
 - **Datasette / sqlite-utils.** Strong CLI surface on SQLite. Wrong source of truth: structured rows, not markdown bodies. Humans don't edit it ergonomically; subagents would have to learn schemas instead of writing prose.
-- **`git-bug` / `git-appraise`.** Git-native append-only issue/review stores. Closest in spirit. Wrong scope: hard-coded to issues/reviews, not extensible to arbitrary node types.
-- **Plain `docs/` + `grep`.** Today's baseline. Fails the "queryable by metadata" goal and the "subagent reads neighbors in one call" goal.
-- **`normalize-context` as-is.** Closest existing thing. Missing: stable IDs, typed edges, neighbor traversal, write API. The substrate is what `normalize-context` becomes when those are added.
+- **`git-bug` / `git-appraise`.** Git-native append-only issue/review stores. Closest in spirit. Wrong scope: hard-coded to issues/reviews, not extensible to arbitrary unit kinds.
+- **Plain `docs/` + `grep`.** Today's baseline. Fails the "queryable by metadata" goal and the "read unit + neighbors in one call" goal.
+- **`normalize-context` as-is.** Closest existing thing. Missing: stable IDs, typed edges, neighbor traversal, write API, code anchors. The substrate is what `normalize-context` becomes when those are added.
 
-The novel piece is not the file format or the graph algorithms — both are off-the-shelf. The novel piece is **continuous bidirectional sync between a live orchestrator and a persistent shared workspace**:
+The novel piece is not the file format or the graph algorithms — both are off-the-shelf. The novel piece is **continuous bidirectional sync between any process (human, LLM session, subagent, hook) and a persistent shared workspace** that lives next to the codebase, with anchors that connect the workspace to the code.
 
-- **Write side (the harder half).** The orchestrator's evolving mental model — current hypothesis, working decomposition, open questions, provisional decisions, what just got ruled out — must flush into the substrate *as it forms*, not at end-of-session and not only at dispatch boundaries. Conversation tokens are transient and poisoning-prone; the substrate is the durable representation of "what we currently think." If the substrate only catches the orchestrator's state when a subagent is spawned, it's already a stale projection of a context that has since drifted. The thesis's sub-claim 8 ("updates as side effect of doing the work") is this requirement.
-- **Read side (the dispatch contract).** Spawned subagents read by id from the substrate instead of receiving prompt-compressed prose. They see the orchestrator's latest committed mental model directly, at full fidelity.
+## Primitives
 
-Continuous write-out is what makes context discard cheap (nothing is lost because the substrate already has it), makes compaction non-destructive (the substrate survives the compactor), and makes the read side meaningful (subagents read fresh state, not a snapshot from N turns ago). The dispatch contract is the easy half; continuous sync is the part the design has to actually earn.
+The strong composable core is three primitives. Everything else is convention on top.
 
-## Data model
+### 1. Unit
 
-### Node
+The addressable atom of content.
 
-Every node is a markdown file at `.normalize/graph/<id>.md`. Frontmatter holds metadata; body is the content.
+- **ID:** user-chosen slug (ergonomic) with content-hash fallback (machine-generatable).
+- **Body:** opaque to the substrate. Any content-type — markdown by convention, but could be image, PDF, JSON, binary. The `content-type` is just a metadata key.
+- **Metadata:** arbitrary key-value. No required keys. Conventions populate `status`, `type`, `kind`, etc. as they see fit. The substrate does not privilege any key beyond what's needed for storage/query bookkeeping.
 
-```markdown
----
-id: hypothesis-correction-tax
-type: hypothesis
-status: alive
-intent: |
-  Encoded constraints are violated because the encoding is leaky.
-  Specifically: rules that name failure modes work; rules requiring
-  the user's generator do not.
-parents: [investigation-2026-05-20-whats-wrong]
-links:
-  - kind: derived-from
-    to: investigation-2026-05-20-whats-wrong/recon
-  - kind: relates-to
-    to: hypothesis-implicit-constraints
-  - kind: red-teamed-by
-    to: red-team-correction-tax
-created: 2026-05-20T16:14:00Z
-updated: 2026-05-20T17:42:00Z
----
+### 2. Edge
 
-# Correction Tax (alive, narrowed)
+A typed, directed relationship between two units.
 
-Five distinct correction classes recur across sessions separated by
-days to weeks, after CLAUDE.md encoding. The clearest mechanism is
-the reactive-bandaid loop: rule added in response to violation → rule
-itself violates the no-bandaid principle → rule deleted → behavior
-recurs.
+- **Shape:** `(from, to, kind, optional metadata)`.
+- **Kind** is a freeform string. The substrate doesn't know what `supersedes` means; conventions do.
+- Edge kind is primitive (not encoded as metadata on a unit) because the asymmetry is real: a `supersedes` edge means something different from an `evidence-for` edge in a way no metadata convention reduces. Edges are how the graph gets its shape.
 
-## Evidence For
-...
+### 3. Query
 
-## Caveats
-...
+Predicate over units, edges, and metadata.
+
+- "Reach all units where `metadata.X = Y` and there's an edge of kind `K` to unit `Z`."
+- Standard traversal patterns (children-of, descendants, predecessors, link-graph) are convenience over this primitive.
+
+No `type` at the primitive layer. No `status`, no `parents`, no `intent`. Those are all conventions. The substrate cares about identity, relationships, and queryability — not about how any particular consumer organizes meaning.
+
+## Standard library (conventions on top)
+
+Documented but not enforced. Conventions can live in wrapper scripts or in `normalize` subcommands; the substrate doesn't care.
+
+### Anchors
+
+How a unit connects to anything outside the substrate. Recommended schema:
+
+```yaml
+metadata:
+  anchors:
+    - symbol: Frobnicator
+      crate: normalize-foo
+      path: crates/normalize-foo/src/frobnicator.rs
+      commit: abc123
+    - url: https://example.com/spec
 ```
 
-### Fields (frontmatter)
+An anchor is a **bag of identifying facts**. Queries match on any subset (`anchors[].symbol = X`, `anchors[].crate = Y`, `anchors[].path = Z`). The substrate doesn't canonicalize — it stores the facts and matches on any of them.
 
-| Field      | Type             | Required | Purpose                                                            |
-|------------|------------------|----------|--------------------------------------------------------------------|
-| `id`       | slug             | yes      | Stable identifier. Must match filename without `.md`.              |
-| `type`     | string           | yes      | Node-kind, e.g. `hypothesis`, `task`, `decision`, `evidence`.      |
-| `status`   | string           | no       | Lifecycle state, e.g. `open`, `in-progress`, `done`, `discarded`.  |
-| `intent`   | string (multiline) | no     | Brief statement of what this node is for. Read by subagents.       |
-| `parents`  | list[id]         | no       | Hierarchical parent(s). Multiple allowed (graph, not tree).        |
-| `links`    | list[{kind, to}] | no       | Typed edges to other nodes.                                        |
-| `created`  | ISO 8601         | yes      | Set on creation.                                                   |
-| `updated`  | ISO 8601         | yes      | Set on every update.                                               |
-| ...        | any              | no       | Convention-specific extension fields (e.g. `evidence_session_ids`).|
+Redundancy is the feature: multiple facts mean multiple query paths, self-validating links, and graceful degradation when one fact goes stale. If a symbol is renamed, queries by old symbol still hit historical anchors; queries by current symbol require the anchor to have been updated by something that knows how (a hook calling `normalize structure`, a maintenance command). Resolution lives outside the primitive.
 
-Conventions on top (workqueue, investigation, decision-log, design space) add their own conventional fields without changing the substrate.
+Anchors aren't strictly primitive — they're structured metadata — but they're the most important convention because they're how the substrate stops being a closed notebook and becomes part of a world.
 
-### Edges
+### Type-as-tag
 
-Two edge representations:
+Common to tag units with a `type` or `kind` metadata key — `wiki-page`, `design-fragment`, `decision`, `note`. Useful for queries (`find all decisions about typechecker`). At the substrate level it's just metadata; conventions assign meaning.
 
-- **Frontmatter `links`** — explicit typed edges. Used for structural relationships (parent, derived-from, supersedes, relates-to, red-teamed-by, evidence-for). Queryable directly.
-- **Wikilinks in body** — `[[other-node-id]]` in markdown. Parsed lazily by the query layer to surface "what links to X." Less structural, more associative.
+### Status
 
-Both are first-class. Frontmatter is for relationships you'd query; wikilinks are for relationships that emerge from writing.
+Lifecycle: `open`, `in-progress`, `done`, `discarded`. Useful for task-shaped conventions; meaningless for wiki-shaped ones. Always a metadata key, never privileged.
 
-### Storage layout
+### Standard edge kinds
+
+A non-exhaustive vocabulary that conventions converge on: `parent-of`, `supersedes`, `derived-from`, `alternative-to`, `evidence-for`, `red-teamed-by`, `relates-to`. Conventions extend as needed.
+
+### Rollups and current-view
+
+A query pattern, not a primitive. "Show me the leaf of the `supersedes` chain reachable from root X" or "show me the most-recently-updated unit tagged `current-view` under X." Some conventions maintain an explicit rollup unit; others derive it on demand.
+
+## Conventions illustrated
+
+Two convention sketches showing how the primitives compose. Neither is part of the substrate; both could be built atop a stable v0 substrate. They are illustrations of the kind of thing conventions are, not a fixed list.
+
+### Codebase wiki
+
+- Units tagged `kind: wiki-page` with anchors pointing at code (symbols, paths, crates).
+- Edges of kind `references`, `relates-to`.
+- Surfaced inline by `normalize view <file>` listing related wiki pages by anchor match.
+- Anchors maintained by a hook on `normalize structure rebuild` that detects renames and updates anchor facts.
+
+### Design workspace
+
+- Units tagged variously: `fragment`, `alternative`, `decision`, `open-question`.
+- Edges: `alternative-to`, `supersedes`, `decided-by`, `blocked-on`.
+- "Current best understanding" is a query: latest unit with `tag: current-view` for a given root, or the leaf of a `supersedes` chain.
+- A fresh session reads the workspace and inherits the accumulated design state at full fidelity.
+
+Other plausible conventions (decision logs, investigation registries, daily journals, task trackers, research notebooks) build on the same primitives. The substrate doesn't care which exist.
+
+## Storage layout
 
 ```
-.normalize/graph/
-├── <id>.md                       # one file per node — source of truth
-└── <namespace>/<id>.md           # optional: namespace by type or convention
+.normalize/substrate/
+├── <id>.md                       # one file per unit — source of truth
+├── <namespace>/<id>.md           # optional: namespace by convention
+└── edges.jsonl                   # edge log; one line per edge
 ```
 
 Source of truth: the filesystem. There is no parallel write target. Everything else is derived.
 
-**Indexing follows the `normalize-facts` content-addressed pattern.** Per-node cache rows in `~/.config/normalize/ca-cache.sqlite` (the existing CA cache, extended with a new namespace) keyed on `(blake3(node_bytes), substrate_version)`. On any read:
+**Indexing follows the `normalize-facts` content-addressed pattern.** Per-unit cache rows in `~/.config/normalize/ca-cache.sqlite` (the existing CA cache, extended with a new namespace) keyed on `(blake3(unit_bytes), substrate_version)`. On any read:
 
-1. Hash each node file in the working tree.
-2. Look up `(hash, version)` in the CA cache. Hit → reuse parsed frontmatter + edge set. Miss → parse, store, return.
-3. Query the cache for the requested view (children of X, nodes with status=Y, etc.).
+1. Hash each unit file in the working tree (and the edge log).
+2. Look up `(hash, version)` in the CA cache. Hit → reuse parsed metadata + edge set. Miss → parse, store, return.
+3. Query the cache for the requested view.
 
 Consequences:
 - **No staleness ambiguity.** If a hash matches a row, the row is correct by construction. If no row matches, parse cost is paid exactly once per content version.
 - **No mtime, no watch loops, no "rebuild on stale."** The cache is never wrong; at worst it's empty for new content.
 - **No gitignored generated SQLite inside the repo.** The cache lives in the user's config dir (per existing convention) and is fully reconstructible from the tree.
-- **Manual edits and CLI writes are indistinguishable.** Both produce a file change; the next read hashes and indexes it. Subagents and humans use the same write path semantically — write the file.
+- **Manual edits and CLI writes are indistinguishable.** Both produce a file change; the next read hashes and indexes it. Any process (human, subagent, hook) uses the same write semantics — write the file.
 
-`normalize-graph` consumes the adjacency built from the cached edge sets. Traversal, reachability, and structural queries reuse its existing algorithms; the substrate provides the adjacency, not new graph code.
+Edges live in a single append-friendly log rather than scattered through frontmatter so adding/removing edges doesn't require rewriting unit files. (Alternative: edges in frontmatter on each side. v0 uses the log because it's simpler and works for the recommended conventions; revisit if it fights real use.)
 
-Concurrency falls out of file granularity: one file per node means concurrent subagent writes to *different* nodes don't collide; concurrent writes to the *same* node use file locking with last-writer-wins, and the substrate's append-style operations (e.g. `append`) are implemented as read-modify-write under that lock. v0 does not attempt finer-grained merges.
+`normalize-graph` consumes the adjacency built from the cached edge log. Traversal, reachability, structural queries reuse its existing algorithms; the substrate provides adjacency, not new graph code.
+
+Concurrency follows file granularity: concurrent writes to *different* units don't collide; concurrent writes to the *same* unit use file locking with last-writer-wins. Append-style operations are read-modify-write under that lock. v0 doesn't attempt finer-grained merges.
 
 ## CLI surface
 
-All commands under `normalize graph`. Output respects existing `--pretty/--compact/--json/--jsonl/--jq` conventions from elsewhere in normalize.
+Two layers.
 
-### Read
+### Primitive layer
 
-```bash
-# Fetch a node (frontmatter + body)
-normalize graph show <id>
-
-# Fetch a node plus immediate neighbors (parents, children, linked)
-normalize graph context <id> [--depth 1]
-
-# Query nodes by metadata
-normalize graph query --match status=open --match type=task
-normalize graph query --match 'parent=hypothesis-correction-tax'
-normalize graph query --any 'status=open' 'status=in-progress'
-
-# Traverse
-normalize graph neighbors <id> [--kind links.derived-from]
-normalize graph subtree <id>          # all descendants
-normalize graph ancestors <id>        # all ancestors
-
-# List
-normalize graph list [--type X] [--status Y]
-```
-
-### Write
+Boring, complete, never grows. Output respects existing `--pretty/--compact/--json/--jsonl/--jq` conventions.
 
 ```bash
-# Create a node (id auto-generated if not provided; body via stdin or -m)
-normalize graph create --type task --parent <parent-id> --intent "..." -m "body..."
-normalize graph create --type hypothesis --id custom-id < body.md
+# Units
+normalize substrate unit create [--id ID] [--metadata key=val ...] [body via stdin]
+normalize substrate unit get <id>
+normalize substrate unit set <id> --metadata key=val
+normalize substrate unit append <id> < new-content.md
+normalize substrate unit delete <id>
 
-# Update metadata
-normalize graph set <id> --status done
-normalize graph set <id> --link kind=derived-from to=<other-id>
-normalize graph unlink <id> --to <other-id> --kind <kind>
+# Edges
+normalize substrate edge add --from A --to B --kind K [--metadata key=val]
+normalize substrate edge remove --from A --to B --kind K
+normalize substrate edge list [--from A] [--to B] [--kind K]
 
-# Append to body (subagent result, for instance)
-normalize graph append <id> < new-content.md
-
-# Discard (set status=discarded; does not delete the file)
-normalize graph discard <id>
-
-# Permanently delete (probably never used directly)
-normalize graph delete <id>
+# Query
+normalize substrate query --match metadata.X=Y --edge-kind K --connected-to Z
+normalize substrate neighbors <id> [--depth 1] [--edge-kind K]
 ```
 
-### Index / maintenance
+### Convention layer
+
+Sugar over the primitives. Conventions can be added without touching the primitive layer; conventions can also live in wrapper scripts that don't ship with normalize.
 
 ```bash
-normalize graph index               # rebuild SQLite cache
-normalize graph validate            # check for broken links, schema violations
-normalize graph migrate <from> <to> # rename id, update all references
+normalize wiki <page>          # convention: kind=wiki-page with code anchors
+normalize design <topic>       # convention: design workspace
+# Future: normalize decisions, normalize investigations, etc.
 ```
 
-## Integration with the Claude Code harness
+The primitive layer is the contract. The convention layer is curated sugar that may evolve, fork, or live entirely outside the binary.
 
-Normalize itself does not integrate with Claude Code. Integration lives in a shell wrapper (call it `claude-graph` or similar) that calls `claude` with hooks/prompts arranged to use the substrate. This keeps normalize agnostic of the harness.
+## Open questions
 
-Sketch of what the wrapper does:
-
-### On session start
-
-Before invoking `claude`, the wrapper:
-
-1. Inspects the working directory and recent git activity.
-2. Runs `normalize graph query` to find active nodes (status=in-progress, recently touched).
-3. Injects them as initial context via `claude`'s `--append-system-prompt` or via a `SessionStart` hook that calls `normalize graph context <root>`.
-
-Result: the session opens with the relevant subgraph already loaded. No "what were we working on" reconstruction.
-
-### On subagent dispatch (PostToolUse hook on Agent / Task tool)
-
-When the model calls Agent / Task, the wrapper:
-
-1. Parses the prompt for a `--node <id>` argument (convention: subagent prompts include the node they're working on).
-2. Sets the node's status to `in-progress`.
-3. Lets the subagent run.
-4. On completion, takes the subagent's return value and `normalize graph append <id> --section "Subagent result"`s it to the node.
-5. Sets status to `done` or whatever the subagent's last line indicates.
-
-Result: subagent work auto-persists to the substrate without the orchestrator having to remember to write it.
-
-### On session end (Stop hook or wrapper postlude)
-
-The wrapper:
-
-1. Asks the model to summarize unwritten state into a node (or several).
-2. Persists that summary.
-3. Marks any in-progress nodes that the session closed without resolving.
-
-Result: nothing important leaves the session without being captured.
-
-### Slash command for explicit ops
-
-A `/graph` skill in `~/.claude/commands/` exposes the common ops (create, query, link, append) as inline commands the model can use mid-conversation when hooks miss something.
-
-## How subagents use the substrate
-
-The dispatch contract: every subagent prompt names the node it's working on.
-
-```
-You are working on node `<id>`. Your task is the `intent` field of that node.
-Read its context via `normalize graph context <id> --depth 2`. Return your
-result. The wrapper will append it to the node and update its status.
-```
-
-The subagent reads:
-- The node itself (intent, prior content)
-- Parents (broader context, root intent)
-- Children (sub-work already done)
-- Linked nodes (evidence, derived-from chain, related work)
-
-It does NOT need a hand-written prompt that re-states main session's context. The substrate IS the context channel.
-
-Result: the prompt-as-sole-bridge weakness identified in the thesis is fixed at the dispatch interface. Subagents read intent at full fidelity from the substrate.
-
-## Migration path
-
-The substrate stands up alongside existing conventions; nothing is deleted in v0.
-
-1. **First convention: investigation registries.** The investigation we just ran (`docs/introspection/investigations/2026-05-20-whats-wrong/`) is already almost a graph — directory of hypothesis files with implicit cross-references. Convert to substrate as the proof-of-concept: each hypothesis becomes a node, evidence becomes child nodes, red-team results become linked nodes, synthesis is the root.
-2. **Second convention: per-project work queues.** Take one project's TODO.md, convert each item to a task node. See if the day-to-day experience improves.
-3. **Third convention: decision logs.** When a non-trivial decision happens, capture as a node with alternatives-considered linked.
-4. **Fourth convention: domain knowledge bases.** Type theory / Lua semantics / MLstruct notes as a linked graph for crescent's typechecker work.
-
-At each step, the substrate schema may need extension. Don't try to design v0 with all four use cases in mind — design for the first, observe friction, extend.
-
-## Open implementation questions
-
-- **`.normalize/graph/` vs other location.** Could live alongside `.normalize/context/` (same machinery, expanded), in a separate subdirectory, or even in `docs/graph/` for visibility. Trade-off: code-adjacent vs docs-adjacent.
-- **Wikilink resolution.** What if `[[some-id]]` references a node that doesn't exist yet? Create stub? Warn? Ignore? Probably warn-and-allow, with `normalize graph validate` surfacing broken links.
-- **Concurrency.** Two subagents writing to the same node concurrently. v0: file locking, last-writer-wins with a warning. v1: maybe append-mode for some node types (logs), replace-mode for others (status).
-- **GC and archive.** Discarded nodes stay in the filesystem. At some point, do we archive them? Probably not until friction emerges.
-- **Cross-project linking.** A node in crescent links to a node in normalize. Out of scope for v0 (each repo has its own graph), but the id schema should be designed to allow it later (URI-shaped, not just slug-shaped).
-- **Body conventions.** Should the body have suggested sections (Claim, Evidence, Caveats) per node type? Or stay free-form? Probably free-form for v0; conventions document recommended sections per type.
-- **Search.** Full-text search over node bodies. Probably defer to `normalize grep` extended to handle the graph, or `ripgrep .normalize/graph/`. Don't reinvent.
-
-## What this design does NOT yet specify
-
-- Whether SQLite is required or whether a pure-filesystem v0 is viable (probably depends on graph size).
-- The exact shape of the SessionStart hook's injection (raw text? rendered prompt? structured JSON the model is expected to parse?).
-- How the slash command interacts with subagent dispatch (does `/graph create` from within a subagent persist the same way?).
-- The wrapper's exact name, install location, and configuration mechanism.
-- Migration tooling for existing TODO.md / investigation directories.
-- Whether the substrate needs an explicit "root intent" node per project, or if intent is inferred from the highest unparented node.
-- Telemetry: does the substrate track how often nodes are read, by which sessions, to inform later quality-of-context measurement?
-
-These should be answered in v0 implementation, not in the design doc.
+- **Edges in a log vs in frontmatter.** Both have trade-offs. Log is simpler for the substrate, worse for "what does this unit point at" at-a-glance; frontmatter is git-diff-friendly per-unit, worse for bulk edge ops. v0 picks log; revisit if it fights use.
+- **Anchor resolution lifecycle.** Who updates anchors when code changes? A hook on `normalize structure rebuild`, an explicit `normalize substrate anchors refresh`, both? What happens to stale anchors — surfaced, archived, ignored?
+- **Cross-substrate references.** Anchor schema admits URLs and could admit substrate-relative paths; whether substrates can reference each other as first-class is open for v0.
+- **Body encodings.** Markdown is convention. If a unit's body is binary, what does `unit get` print? Conventions around `content-type` need design.
+- **Where convention sugar lives.** Some conventions warrant being in the `normalize` binary (wiki, design); others might live entirely in user wrapper scripts. The cut isn't obvious.
+- **Continuous-sync ergonomics.** The substrate is durable, but writing into it still requires *something* (a command, a hook, an edit). What patterns make "the live mental model is in the substrate" actually true in practice, vs aspirational?
+- **History granularity.** Each unit's history is its git history at file granularity. Sub-unit changes (one metadata field changing) are visible only as whole-file diffs. Sufficient for v0; richer change-tracking is deferred.
 
 ## Smallest viable prototype
 
-To validate the thesis, the minimum working version is:
+The minimum working version is the three primitives:
 
-- `normalize graph create / show / set / query` (4 commands).
-- Markdown-with-frontmatter storage, no SQLite cache initially.
-- One convention (investigation registries) migrated.
-- One shell wrapper that invokes `claude` with SessionStart loading the active investigation node.
+- `normalize substrate unit create / get / set / append / delete`
+- `normalize substrate edge add / remove / list`
+- `normalize substrate query / neighbors`
+- Markdown-with-frontmatter storage + edge log, CA cache for index.
+- One convention layered on (probably wiki or design — pick the one with a real near-term use).
 
-That's enough to dogfood. Friction discovered there shapes the rest of the design.
+Friction discovered there shapes the convention layer and any harness integration. The primitives don't change.
