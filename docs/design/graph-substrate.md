@@ -182,7 +182,7 @@ Concurrency follows file granularity: concurrent writes to *different* units don
 Flat verbs under `normalize kg`. One nesting level, no sub-nouns. Output respects `--pretty/--compact/--json/--jsonl/--jq` automatically via server-less.
 
 ```bash
-normalize kg create   [--id ID] [--metadata key=val ...]   # body via stdin
+normalize kg create   [id] [--metadata key=val ...]        # body via stdin
 normalize kg get      <id>
 normalize kg set      <id> [--metadata key=val ...]
 normalize kg append   <id>                                  # body via stdin

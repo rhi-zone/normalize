@@ -142,14 +142,14 @@ impl KgCliService {
     description = "Persistent knowledge graph adjacent to code"
 )]
 impl KgCliService {
-    /// Create a new unit (body via stdin). Auto-generates an ID if --id is not provided.
+    /// Create a new unit (body via stdin). Auto-generates an ID if not provided.
     ///
     /// Examples:
-    ///   echo "Design notes." | normalize kg create --id my-design --metadata tag=design
+    ///   echo "Design notes." | normalize kg create my-design --metadata tag=design
     #[cli(display_with = "display_output")]
     pub fn create(
         &self,
-        #[param(short = 'i', help = "Unit ID (auto-generated if omitted)")] id: Option<String>,
+        #[param(positional, help = "Unit ID (auto-generated if omitted)")] id: Option<String>,
         #[param(short = 'm', help = "Metadata key=value pairs (repeatable)")] metadata: Vec<String>,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
