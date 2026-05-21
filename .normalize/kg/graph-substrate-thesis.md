@@ -1,8 +1,15 @@
+---
+anchors:
+  path: docs/introspection/graph-substrate-thesis.md
+authored: 2026-05-20
+context: single-session
+tag: thesis
+---
 # Graph Substrate for Stateful LLM Workflows
 
 A thesis on why current LLM-coding workflows lose state, misaim work, and pay recurring correction costs — and what a small primitive in `normalize` could do about it.
 
-This document was authored in a single Claude Code session on 2026-05-20. It captures a line of reasoning that emerged from an investigation into "Claude Code is performing worse" — which the investigation itself partially refuted, then opened into deeper questions about context, state, and decomposition. The reasoning here is honest but not battle-tested. Treat it as a starting position for the actual design work in `docs/design/graph-substrate.md`, not a finished argument.
+This document was authored in a single Claude Code session on 2026-05-20. It captures a line of reasoning that emerged from an investigation into "Claude Code is performing worse" — which the investigation itself partially refuted, then opened into deeper questions about context, state, and decomposition. The reasoning here is honest but not battle-tested. Treat it as a starting position for graph-substrate-design, not a finished argument.
 
 ## Origin: the investigation that started this
 
@@ -29,7 +36,7 @@ That observation opens the deeper question this document addresses: what is the 
 
 **Conversation-as-substrate is broken. Reasoning happens in an append-only forward token stream that cannot unpoison itself once contaminated — premature conclusions become load-bearing on everything downstream, intent drifts and cannot be steered back in-context. The fix is to move state out of conversation context entirely, into a persistent graph substrate that (a) survives context discard so kill-and-restart becomes cheap, and (b) serves as the full-fidelity intent channel for stateless subagent calls so decomposed work doesn't lose information through prompt-shaped compression.**
 
-This is largely consistent with [nanites' thesis](../../nanites/CLAUDE.md) (conversation is context poisoning; the agent is the wrong unit; recursive decomposition is the architecture; the orchestrator is a program, not an agent). Nanites articulates the orchestration story. This document articulates the *state* story that orchestration needs to actually work. They're complementary.
+This is largely consistent with nanites' CLAUDE.md (conversation is context poisoning; the agent is the wrong unit; recursive decomposition is the architecture; the orchestrator is a program, not an agent). Nanites articulates the orchestration story. This document articulates the *state* story that orchestration needs to actually work. They're complementary.
 
 ## Sub-claims and the reasoning
 

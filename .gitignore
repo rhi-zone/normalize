@@ -91,6 +91,7 @@ cache/
 !/.normalize/similar-blocks-allow
 !/.normalize/hotspots-allow
 !/.normalize/large-files-allow
+!/.normalize/kg/
 
 # Normalize
 .normalize/*
@@ -105,5 +106,6 @@ cache/
 !.normalize/hotspots-allow
 !.normalize/large-files-allow
 !.normalize/memory/
+!.normalize/kg/
 .normalize/shadow
 .fastembed_cache/

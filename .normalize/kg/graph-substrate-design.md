@@ -1,6 +1,14 @@
+---
+anchors:
+  path: docs/design/graph-substrate.md
+tag: design-sketch
+links:
+- kind: derived-from
+  to: graph-substrate-thesis
+---
 # Graph Substrate: Design Sketch
 
-A persistent, addressable, queryable medium for structured thought adjacent to a codebase — implementing the primitive proposed in [`../introspection/graph-substrate-thesis.md`](../introspection/graph-substrate-thesis.md).
+A persistent, addressable, queryable medium for structured thought adjacent to a codebase — implementing the primitive proposed in graph-substrate-thesis.
 
 **Status (2026-05-21):** v0 shipped as `normalize-knowledge-graph` crate, CLI noun `kg`. Decisions below marked **[LOCKED]** were settled by the approved plan and are implemented. Open questions that remain are unchanged.
 
