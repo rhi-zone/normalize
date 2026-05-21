@@ -3,7 +3,7 @@
 //! Exposes `kg` subcommands: create, get, set, append, delete, link, unlink,
 //! edges, query, neighbors, show.
 
-use crate::model::{Edge, EdgeOp, EdgeOpKind, Unit, validate_id};
+use crate::model::{Edge, Unit, validate_id};
 use crate::query::{MatchPredicate, bfs_neighbors, filter_edges, filter_units};
 use crate::reports::{
     DeleteReport, EdgeListReport, EdgeReport, NeighborEntry, NeighborsReport, QueryReport,
@@ -49,9 +49,12 @@ fn get_normalize_dir(root: &Path) -> PathBuf {
 }
 
 /// Get the normalize dir then the kg dir, ensuring it exists.
+/// Also runs the one-shot migration from legacy edges.jsonl if present.
 fn open_kg(root: &Path) -> Result<PathBuf, String> {
     let norm_dir = get_normalize_dir(root);
-    store::ensure_kg_dir(&norm_dir)
+    let kg = store::ensure_kg_dir(&norm_dir)?;
+    store::migrate_jsonl_if_present(&kg)?;
+    Ok(kg)
 }
 
 /// Parse `key=value` metadata pairs into a JSON object.
@@ -94,11 +97,6 @@ fn merge_metadata(base: &serde_json::Value, new_meta: &serde_json::Value) -> ser
         }
     }
     result
-}
-
-/// Current ISO 8601 timestamp.
-fn now_iso() -> String {
-    chrono::Utc::now().to_rfc3339()
 }
 
 /// Read body from stdin.
@@ -185,6 +183,7 @@ impl KgCliService {
         let unit = Unit {
             id: id.clone(),
             metadata: meta,
+            links: vec![],
             body,
         };
         store::write_unit(&kg, &unit)?;
@@ -327,15 +326,7 @@ impl KgCliService {
 
         let meta = parse_metadata_pairs(&metadata)?;
 
-        let op = EdgeOp {
-            op: EdgeOpKind::Add,
-            from: from.clone(),
-            to: to.clone(),
-            kind: kind.clone(),
-            metadata: meta.clone(),
-            created: now_iso(),
-        };
-        store::append_edge_op(&kg, &op)?;
+        store::link(&kg, &from, &to, &kind, meta.clone())?;
 
         Ok(EdgeReport {
             from,
@@ -347,7 +338,7 @@ impl KgCliService {
 
     /// Remove a directed edge between two units.
     ///
-    /// Appends a tombstone to edges.jsonl; does not modify history.
+    /// Removes the link from the source unit's frontmatter.
     ///
     /// Examples:
     ///   normalize kg unlink --from design-doc --to api-spec --kind references
@@ -367,15 +358,7 @@ impl KgCliService {
         validate_id(&from)?;
         validate_id(&to)?;
 
-        let op = EdgeOp {
-            op: EdgeOpKind::Remove,
-            from: from.clone(),
-            to: to.clone(),
-            kind: kind.clone(),
-            metadata: serde_json::Value::Null,
-            created: now_iso(),
-        };
-        store::append_edge_op(&kg, &op)?;
+        store::unlink(&kg, &from, &to, &kind)?;
 
         Ok(EdgeReport {
             from,
@@ -403,7 +386,7 @@ impl KgCliService {
         let root_path = resolve_root(root)?;
         let kg = open_kg(&root_path)?;
 
-        let all_edges = store::project_edges(&kg)?;
+        let all_edges = store::list_all_edges(&kg)?;
         let filtered = filter_edges(
             all_edges.iter(),
             from.as_deref(),
@@ -451,7 +434,7 @@ impl KgCliService {
             .collect::<Result<Vec<_>, _>>()?;
 
         let all_units = store::read_all_units(&kg)?;
-        let all_edges = store::project_edges(&kg)?;
+        let all_edges = store::list_all_edges(&kg)?;
 
         // Apply edge-kind filter if provided
         let filtered_edges: Vec<Edge> = if let Some(ref k) = edge_kind {
@@ -501,7 +484,7 @@ impl KgCliService {
             store::read_unit(&kg, &id)?.ok_or_else(|| format!("Unit '{}' not found.", id))?;
 
         let all_units = store::read_all_units(&kg)?;
-        let all_edges = store::project_edges(&kg)?;
+        let all_edges = store::list_all_edges(&kg)?;
 
         let depth = depth.unwrap_or(1);
         let neighbor_pairs =
@@ -544,7 +527,7 @@ impl KgCliService {
             store::read_unit(&kg, &id)?.ok_or_else(|| format!("Unit '{}' not found.", id))?;
 
         let all_units = store::read_all_units(&kg)?;
-        let all_edges = store::project_edges(&kg)?;
+        let all_edges = store::list_all_edges(&kg)?;
 
         let depth = depth.unwrap_or(1);
         let neighbor_pairs = bfs_neighbors(&id, depth, &all_edges, &all_units, None);

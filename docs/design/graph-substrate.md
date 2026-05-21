@@ -147,22 +147,39 @@ Two convention sketches showing how the primitives compose. Neither is part of t
 
 Other plausible conventions (decision logs, investigation registries, daily journals, task trackers, research notebooks) build on the same primitives. The substrate doesn't care which exist.
 
-## Storage layout **[LOCKED: v0]**
+## Storage layout **[LOCKED: v1]**
 
 ```
 .normalize/kg/
-├── <id>.md                       # one file per unit — source of truth (ID grammar: [a-z0-9][a-z0-9-]*)
-└── edges.jsonl                   # edge log; one line per edge op
+└── <id>.md                       # one file per unit — source of truth (ID grammar: [a-z0-9][a-z0-9-]*)
 ```
 
-**Locked decisions:** storage root is `.normalize/kg/` (not `.normalize/substrate/`); no namespace directories in v0; ID grammar is `[a-z0-9][a-z0-9-]*`; edge log format is `{"op":"add"|"remove","from":"...","to":"...","kind":"...","metadata":{...},"created":"ISO8601"}`.
+Each unit file has YAML frontmatter with an optional `links` field holding outgoing edges:
+
+```yaml
+---
+tag: wiki-page
+anchors:
+  symbol: Frobnicator
+links:
+  - kind: references
+    to: other-unit
+  - kind: derived-from
+    to: another-unit
+    metadata:
+      note: background context
+---
+Body text here.
+```
+
+**Locked decisions:** storage root is `.normalize/kg/` (not `.normalize/substrate/`); no namespace directories in v0; ID grammar is `[a-z0-9][a-z0-9-]*`; outgoing edges stored in each source unit's `links` frontmatter array as `{kind, to, metadata?}`.
 
 Source of truth: the filesystem. There is no parallel write target. Everything else is derived.
 
 **Indexing follows the `normalize-facts` content-addressed pattern.** Per-unit cache rows in `~/.config/normalize/ca-cache.sqlite` (the existing CA cache, extended with a new namespace) keyed on `(blake3(unit_bytes), substrate_version)`. On any read:
 
-1. Hash each unit file in the working tree (and the edge log).
-2. Look up `(hash, version)` in the CA cache. Hit → reuse parsed metadata + edge set. Miss → parse, store, return.
+1. Hash each unit file in the working tree.
+2. Look up `(hash, version)` in the CA cache. Hit → reuse parsed metadata + link set. Miss → parse, store, return.
 3. Query the cache for the requested view.
 
 Consequences:
@@ -171,11 +188,13 @@ Consequences:
 - **No gitignored generated SQLite inside the repo.** The cache lives in the user's config dir (per existing convention) and is fully reconstructible from the tree.
 - **Manual edits and CLI writes are indistinguishable.** Both produce a file change; the next read hashes and indexes it. Any process (human, subagent, hook) uses the same write semantics — write the file.
 
-Edges live in a single append-friendly log rather than scattered through frontmatter so adding/removing edges doesn't require rewriting unit files. (Alternative: edges in frontmatter on each side. v0 uses the log because it's simpler and works for the recommended conventions; revisit if it fights real use.)
+Edges are stored in each source unit's frontmatter `links` array. Adding or removing an edge rewrites the source unit atomically (write-to-temp, rename). Outgoing edges are local to each unit's file; incoming edges are found by scanning all units for `link.to == id`.
 
-`normalize-graph` consumes the adjacency built from the cached edge log. Traversal, reachability, structural queries reuse its existing algorithms; the substrate provides adjacency, not new graph code.
+`normalize-graph` consumes the adjacency built from walking all units' links. Traversal, reachability, structural queries reuse its existing algorithms; the substrate provides adjacency, not new graph code.
 
 Concurrency follows file granularity: concurrent writes to *different* units don't collide; concurrent writes to the *same* unit use file locking with last-writer-wins. Append-style operations are read-modify-write under that lock. v0 doesn't attempt finer-grained merges.
+
+**Migration:** if `.normalize/kg/edges.jsonl` is present (legacy v0 log format), the first kg command automatically projects the current edge state, writes each edge into the corresponding source unit's frontmatter, and renames the log to `edges.jsonl.migrated-v0`. One-shot; idempotent after rename.
 
 ## CLI surface **[LOCKED: v0]**
 
@@ -199,9 +218,11 @@ normalize kg show     <id> [--depth N]                      # unit + neighbors
 
 No convention layer in v0. `normalize wiki`, `normalize design`, etc. are deferred — primitives are the surface.
 
-## Open questions
+## Decisions log
 
-- **Edges in a log vs in frontmatter.** **[LOCKED: log]** v0 uses append-only `edges.jsonl` with tombstones. Current edge state is the projection (last add/remove per `(from, to, kind)` triple). Revisit if it fights real use.
+- **Edges-in-log vs edges-in-frontmatter.** **[DECIDED: per-unit frontmatter]** v0 shipped an append-only `edges.jsonl` log with tombstone projections. Flipped to per-unit frontmatter (`links` array) because the shared log is git-unfriendly: every concurrent branch that appends an edge produces a merge conflict at EOF. Per-unit ownership matches the Obsidian/Logseq pattern — edge changes show up in the source unit's diff, which is where they belong. Whole-unit rewrites are microseconds; we don't have a write-rate problem. v0 data auto-migrates on first run.
+
+## Open questions
 - **Anchor resolution lifecycle.** Who updates anchors when code changes? A hook on `normalize structure rebuild`, an explicit `normalize kg anchors refresh`, both? What happens to stale anchors — surfaced, archived, ignored? **[OPEN]**
 - **Cross-substrate references.** Anchor schema admits URLs and could admit substrate-relative paths; whether substrates can reference each other as first-class is open. **[OPEN]**
 - **Body encodings.** Markdown is convention. If a unit's body is binary, what does `kg get` print? Conventions around `content-type` need design. **[OPEN, deferred from v0]**
@@ -210,14 +231,14 @@ No convention layer in v0. `normalize wiki`, `normalize design`, etc. are deferr
 - **History granularity.** Each unit's history is its git history at file granularity. Sub-unit changes (one metadata field changing) are visible only as whole-file diffs. Sufficient for v0; richer change-tracking is deferred. **[OPEN]**
 - **CA cache.** v0 does NOT use a CA cache. Walk-the-tree on every read, per `normalize-context` pattern. Add the cache when read latency hurts. **[LOCKED: no cache in v0]**
 
-## Smallest viable prototype **[SHIPPED: v0]**
+## Smallest viable prototype **[SHIPPED]**
 
 Shipped as `normalize-knowledge-graph` crate, mounted as `normalize kg`:
 
 - `normalize kg create / get / set / append / delete`
 - `normalize kg link / unlink / edges`
 - `normalize kg query / neighbors / show`
-- Markdown-with-frontmatter storage + append-only `edges.jsonl` log. No CA cache (walk-the-tree).
+- Markdown-with-frontmatter storage; outgoing edges in per-unit `links` frontmatter. No CA cache (walk-the-tree). Auto-migration from legacy `edges.jsonl` log.
 - No convention layer — primitives are the surface.
 
 Friction discovered there shapes the convention layer and any harness integration. The primitives don't change.

@@ -4,6 +4,8 @@
 //! - `--match key=value` (dotted-path, string equality)
 //! - `--edge-kind K` (filter edges by kind)
 //! - `--connected-to ID` (filter units connected to a given unit)
+//!
+//! Edges are projected from per-unit frontmatter `links` fields via `store::list_all_edges`.
 
 use crate::model::{Edge, Unit, dotted_lookup};
 use std::collections::{HashMap, HashSet};
@@ -188,6 +190,7 @@ mod tests {
         Unit {
             id: id.to_string(),
             metadata: meta,
+            links: vec![],
             body: body.to_string(),
         }
     }

@@ -6,9 +6,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **`normalize kg` edge storage moved from shared log to per-unit frontmatter.** Outgoing edges are now stored in each source unit's `links` YAML frontmatter field (`[{kind, to, metadata?}]`) instead of a shared append-only `edges.jsonl` log. Per-unit ownership makes branches that add edges to different units merge cleanly. On first use, any existing `edges.jsonl` is auto-migrated and renamed to `edges.jsonl.migrated-v0`.
+
 ### Added
 
-- **`normalize kg` knowledge graph** — new `normalize-knowledge-graph` crate with v0 primitives: unit CRUD (`create`/`get`/`set`/`append`/`delete`), edge management (`link`/`unlink`/`edges`), and query/traversal (`query`/`neighbors`/`show`). Filesystem-backed in `.normalize/kg/` with YAML frontmatter units and append-only `edges.jsonl` with tombstones. Dotted-path metadata matching (e.g. `--match anchors.symbol=Frobnicator`). BFS neighbor traversal at configurable depth.
+- **`normalize kg` knowledge graph** — new `normalize-knowledge-graph` crate with v0 primitives: unit CRUD (`create`/`get`/`set`/`append`/`delete`), edge management (`link`/`unlink`/`edges`), and query/traversal (`query`/`neighbors`/`show`). Filesystem-backed in `.normalize/kg/` with YAML frontmatter units and per-unit `links` arrays. Dotted-path metadata matching (e.g. `--match anchors.symbol=Frobnicator`). BFS neighbor traversal at configurable depth.
 
 ### Fixed
 
