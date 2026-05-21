@@ -5626,8 +5626,10 @@ dependencies = [
 name = "normalize-knowledge-graph"
 version = "0.3.2"
 dependencies = [
- "chrono",
  "dirs 5.0.1",
+ "jaq-core",
+ "jaq-json",
+ "jaq-std",
  "normalize-output",
  "schemars",
  "serde",

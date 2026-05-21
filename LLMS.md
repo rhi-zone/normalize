@@ -140,19 +140,25 @@ normalize ci --sarif               # SARIF output for GitHub Actions
 
 ### kg - Knowledge Graph
 
+Three primitives: `read` (selector → units), `write` (jq transform → mutate/delete), `walk` (graph traversal).
+
 ```bash
-echo "Design notes." | normalize kg create --id my-design --metadata tag=design
-normalize kg get my-design
-normalize kg set my-design --metadata status=approved
-echo "More notes." | normalize kg append my-design
-normalize kg link --from my-design --to api-spec --kind references
-normalize kg unlink --from my-design --to api-spec --kind references
-normalize kg edges --from my-design
-normalize kg query --match tag=design
-normalize kg query --match anchors.symbol=Frobnicator
-normalize kg neighbors my-design --depth 2
-normalize kg show my-design
-normalize kg delete my-design
+# read: by id, by jq predicate, or all
+normalize kg read my-design
+normalize kg read -q '.metadata.tag == "design"'
+normalize kg read
+
+# write: from stdin (no selector), or jq transform
+echo '{"id":"my-design","metadata":{"tag":"design"},"body":"Notes."}' | normalize kg write
+normalize kg write my-design '.metadata.status = "approved"'
+normalize kg write my-design '.metadata.links += [{"kind":"references","to":"api-spec"}]'
+normalize kg write my-design '.body += "\nMore notes."'
+normalize kg write my-design 'null'  # delete
+
+# walk: BFS graph traversal via jq-extracted link IDs
+normalize kg walk my-design '.metadata.links[].to'
+normalize kg walk my-design '.metadata.links[].to' --depth 2
+normalize kg walk my-design '.metadata.links[].to' --include-start
 ```
 
 ## Command Aliases

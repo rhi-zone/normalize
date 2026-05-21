@@ -8,14 +8,16 @@ description = "Persistent, addressable, queryable knowledge graph adjacent to co
 
 [features]
 default = []
-cli = ["dep:server-less", "dep:schemars", "dep:normalize-output", "dep:dirs", "dep:chrono"]
+cli = ["dep:server-less", "dep:schemars", "dep:normalize-output", "dep:dirs", "dep:jaq-core", "dep:jaq-std", "dep:jaq-json"]
 
 [dependencies]
 server-less = { workspace = true, optional = true }
 schemars = { version = "1", optional = true }
 normalize-output = { path = "../normalize-output", version = "0.3.2", optional = true }
 dirs = { version = "5", optional = true }
-chrono = { version = "0.4", default-features = false, features = ["std", "clock"], optional = true }
+jaq-core = { version = "3", optional = true }
+jaq-std = { version = "3", optional = true }
+jaq-json = { version = "2", features = ["serde"], optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }

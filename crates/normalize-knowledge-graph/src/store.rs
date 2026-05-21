@@ -5,7 +5,7 @@
 //! The old `edges.jsonl` log is no longer written; if present, it is migrated
 //! on first access and renamed to `edges.jsonl.migrated-v0`.
 
-use crate::model::{Edge, Link, Unit, validate_id};
+use crate::model::{Link, Unit, validate_id};
 use std::path::{Path, PathBuf};
 
 /// Returns the knowledge-graph directory: `<normalize_dir>/kg/`.
@@ -46,7 +46,6 @@ pub fn read_unit(kg_dir: &Path, id: &str) -> Result<Option<Unit>, String> {
 pub fn write_unit(kg_dir: &Path, unit: &Unit) -> Result<(), String> {
     let path = unit_path(kg_dir, &unit.id);
     let contents = render_unit_file(&unit.metadata, &unit.links, &unit.body);
-    // Atomic write: write to temp file then rename
     let tmp_path = path.with_extension("md.tmp");
     std::fs::write(&tmp_path, &contents)
         .map_err(|e| format!("Failed to write temp {:?}: {}", tmp_path, e))?;
@@ -76,11 +75,10 @@ pub fn list_units(kg_dir: &Path) -> Result<Vec<String>, String> {
         let entry = entry.map_err(|e| format!("Dir entry error: {}", e))?;
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
-        if let Some(id) = name_str.strip_suffix(".md") {
-            // Skip non-ID files (anything that doesn't pass the ID grammar)
-            if validate_id(id).is_ok() {
-                ids.push(id.to_string());
-            }
+        if let Some(id) = name_str.strip_suffix(".md")
+            && validate_id(id).is_ok()
+        {
+            ids.push(id.to_string());
         }
     }
     ids.sort();
@@ -104,80 +102,233 @@ fn unit_path(kg_dir: &Path, id: &str) -> PathBuf {
 }
 
 // ---------------------------------------------------------------------------
-// Edge operations (per-unit frontmatter)
+// jq evaluation
 // ---------------------------------------------------------------------------
 
-/// Add a directed edge from `from` to `to` with `kind` and `metadata`.
-///
-/// Reads the source unit, deduplicates on `(kind, to)` (latest metadata wins),
-/// and writes back atomically.
-pub fn link(
-    kg_dir: &Path,
-    from: &str,
-    to: &str,
-    kind: &str,
-    metadata: serde_json::Value,
-) -> Result<(), String> {
-    let mut unit =
-        read_unit(kg_dir, from)?.ok_or_else(|| format!("Source unit '{}' not found.", from))?;
+#[cfg(feature = "cli")]
+type D = jaq_core::data::JustLut<jaq_json::Val>;
+#[cfg(feature = "cli")]
+type CompiledFilter = jaq_core::compile::Filter<jaq_core::Native<D>>;
 
-    // Deduplicate: remove existing entry for (kind, to) if present
-    unit.links.retain(|l| !(l.kind == kind && l.to == to));
-    // Append the new link
-    unit.links.push(Link {
-        kind: kind.to_string(),
-        to: to.to_string(),
-        metadata,
-    });
+#[cfg(feature = "cli")]
+fn jq_compile(expr: &str) -> Result<CompiledFilter, String> {
+    use jaq_core::load::{Arena, File, Loader};
 
-    write_unit(kg_dir, &unit)
+    let arena = Arena::default();
+    let defs = jaq_core::defs()
+        .chain(jaq_std::defs())
+        .chain(jaq_json::defs());
+    let loader = Loader::new(defs);
+    let modules = loader
+        .load(
+            &arena,
+            File {
+                code: expr,
+                path: (),
+            },
+        )
+        .map_err(|errs| {
+            let msgs: Vec<String> = errs.into_iter().map(|(_, e)| format!("{e:?}")).collect();
+            format!("jq parse error: {}", msgs.join("; "))
+        })?;
+
+    let funs = jaq_core::funs::<D>()
+        .chain(jaq_std::funs::<D>())
+        .chain(jaq_json::funs::<D>());
+    jaq_core::Compiler::default()
+        .with_funs(funs)
+        .compile(modules)
+        .map_err(|errs| {
+            let msgs: Vec<String> = errs.into_iter().map(|(_, e)| format!("{e:?}")).collect();
+            format!("jq compile error: {}", msgs.join("; "))
+        })
 }
 
-/// Remove a directed edge from `from` to `to` with `kind`.
-///
-/// Reads the source unit, filters out the matching link, and writes back atomically.
-pub fn unlink(kg_dir: &Path, from: &str, to: &str, kind: &str) -> Result<(), String> {
-    let mut unit =
-        read_unit(kg_dir, from)?.ok_or_else(|| format!("Source unit '{}' not found.", from))?;
-
-    unit.links.retain(|l| !(l.kind == kind && l.to == to));
-
-    write_unit(kg_dir, &unit)
+#[cfg(feature = "cli")]
+fn jq_val_to_json(val: &jaq_json::Val) -> Result<serde_json::Value, String> {
+    serde_json::from_str(&format!("{val}"))
+        .map_err(|e| format!("Failed to convert jq output to JSON: {}", e))
 }
 
-/// Project all edges from all units in the kg directory.
-///
-/// Walks all units, flattens each unit's `links` into `Edge` tuples with `from = unit.id`.
-pub fn list_all_edges(kg_dir: &Path) -> Result<Vec<Edge>, String> {
-    let units = read_all_units(kg_dir)?;
-    let mut edges = Vec::new();
-    for unit in &units {
-        for link in &unit.links {
-            edges.push(Edge::from_link(&unit.id, link));
+#[cfg(feature = "cli")]
+fn jq_run_one(
+    filter: &CompiledFilter,
+    input: &serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    use jaq_core::{Ctx, Vars};
+    use jaq_json::Val;
+
+    let val: Val = serde_json::from_value(input.clone())
+        .map_err(|e| format!("Failed to convert input to Val: {}", e))?;
+
+    let ctx = Ctx::<D>::new(&filter.lut, Vars::new([]));
+    let outputs: Vec<_> = filter.id.run((ctx, val)).collect();
+
+    if outputs.len() != 1 {
+        return Err(format!(
+            "jq expression must produce exactly one output (got {})",
+            outputs.len()
+        ));
+    }
+
+    let result = outputs
+        .into_iter()
+        .next()
+        .unwrap()
+        .map_err(|e| format!("jq runtime error: {e:?}"))?;
+
+    jq_val_to_json(&result)
+}
+
+#[cfg(feature = "cli")]
+fn jq_run_all(
+    filter: &CompiledFilter,
+    input: &serde_json::Value,
+) -> Result<Vec<serde_json::Value>, String> {
+    use jaq_core::{Ctx, Vars};
+    use jaq_json::Val;
+
+    let val: Val = serde_json::from_value(input.clone())
+        .map_err(|e| format!("Failed to convert input to Val: {}", e))?;
+
+    let ctx = Ctx::<D>::new(&filter.lut, Vars::new([]));
+    let mut results = Vec::new();
+    for output in filter.id.run((ctx, val)) {
+        match output {
+            Ok(v) => results.push(jq_val_to_json(&v)?),
+            Err(e) => return Err(format!("jq runtime error: {e:?}")),
         }
     }
-    Ok(edges)
+    Ok(results)
+}
+
+/// Apply a jq expression to a unit (serialized as JSON).
+///
+/// Returns:
+/// - `Ok(Some(unit))` — transform returned a unit-shaped object.
+/// - `Ok(None)` — transform returned `null` (delete semantics).
+/// - `Err(msg)` — parse/eval error or result was not an object or null.
+#[cfg(feature = "cli")]
+pub fn apply_jq_transform(unit: &Unit, expr: &str) -> Result<Option<Unit>, String> {
+    let filter = jq_compile(expr)?;
+    let unit_json =
+        serde_json::to_value(unit).map_err(|e| format!("Failed to serialize unit: {}", e))?;
+    let result = jq_run_one(&filter, &unit_json)?;
+
+    match result {
+        serde_json::Value::Null => Ok(None),
+        other => {
+            let updated: Unit = serde_json::from_value(other).map_err(|e| {
+                format!(
+                    "jq expression must return a unit-shaped object (with id, metadata, body) or null: {}",
+                    e
+                )
+            })?;
+            Ok(Some(updated))
+        }
+    }
+}
+
+/// Evaluate a jq predicate against a unit, returning true if the predicate is truthy.
+#[cfg(feature = "cli")]
+pub fn eval_jq_predicate(unit: &Unit, predicate: &str) -> Result<bool, String> {
+    use jaq_core::{Ctx, ValT, Vars};
+    use jaq_json::Val;
+
+    let filter = jq_compile(predicate)?;
+    let unit_json =
+        serde_json::to_value(unit).map_err(|e| format!("Failed to serialize unit: {}", e))?;
+    let val: Val = serde_json::from_value(unit_json)
+        .map_err(|e| format!("Failed to convert unit to Val: {}", e))?;
+
+    let ctx = Ctx::<D>::new(&filter.lut, Vars::new([]));
+    for v in filter.id.run((ctx, val)).flatten() {
+        if v.as_bool() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Walk the graph from `start_id`, extracting next-hop IDs from each unit using `link_expr`.
+///
+/// `link_expr` is a jq expression evaluated against the whole unit JSON; each string output
+/// is treated as a unit ID to visit next. Traversal is BFS, de-duped by ID.
+/// `depth` limits hops (0 = unlimited). `include_start` controls whether the start unit
+/// appears in the results.
+#[cfg(feature = "cli")]
+pub fn walk_from(
+    kg_dir: &Path,
+    start_id: &str,
+    link_expr: &str,
+    depth: usize,
+    include_start: bool,
+) -> Result<Vec<Unit>, String> {
+    use std::collections::{HashSet, VecDeque};
+
+    let filter = jq_compile(link_expr)?;
+
+    let extract_ids = |unit: &Unit| -> Result<Vec<String>, String> {
+        let unit_json =
+            serde_json::to_value(unit).map_err(|e| format!("Failed to serialize unit: {}", e))?;
+        let outputs = jq_run_all(&filter, &unit_json)?;
+        let mut ids = Vec::new();
+        for v in outputs {
+            if let serde_json::Value::String(s) = v {
+                ids.push(s);
+            }
+        }
+        Ok(ids)
+    };
+
+    let start_unit =
+        read_unit(kg_dir, start_id)?.ok_or_else(|| format!("Unit '{}' not found.", start_id))?;
+
+    let mut visited: HashSet<String> = HashSet::new();
+    visited.insert(start_id.to_string());
+
+    let mut queue: VecDeque<(String, usize)> = VecDeque::new();
+    let initial_ids = extract_ids(&start_unit)?;
+    for id in initial_ids {
+        if !visited.contains(&id) {
+            visited.insert(id.clone());
+            queue.push_back((id, 1));
+        }
+    }
+
+    let mut result: Vec<Unit> = Vec::new();
+    if include_start {
+        result.push(start_unit);
+    }
+
+    while let Some((id, hop)) = queue.pop_front() {
+        let unit = match read_unit(kg_dir, &id)? {
+            Some(u) => u,
+            None => continue,
+        };
+
+        if depth == 0 || hop < depth {
+            let next_ids = extract_ids(&unit)?;
+            for next_id in next_ids {
+                if !visited.contains(&next_id) {
+                    visited.insert(next_id.clone());
+                    queue.push_back((next_id, hop + 1));
+                }
+            }
+        }
+
+        result.push(unit);
+    }
+
+    Ok(result)
 }
 
 // ---------------------------------------------------------------------------
 // Frontmatter parsing / rendering
 // ---------------------------------------------------------------------------
 
-/// Parse a unit file into (metadata, links, body).
-///
-/// Supports the standard YAML frontmatter format:
-/// ```text
-/// ---
-/// key: value
-/// links:
-///   - kind: references
-///     to: other-unit
-/// ---
-/// body text
-/// ```
 fn parse_unit_file(contents: &str) -> Result<(serde_json::Value, Vec<Link>, String), String> {
     if !contents.starts_with("---") {
-        // No frontmatter — treat whole file as body.
         return Ok((
             serde_json::Value::Object(Default::default()),
             vec![],
@@ -185,10 +336,8 @@ fn parse_unit_file(contents: &str) -> Result<(serde_json::Value, Vec<Link>, Stri
         ));
     }
 
-    // Find the closing `---`
     let after_first = &contents[3..];
     let Some(close_idx) = after_first.find("\n---") else {
-        // Malformed frontmatter — treat whole file as body.
         return Ok((
             serde_json::Value::Object(Default::default()),
             vec![],
@@ -197,14 +346,12 @@ fn parse_unit_file(contents: &str) -> Result<(serde_json::Value, Vec<Link>, Stri
     };
 
     let yaml_str = &after_first[..close_idx];
-    // Everything after `\n---` (plus the newline that may follow)
-    let rest = &after_first[close_idx + 4..]; // skip "\n---"
+    let rest = &after_first[close_idx + 4..];
     let body = rest.strip_prefix('\n').unwrap_or(rest).to_string();
 
     let yaml_val: serde_yaml::Value =
         serde_yaml::from_str(yaml_str).unwrap_or(serde_yaml::Value::Mapping(Default::default()));
 
-    // Extract `links` from the YAML mapping, convert the remainder to JSON metadata.
     let serde_yaml::Value::Mapping(mut map) = yaml_val else {
         return Ok((serde_json::Value::Object(Default::default()), vec![], body));
     };
@@ -222,21 +369,15 @@ fn parse_unit_file(contents: &str) -> Result<(serde_json::Value, Vec<Link>, Stri
     Ok((metadata_json, links, body))
 }
 
-/// Render a unit to a file string with YAML frontmatter.
-///
-/// If `links` is non-empty, they are rendered under the `links` key in frontmatter.
 fn render_unit_file(metadata: &serde_json::Value, links: &[Link], body: &str) -> String {
-    // Build the full frontmatter object: metadata fields + optional links
     let mut yaml_map = serde_yaml::Mapping::new();
 
-    // Insert metadata fields
     if let serde_json::Value::Object(meta_map) = metadata {
         for (k, v) in meta_map {
             yaml_map.insert(serde_yaml::Value::String(k.clone()), json_to_yaml_value(v));
         }
     }
 
-    // Append links if non-empty
     if !links.is_empty() {
         let links_json = serde_json::to_value(links).unwrap_or(serde_json::Value::Array(vec![]));
         yaml_map.insert(
@@ -250,7 +391,6 @@ fn render_unit_file(metadata: &serde_json::Value, links: &[Link], body: &str) ->
     format!("---\n{}---\n{}", yaml_str, body)
 }
 
-/// Convert serde_yaml::Value to serde_json::Value.
 fn yaml_to_json(v: serde_yaml::Value) -> serde_json::Value {
     match v {
         serde_yaml::Value::Null => serde_json::Value::Null,
@@ -314,15 +454,6 @@ fn json_to_yaml_value(v: &serde_json::Value) -> serde_yaml::Value {
 // Migration from edges.jsonl
 // ---------------------------------------------------------------------------
 
-/// Migrate the legacy `edges.jsonl` log into per-unit frontmatter if present.
-///
-/// On first call (when `edges.jsonl` exists):
-/// 1. Projects the current edge state from the log.
-/// 2. For each present edge, reads the source unit, appends the link (idempotent).
-/// 3. Renames `edges.jsonl` → `edges.jsonl.migrated-v0`.
-/// 4. Logs one line to stderr.
-///
-/// Subsequent calls are no-ops (the file is gone).
 pub fn migrate_jsonl_if_present(kg_dir: &Path) -> Result<(), String> {
     let edges_path = kg_dir.join("edges.jsonl");
     if !edges_path.exists() {
@@ -333,13 +464,18 @@ pub fn migrate_jsonl_if_present(kg_dir: &Path) -> Result<(), String> {
     let count = edges.len();
 
     for edge in edges {
-        // Only migrate if source unit exists; skip dangling edges
-        if read_unit(kg_dir, &edge.from)?.is_some() {
-            link(kg_dir, &edge.from, &edge.to, &edge.kind, edge.metadata)?;
+        if let Some(mut unit) = read_unit(kg_dir, &edge.from)? {
+            unit.links
+                .retain(|l| !(l.kind == edge.kind && l.to == edge.to));
+            unit.links.push(Link {
+                kind: edge.kind,
+                to: edge.to,
+                metadata: edge.metadata,
+            });
+            write_unit(kg_dir, &unit)?;
         }
     }
 
-    // Rename the log
     let migrated_path = kg_dir.join("edges.jsonl.migrated-v0");
     std::fs::rename(&edges_path, &migrated_path)
         .map_err(|e| format!("Failed to rename edges.jsonl: {}", e))?;
@@ -352,10 +488,14 @@ pub fn migrate_jsonl_if_present(kg_dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Project the legacy edge log into a flat list of current edges.
-///
-/// Reads `edges.jsonl` line by line, applying add/remove ops in order.
-fn project_legacy_edges(kg_dir: &Path) -> Result<Vec<Edge>, String> {
+struct LegacyEdge {
+    from: String,
+    to: String,
+    kind: String,
+    metadata: serde_json::Value,
+}
+
+fn project_legacy_edges(kg_dir: &Path) -> Result<Vec<LegacyEdge>, String> {
     use std::collections::HashMap;
     use std::io::BufRead;
 
@@ -364,7 +504,7 @@ fn project_legacy_edges(kg_dir: &Path) -> Result<Vec<Edge>, String> {
         return Ok(vec![]);
     }
 
-    let mut present: HashMap<(String, String, String), Edge> = HashMap::new();
+    let mut present: HashMap<(String, String, String), LegacyEdge> = HashMap::new();
     let mut order: Vec<(String, String, String)> = Vec::new();
 
     let file =
@@ -388,7 +528,7 @@ fn project_legacy_edges(kg_dir: &Path) -> Result<Vec<Edge>, String> {
                 }
                 present.insert(
                     key,
-                    Edge {
+                    LegacyEdge {
                         from: op.from,
                         to: op.to,
                         kind: op.kind,
@@ -399,9 +539,7 @@ fn project_legacy_edges(kg_dir: &Path) -> Result<Vec<Edge>, String> {
             "remove" => {
                 present.remove(&key);
             }
-            _ => {
-                // Unknown op — skip
-            }
+            _ => {}
         }
     }
 
@@ -411,7 +549,6 @@ fn project_legacy_edges(kg_dir: &Path) -> Result<Vec<Edge>, String> {
         .collect())
 }
 
-/// Minimal representation of a legacy edges.jsonl line.
 #[derive(serde::Deserialize)]
 struct LegacyEdgeOp {
     op: String,
@@ -469,120 +606,10 @@ mod tests {
     }
 
     #[test]
-    fn test_link_stores_in_frontmatter() {
-        let dir = tempfile::tempdir().unwrap();
-        let kg = dir.path();
-
-        // Create source and target units
-        let src = Unit {
-            id: "src".to_string(),
-            metadata: serde_json::json!({}),
-            links: vec![],
-            body: "Source\n".to_string(),
-        };
-        write_unit(kg, &src).unwrap();
-        let tgt = Unit {
-            id: "tgt".to_string(),
-            metadata: serde_json::json!({}),
-            links: vec![],
-            body: "Target\n".to_string(),
-        };
-        write_unit(kg, &tgt).unwrap();
-
-        // Link
-        link(kg, "src", "tgt", "references", serde_json::Value::Null).unwrap();
-
-        // Read back — link should be in frontmatter
-        let unit = read_unit(kg, "src").unwrap().unwrap();
-        assert_eq!(unit.links.len(), 1);
-        assert_eq!(unit.links[0].kind, "references");
-        assert_eq!(unit.links[0].to, "tgt");
-    }
-
-    #[test]
-    fn test_link_deduplicate_latest_metadata() {
-        let dir = tempfile::tempdir().unwrap();
-        let kg = dir.path();
-
-        let src = Unit {
-            id: "src".to_string(),
-            metadata: serde_json::json!({}),
-            links: vec![],
-            body: "".to_string(),
-        };
-        write_unit(kg, &src).unwrap();
-        let tgt = Unit {
-            id: "tgt".to_string(),
-            metadata: serde_json::json!({}),
-            links: vec![],
-            body: "".to_string(),
-        };
-        write_unit(kg, &tgt).unwrap();
-
-        // Link twice with different metadata — latest wins
-        link(kg, "src", "tgt", "ref", serde_json::json!({"n": 1})).unwrap();
-        link(kg, "src", "tgt", "ref", serde_json::json!({"n": 2})).unwrap();
-
-        let unit = read_unit(kg, "src").unwrap().unwrap();
-        assert_eq!(unit.links.len(), 1, "dedup: only one link for (kind, to)");
-        assert_eq!(unit.links[0].metadata["n"], 2, "latest metadata wins");
-    }
-
-    #[test]
-    fn test_unlink_removes_entry() {
-        let dir = tempfile::tempdir().unwrap();
-        let kg = dir.path();
-
-        for id in ["src", "tgt"] {
-            let unit = Unit {
-                id: id.to_string(),
-                metadata: serde_json::json!({}),
-                links: vec![],
-                body: "".to_string(),
-            };
-            write_unit(kg, &unit).unwrap();
-        }
-
-        link(kg, "src", "tgt", "ref", serde_json::Value::Null).unwrap();
-        unlink(kg, "src", "tgt", "ref").unwrap();
-
-        let unit = read_unit(kg, "src").unwrap().unwrap();
-        assert!(unit.links.is_empty(), "link should be gone after unlink");
-    }
-
-    #[test]
-    fn test_list_all_edges_from_units() {
-        let dir = tempfile::tempdir().unwrap();
-        let kg = dir.path();
-
-        for id in ["a", "b", "c"] {
-            let unit = Unit {
-                id: id.to_string(),
-                metadata: serde_json::json!({}),
-                links: vec![],
-                body: "".to_string(),
-            };
-            write_unit(kg, &unit).unwrap();
-        }
-
-        link(kg, "a", "c", "ref", serde_json::Value::Null).unwrap();
-        link(kg, "b", "c", "ref", serde_json::Value::Null).unwrap();
-
-        let edges = list_all_edges(kg).unwrap();
-        assert_eq!(edges.len(), 2);
-        let froms: Vec<&str> = edges.iter().map(|e| e.from.as_str()).collect();
-        assert!(froms.contains(&"a"));
-        assert!(froms.contains(&"b"));
-        let tos: Vec<&str> = edges.iter().map(|e| e.to.as_str()).collect();
-        assert!(tos.iter().all(|t| *t == "c"));
-    }
-
-    #[test]
     fn test_migration_from_jsonl() {
         let dir = tempfile::tempdir().unwrap();
         let kg = dir.path();
 
-        // Create units
         for id in ["a", "b", "c"] {
             let unit = Unit {
                 id: id.to_string(),
@@ -593,7 +620,6 @@ mod tests {
             write_unit(kg, &unit).unwrap();
         }
 
-        // Write a fake edges.jsonl with 3 adds and 1 remove
         let edges_path = kg.join("edges.jsonl");
         let lines = [
             r#"{"op":"add","from":"a","to":"b","kind":"ref","metadata":null,"created":"2026-01-01T00:00:00Z"}"#,
@@ -603,22 +629,18 @@ mod tests {
         ];
         std::fs::write(&edges_path, lines.join("\n") + "\n").unwrap();
 
-        // Migrate
         migrate_jsonl_if_present(kg).unwrap();
 
-        // edges.jsonl should be renamed
         assert!(!edges_path.exists(), "edges.jsonl should be gone");
         assert!(
             kg.join("edges.jsonl.migrated-v0").exists(),
             "migrated file should exist"
         );
 
-        // a should have link to c only (a->b was removed)
         let a = read_unit(kg, "a").unwrap().unwrap();
         assert_eq!(a.links.len(), 1);
         assert_eq!(a.links[0].to, "c");
 
-        // b should have link to c with metadata
         let b = read_unit(kg, "b").unwrap().unwrap();
         assert_eq!(b.links.len(), 1);
         assert_eq!(b.links[0].to, "c");

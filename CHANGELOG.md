@@ -8,7 +8,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- **Move graph-substrate design and thesis docs into the kg knowledge graph** (units: `graph-substrate-design`, `graph-substrate-thesis`). Originals removed from `docs/design/` and `docs/introspection/`. Linked by a `derived-from` edge; anchor metadata preserves prior paths. See `normalize kg get graph-substrate-design` and `normalize kg get graph-substrate-thesis`.
+- **`normalize kg` collapsed to 3 primitives: `read`, `write`, `walk`.** The 11-verb surface (create/get/set/append/delete/link/unlink/edges/query/neighbors/show) is replaced by three indivisible operations. `write` accepts a jq transform (null = delete, object = put/patch); `read` accepts an id or `-q` jq predicate; `walk` does BFS traversal via a jq expression that extracts link target IDs. Embedded jq via the `jaq` crate — no external jq dependency. `--depth N` and `--include-start` on `walk`.
+
+- **Move graph-substrate design and thesis docs into the kg knowledge graph** (units: `graph-substrate-design`, `graph-substrate-thesis`). Originals removed from `docs/design/` and `docs/introspection/`. Linked by a `derived-from` edge; anchor metadata preserves prior paths. See `normalize kg read graph-substrate-design` and `normalize kg read graph-substrate-thesis`.
 
 - **`normalize kg` edge storage moved from shared log to per-unit frontmatter.** Outgoing edges are now stored in each source unit's `links` YAML frontmatter field (`[{kind, to, metadata?}]`) instead of a shared append-only `edges.jsonl` log. Per-unit ownership makes branches that add edges to different units merge cleanly. On first use, any existing `edges.jsonl` is auto-migrated and renamed to `edges.jsonl.migrated-v0`.
 

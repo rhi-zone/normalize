@@ -12,7 +12,7 @@
 | `edit` | Structural code modifications (delete, replace, swap, insert, undo, redo, history) |
 | `rules` | Manage and run analysis rules (syntax + fact) |
 | `structure` | Manage structural index (symbols, imports, calls) |
-| `kg` | Knowledge graph (unit CRUD, edges, query, neighbors) |
+| `kg` | Knowledge graph — three primitives: read (selector → units), write (jq transform → mutate/delete), walk (graph traversal) |
 | `init` | Initialize normalize in a directory |
 
 ### Analysis
