@@ -64,25 +64,48 @@
           doCheck = false;
         };
 
-        devShells.default = pkgs.mkShell rec {
-          buildInputs = with pkgs; [
-            stdenv.cc.cc
-            sqlite
-            # Rust toolchain (fenix — includes x86_64-unknown-linux-musl std)
-            rustToolchain
-            rust-analyzer
-            # Fast linker for incremental builds
-            mold
-            clang
-            # JS tooling: VS Code extension, docs, sessions SPA
-            bun
-            nodejs
-          ];
-          LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath buildInputs}:$LD_LIBRARY_PATH";
-          shellHook = ''
-            export PATH="${pkgs.musl.dev}/bin:${pkgs.tree-sitter}/bin:$PATH"
-          '';
-        };
+        devShells.default =
+          let
+            # mkShell merges `packages` into `nativeBuildInputs`. stdenv's
+            # cc-wrapper setup hook then propagates any nativeBuildInput with an
+            # include/ or lib/ dir into NIX_CFLAGS_COMPILE / NIX_LDFLAGS, leaking
+            # musl/tree-sitter paths into rust-lld and breaking the host build.
+            #
+            # symlinkJoin strips include/lib dirs but does NOT suppress a package's
+            # propagated-build-inputs — musl.dev propagates musl/lib through.
+            #
+            # runCommand with an explicit bin-copy creates a truly isolated
+            # derivation with no propagated deps and no include/lib dirs, so the
+            # cc-wrapper hook has nothing to propagate.
+            binOnly =
+              pkg: name:
+              pkgs.runCommand name { } ''
+                mkdir -p $out/bin
+                for f in ${pkg}/bin/*; do
+                  ln -s "$f" "$out/bin/$(basename "$f")"
+                done
+              '';
+            treeShitterBinOnly = binOnly pkgs.tree-sitter "tree-sitter-bin";
+            muslDevBinOnly = binOnly pkgs.musl.dev "musl-dev-bin";
+            nodejsBinOnly = binOnly pkgs.nodejs "nodejs-bin";
+          in
+          pkgs.mkShell {
+            buildInputs = with pkgs; [
+              stdenv.cc.cc
+              sqlite
+            ];
+            packages = with pkgs; [
+              rustToolchain
+              rust-analyzer
+              mold
+              clang
+              bun
+              nodejsBinOnly
+              treeShitterBinOnly
+              muslDevBinOnly
+            ];
+            LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath (with pkgs; [ stdenv.cc.cc sqlite ])}:$LD_LIBRARY_PATH";
+          };
       }
     );
 }
