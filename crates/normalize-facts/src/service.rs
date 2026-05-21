@@ -6,6 +6,7 @@
 
 use crate::FileIndex;
 use normalize_output::OutputFormatter;
+use normalize_rules_config::WalkConfig;
 use schemars::JsonSchema;
 use serde::Serialize;
 use server_less::cli;
@@ -76,11 +77,36 @@ fn open_index_path(root: &Path) -> PathBuf {
     root.join(".normalize").join("index.sqlite")
 }
 
+/// Best-effort: parse `[walk]` from `.normalize/config.toml`.
+/// Falls back to a default that excludes `.git/` and `.normalize/` if the file
+/// is absent or malformed.
+fn load_walk_config(root: &Path) -> WalkConfig {
+    #[derive(serde::Deserialize, Default)]
+    struct MinimalConfig {
+        #[serde(default)]
+        walk: WalkConfig,
+    }
+    let config_path = root.join(".normalize").join("config.toml");
+    if let Ok(contents) = std::fs::read_to_string(&config_path) {
+        if let Ok(cfg) = toml::from_str::<MinimalConfig>(&contents) {
+            return cfg.walk;
+        }
+    }
+    // Bootstrap default: exclude .git/ and .normalize/ so the standalone
+    // service doesn't index its own SQLite state.
+    WalkConfig {
+        exclude: Some(vec![".git/".to_string(), ".normalize/".to_string()]),
+        ..Default::default()
+    }
+}
+
 async fn open_index(root: &Path) -> Result<FileIndex, String> {
     let db_path = open_index_path(root);
-    FileIndex::open(&db_path, root)
+    let mut idx = FileIndex::open(&db_path, root)
         .await
-        .map_err(|e| format!("Failed to open index: {}", e))
+        .map_err(|e| format!("Failed to open index: {}", e))?;
+    idx.set_walk_config(load_walk_config(root));
+    Ok(idx)
 }
 
 fn resolve_root(root: Option<String>) -> Result<PathBuf, String> {

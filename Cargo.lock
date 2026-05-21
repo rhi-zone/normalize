@@ -5445,6 +5445,7 @@ dependencies = [
  "normalize-local-deps",
  "normalize-manifest",
  "normalize-output",
+ "normalize-rules-config",
  "rayon",
  "schemars",
  "serde",
@@ -5453,6 +5454,7 @@ dependencies = [
  "streaming-iterator",
  "tempfile",
  "tokio",
+ "toml",
  "tracing",
  "tree-sitter",
 ]

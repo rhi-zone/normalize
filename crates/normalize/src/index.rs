@@ -15,7 +15,10 @@ pub use normalize_facts::{CallGraphStats, ChangedFiles, FileIndex, IndexedFile, 
 pub async fn open(root: &Path) -> Result<FileIndex, libsql::Error> {
     let moss_dir = get_normalize_dir(root);
     let db_path = moss_dir.join("index.sqlite");
-    FileIndex::open(&db_path, root).await
+    let mut idx = FileIndex::open(&db_path, root).await?;
+    let config = NormalizeConfig::load(root);
+    idx.set_walk_config(config.walk);
+    Ok(idx)
 }
 
 /// Open index only if indexing is enabled in config.

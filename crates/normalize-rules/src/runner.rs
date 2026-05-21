@@ -1976,6 +1976,10 @@ async fn ensure_relations(root: &Path) -> Result<normalize_facts_rules_api::Rela
             let mut idx = normalize_facts::FileIndex::open(&db_path, root)
                 .await
                 .map_err(|e| format!("Failed to open index: {}", e))?;
+            // Load walk config from project config so the index walker respects
+            // exclude patterns (e.g. .normalize/, .git/).
+            let walk_config = load_walk_config(root);
+            idx.set_walk_config(walk_config);
             let count = idx
                 .refresh()
                 .await
@@ -2014,6 +2018,29 @@ fn get_normalize_dir(root: &Path) -> std::path::PathBuf {
         return data_home.join("normalize").join(&index_dir);
     }
     root.join(".normalize")
+}
+
+/// Load `[walk]` config from the project's `.normalize/config.toml`.
+///
+/// Falls back to a bootstrap default (exclude `.git/` and `.normalize/`) when
+/// the file is absent or malformed, so the index walker never descends into
+/// its own SQLite state.
+fn load_walk_config(root: &Path) -> normalize_rules_config::WalkConfig {
+    #[derive(serde::Deserialize, Default)]
+    struct MinimalConfig {
+        #[serde(default)]
+        walk: normalize_rules_config::WalkConfig,
+    }
+    let config_path = root.join(".normalize").join("config.toml");
+    if let Ok(contents) = std::fs::read_to_string(&config_path) {
+        if let Ok(cfg) = toml::from_str::<MinimalConfig>(&contents) {
+            return cfg.walk;
+        }
+    }
+    normalize_rules_config::WalkConfig {
+        exclude: Some(vec![".git/".to_string(), ".normalize/".to_string()]),
+        ..Default::default()
+    }
 }
 
 /// Build Relations from the file index.

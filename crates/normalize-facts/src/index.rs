@@ -5,6 +5,7 @@ use libsql::{Connection, Database, params};
 pub use normalize_facts_core::IndexedFile;
 use normalize_facts_core::{FlatImport, FlatSymbol, TypeRef};
 use normalize_languages::support_for_path;
+use normalize_rules_config::WalkConfig;
 use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -178,6 +179,9 @@ pub struct FileIndex {
     db: Database,
     root: PathBuf,
     progress: bool,
+    /// Walk configuration — controls which files/directories are visited during
+    /// `refresh` and `get_changed_files`. Set via [`FileIndex::set_walk_config`].
+    walk_config: WalkConfig,
     /// Content-addressed extraction cache (optional; best-effort).
     ca_cache: Option<crate::ca_cache::CaCache>,
 }
@@ -779,6 +783,7 @@ impl FileIndex {
             db,
             root: root.to_path_buf(),
             progress: false,
+            walk_config: WalkConfig::default(),
             ca_cache,
         })
     }
@@ -787,6 +792,15 @@ impl FileIndex {
     /// Only shows bars when stderr is a terminal.
     pub fn set_progress(&mut self, enabled: bool) {
         self.progress = enabled;
+    }
+
+    /// Set the walk configuration used by [`FileIndex::refresh`] and
+    /// [`FileIndex::get_changed_files`].
+    ///
+    /// Call this after `open` to propagate the project's `[walk]` config so the
+    /// index walkers respect the same `exclude` patterns as the rest of the system.
+    pub fn set_walk_config(&mut self, config: WalkConfig) {
+        self.walk_config = config;
     }
 
     /// Get a reference to the underlying SQLite connection for direct queries
@@ -812,13 +826,39 @@ impl FileIndex {
             }
         }
 
-        // Walk current filesystem
-        let walker = WalkBuilder::new(&self.root)
-            .hidden(false)
-            .git_ignore(true)
-            .git_global(true)
-            .git_exclude(true)
-            .build();
+        // Walk current filesystem using the project's WalkConfig so exclude
+        // patterns (e.g. `.normalize/`, `.git/`) are honoured — the same rules
+        // the rest of the system uses via gitignore_walk.
+        let walk_config = &self.walk_config;
+        let ignore_files = walk_config.ignore_files();
+        let has_gitignore = ignore_files.contains(&".gitignore");
+        let excludes = walk_config.compiled_excludes(&self.root);
+        let root_clone = self.root.clone();
+        let mut builder = WalkBuilder::new(&self.root);
+        builder.hidden(false);
+        builder.git_ignore(has_gitignore);
+        builder.git_global(has_gitignore);
+        builder.git_exclude(has_gitignore);
+        for file in &ignore_files {
+            if *file != ".gitignore" {
+                let ignore_path = self.root.join(file);
+                if ignore_path.exists() {
+                    builder.add_ignore(ignore_path);
+                }
+            }
+        }
+        builder.filter_entry(move |e| {
+            let path = e.path();
+            let rel = path.strip_prefix(&root_clone).unwrap_or(path);
+            if rel.as_os_str().is_empty() {
+                return true;
+            }
+            let is_dir = e.file_type().is_some_and(|ft| ft.is_dir());
+            !excludes
+                .matched_path_or_any_parents(rel, is_dir)
+                .is_ignore()
+        });
+        let walker = builder.build();
 
         let mut seen = std::collections::HashSet::new();
         for entry in walker.flatten() {
@@ -828,8 +868,7 @@ impl FileIndex {
             }
             if let Ok(rel) = path.strip_prefix(&self.root) {
                 let rel_str = rel.to_string_lossy().to_string();
-                // Skip internal directories
-                if rel_str.is_empty() || rel_str == ".git" || rel_str.starts_with(".git/") {
+                if rel_str.is_empty() {
                     continue;
                 }
                 seen.insert(rel_str.clone());
@@ -1093,12 +1132,37 @@ impl FileIndex {
 
     /// Refresh the index by walking the filesystem
     pub async fn refresh(&mut self) -> Result<usize, libsql::Error> {
-        let walker = WalkBuilder::new(&self.root)
-            .hidden(false)
-            .git_ignore(true)
-            .git_global(true)
-            .git_exclude(true)
-            .build();
+        // Build a config-driven walker that respects the project's WalkConfig
+        // (same exclude rules as gitignore_walk used everywhere else).
+        let ignore_files = self.walk_config.ignore_files();
+        let has_gitignore = ignore_files.contains(&".gitignore");
+        let excludes = self.walk_config.compiled_excludes(&self.root);
+        let root_clone = self.root.clone();
+        let mut builder = WalkBuilder::new(&self.root);
+        builder.hidden(false);
+        builder.git_ignore(has_gitignore);
+        builder.git_global(has_gitignore);
+        builder.git_exclude(has_gitignore);
+        for file in &ignore_files {
+            if *file != ".gitignore" {
+                let ignore_path = self.root.join(file);
+                if ignore_path.exists() {
+                    builder.add_ignore(ignore_path);
+                }
+            }
+        }
+        builder.filter_entry(move |e| {
+            let path = e.path();
+            let rel = path.strip_prefix(&root_clone).unwrap_or(path);
+            if rel.as_os_str().is_empty() {
+                return true;
+            }
+            let is_dir = e.file_type().is_some_and(|ft| ft.is_dir());
+            !excludes
+                .matched_path_or_any_parents(rel, is_dir)
+                .is_ignore()
+        });
+        let walker = builder.build();
 
         self.conn.execute("BEGIN", ()).await?;
 
@@ -1122,8 +1186,7 @@ impl FileIndex {
             let path = entry.path();
             if let Ok(rel) = path.strip_prefix(&self.root) {
                 let rel_str = rel.to_string_lossy().to_string();
-                // Skip internal directories
-                if rel_str.is_empty() || rel_str == ".git" || rel_str.starts_with(".git/") {
+                if rel_str.is_empty() {
                     continue;
                 }
 

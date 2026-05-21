@@ -172,7 +172,7 @@ impl NormalizeConfig {
     pub fn bootstrap() -> Self {
         Self {
             walk: normalize_rules_config::WalkConfig {
-                exclude: Some(vec![".git/".to_string()]),
+                exclude: Some(vec![".git/".to_string(), ".normalize/".to_string()]),
                 ..Default::default()
             },
             ..Default::default()
@@ -429,18 +429,18 @@ highlight = false
     #[test]
     fn test_walk_config_default() {
         // No .normalize/config.toml → load() returns bootstrap, which seeds
-        // [walk] exclude = [".git/"]. (`WalkConfig::default()` itself is empty.)
+        // [walk] exclude = [".git/", ".normalize/"]. (`WalkConfig::default()` itself is empty.)
         let dir = TempDir::new().unwrap();
         let config = NormalizeConfig::load(dir.path());
         assert_eq!(config.walk.ignore_files(), vec![".gitignore"]);
-        assert_eq!(config.walk.exclude(), vec![".git/"]);
+        assert_eq!(config.walk.exclude(), vec![".git/", ".normalize/"]);
     }
 
     #[test]
     fn test_bootstrap_carries_opinions() {
         // Bootstrap has the project-startup opinions; Default does not.
         let bootstrap = NormalizeConfig::bootstrap();
-        assert_eq!(bootstrap.walk.exclude(), vec![".git/"]);
+        assert_eq!(bootstrap.walk.exclude(), vec![".git/", ".normalize/"]);
 
         let default = NormalizeConfig::default();
         assert!(default.walk.exclude().is_empty());
@@ -451,7 +451,7 @@ highlight = false
         let dir = TempDir::new().unwrap();
         // No .normalize/ subdirectory at all.
         let config = NormalizeConfig::load(dir.path());
-        assert_eq!(config.walk.exclude(), vec![".git/"]);
+        assert_eq!(config.walk.exclude(), vec![".git/", ".normalize/"]);
     }
 
     #[test]
