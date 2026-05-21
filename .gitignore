@@ -1,3 +1,6 @@
+# Nix build output symlink
+/result
+
 # Documentation build
 site/
 docs/.vitepress/dist/
