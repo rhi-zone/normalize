@@ -20,6 +20,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`normalize kg write/walk` jq expressions now use `.metadata.links` consistently.**
+  Previously, jq transforms saw `links` as a top-level field (separate from `metadata`)
+  so `.metadata.links += [...]` would silently discard changes and `.metadata.links[].to`
+  would fail with a null-iteration error on units with no links. The jq-facing JSON
+  representation now always embeds `links` inside `metadata` as an array (empty when no
+  links exist), matching the on-disk YAML frontmatter format.
+
+- **`normalize kg` build: tree-sitter removed from flake devShell `buildInputs`.**
+  `tree-sitter` was in `buildInputs`, causing NixOS to add its include path to
+  `NIX_CFLAGS_COMPILE` which then leaked into `rust-lld`'s input list as a bare path,
+  producing "cannot open .../include: Is a directory" linker errors. Moved to PATH
+  via `shellHook` (same treatment as `musl.dev` in the prior fix).
+
 - **`normalize sessions ... --all-projects` now honors `CLAUDE_SESSIONS_DIR`.** The
   `list_all_project_dirs` helper previously hardcoded `~/.claude/projects`, so
   `--all-projects` ignored the env var that the rest of the session machinery

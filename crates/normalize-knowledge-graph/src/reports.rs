@@ -23,9 +23,23 @@ pub struct UnitReport {
 
 impl UnitReport {
     pub fn from_unit(unit: &Unit) -> Self {
+        // Embed links inside metadata for the report so that the rendered output
+        // and JSON representation are consistent with the jq-facing API (.metadata.links).
+        let metadata = if !unit.links.is_empty() {
+            let mut meta = match &unit.metadata {
+                serde_json::Value::Object(m) => m.clone(),
+                _ => serde_json::Map::new(),
+            };
+            let links_json =
+                serde_json::to_value(&unit.links).unwrap_or(serde_json::Value::Array(vec![]));
+            meta.insert("links".to_string(), links_json);
+            serde_json::Value::Object(meta)
+        } else {
+            unit.metadata.clone()
+        };
         Self {
             id: unit.id.clone(),
-            metadata: unit.metadata.clone(),
+            metadata,
             body: unit.body.clone(),
         }
     }

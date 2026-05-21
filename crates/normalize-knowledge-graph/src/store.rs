@@ -202,7 +202,85 @@ fn jq_run_all(
     Ok(results)
 }
 
+/// Produce a jq-facing JSON representation of a unit.
+///
+/// `links` is always embedded inside `metadata` (as an array, possibly empty) so that jq
+/// expressions like `.metadata.links[].to` work without null-guards on units without links.
+/// This is consistent with the user-facing API and the on-disk YAML frontmatter format.
+#[cfg(feature = "cli")]
+fn unit_to_jq_json(unit: &Unit) -> Result<serde_json::Value, String> {
+    let mut meta = match &unit.metadata {
+        serde_json::Value::Object(m) => m.clone(),
+        _ => serde_json::Map::new(),
+    };
+    let links_json = serde_json::to_value(&unit.links)
+        .map_err(|e| format!("Failed to serialize links: {}", e))?;
+    meta.insert("links".to_string(), links_json);
+    Ok(serde_json::json!({
+        "id": unit.id,
+        "metadata": serde_json::Value::Object(meta),
+        "body": unit.body,
+    }))
+}
+
+/// Parse a jq-facing JSON representation back into a `Unit`.
+///
+/// Extracts `links` from inside `metadata` (where jq expressions put them).
+#[cfg(feature = "cli")]
+fn jq_json_to_unit(value: serde_json::Value) -> Result<Unit, String> {
+    let obj = match value {
+        serde_json::Value::Object(m) => m,
+        other => {
+            return Err(format!(
+                "jq expression must return an object (got {})",
+                other
+            ));
+        }
+    };
+
+    let id = match obj.get("id") {
+        Some(serde_json::Value::String(s)) => s.clone(),
+        _ => {
+            return Err("jq result must have a string .id field".to_string());
+        }
+    };
+
+    let body = match obj.get("body") {
+        Some(serde_json::Value::String(s)) => s.clone(),
+        Some(other) => return Err(format!(".body must be a string, got {other}")),
+        None => String::new(),
+    };
+
+    let mut metadata = match obj.get("metadata") {
+        Some(serde_json::Value::Object(m)) => m.clone(),
+        Some(serde_json::Value::Null) | None => serde_json::Map::new(),
+        Some(other) => {
+            return Err(format!(".metadata must be an object, got {other}"));
+        }
+    };
+
+    let links = match metadata.remove("links") {
+        None | Some(serde_json::Value::Null) => vec![],
+        Some(v) => serde_json::from_value(v).map_err(|e| {
+            format!(
+                ".metadata.links must be an array of {{kind, to}} objects: {}",
+                e
+            )
+        })?,
+    };
+
+    Ok(Unit {
+        id,
+        metadata: serde_json::Value::Object(metadata),
+        links,
+        body,
+    })
+}
+
 /// Apply a jq expression to a unit (serialized as JSON).
+///
+/// The unit is presented to jq with `links` inside `metadata`, so expressions
+/// like `.metadata.links += [...]` work as expected.
 ///
 /// Returns:
 /// - `Ok(Some(unit))` — transform returned a unit-shaped object.
@@ -211,21 +289,12 @@ fn jq_run_all(
 #[cfg(feature = "cli")]
 pub fn apply_jq_transform(unit: &Unit, expr: &str) -> Result<Option<Unit>, String> {
     let filter = jq_compile(expr)?;
-    let unit_json =
-        serde_json::to_value(unit).map_err(|e| format!("Failed to serialize unit: {}", e))?;
+    let unit_json = unit_to_jq_json(unit)?;
     let result = jq_run_one(&filter, &unit_json)?;
 
     match result {
         serde_json::Value::Null => Ok(None),
-        other => {
-            let updated: Unit = serde_json::from_value(other).map_err(|e| {
-                format!(
-                    "jq expression must return a unit-shaped object (with id, metadata, body) or null: {}",
-                    e
-                )
-            })?;
-            Ok(Some(updated))
-        }
+        other => Ok(Some(jq_json_to_unit(other)?)),
     }
 }
 
@@ -236,8 +305,7 @@ pub fn eval_jq_predicate(unit: &Unit, predicate: &str) -> Result<bool, String> {
     use jaq_json::Val;
 
     let filter = jq_compile(predicate)?;
-    let unit_json =
-        serde_json::to_value(unit).map_err(|e| format!("Failed to serialize unit: {}", e))?;
+    let unit_json = unit_to_jq_json(unit)?;
     let val: Val = serde_json::from_value(unit_json)
         .map_err(|e| format!("Failed to convert unit to Val: {}", e))?;
 
@@ -269,8 +337,7 @@ pub fn walk_from(
     let filter = jq_compile(link_expr)?;
 
     let extract_ids = |unit: &Unit| -> Result<Vec<String>, String> {
-        let unit_json =
-            serde_json::to_value(unit).map_err(|e| format!("Failed to serialize unit: {}", e))?;
+        let unit_json = unit_to_jq_json(unit)?;
         let outputs = jq_run_all(&filter, &unit_json)?;
         let mut ids = Vec::new();
         for v in outputs {
