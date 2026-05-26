@@ -113,27 +113,9 @@ When unsure of syntax: `normalize <cmd> --help`. Fall back to Read only for exac
 
 **Maintain CHANGELOG.md.** User-facing changes go in `CHANGELOG.md` (Keep a Changelog format) as they land — not in a batch at release time. Add entries under `## [Unreleased]` when committing the feature. At release, rename `[Unreleased]` to the version and add a new empty `[Unreleased]` section. The release workflow body should link to or excerpt the changelog rather than duplicating install instructions as the primary content.
 
-## Context Is The Only Scarce Resource
-
-Every byte that enters the main session stays in the main session for its entire lifetime. File contents, command output, search results — once read, it lingers in cache and shapes every downstream token. There is no "just looking."
-
-**All exploration runs in subagents.** Investigations, surveys, audits, "let me check," "let me find" — if the purpose of a tool sequence is to find out something you don't yet know, it runs in a subagent. Renaming the activity does not change what it is. The subagent returns a distilled summary; the raw output stays in the subagent.
-
-**Inline-vs-agent is a hard rule, not a rule of thumb:**
-- Any edit that requires `cargo test`, `cargo clippy`, or `cargo build` → **always** an agent. No exceptions for "this one's small." Building a single crate compiles the rest of the workspace and pollutes the main context with hundreds of lines of warnings; a `cargo test` failure produces dozens of test names. The cost is identical whether the edit was 10 lines or 1000.
-- Codebase-wide analysis (architecture, patterns, cross-crate survey) → always subagent.
-- Any grep/read whose purpose is discovery rather than acting on a known result → always subagent. If you find yourself running a second grep to refine the first, you should have spawned a subagent.
-- Inline is reserved for: reading a known file at a known path, edits/writes you're committing to, a single targeted lookup whose result you'll act on immediately.
-
-The main session holds only the durable artifacts you are producing: the edit, the commit, the doc update.
-
 ## Commit Convention
 
 Conventional commits: `type(scope): message`. Scope recommended for multi-crate changes.
-
-## Discipline
-
-Corrections from the user are conversation, not material for new rules. A single correction does not warrant a CLAUDE.md edit. Rules are added when a failure mode is observed repeatedly and the rule names the failure it prevents.
 
 ## Hard Constraints
 
@@ -148,8 +130,6 @@ Do not:
 - Put node classification in Rust when a `.scm` query file fits — `*.calls.scm`, `*.complexity.scm` etc. Extraction (getting names/fields from identified nodes) stays in Rust. **This applies to runner-level filters too**, not just to first-class language traits. If you find yourself writing `if grammar_name == "rust" { ... }`, a `RUST_FOO_QUERY: &str = "..."` constant, or any other language-specific branch in a language-agnostic crate (e.g. `normalize-syntax-rules`), stop. The query goes in `crates/normalize-languages/src/queries/<lang>.<purpose>.scm` and gets loaded via `GrammarLoader` the same way `*.complexity.scm` and `*.tags.scm` are. The runner stays generic.
 - Add runner-wide filters that override every rule's behavior. Filtering decisions belong on the rule, not the runner. If you're tempted to write `findings.retain(|f| !is_in_test_region(f))` in the runner, instead add a metadata field to the rule (`applies_in_tests: bool`, etc.) and have the runner consult it. The runner's job is to dispatch and collect; deciding what to ignore is the rule's call.
 - Hardcode third-party-tool conventions in normalize source. `.claude/`, `node_modules/`, `__pycache__/`, `target/`, `.venv/` etc. are conventions of *consumers* of normalize (Claude Code, npm, Python, Cargo). They belong in **project config** — `.normalize/config.toml`, `.normalizeignore`, or wherever the project declares its own scope — not as constants in `normalize-native-rules`, `normalize-syntax-rules`, or any other library crate. The general rule: normalize knows about source code, ASTs, git, and SQLite. It does not know what Claude Code, ESLint, Prettier, npm, or any other tool stores where. If the answer to "should we exclude this path?" depends on what tool the user is running alongside normalize, the answer is "configure it in the project's normalize config", not "hardcode the path in a Rust constant."
-- Use path dependencies in Cargo.toml — causes clippy to stash changes across repos
-- Use `--no-verify` — fix the issue or fix the hook
 - Read mutable globals (env vars, `lazy_static`, `OnceLock` of writable state) at call sites
   for things that should be construction-time config. Pass dependencies in. A `Client::new()`
   that pulls a socket path from `std::env::var(...)` on every invocation looks fine until
@@ -183,3 +163,68 @@ non-zero code. Never silently return empty results.
 ## Code Conventions
 
 **OutputFormatter trait** (`crates/normalize/src/output.rs`): All report structs implement `format_text()` and optionally `format_pretty()`. See any report in `commands/analyze/` for examples. `--json`/`--jq`/`--jsonl` are automatic via server-less.
+
+<!-- BEGIN ECOSYSTEM RULES -->
+
+## Delegation
+
+The main session is an orchestrator. Allowed actions: `Agent`/`Task*`/`AskUserQuestion`/plan-mode/`ScheduleWakeup`, and Bash limited to `git commit`, `git push`, `git status`, `git log --oneline`. Everything else delegates to a subagent. The hook is evidence of a prompting failure, not a behavioral guide. If a tool call hits the hook AT ALL, the prompt failed to prevent it. Delegate before the decision point, not after.
+
+### Triggers
+
+Before calling Read, Grep, Glob, or any Bash beyond the four git commands — stop. Dispatch an Agent instead.
+
+Before editing any file — stop. Dispatch an Agent. This includes plan files in `~/.claude/plans/`: in plan mode, dispatch a subagent to write to the plan file; do not Write it yourself. The plan file's content must not enter main context.
+
+When you need git context beyond status/log-oneline (a diff, a blame, a show) — dispatch an Agent.
+
+When a tool call is denied by the hook — do not retry, do not narrate. Dispatch the equivalent Agent and continue.
+
+When a code-modifying subagent returns — `git status`, then `git commit` before any user-facing reply.
+
+Before dispatching an Agent that modifies code — scan your prompt for "do not commit" or "based on your findings". Delete them.
+
+Before dispatching: if your prompt says "if you find", "based on your findings", or "as appropriate" — stop. Investigate first; dispatch with the decision made.
+
+When you can't verify something — do not speculate or guess at file locations, names, or contents. Dispatch a Read subagent or ask. Confabulation is failure.
+
+### Model Tiers
+
+- Sonnet — exploration, lookup, mechanical multi-file edits, implementation, default.
+- Opus — architectural judgment, design, subagents that themselves spawn subagents.
+
+Always set `subagent_type` and `model` explicitly.
+
+### Prompt Rules
+
+- Never tell a subagent "do not commit." Code-modifying subagents commit their own work.
+- Don't ask for a diff summary. After a code-modifying subagent, `git status` in main and dispatch a review Agent if you need to see the diff.
+- Don't re-explain CLAUDE.md. Subagents inherit it.
+- Cite locations by content ("the block that does X"), not line numbers — files shift between reads.
+- Name files explicitly; don't outsource the grep.
+- Match agent type to deliverable: `Explore` for lookup/search, `general-purpose` for reports and file-modifying work.
+- On unsatisfying output, change something before retrying. Same prompt + same tier = same result.
+- Dispatch independent subagents in parallel (multiple Agent blocks in one message).
+- Pair `isolation: worktree` with `run_in_background: true`.
+- Code-modifying subagents must verify their own changes before returning (re-read the diff, run tests, etc.). The orchestrator does not get a second pass with git diff — that's hook-blocked.
+
+## Hard Constraints
+
+- No Edit/Write/NotebookEdit in main. Plan files in `~/.claude/plans/` are written by subagents, not by main.
+- No Read/Grep/Glob/NotebookRead in main. Delegate.
+- No Bash in main beyond `git commit`, `git push`, `git status`, `git log --oneline`.
+- No `--no-verify`. Fix the issue or fix the hook.
+- No path dependencies in `Cargo.toml` — they couple repos and break independent publishing.
+- No interactive git (no `git rebase -i`, no `git add -i`, no `--no-edit` on rebase).
+- No suggesting project names. LLMs are bad at this; refine the conceptual space only.
+- No tracking cross-project issues in conversation — they go in TODO.md in the affected repo.
+- No ecosystem changes without checking all affected repos.
+- No assuming a tool is missing without checking `nix develop`.
+- Commit completed work in the same turn it finishes. Uncommitted work is lost work.
+
+## Meta
+
+- Something unexpected is a signal. Stop and find out why. Do not accept the anomaly and proceed.
+- Corrections from the user are conversation, not material for new rules. Rules are added when a failure mode is observed repeatedly.
+
+<!-- END ECOSYSTEM RULES -->
