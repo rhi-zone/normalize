@@ -17,8 +17,10 @@
 //! ```
 
 mod cache;
+pub mod docs_rs;
 pub mod ecosystems;
 mod http;
+pub mod symbol_docs;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -313,6 +315,26 @@ pub trait Ecosystem: Send + Sync {
     /// Default implementation returns empty result (no audit tool available).
     fn audit(&self, project_root: &Path) -> Result<AuditResult, PackageError>;
 
+    /// Fetch documentation for a symbol from the upstream registry.
+    ///
+    /// `package` is the crate/package name (e.g. "serde").
+    /// `symbol_path` is the full dotted path (e.g. "serde::Serialize" or just "serde").
+    /// `version` is the exact version to fetch; `None` resolves to the latest.
+    ///
+    /// Default implementation returns `PackageError::ToolFailed` with a "not supported" message.
+    /// Override in ecosystem-specific implementations (Cargo only in this MVP).
+    fn fetch_symbol_docs(
+        &self,
+        _package: &str,
+        _symbol_path: &str,
+        _version: Option<&str>,
+    ) -> Result<symbol_docs::SymbolDoc, PackageError> {
+        Err(PackageError::ToolFailed(format!(
+            "fetch_symbol_docs is not supported for the '{}' ecosystem",
+            self.name()
+        )))
+    }
+
     /// Find the first available tool in PATH.
     fn find_tool(&self) -> Option<&'static str> {
         self.tools().iter().copied().find(|tool| which(tool))
@@ -403,3 +425,6 @@ pub use ecosystems::{
     all_ecosystems, detect_all_ecosystems, detect_ecosystem, get_ecosystem, list_ecosystems,
     register as register_ecosystem,
 };
+
+// Re-export SymbolDoc for convenience
+pub use symbol_docs::SymbolDoc;

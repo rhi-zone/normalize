@@ -3,6 +3,7 @@
 use crate::{
     AuditResult, DepSource, Dependency, DependencyTree, Ecosystem, Feature, LockfileManager,
     PackageError, PackageInfo, PackageQuery, TreeNode, Vulnerability, VulnerabilitySeverity,
+    symbol_docs::SymbolDoc,
 };
 use std::path::Path;
 use std::process::Command;
@@ -237,6 +238,15 @@ impl Ecosystem for Cargo {
             }
         }
         names
+    }
+
+    fn fetch_symbol_docs(
+        &self,
+        package: &str,
+        symbol_path: &str,
+        version: Option<&str>,
+    ) -> Result<SymbolDoc, PackageError> {
+        crate::docs_rs::fetch(package, symbol_path, version)
     }
 
     fn audit(&self, project_root: &Path) -> Result<AuditResult, PackageError> {

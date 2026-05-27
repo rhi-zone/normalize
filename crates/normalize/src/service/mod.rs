@@ -21,6 +21,7 @@ pub mod analyze;
 pub mod config;
 pub mod context;
 pub mod daemon;
+pub mod docs;
 pub mod edit;
 pub mod facts;
 pub mod generate;
@@ -770,6 +771,51 @@ impl NormalizeService {
     #[server(group = "utilities")]
     pub fn package(&self) -> &package::PackageService {
         &self.package
+    }
+
+    /// Fetch upstream symbol documentation into LLM context.
+    ///
+    /// Retrieves current documentation from docs.rs for Rust symbols and outputs a
+    /// Markdown block ready to paste into an LLM prompt. Results are cached in the
+    /// knowledge graph so repeat lookups are instant. Patches training-cutoff blind spots.
+    ///
+    /// Accepts Rust path syntax. Append `@version` to pin a specific version.
+    /// If invoked inside a Cargo project, the lockfile version is used automatically.
+    ///
+    /// Examples:
+    ///   normalize docs serde::Serialize
+    ///   normalize docs tokio::sync::Mutex
+    ///   normalize docs serde                           # crate-level docs
+    ///   normalize docs serde::Serialize@1.0.193       # pin a specific version
+    ///   normalize docs serde::Serialize --no-cache    # bypass local cache
+    #[server(group = "utilities")]
+    #[cli(display_with = "display_output")]
+    pub fn docs(
+        &self,
+        #[param(
+            positional,
+            help = "Symbol path, e.g. serde::Serialize or serde::Serialize@1.0.193"
+        )]
+        symbol: String,
+        #[param(
+            short = 'r',
+            help = "Root directory for lockfile lookup (defaults to current directory)"
+        )]
+        root: Option<String>,
+        #[param(help = "Bypass the local knowledge-graph cache and always fetch from the network")]
+        no_cache: bool,
+        pretty: bool,
+        compact: bool,
+    ) -> Result<docs::DocsReport, String> {
+        let root_path = root
+            .map(PathBuf::from)
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+
+        self.resolve_format(pretty, compact, &root_path);
+
+        docs::fetch_docs(&symbol, root_path, no_cache)
     }
 
     /// Review AI agent session logs. Use to check cost, duration, and tool usage across coding sessions.
