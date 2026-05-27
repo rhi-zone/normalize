@@ -2022,9 +2022,9 @@ fn get_normalize_dir(root: &Path) -> std::path::PathBuf {
 
 /// Load `[walk]` config from the project's `.normalize/config.toml`.
 ///
-/// Falls back to a bootstrap default (exclude `.git/` and `.normalize/`) when
-/// the file is absent or malformed, so the index walker never descends into
-/// its own SQLite state.
+/// Always applies the daemon baseline (`.git/`, `.normalize/`) via
+/// [`WalkConfig::with_daemon_baseline`] so the index walkers never descend
+/// into `.normalize/` even when the project config exists but omits `[walk]`.
 fn load_walk_config(root: &Path) -> normalize_rules_config::WalkConfig {
     #[derive(serde::Deserialize, Default)]
     struct MinimalConfig {
@@ -2034,9 +2034,10 @@ fn load_walk_config(root: &Path) -> normalize_rules_config::WalkConfig {
     let config_path = root.join(".normalize").join("config.toml");
     if let Ok(contents) = std::fs::read_to_string(&config_path) {
         if let Ok(cfg) = toml::from_str::<MinimalConfig>(&contents) {
-            return cfg.walk;
+            return cfg.walk.with_daemon_baseline();
         }
     }
+    // File absent or malformed — bootstrap default already has the baseline.
     normalize_rules_config::WalkConfig {
         exclude: Some(vec![".git/".to_string(), ".normalize/".to_string()]),
         ..Default::default()

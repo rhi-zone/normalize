@@ -384,6 +384,33 @@ impl WalkConfig {
         let gi = self.compiled_excludes(root);
         gi.matched_path_or_any_parents(rel_path, is_dir).is_ignore()
     }
+
+    /// Ensure the daemon-invariant baseline excludes are present.
+    ///
+    /// `.git/` and `.normalize/` are **always** excluded by daemon walkers,
+    /// regardless of whether the project has a `[walk]` section in its config.
+    /// Call this after loading a `WalkConfig` from a config file to guarantee
+    /// the invariant holds even when the file exists but omits `[walk]`.
+    ///
+    /// This is distinct from `NormalizeConfig::bootstrap`, which seeds new
+    /// projects. `with_daemon_baseline` is a safety net for the daemon's
+    /// index walkers — it prevents descending into `.normalize/` (where
+    /// `index.sqlite` lives) even when an existing config file has no
+    /// `[walk]` section, which would otherwise produce an empty exclude list
+    /// and cause an infinite walk-index-mutate-walk spin.
+    ///
+    /// Entries already present are not duplicated.
+    #[must_use]
+    pub fn with_daemon_baseline(mut self) -> Self {
+        const BASELINE: &[&str] = &[".git/", ".normalize/"];
+        let excludes = self.exclude.get_or_insert_with(Vec::new);
+        for &pat in BASELINE {
+            if !excludes.iter().any(|e| e == pat) {
+                excludes.push(pat.to_string());
+            }
+        }
+        self
+    }
 }
 
 /// Pre-walk path filter for `--only` / `--exclude` glob patterns.
@@ -850,6 +877,84 @@ exclude = [".git", "node_modules", ".cache"]
         let merged = a.merge(b);
         assert_eq!(merged.ignore_files(), vec![".npmignore"]);
         assert!(merged.exclude().is_empty()); // self's None → empty (default)
+    }
+
+    // -- WalkConfig::with_daemon_baseline -------------------------------------
+
+    #[test]
+    fn walk_config_daemon_baseline_on_empty() {
+        // Default (empty) config gets the baseline entries added.
+        let config = WalkConfig::default().with_daemon_baseline();
+        let excl = config.exclude();
+        assert!(excl.contains(&".git/"), "expected .git/ in {:?}", excl);
+        assert!(
+            excl.contains(&".normalize/"),
+            "expected .normalize/ in {:?}",
+            excl
+        );
+    }
+
+    #[test]
+    fn walk_config_daemon_baseline_no_duplication() {
+        // Already-present entries must not be duplicated.
+        let config = WalkConfig {
+            ignore_files: None,
+            exclude: Some(vec![".git/".into(), ".normalize/".into(), "vendor/".into()]),
+        }
+        .with_daemon_baseline();
+        let excl = config.exclude();
+        assert_eq!(excl.iter().filter(|&&e| e == ".git/").count(), 1);
+        assert_eq!(excl.iter().filter(|&&e| e == ".normalize/").count(), 1);
+        assert!(excl.contains(&"vendor/"));
+    }
+
+    #[test]
+    fn walk_config_daemon_baseline_preserves_user_excludes() {
+        // User-configured excludes must not be removed.
+        let config = WalkConfig {
+            ignore_files: None,
+            exclude: Some(vec!["node_modules".into(), "target/".into()]),
+        }
+        .with_daemon_baseline();
+        let excl = config.exclude();
+        assert!(excl.contains(&"node_modules"));
+        assert!(excl.contains(&"target/"));
+        assert!(excl.contains(&".git/"));
+        assert!(excl.contains(&".normalize/"));
+    }
+
+    #[test]
+    fn walk_config_daemon_baseline_on_config_without_walk_section() {
+        // Simulates the reproducer: config.toml exists but has no [walk] section.
+        // Parsing produces WalkConfig::default() (empty); with_daemon_baseline()
+        // must still enforce .git/ and .normalize/.
+        let toml_without_walk = r#"
+[daemon]
+# enabled = true
+
+[aliases]
+todo = ["TODO.md"]
+"#;
+        #[derive(serde::Deserialize, Default)]
+        struct MinimalConfig {
+            #[serde(default)]
+            walk: WalkConfig,
+        }
+        let parsed: MinimalConfig = toml::from_str(toml_without_walk).unwrap();
+        // Without baseline: empty (the bug)
+        assert!(
+            parsed.walk.exclude().is_empty(),
+            "pre-condition: parsed walk has no excludes"
+        );
+        // With baseline: both entries present (the fix)
+        let with_baseline = parsed.walk.with_daemon_baseline();
+        let excl = with_baseline.exclude();
+        assert!(excl.contains(&".git/"), "expected .git/ in {:?}", excl);
+        assert!(
+            excl.contains(&".normalize/"),
+            "expected .normalize/ in {:?}",
+            excl
+        );
     }
 
     // -- ConfigDiff -----------------------------------------------------------

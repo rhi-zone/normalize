@@ -478,4 +478,45 @@ exclude = [".git", "node_modules", ".cache"]
             vec![".git", "node_modules", ".cache"]
         );
     }
+
+    #[test]
+    fn test_config_file_without_walk_section_still_has_daemon_baseline() {
+        // Regression: a project with a config.toml that has no [walk] section
+        // previously produced an empty WalkConfig (WalkConfig::default), bypassing
+        // bootstrap and causing the daemon to walk into .normalize/ and spin.
+        // Applying with_daemon_baseline() after load() must fix this.
+        let dir = TempDir::new().unwrap();
+        let moss_dir = dir.path().join(".normalize");
+        std::fs::create_dir_all(&moss_dir).unwrap();
+
+        // Config exists but has no [walk] section — mirrors the reproducer projects
+        // (/home/me/git/busiless and /home/me/git/pterror/fuwafuwa).
+        std::fs::write(
+            moss_dir.join("config.toml"),
+            r#"
+[daemon]
+# enabled = true
+
+[aliases]
+todo = ["TODO.md"]
+"#,
+        )
+        .unwrap();
+
+        let config = NormalizeConfig::load(dir.path());
+        // Raw load produces empty walk config (no [walk] section → WalkConfig::default).
+        // The daemon callers must apply with_daemon_baseline() — verify it adds the required entries.
+        let with_baseline = config.walk.with_daemon_baseline();
+        let excludes = with_baseline.exclude();
+        assert!(
+            excludes.contains(&".git/"),
+            ".git/ must be excluded; got: {:?}",
+            excludes
+        );
+        assert!(
+            excludes.contains(&".normalize/"),
+            ".normalize/ must be excluded; got: {:?}",
+            excludes
+        );
+    }
 }

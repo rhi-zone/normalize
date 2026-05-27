@@ -20,6 +20,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Daemon no longer spins on projects with a `config.toml` that omits `[walk]`.** When
+  a project has a `.normalize/config.toml` with no `[walk]` section, the walker previously
+  resolved to an empty `WalkConfig` (bypassing the bootstrap defaults), descended into
+  `.normalize/`, mutated `index.sqlite`, and looped forever at ~22% CPU. Fixed by adding
+  `WalkConfig::with_daemon_baseline()` — called in all three daemon walk-config load paths
+  (`normalize/src/index.rs`, `normalize-facts/src/service.rs`,
+  `normalize-rules/src/runner.rs`) — which unconditionally ensures `.git/` and
+  `.normalize/` are in the exclusion list regardless of config file presence.
+
 - **`normalize kg write/walk` jq expressions now use `.metadata.links` consistently.**
   Previously, jq transforms saw `links` as a top-level field (separate from `metadata`)
   so `.metadata.links += [...]` would silently discard changes and `.metadata.links[].to`

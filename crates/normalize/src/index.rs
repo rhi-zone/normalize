@@ -17,7 +17,7 @@ pub async fn open(root: &Path) -> Result<FileIndex, libsql::Error> {
     let db_path = moss_dir.join("index.sqlite");
     let mut idx = FileIndex::open(&db_path, root).await?;
     let config = NormalizeConfig::load(root);
-    idx.set_walk_config(config.walk);
+    idx.set_walk_config(config.walk.with_daemon_baseline());
     Ok(idx)
 }
 
