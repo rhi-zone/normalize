@@ -82,18 +82,11 @@ cache/
 # Normalize - ignore .normalize/ in subdirectories (but not root)
 */**/.normalize/
 
-# Root .normalize/ - ignore all but config/allow files
+# Root .normalize/ - ignore all but config files
 /.normalize/*
 !/.normalize/config.toml
 !/.normalize/SUMMARY.md
 !/.normalize/rule-tests/
-!/.normalize/duplicate-functions-allow
-!/.normalize/duplicate-blocks-allow
-!/.normalize/duplicate-types-allow
-!/.normalize/similar-functions-allow
-!/.normalize/similar-blocks-allow
-!/.normalize/hotspots-allow
-!/.normalize/large-files-allow
 !/.normalize/kg/
 
 # Normalize
@@ -101,13 +94,6 @@ cache/
 !.normalize/config.toml
 !.normalize/SUMMARY.md
 !.normalize/rule-tests/
-!.normalize/duplicate-functions-allow
-!.normalize/duplicate-blocks-allow
-!.normalize/duplicate-types-allow
-!.normalize/similar-functions-allow
-!.normalize/similar-blocks-allow
-!.normalize/hotspots-allow
-!.normalize/large-files-allow
 !.normalize/memory/
 !.normalize/kg/
 .normalize/shadow
