@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 26
 expression: "snapshot_help(&[])"
 ---
 normalize - Structural code intelligence: index symbols and calls, enforce rules, track complexity.
@@ -39,6 +40,7 @@ Analysis:
 Utilities:
   aliases    List filter aliases. Use to see available shorthand names for --exclude/--only globs.
   translate  Convert code between programming languages. Use for porting or understanding unfamiliar syntax.
+  docs       Fetch upstream symbol documentation into LLM context.
   sync       Copy a project and its session metadata to a destination for portability.
   context    Inject project context into LLM prompts. Use to provide per-project instructions to agents.
   guide      Step-by-step workflow guides. Use when learning normalize or onboarding a new codebase.

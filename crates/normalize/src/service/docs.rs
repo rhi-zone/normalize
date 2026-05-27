@@ -1,7 +1,19 @@
 //! `normalize docs` — fetch upstream symbol documentation into LLM context.
 //!
-//! Looks up symbol docs from docs.rs for Cargo packages.
-//! Caches results in the knowledge graph so repeat lookups are instant.
+//! Looks up symbol docs from local Cargo source first, then falls back to
+//! docs.rs when the package is not available locally. Results are cached in the
+//! knowledge graph so repeat lookups are instant.
+//!
+//! ## Architecture
+//!
+//! Uses a two-trait coordinator pattern:
+//! - [`CargoLocalDocsExtractor`] resolves packages via `cargo metadata` and
+//!   parses doc comments from on-disk source. No network access.
+//! - [`DocsRsFetcher`] fetches from docs.rs as the remote fallback.
+//! - [`fetch_symbol_docs_with_fallback`] is the coordinator: local first, then remote.
+//!
+//! The `Ecosystem::fetch_symbol_docs` method on `Cargo` is retained for
+//! backward compatibility but routes through the coordinator.
 //!
 //! ## Cache
 //!
@@ -9,7 +21,10 @@
 //!   `docs-cargo-<pkg>-<ver>-<slug>`
 //! and are read back on subsequent invocations without touching the network.
 
-use normalize_ecosystems::{Ecosystem, PackageError, SymbolDoc, ecosystems::Cargo};
+use normalize_ecosystems::{
+    CargoLocalDocsExtractor, DocsError, DocsRsFetcher, Ecosystem, SymbolDoc, ecosystems::Cargo,
+    fetch_symbol_docs_with_fallback,
+};
 use normalize_knowledge_graph::{
     model::{Link, Unit},
     store::{ensure_kg_dir, kg_dir, read_unit, write_unit},
@@ -155,11 +170,17 @@ pub(crate) fn fetch_docs(
         }
     }
 
-    // Fetch from docs.rs
-    let cargo = Cargo;
-    let doc = cargo
-        .fetch_symbol_docs(&package, &symbol_path, version.as_deref())
-        .map_err(|e| format_docs_error(&e, &symbol_path))?;
+    // Coordinator: local-first (cargo metadata + source parsing), then docs.rs fallback
+    let local = CargoLocalDocsExtractor::new(&root_path);
+    let remote = DocsRsFetcher;
+    let doc = fetch_symbol_docs_with_fallback(
+        &local,
+        &remote,
+        &package,
+        &symbol_path,
+        version.as_deref(),
+    )
+    .map_err(|e| format_docs_error_new(&e, &symbol_path))?;
 
     // Write to KG cache (best-effort)
     if !no_cache {
@@ -178,14 +199,14 @@ pub(crate) fn fetch_docs(
     })
 }
 
-pub(crate) fn format_docs_error(e: &PackageError, symbol_path: &str) -> String {
+pub(crate) fn format_docs_error_new(e: &DocsError, symbol_path: &str) -> String {
     match e {
-        PackageError::NotFound(_) => format!(
+        DocsError::NotFound(_) => format!(
             "Symbol '{}' not found. Check the crate name, symbol path, and version.",
             symbol_path
         ),
-        PackageError::RegistryError(msg) => format!("docs.rs error: {}", msg),
-        PackageError::ParseError(msg) => format!("Parse error fetching '{}': {}", symbol_path, msg),
-        _ => format!("Error fetching '{}': {}", symbol_path, e),
+        DocsError::NetworkError(msg) => format!("docs.rs error: {}", msg),
+        DocsError::ParseError(msg) => format!("Parse error fetching '{}': {}", symbol_path, msg),
+        DocsError::ToolFailed(msg) => format!("Tool error for '{}': {}", symbol_path, msg),
     }
 }

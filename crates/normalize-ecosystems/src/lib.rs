@@ -20,6 +20,7 @@ mod cache;
 pub mod docs_rs;
 pub mod ecosystems;
 mod http;
+pub mod local_docs;
 pub mod symbol_docs;
 
 use schemars::JsonSchema;
@@ -259,6 +260,120 @@ impl std::fmt::Display for PackageError {
 impl std::error::Error for PackageError {}
 
 // ============================================================================
+// Docs extraction traits and coordinator
+// ============================================================================
+
+/// Error type for documentation extraction and fetching.
+#[derive(Debug)]
+pub enum DocsError {
+    /// The requested symbol or package was not found.
+    NotFound(String),
+    /// A local tool (e.g. `cargo metadata`) failed to run or returned an error.
+    ToolFailed(String),
+    /// Parsing of source or remote response failed.
+    ParseError(String),
+    /// A network error occurred while fetching remote docs.
+    NetworkError(String),
+}
+
+impl std::fmt::Display for DocsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DocsError::NotFound(msg) => write!(f, "not found: {}", msg),
+            DocsError::ToolFailed(msg) => write!(f, "tool failed: {}", msg),
+            DocsError::ParseError(msg) => write!(f, "parse error: {}", msg),
+            DocsError::NetworkError(msg) => write!(f, "network error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for DocsError {}
+
+/// Convert a [`PackageError`] into a [`DocsError`] (used by the remote fetcher adapter).
+impl From<PackageError> for DocsError {
+    fn from(e: PackageError) -> Self {
+        match e {
+            PackageError::NotFound(msg) => DocsError::NotFound(msg),
+            PackageError::ToolFailed(msg) => DocsError::ToolFailed(msg),
+            PackageError::ParseError(msg) => DocsError::ParseError(msg),
+            PackageError::RegistryError(msg) => DocsError::NetworkError(msg),
+            PackageError::NoToolFound => DocsError::ToolFailed("no tool found".to_string()),
+        }
+    }
+}
+
+/// Per-language/ecosystem extractor that reads doc comments from on-disk source.
+///
+/// Implementations resolve the package to its on-disk source directory (via the
+/// package manager's metadata command), then parse doc comments from the source.
+///
+/// # Implementing for a new ecosystem
+///
+/// 1. Implement this trait for your language (e.g. `NpmLocalDocsExtractor`).
+/// 2. In `extract_docs`, resolve `package` to the on-disk source via the
+///    ecosystem's metadata tool (e.g. `npm list --json`, `go list`, etc.).
+/// 3. Walk the module tree to find `symbol_path` and extract doc comments.
+pub trait LocalDocsExtractor: Send + Sync {
+    /// Extract documentation for `symbol_path` from on-disk source.
+    ///
+    /// `package` is the package/crate name (e.g. `"serde"`).
+    /// `symbol_path` is the full dotted path (e.g. `"serde::Serialize"`).
+    /// `version` is the exact version; `None` means "whatever is locally present".
+    fn extract_docs(
+        &self,
+        package: &str,
+        symbol_path: &str,
+        version: Option<&str>,
+    ) -> Result<symbol_docs::SymbolDoc, DocsError>;
+}
+
+/// Per-ecosystem fetcher that retrieves docs from a remote registry / docs site.
+///
+/// Used as the fallback when [`LocalDocsExtractor`] fails (e.g. the package is
+/// not installed locally, or no Cargo.lock is present).
+///
+/// # Implementing for a new ecosystem
+///
+/// Implement `fetch_docs` to hit the appropriate remote docs source (docs.rs,
+/// pkg.go.dev, PyPI, npm.runkit.com, etc.) and return a populated [`SymbolDoc`].
+pub trait RemoteDocsFetcher: Send + Sync {
+    /// Fetch documentation for `symbol_path` from a remote source.
+    fn fetch_docs(
+        &self,
+        package: &str,
+        symbol_path: &str,
+        version: Option<&str>,
+    ) -> Result<symbol_docs::SymbolDoc, DocsError>;
+}
+
+/// Coordinator: try local extraction first, fall back to remote on any error.
+///
+/// This is the single entry-point that the CLI and KG cache layer call.
+/// The caller is responsible for cache lookup *before* this and cache write
+/// *after* (the coordinator itself is cache-unaware).
+pub fn fetch_symbol_docs_with_fallback(
+    local: &dyn LocalDocsExtractor,
+    remote: &dyn RemoteDocsFetcher,
+    package: &str,
+    symbol_path: &str,
+    version: Option<&str>,
+) -> Result<symbol_docs::SymbolDoc, DocsError> {
+    match local.extract_docs(package, symbol_path, version) {
+        Ok(doc) => Ok(doc),
+        Err(local_err) => {
+            // Local failed — try remote
+            remote
+                .fetch_docs(package, symbol_path, version)
+                .map_err(|remote_err| {
+                    // Both failed: surface the remote error (usually more informative)
+                    // but annotate with the local reason
+                    DocsError::NotFound(format!("local: {}; remote: {}", local_err, remote_err))
+                })
+        }
+    }
+}
+
+// ============================================================================
 // Ecosystem trait
 // ============================================================================
 
@@ -428,3 +543,7 @@ pub use ecosystems::{
 
 // Re-export SymbolDoc for convenience
 pub use symbol_docs::SymbolDoc;
+
+// Re-export docs traits and coordinator
+pub use docs_rs::DocsRsFetcher;
+pub use local_docs::CargoLocalDocsExtractor;

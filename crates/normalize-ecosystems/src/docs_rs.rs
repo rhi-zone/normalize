@@ -6,8 +6,27 @@
 //!    (trait, struct, fn, enum, type, module/crate root).
 //! 3. Fetch and parse the rustdoc HTML page.
 //! 4. Extract: signature, doc text, code examples.
+//!
+//! Used as the [`RemoteDocsFetcher`] fallback for Cargo in the local-first
+//! coordinator ([`crate::fetch_symbol_docs_with_fallback`]).
 
-use crate::{PackageError, symbol_docs::SymbolDoc};
+use crate::{DocsError, PackageError, RemoteDocsFetcher, symbol_docs::SymbolDoc};
+
+// ── RemoteDocsFetcher impl ────────────────────────────────────────────────────
+
+/// docs.rs fetcher — the remote fallback for Cargo symbol docs.
+pub struct DocsRsFetcher;
+
+impl RemoteDocsFetcher for DocsRsFetcher {
+    fn fetch_docs(
+        &self,
+        package: &str,
+        symbol_path: &str,
+        version: Option<&str>,
+    ) -> Result<SymbolDoc, DocsError> {
+        fetch(package, symbol_path, version).map_err(DocsError::from)
+    }
+}
 
 /// User-agent sent with all docs.rs / crates.io requests.
 const USER_AGENT: &str = "normalize-docs-fetch/0 (https://github.com/rhi-zone/normalize)";
