@@ -430,24 +430,40 @@ pub trait Ecosystem: Send + Sync {
     /// Default implementation returns empty result (no audit tool available).
     fn audit(&self, project_root: &Path) -> Result<AuditResult, PackageError>;
 
-    /// Fetch documentation for a symbol from the upstream registry.
+    /// Local documentation extractor for this ecosystem, if any.
     ///
-    /// `package` is the crate/package name (e.g. "serde").
-    /// `symbol_path` is the full dotted path (e.g. "serde::Serialize" or just "serde").
-    /// `version` is the exact version to fetch; `None` resolves to the latest.
+    /// Returns a [`LocalDocsExtractor`] that reads doc comments from on-disk
+    /// source (resolved via the ecosystem's metadata tool). `None` means the
+    /// ecosystem has no local extraction path.
+    fn docs_extractor(&self, _project_root: &Path) -> Option<Box<dyn LocalDocsExtractor>> {
+        None
+    }
+
+    /// Remote documentation fetcher for this ecosystem, if any.
     ///
-    /// Default implementation returns `PackageError::ToolFailed` with a "not supported" message.
-    /// Override in ecosystem-specific implementations (Cargo only in this MVP).
-    fn fetch_symbol_docs(
-        &self,
-        _package: &str,
-        _symbol_path: &str,
-        _version: Option<&str>,
-    ) -> Result<symbol_docs::SymbolDoc, PackageError> {
-        Err(PackageError::ToolFailed(format!(
-            "fetch_symbol_docs is not supported for the '{}' ecosystem",
-            self.name()
-        )))
+    /// Returns a [`RemoteDocsFetcher`] that retrieves docs from a remote
+    /// registry / docs site (docs.rs, pkg.go.dev, etc.). `None` means the
+    /// ecosystem has no remote fetch path.
+    fn docs_fetcher(&self) -> Option<Box<dyn RemoteDocsFetcher>> {
+        None
+    }
+
+    /// Split a doc query symbol into `(package, symbol_path)`.
+    ///
+    /// `symbol` is the user-supplied symbol (version already stripped), e.g.
+    /// `"serde::Serialize"`. Returns the package/crate name and the full symbol
+    /// path. `None` means the ecosystem cannot interpret this symbol syntax.
+    fn package_from_symbol(&self, _symbol: &str) -> Option<(String, String)> {
+        None
+    }
+
+    /// Source-code language for docs produced by this ecosystem (e.g. "rust").
+    ///
+    /// Used to construct the knowledge-graph cache ID before a doc is fetched.
+    /// Defaults to [`Ecosystem::name`]; override when the ecosystem name and the
+    /// language differ (e.g. "cargo" → "rust").
+    fn docs_language(&self) -> &'static str {
+        self.name()
     }
 
     /// Find the first available tool in PATH.

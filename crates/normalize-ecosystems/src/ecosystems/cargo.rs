@@ -1,9 +1,9 @@
 //! Cargo (Rust) ecosystem.
 
 use crate::{
-    AuditResult, DepSource, Dependency, DependencyTree, Ecosystem, Feature, LockfileManager,
-    PackageError, PackageInfo, PackageQuery, TreeNode, Vulnerability, VulnerabilitySeverity,
-    symbol_docs::SymbolDoc,
+    AuditResult, CargoLocalDocsExtractor, DepSource, Dependency, DependencyTree, DocsRsFetcher,
+    Ecosystem, Feature, LocalDocsExtractor, LockfileManager, PackageError, PackageInfo,
+    PackageQuery, RemoteDocsFetcher, TreeNode, Vulnerability, VulnerabilitySeverity,
 };
 use std::path::Path;
 use std::process::Command;
@@ -240,13 +240,26 @@ impl Ecosystem for Cargo {
         names
     }
 
-    fn fetch_symbol_docs(
-        &self,
-        package: &str,
-        symbol_path: &str,
-        version: Option<&str>,
-    ) -> Result<SymbolDoc, PackageError> {
-        crate::docs_rs::fetch(package, symbol_path, version)
+    fn docs_extractor(&self, project_root: &Path) -> Option<Box<dyn LocalDocsExtractor>> {
+        Some(Box::new(CargoLocalDocsExtractor::new(project_root)))
+    }
+
+    fn docs_fetcher(&self) -> Option<Box<dyn RemoteDocsFetcher>> {
+        Some(Box::new(DocsRsFetcher))
+    }
+
+    fn package_from_symbol(&self, symbol: &str) -> Option<(String, String)> {
+        // Rust path syntax: first `::` segment is the crate, the whole thing is
+        // the symbol path (e.g. "serde::Serialize" → ("serde", "serde::Serialize")).
+        let package = symbol.split("::").next().unwrap_or(symbol);
+        if package.is_empty() {
+            return None;
+        }
+        Some((package.to_string(), symbol.to_string()))
+    }
+
+    fn docs_language(&self) -> &'static str {
+        "rust"
     }
 
     fn audit(&self, project_root: &Path) -> Result<AuditResult, PackageError> {

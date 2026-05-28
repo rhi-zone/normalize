@@ -1,19 +1,19 @@
 //! `normalize docs` — fetch upstream symbol documentation into LLM context.
 //!
-//! Looks up symbol docs from local Cargo source first, then falls back to
-//! docs.rs when the package is not available locally. Results are cached in the
-//! knowledge graph so repeat lookups are instant.
+//! Dispatch is generic over [`Ecosystem`]: the resolved ecosystem supplies an
+//! optional [`LocalDocsExtractor`] and [`RemoteDocsFetcher`] via trait methods.
+//! For Cargo this means local Cargo source first, then docs.rs fallback. Results
+//! are cached in the knowledge graph so repeat lookups are instant.
 //!
 //! ## Architecture
 //!
-//! Uses a two-trait coordinator pattern:
-//! - [`CargoLocalDocsExtractor`] resolves packages via `cargo metadata` and
-//!   parses doc comments from on-disk source. No network access.
-//! - [`DocsRsFetcher`] fetches from docs.rs as the remote fallback.
-//! - [`fetch_symbol_docs_with_fallback`] is the coordinator: local first, then remote.
-//!
-//! The `Ecosystem::fetch_symbol_docs` method on `Cargo` is retained for
-//! backward compatibility but routes through the coordinator.
+//! Uses a two-trait coordinator pattern, both surfaces obtained from the
+//! [`Ecosystem`] trait (`docs_extractor` / `docs_fetcher`):
+//! - A `LocalDocsExtractor` resolves packages via the ecosystem's metadata tool
+//!   and parses doc comments from on-disk source. No network access.
+//! - A `RemoteDocsFetcher` fetches from a remote docs site as the fallback.
+//! - [`fetch_symbol_docs_with_fallback`] is the coordinator: local first, then
+//!   remote, used when the ecosystem exposes both.
 //!
 //! ## Cache
 //!
@@ -22,8 +22,8 @@
 //! and are read back on subsequent invocations without touching the network.
 
 use normalize_ecosystems::{
-    CargoLocalDocsExtractor, DocFormat, DocsError, DocsRsFetcher, Ecosystem, SymbolDoc,
-    docs_rs::html_to_markdown, ecosystems::Cargo, fetch_symbol_docs_with_fallback,
+    DocFormat, DocsError, Ecosystem, SymbolDoc, detect_all_ecosystems, docs_rs::html_to_markdown,
+    fetch_symbol_docs_with_fallback, get_ecosystem,
 };
 use normalize_knowledge_graph::{
     model::{Link, Unit},
@@ -111,18 +111,6 @@ pub(crate) fn parse_docs_query(input: &str) -> (String, Option<String>) {
     }
 }
 
-/// Extract the crate name from a symbol path like "serde::Serialize" → "serde".
-pub(crate) fn crate_name_from_path(symbol_path: &str) -> &str {
-    symbol_path.split("::").next().unwrap_or(symbol_path)
-}
-
-/// Find `Cargo.lock` walking up from `start` and return the pinned version of
-/// `package` if present.
-pub(crate) fn locked_version(package: &str, start: &std::path::Path) -> Option<String> {
-    let cargo = Cargo;
-    cargo.installed_version(package, start)
-}
-
 /// Store a `SymbolDoc` as a KG unit. Silently ignores errors (cache is best-effort).
 pub(crate) fn cache_write(normalize_dir: &std::path::Path, doc: &SymbolDoc) {
     let Ok(kg) = ensure_kg_dir(normalize_dir) else {
@@ -172,16 +160,69 @@ pub(crate) fn cache_read_doc(normalize_dir: &std::path::Path, doc_id: &str) -> O
     })
 }
 
+/// Resolve which ecosystem services a docs query.
+///
+/// When `ecosystem` is given, look it up by name. Otherwise detect ecosystems
+/// in `root_path` and keep only docs-capable ones (those exposing a local
+/// extractor or remote fetcher). Exactly one match is required.
+fn resolve_docs_ecosystem(
+    ecosystem: Option<&str>,
+    root_path: &std::path::Path,
+) -> Result<&'static dyn Ecosystem, String> {
+    if let Some(name) = ecosystem {
+        let eco = get_ecosystem(name)
+            .ok_or_else(|| format!("Unknown ecosystem '{name}'. Run `normalize package` for the list of supported ecosystems."))?;
+        if eco.docs_extractor(root_path).is_none() && eco.docs_fetcher().is_none() {
+            return Err(format!(
+                "Documentation is not supported for the '{name}' ecosystem."
+            ));
+        }
+        return Ok(eco);
+    }
+
+    let capable: Vec<&'static dyn Ecosystem> = detect_all_ecosystems(root_path)
+        .into_iter()
+        .filter(|e| e.docs_extractor(root_path).is_some() || e.docs_fetcher().is_some())
+        .collect();
+
+    match capable.as_slice() {
+        [] => Err("No docs-capable ecosystem detected in this directory. \
+             Pass --ecosystem <name> to select one (e.g. --ecosystem cargo)."
+            .to_string()),
+        [one] => Ok(*one),
+        many => {
+            let names: Vec<&str> = many.iter().map(|e| e.name()).collect();
+            Err(format!(
+                "Multiple docs-capable ecosystems detected ({}). \
+                 Pass --ecosystem <name> to disambiguate.",
+                names.join(", ")
+            ))
+        }
+    }
+}
+
 pub(crate) fn fetch_docs(
     symbol: &str,
     root_path: PathBuf,
     no_cache: bool,
+    ecosystem: Option<String>,
 ) -> Result<DocsReport, String> {
-    let (symbol_path, explicit_version) = parse_docs_query(symbol);
-    let package = crate_name_from_path(&symbol_path).to_string();
+    let (symbol_query, explicit_version) = parse_docs_query(symbol);
 
-    // Resolve version: explicit > lockfile > None (latest)
-    let version: Option<String> = explicit_version.or_else(|| locked_version(&package, &root_path));
+    let eco = resolve_docs_ecosystem(ecosystem.as_deref(), &root_path)?;
+
+    // Generic symbol → (package, symbol_path) split via the ecosystem.
+    let (package, symbol_path) = eco.package_from_symbol(&symbol_query).ok_or_else(|| {
+        format!(
+            "Could not parse '{symbol_query}' as a {} symbol. \
+             Expected a package-qualified path (e.g. serde::Serialize).",
+            eco.name()
+        )
+    })?;
+
+    // Resolve version: explicit > installed (lockfile) > None (latest)
+    let version: Option<String> =
+        explicit_version.or_else(|| eco.installed_version(&package, &root_path));
 
     // Cache lookup (only when version is known)
     let normalize_dir = root_path.join(".normalize");
@@ -189,7 +230,7 @@ pub(crate) fn fetch_docs(
         if let Some(ver) = &version {
             let temp_doc = SymbolDoc {
                 name: String::new(),
-                language: "rust".to_string(),
+                language: eco.docs_language().to_string(),
                 package: package.clone(),
                 version: ver.clone(),
                 symbol_path: symbol_path.clone(),
@@ -208,16 +249,20 @@ pub(crate) fn fetch_docs(
         }
     }
 
-    // Coordinator: local-first (cargo metadata + source parsing), then docs.rs fallback
-    let local = CargoLocalDocsExtractor::new(&root_path);
-    let remote = DocsRsFetcher;
-    let doc = fetch_symbol_docs_with_fallback(
-        &local,
-        &remote,
-        &package,
-        &symbol_path,
-        version.as_deref(),
-    )
+    // Dispatch generically over whichever doc surfaces the ecosystem exposes.
+    let local = eco.docs_extractor(&root_path);
+    let remote = eco.docs_fetcher();
+    let doc = match (local.as_deref(), remote.as_deref()) {
+        (Some(l), Some(r)) => {
+            fetch_symbol_docs_with_fallback(l, r, &package, &symbol_path, version.as_deref())
+        }
+        (Some(l), None) => l.extract_docs(&package, &symbol_path, version.as_deref()),
+        (None, Some(r)) => r.fetch_docs(&package, &symbol_path, version.as_deref()),
+        (None, None) => Err(DocsError::ToolFailed(format!(
+            "docs are not supported for the '{}' ecosystem",
+            eco.name()
+        ))),
+    }
     .map_err(|e| format_docs_error_new(&e, &symbol_path))?;
 
     // Write to KG cache (best-effort)

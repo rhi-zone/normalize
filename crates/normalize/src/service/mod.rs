@@ -802,6 +802,11 @@ impl NormalizeService {
             help = "Root directory for lockfile lookup (defaults to current directory)"
         )]
         root: Option<String>,
+        #[param(
+            short = 'e',
+            help = "Ecosystem to query (e.g. cargo); auto-detected from the project when omitted"
+        )]
+        ecosystem: Option<String>,
         #[param(help = "Bypass the local knowledge-graph cache and always fetch from the network")]
         no_cache: bool,
         pretty: bool,
@@ -815,7 +820,7 @@ impl NormalizeService {
 
         self.resolve_format(pretty, compact, &root_path);
 
-        docs::fetch_docs(&symbol, root_path, no_cache)
+        docs::fetch_docs(&symbol, root_path, no_cache, ecosystem)
     }
 
     /// Review AI agent session logs. Use to check cost, duration, and tool usage across coding sessions.
