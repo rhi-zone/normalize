@@ -16,6 +16,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Daemon logs to a file and self-detects spin loops.** Auto-started daemons previously ran
+  with stdout/stderr connected to `/dev/null`, so all `tracing` output — including the runaway
+  re-index "spin" that burned CPU for hours — was silently discarded. The daemon now routes its
+  logs to `~/.config/normalize/daemon.log` (same dir as the socket/lock; honors
+  `NORMALIZE_DAEMON_CONFIG_DIR`) when auto-started; foreground `daemon run` still logs to the
+  terminal. In addition, the daemon now watches for the spin signal directly: when a refresh's
+  changed-file set overlaps the root's own index/state directory at high density (≥5 refreshes in
+  10s), it flags the root, backs off refreshes for that root for 30s (per-root, never global),
+  emits a WARN, and records a structured spin warning surfaced by `normalize daemon status`.
+  Indexing is never silently dropped — backoff plus a loud, visible warning only.
+
 - **`normalize kg` knowledge graph** — new `normalize-knowledge-graph` crate with v0 primitives: unit CRUD (`create`/`get`/`set`/`append`/`delete`), edge management (`link`/`unlink`/`edges`), and query/traversal (`query`/`neighbors`/`show`). Filesystem-backed in `.normalize/kg/` with YAML frontmatter units and per-unit `links` arrays. Dotted-path metadata matching (e.g. `--match anchors.symbol=Frobnicator`). BFS neighbor traversal at configurable depth.
 
 ### Fixed

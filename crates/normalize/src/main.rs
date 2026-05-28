@@ -119,15 +119,35 @@ fn reset_sigpipe() {}
 async fn main() -> std::process::ExitCode {
     reset_sigpipe();
 
-    tracing_subscriber::fmt()
-        .without_time()
-        .with_target(false)
-        .with_level(false)
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .init();
+    // Auto-started daemons run with stdout/stderr connected to /dev/null, so
+    // their tracing output would be silently discarded. When this process is a
+    // spawned daemon (NORMALIZE_DAEMON_LOG is set), route logs to a file sink so
+    // WARN/ERROR — including spin-loop detection — survive. Foreground
+    // `daemon run` and all other invocations keep logging to stderr.
+    let env_filter = || {
+        tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"))
+    };
+    #[cfg(unix)]
+    let daemon_log = normalize::daemon::open_daemon_log_writer();
+    #[cfg(not(unix))]
+    let daemon_log: Option<std::fs::File> = None;
+    if let Some(log_file) = daemon_log {
+        // File sink: keep timestamps + level + target (this is a long-lived
+        // process whose log is read after the fact, unlike interactive output).
+        tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_writer(std::sync::Mutex::new(log_file))
+            .with_env_filter(env_filter())
+            .init();
+    } else {
+        tracing_subscriber::fmt()
+            .without_time()
+            .with_target(false)
+            .with_level(false)
+            .with_env_filter(env_filter())
+            .init();
+    }
 
     let argv: Vec<std::ffi::OsString> = std::env::args_os().collect();
 

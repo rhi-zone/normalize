@@ -171,6 +171,20 @@ second look — none are blocking, none are strictly committed:
   agent who chased it called it transient (possibly inotify saturation
   under parallel test load). Watch for recurrences.
 
+- [x] **Daemon spin observability + self-defense** (follow-up to commit
+  365f9ee6, which fixed the acute walk-exclude cause). Two features landed:
+  (1) auto-started daemons now log to `~/.config/normalize/daemon.log` instead
+  of `/dev/null` (the reason both spins went unnoticed) — keyed off
+  `NORMALIZE_DAEMON_LOG` set on the spawned child; foreground `daemon run`
+  still logs to the terminal. (2) overlap-based spin detector: when a refresh's
+  changed-set overlaps the root's own state dir (config-derived via
+  `get_normalize_dir`) at ≥5 refreshes/10s, the daemon flags the root, backs
+  off refreshes for 30s (per-root), WARNs, and records a `SpinWarning` surfaced
+  by `daemon status`. Indexing is never silently dropped — backoff + loud warning
+  only. Follow-up corner cut: log file is append-only with no rotation
+  (`tracing-appender` not yet a dep); add daily rotation if the file grows
+  unbounded in practice.
+
 ## Structured-metadata symbol search (0.4 design)
 
 Replaces the embedding-based symbol search dropped in 0.3.0. The design sits

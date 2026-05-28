@@ -24,6 +24,28 @@ pub struct DaemonStatus {
     /// Number of project roots currently being watched, if available.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub roots_watched: Option<u64>,
+    /// Spin-loop detections recorded by the daemon. Each entry means the daemon
+    /// caught itself re-indexing its own state directory in a tight loop and
+    /// backed off. Empty in the normal case. This is the user-facing channel for
+    /// the spin failure mode, since the auto-started daemon's logs go to a file.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub spin_warnings: Vec<SpinWarningReport>,
+}
+
+/// A single spin-loop detection surfaced in `normalize daemon status`.
+#[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct SpinWarningReport {
+    /// The watched root that was re-indexing its own state directory.
+    pub root: String,
+    /// Overlapping paths inside the root's own state dir that triggered detection.
+    #[serde(default)]
+    pub overlapping_paths: Vec<String>,
+    /// Number of refreshes observed in the detection window.
+    #[serde(default)]
+    pub refresh_count: u64,
+    /// Daemon uptime in seconds at detection time.
+    #[serde(default)]
+    pub at_uptime_secs: u64,
 }
 
 impl OutputFormatter for DaemonStatus {
@@ -44,7 +66,32 @@ impl OutputFormatter for DaemonStatus {
             let _ = writeln!(out, "  Uptime: {} seconds", uptime);
         }
         if let Some(roots) = self.roots_watched {
-            let _ = write!(out, "  Roots watched: {}", roots);
+            let _ = writeln!(out, "  Roots watched: {}", roots);
+        }
+        if self.spin_warnings.is_empty() {
+            // Trim trailing newline from the last writeln above.
+            while out.ends_with('\n') {
+                out.pop();
+            }
+        } else {
+            let _ = writeln!(
+                out,
+                "  Spin warnings: {} (daemon caught itself re-indexing its own state dir)",
+                self.spin_warnings.len()
+            );
+            for w in &self.spin_warnings {
+                let _ = writeln!(
+                    out,
+                    "    - {} ({} refreshes/window, at {}s uptime)",
+                    w.root, w.refresh_count, w.at_uptime_secs
+                );
+                for p in &w.overlapping_paths {
+                    let _ = writeln!(out, "        {}", p);
+                }
+            }
+            while out.ends_with('\n') {
+                out.pop();
+            }
         }
         out
     }
@@ -160,18 +207,25 @@ impl DaemonService {
                 pid: None,
                 uptime_secs: None,
                 roots_watched: None,
+                spin_warnings: Vec::new(),
             });
         }
 
         match client.status() {
             Ok(resp) if resp.ok => {
                 let data = resp.data.unwrap_or_default();
+                let spin_warnings = data
+                    .get("spin_warnings")
+                    .cloned()
+                    .and_then(|v| serde_json::from_value::<Vec<SpinWarningReport>>(v).ok())
+                    .unwrap_or_default();
                 Ok(DaemonStatus {
                     running: true,
                     socket,
                     pid: data.get("pid").and_then(|v| v.as_u64()),
                     uptime_secs: data.get("uptime_secs").and_then(|v| v.as_u64()),
                     roots_watched: data.get("roots_watched").and_then(|v| v.as_u64()),
+                    spin_warnings,
                 })
             }
             Ok(resp) => Err(resp.error.unwrap_or_default()),

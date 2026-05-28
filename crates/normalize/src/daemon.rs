@@ -310,6 +310,42 @@ mod unix_impl {
         daemon_config_dir().join("daemon.lock")
     }
 
+    /// Path to the daemon's log file (`~/.config/normalize/daemon.log`).
+    ///
+    /// Auto-started daemons run with stdout/stderr connected to `/dev/null`
+    /// (see [`DaemonClient::start_daemon`]), so without this sink all `tracing`
+    /// output — including the spin-loop WARNs — would be silently discarded.
+    /// The path follows the same `daemon_config_dir()` convention as the socket
+    /// and lock files, so `NORMALIZE_DAEMON_CONFIG_DIR` redirects it for tests.
+    pub fn daemon_log_path() -> PathBuf {
+        daemon_config_dir().join("daemon.log")
+    }
+
+    /// Environment variable the parent sets on the spawned daemon process so the
+    /// child knows to route `tracing` output to [`daemon_log_path`] instead of the
+    /// (nulled) inherited stderr. Foreground `daemon run` does not set this, so it
+    /// keeps logging to the terminal.
+    pub const DAEMON_LOG_ENV: &str = "NORMALIZE_DAEMON_LOG";
+
+    /// If this process is an auto-started daemon (the [`DAEMON_LOG_ENV`] marker is
+    /// set), open the daemon log file in append mode for use as the `tracing`
+    /// writer. Returns `None` for foreground runs or if the file cannot be opened
+    /// (in which case the caller falls back to stderr).
+    pub fn open_daemon_log_writer() -> Option<std::fs::File> {
+        if std::env::var_os(DAEMON_LOG_ENV).is_none() {
+            return None;
+        }
+        let path = daemon_log_path();
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .ok()
+    }
+
     /// Get the spawn lock file path (~/.config/normalize/daemon-spawn.lock)
     /// Used by clients to serialize daemon spawn attempts.
     fn spawn_lock_path() -> PathBuf {
@@ -523,6 +559,15 @@ mod unix_impl {
     /// tracks per-root metadata only.
     struct WatchedRoot {
         last_refresh: Instant,
+        /// Timestamps of recent `refresh_root` invocations, newest last. Used by
+        /// the spin detector to measure refresh density. Trimmed to the
+        /// [`SPIN_WINDOW`] on every push so it stays O(refreshes-in-window).
+        refresh_window: std::collections::VecDeque<Instant>,
+        /// When set and in the future, the dispatch loop backs off (skips
+        /// sending) refresh requests for this root. Set when a spin loop is
+        /// detected; cleared implicitly once the instant passes. Per-root, never
+        /// global — one misbehaving root must not stall the others.
+        spin_flagged_until: Option<Instant>,
         /// Whether the diagnostics cache has been fully primed (first run completed).
         /// Diagnostics are persisted to SQLite; this flag just tracks prime state in memory
         /// so the daemon knows when to prime lazily on the first `RunRules` request.
@@ -569,9 +614,45 @@ mod unix_impl {
         context_index: Arc<Mutex<ContextIndex>>,
     }
 
+    /// Sliding window over which refresh density is measured for spin detection.
+    const SPIN_WINDOW: Duration = Duration::from_secs(10);
+    /// Minimum number of refreshes within [`SPIN_WINDOW`] before a self-write
+    /// overlap is treated as a spin loop. 5-in-10s is well above any plausible
+    /// human edit cadence (even rapid save-on-keystroke debounces to one refresh
+    /// per 500ms here) but trips quickly once the daemon is re-indexing its own
+    /// writes in a tight loop. The overlap check is the real signal; the density
+    /// gate just avoids flagging a single coincidental self-write.
+    const SPIN_DENSITY_THRESHOLD: usize = 5;
+    /// How long to back off refreshes for a root after a spin is detected. Long
+    /// enough to break the feedback loop and let any in-flight writes settle,
+    /// short enough that legitimate work resumes promptly.
+    const SPIN_COOLDOWN: Duration = Duration::from_secs(30);
+    /// Cap on retained spin warnings; keeps `status()` bounded.
+    const MAX_SPIN_WARNINGS: usize = 32;
+
+    /// A recorded spin-loop detection, surfaced via `normalize daemon status`.
+    /// This is the channel that actually reaches the user given the daemon's
+    /// stdout/stderr are nulled on auto-start.
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    pub(super) struct SpinWarning {
+        /// The watched root that was re-indexing its own state directory.
+        pub root: String,
+        /// The overlapping paths inside the root's own index/state dir that
+        /// triggered detection (capped to a handful for readability).
+        pub overlapping_paths: Vec<String>,
+        /// Number of refreshes observed in [`SPIN_WINDOW`] when flagged.
+        pub refresh_count: usize,
+        /// Seconds since the daemon started, at detection time.
+        pub at_uptime_secs: u64,
+    }
+
     /// Global daemon server managing multiple roots.
     struct DaemonServer {
         roots: Mutex<HashMap<PathBuf, WatchedRoot>>,
+        /// Recent spin-loop detections, newest last, capped to the most recent
+        /// [`MAX_SPIN_WARNINGS`]. Surfaced by `status()` so the failure mode is
+        /// self-reporting instead of silently burning CPU.
+        spin_warnings: Mutex<Vec<SpinWarning>>,
         refresh_tx: Sender<PathBuf>,
         /// Sender for native-rules-only refresh requests (triggered by .git/index changes).
         native_refresh_tx: Sender<PathBuf>,
@@ -613,6 +694,7 @@ mod unix_impl {
 
             Self {
                 roots: Mutex::new(HashMap::new()),
+                spin_warnings: Mutex::new(Vec::new()),
                 refresh_tx,
                 native_refresh_tx,
                 config_reload_tx,
@@ -723,6 +805,8 @@ mod unix_impl {
                 root.clone(),
                 WatchedRoot {
                     last_refresh: Instant::now(),
+                    refresh_window: std::collections::VecDeque::new(),
+                    spin_flagged_until: None,
                     primed: false,
                     has_git_index,
                     index,
@@ -791,10 +875,16 @@ mod unix_impl {
 
         fn status(&self) -> Response {
             let roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+            let spin_warnings = self
+                .spin_warnings
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone();
             Response::ok(serde_json::json!({
                 "uptime_secs": self.start_time.elapsed().as_secs(),
                 "roots_watched": roots.len(),
                 "pid": std::process::id(),
+                "spin_warnings": spin_warnings,
             }))
         }
 
@@ -1875,6 +1965,93 @@ mod unix_impl {
             report.issues
         }
 
+        /// Record a refresh and decide whether the root is in a spin loop.
+        ///
+        /// The signal is *overlap*, not raw frequency: a refresh whose changed
+        /// set touches the root's own index/state directory means the daemon is
+        /// re-indexing files it wrote itself (index.sqlite, journals,
+        /// diagnostics.json) — the exact feedback loop that burned CPU for hours
+        /// twice. A human editing source files produces zero changed paths inside
+        /// that dir, so a busy repo never trips this. The density gate
+        /// ([`SPIN_DENSITY_THRESHOLD`] refreshes in [`SPIN_WINDOW`]) just avoids
+        /// flagging a single coincidental self-write (e.g. a one-off config
+        /// rewrite).
+        ///
+        /// `state_dir` is derived from the root's configured index location
+        /// ([`crate::paths::get_normalize_dir`]), not a hardcoded `.normalize`.
+        /// On detection: sets `spin_flagged_until`, emits a WARN, and records a
+        /// [`SpinWarning`] for `status()`. Returns `true` when a spin was flagged.
+        ///
+        /// Pure enough to unit-test: pass a synthetic changed set + state dir.
+        fn record_refresh_and_detect_spin(
+            &self,
+            root: &Path,
+            changed: &[PathBuf],
+            now: Instant,
+        ) -> bool {
+            let state_dir = crate::paths::get_normalize_dir(root);
+
+            // Update the sliding refresh window and measure density.
+            let refresh_count = {
+                let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+                let Some(watched) = roots.get_mut(root) else {
+                    return false;
+                };
+                watched.refresh_window.push_back(now);
+                while let Some(front) = watched.refresh_window.front() {
+                    if now.duration_since(*front) > SPIN_WINDOW {
+                        watched.refresh_window.pop_front();
+                    } else {
+                        break;
+                    }
+                }
+                watched.refresh_window.len()
+            };
+
+            // Overlap check: any changed path under the root's own state dir.
+            let overlapping: Vec<String> = changed
+                .iter()
+                .filter(|p| p.starts_with(&state_dir))
+                .take(8)
+                .map(|p| p.display().to_string())
+                .collect();
+
+            if overlapping.is_empty() || refresh_count < SPIN_DENSITY_THRESHOLD {
+                return false;
+            }
+
+            // Spin detected: flag backoff, warn loudly, record for status.
+            {
+                let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(watched) = roots.get_mut(root) {
+                    watched.spin_flagged_until = Some(now + SPIN_COOLDOWN);
+                }
+            }
+
+            tracing::warn!(
+                root = %root.display(),
+                refreshes_in_window = refresh_count,
+                overlapping = ?overlapping,
+                "spin loop detected: daemon is re-indexing its own state dir; backing off {}s",
+                SPIN_COOLDOWN.as_secs(),
+            );
+
+            {
+                let mut warnings = self.spin_warnings.lock().unwrap_or_else(|e| e.into_inner());
+                warnings.push(SpinWarning {
+                    root: root.display().to_string(),
+                    overlapping_paths: overlapping,
+                    refresh_count,
+                    at_uptime_secs: self.start_time.elapsed().as_secs(),
+                });
+                let len = warnings.len();
+                if len > MAX_SPIN_WARNINGS {
+                    warnings.drain(0..len - MAX_SPIN_WARNINGS);
+                }
+            }
+            true
+        }
+
         fn refresh_root(&self, root: &Path) {
             // Check root is still watched and retrieve the persistent index.
             let idx_arc = {
@@ -1892,6 +2069,13 @@ mod unix_impl {
                     .block_on(idx.incremental_refresh_force())
                 {
                     Ok(changed) if !changed.is_empty() => {
+                        // Spin detection: if this refresh is picking up the
+                        // daemon's own writes under the root's state dir at high
+                        // density, flag a backoff and warn. We still proceed with
+                        // this refresh — backoff only suppresses *future* sends
+                        // (see the dispatch loop); we never silently drop indexing.
+                        self.record_refresh_and_detect_spin(root, &changed, Instant::now());
+
                         if let Err(e) = self
                             .runtime_handle
                             .block_on(idx.incremental_call_graph_refresh())
@@ -2658,14 +2842,19 @@ mod unix_impl {
                 );
 
                 {
-                    let roots = server_dispatch
+                    let mut roots = server_dispatch
                         .roots
                         .lock()
                         .unwrap_or_else(|e| e.into_inner());
+                    // Snapshot keys so we can mutate `roots` (spin backoff state)
+                    // inside the loop without holding an immutable borrow.
+                    let root_keys: Vec<PathBuf> = roots.keys().cloned().collect();
                     for path in &event.paths {
                         // Find the root this path belongs to
-                        let root = roots.keys().find(|r| path.starts_with(r.as_path()));
+                        let root = root_keys.iter().find(|r| path.starts_with(r.as_path()));
                         let Some(root) = root else { continue };
+                        let root = root.clone();
+                        let root = &root;
 
                         // Classify the path. Config and rule-definition paths
                         // route to a config-reload (clear blobs + full reprime).
@@ -2731,6 +2920,29 @@ mod unix_impl {
                                 *last = Instant::now();
                             }
                         } else {
+                            // Spin backoff (per-root): while a root is flagged as
+                            // spinning, skip dispatching refreshes for it so the
+                            // self-write feedback loop can't keep firing. When the
+                            // cooldown expires, clear the flag and log the resume.
+                            let now = Instant::now();
+                            let backed_off = match roots.get_mut(root) {
+                                Some(w) => match w.spin_flagged_until {
+                                    Some(until) if now < until => true,
+                                    Some(_) => {
+                                        w.spin_flagged_until = None;
+                                        tracing::info!(
+                                            root = %root.display(),
+                                            "spin backoff lifted; resuming refreshes",
+                                        );
+                                        false
+                                    }
+                                    None => false,
+                                },
+                                None => false,
+                            };
+                            if backed_off {
+                                continue;
+                            }
                             let last = last_refresh
                                 .entry(root.clone())
                                 .or_insert(Instant::now() - debounce * 2);
@@ -3111,9 +3323,14 @@ mod unix_impl {
             let current_exe =
                 std::env::current_exe().map_err(|e| format!("Failed to get executable: {}", e))?;
 
+            // Mark the child as an auto-started daemon so it routes tracing
+            // output to the daemon log file. stderr is nulled below, so without
+            // this the daemon's WARN/ERROR (including spin-loop detection) would
+            // vanish — which is exactly why two spin loops went unnoticed.
             Command::new(&current_exe)
                 .arg("daemon")
                 .arg("run")
+                .env(DAEMON_LOG_ENV, "1")
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
@@ -3478,6 +3695,8 @@ mod unix_impl {
                 root.to_path_buf(),
                 WatchedRoot {
                     last_refresh: Instant::now(),
+                    refresh_window: std::collections::VecDeque::new(),
+                    spin_flagged_until: None,
                     primed: true,
                     has_git_index: false,
                     index: Arc::new(std::sync::Mutex::new(idx)),
@@ -3864,10 +4083,165 @@ allow = ["a.rs"]
             assert_eq!(issues[0].severity, Severity::Warning);
         }
     }
+
+    #[cfg(test)]
+    mod spin_tests {
+        use super::*;
+
+        /// Build a minimal server with one registered root. Reuses a real
+        /// SQLite-backed index (cheap; no files indexed) so the `roots` map has a
+        /// valid `WatchedRoot` for the detector to mutate.
+        async fn server_with_root(root: &Path) -> Arc<DaemonServer> {
+            let (refresh_tx, _r) = std::sync::mpsc::channel::<PathBuf>();
+            let (native_tx, _n) = std::sync::mpsc::channel::<PathBuf>();
+            let (config_reload_tx, _c) = std::sync::mpsc::channel::<PathBuf>();
+            let (notify_tx, _nx) = std::sync::mpsc::channel::<notify::Result<notify::Event>>();
+            let watcher = RecommendedWatcher::new(notify_tx, Config::default()).unwrap();
+            let server = Arc::new(DaemonServer::new(
+                refresh_tx,
+                native_tx,
+                config_reload_tx,
+                tokio::runtime::Handle::current(),
+                watcher,
+            ));
+            let idx = crate::index::open(root).await.unwrap();
+            let mut roots = server.roots.lock().unwrap();
+            roots.insert(
+                root.to_path_buf(),
+                WatchedRoot {
+                    last_refresh: Instant::now(),
+                    refresh_window: std::collections::VecDeque::new(),
+                    spin_flagged_until: None,
+                    primed: true,
+                    has_git_index: false,
+                    index: Arc::new(std::sync::Mutex::new(idx)),
+                    cached_rules: Arc::new(normalize_rules_config::RulesConfig::default()),
+                    cached_walk: Arc::new(normalize_rules_config::WalkConfig::default()),
+                    cached_scm_hashes: HashMap::new(),
+                    serve_filter_pending: false,
+                    context_index: Arc::new(Mutex::new(ContextIndex::new())),
+                },
+            );
+            drop(roots);
+            server
+        }
+
+        fn flagged_until(server: &DaemonServer, root: &Path) -> Option<Instant> {
+            let roots = server.roots.lock().unwrap();
+            roots.get(root).and_then(|w| w.spin_flagged_until)
+        }
+
+        /// Self-write overlap + high density trips the flag and records a warning.
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn overlap_plus_density_trips_spin() {
+            let dir = tempfile::tempdir().unwrap();
+            let root = dir.path();
+            let server = server_with_root(root).await;
+
+            // A changed set that includes the root's own state dir (index.sqlite).
+            let state = crate::paths::get_normalize_dir(root);
+            let changed = vec![state.join("index.sqlite"), root.join("src/lib.rs")];
+
+            let now = Instant::now();
+            // First SPIN_DENSITY_THRESHOLD-1 refreshes: density not yet met.
+            for _ in 0..(SPIN_DENSITY_THRESHOLD - 1) {
+                assert!(!server.record_refresh_and_detect_spin(root, &changed, now));
+            }
+            assert!(flagged_until(&server, root).is_none());
+            // The threshold-th refresh trips it.
+            assert!(server.record_refresh_and_detect_spin(root, &changed, now));
+            assert!(flagged_until(&server, root).is_some());
+
+            // A warning was recorded for status().
+            let warnings = server.spin_warnings.lock().unwrap();
+            assert_eq!(warnings.len(), 1);
+            assert!(
+                warnings[0]
+                    .overlapping_paths
+                    .iter()
+                    .any(|p| p.contains("index.sqlite"))
+            );
+        }
+
+        /// A busy repo (many source-file changes, none in the state dir) never
+        /// trips, no matter the refresh density.
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn busy_repo_does_not_trip_spin() {
+            let dir = tempfile::tempdir().unwrap();
+            let root = dir.path();
+            let server = server_with_root(root).await;
+
+            let changed: Vec<PathBuf> =
+                (0..50).map(|i| root.join(format!("src/f{i}.rs"))).collect();
+            let now = Instant::now();
+            for _ in 0..(SPIN_DENSITY_THRESHOLD * 4) {
+                assert!(!server.record_refresh_and_detect_spin(root, &changed, now));
+            }
+            assert!(flagged_until(&server, root).is_none());
+            assert!(server.spin_warnings.lock().unwrap().is_empty());
+        }
+
+        /// Overlap without density (sparse self-writes) does not trip.
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn overlap_without_density_does_not_trip() {
+            let dir = tempfile::tempdir().unwrap();
+            let root = dir.path();
+            let server = server_with_root(root).await;
+            let state = crate::paths::get_normalize_dir(root);
+            let changed = vec![state.join("diagnostics.json")];
+
+            // Each refresh is SPIN_WINDOW+1s apart, so the window never holds more
+            // than one timestamp — density gate never met.
+            let mut t = Instant::now();
+            for _ in 0..(SPIN_DENSITY_THRESHOLD * 3) {
+                assert!(!server.record_refresh_and_detect_spin(root, &changed, t));
+                t += SPIN_WINDOW + Duration::from_secs(1);
+            }
+            assert!(flagged_until(&server, root).is_none());
+        }
+
+        /// Once flagged, the backoff window lifts after the cooldown elapses.
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn backoff_lifts_after_cooldown() {
+            let dir = tempfile::tempdir().unwrap();
+            let root = dir.path();
+            let server = server_with_root(root).await;
+            let state = crate::paths::get_normalize_dir(root);
+            let changed = vec![state.join("index.sqlite")];
+
+            let now = Instant::now();
+            for _ in 0..SPIN_DENSITY_THRESHOLD {
+                server.record_refresh_and_detect_spin(root, &changed, now);
+            }
+            let until = flagged_until(&server, root).expect("should be flagged");
+
+            // The cooldown endpoint is COOLDOWN past `now`; a check past it means
+            // the dispatch loop would clear the flag and resume.
+            assert!(until <= now + SPIN_COOLDOWN);
+            let after = now + SPIN_COOLDOWN + Duration::from_secs(1);
+            assert!(
+                after >= until,
+                "cooldown endpoint should be in the past now"
+            );
+        }
+
+        /// The daemon log path follows the same dir convention as the socket and
+        /// is named `daemon.log`. This verifies the chosen sink mechanism without
+        /// mutating process env (which would race other tests in this binary).
+        #[test]
+        fn daemon_log_path_matches_socket_dir() {
+            let log = daemon_log_path();
+            let sock = global_socket_path();
+            assert_eq!(log.parent(), sock.parent());
+            assert_eq!(log.file_name().and_then(|n| n.to_str()), Some("daemon.log"));
+        }
+    }
 }
 
 #[cfg(unix)]
-pub use unix_impl::{DaemonClient, global_socket_path, run_daemon};
+pub use unix_impl::{
+    DaemonClient, daemon_log_path, global_socket_path, open_daemon_log_writer, run_daemon,
+};
 
 // ============================================================================
 // Auto-start helper
