@@ -452,24 +452,7 @@ Crate split is correct. All 38 published crates justified. No reusable logic tra
       (`render_symbol_doc`). KG cache prefix changed `docs-cargo-`→`docs-rust-…`.
       This effort was not previously tracked here.
 
-Follow-ups:
-- [ ] **`DocFormat`-aware doc rendering for Go/Python.** Go/Python doc bodies
-      are currently emitted verbatim as `plaintext`. A renderer that parses
-      docstring conventions (RST, Google-style, NumPy-style for Python; godoc
-      conventions for Go) into cleaner Markdown would improve LLM-context
-      quality. The `DocFormat` tag already exists to drive this.
-- [ ] **Unify the Rust remote path onto the source-archive approach.** Rust
-      still fetches remote docs via docs.rs HTML scrape (`docs_rs.rs`), while Go
-      and Python use `source_archive` + `doc_tree`. Moving Rust onto the
-      source-archive path (crates.io `.crate` tarball → `doc_tree`) would make
-      all three ecosystems consistent and drop the HTML-to-Markdown conversion.
-- [ ] **Share `escape_go_proxy` with `index/go.rs`.**
-      `crates/normalize-package-index/src/index/go.rs` builds Go module-proxy
-      URLs WITHOUT `!`-escaping uppercase letters in module paths/versions, so
-      it 404s for modules like `github.com/Azure/...`. `go_docs.rs` added a
-      private `escape_go_proxy` helper; extract it to a shared location and use
-      it in `index/go.rs` too. (Pre-existing bug surfaced during this effort,
-      not introduced by it.)
+Follow-ups: see Deferred — `DocFormat`-aware rendering, Rust source-archive unification, `escape_go_proxy` bug, remaining-ecosystem doc support.
 
 ### Analyze Command Consolidation — remaining work
 
@@ -1591,6 +1574,33 @@ find_cycles_dfs iterative conversion (was stack depth ever actually a problem?).
 ---
 
 ## Deferred
+
+### `normalize docs` follow-ups (from 2026-05-29 multi-language landing)
+
+- **`DocFormat`-aware doc rendering for Go/Python.** Go/Python doc bodies are currently
+  emitted verbatim as `plaintext`. A renderer that parses docstring conventions (RST,
+  Google-style, NumPy-style for Python; godoc conventions for Go) into cleaner Markdown
+  would improve LLM-context quality. The `DocFormat` tag already exists to drive this.
+- **Unify the Rust remote path onto the source-archive approach.** Rust still fetches
+  remote docs via docs.rs HTML scrape (`docs_rs.rs`), while Go and Python use
+  `source_archive` + `doc_tree`. Moving Rust onto the source-archive path (crates.io
+  `.crate` tarball → `doc_tree`) would make all three ecosystems consistent and drop the
+  HTML-to-Markdown conversion.
+- **Share `escape_go_proxy` with `index/go.rs`.** (Pre-existing bug, surfaced during the
+  multi-language effort.) `crates/normalize-package-index/src/index/go.rs` builds
+  Go module-proxy URLs WITHOUT `!`-escaping uppercase letters in module paths/versions,
+  so it 404s for modules like `github.com/Azure/...`. `go_docs.rs` added a private
+  `escape_go_proxy` helper; extract it to a shared location in `index/go.rs` and use it
+  there too.
+- **`normalize docs` support for remaining ecosystems.** Docs currently work for Rust
+  (cargo), Go, and Python. The other 9 registered ecosystems still need doc support:
+  npm (JavaScript/Node), gem (Ruby), maven (Java), nuget (.NET/C#), deno
+  (TypeScript/Deno), hex (Elixir), composer (PHP), conan (C/C++), nix (Nix).
+  The generic dispatch infrastructure (`Ecosystem` trait, `source_archive`/`doc_tree`
+  primitives) is already in place — adding a new ecosystem is mostly: implement
+  `docs_extractor`/`docs_fetcher`/`package_from_symbol` for it and locate its registry
+  source-archive URL. Aligned with the CLAUDE.md "maximum quality for every language"
+  goal.
 
 - `normalize jq` multi-format support (YAML/CBOR/TOML/XML via `jaq-all` with `formats` feature): currently using `jaq-core/std/json` directly to avoid `jaq-fmts` bloat. Low priority — vanilla jq is JSON-only anyway.
 - `normalize rg` PCRE2 support (pcre2 feature not enabled)
