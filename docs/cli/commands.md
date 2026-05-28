@@ -29,6 +29,7 @@
 | Command | Description |
 |---------|-------------|
 | `aliases` | List filter aliases |
+| `docs` | Fetch upstream symbol documentation (Rust/Go/Python) into LLM context |
 | `context` | Show directory context (.context.md files) |
 | `translate` | Translate code between programming languages |
 | `guide` | Workflow guides with examples |

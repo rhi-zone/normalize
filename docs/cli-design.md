@@ -116,7 +116,23 @@ rules validate
 All filters on `list` and `run` compose (see principle #8). `enable`/`disable` accept either a rule ID or a tag name — when given a tag, they apply to all rules matching that tag.
 
 Commands with no subcommands (positional/flag-based):
-- `view`, `grep`, `aliases`, `context`, `init`, `update`
+- `view`, `grep`, `aliases`, `context`, `init`, `update`, `docs`
+
+### `docs` — ecosystem-dispatched, not language-flagged
+
+`normalize docs <symbol>` fetches upstream symbol documentation. Rather than a
+`--language` flag, it dispatches over the project's **ecosystem** (the same
+`Ecosystem` trait that backs `package`): the ecosystem owns both the
+symbol-parsing convention (`crate::Sym` for Rust, `path#Sym`/`pkg.Sym` for Go,
+`pkg.Sym` for Python) and the doc sources. This keeps the data model honest —
+"where do docs come from" is an ecosystem question, not a syntax question — and
+lets the command auto-detect from the working directory, with `-e/--ecosystem`
+to disambiguate when more than one is present. Each ecosystem resolves docs
+**locally first** (installed source) and falls back to the **remote package
+source archive** (not a scraped docs site), so the body reflects the version in
+use. Bodies are stored source-native (`doc_body` + `doc_format`); rendering to
+display Markdown happens at the output layer, so `--json` consumers get the raw
+text and pick their own rendering.
 
 ## Command Aliases
 

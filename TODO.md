@@ -438,6 +438,39 @@ Added positional `path` arg to `normalize grep`. Also added `--only`/`--exclude`
 
 Crate split is correct. All 38 published crates justified. No reusable logic trapped in `normalize`; no unjustified extractions. Single-consumer domain libraries (graph, scope, edit, deps, etc.) are correctly placed — the test is "CLI wiring vs. domain logic", not "has 2+ consumers". Revisit only if a concrete second consumer appears for a specific module.
 
+### Multi-language `normalize docs`
+
+- [x] **`normalize docs` is now multi-language (Rust/Go/Python)** (2026-05-29).
+      Previously Rust-only (docs.rs). Now dispatches generically over the
+      `Ecosystem` trait (`docs_extractor`/`docs_fetcher`/`package_from_symbol`/
+      `docs_language`) with an `--ecosystem`/`-e` flag (auto-detect when
+      omitted). Shared primitives `source_archive` (download+extract registry
+      archives) and `doc_tree` (tree-sitter docstring/signature extraction)
+      back Go (mod cache local + module-proxy `.zip` remote) and Python
+      (site-packages local + PyPI sdist remote). Doc bodies are source-native
+      (`doc_body` + `doc_format`); rendering moved to the output layer
+      (`render_symbol_doc`). KG cache prefix changed `docs-cargo-`→`docs-rust-…`.
+      This effort was not previously tracked here.
+
+Follow-ups:
+- [ ] **`DocFormat`-aware doc rendering for Go/Python.** Go/Python doc bodies
+      are currently emitted verbatim as `plaintext`. A renderer that parses
+      docstring conventions (RST, Google-style, NumPy-style for Python; godoc
+      conventions for Go) into cleaner Markdown would improve LLM-context
+      quality. The `DocFormat` tag already exists to drive this.
+- [ ] **Unify the Rust remote path onto the source-archive approach.** Rust
+      still fetches remote docs via docs.rs HTML scrape (`docs_rs.rs`), while Go
+      and Python use `source_archive` + `doc_tree`. Moving Rust onto the
+      source-archive path (crates.io `.crate` tarball → `doc_tree`) would make
+      all three ecosystems consistent and drop the HTML-to-Markdown conversion.
+- [ ] **Share `escape_go_proxy` with `index/go.rs`.**
+      `crates/normalize-package-index/src/index/go.rs` builds Go module-proxy
+      URLs WITHOUT `!`-escaping uppercase letters in module paths/versions, so
+      it 404s for modules like `github.com/Azure/...`. `go_docs.rs` added a
+      private `escape_go_proxy` helper; extract it to a shared location and use
+      it in `index/go.rs` too. (Pre-existing bug surfaced during this effort,
+      not introduced by it.)
+
 ### Analyze Command Consolidation — remaining work
 
 **Current: ~35 commands** (after 2026-03-15/16 consolidation: deleted `analyze parse`, `analyze query`, `analyze all`, `analyze node-types` → moved to `syntax`; merged 4 trend commands; deleted `normalize-rules-loader`). Trend commands moved to `normalize trend` on 2026-03-28 (5 methods removed from analyze, 5 added to trend service). `analyze length` and `analyze test-gaps` moved to `rank`; `analyze node-types` duplicate removed (2026-03-28).

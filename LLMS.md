@@ -25,6 +25,7 @@ normalize view src/main.rs
 | `normalize rank complexity` | Cyclomatic complexity report | Checking code quality |
 | `normalize grep "pattern"` | Search code | Finding usage, definitions |
 | `normalize package audit` | Security vulnerability scan | Checking dependencies |
+| `normalize docs serde::Serialize` | Fetch a library symbol's upstream docs (Rust/Go/Python) | Looking up an API past your training cutoff |
 
 ## Output Modes
 

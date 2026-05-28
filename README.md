@@ -129,6 +129,23 @@ normalize package audit              # Security vulnerability scan
 
 Supports: Cargo, npm, pip, Go modules, Bundler, Composer, Hex, Maven, NuGet, Nix, Conan.
 
+### docs - Upstream Symbol Documentation
+
+Fetch a library symbol's current documentation as a Markdown block for LLM
+context — patches training-cutoff blind spots:
+
+```bash
+normalize docs serde::Serialize             # Rust (auto-detected)
+normalize docs -e go encoding/json#Marshal  # Go
+normalize docs -e python requests.Session   # Python
+normalize docs tokio::sync::Mutex@1.38      # pin a version
+```
+
+Works for Rust, Go, and Python. Reads installed packages locally (Cargo source,
+Go module cache, Python site-packages); for uninstalled packages it downloads
+the upstream source archive (docs.rs, Go module proxy `.zip`, PyPI sdist).
+Results are cached in the knowledge graph for instant offline reuse.
+
 ### serve - Server Modes
 
 Run normalize as a server for integration:
