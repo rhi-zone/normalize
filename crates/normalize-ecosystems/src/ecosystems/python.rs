@@ -299,6 +299,42 @@ impl Ecosystem for Python {
 
         Ok(AuditResult { vulnerabilities })
     }
+
+    #[cfg(feature = "python")]
+    fn docs_extractor(&self, project_root: &Path) -> Option<Box<dyn crate::LocalDocsExtractor>> {
+        Some(Box::new(crate::PythonLocalDocsExtractor::new(project_root)))
+    }
+
+    #[cfg(feature = "python")]
+    fn docs_fetcher(&self) -> Option<Box<dyn crate::RemoteDocsFetcher>> {
+        Some(Box::new(crate::PythonRemoteDocsFetcher))
+    }
+
+    /// Split a Python doc query into `(package, symbol_path)`.
+    ///
+    /// The first `.`-segment is the importable top-level package/module; the
+    /// remainder (after the first dot) is the symbol path:
+    /// - `requests.Session` -> `("requests", "Session")`
+    /// - `requests.adapters.HTTPAdapter` -> `("requests", "adapters.HTTPAdapter")`
+    ///
+    /// The symbol path keeps its full dotted remainder; `extract_from_source_tree`
+    /// matches only its **last** segment against definition-node names, so passing
+    /// the qualified remainder is harmless and preserves the user's intent in the
+    /// reported `symbol_path`.
+    ///
+    /// A bare name with no `.` is a module, not a symbol, and cannot be looked up as
+    /// a definition — return `None` (mirroring the Go convention).
+    fn package_from_symbol(&self, symbol: &str) -> Option<(String, String)> {
+        let (package, symbol_path) = symbol.split_once('.')?;
+        if package.is_empty() || symbol_path.is_empty() {
+            return None;
+        }
+        Some((package.to_string(), symbol_path.to_string()))
+    }
+
+    fn docs_language(&self) -> &'static str {
+        "python"
+    }
 }
 
 fn build_python_tree(

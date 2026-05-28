@@ -24,6 +24,8 @@ pub mod ecosystems;
 pub mod go_docs;
 pub mod http;
 pub mod local_docs;
+#[cfg(feature = "python")]
+pub mod python_docs;
 pub mod source_archive;
 pub mod symbol_docs;
 
@@ -569,3 +571,5 @@ pub use docs_rs::DocsRsFetcher;
 #[cfg(feature = "go")]
 pub use go_docs::{GoLocalDocsExtractor, GoRemoteDocsFetcher};
 pub use local_docs::CargoLocalDocsExtractor;
+#[cfg(feature = "python")]
+pub use python_docs::{PythonLocalDocsExtractor, PythonRemoteDocsFetcher};
