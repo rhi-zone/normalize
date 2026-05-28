@@ -10,7 +10,10 @@
 //! Used as the [`RemoteDocsFetcher`] fallback for Cargo in the local-first
 //! coordinator ([`crate::fetch_symbol_docs_with_fallback`]).
 
-use crate::{DocsError, PackageError, RemoteDocsFetcher, symbol_docs::SymbolDoc};
+use crate::{
+    DocsError, PackageError, RemoteDocsFetcher,
+    symbol_docs::{DocFormat, SymbolDoc},
+};
 
 // ── RemoteDocsFetcher impl ────────────────────────────────────────────────────
 
@@ -212,8 +215,8 @@ fn fetch_crate_root(
     );
     let html = fetch_html(&url)?;
 
-    // Extract first docblock paragraph as doc_text
-    let doc_text = extract_first_docblock_text(&html);
+    // Extract first docblock as a raw HTML fragment; rendered at the output layer.
+    let doc_body = extract_first_docblock_html(&html);
 
     Ok(SymbolDoc {
         name: package.to_string(),
@@ -223,7 +226,8 @@ fn fetch_crate_root(
         symbol_path: symbol_path.to_string(),
         kind: "module".to_string(),
         signature: None,
-        doc_text,
+        doc_body,
+        doc_format: DocFormat::Html,
         examples: vec![],
         source_url: url,
         fetched_at: chrono::Utc::now(),
@@ -245,7 +249,7 @@ fn parse_symbol_page(
     html: &str,
 ) -> Result<SymbolDoc, PackageError> {
     let signature = extract_signature(html);
-    let doc_text = extract_first_docblock_text(html);
+    let doc_body = extract_first_docblock_html(html);
     let examples = extract_examples(html);
 
     Ok(SymbolDoc {
@@ -256,7 +260,8 @@ fn parse_symbol_page(
         symbol_path: symbol_path.to_string(),
         kind: kind.to_string(),
         signature,
-        doc_text,
+        doc_body,
+        doc_format: DocFormat::Html,
         examples,
         source_url: url.to_string(),
         fetched_at: chrono::Utc::now(),
@@ -279,8 +284,11 @@ fn extract_signature(html: &str) -> Option<String> {
     Some(strip_html_tags(raw).trim().to_string())
 }
 
-/// Extract the first doc-comment block from the main content area.
-fn extract_first_docblock_text(html: &str) -> String {
+/// Extract the first doc-comment block from the main content area, as a raw
+/// HTML fragment. Rendering to Markdown happens at the output layer
+/// (`render_symbol_doc`), not here — the body is stored source-native with
+/// `DocFormat::Html`.
+fn extract_first_docblock_html(html: &str) -> String {
     // Find the first <div class="docblock"> in the main content section
     // (skip sidebar docblocks if any appear before)
     let main_marker = "id=\"main-content\"";
@@ -293,8 +301,7 @@ fn extract_first_docblock_text(html: &str) -> String {
     };
     let after = &html_from_main[start + tag.len()..];
     // Find the matching closing </div>
-    let content = extract_until_closing_div(after);
-    html_to_markdown(&content)
+    extract_until_closing_div(after)
 }
 
 /// Extract code examples from `<div class="example-wrap">` blocks that contain
@@ -372,7 +379,7 @@ fn extract_until_closing_div(html: &str) -> String {
 }
 
 /// Strip HTML tags, decode common entities, normalise whitespace.
-fn strip_html_tags(html: &str) -> String {
+pub fn strip_html_tags(html: &str) -> String {
     let mut out = String::with_capacity(html.len());
     let mut in_tag = false;
     for c in html.chars() {
@@ -386,7 +393,7 @@ fn strip_html_tags(html: &str) -> String {
     decode_html_entities(&out)
 }
 
-fn decode_html_entities(s: &str) -> String {
+pub fn decode_html_entities(s: &str) -> String {
     s.replace("&amp;", "&")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
@@ -401,7 +408,7 @@ fn decode_html_entities(s: &str) -> String {
 
 /// Convert a fragment of rustdoc HTML to approximate Markdown.
 /// This is best-effort: handles paragraphs, code spans, code blocks, links.
-fn html_to_markdown(html: &str) -> String {
+pub fn html_to_markdown(html: &str) -> String {
     // Simplistic approach: strip most tags, but preserve structure
     let mut out = String::new();
 
@@ -441,7 +448,7 @@ fn html_to_markdown(html: &str) -> String {
     out.trim().to_string()
 }
 
-fn normalize_blank_lines(s: &str) -> String {
+pub fn normalize_blank_lines(s: &str) -> String {
     let mut out = String::new();
     let mut blank_count = 0u32;
     for line in s.lines() {
@@ -520,8 +527,9 @@ mod tests {
         assert_eq!(doc.name, "Serialize");
         assert_eq!(doc.package, "serde");
         assert_eq!(doc.kind, "trait");
-        assert!(!doc.doc_text.is_empty(), "doc_text should not be empty");
-        println!("{}", doc.to_markdown());
+        assert!(!doc.doc_body.is_empty(), "doc_body should not be empty");
+        assert_eq!(doc.doc_format, DocFormat::Html);
+        println!("{}", doc.doc_body);
     }
 
     #[test]
@@ -530,6 +538,6 @@ mod tests {
         let doc = fetch("tokio", "tokio::sync::Mutex", None).unwrap();
         assert_eq!(doc.name, "Mutex");
         assert_eq!(doc.kind, "struct");
-        println!("{}", doc.to_markdown());
+        println!("{}", doc.doc_body);
     }
 }

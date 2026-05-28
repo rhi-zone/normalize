@@ -230,6 +230,9 @@ mod tests {
         use crate::service::context::{ContextKindReport, ContextMigrateReport};
         assert_output_formatter::<ContextKindReport>();
         assert_output_formatter::<ContextMigrateReport>();
+
+        use crate::service::docs::DocsReport;
+        assert_output_formatter::<DocsReport>();
         use crate::service::{InitReport, TranslateReport};
         assert_output_formatter::<InitReport>();
         assert_output_formatter::<TranslateReport>();

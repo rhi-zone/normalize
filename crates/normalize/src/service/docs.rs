@@ -18,12 +18,12 @@
 //! ## Cache
 //!
 //! Results are stored as KG units under the ID scheme:
-//!   `docs-cargo-<pkg>-<ver>-<slug>`
+//!   `docs-<language>-<pkg>-<ver>-<slug>` (e.g. `docs-rust-…`)
 //! and are read back on subsequent invocations without touching the network.
 
 use normalize_ecosystems::{
-    CargoLocalDocsExtractor, DocsError, DocsRsFetcher, Ecosystem, SymbolDoc, ecosystems::Cargo,
-    fetch_symbol_docs_with_fallback,
+    CargoLocalDocsExtractor, DocFormat, DocsError, DocsRsFetcher, Ecosystem, SymbolDoc,
+    docs_rs::html_to_markdown, ecosystems::Cargo, fetch_symbol_docs_with_fallback,
 };
 use normalize_knowledge_graph::{
     model::{Link, Unit},
@@ -34,28 +34,69 @@ use std::path::PathBuf;
 // ── Output type ───────────────────────────────────────────────────────────────
 
 /// Output from `normalize docs`.
+///
+/// Carries the structured [`SymbolDoc`] directly; the display Markdown is
+/// rendered on demand by [`render_symbol_doc`] at the output layer, never
+/// precomputed in the data model.
 #[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 pub struct DocsReport {
-    /// The Markdown block ready to paste into LLM context.
-    pub markdown: String,
-    /// Which package the symbol belongs to.
-    pub package: String,
-    /// Resolved version.
-    pub version: String,
-    /// Full symbol path queried.
-    pub symbol_path: String,
-    /// Item kind (trait / struct / fn / ...).
-    pub kind: String,
+    /// The structured symbol documentation.
+    #[serde(flatten)]
+    pub doc: SymbolDoc,
     /// Whether the result was served from the local KG cache.
     pub from_cache: bool,
-    /// Canonical source URL on docs.rs.
-    pub source_url: String,
 }
 
 impl normalize_output::OutputFormatter for DocsReport {
     fn format_text(&self) -> String {
-        self.markdown.clone()
+        render_symbol_doc(&self.doc)
     }
+}
+
+/// Render a [`SymbolDoc`] as a Markdown block suitable for pasting into LLM
+/// context. The doc body is interpreted according to its [`DocFormat`]:
+/// Markdown/PlainText/Rst are emitted verbatim; HTML is converted via
+/// [`html_to_markdown`].
+pub fn render_symbol_doc(doc: &SymbolDoc) -> String {
+    // For crate-root docs (kind = "module", name = package), show just the package name.
+    let heading = if doc.name == doc.package || doc.symbol_path == doc.package {
+        doc.package.clone()
+    } else {
+        format!("{}::{}", doc.package, doc.name)
+    };
+    let mut out = format!(
+        "# {} ({}, {} {})\n\n",
+        heading, doc.language, doc.package, doc.version
+    );
+
+    out.push_str(&format!("{}\n\n", doc.kind));
+
+    if let Some(sig) = &doc.signature {
+        out.push_str(&format!("```{}\n", doc.language));
+        out.push_str(sig.trim());
+        out.push_str("\n```\n\n");
+    }
+
+    let body = match doc.doc_format {
+        DocFormat::Markdown | DocFormat::PlainText | DocFormat::Rst => doc.doc_body.clone(),
+        DocFormat::Html => html_to_markdown(&doc.doc_body),
+    };
+    if !body.is_empty() {
+        out.push_str(body.trim());
+        out.push_str("\n\n");
+    }
+
+    for (i, example) in doc.examples.iter().enumerate() {
+        if i == 0 {
+            out.push_str("## Examples\n\n");
+        }
+        out.push_str(&format!("```{}\n", doc.language));
+        out.push_str(example.trim());
+        out.push_str("\n```\n\n");
+    }
+
+    out.push_str(&format!("Source: <{}>\n", doc.source_url));
+    out
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -101,6 +142,9 @@ pub(crate) fn cache_write(normalize_dir: &std::path::Path, doc: &SymbolDoc) {
         "item_kind": doc.kind,
         "source_url": doc.source_url,
         "fetched_at": doc.fetched_at.to_rfc3339(),
+        // Full structured doc so the cache reconstructs a real `SymbolDoc` on
+        // read; the rendered `body` below is for human/grep readability only.
+        "doc": doc,
     });
     let unit = Unit {
         id,
@@ -110,7 +154,7 @@ pub(crate) fn cache_write(normalize_dir: &std::path::Path, doc: &SymbolDoc) {
             to: doc.source_url.clone(),
             metadata: serde_json::Value::Null,
         }],
-        body: doc.to_markdown(),
+        body: render_symbol_doc(doc),
     };
     let _ = write_unit(&kg, &unit);
 }
@@ -118,20 +162,13 @@ pub(crate) fn cache_write(normalize_dir: &std::path::Path, doc: &SymbolDoc) {
 pub(crate) fn cache_read_doc(normalize_dir: &std::path::Path, doc_id: &str) -> Option<DocsReport> {
     let kg = kg_dir(normalize_dir);
     let unit = read_unit(&kg, doc_id).ok()??;
-    let meta = &unit.metadata;
-    let package = meta.get("package")?.as_str()?.to_string();
-    let version = meta.get("version")?.as_str()?.to_string();
-    let symbol_path = meta.get("symbol_path")?.as_str()?.to_string();
-    let kind = meta.get("item_kind")?.as_str()?.to_string();
-    let source_url = meta.get("source_url")?.as_str()?.to_string();
+    // Reconstruct the structured doc from metadata. Legacy cache entries
+    // written before the structured form was stored lack `doc`; treat those as
+    // a cache miss so the symbol is re-fetched and re-cached in the new shape.
+    let doc: SymbolDoc = serde_json::from_value(unit.metadata.get("doc")?.clone()).ok()?;
     Some(DocsReport {
-        markdown: unit.body,
-        package,
-        version,
-        symbol_path,
-        kind,
+        doc,
         from_cache: true,
-        source_url,
     })
 }
 
@@ -158,7 +195,8 @@ pub(crate) fn fetch_docs(
                 symbol_path: symbol_path.clone(),
                 kind: String::new(),
                 signature: None,
-                doc_text: String::new(),
+                doc_body: String::new(),
+                doc_format: DocFormat::Markdown,
                 examples: vec![],
                 source_url: String::new(),
                 fetched_at: chrono::Utc::now(),
@@ -187,15 +225,9 @@ pub(crate) fn fetch_docs(
         cache_write(&normalize_dir, &doc);
     }
 
-    let markdown = doc.to_markdown();
     Ok(DocsReport {
-        markdown,
-        package: doc.package,
-        version: doc.version,
-        symbol_path: doc.symbol_path,
-        kind: doc.kind,
+        doc,
         from_cache: false,
-        source_url: doc.source_url,
     })
 }
 

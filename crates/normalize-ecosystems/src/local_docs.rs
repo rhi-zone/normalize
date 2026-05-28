@@ -7,7 +7,10 @@
 //! Cargo registry cache (`~/.cargo/registry/src/...`) populated by prior
 //! `cargo build` / `cargo fetch` runs.
 
-use crate::{DocsError, LocalDocsExtractor, symbol_docs::SymbolDoc};
+use crate::{
+    DocsError, LocalDocsExtractor,
+    symbol_docs::{DocFormat, SymbolDoc},
+};
 use std::path::{Path, PathBuf};
 
 // ── public extractor ─────────────────────────────────────────────────────────
@@ -158,7 +161,8 @@ fn extract_crate_root_docs(
                 symbol_path: symbol_path.to_string(),
                 kind: "module".to_string(),
                 signature: None,
-                doc_text,
+                doc_body: doc_text,
+                doc_format: DocFormat::Markdown,
                 examples: vec![],
                 source_url,
                 fetched_at: chrono::Utc::now(),
@@ -208,7 +212,8 @@ fn extract_item_docs(
                 symbol_path: symbol_path.to_string(),
                 kind,
                 signature: sig,
-                doc_text,
+                doc_body: doc_text,
+                doc_format: DocFormat::Markdown,
                 examples,
                 source_url,
                 fetched_at: chrono::Utc::now(),
@@ -236,7 +241,8 @@ fn extract_item_docs(
             symbol_path: symbol_path.to_string(),
             kind,
             signature: sig,
-            doc_text,
+            doc_body: doc_text,
+            doc_format: DocFormat::Markdown,
             examples,
             source_url,
             fetched_at: chrono::Utc::now(),
@@ -810,11 +816,12 @@ pub trait Serialize {
                 assert_eq!(doc.package, "serde");
                 assert_eq!(doc.kind, "trait");
                 assert!(
-                    !doc.doc_text.is_empty(),
-                    "doc_text should not be empty, got markdown:\n{}",
-                    doc.to_markdown()
+                    !doc.doc_body.is_empty(),
+                    "doc_body should not be empty, got body:\n{}",
+                    doc.doc_body
                 );
-                println!("Local doc extraction succeeded:\n{}", doc.to_markdown());
+                assert_eq!(doc.doc_format, DocFormat::Markdown);
+                println!("Local doc extraction succeeded:\n{}", doc.doc_body);
             }
             Err(e) => panic!("local extraction failed: {:?}", e),
         }

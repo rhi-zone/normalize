@@ -3,10 +3,28 @@
 //! `SymbolDoc` carries structured documentation for a single Rust (or future
 //! language) symbol retrieved from upstream registries such as docs.rs.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+/// Source format of a symbol's documentation body.
+///
+/// Doc bodies are stored in their source-native format and rendered to display
+/// form (Markdown) at the output layer, not at fetch time.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum DocFormat {
+    /// CommonMark / Markdown (e.g. Rust `///` doc comments).
+    Markdown,
+    /// reStructuredText (e.g. Python docstrings).
+    Rst,
+    /// An HTML fragment (e.g. a rustdoc docblock from docs.rs).
+    Html,
+    /// Unstructured plain text.
+    PlainText,
+}
+
 /// Documentation for a single named symbol from an upstream registry.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SymbolDoc {
     /// Simple name of the symbol (e.g. "Serialize").
     pub name: String,
@@ -22,59 +40,23 @@ pub struct SymbolDoc {
     pub kind: String,
     /// Formatted item declaration / signature, if available.
     pub signature: Option<String>,
-    /// Primary documentation body as Markdown.
-    pub doc_text: String,
+    /// Primary documentation body, in its source-native format (see `doc_format`).
+    pub doc_body: String,
+    /// Source format of `doc_body`.
+    pub doc_format: DocFormat,
     /// Runnable/shown examples extracted from the docs.
     pub examples: Vec<String>,
     /// Canonical source URL (e.g. `https://docs.rs/serde/1.0.193/serde/trait.Serialize.html`).
     pub source_url: String,
     /// When this record was fetched.
+    #[schemars(with = "String")]
     pub fetched_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl SymbolDoc {
-    /// Render the doc as a Markdown block suitable for pasting into LLM context.
-    pub fn to_markdown(&self) -> String {
-        // For crate-root docs (kind = "module", name = package), show just the package name.
-        let heading = if self.name == self.package || self.symbol_path == self.package {
-            self.package.clone()
-        } else {
-            format!("{}::{}", self.package, self.name)
-        };
-        let mut out = format!(
-            "# {} (rust, {} {})\n\n",
-            heading, self.package, self.version
-        );
-
-        out.push_str(&format!("{}\n\n", self.kind));
-
-        if let Some(sig) = &self.signature {
-            out.push_str("```rust\n");
-            out.push_str(sig.trim());
-            out.push_str("\n```\n\n");
-        }
-
-        if !self.doc_text.is_empty() {
-            out.push_str(self.doc_text.trim());
-            out.push_str("\n\n");
-        }
-
-        for (i, example) in self.examples.iter().enumerate() {
-            if i == 0 {
-                out.push_str("## Examples\n\n");
-            }
-            out.push_str("```rust\n");
-            out.push_str(example.trim());
-            out.push_str("\n```\n\n");
-        }
-
-        out.push_str(&format!("Source: <{}>\n", self.source_url));
-        out
-    }
-
     /// Stable knowledge-graph ID for this symbol doc.
     ///
-    /// Shape: `docs-cargo-<package>-<version>-<escaped-symbol>`.
+    /// Shape: `docs-<language>-<package>-<version>-<escaped-symbol>`.
     /// Slashes, colons and other non-[a-z0-9] chars are replaced with `-`.
     pub fn kg_id(&self) -> String {
         let path_slug = self
@@ -86,7 +68,10 @@ impl SymbolDoc {
         // Collapse consecutive dashes
         let path_slug = collapse_dashes(&path_slug);
         let version_slug = self.version.replace('.', "-");
-        format!("docs-cargo-{}-{}-{}", self.package, version_slug, path_slug)
+        format!(
+            "docs-{}-{}-{}-{}",
+            self.language, self.package, version_slug, path_slug
+        )
     }
 }
 

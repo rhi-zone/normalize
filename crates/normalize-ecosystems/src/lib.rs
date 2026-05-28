@@ -542,7 +542,7 @@ pub use ecosystems::{
 };
 
 // Re-export SymbolDoc for convenience
-pub use symbol_docs::SymbolDoc;
+pub use symbol_docs::{DocFormat, SymbolDoc};
 
 // Re-export docs traits and coordinator
 pub use docs_rs::DocsRsFetcher;

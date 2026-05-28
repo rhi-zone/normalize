@@ -396,8 +396,8 @@ primitives (current API, 3-primitive design):
 **Unit ID convention:** `[a-z0-9][a-z0-9-]*` (enforced by
 `model::validate_id`). For machine-generated IDs (docs cache, fact-derived
 units), build a deterministic slug:
-`<source>-<ecosystem>-<package>-<version>-<symbol-slug>` is the convention
-used by the docs cache (`docs-cargo-serde-1-0-228-serde-serialize`).
+`<source>-<language>-<package>-<version>-<symbol-slug>` is the convention
+used by the docs cache (`docs-rust-serde-1-0-228-serde-serialize`).
 
 **When to use KG vs the facts index:**
 
