@@ -217,6 +217,20 @@ impl Language for Python {
         }
     }
 
+    fn is_definition_node(&self, node: &Node) -> bool {
+        // Python's import grammar gives several nodes a `name` field that
+        // `node_name` returns — these re-export/import a symbol but do not define
+        // it. Treat them as non-definitions so name-based lookup skips past a
+        // re-export (`from .sessions import Session`) to the real `class Session`.
+        !matches!(
+            node.kind(),
+            "import_statement"
+                | "import_from_statement"
+                | "future_import_statement"
+                | "aliased_import"
+        )
+    }
+
     fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
         let name = symbol.name.as_str();
         match symbol.kind {

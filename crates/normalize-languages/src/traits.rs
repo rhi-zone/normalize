@@ -336,4 +336,20 @@ pub trait Language: Send + Sync {
         node.child_by_field_name("name")
             .map(|n| &content[n.byte_range()])
     }
+
+    /// Is this node a genuine definition of a symbol (vs. an import/re-export/alias)?
+    ///
+    /// Several grammars give import/re-export nodes a `name` field that
+    /// [`Language::node_name`] happily returns — e.g. Python's
+    /// `from .sessions import Session` is an `import_from_statement` whose `name`
+    /// is `Session`, even though the real `class Session` lives elsewhere. Consumers
+    /// that locate a symbol by name (e.g. source-tree doc extraction) use this to
+    /// prefer the actual definition over a re-export that merely shadows the name.
+    ///
+    /// Default: `true` (a name-bearing node is treated as a definition). Languages
+    /// whose grammar attaches names to import/re-export nodes override this to return
+    /// `false` for those node kinds.
+    fn is_definition_node(&self, _node: &Node) -> bool {
+        true
+    }
 }
