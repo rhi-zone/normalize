@@ -17,10 +17,12 @@
 //! ```
 
 mod cache;
+pub mod doc_tree;
 pub mod docs_rs;
 pub mod ecosystems;
-mod http;
+pub mod http;
 pub mod local_docs;
+pub mod source_archive;
 pub mod symbol_docs;
 
 use schemars::JsonSchema;

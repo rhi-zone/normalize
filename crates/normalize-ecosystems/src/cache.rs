@@ -13,7 +13,7 @@ struct CacheEntry {
 }
 
 /// Get base cache directory: ~/.cache/normalize
-fn cache_base() -> Option<PathBuf> {
+pub(crate) fn cache_base() -> Option<PathBuf> {
     let base = if let Ok(cache) = std::env::var("XDG_CACHE_HOME") {
         PathBuf::from(cache)
     } else if let Ok(home) = std::env::var("HOME") {

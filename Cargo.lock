@@ -5408,15 +5408,22 @@ version = "0.3.2"
 dependencies = [
  "base64 0.22.1",
  "chrono",
+ "flate2",
  "glob",
+ "normalize-languages",
+ "normalize-local-deps",
  "schemars",
  "serde",
  "serde_json",
  "serde_json_lenient",
  "serde_yaml",
+ "tar",
+ "tempfile",
  "toml",
+ "tree-sitter",
  "ureq 2.12.1",
  "urlencoding",
+ "zip",
 ]
 
 [[package]]
