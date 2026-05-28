@@ -20,6 +20,8 @@ mod cache;
 pub mod doc_tree;
 pub mod docs_rs;
 pub mod ecosystems;
+#[cfg(feature = "go")]
+pub mod go_docs;
 pub mod http;
 pub mod local_docs;
 pub mod source_archive;
@@ -564,4 +566,6 @@ pub use symbol_docs::{DocFormat, SymbolDoc};
 
 // Re-export docs traits and coordinator
 pub use docs_rs::DocsRsFetcher;
+#[cfg(feature = "go")]
+pub use go_docs::{GoLocalDocsExtractor, GoRemoteDocsFetcher};
 pub use local_docs::CargoLocalDocsExtractor;

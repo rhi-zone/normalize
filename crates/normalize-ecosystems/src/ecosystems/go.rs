@@ -1,8 +1,9 @@
 //! Go modules ecosystem.
 
 use crate::{
-    AuditResult, Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo,
-    PackageQuery, TreeNode, Vulnerability, VulnerabilitySeverity,
+    AuditResult, Dependency, DependencyTree, Ecosystem, GoLocalDocsExtractor, GoRemoteDocsFetcher,
+    LocalDocsExtractor, LockfileManager, PackageError, PackageInfo, PackageQuery,
+    RemoteDocsFetcher, TreeNode, Vulnerability, VulnerabilitySeverity,
 };
 use std::path::Path;
 use std::process::Command;
@@ -160,6 +161,46 @@ impl Ecosystem for Go {
             return vec![module.to_string()];
         }
         Vec::new()
+    }
+
+    fn docs_extractor(&self, project_root: &Path) -> Option<Box<dyn LocalDocsExtractor>> {
+        Some(Box::new(GoLocalDocsExtractor::new(project_root)))
+    }
+
+    fn docs_fetcher(&self) -> Option<Box<dyn RemoteDocsFetcher>> {
+        Some(Box::new(GoRemoteDocsFetcher))
+    }
+
+    /// Split a Go doc query into `(import_path, symbol)`.
+    ///
+    /// Two accepted syntaxes:
+    /// - Explicit `import/path#Symbol` (the `#` separates the import path from the
+    ///   symbol). Use this when the import path itself contains dots that would
+    ///   otherwise be ambiguous (e.g. `github.com/gin-gonic/gin#Engine`).
+    /// - Last-dot split, mirroring Go's selector syntax: everything before the final
+    ///   `.` is the import path / package, the segment after it is the symbol.
+    ///   `fmt.Println` -> `("fmt", "Println")`;
+    ///   `github.com/gin-gonic/gin.Engine` -> `("github.com/gin-gonic/gin", "Engine")`.
+    ///
+    /// A bare symbol with neither `#` nor `.` cannot be attributed to a package and
+    /// returns `None`.
+    fn package_from_symbol(&self, symbol: &str) -> Option<(String, String)> {
+        if let Some((path, sym)) = symbol.split_once('#') {
+            if path.is_empty() || sym.is_empty() {
+                return None;
+            }
+            return Some((path.to_string(), sym.to_string()));
+        }
+        // Last-dot split: import path before the final '.', symbol after.
+        let (path, sym) = symbol.rsplit_once('.')?;
+        if path.is_empty() || sym.is_empty() {
+            return None;
+        }
+        Some((path.to_string(), sym.to_string()))
+    }
+
+    fn docs_language(&self) -> &'static str {
+        "go"
     }
 
     fn audit(&self, project_root: &Path) -> Result<AuditResult, PackageError> {
