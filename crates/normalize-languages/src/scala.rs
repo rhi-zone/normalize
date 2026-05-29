@@ -23,6 +23,10 @@ impl Language for Scala {
         Some(self)
     }
 
+    fn as_refactor_codegen(&self) -> Option<&dyn crate::RefactorCodeGen> {
+        Some(self)
+    }
+
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }
@@ -249,6 +253,132 @@ impl Language for Scala {
 }
 
 impl LanguageSymbols for Scala {}
+
+impl crate::RefactorCodeGen for Scala {
+    fn format_param(&self, name: &str, ty: Option<&str>) -> String {
+        match ty {
+            Some(t) => format!("{}: {}", name, t),
+            None => name.to_string(),
+        }
+    }
+
+    fn render_binding(&self, name: &str, expr: &str, indent: &str) -> String {
+        format!("{}val {} = {}\n", indent, name, expr)
+    }
+
+    fn render_function(&self, spec: &crate::ExtractedFnSpec) -> String {
+        use crate::GenReturn;
+        let param_str = spec
+            .params
+            .iter()
+            .map(|p| match &p.inferred_type {
+                Some(ty) => format!("{}: {}", p.name, ty),
+                None => format!("{}: Any", p.name),
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let ret_anno = match &spec.ret {
+            GenReturn::Unit => ": Unit".to_string(),
+            GenReturn::Single(v) => format!(": /* {} */", v),
+            GenReturn::Tuple(vs) => format!(": ({})", vs.join(", ")),
+            GenReturn::Result(ok, _) => format!(": /* {} */", ok),
+        };
+        let indent = &spec.indent;
+        let return_expr = match &spec.ret {
+            GenReturn::Unit => String::new(),
+            GenReturn::Single(v) => format!("\n{}    {}", indent, v),
+            GenReturn::Tuple(vs) => format!("\n{}    ({})", indent, vs.join(", ")),
+            GenReturn::Result(ok, _) => format!("\n{}    {}", indent, ok),
+        };
+
+        let body = spec
+            .body_lines
+            .iter()
+            .map(|l| format!("{}    {}", indent, l))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            "\n{}private def {}({}){} = {{\n{}{}\n{}}}\n",
+            indent, spec.name, param_str, ret_anno, body, return_expr, indent
+        )
+    }
+
+    fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
+        use crate::GenReturn;
+        let args = spec
+            .params
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let indent = &spec.indent;
+        let name = &spec.name;
+        match &spec.ret {
+            GenReturn::Unit => format!("{}{}({})\n", indent, name, args),
+            GenReturn::Single(v) => format!("{}val {} = {}({})\n", indent, v, name, args),
+            GenReturn::Tuple(vs) => {
+                format!("{}val ({}) = {}({})\n", indent, vs.join(", "), name, args)
+            }
+            GenReturn::Result(ok, _) => format!("{}val {} = {}({})\n", indent, ok, name, args),
+        }
+    }
+
+    fn supports_multi_return(&self) -> bool {
+        // Scala tuples: `(Int, String)` + `val (a, b) = f()`.
+        true
+    }
+
+    fn infer_param_type(&self, content: &str, name: &str) -> Option<String> {
+        let pattern = format!("{}: ", name);
+        let pos = content.find(&pattern)?;
+        let after = &content[pos + pattern.len()..];
+        let end = after.find([',', ')', '=', '\n']).unwrap_or(after.len());
+        let ty = after[..end].trim().to_string();
+        if ty.is_empty() { None } else { Some(ty) }
+    }
+}
+
+#[cfg(test)]
+mod refactor_codegen_tests {
+    use super::Scala;
+    use crate::{CallSiteSpec, ExtractedFnSpec, GenParam, GenReturn, RefactorCodeGen};
+
+    #[test]
+    fn scala_fn_basic() {
+        let spec = ExtractedFnSpec {
+            name: "double".to_string(),
+            params: vec![GenParam {
+                name: "n".to_string(),
+                inferred_type: Some("Int".to_string()),
+                mutable: false,
+            }],
+            ret: GenReturn::Single("result".to_string()),
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["val result = n * 2".to_string()],
+            indent: String::new(),
+        };
+        assert_eq!(
+            Scala.render_function(&spec),
+            "\nprivate def double(n: Int): /* result */ = {\n    val result = n * 2\n    result\n}\n"
+        );
+    }
+
+    #[test]
+    fn scala_call_site_and_binding() {
+        let spec = CallSiteSpec {
+            name: "pair".to_string(),
+            params: vec![],
+            ret: GenReturn::Tuple(vec!["a".to_string(), "b".to_string()]),
+            is_async: false,
+            indent: "  ".to_string(),
+        };
+        assert_eq!(Scala.render_call_site(&spec), "  val (a, b) = pair()\n");
+        assert_eq!(Scala.render_binding("x", "f()", "  "), "  val x = f()\n");
+        assert_eq!(Scala.format_param("n", Some("Int")), "n: Int");
+    }
+}
 
 // =============================================================================
 // Scala Module Resolver

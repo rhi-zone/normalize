@@ -1017,8 +1017,8 @@ RESOLVED 2026-05-30: Added CommonJS `require()` patterns (simple binding, shorth
 - [x] java (`.refactor.scm` + codegen done)
 - [x] ruby
 - [x] kotlin
-- [ ] scala
-- [ ] groovy
+- [x] scala
+- [x] groovy
 - [x] c-sharp
 - [ ] vb
 - [ ] fsharp

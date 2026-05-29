@@ -1225,6 +1225,8 @@ fn bundled_refactor_query(name: &str) -> Option<&'static str> {
         "dart" => Some(include_str!("queries/dart.refactor.scm")),
         "c-sharp" => Some(include_str!("queries/c-sharp.refactor.scm")),
         "php" => Some(include_str!("queries/php.refactor.scm")),
+        "scala" => Some(include_str!("queries/scala.refactor.scm")),
+        "groovy" => Some(include_str!("queries/groovy.refactor.scm")),
         _ => None,
     }
 }
@@ -1247,6 +1249,8 @@ const BUNDLED_REFACTOR_LANGS: &[&str] = &[
     "dart",
     "c-sharp",
     "php",
+    "scala",
+    "groovy",
 ];
 
 /// Return a bundled test-regions query for a grammar, if available.
