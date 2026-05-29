@@ -9,12 +9,10 @@
 //! 5. At each call site: find the argument list; insert `default_value` at `position`.
 //! 6. Return a `RefactoringPlan` with one `PlannedEdit` per affected file.
 //!
-//! Language support: Rust, TypeScript/JavaScript, Python.
-//! Node kinds by language:
-//! - Rust: `function_item` → `parameters`, args in `arguments`
-//! - Python: `function_definition` → `parameters`, args in `argument_list`
-//! - JS/TS: `function_declaration`/`function`/`method_definition`/`arrow_function`
-//!   → `formal_parameters`, args in `arguments`
+//! Language support is driven entirely by the `*.refactor.scm` query (structural
+//! classification) plus the `RefactorCodeGen` trait (parameter formatting). A
+//! language with neither yields a clear "not supported" error rather than a
+//! Rust-shaped default.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -22,6 +20,7 @@ use std::path::Path;
 use normalize_languages::parsers::parse_with_grammar;
 use normalize_languages::support_for_path;
 
+use crate::refactor_query::RefactorCaptures;
 use crate::{PlannedEdit, RefactoringContext, RefactoringPlan};
 
 /// Outcome of a successful add-parameter plan.
@@ -157,7 +156,21 @@ fn plan_add_param_in_definition(
         )
     })?;
 
-    let params_range = find_param_list(&tree.root_node(), content, grammar, function_name)
+    let cg = support.as_refactor_codegen().ok_or_else(|| {
+        format!(
+            "add-parameter does not support language {} (no code generation implemented)",
+            support.name()
+        )
+    })?;
+
+    let caps = RefactorCaptures::load(grammar, tree.root_node(), content).ok_or_else(|| {
+        format!(
+            "add-parameter does not support language {} (no refactor query)",
+            support.name()
+        )
+    })?;
+
+    let params_range = find_param_list(&tree.root_node(), content, &caps, function_name)
         .ok_or_else(|| {
             format!(
                 "Function '{}' not found in {}",
@@ -166,7 +179,7 @@ fn plan_add_param_in_definition(
             )
         })?;
 
-    let param_text = format_param(grammar, param_name, param_type);
+    let param_text = cg.format_param(param_name, param_type);
     let new_content = insert_into_list(
         content,
         &params_range,
@@ -206,14 +219,15 @@ fn plan_add_arg_in_file(
         )
     })?;
 
+    let caps = RefactorCaptures::load(grammar, tree.root_node(), content).ok_or_else(|| {
+        format!(
+            "add-parameter does not support language {} (no refactor query)",
+            support.name()
+        )
+    })?;
+
     // Collect all argument list ranges for calls to `function_name` on the given lines.
-    let ranges = find_call_arg_lists(
-        &tree.root_node(),
-        content,
-        grammar,
-        function_name,
-        call_lines,
-    );
+    let ranges = find_call_arg_lists(&tree.root_node(), content, &caps, function_name, call_lines);
 
     if ranges.is_empty() {
         return Ok(None);
@@ -325,18 +339,15 @@ fn walk_tree(node: tree_sitter::Node<'_>, f: &mut impl FnMut(tree_sitter::Node<'
 fn find_param_list(
     root: &tree_sitter::Node<'_>,
     content: &str,
-    grammar: &str,
+    caps: &RefactorCaptures,
     name: &str,
 ) -> Option<ListRange> {
-    let fn_kinds = function_item_kinds(grammar);
-    let param_list_kind = param_list_kind(grammar);
-
     let mut result: Option<ListRange> = None;
     walk_tree(*root, &mut |node| {
         if result.is_some() {
             return;
         }
-        if !fn_kinds.contains(&node.kind()) {
+        if !caps.is("function_def", &node) {
             return;
         }
         // Check if this function's name matches.
@@ -346,7 +357,7 @@ fn find_param_list(
         // Find the parameter list child.
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            if child.kind() == param_list_kind {
+            if caps.is("param_list", &child) {
                 result = Some(list_range_from_node(&child, content));
                 break;
             }
@@ -359,16 +370,13 @@ fn find_param_list(
 fn find_call_arg_lists(
     root: &tree_sitter::Node<'_>,
     content: &str,
-    grammar: &str,
+    caps: &RefactorCaptures,
     function_name: &str,
     call_lines: &[usize],
 ) -> Vec<ListRange> {
-    let call_kind = call_kind(grammar);
-    let arg_list_kind = arg_list_kind(grammar);
-
     let mut results = vec![];
     walk_tree(*root, &mut |node| {
-        if node.kind() != call_kind {
+        if !caps.is("call", &node) {
             return;
         }
         // The call node's 1-based start line.
@@ -383,7 +391,7 @@ fn find_call_arg_lists(
         // Find the argument list.
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            if child.kind() == arg_list_kind {
+            if caps.is("arg_list", &child) {
                 results.push(list_range_from_node(&child, content));
                 break;
             }
@@ -425,67 +433,7 @@ fn list_range_from_node(node: &tree_sitter::Node<'_>, content: &str) -> ListRang
     }
 }
 
-// ── Language-specific helpers ─────────────────────────────────────────────────
-
-fn function_item_kinds(grammar: &str) -> &'static [&'static str] {
-    match grammar {
-        "rust" => &["function_item", "function_signature_item"],
-        "python" => &["function_definition"],
-        "javascript" | "typescript" | "tsx" => &[
-            "function_declaration",
-            "function",
-            "method_definition",
-            "arrow_function",
-        ],
-        _ => &[
-            "function_item",
-            "function_declaration",
-            "function_definition",
-        ],
-    }
-}
-
-fn param_list_kind(grammar: &str) -> &'static str {
-    match grammar {
-        "python" => "parameters",
-        "javascript" | "typescript" | "tsx" => "formal_parameters",
-        _ => "parameters",
-    }
-}
-
-fn call_kind(grammar: &str) -> &'static str {
-    match grammar {
-        "python" => "call",
-        _ => "call_expression",
-    }
-}
-
-fn arg_list_kind(grammar: &str) -> &'static str {
-    match grammar {
-        "python" => "argument_list",
-        _ => "arguments",
-    }
-}
-
-/// Build the parameter text for the definition.
-fn format_param(grammar: &str, name: &str, ty: Option<&str>) -> String {
-    match grammar {
-        "rust" => match ty {
-            Some(t) => format!("{}: {}", name, t),
-            None => name.to_string(),
-        },
-        "typescript" | "tsx" => match ty {
-            Some(t) => format!("{}: {}", name, t),
-            None => name.to_string(),
-        },
-        "python" => name.to_string(),
-        "javascript" => name.to_string(),
-        _ => match ty {
-            Some(t) => format!("{}: {}", name, t),
-            None => name.to_string(),
-        },
-    }
-}
+// ── Name-extraction helpers (cross-language identifier-kind union) ─────────────
 
 /// Check whether a function node's name identifier matches `name`.
 fn function_name_matches(node: &tree_sitter::Node<'_>, content: &str, name: &str) -> bool {
@@ -847,6 +795,28 @@ mod tests {
         assert!(
             err.contains("not found"),
             "expected 'not found' in: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn unsupported_language_returns_clean_error() {
+        // Go has no `*.refactor.scm` query — add-parameter must refuse with a
+        // clear "does not support" message rather than fall through.
+        if !grammar_available("go") {
+            eprintln!("skipping: go grammar not available");
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("test.go");
+        let content = "func myFunc(a int) bool {\n    return true\n}\n";
+        std::fs::write(&file, content).unwrap();
+
+        let res = plan_add_param_in_definition(&file, content, "myFunc", "b", Some("string"), None);
+        let err = res.err().expect("should error for unsupported language");
+        assert!(
+            err.contains("does not support"),
+            "expected a clean unsupported-language error, got: {}",
             err
         );
     }

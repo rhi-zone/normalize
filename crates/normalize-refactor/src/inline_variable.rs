@@ -11,17 +11,19 @@
 //! 6. Replace each reference with the initializer expression text (wrapping in parens if needed).
 //! 7. Remove the declaration statement line.
 //!
-//! Language-specific declaration node kinds:
-//! - Rust: `let_declaration`  — pattern child is `identifier` or `_pattern`, value child via `=`
-//! - JS/TS: `lexical_declaration` (const/let) / `variable_declaration` (var) — contains
-//!   `variable_declarator` which has `name: identifier` and `value: <expr>`
-//! - Python: `assignment` — left child is `identifier`, right is the value
+//! Declaration nodes are classified by the `@refactor.var_decl` capture and
+//! reassignment targets by `@refactor.reassign`; scopes/blocks by
+//! `@refactor.scope`/`@refactor.block`. The structural navigation that finds the
+//! binding identifier and the initializer within a declaration uses tree-sitter
+//! field names (extraction), trying the binding strategies the supported grammars
+//! use (Rust `let`, JS/TS `variable_declarator`, Python `assignment`).
 
 use std::path::Path;
 
 use normalize_languages::parsers::parse_with_grammar;
 use normalize_languages::support_for_path;
 
+use crate::refactor_query::RefactorCaptures;
 use crate::{PlannedEdit, RefactoringPlan};
 
 /// Outcome of a successful inline-variable plan.
@@ -62,6 +64,13 @@ pub fn plan_inline_variable(
 
     let root_node = tree.root_node();
 
+    let caps = RefactorCaptures::load(grammar, root_node, content).ok_or_else(|| {
+        format!(
+            "inline-variable does not support language {} (no refactor query)",
+            support.name()
+        )
+    })?;
+
     // Convert line:col to byte offset.
     let target_byte = line_col_to_byte(content, line, col).ok_or_else(|| {
         format!(
@@ -89,21 +98,21 @@ pub fn plan_inline_variable(
     let var_name = &content[ident_node.start_byte()..ident_node.end_byte()];
 
     // Walk up to find the declaration node.
-    let decl_node = find_declaration_node(&ident_node, grammar)?;
+    let decl_node = find_declaration_node(&ident_node, &caps)?;
 
     // Extract the initializer expression.
-    let initializer = extract_initializer(content, &decl_node, grammar)?;
+    let initializer = extract_initializer(content, &decl_node)?;
     let init_text = content[initializer.start_byte()..initializer.end_byte()].to_string();
 
     // Find the scope node (the block/function/module containing the declaration).
-    let scope_node = find_scope_node(&decl_node)
+    let scope_node = find_scope_node(&decl_node, &caps)
         .ok_or_else(|| "Could not find a scope containing the declaration".to_string())?;
 
     // Find the declaration statement (the direct child of the scope block).
     let decl_stmt = find_declaration_statement(&decl_node, &scope_node)?;
 
     // Walk the scope to find all references and check for reassignments.
-    let refs = collect_references(content, &scope_node, var_name, &decl_node, grammar)?;
+    let refs = collect_references(content, &scope_node, var_name, &decl_node, &caps)?;
 
     // Decide whether to wrap the init_text in parentheses.
     // Wrap if the initializer is a binary expression, conditional, or similar compound expression
@@ -176,11 +185,11 @@ pub fn plan_inline_variable(
     })
 }
 
-/// Find the declaration node (let_declaration, lexical_declaration, variable_declaration,
-/// or assignment) that contains the given identifier as the bound name.
+/// Find the declaration node (captured `@refactor.var_decl`) that contains the
+/// given identifier as the bound name.
 fn find_declaration_node<'a>(
     ident: &tree_sitter::Node<'a>,
-    grammar: &str,
+    caps: &RefactorCaptures,
 ) -> Result<tree_sitter::Node<'a>, String> {
     let mut current = *ident;
     loop {
@@ -189,230 +198,107 @@ fn find_declaration_node<'a>(
                 "Identifier is not inside a variable declaration — cannot inline".to_string(),
             );
         };
-        match grammar {
-            "rust" => {
-                if parent.kind() == "let_declaration" {
-                    // Verify the ident is the binding pattern, not the initializer.
-                    // In a let_declaration, the pattern is the first named child (before `=`).
-                    if is_binding_ident_in_rust_let(&parent, ident) {
-                        return Ok(parent);
-                    }
-                    return Err(
-                        "Identifier is in the initializer, not the binding pattern".to_string()
-                    );
-                }
+        if caps.is("var_decl", &parent) {
+            // Verify the ident is the binding, not the initializer/RHS.
+            if is_binding_ident_in_var_decl(&parent, ident) {
+                return Ok(parent);
             }
-            "javascript" | "typescript" | "tsx" => {
-                if matches!(
-                    parent.kind(),
-                    "lexical_declaration" | "variable_declaration"
-                ) {
-                    // The ident should be inside a variable_declarator.name
-                    if is_binding_ident_in_js_decl(&parent, ident) {
-                        return Ok(parent);
-                    }
-                    return Err(
-                        "Identifier is in the initializer, not the binding name".to_string()
-                    );
-                }
-            }
-            "python" => {
-                if parent.kind() == "assignment" {
-                    // In Python, the left side is the target.
-                    if is_binding_ident_in_python_assign(&parent, ident) {
-                        return Ok(parent);
-                    }
-                    return Err(
-                        "Identifier is in the right-hand side, not the binding target".to_string(),
-                    );
-                }
-            }
-            _ => {
-                // Generic: accept common patterns
-                if matches!(
-                    parent.kind(),
-                    "let_declaration"
-                        | "lexical_declaration"
-                        | "variable_declaration"
-                        | "assignment"
-                ) {
-                    return Ok(parent);
-                }
-            }
+            return Err("Identifier is in the initializer, not the binding pattern".to_string());
         }
         current = parent;
     }
 }
 
-/// Check if `ident` is the binding name in a Rust `let_declaration`.
-fn is_binding_ident_in_rust_let(
-    let_decl: &tree_sitter::Node<'_>,
-    ident: &tree_sitter::Node<'_>,
-) -> bool {
-    // Structure: (let_declaration (identifier) "=" <expr> ";")
-    // Walk the let_decl's children to find the pattern (before "=").
-    let mut cursor = let_decl.walk();
-    let mut saw_eq = false;
-    for child in let_decl.children(&mut cursor) {
-        if child.kind() == "=" {
-            saw_eq = true;
-            break;
-        }
-        // The pattern is the first named child (identifier, or destructuring pattern).
-        if child.kind() == "identifier" && child.id() == ident.id() {
-            return true;
-        }
-        // Could also be a mutable_specifier before the ident.
-    }
-    let _ = saw_eq;
-    false
-}
-
-/// Check if `ident` is the binding name in a JS/TS `lexical_declaration` or `variable_declaration`.
-fn is_binding_ident_in_js_decl(
+/// Check whether `ident` is the *binding* identifier of a declaration node,
+/// rather than something in the initializer / RHS.
+///
+/// Pure structural (field-name) navigation — tries the binding strategies the
+/// supported grammars use, keyed on the declaration's shape, not the grammar:
+/// - Rust `let_declaration`: first `identifier` child before `=`.
+/// - JS/TS: a `variable_declarator` whose `name` field is the ident.
+/// - Python `assignment`: the `left` field (or first identifier child).
+fn is_binding_ident_in_var_decl(
     decl: &tree_sitter::Node<'_>,
     ident: &tree_sitter::Node<'_>,
 ) -> bool {
-    // Structure: (lexical_declaration "const"/"let" (variable_declarator name: (identifier) value: <expr>))
-    let mut cursor = decl.walk();
-    for child in decl.children(&mut cursor) {
-        if child.kind() == "variable_declarator" {
-            // The `name` field is the identifier.
-            if let Some(name_node) = child.child_by_field_name("name")
-                && name_node.id() == ident.id()
-            {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-/// Check if `ident` is on the left side of a Python `assignment`.
-fn is_binding_ident_in_python_assign(
-    assign: &tree_sitter::Node<'_>,
-    ident: &tree_sitter::Node<'_>,
-) -> bool {
-    // Structure: (assignment left: (identifier) right: <expr>)
-    if let Some(left) = assign.child_by_field_name("left") {
+    // Python-style: `left` field is the binding target.
+    if let Some(left) = decl.child_by_field_name("left") {
         return left.id() == ident.id();
     }
-    // Fallback: first child that is an identifier is the left side.
-    let mut cursor = assign.walk();
-    if let Some(child) = assign.children(&mut cursor).next()
-        && child.kind() == "identifier"
-    {
-        return child.id() == ident.id();
+
+    let mut cursor = decl.walk();
+    for child in decl.children(&mut cursor) {
+        // JS/TS-style: the binding name lives in a variable_declarator's `name` field.
+        if let Some(name_node) = child.child_by_field_name("name")
+            && name_node.id() == ident.id()
+        {
+            return true;
+        }
+        // Rust-style: the binding pattern is the first `identifier` before `=`.
+        if child.kind() == "=" {
+            break;
+        }
+        if child.kind() == "identifier" && child.id() == ident.id() {
+            return true;
+        }
     }
     false
 }
 
 /// Extract the initializer expression node from a declaration node.
+///
+/// Pure structural (field-name) navigation, trying the supported grammars'
+/// initializer shapes: a `right` field (Python), a `variable_declarator`'s
+/// `value` field (JS/TS), or the first named node after `=` (Rust et al.).
 fn extract_initializer<'a>(
     content: &str,
     decl: &tree_sitter::Node<'a>,
-    grammar: &str,
 ) -> Result<tree_sitter::Node<'a>, String> {
-    match grammar {
-        "rust" => {
-            // let_declaration: (let "mut"? <pattern> ":" <type>? "=" <value> ";")
-            // The value comes after "=".
-            let mut cursor = decl.walk();
-            let mut after_eq = false;
-            for child in decl.children(&mut cursor) {
-                if child.kind() == "=" {
-                    after_eq = true;
-                    continue;
-                }
-                if after_eq && child.kind() != ";" && child.is_named() {
-                    return Ok(child);
-                }
-            }
-            Err(format!(
-                "Variable has no initializer — cannot inline (content: {:?})",
-                &content[decl.start_byte()..decl.end_byte()]
-            ))
-        }
-        "javascript" | "typescript" | "tsx" => {
-            // lexical_declaration/variable_declaration contains a variable_declarator.
-            let mut cursor = decl.walk();
-            for child in decl.children(&mut cursor) {
-                if child.kind() == "variable_declarator" {
-                    if let Some(val) = child.child_by_field_name("value") {
-                        return Ok(val);
-                    }
-                    return Err(format!(
-                        "Variable '{}' has no initializer — cannot inline",
-                        &content[decl.start_byte()..decl.end_byte()]
-                    ));
-                }
-            }
-            Err("Could not find variable_declarator in declaration".to_string())
-        }
-        "python" => {
-            // assignment: left "=" right
-            if let Some(right) = decl.child_by_field_name("right") {
-                return Ok(right);
-            }
-            // Fallback: node after "="
-            let mut cursor = decl.walk();
-            let mut after_eq = false;
-            for child in decl.children(&mut cursor) {
-                if child.kind() == "=" {
-                    after_eq = true;
-                    continue;
-                }
-                if after_eq && child.is_named() {
-                    return Ok(child);
-                }
-            }
-            Err("Python assignment has no right-hand side — cannot inline".to_string())
-        }
-        _ => {
-            // Generic: find value after "=".
-            let mut cursor = decl.walk();
-            let mut after_eq = false;
-            for child in decl.children(&mut cursor) {
-                if child.kind() == "=" {
-                    after_eq = true;
-                    continue;
-                }
-                if after_eq && child.is_named() {
-                    return Ok(child);
-                }
-            }
-            Err("Declaration has no initializer — cannot inline".to_string())
+    // Python-style: `right` field is the value.
+    if let Some(right) = decl.child_by_field_name("right") {
+        return Ok(right);
+    }
+
+    // JS/TS-style: a variable_declarator with a `value` field.
+    let mut cursor = decl.walk();
+    for child in decl.children(&mut cursor) {
+        if let Some(val) = child.child_by_field_name("value") {
+            return Ok(val);
         }
     }
+
+    // Rust-style and generic: the first named node after `=` (excluding `;`).
+    let mut cursor = decl.walk();
+    let mut after_eq = false;
+    for child in decl.children(&mut cursor) {
+        if child.kind() == "=" {
+            after_eq = true;
+            continue;
+        }
+        if after_eq && child.kind() != ";" && child.is_named() {
+            return Ok(child);
+        }
+    }
+
+    Err(format!(
+        "Variable has no initializer — cannot inline (content: {:?})",
+        &content[decl.start_byte()..decl.end_byte()]
+    ))
 }
 
-/// Find the innermost scope node (block/function body/module) that contains the declaration.
-fn find_scope_node<'a>(decl: &tree_sitter::Node<'a>) -> Option<tree_sitter::Node<'a>> {
+/// Find the innermost scope node (captured `@refactor.scope`) that contains the
+/// declaration.
+fn find_scope_node<'a>(
+    decl: &tree_sitter::Node<'a>,
+    caps: &RefactorCaptures,
+) -> Option<tree_sitter::Node<'a>> {
     let mut current = decl.parent()?;
     loop {
-        if is_scope_kind(current.kind()) {
+        if caps.is("scope", &current) {
             return Some(current);
         }
         current = current.parent()?;
     }
-}
-
-fn is_scope_kind(kind: &str) -> bool {
-    matches!(
-        kind,
-        // Rust
-        "block"
-        // Python
-        | "module"
-        | "body"
-        // JS/TS
-        | "program"
-        | "statement_block"
-        // Generic
-        | "source_file"
-        | "function_body"
-        | "class_body"
-    )
 }
 
 /// Find the statement node that is the direct child of scope_node and contains decl.
@@ -442,7 +328,7 @@ fn collect_references(
     scope: &tree_sitter::Node<'_>,
     var_name: &str,
     decl: &tree_sitter::Node<'_>,
-    grammar: &str,
+    caps: &RefactorCaptures,
 ) -> Result<Vec<usize>, String> {
     let mut refs: Vec<usize> = vec![];
     let mut cursor = scope.walk();
@@ -462,7 +348,7 @@ fn collect_references(
             return WalkAction::Continue;
         }
         // Check if this identifier is a reassignment target.
-        if is_reassignment(node, grammar) {
+        if is_reassignment(node, caps) {
             return WalkAction::Reassignment;
         }
         refs.push(node.start_byte());
@@ -532,59 +418,18 @@ where
 
 /// Check if an identifier node is a reassignment target (not a use).
 ///
-/// Conservative: only flags clearly identifiable reassignment patterns.
-fn is_reassignment(node: tree_sitter::Node<'_>, grammar: &str) -> bool {
+/// Conservative: the node's parent must be captured `@refactor.reassign` and the
+/// node must be its `left` (assignment-target) field.
+fn is_reassignment(node: tree_sitter::Node<'_>, caps: &RefactorCaptures) -> bool {
     let Some(parent) = node.parent() else {
         return false;
     };
-    match grammar {
-        "rust" => {
-            // assignment_expression where the left side is this ident.
-            if parent.kind() == "assignment_expression"
-                && let Some(left) = parent.child_by_field_name("left")
-            {
-                return left.id() == node.id();
-            }
-            // compound_assignment_expression
-            if parent.kind() == "compound_assignment_expr"
-                && let Some(left) = parent.child_by_field_name("left")
-            {
-                return left.id() == node.id();
-            }
-            false
-        }
-        "javascript" | "typescript" | "tsx" => {
-            // assignment_expression where the left side is this ident.
-            if parent.kind() == "assignment_expression"
-                && let Some(left) = parent.child_by_field_name("left")
-            {
-                return left.id() == node.id();
-            }
-            // augmented_assignment_expression
-            if parent.kind() == "augmented_assignment_expression"
-                && let Some(left) = parent.child_by_field_name("left")
-            {
-                return left.id() == node.id();
-            }
-            false
-        }
-        "python" => {
-            // assignment where the left side is this ident (and it's not the original decl).
-            if parent.kind() == "assignment"
-                && let Some(left) = parent.child_by_field_name("left")
-            {
-                return left.id() == node.id();
-            }
-            // augmented_assignment
-            if parent.kind() == "augmented_assignment"
-                && let Some(left) = parent.child_by_field_name("left")
-            {
-                return left.id() == node.id();
-            }
-            false
-        }
-        _ => false,
+    if caps.is("reassign", &parent)
+        && let Some(left) = parent.child_by_field_name("left")
+    {
+        return left.id() == node.id();
     }
+    false
 }
 
 /// Returns true if the expression node likely needs parentheses when substituted inline.
@@ -850,6 +695,30 @@ mod tests {
         assert!(
             !outcome.plan.warnings.is_empty(),
             "should warn about side effects with multiple references"
+        );
+    }
+
+    /// Returns true if the named external grammar can be loaded.
+    fn grammar_available(name: &str) -> bool {
+        normalize_languages::parsers::parser_for(name).is_some()
+    }
+
+    #[test]
+    fn test_unsupported_language_returns_clean_error() {
+        // Go has codegen but no `*.refactor.scm` query — the recipe must refuse
+        // with a clear "does not support" message rather than fall through.
+        if !grammar_available("go") {
+            eprintln!("skipping: go grammar not available");
+            return;
+        }
+        let content = "func main() {\n    x := 1 + 2\n    println(x)\n}\n";
+        let (line, col) = find_pos(content, "x := 1");
+        let result = plan_inline_variable(&PathBuf::from("test.go"), content, line, col);
+        let msg = result.err().expect("should error for unsupported language");
+        assert!(
+            msg.contains("does not support") && msg.contains("refactor query"),
+            "expected a clean unsupported-language error, got: {}",
+            msg
         );
     }
 }

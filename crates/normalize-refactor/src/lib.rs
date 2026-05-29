@@ -12,6 +12,7 @@ pub mod inline_function;
 pub mod inline_variable;
 pub mod introduce_variable;
 pub mod move_item;
+pub mod refactor_query;
 pub mod rename;
 
 use std::path::PathBuf;

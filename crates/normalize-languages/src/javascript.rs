@@ -151,6 +151,9 @@ impl crate::RefactorCodeGen for JavaScript {
     fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
         ecmascript::refactor_render_call_site(spec)
     }
+    fn supports_multi_return(&self) -> bool {
+        true
+    }
 }
 
 // =============================================================================

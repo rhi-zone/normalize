@@ -209,6 +209,21 @@ pub trait RefactorCodeGen: Language {
     fn uses_result_for_exceptions(&self) -> bool {
         false
     }
+
+    /// Best-effort: does the binding for `name` in `content` use a mutable binding
+    /// keyword (Rust `let mut`)? The index does not store mutability, so this is a
+    /// text heuristic owned by the language. Default `false` (the language has no
+    /// mutable-binding concept the extracted signature must reproduce).
+    fn param_is_mutable(&self, _content: &str, _name: &str) -> bool {
+        false
+    }
+
+    /// Best-effort: extract a type annotation for the parameter `name` from
+    /// `content` (a text heuristic over function parameter lists / declarations).
+    /// Returns `None` when no annotation is found or the language is untyped.
+    fn infer_param_type(&self, _content: &str, _name: &str) -> Option<String> {
+        None
+    }
 }
 
 // === Helper functions for common extractor patterns ===

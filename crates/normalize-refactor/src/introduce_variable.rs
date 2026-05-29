@@ -7,16 +7,16 @@
 //! 4. Insert `let <name> = <expr>;` (or the language-appropriate binding) before the statement.
 //! 5. Replace the original expression text with `<name>`.
 //!
-//! Language-specific keyword mapping (everything else uses `let`):
-//! - Python: `<name> = <expr>` (no keyword)
-//! - JavaScript / TypeScript: `const <name> = <expr>;`
-//! - Rust, Go, Swift, Kotlin, Scala, Dart, etc.: `let <name> = <expr>;`
+//! The binding keyword (`let`/`const`/none) is produced by the language's
+//! `RefactorCodeGen::render_binding`. Statement vs. block classification is driven
+//! by the `@refactor.statement` / `@refactor.block` captures.
 
 use std::path::Path;
 
 use normalize_languages::parsers::parse_with_grammar;
 use normalize_languages::support_for_path;
 
+use crate::refactor_query::RefactorCaptures;
 use crate::{PlannedEdit, RefactoringPlan};
 
 /// A byte range selected by the user.
@@ -74,6 +74,20 @@ pub fn plan_introduce_variable(
 
     let root = tree.root_node();
 
+    let cg = support.as_refactor_codegen().ok_or_else(|| {
+        format!(
+            "introduce-variable does not support language {} (no code generation implemented)",
+            support.name()
+        )
+    })?;
+
+    let caps = RefactorCaptures::load(grammar, root, content).ok_or_else(|| {
+        format!(
+            "introduce-variable does not support language {} (no refactor query)",
+            support.name()
+        )
+    })?;
+
     // Find the innermost node that covers the selection range.
     let expr_node = root
         .descendant_for_byte_range(range.start, range.end)
@@ -102,12 +116,17 @@ pub fn plan_introduce_variable(
         return Err("Selected range is empty or whitespace only".to_string());
     }
 
-    // Verify the node kind looks like an expression (not a statement wrapper, keyword, etc.).
-    let kind = expr_node.kind();
-    if is_statement_kind(kind) {
+    // Verify the node looks like an expression (not a statement wrapper, keyword, etc.).
+    // A node is "not an expression" if it is captured as a statement, a variable
+    // declaration, a reassignment, or a block/scope container.
+    if caps.is("statement", &expr_node)
+        || caps.is("var_decl", &expr_node)
+        || caps.is("reassign", &expr_node)
+        || caps.is("block", &expr_node)
+    {
         return Err(format!(
             "Selected node '{}' is a statement, not an expression. Select the expression inside it.",
-            kind
+            expr_node.kind()
         ));
     }
 
@@ -115,7 +134,7 @@ pub fn plan_introduce_variable(
     let _ = (node_start, node_end);
 
     // Walk up to find the parent statement that contains this expression.
-    let stmt_node = find_parent_statement(&expr_node)
+    let stmt_node = find_parent_statement(&expr_node, &caps)
         .ok_or_else(|| "Could not find a parent statement for the expression".to_string())?;
 
     // Determine indentation of the statement.
@@ -124,7 +143,7 @@ pub fn plan_introduce_variable(
 
     // Generate the binding declaration.
     let expr_text = content[actual_start..actual_end].to_string();
-    let binding = make_binding(grammar, name, &expr_text, &indent);
+    let binding = cg.render_binding(name, &expr_text, &indent);
 
     // Build new file content:
     // 1. Insert the binding before the statement line.
@@ -204,50 +223,15 @@ fn find_best_expression_node<'a>(
     node
 }
 
-/// Returns true if the node kind is a statement wrapper, not an expression.
-fn is_statement_kind(kind: &str) -> bool {
-    matches!(
-        kind,
-        // Rust
-        "let_declaration"
-            | "expression_statement"
-            // Python
-            | "assignment"
-            | "augmented_assignment"
-            | "assert_statement"
-            | "return_statement"
-            | "pass_statement"
-            | "break_statement"
-            | "continue_statement"
-            | "delete_statement"
-            | "import_statement"
-            | "import_from_statement"
-            | "raise_statement"
-            | "global_statement"
-            | "nonlocal_statement"
-            // JS/TS (not already covered above)
-            | "lexical_declaration"
-            | "variable_declaration"
-            | "throw_statement"
-            | "if_statement"
-            | "while_statement"
-            | "for_statement"
-            | "for_in_statement"
-            | "switch_statement"
-            | "try_statement"
-            // General
-            | "block"
-            | "source_file"
-            | "program"
-            | "module"
-    )
-}
-
 /// Return the statement-level parent of an expression node.
 ///
-/// Walks up the tree until we find a node that is at the statement level
-/// (i.e., its parent is a block / function body / module).
-fn find_parent_statement<'a>(node: &tree_sitter::Node<'a>) -> Option<tree_sitter::Node<'a>> {
+/// Walks up the tree until we find a node whose parent is captured
+/// `@refactor.block` (a block / function body / module). That node is the
+/// statement directly containing the expression.
+fn find_parent_statement<'a>(
+    node: &tree_sitter::Node<'a>,
+    caps: &RefactorCaptures,
+) -> Option<tree_sitter::Node<'a>> {
     let mut current = *node;
     loop {
         let Some(parent) = current.parent() else {
@@ -255,32 +239,12 @@ fn find_parent_statement<'a>(node: &tree_sitter::Node<'a>) -> Option<tree_sitter
             // expression itself, which lives at the top level).
             return Some(current);
         };
-        let parent_kind = parent.kind();
-        if is_block_kind(parent_kind) {
+        if caps.is("block", &parent) {
             // current is a direct child of a block → it IS the statement.
             return Some(current);
         }
         current = parent;
     }
-}
-
-/// Returns true if the node kind is a block / body container.
-fn is_block_kind(kind: &str) -> bool {
-    matches!(
-        kind,
-        // Rust
-        "block"
-            // Python
-            | "module"
-            | "body"
-            // JS / TS
-            | "program"
-            | "statement_block"
-            // Generic
-            | "source_file"
-            | "class_body"
-            | "enum_body"
-    )
 }
 
 /// Return the byte position of the start of the line containing `pos`.
@@ -296,24 +260,6 @@ fn leading_whitespace(content: &str, pos: usize) -> String {
         .find(|c: char| !c.is_whitespace())
         .unwrap_or(line.len());
     line[..ws_end].to_string()
-}
-
-/// Generate the variable binding declaration for the given grammar/language.
-fn make_binding(grammar: &str, name: &str, expr: &str, indent: &str) -> String {
-    match grammar {
-        "python" => {
-            // Python: `name = expr\n`
-            format!("{}{} = {}\n", indent, name, expr)
-        }
-        "javascript" | "typescript" | "tsx" => {
-            // JS/TS: `const name = expr;\n`
-            format!("{}const {} = {};\n", indent, name, expr)
-        }
-        _ => {
-            // Default (Rust, Go, Swift, Kotlin, etc.): `let name = expr;\n`
-            format!("{}let {} = {};\n", indent, name, expr)
-        }
-    }
 }
 
 // ── Range parsing helpers ─────────────────────────────────────────────────────
@@ -538,5 +484,28 @@ mod tests {
         let range = byte_range_of(content, "let x = 1 + 2;");
         let result = plan_introduce_variable(&rust_file(), content, range, "y");
         assert!(result.is_err(), "should error on statement selection");
+    }
+
+    fn grammar_available(name: &str) -> bool {
+        normalize_languages::parsers::parser_for(name).is_some()
+    }
+
+    #[test]
+    fn test_unsupported_language_returns_clean_error() {
+        // Go has codegen but no `*.refactor.scm` query — the recipe must refuse
+        // with a clear "does not support" message rather than fall through.
+        if !grammar_available("go") {
+            eprintln!("skipping: go grammar not available");
+            return;
+        }
+        let content = "func main() {\n    x := foo(a + b)\n}\n";
+        let range = byte_range_of(content, "a + b");
+        let result = plan_introduce_variable(&PathBuf::from("test.go"), content, range, "sum");
+        let msg = result.err().expect("should error for unsupported language");
+        assert!(
+            msg.contains("does not support") && msg.contains("refactor query"),
+            "expected a clean unsupported-language error, got: {}",
+            msg
+        );
     }
 }

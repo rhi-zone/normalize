@@ -27,6 +27,21 @@ pub fn refactor_render_binding(name: &str, expr: &str, indent: &str) -> String {
     format!("{}const {} = {};\n", indent, name, expr)
 }
 
+/// Best-effort: extract a TypeScript type annotation for the parameter `name`
+/// from `content` (text heuristic over `<name>: <type>` in parameter lists).
+pub fn refactor_infer_param_type(content: &str, name: &str) -> Option<String> {
+    let pattern = format!("{}: ", name);
+    if let Some(pos) = content.find(&pattern) {
+        let after = &content[pos + pattern.len()..];
+        let end = after.find([',', ')', '=', '\n']).unwrap_or(after.len());
+        let ty = after[..end].trim().to_string();
+        if !ty.is_empty() {
+            return Some(ty);
+        }
+    }
+    None
+}
+
 /// Render an extracted JS/TS function definition.
 /// `typed` is true for TypeScript/TSX (emit type annotations), false for JavaScript.
 pub fn refactor_render_function(typed: bool, spec: &ExtractedFnSpec) -> String {

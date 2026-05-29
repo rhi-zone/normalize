@@ -168,10 +168,19 @@ pub async fn plan_extract_function(
         .to_string_lossy()
         .to_string();
 
-    // ── 1. Detect grammar / language ──────────────────────────────────────────
-    let grammar_name = normalize_languages::support_for_path(file_abs)
-        .map(|s| s.name().to_string())
-        .unwrap_or_default();
+    // ── 1. Detect language and its code-generation capability ─────────────────
+    let support = normalize_languages::support_for_path(file_abs).ok_or_else(|| {
+        format!(
+            "extract-function: no language support for {}",
+            file_abs.display()
+        )
+    })?;
+    let cg = support.as_refactor_codegen().ok_or_else(|| {
+        format!(
+            "extract-function does not support language {} (no code generation implemented)",
+            support.name()
+        )
+    })?;
 
     // ── 2. Query the index ────────────────────────────────────────────────────
     let index = ctx.index.as_ref().ok_or_else(|| {
@@ -307,8 +316,8 @@ pub async fn plan_extract_function(
     let parameters: Vec<Parameter> = param_names
         .iter()
         .map(|name| {
-            let mutable = is_mut_binding(&grammar_name, content, name);
-            let inferred_type = infer_type_from_annotation(&grammar_name, content, name);
+            let mutable = cg.param_is_mutable(content, name);
+            let inferred_type = cg.infer_param_type(content, name);
             Parameter {
                 name: name.clone(),
                 inferred_type,
@@ -329,7 +338,7 @@ pub async fn plan_extract_function(
         .filter_map(|e| e.exception_type.as_ref().map(|t| (t.clone(), e.from)))
         .collect();
 
-    let return_type = if !escaping_exceptions.is_empty() && grammar_name == "rust" {
+    let return_type = if !escaping_exceptions.is_empty() && cg.uses_result_for_exceptions() {
         let ret_vars: Vec<String> = return_var_names.iter().cloned().collect();
         let ok_type = if ret_vars.is_empty() {
             "()".to_string()
@@ -402,11 +411,7 @@ pub async fn plan_extract_function(
 
     if let ReturnType::Tuple(ref names) = return_type {
         // Some languages don't support multi-return natively.
-        if grammar_name != "go"
-            && grammar_name != "python"
-            && grammar_name != "typescript"
-            && grammar_name != "javascript"
-        {
+        if !cg.supports_multi_return() {
             warnings.push(ExtractionWarning::MultipleLiveOutVariables {
                 names: names.clone(),
             });
@@ -442,26 +447,25 @@ pub async fn plan_extract_function(
     let body_lines = strip_common_indent(&region_lines);
     let body_indent = "    "; // one level of indentation inside the new function
 
-    // ── 11. Generate code ─────────────────────────────────────────────────────
-    let new_function = generate_function(
-        &grammar_name,
-        function_name,
-        &parameters,
-        &return_type,
+    // ── 11. Generate code (via the language's RefactorCodeGen) ────────────────
+    let gen_params = to_gen_params(&parameters);
+    let new_function = cg.render_function(&normalize_languages::ExtractedFnSpec {
+        name: function_name.to_string(),
+        params: gen_params.clone(),
+        ret: to_gen_return(&return_type),
         is_async,
         is_generator,
-        &body_lines,
-        body_indent,
-    );
+        body_lines: body_lines.clone(),
+        indent: body_indent.to_string(),
+    });
 
-    let call_site = generate_call_site(
-        &grammar_name,
-        function_name,
-        &parameters,
-        &return_type,
+    let call_site = cg.render_call_site(&normalize_languages::CallSiteSpec {
+        name: function_name.to_string(),
+        params: gen_params,
+        ret: to_gen_return(&return_type),
         is_async,
-        call_site_indent,
-    );
+        indent: call_site_indent.to_string(),
+    });
 
     // ── 12. Build the PlannedEdit ─────────────────────────────────────────────
     // Replace the extracted lines with the call site.
@@ -746,454 +750,29 @@ fn compute_liveness(
     (live_in, live_out)
 }
 
-// ─── Source analysis helpers ──────────────────────────────────────────────────
+// ─── Spec mapping (recipe types → normalize-languages codegen inputs) ──────────
 
-/// Check whether a variable binding in the source uses `mut` (Rust-specific).
-fn is_mut_binding(grammar: &str, content: &str, name: &str) -> bool {
-    if grammar != "rust" {
-        return false;
-    }
-    // Heuristic: look for `let mut <name>` in the source.
-    // This is a text scan; the index doesn't store mutability.
-    let pattern = format!("let mut {}", name);
-    content.contains(&pattern)
-}
-
-/// Try to extract a type annotation for a variable from the source (best-effort).
-/// Returns `None` when no annotation is found.
-fn infer_type_from_annotation(grammar: &str, content: &str, name: &str) -> Option<String> {
-    match grammar {
-        "rust" => {
-            // Look for `let [mut] <name>: <type>` or `<name>: <type>` in function params.
-            // Simple heuristic: find `<name>: ` and grab the type until `,` or `)` or `=`.
-            let pattern = format!("{}: ", name);
-            if let Some(pos) = content.find(&pattern) {
-                let after = &content[pos + pattern.len()..];
-                let end = after.find([',', ')', '=', '\n']).unwrap_or(after.len());
-                let ty = after[..end].trim().to_string();
-                if !ty.is_empty() && !ty.contains(' ') {
-                    return Some(ty);
-                }
-            }
-            None
-        }
-        "typescript" => {
-            // Look for `<name>: <type>` in parameter lists.
-            let pattern = format!("{}: ", name);
-            if let Some(pos) = content.find(&pattern) {
-                let after = &content[pos + pattern.len()..];
-                let end = after.find([',', ')', '=', '\n']).unwrap_or(after.len());
-                let ty = after[..end].trim().to_string();
-                if !ty.is_empty() {
-                    return Some(ty);
-                }
-            }
-            None
-        }
-        _ => None,
-    }
-}
-
-// ─── Code generation ──────────────────────────────────────────────────────────
-
-#[allow(clippy::too_many_arguments)]
-fn generate_function(
-    grammar: &str,
-    name: &str,
-    params: &[Parameter],
-    ret: &ReturnType,
-    is_async: bool,
-    is_generator: bool,
-    body_lines: &[String],
-    indent: &str,
-) -> String {
-    match grammar {
-        "python" => generate_python_function(name, params, ret, is_async, body_lines, indent),
-        "go" => generate_go_function(name, params, ret, body_lines, indent),
-        "typescript" | "javascript" | "tsx" | "jsx" => {
-            generate_ts_function(grammar, name, params, ret, is_async, body_lines, indent)
-        }
-        "java" => generate_java_function(name, params, ret, body_lines, indent),
-        _ => {
-            // Default: Rust
-            generate_rust_function(
-                name,
-                params,
-                ret,
-                is_async,
-                is_generator,
-                body_lines,
-                indent,
-            )
-        }
-    }
-}
-
-fn generate_rust_function(
-    name: &str,
-    params: &[Parameter],
-    ret: &ReturnType,
-    is_async: bool,
-    _is_generator: bool,
-    body_lines: &[String],
-    indent: &str,
-) -> String {
-    let async_kw = if is_async { "async " } else { "" };
-    let param_str = params
+/// Map the recipe's `Parameter` list into the language-agnostic `GenParam` inputs
+/// that `RefactorCodeGen` consumes.
+fn to_gen_params(params: &[Parameter]) -> Vec<normalize_languages::GenParam> {
+    params
         .iter()
-        .map(|p| {
-            let mut_kw = if p.mutable { "mut " } else { "" };
-            match &p.inferred_type {
-                Some(ty) => format!("{}{}: {}", mut_kw, p.name, ty),
-                None => format!("{}{}: /* type */", mut_kw, p.name),
-            }
+        .map(|p| normalize_languages::GenParam {
+            name: p.name.clone(),
+            inferred_type: p.inferred_type.clone(),
+            mutable: p.mutable,
         })
-        .collect::<Vec<_>>()
-        .join(", ");
-    let ret_str = match ret {
-        ReturnType::Unit => String::new(),
-        ReturnType::Single(v) => format!(" -> /* {} */", v),
-        ReturnType::Tuple(vs) => format!(" -> /* ({}) */", vs.join(", ")),
-        ReturnType::Result(ok, err) => format!(" -> Result</* {} */, {}>", ok, err),
-    };
-    let return_stmt = match ret {
-        ReturnType::Unit => String::new(),
-        ReturnType::Single(v) => format!("\n{}    {}", indent, v),
-        ReturnType::Tuple(vs) => format!("\n{}    ({})", indent, vs.join(", ")),
-        ReturnType::Result(ok, _) => {
-            if ok == "()" {
-                format!("\n{}    Ok(())", indent)
-            } else {
-                format!("\n{}    Ok({})", indent, ok)
-            }
-        }
-    };
-
-    let body = body_lines
-        .iter()
-        .map(|l| format!("{}    {}", indent, l))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    format!(
-        "\n{}{}fn {}({}){} {{\n{}{}\n{}}}\n",
-        indent, async_kw, name, param_str, ret_str, body, return_stmt, indent
-    )
+        .collect()
 }
 
-fn generate_python_function(
-    name: &str,
-    params: &[Parameter],
-    ret: &ReturnType,
-    is_async: bool,
-    body_lines: &[String],
-    indent: &str,
-) -> String {
-    let async_kw = if is_async { "async " } else { "" };
-    let param_str = params
-        .iter()
-        .map(|p| p.name.clone())
-        .collect::<Vec<_>>()
-        .join(", ");
-    let return_stmt = match ret {
-        ReturnType::Unit => String::new(),
-        ReturnType::Single(v) => format!("\n{}    return {}", indent, v),
-        ReturnType::Tuple(vs) => format!("\n{}    return {}", indent, vs.join(", ")),
-        ReturnType::Result(ok, _) => format!("\n{}    return {}", indent, ok),
-    };
-
-    let body = body_lines
-        .iter()
-        .map(|l| format!("{}    {}", indent, l))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    format!(
-        "\n{}{}def {}({}):\n{}{}\n",
-        indent, async_kw, name, param_str, body, return_stmt
-    )
-}
-
-fn generate_go_function(
-    name: &str,
-    params: &[Parameter],
-    ret: &ReturnType,
-    body_lines: &[String],
-    indent: &str,
-) -> String {
-    // Go: capitalise first letter for exported, lowercase for unexported.
-    let param_str = params
-        .iter()
-        .map(|p| match &p.inferred_type {
-            Some(ty) => format!("{} {}", p.name, ty),
-            None => format!("{} interface{{}}", p.name),
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
-    let ret_str = match ret {
-        ReturnType::Unit => String::new(),
-        ReturnType::Single(v) => format!(" /* {} */", v),
-        ReturnType::Tuple(vs) => format!(" ({} /* multi-return */)", vs.join(", ")),
-        ReturnType::Result(ok, _) => format!(" ({}, error)", ok),
-    };
-    let return_stmt = match ret {
-        ReturnType::Unit => String::new(),
-        ReturnType::Single(v) => format!("\n{}    return {}", indent, v),
-        ReturnType::Tuple(vs) => format!("\n{}    return {}", indent, vs.join(", ")),
-        ReturnType::Result(ok, _) => format!("\n{}    return {}, nil", indent, ok),
-    };
-
-    let body = body_lines
-        .iter()
-        .map(|l| format!("{}    {}", indent, l))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    format!(
-        "\n{}func {}({}){} {{\n{}{}\n{}}}\n",
-        indent, name, param_str, ret_str, body, return_stmt, indent
-    )
-}
-
-fn generate_ts_function(
-    grammar: &str,
-    name: &str,
-    params: &[Parameter],
-    ret: &ReturnType,
-    is_async: bool,
-    body_lines: &[String],
-    indent: &str,
-) -> String {
-    let async_kw = if is_async { "async " } else { "" };
-    let param_str = params
-        .iter()
-        .map(|p| match &p.inferred_type {
-            Some(ty) if grammar == "typescript" || grammar == "tsx" => {
-                format!("{}: {}", p.name, ty)
-            }
-            _ => p.name.clone(),
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
-
-    let ret_annotation = if grammar == "typescript" || grammar == "tsx" {
-        match ret {
-            ReturnType::Unit => ": void".to_string(),
-            ReturnType::Single(v) => format!(": /* {} */", v),
-            ReturnType::Tuple(vs) => format!(
-                ": [{}]",
-                vs.iter()
-                    .map(|v| format!("/* {} */", v))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
-            ReturnType::Result(ok, _) => format!(": {} | Error", ok),
-        }
-    } else {
-        String::new()
-    };
-
-    let return_stmt = match ret {
-        ReturnType::Unit => String::new(),
-        ReturnType::Single(v) => format!("\n{}    return {};", indent, v),
-        ReturnType::Tuple(vs) => format!("\n{}    return [{}];", indent, vs.join(", ")),
-        ReturnType::Result(ok, _) => format!("\n{}    return {};", indent, ok),
-    };
-
-    let body = body_lines
-        .iter()
-        .map(|l| format!("{}    {}", indent, l))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    format!(
-        "\n{}{}function {}({}){} {{\n{}{}\n{}}}\n",
-        indent, async_kw, name, param_str, ret_annotation, body, return_stmt, indent
-    )
-}
-
-fn generate_java_function(
-    name: &str,
-    params: &[Parameter],
-    ret: &ReturnType,
-    body_lines: &[String],
-    indent: &str,
-) -> String {
-    let ret_type = match ret {
-        ReturnType::Unit => "void".to_string(),
-        ReturnType::Single(v) => format!("/* {} */", v),
-        ReturnType::Tuple(vs) => format!("/* TODO: struct({}) */", vs.join(", ")),
-        ReturnType::Result(ok, err) => format!("/* {} throws {} */", ok, err),
-    };
-    let param_str = params
-        .iter()
-        .map(|p| match &p.inferred_type {
-            Some(ty) => format!("{} {}", ty, p.name),
-            None => format!("/* type */ {}", p.name),
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
-    let return_stmt = match ret {
-        ReturnType::Unit => String::new(),
-        ReturnType::Single(v) => format!("\n{}    return {};", indent, v),
-        ReturnType::Tuple(vs) => {
-            format!("\n{}    // TODO: return struct({});", indent, vs.join(", "))
-        }
-        ReturnType::Result(ok, _) => format!("\n{}    return {};", indent, ok),
-    };
-
-    let body = body_lines
-        .iter()
-        .map(|l| format!("{}    {}", indent, l))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    format!(
-        "\n{}private {} {}({}) {{\n{}{}\n{}}}\n",
-        indent, ret_type, name, param_str, body, return_stmt, indent
-    )
-}
-
-fn generate_call_site(
-    grammar: &str,
-    name: &str,
-    params: &[Parameter],
-    ret: &ReturnType,
-    is_async: bool,
-    indent: &str,
-) -> String {
-    let args = params
-        .iter()
-        .map(|p| p.name.as_str())
-        .collect::<Vec<_>>()
-        .join(", ");
-    let await_kw = if is_async {
-        match grammar {
-            "rust" => ".await",
-            _ => "await ",
-        }
-    } else {
-        ""
-    };
-
-    match grammar {
-        "python" => match ret {
-            ReturnType::Unit => format!(
-                "{}{}{}{}",
-                indent,
-                await_kw,
-                name,
-                format_args!("({})", args)
-            ),
-            ReturnType::Single(v) => {
-                format!("{}{} = {}{}({})\n", indent, v, await_kw, name, args)
-            }
-            ReturnType::Tuple(vs) => {
-                format!(
-                    "{}{} = {}{}({})\n",
-                    indent,
-                    vs.join(", "),
-                    await_kw,
-                    name,
-                    args
-                )
-            }
-            ReturnType::Result(ok, _) => format!("{}{} = {}({})\n", indent, ok, name, args),
-        },
-        "go" => match ret {
-            ReturnType::Unit => format!("{}{}({})\n", indent, name, args),
-            ReturnType::Single(v) => format!("{}{} := {}({})\n", indent, v, name, args),
-            ReturnType::Tuple(vs) => {
-                format!("{}{} := {}({})\n", indent, vs.join(", "), name, args)
-            }
-            ReturnType::Result(ok, _) => {
-                format!(
-                    "{}{}, err := {}({})\n{}if err != nil {{ return err }}\n",
-                    indent, ok, name, args, indent
-                )
-            }
-        },
-        "typescript" | "javascript" | "tsx" | "jsx" => match ret {
-            ReturnType::Unit => format!(
-                "{}{}{}{}",
-                indent,
-                await_kw,
-                name,
-                format_args!("({});", args)
-            ),
-            ReturnType::Single(v) => {
-                let prefix = if await_kw == "await " { "await " } else { "" };
-                format!("{}const {} = {}{}({});\n", indent, v, prefix, name, args)
-            }
-            ReturnType::Tuple(vs) => {
-                let prefix = if await_kw == "await " { "await " } else { "" };
-                format!(
-                    "{}const [{}] = {}{}({});\n",
-                    indent,
-                    vs.join(", "),
-                    prefix,
-                    name,
-                    args
-                )
-            }
-            ReturnType::Result(ok, _) => {
-                let prefix = if await_kw == "await " { "await " } else { "" };
-                format!("{}const {} = {}{}({});\n", indent, ok, prefix, name, args)
-            }
-        },
-        "java" => match ret {
-            ReturnType::Unit => format!("{}{}({});\n", indent, name, args),
-            ReturnType::Single(v) => format!("{}var {} = {}({});\n", indent, v, name, args),
-            ReturnType::Tuple(vs) => {
-                format!(
-                    "{}var result = {}({}); // TODO: unpack ({})\n",
-                    indent,
-                    name,
-                    args,
-                    vs.join(", ")
-                )
-            }
-            ReturnType::Result(ok, _) => format!("{}var {} = {}({});\n", indent, ok, name, args),
-        },
-        _ => {
-            // Rust
-            match ret {
-                ReturnType::Unit => {
-                    if is_async {
-                        format!("{}{}({}).await;\n", indent, name, args)
-                    } else {
-                        format!("{}{}({});\n", indent, name, args)
-                    }
-                }
-                ReturnType::Single(v) => {
-                    if is_async {
-                        format!("{}let {} = {}({}).await;\n", indent, v, name, args)
-                    } else {
-                        format!("{}let {} = {}({});\n", indent, v, name, args)
-                    }
-                }
-                ReturnType::Tuple(vs) => {
-                    if is_async {
-                        format!(
-                            "{}let ({}) = {}({}).await;\n",
-                            indent,
-                            vs.join(", "),
-                            name,
-                            args
-                        )
-                    } else {
-                        format!("{}let ({}) = {}({});\n", indent, vs.join(", "), name, args)
-                    }
-                }
-                ReturnType::Result(ok, _) => {
-                    if is_async {
-                        format!("{}let {} = {}({}).await?;\n", indent, ok, name, args)
-                    } else {
-                        format!("{}let {} = {}({})?;\n", indent, ok, name, args)
-                    }
-                }
-            }
-        }
+/// Map the recipe's `ReturnType` into the codegen `GenReturn`.
+fn to_gen_return(ret: &ReturnType) -> normalize_languages::GenReturn {
+    use normalize_languages::GenReturn;
+    match ret {
+        ReturnType::Unit => GenReturn::Unit,
+        ReturnType::Single(v) => GenReturn::Single(v.clone()),
+        ReturnType::Tuple(vs) => GenReturn::Tuple(vs.clone()),
+        ReturnType::Result(ok, err) => GenReturn::Result(ok.clone(), err.clone()),
     }
 }
 
@@ -1357,115 +936,6 @@ mod tests {
         assert_eq!(out, vec!["let x = 1;", "    let y = 2;"]);
     }
 
-    // ── generate_rust_function ────────────────────────────────────────────────
-
-    #[test]
-    fn generate_rust_fn_unit_return() {
-        let params = vec![Parameter {
-            name: "x".to_string(),
-            inferred_type: Some("i32".to_string()),
-            mutable: false,
-        }];
-        let body = vec!["println!(\"{}\", x);".to_string()];
-        let out = generate_rust_function(
-            "do_thing",
-            &params,
-            &ReturnType::Unit,
-            false,
-            false,
-            &body,
-            "",
-        );
-        assert!(out.contains("fn do_thing(x: i32)"));
-        assert!(out.contains("println!"));
-        assert!(!out.contains("->"));
-    }
-
-    #[test]
-    fn generate_rust_fn_single_return() {
-        let params = vec![];
-        let body = vec!["let result = 42;".to_string()];
-        let out = generate_rust_function(
-            "compute",
-            &params,
-            &ReturnType::Single("result".to_string()),
-            false,
-            false,
-            &body,
-            "",
-        );
-        assert!(out.contains("fn compute()"));
-        assert!(out.contains("-> /* result */"));
-        assert!(out.contains("result"));
-    }
-
-    #[test]
-    fn generate_rust_fn_async() {
-        let params = vec![];
-        let body = vec!["tokio::time::sleep(Duration::from_secs(1)).await;".to_string()];
-        let out = generate_rust_function(
-            "wait_a_bit",
-            &params,
-            &ReturnType::Unit,
-            true,
-            false,
-            &body,
-            "",
-        );
-        assert!(out.contains("async fn wait_a_bit()"));
-    }
-
-    // ── generate_python_function ──────────────────────────────────────────────
-
-    #[test]
-    fn generate_python_fn_basic() {
-        let params = vec![Parameter {
-            name: "x".to_string(),
-            inferred_type: None,
-            mutable: false,
-        }];
-        let body = vec!["print(x)".to_string()];
-        let out = generate_python_function("show", &params, &ReturnType::Unit, false, &body, "");
-        assert!(out.contains("def show(x):"));
-        assert!(out.contains("print(x)"));
-    }
-
-    #[test]
-    fn generate_python_fn_multi_return() {
-        let params = vec![];
-        let body = vec!["a = 1".to_string(), "b = 2".to_string()];
-        let out = generate_python_function(
-            "two_values",
-            &params,
-            &ReturnType::Tuple(vec!["a".to_string(), "b".to_string()]),
-            false,
-            &body,
-            "",
-        );
-        assert!(out.contains("return a, b"));
-    }
-
-    // ── generate_go_function ──────────────────────────────────────────────────
-
-    #[test]
-    fn generate_go_fn_basic() {
-        let params = vec![Parameter {
-            name: "n".to_string(),
-            inferred_type: Some("int".to_string()),
-            mutable: false,
-        }];
-        let body = vec!["result := n * 2".to_string()];
-        let out = generate_go_function(
-            "double",
-            &params,
-            &ReturnType::Single("result".to_string()),
-            &body,
-            "",
-        );
-        assert!(out.contains("func double(n int)"));
-        assert!(out.contains("return result"));
-    }
-
     // ── splice_content ────────────────────────────────────────────────────────
 
     #[test]
@@ -1482,53 +952,5 @@ mod tests {
         let content = "a\nb\nc\nd\n";
         let result = splice_content(content, 2, 2, "X\n", "\nfn f() {}\n").unwrap();
         assert!(result.starts_with("a\nX\nc\nd\n"));
-    }
-
-    // ── call site generation ──────────────────────────────────────────────────
-
-    #[test]
-    fn rust_call_site_with_return() {
-        let params = vec![Parameter {
-            name: "x".to_string(),
-            inferred_type: Some("i32".to_string()),
-            mutable: false,
-        }];
-        let call = generate_call_site(
-            "rust",
-            "compute",
-            &params,
-            &ReturnType::Single("result".to_string()),
-            false,
-            "    ",
-        );
-        assert_eq!(call, "    let result = compute(x);\n");
-    }
-
-    #[test]
-    fn rust_call_site_async() {
-        let params = vec![];
-        let call = generate_call_site(
-            "rust",
-            "fetch",
-            &params,
-            &ReturnType::Single("data".to_string()),
-            true,
-            "    ",
-        );
-        assert_eq!(call, "    let data = fetch().await;\n");
-    }
-
-    #[test]
-    fn python_call_site_multi_return() {
-        let params = vec![];
-        let call = generate_call_site(
-            "python",
-            "two_vals",
-            &params,
-            &ReturnType::Tuple(vec!["a".to_string(), "b".to_string()]),
-            false,
-            "",
-        );
-        assert_eq!(call, "a, b = two_vals()\n");
     }
 }

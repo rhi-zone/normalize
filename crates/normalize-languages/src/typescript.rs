@@ -162,6 +162,12 @@ impl crate::RefactorCodeGen for TypeScript {
     fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
         ecmascript::refactor_render_call_site(spec)
     }
+    fn supports_multi_return(&self) -> bool {
+        true
+    }
+    fn infer_param_type(&self, content: &str, name: &str) -> Option<String> {
+        ecmascript::refactor_infer_param_type(content, name)
+    }
 }
 
 impl crate::RefactorCodeGen for Tsx {
@@ -176,6 +182,12 @@ impl crate::RefactorCodeGen for Tsx {
     }
     fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
         ecmascript::refactor_render_call_site(spec)
+    }
+    fn supports_multi_return(&self) -> bool {
+        true
+    }
+    fn infer_param_type(&self, content: &str, name: &str) -> Option<String> {
+        ecmascript::refactor_infer_param_type(content, name)
     }
 }
 

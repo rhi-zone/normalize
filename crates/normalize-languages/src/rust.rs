@@ -438,6 +438,28 @@ impl crate::RefactorCodeGen for Rust {
     fn uses_result_for_exceptions(&self) -> bool {
         true
     }
+
+    fn param_is_mutable(&self, content: &str, name: &str) -> bool {
+        // Heuristic: look for `let mut <name>` in the source.
+        // The index doesn't store mutability.
+        let pattern = format!("let mut {}", name);
+        content.contains(&pattern)
+    }
+
+    fn infer_param_type(&self, content: &str, name: &str) -> Option<String> {
+        // Look for `let [mut] <name>: <type>` or `<name>: <type>` in function params.
+        // Simple heuristic: find `<name>: ` and grab the type until `,`/`)`/`=`/newline.
+        let pattern = format!("{}: ", name);
+        if let Some(pos) = content.find(&pattern) {
+            let after = &content[pos + pattern.len()..];
+            let end = after.find([',', ')', '=', '\n']).unwrap_or(after.len());
+            let ty = after[..end].trim().to_string();
+            if !ty.is_empty() && !ty.contains(' ') {
+                return Some(ty);
+            }
+        }
+        None
+    }
 }
 
 #[cfg(test)]
