@@ -977,6 +977,55 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
   - Open: linter vs formatter vs typechecker config - same trait or specialized?
   - Open: reconsider normalize config format choice (TOML vs YAML, JSON, KDL) - rationalize decision
 
+### Candidate rule: drifted-dispatch-tables
+
+See `docs/ad-hoc-dispatch.md` for the full design tenet and ecosystem evidence.
+
+**Status:** Viable. Extraction sufficient (spike confirmed). Rule-side logic needed.
+
+**What it detects:** N parallel dispatch tables over the same closed name-set where one registry/trait/visitor belongs — strongest signal is *drift* (set-difference of key-sets between parallel tables). Reproduced wick and marinada drift mechanically using `normalize syntax query`.
+
+**Rule-side logic needed (extraction is not the bottleneck):**
+1. Per-function scoping by row-range — to isolate individual dispatch tables rather than treating a file as one bag of keys.
+2. Jaccard key-set clustering — to identify which tables draw from the same "roster" vs. unrelated dispatchers in the same file. Load-bearing: without it the signal is buried in false positives.
+3. Set-difference + min-table-size threshold + baseline/allowlist — to distinguish genuine drift from intentional asymmetry.
+
+**Caveat:** Depends on `normalize syntax query`. Currently mis-handles top-level `[...]` alternation (P0 bug, commit 3b8e8857). Workaround: run each alternation branch as a separate query and merge.
+
+---
+
+### normalize self-violations of CLAUDE.md dispatch rules
+
+See `docs/ad-hoc-dispatch.md` for the anti-pattern definition and cross-project context.
+
+These violate the CLAUDE.md rules "no grammar_name== branches in language-agnostic crates" and "node classification belongs in .scm". Cross-ref `docs/audit-2026-03-12.md` for prior audit findings.
+
+**HIGH — `normalize-facts/src/extract.rs` ~344-356**
+
+Three `if grammar_name == "rust"` / `"haskell"` / `("typescript" || "javascript")` branches in a language-agnostic extraction crate, each calling a bespoke post-process (`merge_rust_impl_blocks`, `dedup_haskell_functions`, `mark_interface_implementations`). Should be a `Language` trait `post_process_symbols` hook (or a `.scm` fix for the Haskell deduplication case, which may be a grammar issue rather than a post-process need). Direct CLAUDE.md violation.
+
+**HIGH — `normalize-deps/src/lib.rs:50-53` + `collect_js_ts_deps` ~409-638**
+
+JS/TS/TSX bypass the `.scm` imports path (used by all other languages via `get_imports`) for a 200+ line hand-rolled AST walker. The `.scm` files (`javascript.imports.scm`, `typescript.imports.scm`, `tsx.imports.scm`) already exist; only `require()` (CommonJS) is missing from `javascript.imports.scm`. Fix: add `require()` to the `.scm`, delete the JS/TS special-case. Violates "node classification belongs in .scm."
+
+**HIGH — `normalize-refactor/src/{extract_function,add_parameter,inline_variable,introduce_variable}.rs` (~3800 LOC total)**
+
+Pervasive `match grammar` / `grammar ==` dispatch on hardcoded language names + hardcoded node-kind strings throughout the refactor recipes. Node-kind lookups (`function_item_kinds`, `param_list_kind`, etc.) should be `.scm` queries loaded via `GrammarLoader`; code *generation* (`generate_rust_function` etc.) cannot be `.scm` — needs a `CodeGen` trait or Language-trait methods. Violates the CLAUDE.md node-classification rule.
+
+**MEDIUM — `normalize-filter/src/lib.rs` ~94-103**
+
+The `build` filter alias hardcodes `target/`, `node_modules/`, `.next/`, `.nuxt/`, `__pycache__/` (Cargo/npm/Next/Nuxt/Python conventions) in a library crate. Mitigated by being applied only on explicit `build` alias request (not silently). Judgment call per CLAUDE.md: curated-default-alias vs. hardcoded-third-party-convention. CLAUDE.md says these belong in project config; however this is explicitly a *named alias* the user opts into. Flag for decision, not emergency fix.
+
+**LOW / HYPOTHESIS — `normalize-ecosystems/src/local_docs.rs` ~278**
+
+`walk_rs_files` hardcodes the `.rs` extension (also `lib.rs`/`main.rs`/`mod.rs` candidates). The struct is Cargo-specific, so Rust-only coupling may be intentional and correct. Fix if it becomes general: pass a `Language` ref. Note as judgment call.
+
+**LOW — `normalize-facts/tests/extract_fixtures.rs` ~217-270**
+
+Hardcoded runtime→command map (`python`→`python3`, etc.) in tests. Test-only, out of the library-crate rule's scope. Recorded for completeness.
+
+---
+
 ### Code Quality
 
 - Unnecessary aliases: `let x = Foo; x.bar()` → `Foo.bar()`. Lint for pointless intermediate bindings.
