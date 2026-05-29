@@ -8,6 +8,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`syntax query` top-level alternation `[...]` now returns correct matches.**
+  Queries whose entire pattern is a top-level tree-sitter alternation (e.g.
+  `[(identifier) @i (line_comment) @c]`) previously returned 0 matches silently
+  because `is_sexp_pattern()` only checked for a leading `(`, causing the query
+  to be mis-dispatched to ast-grep which silently no-ops on S-expression input.
+  `is_sexp_pattern()` now also recognises a leading `[` as an S-expression pattern.
+  Nested alternations (e.g. `(call_expression [(identifier) @a (string) @b])`) were
+  unaffected and continue to work.
 - **Daemon native-rules refresh no longer builds an unbounded backlog.** The
   daemon watched each repo's `.git/index` and pushed the root into an unbounded
   channel on every change; under heavy git churn the producer (~5/s) outran the

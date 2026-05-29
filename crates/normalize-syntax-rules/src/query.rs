@@ -23,10 +23,77 @@ pub struct MatchResult {
     pub captures: HashMap<String, String>,
 }
 
-/// Detect if pattern is a tree-sitter S-expression (starts with `(`)
-/// or an ast-grep pattern (anything else).
+/// Detect if pattern is a tree-sitter S-expression or an ast-grep pattern.
+///
+/// Tree-sitter S-expression patterns start with `(` (node pattern) or `[` (top-level
+/// alternation). ast-grep patterns are plain source-code fragments (identifiers, keywords,
+/// expressions) that don't start with either of these characters.
 pub fn is_sexp_pattern(pattern: &str) -> bool {
-    pattern.trim_start().starts_with('(')
+    let trimmed = pattern.trim_start();
+    trimmed.starts_with('(') || trimmed.starts_with('[')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_sexp_pattern_paren() {
+        assert!(is_sexp_pattern("(identifier) @i"));
+        assert!(is_sexp_pattern("  (call_expression) @c"));
+    }
+
+    #[test]
+    fn test_is_sexp_pattern_bracket_toplevel_alternation() {
+        assert!(is_sexp_pattern("[(identifier) (comment)] @x"));
+        assert!(is_sexp_pattern(
+            "  [(string_literal) (number_literal)] @lit"
+        ));
+    }
+
+    #[test]
+    fn test_is_sexp_pattern_astgrep_not_matched() {
+        assert!(!is_sexp_pattern("foo.bar()"));
+        assert!(!is_sexp_pattern("let $X = $Y"));
+        assert!(!is_sexp_pattern("$F($$$ARGS)"));
+    }
+
+    #[test]
+    fn test_sexp_toplevel_alternation_returns_matches() {
+        use normalize_languages::GrammarLoader;
+        use std::path::Path;
+
+        let loader = GrammarLoader::new();
+        let grammar = loader.get("rust").expect("rust grammar must be available");
+
+        // A simple Rust source with an identifier and a line comment.
+        let content = "// hello\nlet x = 1;\n";
+        let path = Path::new("test.rs");
+
+        // Top-level alternation: should match both identifiers and line_comments.
+        let results = run_sexp_query(
+            path,
+            content,
+            "[(identifier) @i (line_comment) @c]",
+            &grammar,
+            "rust",
+        )
+        .expect("sexp query must not error");
+
+        assert!(
+            !results.is_empty(),
+            "top-level alternation query must return matches; got 0"
+        );
+
+        // Confirm we see both capture kinds.
+        let has_ident = results.iter().any(|r| r.captures.contains_key("i"));
+        let has_comment = results.iter().any(|r| r.captures.contains_key("c"));
+        assert!(has_ident, "expected captures with name 'i' (identifier)");
+        assert!(
+            has_comment,
+            "expected captures with name 'c' (line_comment)"
+        );
+    }
 }
 
 /// Run a tree-sitter S-expression query against a single file's content.
