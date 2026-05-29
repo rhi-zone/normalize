@@ -275,6 +275,40 @@ as a niche escape hatch, but not in the default path.
 
 ## P0 — Blocking / Broken / Incoherent
 
+### `syntax query` silently ignores top-level `[...]` alternation
+
+**Bug:** `normalize syntax query '[(identifier) @i (line_comment) @c]'` returns `0 matches`
+(exit 0, empty stderr) even though `(identifier) @i` returns 728 captures and `(line_comment) @c`
+returns 38 captures on the same file.
+
+**Silent vs loud:** Exit 0, no stderr, no error — purely silent data loss.
+
+**Scope:** Top-level only. Nested alternation inside a parent node pattern —
+e.g. `(use_declaration [(scoped_identifier) @s (identifier) @i])` — works correctly (97 captures
+matching the union of the two branches). The bug is triggered only when the entire query string
+starts with `[`.
+
+**Root cause (confirmed):** `is_sexp_pattern()` in
+`crates/normalize-syntax-rules/src/query.rs` detects S-expression syntax by checking
+`pattern.trim_start().starts_with('(')`. A top-level `[...]` alternation is valid
+tree-sitter S-expression syntax but starts with `[`, so the function returns `false` and
+the query is dispatched to `run_astgrep_query` instead of `run_sexp_query`. ast-grep
+silently returns 0 results for the S-expression input rather than erroring.
+
+**Blast radius:** Zero impact on shipped queries. Scanning all 456 `.scm` files under
+`crates/normalize-languages/src/queries/` and all 87 builtin `.scm` files under
+`crates/normalize-syntax-rules/src/builtin/` finds no top-level `[...]` patterns — all
+alternations in shipped queries are nested inside a parent node pattern. The builtin rules
+engine (runner.rs) also calls `tree_sitter::Query::new` directly without going through
+`is_sexp_pattern`, so it is unaffected regardless. The bug is therefore latent: purely a
+`syntax query` interactive/agent command issue with no current extraction impact.
+
+**Fix:** Extend `is_sexp_pattern` to also return `true` when the pattern starts with `[`
+(top-level alternation) or `(` (standard pattern). One-line fix in `query.rs`.
+
+**Workaround (until fixed):** Run each alternation branch as a separate query and merge
+results in the caller.
+
 ### `normalize context context` duplicate subcommand — fixed in server-less, pending publish
 
 `normalize context --help` shows `context` as a named subcommand (duplicate of the service itself).
