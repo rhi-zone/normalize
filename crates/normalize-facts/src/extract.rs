@@ -14,6 +14,7 @@
 
 use crate::ca_cache;
 use crate::parsers;
+use normalize_facts_core::InterfaceResolver;
 use normalize_facts_core::SymbolKind;
 use normalize_languages::{Language, Symbol, Visibility, support_for_path};
 use std::path::Path;
@@ -142,14 +143,6 @@ impl Default for ExtractOptions {
             include_private: true,
         }
     }
-}
-
-/// Resolver for cross-file interface method lookups.
-/// Used to find interface/class method signatures from other files.
-pub trait InterfaceResolver {
-    /// Get method names for an interface/class by name.
-    /// Returns None if the interface cannot be resolved (external, missing, etc.).
-    fn resolve_interface_methods(&self, name: &str, current_file: &str) -> Option<Vec<String>>;
 }
 
 /// Resolver that parses files on-demand for cross-file interface lookups.
@@ -340,21 +333,9 @@ impl Extractor {
             Vec::new()
         };
 
-        // Post-process for Rust: merge impl blocks with their types
-        if grammar_name == "rust" {
-            Self::merge_rust_impl_blocks(&mut symbols);
-        }
-
-        // Post-process for Haskell: deduplicate functions by name (multi-equation definitions
-        // produce one `function` node per equation, each with the same name field).
-        if grammar_name == "haskell" {
-            Self::dedup_haskell_functions(&mut symbols);
-        }
-
-        // Post-process for TypeScript/JavaScript: mark interface implementations
-        if grammar_name == "typescript" || grammar_name == "javascript" {
-            Self::mark_interface_implementations(&mut symbols, resolver, current_file);
-        }
+        // Language-specific post-processing: fold impl blocks, dedup multi-equation
+        // definitions, mark interface implementations, etc.
+        support.post_process_symbols(&mut symbols, resolver, current_file);
 
         // Store in the persistent symbol cache (only when no cross-file resolver
         // was used, so the result is fully content-addressed).
@@ -372,207 +353,6 @@ impl Extractor {
         }
 
         symbols
-    }
-
-    /// Deduplicate Haskell function symbols by name.
-    ///
-    /// Haskell allows multi-equation function definitions where each equation is a
-    /// separate top-level declaration. The tree-sitter-haskell grammar produces one
-    /// `function` node per equation, each with the same `name` field. The tags query
-    /// therefore captures the same function name once per equation. This pass keeps
-    /// only the first occurrence of each (name, kind) pair at the top level, and merges
-    /// the byte ranges by extending the first occurrence's `end_line` to cover all
-    /// equations (so the symbol spans the complete definition).
-    fn dedup_haskell_functions(symbols: &mut Vec<Symbol>) {
-        // Use a Vec<(name, kind)> for seen tracking since SymbolKind doesn't derive Hash.
-        let mut seen: Vec<(String, SymbolKind)> = Vec::new();
-        let mut i = 0;
-        while i < symbols.len() {
-            let key = (symbols[i].name.clone(), symbols[i].kind);
-            if seen.contains(&key) {
-                symbols.remove(i);
-            } else {
-                seen.push(key);
-                i += 1;
-            }
-        }
-    }
-
-    /// Merge Rust impl blocks with their corresponding struct/enum types
-    fn merge_rust_impl_blocks(symbols: &mut Vec<Symbol>) {
-        use std::collections::HashMap;
-
-        // Collect impl blocks: their children and implements lists
-        let mut impl_methods: HashMap<String, Vec<Symbol>> = HashMap::new();
-        let mut impl_implements: HashMap<String, Vec<String>> = HashMap::new();
-
-        // Remove impl blocks and collect their methods + implements
-        symbols.retain(|sym| {
-            if sym.signature.starts_with("impl ") {
-                impl_methods
-                    .entry(sym.name.clone())
-                    .or_default()
-                    .extend(sym.children.clone());
-                impl_implements
-                    .entry(sym.name.clone())
-                    .or_default()
-                    .extend(sym.implements.clone());
-                return false;
-            }
-            true
-        });
-
-        // Add methods and implements to matching struct/enum
-        for sym in symbols.iter_mut() {
-            if matches!(
-                sym.kind,
-                normalize_languages::SymbolKind::Struct | normalize_languages::SymbolKind::Enum
-            ) {
-                if let Some(methods) = impl_methods.remove(&sym.name) {
-                    sym.children.extend(methods);
-                }
-                if let Some(impls) = impl_implements.remove(&sym.name) {
-                    sym.implements.extend(impls);
-                }
-            }
-        }
-
-        // Any remaining impl blocks without matching type: add back
-        for (name, methods) in impl_methods {
-            let impls = impl_implements.remove(&name).unwrap_or_default();
-            if !methods.is_empty() {
-                symbols.push(Symbol {
-                    name: name.clone(),
-                    kind: normalize_languages::SymbolKind::Module, // impl as module-like
-                    signature: format!("impl {}", name),
-                    docstring: None,
-                    attributes: Vec::new(),
-                    start_line: methods.first().map(|m| m.start_line).unwrap_or(0),
-                    end_line: methods.last().map(|m| m.end_line).unwrap_or(0),
-                    visibility: Visibility::Public,
-                    children: methods,
-                    is_interface_impl: !impls.is_empty(),
-                    implements: impls,
-                });
-            }
-        }
-    }
-
-    /// Mark methods that implement interfaces (for TypeScript/JavaScript).
-    /// Builds a map of interface/class names to their method names,
-    /// then marks matching methods in classes that extend/implement them.
-    ///
-    /// If a resolver is provided, it will be used to look up interface methods
-    /// from other files when not found locally.
-    fn mark_interface_implementations(
-        symbols: &mut [Symbol],
-        resolver: Option<&dyn InterfaceResolver>,
-        current_file: &str,
-    ) {
-        use std::collections::{HashMap, HashSet};
-
-        // First pass: collect method names from interfaces and classes in this file
-        // (these could be parent classes that get extended)
-        let mut type_methods: HashMap<String, HashSet<String>> = HashMap::new();
-
-        fn collect_type_methods(
-            symbols: &[Symbol],
-            type_methods: &mut HashMap<String, HashSet<String>>,
-        ) {
-            for sym in symbols {
-                if matches!(
-                    sym.kind,
-                    normalize_languages::SymbolKind::Interface
-                        | normalize_languages::SymbolKind::Class
-                ) {
-                    let methods: HashSet<String> = sym
-                        .children
-                        .iter()
-                        .filter(|c| {
-                            matches!(
-                                c.kind,
-                                normalize_languages::SymbolKind::Method
-                                    | normalize_languages::SymbolKind::Function
-                            )
-                        })
-                        .map(|c| c.name.clone())
-                        .collect();
-                    if !methods.is_empty() {
-                        type_methods.insert(sym.name.clone(), methods);
-                    }
-                }
-                // Recurse into nested types
-                collect_type_methods(&sym.children, type_methods);
-            }
-        }
-
-        collect_type_methods(symbols, &mut type_methods);
-
-        // Cache for cross-file resolved interfaces (avoid repeated lookups)
-        let mut cross_file_cache: HashMap<String, Option<HashSet<String>>> = HashMap::new();
-
-        // Second pass: mark methods in classes that implement/extend
-        fn mark_methods(
-            symbols: &mut [Symbol],
-            type_methods: &HashMap<String, HashSet<String>>,
-            resolver: Option<&dyn InterfaceResolver>,
-            current_file: &str,
-            cross_file_cache: &mut HashMap<String, Option<HashSet<String>>>,
-        ) {
-            for sym in symbols.iter_mut() {
-                if !sym.implements.is_empty() {
-                    // Collect all method names from all implemented interfaces/parents
-                    let mut interface_methods: HashSet<String> = HashSet::new();
-
-                    for parent_name in &sym.implements {
-                        // Try same-file first
-                        if let Some(methods) = type_methods.get(parent_name) {
-                            interface_methods.extend(methods.clone());
-                        } else if let Some(resolver) = resolver {
-                            // Try cross-file resolution with caching
-                            let cached = cross_file_cache
-                                .entry(parent_name.clone())
-                                .or_insert_with(|| {
-                                    resolver
-                                        .resolve_interface_methods(parent_name, current_file)
-                                        .map(|v| v.into_iter().collect())
-                                });
-                            if let Some(methods) = cached {
-                                interface_methods.extend(methods.clone());
-                            }
-                        }
-                    }
-
-                    // Mark matching methods
-                    for child in &mut sym.children {
-                        if matches!(
-                            child.kind,
-                            normalize_languages::SymbolKind::Method
-                                | normalize_languages::SymbolKind::Function
-                        ) && interface_methods.contains(&child.name)
-                        {
-                            child.is_interface_impl = true;
-                        }
-                    }
-                }
-                // Recurse
-                mark_methods(
-                    &mut sym.children,
-                    type_methods,
-                    resolver,
-                    current_file,
-                    cross_file_cache,
-                );
-            }
-        }
-
-        mark_methods(
-            symbols,
-            &type_methods,
-            resolver,
-            current_file,
-            &mut cross_file_cache,
-        );
     }
 }
 

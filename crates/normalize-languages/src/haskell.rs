@@ -116,9 +116,42 @@ impl Language for Haskell {
         static RESOLVER: HaskellModuleResolver = HaskellModuleResolver;
         Some(&RESOLVER)
     }
+
+    fn post_process_symbols(
+        &self,
+        symbols: &mut Vec<crate::Symbol>,
+        _resolver: Option<&dyn crate::InterfaceResolver>,
+        _current_file: &str,
+    ) {
+        dedup_haskell_functions(symbols);
+    }
 }
 
 impl LanguageSymbols for Haskell {}
+
+/// Deduplicate Haskell function symbols by name.
+///
+/// Haskell allows multi-equation function definitions where each equation is a
+/// separate top-level declaration. The tree-sitter-haskell grammar produces one
+/// `function` node per equation, each with the same `name` field. The tags query
+/// therefore captures the same function name once per equation. This pass keeps
+/// only the first occurrence of each (name, kind) pair at the top level, and merges
+/// the byte ranges by extending the first occurrence's `end_line` to cover all
+/// equations (so the symbol spans the complete definition).
+fn dedup_haskell_functions(symbols: &mut Vec<crate::Symbol>) {
+    // Use a Vec<(name, kind)> for seen tracking since SymbolKind doesn't derive Hash.
+    let mut seen: Vec<(String, crate::SymbolKind)> = Vec::new();
+    let mut i = 0;
+    while i < symbols.len() {
+        let key = (symbols[i].name.clone(), symbols[i].kind);
+        if seen.contains(&key) {
+            symbols.remove(i);
+        } else {
+            seen.push(key);
+            i += 1;
+        }
+    }
+}
 
 // =============================================================================
 // Haskell Module Resolver

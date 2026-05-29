@@ -309,9 +309,83 @@ impl Language for Rust {
         static RESOLVER: RustModuleResolver = RustModuleResolver;
         Some(&RESOLVER)
     }
+
+    fn post_process_symbols(
+        &self,
+        symbols: &mut Vec<crate::Symbol>,
+        _resolver: Option<&dyn crate::InterfaceResolver>,
+        _current_file: &str,
+    ) {
+        merge_rust_impl_blocks(symbols);
+    }
 }
 
 impl LanguageSymbols for Rust {}
+
+/// Merge Rust impl blocks with their corresponding struct/enum types.
+///
+/// Rust allows multiple `impl TypeName { ... }` blocks; tree-sitter tags each as a
+/// separate top-level symbol. This pass folds all impl children and `implements` lists
+/// into the matching struct/enum entry so the symbol tree reflects the logical type
+/// rather than the syntactic impl layout.
+fn merge_rust_impl_blocks(symbols: &mut Vec<crate::Symbol>) {
+    use std::collections::HashMap;
+
+    // Collect impl blocks: their children and implements lists
+    let mut impl_methods: HashMap<String, Vec<crate::Symbol>> = HashMap::new();
+    let mut impl_implements: HashMap<String, Vec<String>> = HashMap::new();
+
+    // Remove impl blocks and collect their methods + implements
+    symbols.retain(|sym| {
+        if sym.signature.starts_with("impl ") {
+            impl_methods
+                .entry(sym.name.clone())
+                .or_default()
+                .extend(sym.children.clone());
+            impl_implements
+                .entry(sym.name.clone())
+                .or_default()
+                .extend(sym.implements.clone());
+            return false;
+        }
+        true
+    });
+
+    // Add methods and implements to matching struct/enum
+    for sym in symbols.iter_mut() {
+        if matches!(
+            sym.kind,
+            crate::SymbolKind::Struct | crate::SymbolKind::Enum
+        ) {
+            if let Some(methods) = impl_methods.remove(&sym.name) {
+                sym.children.extend(methods);
+            }
+            if let Some(impls) = impl_implements.remove(&sym.name) {
+                sym.implements.extend(impls);
+            }
+        }
+    }
+
+    // Any remaining impl blocks without matching type: add back as module-like symbols
+    for (name, methods) in impl_methods {
+        let impls = impl_implements.remove(&name).unwrap_or_default();
+        if !methods.is_empty() {
+            symbols.push(crate::Symbol {
+                name: name.clone(),
+                kind: crate::SymbolKind::Module,
+                signature: format!("impl {}", name),
+                docstring: None,
+                attributes: Vec::new(),
+                start_line: methods.first().map(|m| m.start_line).unwrap_or(0),
+                end_line: methods.last().map(|m| m.end_line).unwrap_or(0),
+                visibility: crate::Visibility::Public,
+                children: methods,
+                is_interface_impl: !impls.is_empty(),
+                implements: impls,
+            });
+        }
+    }
+}
 
 /// Module resolver for Rust (Cargo workspace).
 pub struct RustModuleResolver;

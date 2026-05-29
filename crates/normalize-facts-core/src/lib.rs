@@ -8,10 +8,12 @@
 
 mod file;
 mod import;
+mod resolver;
 mod symbol;
 mod type_ref;
 
 pub use file::IndexedFile;
 pub use import::{Export, FlatImport, Import};
+pub use resolver::InterfaceResolver;
 pub use symbol::{FlatSymbol, Symbol, SymbolKind, Visibility};
 pub use type_ref::{TypeRef, TypeRefKind};

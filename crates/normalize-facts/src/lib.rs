@@ -16,8 +16,10 @@ mod symbols;
 #[cfg(feature = "cli")]
 pub mod service;
 
-pub use extract::{ExtractOptions, ExtractResult, Extractor, InterfaceResolver, OnDemandResolver};
+pub use extract::{ExtractOptions, ExtractResult, Extractor, OnDemandResolver};
+// InterfaceResolver moved to normalize-facts-core; re-export here for callers
 pub use index::{CallGraphStats, ChangedFiles, FileIndex, IndexedFile, SymbolMatch};
+pub use normalize_facts_core::InterfaceResolver;
 pub use parsers::{
     MissingGrammar, available_external_grammars, grammar_loader, parse_with_grammar, parser_for,
     peek_missing_grammars, report_missing_grammar, take_missing_grammars, try_get_grammar,

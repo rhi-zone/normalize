@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
 // Re-export core types from normalize-facts-core
-pub use normalize_facts_core::{Import, Symbol, SymbolKind, Visibility};
+pub use normalize_facts_core::{Import, InterfaceResolver, Symbol, SymbolKind, Visibility};
 
 /// Configuration discovered from workspace manifests for module resolution.
 pub struct ResolverConfig {
@@ -219,6 +219,28 @@ pub trait Language: Send + Sync {
     fn refine_kind(&self, node: &Node, _content: &str, tag_kind: SymbolKind) -> SymbolKind {
         let _ = node;
         tag_kind
+    }
+
+    /// Post-process the symbol list after all symbols have been extracted from a file.
+    ///
+    /// Called once per file, after the tags-based extraction pass. Use this for
+    /// language-specific structural transformations that cannot be expressed in a
+    /// `.scm` query:
+    /// - Rust: fold impl-block methods into their owning struct/enum.
+    /// - Haskell: collapse multi-equation function definitions into a single symbol.
+    /// - TypeScript/JavaScript: mark methods that satisfy interface contracts.
+    ///
+    /// The `resolver` and `current_file` parameters are provided for languages
+    /// that need cross-file lookups (e.g. TypeScript interface resolution). Most
+    /// implementations can ignore them.
+    ///
+    /// Default: no-op.
+    fn post_process_symbols(
+        &self,
+        _symbols: &mut Vec<Symbol>,
+        _resolver: Option<&dyn InterfaceResolver>,
+        _current_file: &str,
+    ) {
     }
 
     // === Import/Export ===

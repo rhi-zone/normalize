@@ -980,9 +980,11 @@ See `docs/ad-hoc-dispatch.md` for the anti-pattern definition and cross-project 
 
 These violate the CLAUDE.md rules "no grammar_name== branches in language-agnostic crates" and "node classification belongs in .scm". Cross-ref `docs/audit-2026-03-12.md` for prior audit findings.
 
-**HIGH — `normalize-facts/src/extract.rs` ~344-356**
+~~**HIGH — `normalize-facts/src/extract.rs` ~344-356**~~
 
-Three `if grammar_name == "rust"` / `"haskell"` / `("typescript" || "javascript")` branches in a language-agnostic extraction crate, each calling a bespoke post-process (`merge_rust_impl_blocks`, `dedup_haskell_functions`, `mark_interface_implementations`). Should be a `Language` trait `post_process_symbols` hook (or a `.scm` fix for the Haskell deduplication case, which may be a grammar issue rather than a post-process need). Direct CLAUDE.md violation.
+~~Three `if grammar_name == "rust"` / `"haskell"` / `("typescript" || "javascript")` branches in a language-agnostic extraction crate, each calling a bespoke post-process (`merge_rust_impl_blocks`, `dedup_haskell_functions`, `mark_interface_implementations`). Should be a `Language` trait `post_process_symbols` hook (or a `.scm` fix for the Haskell deduplication case, which may be a grammar issue rather than a post-process need). Direct CLAUDE.md violation.~~
+
+RESOLVED: Added `post_process_symbols` to the `Language` trait (in `normalize-languages/src/traits.rs`; `InterfaceResolver` moved to `normalize-facts-core` to avoid dep-inversion). Rust/Haskell/TypeScript/TSX/JavaScript override it; the three `grammar_name ==` branches replaced by a single `support.post_process_symbols(...)` call.
 
 **HIGH — `normalize-deps/src/lib.rs:50-53` + `collect_js_ts_deps` ~409-638**
 
@@ -996,13 +998,17 @@ Pervasive `match grammar` / `grammar ==` dispatch on hardcoded language names + 
 
 The `build` filter alias hardcodes `target/`, `node_modules/`, `.next/`, `.nuxt/`, `__pycache__/` (Cargo/npm/Next/Nuxt/Python conventions) in a library crate. Mitigated by being applied only on explicit `build` alias request (not silently). Judgment call per CLAUDE.md: curated-default-alias vs. hardcoded-third-party-convention. CLAUDE.md says these belong in project config; however this is explicitly a *named alias* the user opts into. Flag for decision, not emergency fix.
 
-**LOW / HYPOTHESIS — `normalize-ecosystems/src/local_docs.rs` ~278**
+~~**LOW / HYPOTHESIS — `normalize-ecosystems/src/local_docs.rs` ~278**~~
 
-`walk_rs_files` hardcodes the `.rs` extension (also `lib.rs`/`main.rs`/`mod.rs` candidates). The struct is Cargo-specific, so Rust-only coupling may be intentional and correct. Fix if it becomes general: pass a `Language` ref. Note as judgment call.
+~~`walk_rs_files` hardcodes the `.rs` extension (also `lib.rs`/`main.rs`/`mod.rs` candidates). The struct is Cargo-specific, so Rust-only coupling may be intentional and correct.~~
 
-**LOW — `normalize-facts/tests/extract_fixtures.rs` ~217-270**
+WONTFIX: `CargoLocalDocsExtractor` is intentionally Cargo/Rust-scoped (module doc + `cargo metadata`); hardcoding `.rs`/`lib.rs`/`mod.rs` inside a Cargo-specific extractor is correct, not a violation.
 
-Hardcoded runtime→command map (`python`→`python3`, etc.) in tests. Test-only, out of the library-crate rule's scope. Recorded for completeness.
+~~**LOW — `normalize-facts/tests/extract_fixtures.rs` ~217-270**~~
+
+~~Hardcoded runtime→command map (`python`→`python3`, etc.) in tests. Test-only, out of the library-crate rule's scope.~~
+
+WONTFIX: Test plumbing mapping a language to its interpreter binary is environment configuration, not library-crate classification; the dispatch-rule does not apply to test harnesses.
 
 ---
 

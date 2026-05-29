@@ -121,6 +121,15 @@ impl Language for JavaScript {
         static RESOLVER: JsModuleResolver = JsModuleResolver;
         Some(&RESOLVER)
     }
+
+    fn post_process_symbols(
+        &self,
+        symbols: &mut Vec<crate::Symbol>,
+        resolver: Option<&dyn crate::InterfaceResolver>,
+        current_file: &str,
+    ) {
+        ecmascript::mark_interface_implementations(symbols, resolver, current_file);
+    }
 }
 
 impl LanguageSymbols for JavaScript {}

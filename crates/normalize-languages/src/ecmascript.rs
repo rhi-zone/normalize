@@ -3,7 +3,7 @@
 //! This module contains common logic shared between JavaScript, TypeScript, and TSX.
 //! Each language struct delegates to these functions for DRY implementation.
 
-use crate::{ImplementsInfo, Import, Visibility};
+use crate::{ImplementsInfo, Import, InterfaceResolver, Symbol, SymbolKind, Visibility};
 use tree_sitter::Node;
 
 // ============================================================================
@@ -376,4 +376,114 @@ pub fn extract_js_module_doc(src: &str) -> Option<String> {
     let block = &trimmed[..end + 2];
     let doc = clean_block_doc_comment(block);
     if doc.is_empty() { None } else { Some(doc) }
+}
+
+// ============================================================================
+// Symbol post-processing
+// ============================================================================
+
+/// Mark methods that implement interfaces (for TypeScript/JavaScript).
+///
+/// Builds a map of interface/class names to their method names, then marks
+/// matching methods in classes that extend/implement them.
+///
+/// If a resolver is provided, it will be used to look up interface methods
+/// from other files when not found locally.
+pub fn mark_interface_implementations(
+    symbols: &mut [Symbol],
+    resolver: Option<&dyn InterfaceResolver>,
+    current_file: &str,
+) {
+    use std::collections::{HashMap, HashSet};
+
+    // First pass: collect method names from interfaces and classes in this file
+    // (these could be parent classes that get extended)
+    let mut type_methods: HashMap<String, HashSet<String>> = HashMap::new();
+
+    fn collect_type_methods(
+        symbols: &[Symbol],
+        type_methods: &mut HashMap<String, HashSet<String>>,
+    ) {
+        for sym in symbols {
+            if matches!(sym.kind, SymbolKind::Interface | SymbolKind::Class) {
+                let methods: HashSet<String> = sym
+                    .children
+                    .iter()
+                    .filter(|c| matches!(c.kind, SymbolKind::Method | SymbolKind::Function))
+                    .map(|c| c.name.clone())
+                    .collect();
+                if !methods.is_empty() {
+                    type_methods.insert(sym.name.clone(), methods);
+                }
+            }
+            // Recurse into nested types
+            collect_type_methods(&sym.children, type_methods);
+        }
+    }
+
+    collect_type_methods(symbols, &mut type_methods);
+
+    // Cache for cross-file resolved interfaces (avoid repeated lookups)
+    let mut cross_file_cache: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+
+    // Second pass: mark methods in classes that implement/extend
+    fn mark_methods(
+        symbols: &mut [Symbol],
+        type_methods: &HashMap<String, HashSet<String>>,
+        resolver: Option<&dyn InterfaceResolver>,
+        current_file: &str,
+        cross_file_cache: &mut HashMap<String, Option<HashSet<String>>>,
+    ) {
+        for sym in symbols.iter_mut() {
+            if !sym.implements.is_empty() {
+                // Collect all method names from all implemented interfaces/parents
+                let mut interface_methods: HashSet<String> = HashSet::new();
+
+                for parent_name in &sym.implements {
+                    // Try same-file first
+                    if let Some(methods) = type_methods.get(parent_name) {
+                        interface_methods.extend(methods.clone());
+                    } else if let Some(resolver) = resolver {
+                        // Try cross-file resolution with caching
+                        let cached =
+                            cross_file_cache
+                                .entry(parent_name.clone())
+                                .or_insert_with(|| {
+                                    resolver
+                                        .resolve_interface_methods(parent_name, current_file)
+                                        .map(|v| v.into_iter().collect())
+                                });
+                        if let Some(methods) = cached {
+                            interface_methods.extend(methods.clone());
+                        }
+                    }
+                }
+
+                // Mark matching methods
+                for child in &mut sym.children {
+                    if matches!(child.kind, SymbolKind::Method | SymbolKind::Function)
+                        && interface_methods.contains(&child.name)
+                    {
+                        child.is_interface_impl = true;
+                    }
+                }
+            }
+            // Recurse
+            mark_methods(
+                &mut sym.children,
+                type_methods,
+                resolver,
+                current_file,
+                cross_file_cache,
+            );
+        }
+    }
+
+    mark_methods(
+        symbols,
+        &type_methods,
+        resolver,
+        current_file,
+        &mut cross_file_cache,
+    );
 }

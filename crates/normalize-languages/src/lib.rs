@@ -252,9 +252,9 @@ pub use registry::{
     support_for_path, supported_languages, test_file_globs_for_path, validate_unused_kinds_audit,
 };
 pub use traits::{
-    ContainerBody, EmbeddedBlock, ImplementsInfo, Import, ImportSpec, Language, LanguageEmbedded,
-    LanguageSymbols, ModuleId, ModuleResolver, Resolution, ResolverConfig, Symbol, SymbolKind,
-    Visibility, simple_function_symbol, simple_symbol,
+    ContainerBody, EmbeddedBlock, ImplementsInfo, Import, ImportSpec, InterfaceResolver, Language,
+    LanguageEmbedded, LanguageSymbols, ModuleId, ModuleResolver, Resolution, ResolverConfig,
+    Symbol, SymbolKind, Visibility, simple_function_symbol, simple_symbol,
 };
 
 // Re-export language structs (feature-gated)
