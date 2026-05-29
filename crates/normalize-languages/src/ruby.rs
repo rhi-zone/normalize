@@ -26,6 +26,10 @@ impl Language for Ruby {
         Some(self)
     }
 
+    fn as_refactor_codegen(&self) -> Option<&dyn crate::RefactorCodeGen> {
+        Some(self)
+    }
+
     fn signature_suffix(&self) -> &'static str {
         "; end"
     }
@@ -176,6 +180,169 @@ impl Language for Ruby {
 }
 
 impl LanguageSymbols for Ruby {}
+
+impl crate::RefactorCodeGen for Ruby {
+    fn format_param(&self, name: &str, _ty: Option<&str>) -> String {
+        // Ruby is dynamically typed; no annotation.
+        name.to_string()
+    }
+
+    fn render_binding(&self, name: &str, expr: &str, indent: &str) -> String {
+        format!("{}{} = {}\n", indent, name, expr)
+    }
+
+    fn render_function(&self, spec: &crate::ExtractedFnSpec) -> String {
+        use crate::GenReturn;
+        let param_str = spec
+            .params
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>()
+            .join(", ");
+        // Omit empty parens for a no-arg method (idiomatic Ruby).
+        let sig = if param_str.is_empty() {
+            format!("def {}", spec.name)
+        } else {
+            format!("def {}({})", spec.name, param_str)
+        };
+        let indent = &spec.indent;
+        let return_stmt = match &spec.ret {
+            GenReturn::Unit => String::new(),
+            GenReturn::Single(v) => format!("\n{}    {}", indent, v),
+            GenReturn::Tuple(vs) => format!("\n{}    [{}]", indent, vs.join(", ")),
+            GenReturn::Result(ok, _) => format!("\n{}    {}", indent, ok),
+        };
+
+        let body = spec
+            .body_lines
+            .iter()
+            .map(|l| format!("{}    {}", indent, l))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            "\n{}{}\n{}{}\n{}end\n",
+            indent, sig, body, return_stmt, indent
+        )
+    }
+
+    fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
+        use crate::GenReturn;
+        let args = spec
+            .params
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let indent = &spec.indent;
+        let name = &spec.name;
+        let call = if args.is_empty() {
+            name.to_string()
+        } else {
+            format!("{}({})", name, args)
+        };
+        match &spec.ret {
+            GenReturn::Unit => format!("{}{}\n", indent, call),
+            GenReturn::Single(v) => format!("{}{} = {}\n", indent, v, call),
+            GenReturn::Tuple(vs) => format!("{}{} = {}\n", indent, vs.join(", "), call),
+            GenReturn::Result(ok, _) => format!("{}{} = {}\n", indent, ok, call),
+        }
+    }
+
+    fn supports_multi_return(&self) -> bool {
+        // `return a, b` + `a, b = method` destructuring.
+        true
+    }
+}
+
+#[cfg(test)]
+mod refactor_codegen_tests {
+    use super::Ruby;
+    use crate::{CallSiteSpec, ExtractedFnSpec, GenParam, GenReturn, RefactorCodeGen};
+
+    #[test]
+    fn ruby_fn_basic() {
+        let spec = ExtractedFnSpec {
+            name: "double".to_string(),
+            params: vec![GenParam {
+                name: "n".to_string(),
+                inferred_type: None,
+                mutable: false,
+            }],
+            ret: GenReturn::Single("result".to_string()),
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["result = n * 2".to_string()],
+            indent: String::new(),
+        };
+        assert_eq!(
+            Ruby.render_function(&spec),
+            "\ndef double(n)\n    result = n * 2\n    result\nend\n"
+        );
+    }
+
+    #[test]
+    fn ruby_fn_no_args_unit() {
+        let spec = ExtractedFnSpec {
+            name: "greet".to_string(),
+            params: vec![],
+            ret: GenReturn::Unit,
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["puts \"hi\"".to_string()],
+            indent: String::new(),
+        };
+        assert_eq!(
+            Ruby.render_function(&spec),
+            "\ndef greet\n    puts \"hi\"\nend\n"
+        );
+    }
+
+    #[test]
+    fn ruby_fn_multi_return() {
+        let spec = ExtractedFnSpec {
+            name: "pair".to_string(),
+            params: vec![],
+            ret: GenReturn::Tuple(vec!["a".to_string(), "b".to_string()]),
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["a = 1".to_string(), "b = 2".to_string()],
+            indent: String::new(),
+        };
+        let out = Ruby.render_function(&spec);
+        assert!(out.contains("[a, b]"), "got: {out}");
+    }
+
+    #[test]
+    fn ruby_call_site_and_binding() {
+        let spec = CallSiteSpec {
+            name: "pair".to_string(),
+            params: vec![],
+            ret: GenReturn::Tuple(vec!["a".to_string(), "b".to_string()]),
+            is_async: false,
+            indent: "  ".to_string(),
+        };
+        assert_eq!(Ruby.render_call_site(&spec), "  a, b = pair\n");
+        assert_eq!(Ruby.render_binding("x", "f(1)", "  "), "  x = f(1)\n");
+        assert_eq!(Ruby.format_param("n", None), "n");
+    }
+
+    #[test]
+    fn ruby_call_site_single_with_args() {
+        let spec = CallSiteSpec {
+            name: "double".to_string(),
+            params: vec![GenParam {
+                name: "n".to_string(),
+                inferred_type: None,
+                mutable: false,
+            }],
+            ret: GenReturn::Single("result".to_string()),
+            is_async: false,
+            indent: String::new(),
+        };
+        assert_eq!(Ruby.render_call_site(&spec), "result = double(n)\n");
+    }
+}
 
 // =============================================================================
 // Ruby Module Resolver

@@ -1015,7 +1015,7 @@ RESOLVED 2026-05-30: Added CommonJS `require()` patterns (simple binding, shorth
 **Phase B — broadening worklist** (the recipe-migration stage migrates recipes to the new infra; THIS list is the per-language fan-out to give every GP language full refactor support). Each needs `<lang>.refactor.scm` + `RefactorCodeGen` impl. Codegen for a new language is real per-language design work (not mechanical), so each is its own staged effort. Recipe-supported today: rust, python, javascript, typescript, tsx (have both). Go + Java have `RefactorCodeGen` but still need `.refactor.scm` to become recipe targets. GP languages (those with a `module_resolver`) still needing BOTH:
 - [x] go (`.refactor.scm` + codegen done)
 - [x] java (`.refactor.scm` + codegen done)
-- [ ] ruby
+- [x] ruby
 - [ ] kotlin
 - [ ] scala
 - [ ] groovy

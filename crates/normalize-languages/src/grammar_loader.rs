@@ -1218,9 +1218,24 @@ fn bundled_refactor_query(name: &str) -> Option<&'static str> {
         "tsx" => Some(include_str!("queries/tsx.refactor.scm")),
         "go" => Some(include_str!("queries/go.refactor.scm")),
         "java" => Some(include_str!("queries/java.refactor.scm")),
+        "ruby" => Some(include_str!("queries/ruby.refactor.scm")),
         _ => None,
     }
 }
+
+/// Every grammar with a bundled `*.refactor.scm` query. Kept in sync with the
+/// match arms in [`bundled_refactor_query`]; used by the bundled-query tests.
+#[cfg(test)]
+const BUNDLED_REFACTOR_LANGS: &[&str] = &[
+    "rust",
+    "python",
+    "javascript",
+    "typescript",
+    "tsx",
+    "go",
+    "java",
+    "ruby",
+];
 
 /// Return a bundled test-regions query for a grammar, if available.
 ///
@@ -1862,15 +1877,7 @@ mod tests {
 
     #[test]
     fn test_bundled_refactor_queries_exist() {
-        for lang in &[
-            "rust",
-            "python",
-            "javascript",
-            "typescript",
-            "tsx",
-            "go",
-            "java",
-        ] {
+        for lang in BUNDLED_REFACTOR_LANGS {
             let q = bundled_refactor_query(lang);
             assert!(q.is_some(), "Missing bundled refactor query for {lang}");
             assert!(!q.unwrap().is_empty(), "Empty refactor query for {lang}");
@@ -1880,15 +1887,7 @@ mod tests {
     #[test]
     fn test_bundled_refactor_queries_compile() {
         let loader = GrammarLoader::new();
-        for lang in &[
-            "rust",
-            "python",
-            "javascript",
-            "typescript",
-            "tsx",
-            "go",
-            "java",
-        ] {
+        for lang in BUNDLED_REFACTOR_LANGS {
             let Some(g) = loader.get(lang).ok() else {
                 eprintln!("{lang}: grammar .so not found — skipping refactor query compile");
                 continue;
