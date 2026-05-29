@@ -8,6 +8,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **CommonJS `require()` imports and re-exports now extracted via `.scm` queries
+  for JavaScript, TypeScript, and TSX.** Previously JS/TS/TSX bypassed the
+  language-agnostic `.scm` path via a hand-rolled AST walker; the walker handled
+  imports, exports, and re-exports but only for those three languages. All patterns
+  are now in `javascript.imports.scm`, `typescript.imports.scm`, and
+  `tsx.imports.scm`: ES6 `import` statements, CommonJS `require()` (simple binding,
+  shorthand destructured, aliased destructured, bare side-effect), and `export …
+  from` re-exports (named, wildcard `*`, namespace `* as ns`). TSX now also
+  extracts re-exports (it previously lacked those patterns). No behavior change for
+  ES6 imports; `require()` and re-export extraction now also benefit from the same
+  `.scm`-driven improvements applied to other languages.
 - **`syntax query` top-level alternation `[...]` now returns correct matches.**
   Queries whose entire pattern is a top-level tree-sitter alternation (e.g.
   `[(identifier) @i (line_comment) @c]`) previously returned 0 matches silently

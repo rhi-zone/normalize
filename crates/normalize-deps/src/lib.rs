@@ -47,11 +47,6 @@ impl DepsExtractor {
         let support = support_for_path(path);
 
         let extracted = match support {
-            // JS/TS need special handling for re-exports
-            Some(s) if s.grammar_name() == "javascript" => self.extract_javascript(content),
-            Some(s) if s.grammar_name() == "typescript" => self.extract_typescript(content),
-            Some(s) if s.grammar_name() == "tsx" => self.extract_tsx(content),
-            // All other languages use trait-based extraction
             Some(s) => self.extract_with_trait(content, s),
             None => ExtractedDeps {
                 imports: Vec::new(),
@@ -157,7 +152,7 @@ impl DepsExtractor {
         };
 
         let loader = grammar_loader();
-        let imports = loader
+        let (imports, reexports) = loader
             .get_imports(grammar_name)
             .and_then(|query_str| {
                 // Query-first: use the .scm file; None means fall back to trait
@@ -169,7 +164,7 @@ impl DepsExtractor {
                 let root = tree.root_node();
                 let mut cursor = root.walk();
                 Self::collect_imports_with_trait(&mut cursor, content, support, &mut imports);
-                imports
+                (imports, Vec::new())
             });
 
         let exports = Self::extract_exports_from_tags(&tree, content, support, grammar_name);
@@ -177,32 +172,35 @@ impl DepsExtractor {
         ExtractedDeps {
             imports,
             exports,
-            reexports: Vec::new(),
+            reexports,
         }
     }
 
-    /// Extract imports from an imports.scm query.
+    /// Extract imports (and re-exports) from an imports.scm query.
     ///
     /// Returns `None` when the grammar or query is unavailable, or when the query produced
     /// no usable import paths (triggering trait fallback in both cases).
-    /// Returns `Some(vec)` when the query extracted at least one import with a non-empty path.
+    /// Returns `Some((imports, reexports))` when the query extracted at least one import with a
+    /// non-empty path.
     ///
     /// Captures used:
-    /// - `@import`      — the whole import node (provides the line number anchor)
-    /// - `@import.path` — the module path (quotes stripped if present)
-    /// - `@import.name` — a single imported name (may repeat per match for multi-name imports)
-    /// - `@import.alias`— alias for the name or path
-    /// - `@import.glob` — presence means `is_wildcard = true`
+    /// - `@import`         — the whole import node (provides the line number anchor)
+    /// - `@import.path`    — the module path (quotes stripped if present)
+    /// - `@import.name`    — a single imported name (may repeat per match for multi-name imports)
+    /// - `@import.alias`   — alias for the name or path
+    /// - `@import.glob`    — presence means `is_wildcard = true` (also `is_star = true` for re-exports)
+    /// - `@import.reexport`— presence means this is an `export ... from` re-export; the match is
+    ///   emitted as a `ReExport` instead of an `Import`
     ///
     /// Multiple matches may share the same `@import` node (e.g. Rust `use path::{A, B}` emits
-    /// one match per name). They are aggregated into a single `Import` by source position.
+    /// one match per name). They are aggregated into a single `Import`/`ReExport` by source position.
     fn collect_imports_from_query(
         tree: &tree_sitter::Tree,
         content: &str,
         grammar_name: &str,
         query_str: &str,
         loader: &normalize_languages::GrammarLoader,
-    ) -> Option<Vec<Import>> {
+    ) -> Option<(Vec<Import>, Vec<ReExport>)> {
         let ts_lang = loader.get(grammar_name).ok()?;
         let query = tree_sitter::Query::new(&ts_lang, query_str).ok()?;
 
@@ -211,10 +209,14 @@ impl DepsExtractor {
         let mut qcursor = tree_sitter::QueryCursor::new();
         let mut matches = qcursor.matches(&query, root, content.as_bytes());
 
-        // Use an ordered map (keyed by byte offset of @import node) so we can aggregate
-        // multiple matches that belong to the same import statement.
-        let mut seen: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
-        let mut result: Vec<Import> = Vec::new();
+        // Use ordered maps (keyed by byte offset of @import node) to aggregate matches that
+        // belong to the same statement (e.g. `use path::{A, B}` or `export { a, b } from 'm'`).
+        let mut import_seen: std::collections::HashMap<usize, usize> =
+            std::collections::HashMap::new();
+        let mut reexport_seen: std::collections::HashMap<usize, usize> =
+            std::collections::HashMap::new();
+        let mut imports: Vec<Import> = Vec::new();
+        let mut reexports: Vec<ReExport> = Vec::new();
 
         while let Some(m) = matches.next() {
             let mut anchor_byte: Option<usize> = None;
@@ -223,6 +225,7 @@ impl DepsExtractor {
             let mut name: Option<String> = None;
             let mut alias: Option<String> = None;
             let mut is_glob = false;
+            let mut is_reexport = false;
 
             for cap in m.captures {
                 let cn = &capture_names[cap.index as usize];
@@ -248,56 +251,87 @@ impl DepsExtractor {
                     "import.glob" => {
                         is_glob = true;
                     }
+                    "import.reexport" => {
+                        is_reexport = true;
+                    }
                     _ => {}
                 }
             }
 
-            // Determine the grouping key: anchor byte if we have one, else path byte start
+            // Determine the grouping key: anchor byte if we have one, else skip
             let key = match anchor_byte {
                 Some(b) => b,
                 None => continue, // No @import capture — skip malformed match
             };
 
             let module = path.unwrap_or_default();
-            let is_relative = module.starts_with('.');
 
-            if let Some(&idx) = seen.get(&key) {
-                // This is an additional name for an existing import (e.g. use path::{A, B})
-                if let Some(name) = name {
-                    result[idx].names.push(name);
-                }
-                if alias.is_some() {
-                    result[idx].alias = alias;
-                }
-                if is_glob {
-                    result[idx].is_wildcard = true;
+            if is_reexport {
+                // Route to reexports list — aggregated by anchor byte
+                if let Some(&idx) = reexport_seen.get(&key) {
+                    if let Some(n) = name {
+                        reexports[idx].names.push(n);
+                    }
+                    if is_glob {
+                        reexports[idx].is_star = true;
+                    }
+                } else {
+                    if module.is_empty() && name.is_none() && !is_glob {
+                        continue;
+                    }
+                    let mut re = ReExport {
+                        module,
+                        names: Vec::new(),
+                        is_star: is_glob,
+                        line: anchor_line,
+                    };
+                    if let Some(n) = name {
+                        re.names.push(n);
+                    }
+                    reexport_seen.insert(key, reexports.len());
+                    reexports.push(re);
                 }
             } else {
-                // Skip sentinel matches with no usable path info (e.g. Scala's @import-only query)
-                if module.is_empty() && name.is_none() && !is_glob {
-                    continue;
+                let is_relative = module.starts_with('.');
+
+                if let Some(&idx) = import_seen.get(&key) {
+                    // This is an additional name for an existing import (e.g. use path::{A, B})
+                    if let Some(n) = name {
+                        imports[idx].names.push(n);
+                    }
+                    if alias.is_some() {
+                        imports[idx].alias = alias;
+                    }
+                    if is_glob {
+                        imports[idx].is_wildcard = true;
+                    }
+                } else {
+                    // Skip sentinel matches with no usable path info (e.g. Scala's @import-only query)
+                    if module.is_empty() && name.is_none() && !is_glob {
+                        continue;
+                    }
+                    let mut imp = Import {
+                        module,
+                        names: Vec::new(),
+                        alias,
+                        is_wildcard: is_glob,
+                        is_relative,
+                        line: anchor_line,
+                    };
+                    if let Some(n) = name {
+                        imp.names.push(n);
+                    }
+                    import_seen.insert(key, imports.len());
+                    imports.push(imp);
                 }
-                let mut imp = Import {
-                    module,
-                    names: Vec::new(),
-                    alias,
-                    is_wildcard: is_glob,
-                    is_relative,
-                    line: anchor_line,
-                };
-                if let Some(name) = name {
-                    imp.names.push(name);
-                }
-                seen.insert(key, result.len());
-                result.push(imp);
             }
         }
 
-        // Return None when no usable imports found — signals caller to use trait fallback
-        if result.is_empty() {
+        // Return None when no usable imports/reexports found — signals caller to use trait fallback
+        if imports.is_empty() && reexports.is_empty() {
             None
         } else {
-            Some(result)
+            Some((imports, reexports))
         }
     }
 
@@ -355,451 +389,6 @@ impl DepsExtractor {
             // Recurse into children
             if cursor.goto_first_child() {
                 Self::collect_imports_with_trait(cursor, content, support, imports);
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
-
-    fn extract_typescript(&self, content: &str) -> ExtractedDeps {
-        let tree = match parse_with_grammar("typescript", content) {
-            Some(t) => t,
-            None => {
-                return ExtractedDeps {
-                    imports: Vec::new(),
-                    exports: Vec::new(),
-                    reexports: Vec::new(),
-                };
-            }
-        };
-        self.extract_js_ts_deps(&tree, content)
-    }
-
-    fn extract_tsx(&self, content: &str) -> ExtractedDeps {
-        let tree = match parse_with_grammar("tsx", content) {
-            Some(t) => t,
-            None => {
-                return ExtractedDeps {
-                    imports: Vec::new(),
-                    exports: Vec::new(),
-                    reexports: Vec::new(),
-                };
-            }
-        };
-        self.extract_js_ts_deps(&tree, content)
-    }
-
-    fn extract_javascript(&self, content: &str) -> ExtractedDeps {
-        let tree = match parse_with_grammar("javascript", content) {
-            Some(t) => t,
-            None => {
-                return ExtractedDeps {
-                    imports: Vec::new(),
-                    exports: Vec::new(),
-                    reexports: Vec::new(),
-                };
-            }
-        };
-        self.extract_js_ts_deps(&tree, content)
-    }
-
-    /// Shared extraction for JavaScript/TypeScript AST
-    fn extract_js_ts_deps(&self, tree: &tree_sitter::Tree, content: &str) -> ExtractedDeps {
-        let mut imports = Vec::new();
-        let mut exports = Vec::new();
-        let mut reexports = Vec::new();
-        let root = tree.root_node();
-        let mut cursor = root.walk();
-
-        Self::collect_js_ts_deps(
-            &mut cursor,
-            content,
-            &mut imports,
-            &mut exports,
-            &mut reexports,
-        );
-        ExtractedDeps {
-            imports,
-            exports,
-            reexports,
-        }
-    }
-
-    fn collect_js_ts_deps(
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
-        imports: &mut Vec<Import>,
-        exports: &mut Vec<Export>,
-        reexports: &mut Vec<ReExport>,
-    ) {
-        loop {
-            let node = cursor.node();
-            let kind = node.kind();
-
-            match kind {
-                // import { foo, bar } from './module'
-                // import foo from './module'
-                // import * as foo from './module'
-                "import_statement" => {
-                    let mut module = String::new();
-                    let mut names = Vec::new();
-
-                    for i in 0..node.child_count() as u32 {
-                        if let Some(child) = node.child(i) {
-                            match child.kind() {
-                                "string" | "string_fragment" => {
-                                    // Extract module path (remove quotes)
-                                    let text = &content[child.byte_range()];
-                                    module =
-                                        text.trim_matches(|c| c == '"' || c == '\'').to_string();
-                                }
-                                "import_clause" => {
-                                    // Extract imported names
-                                    Self::collect_import_names(child, content, &mut names);
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-
-                    if !module.is_empty() {
-                        let is_relative = module.starts_with('.');
-                        imports.push(Import {
-                            module,
-                            names,
-                            alias: None,
-                            is_wildcard: false,
-                            is_relative,
-                            line: node.start_position().row + 1,
-                        });
-                    }
-                }
-                // export function foo() {}
-                // export class Bar {}
-                // export const baz = ...
-                // export * from './module'
-                // export { foo, bar } from './module'
-                // export * as helpers from './helpers'
-                "export_statement" => {
-                    // Check if this is a re-export (has a source module)
-                    let mut source_module = None;
-                    let mut is_star = false;
-                    let mut named_exports: Vec<String> = Vec::new();
-
-                    for i in 0..node.child_count() as u32 {
-                        if let Some(child) = node.child(i) {
-                            match child.kind() {
-                                "string" => {
-                                    // The source module in 'export ... from "module"'
-                                    let text = &content[child.byte_range()];
-                                    source_module = Some(
-                                        text.trim_matches(|c| c == '"' || c == '\'').to_string(),
-                                    );
-                                }
-                                "*" => {
-                                    // export * from './module'
-                                    is_star = true;
-                                }
-                                "namespace_export" => {
-                                    // export * as foo from './module'
-                                    is_star = true;
-                                }
-                                "export_clause" => {
-                                    // export { foo, bar } from './module'
-                                    Self::collect_export_clause_names(
-                                        child,
-                                        content,
-                                        &mut named_exports,
-                                    );
-                                }
-                                "function_declaration" | "generator_function_declaration" => {
-                                    if let Some(name_node) = child.child_by_field_name("name") {
-                                        exports.push(Export {
-                                            name: content[name_node.byte_range()].to_string(),
-                                            kind: SymbolKind::Function,
-                                            line: node.start_position().row + 1,
-                                        });
-                                    }
-                                }
-                                "class_declaration" => {
-                                    if let Some(name_node) = child.child_by_field_name("name") {
-                                        exports.push(Export {
-                                            name: content[name_node.byte_range()].to_string(),
-                                            kind: SymbolKind::Class,
-                                            line: node.start_position().row + 1,
-                                        });
-                                    }
-                                }
-                                "lexical_declaration" => {
-                                    // export const foo = ..., bar = ...
-                                    Self::collect_variable_names(
-                                        child,
-                                        content,
-                                        exports,
-                                        node.start_position().row + 1,
-                                    );
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-
-                    // If we found a source module, this is a re-export
-                    if let Some(module) = source_module {
-                        reexports.push(ReExport {
-                            module,
-                            names: named_exports,
-                            is_star,
-                            line: node.start_position().row + 1,
-                        });
-                    }
-                }
-                // Top-level function/class (could be exported via export default later)
-                "function_declaration" | "generator_function_declaration" => {
-                    if let Some(name_node) = node.child_by_field_name("name") {
-                        let name = content[name_node.byte_range()].to_string();
-                        if !name.starts_with('_') {
-                            exports.push(Export {
-                                name,
-                                kind: SymbolKind::Function,
-                                line: node.start_position().row + 1,
-                            });
-                        }
-                    }
-                }
-                "class_declaration" => {
-                    if let Some(name_node) = node.child_by_field_name("name") {
-                        let name = content[name_node.byte_range()].to_string();
-                        if !name.starts_with('_') {
-                            exports.push(Export {
-                                name,
-                                kind: SymbolKind::Class,
-                                line: node.start_position().row + 1,
-                            });
-                        }
-                    }
-                }
-                // const x = require('./module')
-                // let { a, b } = require('./module')
-                // var x = require('./module')
-                "lexical_declaration" | "variable_declaration" => {
-                    let line = node.start_position().row + 1;
-                    for i in 0..node.child_count() as u32 {
-                        if let Some(decl) = node.child(i)
-                            && decl.kind() == "variable_declarator"
-                            && let Some(value) = decl.child_by_field_name("value")
-                            && let Some(mut imp) = Self::extract_require_call(value, content, line)
-                        {
-                            if let Some(name_node) = decl.child_by_field_name("name") {
-                                match name_node.kind() {
-                                    "identifier" => {
-                                        imp.names =
-                                            vec![content[name_node.byte_range()].to_string()];
-                                    }
-                                    "object_pattern" => {
-                                        Self::collect_destructure_names(
-                                            name_node,
-                                            content,
-                                            &mut imp.names,
-                                        );
-                                    }
-                                    _ => {}
-                                }
-                            }
-                            imports.push(imp);
-                        }
-                    }
-                }
-                // require('./side-effect') — bare require, no binding
-                "expression_statement" => {
-                    let line = node.start_position().row + 1;
-                    if let Some(child) = node.child(0)
-                        && let Some(imp) = Self::extract_require_call(child, content, line)
-                    {
-                        imports.push(imp);
-                    }
-                }
-                _ => {}
-            }
-
-            // Recurse into children
-            if cursor.goto_first_child() {
-                Self::collect_js_ts_deps(cursor, content, imports, exports, reexports);
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
-
-    /// Extract a require('module') call from a call_expression node.
-    /// Returns Some(Import) if this is a require(string) call, None otherwise.
-    fn extract_require_call(node: tree_sitter::Node, content: &str, line: usize) -> Option<Import> {
-        if node.kind() != "call_expression" {
-            return None;
-        }
-        let func = node.child_by_field_name("function")?;
-        if func.kind() != "identifier" || &content[func.byte_range()] != "require" {
-            return None;
-        }
-        let args = node.child_by_field_name("arguments")?;
-        let module = Self::extract_string_from_args(args, content)?;
-        Some(Import {
-            is_relative: module.starts_with('.'),
-            module,
-            names: Vec::new(),
-            alias: None,
-            is_wildcard: false,
-            line,
-        })
-    }
-
-    /// Extract the first string literal from an arguments node.
-    fn extract_string_from_args(args: tree_sitter::Node, content: &str) -> Option<String> {
-        for i in 0..args.child_count() as u32 {
-            let arg = args.child(i)?;
-            match arg.kind() {
-                "string" => {
-                    for j in 0..arg.child_count() as u32 {
-                        if let Some(frag) = arg.child(j)
-                            && frag.kind() == "string_fragment"
-                        {
-                            return Some(content[frag.byte_range()].to_string());
-                        }
-                    }
-                }
-                "string_fragment" => {
-                    return Some(content[arg.byte_range()].to_string());
-                }
-                _ => {}
-            }
-        }
-        None
-    }
-
-    /// Collect bound names from a destructuring object pattern.
-    /// Handles `{ a, b }` and `{ key: alias }`.
-    fn collect_destructure_names(node: tree_sitter::Node, content: &str, names: &mut Vec<String>) {
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            match child.kind() {
-                "shorthand_property_identifier_pattern" | "identifier" => {
-                    names.push(content[child.byte_range()].to_string());
-                }
-                "pair_pattern" => {
-                    // { key: boundName } — use the bound name (value side)
-                    if let Some(val) = child.child_by_field_name("value")
-                        && val.kind() == "identifier"
-                    {
-                        names.push(content[val.byte_range()].to_string());
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    /// Collect names from export clause: export { foo, bar } from ...
-    fn collect_export_clause_names(
-        node: tree_sitter::Node,
-        content: &str,
-        names: &mut Vec<String>,
-    ) {
-        // Walk through children directly
-        for i in 0..node.child_count() as u32 {
-            if let Some(child) = node.child(i) {
-                match child.kind() {
-                    "export_specifier" => {
-                        // { foo as bar } - get the first identifier (original name)
-                        // or check for "name" field
-                        if let Some(name) = child.child_by_field_name("name") {
-                            names.push(content[name.byte_range()].to_string());
-                        } else {
-                            // Find first identifier child
-                            for j in 0..child.child_count() as u32 {
-                                if let Some(id) = child.child(j)
-                                    && id.kind() == "identifier"
-                                {
-                                    names.push(content[id.byte_range()].to_string());
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    _ => {
-                        // Recurse into other nodes
-                        Self::collect_export_clause_names(child, content, names);
-                    }
-                }
-            }
-        }
-    }
-
-    fn collect_import_names(node: tree_sitter::Node, content: &str, names: &mut Vec<String>) {
-        let mut cursor = node.walk();
-        loop {
-            let child = cursor.node();
-            match child.kind() {
-                "identifier" => {
-                    names.push(content[child.byte_range()].to_string());
-                }
-                "import_specifier" => {
-                    // { foo as bar } - we want "foo"
-                    if let Some(name) = child.child_by_field_name("name") {
-                        names.push(content[name.byte_range()].to_string());
-                    }
-                }
-                "namespace_import" => {
-                    // import * as foo - we want "foo"
-                    for i in 0..child.child_count() as u32 {
-                        if let Some(id) = child.child(i)
-                            && id.kind() == "identifier"
-                        {
-                            names.push(content[id.byte_range()].to_string());
-                        }
-                    }
-                }
-                _ => {}
-            }
-
-            if cursor.goto_first_child() {
-                Self::collect_import_names(cursor.node(), content, names);
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
-
-    fn collect_variable_names(
-        node: tree_sitter::Node,
-        content: &str,
-        exports: &mut Vec<Export>,
-        line: usize,
-    ) {
-        let mut cursor = node.walk();
-        loop {
-            let child = cursor.node();
-            if child.kind() == "variable_declarator"
-                && let Some(name_node) = child.child_by_field_name("name")
-                && name_node.kind() == "identifier"
-            {
-                exports.push(Export {
-                    name: content[name_node.byte_range()].to_string(),
-                    kind: SymbolKind::Variable,
-                    line,
-                });
-            }
-
-            if cursor.goto_first_child() {
-                Self::collect_variable_names(cursor.node(), content, exports, line);
                 cursor.goto_parent();
             }
 

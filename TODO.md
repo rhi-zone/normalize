@@ -986,9 +986,11 @@ These violate the CLAUDE.md rules "no grammar_name== branches in language-agnost
 
 RESOLVED: Added `post_process_symbols` to the `Language` trait (in `normalize-languages/src/traits.rs`; `InterfaceResolver` moved to `normalize-facts-core` to avoid dep-inversion). Rust/Haskell/TypeScript/TSX/JavaScript override it; the three `grammar_name ==` branches replaced by a single `support.post_process_symbols(...)` call.
 
-**HIGH — `normalize-deps/src/lib.rs:50-53` + `collect_js_ts_deps` ~409-638**
+~~**HIGH — `normalize-deps/src/lib.rs:50-53` + `collect_js_ts_deps` ~409-638**~~
 
-JS/TS/TSX bypass the `.scm` imports path (used by all other languages via `get_imports`) for a 200+ line hand-rolled AST walker. The `.scm` files (`javascript.imports.scm`, `typescript.imports.scm`, `tsx.imports.scm`) already exist; only `require()` (CommonJS) is missing from `javascript.imports.scm`. Fix: add `require()` to the `.scm`, delete the JS/TS special-case. Violates "node classification belongs in .scm."
+~~JS/TS/TSX bypass the `.scm` imports path (used by all other languages via `get_imports`) for a 200+ line hand-rolled AST walker. The `.scm` files (`javascript.imports.scm`, `typescript.imports.scm`, `tsx.imports.scm`) already exist; only `require()` (CommonJS) is missing from `javascript.imports.scm`. Fix: add `require()` to the `.scm`, delete the JS/TS special-case. Violates "node classification belongs in .scm."~~
+
+RESOLVED 2026-05-30: Added CommonJS `require()` patterns (simple binding, shorthand and aliased destructuring, bare side-effect) to `javascript.imports.scm`, `typescript.imports.scm`, `tsx.imports.scm`. Added reexport patterns (`export * from`, `export * as ns from`, `export { name } from`) to `tsx.imports.scm` (JS and TS already had them). Extended `collect_imports_from_query` to honor `@import.reexport` captures and return `(Vec<Import>, Vec<ReExport>)`. Removed the `grammar_name == "javascript"/"typescript"/"tsx"` match-arm dispatch from `DepsExtractor::extract`, and deleted `extract_javascript`, `extract_typescript`, `extract_tsx`, `extract_js_ts_deps`, `collect_js_ts_deps`, and all helper fns (`extract_require_call`, `extract_string_from_args`, `collect_destructure_names`, `collect_export_clause_names`, `collect_import_names`, `collect_variable_names`). All 9 tests pass; full clippy clean.
 
 **HIGH — `normalize-refactor/src/{extract_function,add_parameter,inline_variable,introduce_variable}.rs` (~3800 LOC total)**
 

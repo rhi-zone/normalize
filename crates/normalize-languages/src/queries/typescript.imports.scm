@@ -80,9 +80,91 @@
   source: (string
     (string_fragment) @import.path)) @import @import.reexport
 
-; export * as ns from 'module'  (namespace re-export — star with alias, not wildcard)
+; export * as ns from 'module'  (namespace re-export — star with alias)
 (export_statement
   (namespace_export
+    "*" @import.glob
     (identifier) @import.alias)
   source: (string
     (string_fragment) @import.path)) @import @import.reexport
+
+; const x = require('module')
+(lexical_declaration
+  (variable_declarator
+    name: (identifier) @import.name
+    value: (call_expression
+      function: (identifier) @_fn
+      arguments: (arguments
+        (string
+          (string_fragment) @import.path))))
+  (#eq? @_fn "require")) @import
+
+; var x = require('module')
+(variable_declaration
+  (variable_declarator
+    name: (identifier) @import.name
+    value: (call_expression
+      function: (identifier) @_fn
+      arguments: (arguments
+        (string
+          (string_fragment) @import.path))))
+  (#eq? @_fn "require")) @import
+
+; const { a, b } = require('module')  (shorthand destructured — one match per name)
+(lexical_declaration
+  (variable_declarator
+    name: (object_pattern
+      (shorthand_property_identifier_pattern) @import.name)
+    value: (call_expression
+      function: (identifier) @_fn
+      arguments: (arguments
+        (string
+          (string_fragment) @import.path))))
+  (#eq? @_fn "require")) @import
+
+; var { a, b } = require('module')  (shorthand destructured — one match per name)
+(variable_declaration
+  (variable_declarator
+    name: (object_pattern
+      (shorthand_property_identifier_pattern) @import.name)
+    value: (call_expression
+      function: (identifier) @_fn
+      arguments: (arguments
+        (string
+          (string_fragment) @import.path))))
+  (#eq? @_fn "require")) @import
+
+; const { key: alias } = require('module')  (aliased destructured — use the bound name)
+(lexical_declaration
+  (variable_declarator
+    name: (object_pattern
+      (pair_pattern
+        value: (identifier) @import.name))
+    value: (call_expression
+      function: (identifier) @_fn
+      arguments: (arguments
+        (string
+          (string_fragment) @import.path))))
+  (#eq? @_fn "require")) @import
+
+; var { key: alias } = require('module')  (aliased destructured — use the bound name)
+(variable_declaration
+  (variable_declarator
+    name: (object_pattern
+      (pair_pattern
+        value: (identifier) @import.name))
+    value: (call_expression
+      function: (identifier) @_fn
+      arguments: (arguments
+        (string
+          (string_fragment) @import.path))))
+  (#eq? @_fn "require")) @import
+
+; require('module')  (side-effect only, no binding)
+(expression_statement
+  (call_expression
+    function: (identifier) @_fn
+    arguments: (arguments
+      (string
+        (string_fragment) @import.path)))
+  (#eq? @_fn "require")) @import
