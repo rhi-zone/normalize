@@ -166,13 +166,14 @@ second look — none are blocking, none are strictly committed:
   pinned, which is what caused the failure). Could yank the 0.3.0 versions
   for safety.
 
-- **Toolchain drift: `flake.nix` uses fenix `stable` with no version pin; no `rust-toolchain.toml`.**
-  Clippy lints accumulated silently over time (27+ instances fixed 2026-05-29) because `nix flake update`
-  can silently advance the Rust toolchain, making previously-clean code suddenly lint-fail — but only if
-  clippy is actually gated. Consider (a) pinning the fenix input to a specific rev or date in `flake.lock`
-  and committing the lockfile, or (b) adding a `rust-toolchain.toml` (e.g. `channel = "1.XX.Y"`) so all
-  contributors/CI see the same toolchain, or (c) at minimum adding `cargo clippy -- -D warnings` as a
-  mandatory CI step so drift is caught within a PR rather than across sessions.
+- [x] **Toolchain drift: pinned via `rust-toolchain.toml` at `1.95.0`; clippy hard-gated in pre-commit; hook auto-installs via `nix develop` shellHook (2026-05-29).**
+  `rust-toolchain.toml` pins `channel = "1.95.0"` with components and musl target matching `flake.nix`.
+  The pre-commit clippy invocation is now a hard gate (was non-blocking with `|| { echo "non-critical" }`).
+  The flake's `shellHook` diff-guards and auto-installs `.git/hooks/pre-commit` on every `nix develop` entry.
+  **Residual:** `flake.nix` still uses `fenixPkgs.stable` rather than reading `rust-toolchain.toml` via
+  `fromToolchainFile` (option declined — keep flake simple). If `nix flake update` advances fenix `stable`,
+  the in-shell toolchain and `rust-toolchain.toml` channel will diverge. Keep them in sync manually when
+  bumping the toolchain.
 
 - **Daemon flake `config_edit_triggers_reload_event`** — failed once in
   a workspace test run, passed in isolation and on subsequent runs. The

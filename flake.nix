@@ -105,6 +105,12 @@
               muslDevBinOnly
             ];
             LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath (with pkgs; [ stdenv.cc.cc sqlite ])}:$LD_LIBRARY_PATH";
+            shellHook = ''
+              if [ -f scripts/pre-commit ] && { [ ! -f .git/hooks/pre-commit ] || ! diff -q scripts/pre-commit .git/hooks/pre-commit >/dev/null 2>&1; }; then
+                cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+                echo "[devShell] installed/updated .git/hooks/pre-commit"
+              fi
+            '';
           };
       }
     );

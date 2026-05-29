@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Pre-commit hook: format check, clippy, and normalize checks
 #
-# Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# Auto-installed via `nix develop` shellHook. To install manually:
+#   cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 
 set -e
 
@@ -9,12 +10,12 @@ echo "Running cargo fmt check..."
 cargo fmt --check
 
 echo "Running cargo clippy..."
-cargo clippy --all-targets --all-features -- -D warnings 2>/dev/null || {
-    echo "  Warning: clippy check failed or not available (non-critical)"
-}
+cargo clippy --all-targets --all-features -- -D warnings
 
 echo "Validating .calls.scm capture names..."
-bad=$(grep -roh "@[A-Za-z0-9_.]*" --include="*.calls.scm" . 2>/dev/null \
+bad=$(grep -rh "@[A-Za-z0-9_.]*" --include="*.calls.scm" . 2>/dev/null \
+      | grep -v "^[[:space:]]*;" \
+      | grep -oh "@[A-Za-z0-9_.]*" \
       | grep -oP "@\K.*" \
       | grep -vxE "call|call\.write|call\.qualifier" \
       | sort -u)
