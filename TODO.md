@@ -1019,11 +1019,11 @@ RESOLVED 2026-05-30: Added CommonJS `require()` patterns (simple binding, shorth
 - [x] kotlin
 - [ ] scala
 - [ ] groovy
-- [ ] c-sharp
+- [x] c-sharp
 - [ ] vb
 - [ ] fsharp
 - [x] swift (extract/inline/introduce; add-parameter N/A — grammar has no single param-list node)
-- [ ] dart
+- [x] dart (extract/inline/introduce; add-parameter rewrites the signature only — grammar has no call-expression node to find call sites)
 - [ ] zig
 - [ ] d
 - [ ] elixir

@@ -1222,6 +1222,8 @@ fn bundled_refactor_query(name: &str) -> Option<&'static str> {
         "lua" => Some(include_str!("queries/lua.refactor.scm")),
         "kotlin" => Some(include_str!("queries/kotlin.refactor.scm")),
         "swift" => Some(include_str!("queries/swift.refactor.scm")),
+        "dart" => Some(include_str!("queries/dart.refactor.scm")),
+        "c-sharp" => Some(include_str!("queries/c-sharp.refactor.scm")),
         _ => None,
     }
 }
@@ -1241,6 +1243,8 @@ const BUNDLED_REFACTOR_LANGS: &[&str] = &[
     "lua",
     "kotlin",
     "swift",
+    "dart",
+    "c-sharp",
 ];
 
 /// Return a bundled test-regions query for a grammar, if available.

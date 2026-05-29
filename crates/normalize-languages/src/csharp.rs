@@ -23,6 +23,10 @@ impl Language for CSharp {
         Some(self)
     }
 
+    fn as_refactor_codegen(&self) -> Option<&dyn crate::RefactorCodeGen> {
+        Some(self)
+    }
+
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }
@@ -262,6 +266,159 @@ impl Language for CSharp {
 }
 
 impl LanguageSymbols for CSharp {}
+
+impl crate::RefactorCodeGen for CSharp {
+    fn format_param(&self, name: &str, ty: Option<&str>) -> String {
+        match ty {
+            Some(t) => format!("{} {}", t, name),
+            None => name.to_string(),
+        }
+    }
+
+    fn render_binding(&self, name: &str, expr: &str, indent: &str) -> String {
+        format!("{}var {} = {};\n", indent, name, expr)
+    }
+
+    fn render_function(&self, spec: &crate::ExtractedFnSpec) -> String {
+        use crate::GenReturn;
+        let ret_type = match &spec.ret {
+            GenReturn::Unit => "void".to_string(),
+            GenReturn::Single(v) => format!("/* {} */", v),
+            GenReturn::Tuple(vs) => format!("({})", vs.join(", ")),
+            GenReturn::Result(ok, _) => format!("/* {} */", ok),
+        };
+        let param_str = spec
+            .params
+            .iter()
+            .map(|p| match &p.inferred_type {
+                Some(ty) => format!("{} {}", ty, p.name),
+                None => format!("var {}", p.name),
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let indent = &spec.indent;
+        let return_stmt = match &spec.ret {
+            GenReturn::Unit => String::new(),
+            GenReturn::Single(v) => format!("\n{}    return {};", indent, v),
+            GenReturn::Tuple(vs) => format!("\n{}    return ({});", indent, vs.join(", ")),
+            GenReturn::Result(ok, _) => format!("\n{}    return {};", indent, ok),
+        };
+
+        let body = spec
+            .body_lines
+            .iter()
+            .map(|l| format!("{}    {}", indent, l))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            "\n{}private {} {}({}) {{\n{}{}\n{}}}\n",
+            indent, ret_type, spec.name, param_str, body, return_stmt, indent
+        )
+    }
+
+    fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
+        use crate::GenReturn;
+        let args = spec
+            .params
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let indent = &spec.indent;
+        let name = &spec.name;
+        match &spec.ret {
+            GenReturn::Unit => format!("{}{}({});\n", indent, name, args),
+            GenReturn::Single(v) => format!("{}var {} = {}({});\n", indent, v, name, args),
+            GenReturn::Tuple(vs) => {
+                format!("{}var ({}) = {}({});\n", indent, vs.join(", "), name, args)
+            }
+            GenReturn::Result(ok, _) => format!("{}var {} = {}({});\n", indent, ok, name, args),
+        }
+    }
+
+    fn supports_multi_return(&self) -> bool {
+        // C# value tuples: `(int, string) F()` + `var (a, b) = F();`.
+        true
+    }
+
+    fn infer_param_type(&self, content: &str, name: &str) -> Option<String> {
+        // C# parameters are `Type name`; scan for the token preceding `name`.
+        for decl in content.split([',', '(', ')']) {
+            let toks: Vec<&str> = decl.split_whitespace().collect();
+            if toks.len() >= 2 && toks[toks.len() - 1] == name {
+                return Some(toks[toks.len() - 2].to_string());
+            }
+        }
+        None
+    }
+}
+
+#[cfg(test)]
+mod refactor_codegen_tests {
+    use super::CSharp;
+    use crate::{CallSiteSpec, ExtractedFnSpec, GenParam, GenReturn, RefactorCodeGen};
+
+    #[test]
+    fn csharp_fn_basic() {
+        let spec = ExtractedFnSpec {
+            name: "Double".to_string(),
+            params: vec![GenParam {
+                name: "n".to_string(),
+                inferred_type: Some("int".to_string()),
+                mutable: false,
+            }],
+            ret: GenReturn::Single("result".to_string()),
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["var result = n * 2;".to_string()],
+            indent: String::new(),
+        };
+        assert_eq!(
+            CSharp.render_function(&spec),
+            "\nprivate /* result */ Double(int n) {\n    var result = n * 2;\n    return result;\n}\n"
+        );
+    }
+
+    #[test]
+    fn csharp_fn_void() {
+        let spec = ExtractedFnSpec {
+            name: "Log".to_string(),
+            params: vec![],
+            ret: GenReturn::Unit,
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["Console.WriteLine(x);".to_string()],
+            indent: String::new(),
+        };
+        assert_eq!(
+            CSharp.render_function(&spec),
+            "\nprivate void Log() {\n    Console.WriteLine(x);\n}\n"
+        );
+    }
+
+    #[test]
+    fn csharp_call_site_and_binding() {
+        let spec = CallSiteSpec {
+            name: "Pair".to_string(),
+            params: vec![],
+            ret: GenReturn::Tuple(vec!["a".to_string(), "b".to_string()]),
+            is_async: false,
+            indent: "    ".to_string(),
+        };
+        assert_eq!(CSharp.render_call_site(&spec), "    var (a, b) = Pair();\n");
+        assert_eq!(CSharp.render_binding("x", "F()", "  "), "  var x = F();\n");
+        assert_eq!(CSharp.format_param("n", Some("int")), "int n");
+    }
+
+    #[test]
+    fn csharp_infer_param_type() {
+        assert_eq!(
+            CSharp.infer_param_type("int Double(int n, string s)", "s"),
+            Some("string".to_string())
+        );
+    }
+}
 
 // =============================================================================
 // C# Module Resolver
