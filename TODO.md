@@ -959,7 +959,13 @@ pub fn parse_manifest_eval(filename, content, root: &Path, policy: EvalPolicy) -
   - For user projects: detect stale docs in fresh projects (full normalize assistance) and legacy codebases (missing/outdated docs)
   - Consider boy scout rule: when touching code, improve nearby docs
 - Semantic editing next steps:
-  - Structural search-replace: `--pattern 'fn $name($args) -> $ret { ... }'` AST-level, not regex
+  - **Structural pattern rewrite** — highest-value next direction. `syntax query` already
+    matches ast-grep metavariable patterns; `edit` already does structural refactoring.
+    What's missing is the bridge: match an AST pattern anywhere → rewrite to another
+    pattern (comby / ast-grep `--rewrite`). Pattern-match exists, structural-edit exists,
+    pattern→pattern rewrite doesn't. Surfaces the existing primitives into the headline
+    capability of comby/ast-grep, with no new substrate required.
+    Example: `--pattern 'fn $name($args) -> $ret { ... }' --rewrite '...'` AST-level, not regex
   - Integration with shadow git: checkpoint before large refactors, rollback on failure
   - **Local rename (`edit rename path/func/local new_name`)**: scoped rename within a block.
     No index needed. Two tiers:
@@ -1126,9 +1132,14 @@ Hardcoded runtime→command map (`python`→`python3`, etc.) in tests. Test-only
 ### Deep Analysis (CodeQL-style)
 
 - [ ] Type extraction for top languages (TS, Python, Rust, Go)
-- [ ] Data flow analysis
-- [ ] Taint tracking
-- Note: significant per-language effort, but tractable with LLM assistance
+- [ ] **Inter-procedural dataflow / taint analysis** — highest-value next direction. The CFG
+  (`normalize-cfg`), Datalog/ascent engine, and call/import facts (`view trace` does value
+  provenance over the call graph) already exist. What's missing is inter-procedural
+  reaching-definitions and source→sink taint relations in the fact schema. Adding these
+  surfaces the existing substrate into the headline capability that defines CodeQL/Semgrep
+  deep mode, with no new infrastructure required.
+- [ ] Taint tracking (subsumed by the dataflow item above once relations exist)
+- Note: significant per-language effort for type extraction, but tractable with LLM assistance
 
 ### Trait-Based Extensibility
 
