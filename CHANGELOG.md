@@ -81,7 +81,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   JavaScript, TypeScript, and TSX, the following languages gained both a
   `<lang>.refactor.scm` structural-classification query and a `RefactorCodeGen`
   source-synthesis implementation: Go, Java, Ruby, Lua, Kotlin, Swift, Dart, C#,
-  PHP, Elixir, Scala, Groovy, Visual Basic, F#, Zig, D.
+  PHP, Scala, Groovy, Visual Basic, Zig, D. (Swift add-parameter and Dart
+  add-parameter call-site rewriting are limited by their grammars, and VB
+  reassignment detection is limited by grammar ambiguity; see TODO.md.)
 
 - **`normalize docs` now supports Go and Python**, in addition to Rust. Symbol
   documentation is resolved from local source first (Go module cache /

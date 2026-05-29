@@ -23,6 +23,10 @@ impl Language for Zig {
         Some(self)
     }
 
+    fn as_refactor_codegen(&self) -> Option<&dyn crate::RefactorCodeGen> {
+        Some(self)
+    }
+
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         // Look for @import("module")
         if node.kind() != "builtin_call_expression" {
@@ -105,6 +109,163 @@ impl Language for Zig {
 }
 
 impl LanguageSymbols for Zig {}
+
+impl crate::RefactorCodeGen for Zig {
+    fn format_param(&self, name: &str, ty: Option<&str>) -> String {
+        match ty {
+            Some(t) => format!("{}: {}", name, t),
+            None => name.to_string(),
+        }
+    }
+
+    fn render_binding(&self, name: &str, expr: &str, indent: &str) -> String {
+        format!("{}const {} = {};\n", indent, name, expr)
+    }
+
+    fn render_function(&self, spec: &crate::ExtractedFnSpec) -> String {
+        use crate::GenReturn;
+        let param_str = spec
+            .params
+            .iter()
+            .map(|p| match &p.inferred_type {
+                Some(ty) => format!("{}: {}", p.name, ty),
+                None => format!("{}: anytype", p.name),
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let ret_type = match &spec.ret {
+            GenReturn::Unit => "void".to_string(),
+            GenReturn::Single(v) => format!("/* {} */", v),
+            GenReturn::Tuple(vs) => format!("/* ({}) */", vs.join(", ")),
+            GenReturn::Result(ok, _) => format!("!/* {} */", ok),
+        };
+        let indent = &spec.indent;
+        let return_stmt = match &spec.ret {
+            GenReturn::Unit => String::new(),
+            GenReturn::Single(v) => format!("\n{}    return {};", indent, v),
+            GenReturn::Tuple(vs) => format!("\n{}    return .{{ {} }};", indent, vs.join(", ")),
+            GenReturn::Result(ok, _) => format!("\n{}    return {};", indent, ok),
+        };
+
+        let body = spec
+            .body_lines
+            .iter()
+            .map(|l| format!("{}    {}", indent, l))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            "\n{}fn {}({}) {} {{\n{}{}\n{}}}\n",
+            indent, spec.name, param_str, ret_type, body, return_stmt, indent
+        )
+    }
+
+    fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
+        use crate::GenReturn;
+        let args = spec
+            .params
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let indent = &spec.indent;
+        let name = &spec.name;
+        match &spec.ret {
+            GenReturn::Unit => format!("{}{}({});\n", indent, name, args),
+            GenReturn::Single(v) => format!("{}const {} = {}({});\n", indent, v, name, args),
+            GenReturn::Tuple(vs) => format!(
+                "{}const .{{ {} }} = {}({});\n",
+                indent,
+                vs.join(", "),
+                name,
+                args
+            ),
+            GenReturn::Result(ok, _) => {
+                format!("{}const {} = try {}({});\n", indent, ok, name, args)
+            }
+        }
+    }
+
+    fn uses_result_for_exceptions(&self) -> bool {
+        // Zig error unions (`!T`) are the propagated fallible-return type.
+        true
+    }
+
+    fn infer_param_type(&self, content: &str, name: &str) -> Option<String> {
+        // Zig parameters: `name: Type`.
+        let pattern = format!("{}: ", name);
+        let pos = content.find(&pattern)?;
+        let after = &content[pos + pattern.len()..];
+        let end = after.find([',', ')', '\n']).unwrap_or(after.len());
+        let ty = after[..end].trim().to_string();
+        if ty.is_empty() { None } else { Some(ty) }
+    }
+}
+
+#[cfg(test)]
+mod refactor_codegen_tests {
+    use super::Zig;
+    use crate::{CallSiteSpec, ExtractedFnSpec, GenParam, GenReturn, RefactorCodeGen};
+
+    #[test]
+    fn zig_fn_basic() {
+        let spec = ExtractedFnSpec {
+            name: "double".to_string(),
+            params: vec![GenParam {
+                name: "n".to_string(),
+                inferred_type: Some("i32".to_string()),
+                mutable: false,
+            }],
+            ret: GenReturn::Single("result".to_string()),
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["const result = n * 2;".to_string()],
+            indent: String::new(),
+        };
+        assert_eq!(
+            Zig.render_function(&spec),
+            "\nfn double(n: i32) /* result */ {\n    const result = n * 2;\n    return result;\n}\n"
+        );
+    }
+
+    #[test]
+    fn zig_fn_void() {
+        let spec = ExtractedFnSpec {
+            name: "log".to_string(),
+            params: vec![],
+            ret: GenReturn::Unit,
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["std.debug.print(\"x\", .{});".to_string()],
+            indent: String::new(),
+        };
+        assert_eq!(
+            Zig.render_function(&spec),
+            "\nfn log() void {\n    std.debug.print(\"x\", .{});\n}\n"
+        );
+    }
+
+    #[test]
+    fn zig_call_site_and_binding() {
+        let spec = CallSiteSpec {
+            name: "double".to_string(),
+            params: vec![GenParam {
+                name: "n".to_string(),
+                inferred_type: None,
+                mutable: false,
+            }],
+            ret: GenReturn::Single("result".to_string()),
+            is_async: false,
+            indent: "    ".to_string(),
+        };
+        assert_eq!(
+            Zig.render_call_site(&spec),
+            "    const result = double(n);\n"
+        );
+        assert_eq!(Zig.render_binding("x", "f()", "  "), "  const x = f();\n");
+        assert_eq!(Zig.format_param("n", Some("i32")), "n: i32");
+    }
+}
 
 // =============================================================================
 // Zig Module Resolver

@@ -1020,30 +1020,32 @@ RESOLVED 2026-05-30: Added CommonJS `require()` patterns (simple binding, shorth
 - [x] scala
 - [x] groovy
 - [x] c-sharp
-- [ ] vb
-- [ ] fsharp
+- [x] vb (extract/introduce; `@refactor.reassign` omitted — VB grammar conflates `x = expr` with `call_statement`)
 - [x] swift (extract/inline/introduce; add-parameter N/A — grammar has no single param-list node)
 - [x] dart (extract/inline/introduce; add-parameter rewrites the signature only — grammar has no call-expression node to find call sites)
-- [ ] zig
-- [ ] d
-- [ ] elixir
-- [ ] erlang
-- [ ] haskell
-- [ ] ocaml
+- [x] zig (full; `uses_result_for_exceptions` for `!T` error unions)
+- [x] d (extract/inline/introduce; reassignment is best-effort — D grammar misparses bare `x = expr` statements)
 - [x] lua
 - [x] php
-- [ ] perl
-- [ ] clojure
-- [ ] commonlisp
-- [ ] scheme
-- [ ] gleam
-- [ ] rescript
-- [ ] elm
-- [ ] nix
-- [ ] r
-- [ ] julia
-- [ ] matlab
-- [ ] prolog
+
+**Phase B — DEFERRED** (grammar/semantics make extract-function / add-parameter / inline-variable / introduce-variable map awkwardly; each would ship a misaligned implementation rather than honest support). Per-language rationale:
+- [ ] fsharp — ML curried application + pattern-equation/value bindings. No comma-delimited param list (`argument_patterns` is space-separated) and no call-expression node (`application_expression` is curried juxtaposition), immutable so no reassignment node, expression-oriented bodies with no statement list. The recipes' paren/comma param-list + statement-sequence model does not map.
+- [ ] elixir — macro-homoiconic grammar: `def`, `defmodule`, `if`, `case`, and ordinary calls are ALL `(call target: (identifier) (arguments) (do_block)?)` nodes distinguished only by the target name; `def name(params)` nests the params inside a SECOND `call` (`name(params)`), assignment is a `binary_operator`, and there are no statement nodes. Function-def/param-list/statement/reassignment distinctions the recipes need don't exist as node kinds.
+- [ ] erlang — clause/pattern-equation function defs with `;`-separated clauses and no mutable bindings (single assignment); extract-function's live-out/reassignment model doesn't apply, and there's no statement-list block.
+- [ ] haskell — pure pattern-equation definitions, lazy expression bodies, no statements, no reassignment. add-parameter/inline-variable map awkwardly (a binding is an equation, not a statement).
+- [ ] ocaml — ML `let ... in` expression bindings, no statement list, no reassignment (refs use `:=`). Same expression-oriented mismatch as F#.
+- [ ] perl — sigil-heavy, highly context-sensitive grammar; `my $x` declarations and calls are not cleanly separable into the capture vocabulary, and the grammar's expression/statement modeling is ambiguous (similar to the VB/D assignment ambiguity but pervasive).
+- [ ] clojure — lisp s-expressions: every form is a `list`/`vector`; "function definition", "call", "binding" are all the same node shape differing only by the head symbol. Codegen is structural (sexpr surgery), not the line-oriented param-list/statement model the recipes use.
+- [ ] commonlisp — same lisp s-expr rationale as clojure.
+- [ ] scheme — same lisp s-expr rationale as clojure (R7RS).
+- [ ] gleam — ML-style pattern bindings + pipe-oriented expressions; immutable, expression-bodied, no statement list. Maps awkwardly like F#/OCaml.
+- [ ] rescript — ML/OCaml-derived (`let` expression bindings, curried application); same expression-oriented mismatch as OCaml/F#.
+- [ ] elm — pure-functional pattern-equation defs, immutable, expression-only (no statements, no reassignment). The recipe model does not apply.
+- [ ] nix — pure-functional expression language: `let ... in`, attribute sets, no statements, no reassignment, functions are single-argument lambdas (currying). Extract-function has no statement-sequence to lift.
+- [ ] r — vector/stats language; function bodies are expression sequences, `<-`/`=` assignment is an operator not a distinct statement node, and extract-function is rarely meaningful for typical R analysis scripts.
+- [ ] julia — scientific/array language; while it has functions and assignment, extract-function/add-parameter are rarely meaningful for the array/REPL-oriented code base it targets, and multiple-dispatch method defs complicate "the" definition. Deferred pending demand.
+- [ ] matlab — array/stats language; one-function-per-file convention, command syntax, and `end`-delimited blocks without a clean statement-list node. Extract-function rarely meaningful; deferred.
+- [ ] prolog — logic language: clauses/rules, not functions; there is no function-extraction or add-parameter analog (a predicate clause is a head + body of goals, not a parameterised callable in the imperative sense).
 
 ~~**MEDIUM — `normalize-filter/src/lib.rs` ~94-103**~~
 

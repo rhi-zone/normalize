@@ -23,6 +23,10 @@ impl Language for VB {
         Some(self)
     }
 
+    fn as_refactor_codegen(&self) -> Option<&dyn crate::RefactorCodeGen> {
+        Some(self)
+    }
+
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         if node.kind() != "imports_statement" {
             return Vec::new();
@@ -89,6 +93,140 @@ impl Language for VB {
 }
 
 impl LanguageSymbols for VB {}
+
+impl crate::RefactorCodeGen for VB {
+    fn format_param(&self, name: &str, ty: Option<&str>) -> String {
+        match ty {
+            Some(t) => format!("{} As {}", name, t),
+            None => name.to_string(),
+        }
+    }
+
+    fn render_binding(&self, name: &str, expr: &str, indent: &str) -> String {
+        format!("{}Dim {} = {}\n", indent, name, expr)
+    }
+
+    fn render_function(&self, spec: &crate::ExtractedFnSpec) -> String {
+        use crate::GenReturn;
+        let param_str = spec
+            .params
+            .iter()
+            .map(|p| match &p.inferred_type {
+                Some(ty) => format!("{} As {}", p.name, ty),
+                None => p.name.clone(),
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let indent = &spec.indent;
+        // `Sub` for no return, `Function ... As <T>` otherwise.
+        let (keyword, ret_anno, end_kw) = match &spec.ret {
+            GenReturn::Unit => ("Sub", String::new(), "Sub"),
+            GenReturn::Single(v) => ("Function", format!(" As /* {} */", v), "Function"),
+            GenReturn::Tuple(vs) => ("Function", format!(" As ({})", vs.join(", ")), "Function"),
+            GenReturn::Result(ok, _) => ("Function", format!(" As /* {} */", ok), "Function"),
+        };
+        let return_stmt = match &spec.ret {
+            GenReturn::Unit => String::new(),
+            GenReturn::Single(v) => format!("\n{}    Return {}", indent, v),
+            GenReturn::Tuple(vs) => format!("\n{}    Return ({})", indent, vs.join(", ")),
+            GenReturn::Result(ok, _) => format!("\n{}    Return {}", indent, ok),
+        };
+
+        let body = spec
+            .body_lines
+            .iter()
+            .map(|l| format!("{}    {}", indent, l))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            "\n{}Private {} {}({}){}\n{}{}\n{}End {}\n",
+            indent, keyword, spec.name, param_str, ret_anno, body, return_stmt, indent, end_kw
+        )
+    }
+
+    fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
+        use crate::GenReturn;
+        let args = spec
+            .params
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let indent = &spec.indent;
+        let name = &spec.name;
+        match &spec.ret {
+            GenReturn::Unit => format!("{}{}({})\n", indent, name, args),
+            GenReturn::Single(v) => format!("{}Dim {} = {}({})\n", indent, v, name, args),
+            GenReturn::Tuple(vs) => {
+                format!("{}Dim {} = {}({})\n", indent, vs.join(", "), name, args)
+            }
+            GenReturn::Result(ok, _) => format!("{}Dim {} = {}({})\n", indent, ok, name, args),
+        }
+    }
+}
+
+#[cfg(test)]
+mod refactor_codegen_tests {
+    use super::VB;
+    use crate::{CallSiteSpec, ExtractedFnSpec, GenParam, GenReturn, RefactorCodeGen};
+
+    #[test]
+    fn vb_fn_function() {
+        let spec = ExtractedFnSpec {
+            name: "Double".to_string(),
+            params: vec![GenParam {
+                name: "n".to_string(),
+                inferred_type: Some("Integer".to_string()),
+                mutable: false,
+            }],
+            ret: GenReturn::Single("result".to_string()),
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["Dim result = n * 2".to_string()],
+            indent: String::new(),
+        };
+        assert_eq!(
+            VB.render_function(&spec),
+            "\nPrivate Function Double(n As Integer) As /* result */\n    Dim result = n * 2\n    Return result\nEnd Function\n"
+        );
+    }
+
+    #[test]
+    fn vb_fn_sub() {
+        let spec = ExtractedFnSpec {
+            name: "Log".to_string(),
+            params: vec![],
+            ret: GenReturn::Unit,
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["Console.WriteLine(x)".to_string()],
+            indent: String::new(),
+        };
+        assert_eq!(
+            VB.render_function(&spec),
+            "\nPrivate Sub Log()\n    Console.WriteLine(x)\nEnd Sub\n"
+        );
+    }
+
+    #[test]
+    fn vb_call_site_and_binding() {
+        let spec = CallSiteSpec {
+            name: "Double".to_string(),
+            params: vec![GenParam {
+                name: "n".to_string(),
+                inferred_type: None,
+                mutable: false,
+            }],
+            ret: GenReturn::Single("result".to_string()),
+            is_async: false,
+            indent: "    ".to_string(),
+        };
+        assert_eq!(VB.render_call_site(&spec), "    Dim result = Double(n)\n");
+        assert_eq!(VB.render_binding("x", "F()", "  "), "  Dim x = F()\n");
+        assert_eq!(VB.format_param("n", Some("Integer")), "n As Integer");
+    }
+}
 
 // =============================================================================
 // VB Module Resolver

@@ -1227,6 +1227,9 @@ fn bundled_refactor_query(name: &str) -> Option<&'static str> {
         "php" => Some(include_str!("queries/php.refactor.scm")),
         "scala" => Some(include_str!("queries/scala.refactor.scm")),
         "groovy" => Some(include_str!("queries/groovy.refactor.scm")),
+        "vb" => Some(include_str!("queries/vb.refactor.scm")),
+        "zig" => Some(include_str!("queries/zig.refactor.scm")),
+        "d" => Some(include_str!("queries/d.refactor.scm")),
         _ => None,
     }
 }
@@ -1251,6 +1254,9 @@ const BUNDLED_REFACTOR_LANGS: &[&str] = &[
     "php",
     "scala",
     "groovy",
+    "vb",
+    "zig",
+    "d",
 ];
 
 /// Return a bundled test-regions query for a grammar, if available.
