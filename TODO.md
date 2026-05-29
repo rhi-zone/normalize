@@ -1031,7 +1031,7 @@ RESOLVED 2026-05-30: Added CommonJS `require()` patterns (simple binding, shorth
 - [ ] haskell
 - [ ] ocaml
 - [x] lua
-- [ ] php
+- [x] php
 - [ ] perl
 - [ ] clojure
 - [ ] commonlisp

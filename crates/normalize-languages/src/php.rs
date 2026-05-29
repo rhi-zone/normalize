@@ -23,6 +23,10 @@ impl Language for Php {
         Some(self)
     }
 
+    fn as_refactor_codegen(&self) -> Option<&dyn crate::RefactorCodeGen> {
+        Some(self)
+    }
+
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }
@@ -207,6 +211,142 @@ impl Language for Php {
 }
 
 impl LanguageSymbols for Php {}
+
+/// Ensure a PHP variable name carries the `$` sigil.
+fn php_var(name: &str) -> String {
+    if name.starts_with('$') {
+        name.to_string()
+    } else {
+        format!("${}", name)
+    }
+}
+
+impl crate::RefactorCodeGen for Php {
+    fn format_param(&self, name: &str, ty: Option<&str>) -> String {
+        let var = php_var(name);
+        match ty {
+            Some(t) => format!("{} {}", t, var),
+            None => var,
+        }
+    }
+
+    fn render_binding(&self, name: &str, expr: &str, indent: &str) -> String {
+        format!("{}{} = {};\n", indent, php_var(name), expr)
+    }
+
+    fn render_function(&self, spec: &crate::ExtractedFnSpec) -> String {
+        use crate::GenReturn;
+        let param_str = spec
+            .params
+            .iter()
+            .map(|p| match &p.inferred_type {
+                Some(ty) => format!("{} {}", ty, php_var(&p.name)),
+                None => php_var(&p.name),
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let indent = &spec.indent;
+        let return_stmt = match &spec.ret {
+            GenReturn::Unit => String::new(),
+            GenReturn::Single(v) => format!("\n{}    return {};", indent, php_var(v)),
+            GenReturn::Tuple(vs) => format!(
+                "\n{}    return [{}];",
+                indent,
+                vs.iter().map(|v| php_var(v)).collect::<Vec<_>>().join(", ")
+            ),
+            GenReturn::Result(ok, _) => format!("\n{}    return {};", indent, php_var(ok)),
+        };
+
+        let body = spec
+            .body_lines
+            .iter()
+            .map(|l| format!("{}    {}", indent, l))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            "\n{}function {}({}) {{\n{}{}\n{}}}\n",
+            indent, spec.name, param_str, body, return_stmt, indent
+        )
+    }
+
+    fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
+        use crate::GenReturn;
+        let args = spec
+            .params
+            .iter()
+            .map(|p| php_var(&p.name))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let indent = &spec.indent;
+        let name = &spec.name;
+        match &spec.ret {
+            GenReturn::Unit => format!("{}{}({});\n", indent, name, args),
+            GenReturn::Single(v) => {
+                format!("{}{} = {}({});\n", indent, php_var(v), name, args)
+            }
+            GenReturn::Tuple(vs) => format!(
+                "{}[{}] = {}({});\n",
+                indent,
+                vs.iter().map(|v| php_var(v)).collect::<Vec<_>>().join(", "),
+                name,
+                args
+            ),
+            GenReturn::Result(ok, _) => {
+                format!("{}{} = {}({});\n", indent, php_var(ok), name, args)
+            }
+        }
+    }
+
+    fn supports_multi_return(&self) -> bool {
+        // PHP list-destructuring: `return [$a, $b];` + `[$a, $b] = f();`.
+        true
+    }
+}
+
+#[cfg(test)]
+mod refactor_codegen_tests {
+    use super::Php;
+    use crate::{CallSiteSpec, ExtractedFnSpec, GenParam, GenReturn, RefactorCodeGen};
+
+    #[test]
+    fn php_fn_basic() {
+        let spec = ExtractedFnSpec {
+            name: "double".to_string(),
+            params: vec![GenParam {
+                name: "n".to_string(),
+                inferred_type: None,
+                mutable: false,
+            }],
+            ret: GenReturn::Single("result".to_string()),
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["$result = $n * 2;".to_string()],
+            indent: String::new(),
+        };
+        assert_eq!(
+            Php.render_function(&spec),
+            "\nfunction double($n) {\n    $result = $n * 2;\n    return $result;\n}\n"
+        );
+    }
+
+    #[test]
+    fn php_call_site_and_binding() {
+        let spec = CallSiteSpec {
+            name: "pair".to_string(),
+            params: vec![],
+            ret: GenReturn::Tuple(vec!["a".to_string(), "b".to_string()]),
+            is_async: false,
+            indent: "    ".to_string(),
+        };
+        assert_eq!(Php.render_call_site(&spec), "    [$a, $b] = pair();\n");
+        assert_eq!(Php.render_binding("x", "f()", "  "), "  $x = f();\n");
+        // Names already carrying the sigil are not double-prefixed.
+        assert_eq!(Php.render_binding("$y", "g()", ""), "$y = g();\n");
+        assert_eq!(Php.format_param("n", None), "$n");
+        assert_eq!(Php.format_param("n", Some("int")), "int $n");
+    }
+}
 
 // =============================================================================
 // PHP Module Resolver
