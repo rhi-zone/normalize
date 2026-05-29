@@ -996,9 +996,15 @@ RESOLVED 2026-05-30: Added CommonJS `require()` patterns (simple binding, shorth
 
 Pervasive `match grammar` / `grammar ==` dispatch on hardcoded language names + hardcoded node-kind strings throughout the refactor recipes. Node-kind lookups (`function_item_kinds`, `param_list_kind`, etc.) should be `.scm` queries loaded via `GrammarLoader`; code *generation* (`generate_rust_function` etc.) cannot be `.scm` — needs a `CodeGen` trait or Language-trait methods. Violates the CLAUDE.md node-classification rule.
 
-**MEDIUM — `normalize-filter/src/lib.rs` ~94-103**
+~~**MEDIUM — `normalize-filter/src/lib.rs` ~94-103**~~
 
-The `build` filter alias hardcodes `target/`, `node_modules/`, `.next/`, `.nuxt/`, `__pycache__/` (Cargo/npm/Next/Nuxt/Python conventions) in a library crate. Mitigated by being applied only on explicit `build` alias request (not silently). Judgment call per CLAUDE.md: curated-default-alias vs. hardcoded-third-party-convention. CLAUDE.md says these belong in project config; however this is explicitly a *named alias* the user opts into. Flag for decision, not emergency fix.
+~~The `build` filter alias hardcodes `target/`, `node_modules/`, `.next/`, `.nuxt/`, `__pycache__/` (Cargo/npm/Next/Nuxt/Python conventions) in a library crate. Mitigated by being applied only on explicit `build` alias request (not silently). Judgment call per CLAUDE.md: curated-default-alias vs. hardcoded-third-party-convention. CLAUDE.md says these belong in project config; however this is explicitly a *named alias* the user opts into. Flag for decision, not emergency fix.~~
+
+WONTFIX: Filter aliases are fully overridable at runtime. `AliasConfig::get_with_languages` checks the user's `[aliases]` config first and only falls back to the builtin `match name { "build" => ... }` if the user hasn't defined that alias. Users override, extend, or disable any alias via `.normalize/config.toml` `[aliases]` (e.g. `build = [...]` to replace, `tests = []` to disable). The repo's own `.normalize/config.toml` demonstrates this (`todo = ["TODO.md"]`). Documented in `docs/cli/aliases.md`. The hardcoded paths are overridable defaults — a curated convenience alias in the same category as `config`/`docs`/`generated` — not the silent, non-configurable tool-convention coupling the CLAUDE.md Hard Constraint targets.
+
+**LOW — `normalize-filter/src/service.rs` ~114, ~123 (standalone binary + alias config)**
+
+The standalone `normalize-filter` binary calls `AliasConfig::default()` and does not load project `.normalize/config.toml`, so alias overrides defined there do not reach the standalone binary (only the main `normalize` CLI loads project config and passes `config.aliases` to the filter). May be intentional — a standalone binary with no config discovery. Decide: should the standalone binary also walk up for a project config, or is its current "no config" behavior correct? Not a confirmed bug.
 
 ~~**LOW / HYPOTHESIS — `normalize-ecosystems/src/local_docs.rs` ~278**~~
 
