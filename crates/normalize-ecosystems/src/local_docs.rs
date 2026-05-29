@@ -284,10 +284,10 @@ fn walk_rs_files(
 
     // Files first, then recurse into subdirectories
     for file in files {
-        if let Ok(content) = std::fs::read_to_string(&file) {
-            if let Some(result) = extract_item_from_source(&content, item_name) {
-                return Some(result);
-            }
+        if let Ok(content) = std::fs::read_to_string(&file)
+            && let Some(result) = extract_item_from_source(&content, item_name)
+        {
+            return Some(result);
         }
     }
     for sub_dir in dirs {
@@ -382,8 +382,8 @@ fn extract_module_doc_comments(src: &str) -> String {
             let trimmed = line.trim();
             if trimmed == "//!" {
                 ""
-            } else if trimmed.starts_with("//! ") {
-                &trimmed[4..]
+            } else if let Some(stripped) = trimmed.strip_prefix("//! ") {
+                stripped
             } else {
                 &trimmed[3..]
             }
@@ -470,10 +470,10 @@ fn match_item_declaration(line: &str, item_name: &str) -> Option<(String, String
 fn strip_leading_pub(s: &str) -> &str {
     let s = s.trim();
     // pub(crate) pub(super) pub(in ...) pub
-    if s.starts_with("pub(") {
-        if let Some(end) = s.find(')') {
-            return s[end + 1..].trim();
-        }
+    if s.starts_with("pub(")
+        && let Some(end) = s.find(')')
+    {
+        return s[end + 1..].trim();
     }
     s.strip_prefix("pub ").map(str::trim).unwrap_or(s)
 }
@@ -494,8 +494,8 @@ fn collect_preceding_doc_comments(lines: &[&str], line_index: usize) -> String {
     loop {
         let trimmed = lines[i].trim();
 
-        if trimmed.starts_with("/// ") {
-            comments.push(trimmed[4..].to_string());
+        if let Some(stripped) = trimmed.strip_prefix("/// ") {
+            comments.push(stripped.to_string());
         } else if trimmed == "///" {
             comments.push(String::new());
         } else if trimmed.starts_with("//!") {
@@ -657,7 +657,7 @@ fn strip_example_blocks(doc: &str) -> String {
 /// "serde" into ([], None) (crate root).
 // normalize-syntax-allow: rust/tuple-return - private parsing helper, struct overhead unwarranted
 fn split_symbol_path(package: &str, symbol_path: &str) -> (Vec<String>, Option<String>) {
-    if symbol_path == package || symbol_path == &format!("{}::", package) {
+    if symbol_path == package || symbol_path == format!("{}::", package) {
         return (vec![], None);
     }
 

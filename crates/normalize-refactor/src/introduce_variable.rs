@@ -186,8 +186,7 @@ fn find_best_expression_node<'a>(
     }
 
     // Walk up while the parent is a better (closer) match for the range.
-    loop {
-        let Some(parent) = node.parent() else { break };
+    while let Some(parent) = node.parent() {
         // If the parent exactly covers the range, prefer it (it's the "expression" the
         // user intends rather than an inner token).
         if parent.start_byte() == range.start && parent.end_byte() == range.end {

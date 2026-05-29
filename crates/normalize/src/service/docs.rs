@@ -226,26 +226,24 @@ pub(crate) fn fetch_docs(
 
     // Cache lookup (only when version is known)
     let normalize_dir = root_path.join(".normalize");
-    if !no_cache {
-        if let Some(ver) = &version {
-            let temp_doc = SymbolDoc {
-                name: String::new(),
-                language: eco.docs_language().to_string(),
-                package: package.clone(),
-                version: ver.clone(),
-                symbol_path: symbol_path.clone(),
-                kind: String::new(),
-                signature: None,
-                doc_body: String::new(),
-                doc_format: DocFormat::Markdown,
-                examples: vec![],
-                source_url: String::new(),
-                fetched_at: chrono::Utc::now(),
-            };
-            let id = temp_doc.kg_id();
-            if let Some(report) = cache_read_doc(&normalize_dir, &id) {
-                return Ok(report);
-            }
+    if !no_cache && let Some(ver) = &version {
+        let temp_doc = SymbolDoc {
+            name: String::new(),
+            language: eco.docs_language().to_string(),
+            package: package.clone(),
+            version: ver.clone(),
+            symbol_path: symbol_path.clone(),
+            kind: String::new(),
+            signature: None,
+            doc_body: String::new(),
+            doc_format: DocFormat::Markdown,
+            examples: vec![],
+            source_url: String::new(),
+            fetched_at: chrono::Utc::now(),
+        };
+        let id = temp_doc.kg_id();
+        if let Some(report) = cache_read_doc(&normalize_dir, &id) {
+            return Ok(report);
         }
     }
 

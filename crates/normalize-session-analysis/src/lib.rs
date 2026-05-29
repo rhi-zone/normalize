@@ -716,7 +716,7 @@ impl SessionAnalysisReport {
                 .iter()
                 .flat_map(|s| &s.commands)
                 .collect();
-            all_commands.sort_by(|a, b| b.calls.cmp(&a.calls));
+            all_commands.sort_by_key(|b| std::cmp::Reverse(b.calls));
             if !all_commands.is_empty() {
                 lines.push("Top commands:".to_string());
                 for cmd in all_commands.iter().take(10) {
@@ -1804,9 +1804,9 @@ fn sort_tool_stats_by_hint(tools: &mut Vec<&ToolStats>, hint: Option<&str>) {
         _ => {
             // calls
             if descending {
-                tools.sort_by(|a, b| b.calls.cmp(&a.calls));
+                tools.sort_by_key(|b| std::cmp::Reverse(b.calls));
             } else {
-                tools.sort_by(|a, b| a.calls.cmp(&b.calls));
+                tools.sort_by_key(|a| a.calls);
             }
         }
     }
@@ -1854,7 +1854,7 @@ fn build_command_stats(
                     errors,
                 })
                 .collect();
-            details.sort_by(|a, b| b.calls.cmp(&a.calls));
+            details.sort_by_key(|b| std::cmp::Reverse(b.calls));
 
             CommandStats {
                 category: category.to_string(),
@@ -1867,7 +1867,7 @@ fn build_command_stats(
         .collect();
 
     // Sort by total_calls descending
-    stats.sort_by(|a, b| b.total_calls.cmp(&a.total_calls));
+    stats.sort_by_key(|b| std::cmp::Reverse(b.total_calls));
     stats
 }
 
@@ -2110,7 +2110,7 @@ pub fn analyze_session(session: &Session) -> SessionAnalysisReport {
     }
 
     // Build largest_tool_results: top 10 individual results by char count
-    tool_result_candidates.sort_by(|a, b| b.0.cmp(&a.0));
+    tool_result_candidates.sort_by_key(|b| std::cmp::Reverse(b.0));
     analysis.largest_tool_results = tool_result_candidates
         .into_iter()
         .take(10)
@@ -2189,7 +2189,7 @@ pub fn analyze_session(session: &Session) -> SessionAnalysisReport {
     // Sort error patterns by count
     analysis
         .error_patterns
-        .sort_by(|a, b| b.count.cmp(&a.count));
+        .sort_by_key(|b| std::cmp::Reverse(b.count));
 
     analysis
 }

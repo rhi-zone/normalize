@@ -188,13 +188,13 @@ pub fn aggregate_sessions(
     // Sort aggregated command stats and details
     aggregate
         .command_stats
-        .sort_by(|a, b| b.total_calls.cmp(&a.total_calls));
+        .sort_by_key(|b| std::cmp::Reverse(b.total_calls));
     for cs in &mut aggregate.command_stats {
-        cs.commands.sort_by(|a, b| b.calls.cmp(&a.calls));
+        cs.commands.sort_by_key(|b| std::cmp::Reverse(b.calls));
     }
     aggregate
         .retry_hotspots
-        .sort_by(|a, b| b.failures.cmp(&a.failures));
+        .sort_by_key(|b| std::cmp::Reverse(b.failures));
 
     // Extract common tool patterns from all chains
     use crate::sessions::extract_tool_patterns;
@@ -211,7 +211,7 @@ pub fn aggregate_sessions(
     // Re-rank and trim largest tool results across all sessions
     aggregate
         .largest_tool_results
-        .sort_by(|a, b| b.chars.cmp(&a.chars));
+        .sort_by_key(|b| std::cmp::Reverse(b.chars));
     aggregate.largest_tool_results.truncate(10);
 
     // Update format to show aggregate info

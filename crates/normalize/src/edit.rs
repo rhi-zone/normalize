@@ -50,7 +50,7 @@ impl EditorExt for Editor {
             .collect();
 
         // Sort by start position (reverse for safe deletion from end to start)
-        locations.sort_by(|a, b| b.start_byte.cmp(&a.start_byte));
+        locations.sort_by_key(|b| std::cmp::Reverse(b.start_byte));
         locations
     }
 }
@@ -219,7 +219,7 @@ impl BatchEdit {
 
         for (path, mut file_edits) in by_file {
             // Sort by start line descending (apply bottom-up)
-            file_edits.sort_by(|a, b| b.2.start_line.cmp(&a.2.start_line));
+            file_edits.sort_by_key(|b| std::cmp::Reverse(b.2.start_line));
 
             let mut content = std::fs::read_to_string(&path)
                 .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
@@ -301,7 +301,7 @@ impl BatchEdit {
         let mut total_edits = 0;
 
         for (path, mut file_edits) in by_file {
-            file_edits.sort_by(|a, b| b.2.start_line.cmp(&a.2.start_line));
+            file_edits.sort_by_key(|b| std::cmp::Reverse(b.2.start_line));
 
             let original = std::fs::read_to_string(&path)
                 .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;

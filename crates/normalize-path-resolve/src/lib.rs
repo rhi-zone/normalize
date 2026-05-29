@@ -712,7 +712,7 @@ fn resolve_from_paths(query: &str, all_paths: &[(String, bool)]) -> Vec<PathMatc
     }
 
     // Sort by score descending, take top 10
-    fuzzy_matches.sort_by(|a, b| b.score.cmp(&a.score));
+    fuzzy_matches.sort_by_key(|b| std::cmp::Reverse(b.score));
     fuzzy_matches.truncate(10);
 
     fuzzy_matches

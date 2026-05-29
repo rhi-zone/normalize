@@ -221,7 +221,7 @@ fn plan_add_arg_in_file(
 
     // Apply edits from last to first so byte offsets stay valid.
     let mut sorted = ranges;
-    sorted.sort_by(|a, b| b.open_paren.cmp(&a.open_paren));
+    sorted.sort_by_key(|b| std::cmp::Reverse(b.open_paren));
 
     let mut new_content = content.to_string();
     for r in &sorted {

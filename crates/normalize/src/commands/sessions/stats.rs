@@ -307,7 +307,7 @@ pub fn show_stats_grouped(
     }
 
     // Sort by time (newest first) and limit
-    sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
+    sessions.sort_by_key(|b| std::cmp::Reverse(b.mtime));
     let total_before_limit = sessions.len();
     if limit > 0 {
         sessions.truncate(limit);
@@ -440,7 +440,7 @@ pub fn build_stats_data(
         });
     }
 
-    sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
+    sessions.sort_by_key(|b| std::cmp::Reverse(b.mtime));
     let total_before_limit = sessions.len();
     if limit > 0 {
         sessions.truncate(limit);
@@ -831,7 +831,7 @@ pub fn build_repo_stats(
         });
     }
 
-    sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
+    sessions.sort_by_key(|b| std::cmp::Reverse(b.mtime));
     if limit > 0 {
         sessions.truncate(limit);
     }

@@ -360,7 +360,7 @@ impl TurnSummary {
 
         // Sort other tools by frequency descending
         let mut other_tools: Vec<_> = other_map.into_iter().collect();
-        other_tools.sort_by(|a, b| b.1.cmp(&a.1));
+        other_tools.sort_by_key(|b| std::cmp::Reverse(b.1));
 
         Self {
             user_prompt,
@@ -979,7 +979,7 @@ fn print_session_ngrams(session: &Session, n: usize, case_insensitive: bool) -> 
         .into_iter()
         .filter(|(_, count)| *count > 1)
         .collect();
-    ngrams.sort_by(|a, b| b.1.cmp(&a.1));
+    ngrams.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     if ngrams.is_empty() {
         eprintln!("No repeated {}-grams found", n);

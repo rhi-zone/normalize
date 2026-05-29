@@ -420,7 +420,7 @@ pub fn build_session_list(
 
     if sort_spec.keys.is_empty() {
         // Default: newest first (smallest age_seconds = most recent).
-        items.sort_by(|a, b| a.age_seconds.cmp(&b.age_seconds));
+        items.sort_by_key(|a| a.age_seconds);
     } else {
         items.sort_by(|a, b| {
             for key in &sort_spec.keys {

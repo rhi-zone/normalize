@@ -116,7 +116,7 @@ pub fn fetch(
 // normalize-syntax-allow: rust/tuple-return - private parsing helper, struct overhead unwarranted
 fn split_symbol_path(package: &str, symbol_path: &str) -> (Vec<String>, Option<String>) {
     // Check for crate-root query: either "serde" or "serde::" (with empty suffix)
-    if symbol_path == package || symbol_path == &format!("{}::", package) {
+    if symbol_path == package || symbol_path == format!("{}::", package) {
         return (vec![], None);
     }
 
@@ -144,7 +144,7 @@ fn split_symbol_path(package: &str, symbol_path: &str) -> (Vec<String>, Option<S
     }
 }
 
-fn module_path_to_url_segment(module: &Vec<String>) -> String {
+fn module_path_to_url_segment(module: &[String]) -> String {
     if module.is_empty() {
         String::new()
     } else {
@@ -160,13 +160,12 @@ fn docs_rs_url(
     item: &str,
 ) -> String {
     format!(
-        "https://docs.rs/{}/{}/{}/{}{}.\
-         html",
+        "https://docs.rs/{}/{}/{}/{}{}.html",
         package,
         version,
         package.replace('-', "_"),
         module_segment,
-        format!("{}.{}", kind, item),
+        format_args!("{}.{}", kind, item),
     )
 }
 
@@ -331,13 +330,13 @@ fn extract_examples(html: &str) -> Vec<String> {
         // Find the <pre> inside
         if let Some(pre_start) = inner.find("<pre class=\"rust") {
             let pre_content = &inner[pre_start..];
-            if let Some(code_start) = pre_content.find("<code>") {
-                if let Some(code_end) = pre_content.find("</code>") {
-                    let raw = &pre_content[code_start + 6..code_end];
-                    let clean = strip_html_tags(raw).trim().to_string();
-                    if !clean.is_empty() {
-                        examples.push(clean);
-                    }
+            if let Some(code_start) = pre_content.find("<code>")
+                && let Some(code_end) = pre_content.find("</code>")
+            {
+                let raw = &pre_content[code_start + 6..code_end];
+                let clean = strip_html_tags(raw).trim().to_string();
+                if !clean.is_empty() {
+                    examples.push(clean);
                 }
             }
         }

@@ -91,7 +91,7 @@ fn list_plans(limit: usize) -> Vec<PlanInfo> {
         .collect();
 
     // Sort by modification time (newest first)
-    plans.sort_by(|a, b| b.modified.cmp(&a.modified));
+    plans.sort_by_key(|b| std::cmp::Reverse(b.modified));
     plans.truncate(limit);
     plans
 }

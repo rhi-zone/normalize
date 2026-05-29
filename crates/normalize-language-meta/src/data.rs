@@ -125,6 +125,35 @@ pub fn test_file_globs_for_language(name: &str) -> Vec<String> {
     LanguageIndex::get().test_globs_for(name)
 }
 
+fn resolve_capabilities(data: &CapabilitiesData) -> Capabilities {
+    let mut caps = match data.preset.as_deref() {
+        Some("all") | None => Capabilities::all(),
+        Some("data_format") => Capabilities::data_format(),
+        Some("markup") => Capabilities::markup(),
+        Some("query") => Capabilities::query(),
+        Some("build_dsl") => Capabilities::build_dsl(),
+        Some("shell") => Capabilities::shell(),
+        Some("none") => Capabilities::none(),
+        Some(other) => panic!("Unknown capabilities preset '{other}' in languages.toml"),
+    };
+
+    // Apply individual bool overrides on top of the preset.
+    if let Some(v) = data.imports {
+        caps.imports = v;
+    }
+    if let Some(v) = data.callable_symbols {
+        caps.callable_symbols = v;
+    }
+    if let Some(v) = data.complexity {
+        caps.complexity = v;
+    }
+    if let Some(v) = data.executable {
+        caps.executable = v;
+    }
+
+    caps
+}
+
 // ---------------------------------------------------------------------------
 // CapabilitiesData → Capabilities resolution
 // ---------------------------------------------------------------------------
@@ -186,33 +215,4 @@ mod tests {
     fn test_data_file_parses_cleanly() {
         let _ = LanguageIndex::get();
     }
-}
-
-fn resolve_capabilities(data: &CapabilitiesData) -> Capabilities {
-    let mut caps = match data.preset.as_deref() {
-        Some("all") | None => Capabilities::all(),
-        Some("data_format") => Capabilities::data_format(),
-        Some("markup") => Capabilities::markup(),
-        Some("query") => Capabilities::query(),
-        Some("build_dsl") => Capabilities::build_dsl(),
-        Some("shell") => Capabilities::shell(),
-        Some("none") => Capabilities::none(),
-        Some(other) => panic!("Unknown capabilities preset '{other}' in languages.toml"),
-    };
-
-    // Apply individual bool overrides on top of the preset.
-    if let Some(v) = data.imports {
-        caps.imports = v;
-    }
-    if let Some(v) = data.callable_symbols {
-        caps.callable_symbols = v;
-    }
-    if let Some(v) = data.complexity {
-        caps.complexity = v;
-    }
-    if let Some(v) = data.executable {
-        caps.executable = v;
-    }
-
-    caps
 }

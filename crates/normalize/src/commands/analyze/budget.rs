@@ -547,7 +547,7 @@ pub fn analyze_budget(root: &Path, module_limit: usize) -> LineBudgetReport {
         .collect();
 
     // Sort by total lines descending
-    modules.sort_by(|a, b| b.total_lines.cmp(&a.total_lines));
+    modules.sort_by_key(|b| std::cmp::Reverse(b.total_lines));
     modules.truncate(module_limit);
 
     LineBudgetReport {

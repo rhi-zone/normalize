@@ -2537,7 +2537,7 @@ mod tests {
         let src = "function y = foo(x)\n  y = x + 1;\nend";
         let defs = engine.find_definitions("matlab", src, "y");
         assert!(
-            defs.len() >= 1,
+            !defs.is_empty(),
             "matlab: return variable y should be defined"
         );
     }

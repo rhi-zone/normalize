@@ -1573,10 +1573,7 @@ impl RulesService {
         for (idx, line) in content.lines().enumerate() {
             let line_no = idx + 1;
             let mut search = line;
-            loop {
-                let Some(pos) = search.find("error[") else {
-                    break;
-                };
+            while let Some(pos) = search.find("error[") {
                 let after = &search[pos + "error[".len()..];
                 let Some(end) = after.find(']') else {
                     break;

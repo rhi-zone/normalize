@@ -1023,7 +1023,7 @@ pub fn apply_fixes(findings: &[Finding]) -> std::io::Result<usize> {
         // Descending start_byte: innermost (highest offset) findings are
         // processed first, so their replacements don't shift the offsets of
         // earlier findings in the same file.
-        file_findings.sort_by(|a, b| b.start_byte.cmp(&a.start_byte));
+        file_findings.sort_by_key(|b| std::cmp::Reverse(b.start_byte));
 
         let mut content = std::fs::read_to_string(file)?;
         // Track byte ranges that have already been replaced in this pass.

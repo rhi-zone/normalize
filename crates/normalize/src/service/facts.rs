@@ -714,7 +714,7 @@ async fn stats_data(root: Option<&Path>) -> Result<FactsStats, String> {
     }
 
     let mut ext_list: Vec<_> = ext_counts.into_iter().collect();
-    ext_list.sort_by(|a, b| b.1.cmp(&a.1));
+    ext_list.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     let stats = idx.call_graph_stats().await.unwrap_or_default();
 

@@ -271,7 +271,7 @@ fn collect_block_hashes(
 /// a location from a larger group (in the same file). Returns filtered groups.
 fn suppress_contained_blocks(mut groups: Vec<DuplicateBlockGroup>) -> Vec<DuplicateBlockGroup> {
     // Sort largest first so we process parents before children.
-    groups.sort_by(|a, b| b.line_count.cmp(&a.line_count));
+    groups.sort_by_key(|b| std::cmp::Reverse(b.line_count));
 
     // Collect all "taken" ranges per file from already-accepted groups.
     let mut taken: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
@@ -512,7 +512,7 @@ fn suppress_parallel_directory_groups(groups: Vec<DuplicateGroup>) -> DirectoryS
             pair_count: count,
         })
         .collect();
-    summaries.sort_by(|a, b| b.pair_count.cmp(&a.pair_count));
+    summaries.sort_by_key(|b| std::cmp::Reverse(b.pair_count));
 
     DirectorySuppressionResult {
         kept,
@@ -679,7 +679,7 @@ fn suppress_widespread_body_patterns(
             }
         })
         .collect();
-    summaries.sort_by(|a, b| b.pair_count.cmp(&a.pair_count));
+    summaries.sort_by_key(|b| std::cmp::Reverse(b.pair_count));
 
     BodyPatternSuppressionResult {
         kept,
@@ -1978,7 +1978,7 @@ pub fn build_duplicate_types_report(
             }
         }
     }
-    duplicates.sort_by(|a, b| b.overlap_percent.cmp(&a.overlap_percent));
+    duplicates.sort_by_key(|b| std::cmp::Reverse(b.overlap_percent));
 
     DuplicateTypesReport {
         files_scanned,

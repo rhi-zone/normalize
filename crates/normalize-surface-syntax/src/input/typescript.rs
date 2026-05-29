@@ -929,17 +929,16 @@ impl<'a> ReadContext<'a> {
                     let child = children[i];
                     match child.kind() {
                         "[" | "]" => {}
-                        "," => {
+                        ","
                             // A bare comma with no preceding named child since last element =
                             // a hole. We detect holes by checking if the previous child was
                             // also a comma (or the opening bracket).
-                            if i == 0
+                            if (i == 0
                                 || children[i - 1].kind() == "["
-                                || children[i - 1].kind() == ","
-                            {
+                                || children[i - 1].kind() == ",")
+                            => {
                                 elements.push(None);
                             }
-                        }
                         "rest_pattern" => {
                             // [...rest] — extract the identifier name
                             let mut inner_cur = child.walk();

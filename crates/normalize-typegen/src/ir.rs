@@ -339,13 +339,11 @@ fn collect_unresolved_refs(
     errors: &mut Vec<ValidationError>,
 ) {
     match ty {
-        Type::Ref(name) => {
-            if !known.contains(name.as_str()) {
-                errors.push(ValidationError::UnresolvedRef {
-                    from: type_name.to_string(),
-                    to: name.clone(),
-                });
-            }
+        Type::Ref(name) if !known.contains(name.as_str()) => {
+            errors.push(ValidationError::UnresolvedRef {
+                from: type_name.to_string(),
+                to: name.clone(),
+            });
         }
         Type::Array(inner) | Type::Optional(inner) => {
             collect_unresolved_refs(inner, type_name, known, errors);

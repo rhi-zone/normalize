@@ -332,9 +332,7 @@ mod unix_impl {
     /// writer. Returns `None` for foreground runs or if the file cannot be opened
     /// (in which case the caller falls back to stderr).
     pub fn open_daemon_log_writer() -> Option<std::fs::File> {
-        if std::env::var_os(DAEMON_LOG_ENV).is_none() {
-            return None;
-        }
+        std::env::var_os(DAEMON_LOG_ENV)?;
         let path = daemon_log_path();
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);

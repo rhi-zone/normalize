@@ -348,10 +348,8 @@ impl Apt {
                     "Version" => builder.version = Some(value.to_string()),
                     "Description" => builder.description = Some(value.to_string()),
                     "Homepage" => builder.homepage = Some(value.to_string()),
-                    "Vcs-Git" | "Vcs-Browser" => {
-                        if builder.repository.is_none() {
-                            builder.repository = Some(value.to_string());
-                        }
+                    "Vcs-Git" | "Vcs-Browser" if builder.repository.is_none() => {
+                        builder.repository = Some(value.to_string());
                     }
                     "Filename" => builder.filename = Some(value.to_string()),
                     "SHA256" => builder.sha256 = Some(value.to_string()),
@@ -798,10 +796,8 @@ impl Iterator for AptPackageIter {
                             "Version" => builder.version = Some(value.to_string()),
                             "Description" => builder.description = Some(value.to_string()),
                             "Homepage" => builder.homepage = Some(value.to_string()),
-                            "Vcs-Git" | "Vcs-Browser" => {
-                                if builder.repository.is_none() {
-                                    builder.repository = Some(value.to_string());
-                                }
+                            "Vcs-Git" | "Vcs-Browser" if builder.repository.is_none() => {
+                                builder.repository = Some(value.to_string());
                             }
                             "Filename" => builder.filename = Some(value.to_string()),
                             "SHA256" => builder.sha256 = Some(value.to_string()),

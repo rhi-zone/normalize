@@ -173,7 +173,7 @@ fn blame_file(root: &Path, path: &str) -> Option<FileOwnership> {
 
     // Sort authors by line count descending
     let mut sorted: Vec<(String, usize)> = author_lines.into_iter().collect();
-    sorted.sort_by(|a, b| b.1.cmp(&a.1));
+    sorted.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     let top_author = sorted[0].0.clone();
     let top_author_pct = sorted[0].1 as f64 / total_lines as f64;

@@ -145,7 +145,7 @@ fn build_tree(files: &[(String, usize)], total: usize) -> Vec<SizeNode> {
         })
         .collect();
 
-    nodes.sort_by(|a, b| b.lines.cmp(&a.lines));
+    nodes.sort_by_key(|b| std::cmp::Reverse(b.lines));
     nodes
 }
 

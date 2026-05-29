@@ -166,6 +166,14 @@ second look — none are blocking, none are strictly committed:
   pinned, which is what caused the failure). Could yank the 0.3.0 versions
   for safety.
 
+- **Toolchain drift: `flake.nix` uses fenix `stable` with no version pin; no `rust-toolchain.toml`.**
+  Clippy lints accumulated silently over time (27+ instances fixed 2026-05-29) because `nix flake update`
+  can silently advance the Rust toolchain, making previously-clean code suddenly lint-fail — but only if
+  clippy is actually gated. Consider (a) pinning the fenix input to a specific rev or date in `flake.lock`
+  and committing the lockfile, or (b) adding a `rust-toolchain.toml` (e.g. `channel = "1.XX.Y"`) so all
+  contributors/CI see the same toolchain, or (c) at minimum adding `cargo clippy -- -D warnings` as a
+  mandatory CI step so drift is caught within a PR rather than across sessions.
+
 - **Daemon flake `config_edit_triggers_reload_event`** — failed once in
   a workspace test run, passed in isolation and on subsequent runs. The
   agent who chased it called it transient (possibly inotify saturation

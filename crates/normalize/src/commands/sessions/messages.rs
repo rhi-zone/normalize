@@ -874,7 +874,7 @@ pub fn build_messages_report(
         });
     }
 
-    sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
+    sessions.sort_by_key(|b| std::cmp::Reverse(b.mtime));
     // When an explicit --sort is given we must load ALL sessions first so the
     // sort is global, then apply a message-level limit afterwards.  Session-level
     // truncation by recency is only correct for the default (no --sort) ordering.

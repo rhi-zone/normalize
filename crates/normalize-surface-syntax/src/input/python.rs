@@ -429,10 +429,8 @@ impl<'a> ReadContext<'a> {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             match child.kind() {
-                "from" | "import" => {
-                    if child.kind() == "import" {
-                        past_import_kw = true;
-                    }
+                "from" | "import" if child.kind() == "import" => {
+                    past_import_kw = true;
                 }
                 // First dotted_name (before `import`) is the module source
                 "dotted_name" | "relative_import" | "import_prefix" if !past_import_kw => {

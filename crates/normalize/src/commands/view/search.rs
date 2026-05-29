@@ -145,7 +145,7 @@ fn search_symbols_unindexed(query: &str, root: &Path) -> Vec<index::SymbolMatch>
         }
     }
 
-    matches.sort_by(|a, b| b.1.cmp(&a.1));
+    matches.sort_by_key(|b| std::cmp::Reverse(b.1));
     matches.into_iter().take(10).map(|(m, _)| m).collect()
 }
 

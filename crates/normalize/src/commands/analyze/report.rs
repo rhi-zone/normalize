@@ -135,7 +135,7 @@ impl OutputFormatter for SecurityReport {
 
             // Group by severity
             let mut by_severity: Vec<_> = self.findings.iter().collect();
-            by_severity.sort_by(|a, b| b.severity.cmp(&a.severity));
+            by_severity.sort_by_key(|b| std::cmp::Reverse(b.severity));
 
             for finding in by_severity.iter().take(20) {
                 lines.push(format!(
@@ -204,7 +204,7 @@ impl OutputFormatter for AnalyzeReport {
 
                 // Group by risk level (minimal format)
                 let mut sorted: Vec<_> = complexity.functions.iter().collect();
-                sorted.sort_by(|a, b| b.complexity.cmp(&a.complexity));
+                sorted.sort_by_key(|b| std::cmp::Reverse(b.complexity));
                 let top_funcs: Vec<_> = sorted.iter().take(10).collect();
 
                 let mut current_risk: Option<RiskLevel> = None;
@@ -245,7 +245,7 @@ impl OutputFormatter for AnalyzeReport {
                 sections.push("## Longest Functions".to_string());
 
                 let mut sorted: Vec<_> = length.functions.iter().collect();
-                sorted.sort_by(|a, b| b.lines.cmp(&a.lines));
+                sorted.sort_by_key(|b| std::cmp::Reverse(b.lines));
                 let top_funcs: Vec<_> = sorted.iter().take(10).collect();
 
                 let mut current_cat: Option<LengthCategory> = None;
@@ -315,7 +315,7 @@ impl OutputFormatter for AnalyzeReport {
                 sections.push("## Top Complex Functions".to_string());
 
                 let mut sorted: Vec<_> = complexity.functions.iter().collect();
-                sorted.sort_by(|a, b| b.complexity.cmp(&a.complexity));
+                sorted.sort_by_key(|b| std::cmp::Reverse(b.complexity));
 
                 for func in sorted.iter().take(10) {
                     let display_name = if let Some(fp) = &func.file_path {
@@ -362,7 +362,7 @@ impl OutputFormatter for AnalyzeReport {
                 sections.push("## Longest Functions".to_string());
 
                 let mut sorted: Vec<_> = length.functions.iter().collect();
-                sorted.sort_by(|a, b| b.lines.cmp(&a.lines));
+                sorted.sort_by_key(|b| std::cmp::Reverse(b.lines));
 
                 for func in sorted.iter().take(10) {
                     let display_name = if let Some(fp) = &func.file_path {
@@ -484,7 +484,7 @@ fn analyze_glob(
             .collect();
 
         // Sort by complexity descending
-        all_functions.sort_by(|a, b| b.complexity.cmp(&a.complexity));
+        all_functions.sort_by_key(|b| std::cmp::Reverse(b.complexity));
 
         if !all_functions.is_empty() {
             Some(ComplexityReport {
@@ -521,7 +521,7 @@ fn analyze_glob(
             .collect();
 
         // Sort by length descending
-        all_functions.sort_by(|a, b| b.lines.cmp(&a.lines));
+        all_functions.sort_by_key(|b| std::cmp::Reverse(b.lines));
 
         if !all_functions.is_empty() {
             Some(LengthReport {

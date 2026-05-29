@@ -613,7 +613,7 @@ pub fn find_sccs(imports: &HashMap<String, HashSet<String>>) -> Vec<Scc> {
             internal_edges,
         });
     }
-    result.sort_by(|a, b| b.modules.len().cmp(&a.modules.len()));
+    result.sort_by_key(|b| std::cmp::Reverse(b.modules.len()));
     result
 }
 
@@ -885,7 +885,7 @@ pub fn find_longest_chains(
         }
     }
 
-    longest_paths.sort_by(|a, b| b.depth.cmp(&a.depth));
+    longest_paths.sort_by_key(|b| std::cmp::Reverse(b.depth));
 
     // Deduplicate — if a shorter chain is a suffix of a longer one, skip it
     let mut unique_chains: Vec<ImportChain> = Vec::new();

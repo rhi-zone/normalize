@@ -287,7 +287,7 @@ pub fn analyze_contributors(repos: &[std::path::PathBuf]) -> Result<Contributors
     }
 
     // Sort by shared count descending
-    overlaps.sort_by(|a, b| b.shared_authors.cmp(&a.shared_authors));
+    overlaps.sort_by_key(|b| std::cmp::Reverse(b.shared_authors));
 
     Ok(ContributorsReport {
         authors,

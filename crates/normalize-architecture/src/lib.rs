@@ -201,7 +201,7 @@ pub fn compute_coupling_and_hubs(
         }
     }
 
-    coupling.sort_by(|a, b| b.fan_in.cmp(&a.fan_in));
+    coupling.sort_by_key(|b| std::cmp::Reverse(b.fan_in));
 
     let mut hub_modules: Vec<HubModule> = coupling
         .iter()
@@ -213,7 +213,7 @@ pub fn compute_coupling_and_hubs(
             hub_score: m.fan_in * m.fan_out,
         })
         .collect();
-    hub_modules.sort_by(|a, b| b.hub_score.cmp(&a.hub_score));
+    hub_modules.sort_by_key(|b| std::cmp::Reverse(b.hub_score));
     hub_modules.truncate(10);
 
     coupling.truncate(15);
@@ -401,7 +401,7 @@ pub async fn find_symbol_hotspots(
             }
         }
     }
-    hotspots.sort_by(|a, b| b.callers.cmp(&a.callers));
+    hotspots.sort_by_key(|b| std::cmp::Reverse(b.callers));
     hotspots.truncate(10);
     Ok(hotspots)
 }
@@ -508,7 +508,7 @@ pub fn find_longest_chains(graph: &HashMap<String, HashSet<String>>) -> Vec<Impo
         }
     }
 
-    longest_paths.sort_by(|a, b| b.depth.cmp(&a.depth));
+    longest_paths.sort_by_key(|b| std::cmp::Reverse(b.depth));
 
     let mut unique_chains: Vec<ImportChain> = Vec::new();
     for chain in longest_paths {
@@ -613,7 +613,7 @@ pub fn compute_layer_flows(graph: &HashMap<String, HashSet<String>>) -> Vec<Laye
         })
         .collect();
 
-    flows.sort_by(|a, b| b.count.cmp(&a.count));
+    flows.sort_by_key(|b| std::cmp::Reverse(b.count));
     flows.truncate(15);
     flows
 }

@@ -214,7 +214,7 @@ pub fn analyze_fragments(
                             let mut kind_counts = HashMap::new();
                             collect_node_kinds(&node, &mut kind_counts);
                             let mut kv: Vec<_> = kind_counts.into_iter().collect();
-                            kv.sort_by(|a, b| b.1.cmp(&a.1));
+                            kv.sort_by_key(|b| std::cmp::Reverse(b.1));
 
                             fragments.push(Fragment {
                                 file: rel_path.clone(),
@@ -389,7 +389,7 @@ fn walk_blocks(
             let mut kind_counts = HashMap::new();
             collect_node_kinds(node, &mut kind_counts);
             let mut kv: Vec<_> = kind_counts.into_iter().collect();
-            kv.sort_by(|a, b| b.1.cmp(&a.1));
+            kv.sort_by_key(|b| std::cmp::Reverse(b.1));
             out.push(Fragment {
                 file: rel_path.to_string(),
                 start_line: node.start_position().row + 1,
@@ -439,7 +439,7 @@ fn walk_all_subtrees(
             let mut kind_counts = HashMap::new();
             collect_node_kinds(node, &mut kind_counts);
             let mut kv: Vec<_> = kind_counts.into_iter().collect();
-            kv.sort_by(|a, b| b.1.cmp(&a.1));
+            kv.sort_by_key(|b| std::cmp::Reverse(b.1));
             out.push(Fragment {
                 file: rel_path.to_string(),
                 start_line: node.start_position().row + 1,
@@ -680,7 +680,7 @@ fn build_cluster(
         }
     }
     let mut label: Vec<(String, usize)> = agg.into_iter().collect();
-    label.sort_by(|a, b| b.1.cmp(&a.1));
+    label.sort_by_key(|b| std::cmp::Reverse(b.1));
     label.truncate(5);
 
     // Hash representative

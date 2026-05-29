@@ -314,7 +314,7 @@ pub fn generate_pattern_label(elements: &[(String, usize)]) -> String {
 
     // Sort by count descending, pick top 2
     let mut sorted: Vec<(&str, usize)> = categories.into_iter().collect();
-    sorted.sort_by(|a, b| b.1.cmp(&a.1));
+    sorted.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     let parts: Vec<&str> = sorted.iter().take(2).map(|(cat, _)| *cat).collect();
 

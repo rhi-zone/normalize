@@ -332,7 +332,7 @@ pub fn build_parallelization_report(
         });
     }
 
-    sessions.sort_by(|a, b| b.mtime.cmp(&a.mtime));
+    sessions.sort_by_key(|b| std::cmp::Reverse(b.mtime));
     if limit > 0 {
         sessions.truncate(limit);
     }

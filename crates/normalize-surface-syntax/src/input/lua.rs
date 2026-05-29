@@ -637,7 +637,7 @@ impl<'a> ReadContext<'a> {
 
         // Multi-assignment: a, b = 1, 2
         let mut stmts = Vec::new();
-        for (target, value) in targets.into_iter().zip(values.into_iter()) {
+        for (target, value) in targets.into_iter().zip(values) {
             stmts.push(Stmt::expr(Expr::assign(target, value)));
         }
 

@@ -839,7 +839,7 @@ fn compute_complexity_stats(root: &Path, allowlist: &[String]) -> ComplexityStat
     };
 
     let mut top_offenders = report.functions.clone();
-    top_offenders.sort_by(|a, b| b.complexity.cmp(&a.complexity));
+    top_offenders.sort_by_key(|b| std::cmp::Reverse(b.complexity));
     top_offenders.truncate(5);
 
     ComplexityStats {
@@ -1005,7 +1005,7 @@ async fn analyze_health_indexed(
         }
     }
 
-    large_files.sort_by(|a, b| b.lines.cmp(&a.lines));
+    large_files.sort_by_key(|b| std::cmp::Reverse(b.lines));
 
     HealthReport {
         total_files,
@@ -1099,7 +1099,7 @@ fn analyze_health_unindexed(
         }
     }
 
-    large_files.sort_by(|a, b| b.lines.cmp(&a.lines));
+    large_files.sort_by_key(|b| std::cmp::Reverse(b.lines));
 
     HealthReport {
         total_files,
