@@ -23,6 +23,10 @@ impl Language for Java {
         Some(self)
     }
 
+    fn as_refactor_codegen(&self) -> Option<&dyn crate::RefactorCodeGen> {
+        Some(self)
+    }
+
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }
@@ -215,6 +219,86 @@ impl Language for Java {
 }
 
 impl LanguageSymbols for Java {}
+
+impl crate::RefactorCodeGen for Java {
+    fn format_param(&self, name: &str, ty: Option<&str>) -> String {
+        // Java is not a recipe target for add-parameter today; match the recipe's
+        // generic default (`name: type`) so migration is behaviour-preserving.
+        match ty {
+            Some(t) => format!("{}: {}", name, t),
+            None => name.to_string(),
+        }
+    }
+
+    fn render_binding(&self, name: &str, expr: &str, indent: &str) -> String {
+        // Matches the recipe's generic default binding form.
+        format!("{}let {} = {};\n", indent, name, expr)
+    }
+
+    fn render_function(&self, spec: &crate::ExtractedFnSpec) -> String {
+        use crate::GenReturn;
+        let ret_type = match &spec.ret {
+            GenReturn::Unit => "void".to_string(),
+            GenReturn::Single(v) => format!("/* {} */", v),
+            GenReturn::Tuple(vs) => format!("/* TODO: struct({}) */", vs.join(", ")),
+            GenReturn::Result(ok, err) => format!("/* {} throws {} */", ok, err),
+        };
+        let param_str = spec
+            .params
+            .iter()
+            .map(|p| match &p.inferred_type {
+                Some(ty) => format!("{} {}", ty, p.name),
+                None => format!("/* type */ {}", p.name),
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let indent = &spec.indent;
+        let return_stmt = match &spec.ret {
+            GenReturn::Unit => String::new(),
+            GenReturn::Single(v) => format!("\n{}    return {};", indent, v),
+            GenReturn::Tuple(vs) => {
+                format!("\n{}    // TODO: return struct({});", indent, vs.join(", "))
+            }
+            GenReturn::Result(ok, _) => format!("\n{}    return {};", indent, ok),
+        };
+
+        let body = spec
+            .body_lines
+            .iter()
+            .map(|l| format!("{}    {}", indent, l))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            "\n{}private {} {}({}) {{\n{}{}\n{}}}\n",
+            indent, ret_type, spec.name, param_str, body, return_stmt, indent
+        )
+    }
+
+    fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
+        use crate::GenReturn;
+        let args = spec
+            .params
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let indent = &spec.indent;
+        let name = &spec.name;
+        match &spec.ret {
+            GenReturn::Unit => format!("{}{}({});\n", indent, name, args),
+            GenReturn::Single(v) => format!("{}var {} = {}({});\n", indent, v, name, args),
+            GenReturn::Tuple(vs) => format!(
+                "{}var result = {}({}); // TODO: unpack ({})\n",
+                indent,
+                name,
+                args,
+                vs.join(", ")
+            ),
+            GenReturn::Result(ok, _) => format!("{}var {} = {}({});\n", indent, ok, name, args),
+        }
+    }
+}
 
 // =============================================================================
 // Java Module Resolver

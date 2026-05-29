@@ -26,6 +26,10 @@ impl Language for Rust {
         Some(self)
     }
 
+    fn as_refactor_codegen(&self) -> Option<&dyn crate::RefactorCodeGen> {
+        Some(self)
+    }
+
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }
@@ -321,6 +325,213 @@ impl Language for Rust {
 }
 
 impl LanguageSymbols for Rust {}
+
+impl crate::RefactorCodeGen for Rust {
+    fn format_param(&self, name: &str, ty: Option<&str>) -> String {
+        match ty {
+            Some(t) => format!("{}: {}", name, t),
+            None => name.to_string(),
+        }
+    }
+
+    fn render_binding(&self, name: &str, expr: &str, indent: &str) -> String {
+        format!("{}let {} = {};\n", indent, name, expr)
+    }
+
+    fn render_function(&self, spec: &crate::ExtractedFnSpec) -> String {
+        use crate::GenReturn;
+        let async_kw = if spec.is_async { "async " } else { "" };
+        let param_str = spec
+            .params
+            .iter()
+            .map(|p| {
+                let mut_kw = if p.mutable { "mut " } else { "" };
+                match &p.inferred_type {
+                    Some(ty) => format!("{}{}: {}", mut_kw, p.name, ty),
+                    None => format!("{}{}: /* type */", mut_kw, p.name),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let ret_str = match &spec.ret {
+            GenReturn::Unit => String::new(),
+            GenReturn::Single(v) => format!(" -> /* {} */", v),
+            GenReturn::Tuple(vs) => format!(" -> /* ({}) */", vs.join(", ")),
+            GenReturn::Result(ok, err) => format!(" -> Result</* {} */, {}>", ok, err),
+        };
+        let indent = &spec.indent;
+        let return_stmt = match &spec.ret {
+            GenReturn::Unit => String::new(),
+            GenReturn::Single(v) => format!("\n{}    {}", indent, v),
+            GenReturn::Tuple(vs) => format!("\n{}    ({})", indent, vs.join(", ")),
+            GenReturn::Result(ok, _) => {
+                if ok == "()" {
+                    format!("\n{}    Ok(())", indent)
+                } else {
+                    format!("\n{}    Ok({})", indent, ok)
+                }
+            }
+        };
+
+        let body = spec
+            .body_lines
+            .iter()
+            .map(|l| format!("{}    {}", indent, l))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            "\n{}{}fn {}({}){} {{\n{}{}\n{}}}\n",
+            indent, async_kw, spec.name, param_str, ret_str, body, return_stmt, indent
+        )
+    }
+
+    fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
+        use crate::GenReturn;
+        let args = spec
+            .params
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let indent = &spec.indent;
+        let name = &spec.name;
+        let is_async = spec.is_async;
+        match &spec.ret {
+            GenReturn::Unit => {
+                if is_async {
+                    format!("{}{}({}).await;\n", indent, name, args)
+                } else {
+                    format!("{}{}({});\n", indent, name, args)
+                }
+            }
+            GenReturn::Single(v) => {
+                if is_async {
+                    format!("{}let {} = {}({}).await;\n", indent, v, name, args)
+                } else {
+                    format!("{}let {} = {}({});\n", indent, v, name, args)
+                }
+            }
+            GenReturn::Tuple(vs) => {
+                if is_async {
+                    format!(
+                        "{}let ({}) = {}({}).await;\n",
+                        indent,
+                        vs.join(", "),
+                        name,
+                        args
+                    )
+                } else {
+                    format!("{}let ({}) = {}({});\n", indent, vs.join(", "), name, args)
+                }
+            }
+            GenReturn::Result(ok, _) => {
+                if is_async {
+                    format!("{}let {} = {}({}).await?;\n", indent, ok, name, args)
+                } else {
+                    format!("{}let {} = {}({})?;\n", indent, ok, name, args)
+                }
+            }
+        }
+    }
+
+    fn uses_result_for_exceptions(&self) -> bool {
+        true
+    }
+}
+
+#[cfg(test)]
+mod refactor_codegen_tests {
+    use super::Rust;
+    use crate::{CallSiteSpec, ExtractedFnSpec, GenParam, GenReturn, RefactorCodeGen};
+
+    fn p(name: &str, ty: Option<&str>, mutable: bool) -> GenParam {
+        GenParam {
+            name: name.to_string(),
+            inferred_type: ty.map(str::to_string),
+            mutable,
+        }
+    }
+
+    #[test]
+    fn rust_fn_unit_return() {
+        let spec = ExtractedFnSpec {
+            name: "do_thing".to_string(),
+            params: vec![p("x", Some("i32"), false)],
+            ret: GenReturn::Unit,
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["println!(\"{}\", x);".to_string()],
+            indent: String::new(),
+        };
+        let out = Rust.render_function(&spec);
+        assert!(out.contains("fn do_thing(x: i32)"));
+        assert!(out.contains("println!"));
+        assert!(!out.contains("->"));
+    }
+
+    #[test]
+    fn rust_fn_single_return() {
+        let spec = ExtractedFnSpec {
+            name: "compute".to_string(),
+            params: vec![],
+            ret: GenReturn::Single("result".to_string()),
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["let result = 42;".to_string()],
+            indent: String::new(),
+        };
+        let out = Rust.render_function(&spec);
+        assert!(out.contains("fn compute()"));
+        assert!(out.contains("-> /* result */"));
+        assert!(out.contains("result"));
+    }
+
+    #[test]
+    fn rust_fn_async() {
+        let spec = ExtractedFnSpec {
+            name: "wait_a_bit".to_string(),
+            params: vec![],
+            ret: GenReturn::Unit,
+            is_async: true,
+            is_generator: false,
+            body_lines: vec!["tokio::time::sleep(Duration::from_secs(1)).await;".to_string()],
+            indent: String::new(),
+        };
+        let out = Rust.render_function(&spec);
+        assert!(out.contains("async fn wait_a_bit()"));
+    }
+
+    #[test]
+    fn rust_call_site_with_return() {
+        let spec = CallSiteSpec {
+            name: "compute".to_string(),
+            params: vec![p("x", Some("i32"), false)],
+            ret: GenReturn::Single("result".to_string()),
+            is_async: false,
+            indent: "    ".to_string(),
+        };
+        assert_eq!(
+            Rust.render_call_site(&spec),
+            "    let result = compute(x);\n"
+        );
+    }
+
+    #[test]
+    fn rust_call_site_async() {
+        let spec = CallSiteSpec {
+            name: "fetch".to_string(),
+            params: vec![],
+            ret: GenReturn::Single("data".to_string()),
+            is_async: true,
+            indent: "    ".to_string(),
+        };
+        assert_eq!(
+            Rust.render_call_site(&spec),
+            "    let data = fetch().await;\n"
+        );
+    }
+}
 
 /// Merge Rust impl blocks with their corresponding struct/enum types.
 ///

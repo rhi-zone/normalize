@@ -30,6 +30,10 @@ impl Language for TypeScript {
         Some(self)
     }
 
+    fn as_refactor_codegen(&self) -> Option<&dyn crate::RefactorCodeGen> {
+        Some(self)
+    }
+
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }
@@ -145,6 +149,36 @@ impl Language for TypeScript {
 
 impl LanguageSymbols for TypeScript {}
 
+impl crate::RefactorCodeGen for TypeScript {
+    fn format_param(&self, name: &str, ty: Option<&str>) -> String {
+        ecmascript::refactor_format_param(true, name, ty)
+    }
+    fn render_binding(&self, name: &str, expr: &str, indent: &str) -> String {
+        ecmascript::refactor_render_binding(name, expr, indent)
+    }
+    fn render_function(&self, spec: &crate::ExtractedFnSpec) -> String {
+        ecmascript::refactor_render_function(true, spec)
+    }
+    fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
+        ecmascript::refactor_render_call_site(spec)
+    }
+}
+
+impl crate::RefactorCodeGen for Tsx {
+    fn format_param(&self, name: &str, ty: Option<&str>) -> String {
+        ecmascript::refactor_format_param(true, name, ty)
+    }
+    fn render_binding(&self, name: &str, expr: &str, indent: &str) -> String {
+        ecmascript::refactor_render_binding(name, expr, indent)
+    }
+    fn render_function(&self, spec: &crate::ExtractedFnSpec) -> String {
+        ecmascript::refactor_render_function(true, spec)
+    }
+    fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
+        ecmascript::refactor_render_call_site(spec)
+    }
+}
+
 // TSX shares the same implementation as TypeScript, just with a different grammar
 impl Language for Tsx {
     fn name(&self) -> &'static str {
@@ -155,6 +189,10 @@ impl Language for Tsx {
     }
     fn grammar_name(&self) -> &'static str {
         "tsx"
+    }
+
+    fn as_refactor_codegen(&self) -> Option<&dyn crate::RefactorCodeGen> {
+        Some(self)
     }
 
     fn signature_suffix(&self) -> &'static str {

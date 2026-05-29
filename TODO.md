@@ -996,6 +996,44 @@ RESOLVED 2026-05-30: Added CommonJS `require()` patterns (simple binding, shorth
 
 Pervasive `match grammar` / `grammar ==` dispatch on hardcoded language names + hardcoded node-kind strings throughout the refactor recipes. Node-kind lookups (`function_item_kinds`, `param_list_kind`, etc.) should be `.scm` queries loaded via `GrammarLoader`; code *generation* (`generate_rust_function` etc.) cannot be `.scm` — needs a `CodeGen` trait or Language-trait methods. Violates the CLAUDE.md node-classification rule.
 
+**Step 0 (FOUNDATION) DONE 2026-05-30** — `feat(languages): refactor codegen trait + refactor.scm query purpose`. Shared infra landed; recipes NOT yet migrated (violation remains open). Delivered:
+- `.refactor.scm` query purpose loaded via `GrammarLoader::get_refactor` / `bundled_refactor_query`, mirroring `decorations`. Capture vocabulary: `@refactor.function_def`, `@refactor.param_list`, `@refactor.call`, `@refactor.arg_list`, `@refactor.var_decl`, `@refactor.reassign`, `@refactor.scope`, `@refactor.statement`, `@refactor.block`. Files for rust, python, javascript, typescript, tsx — each compiled against the real installed grammar in `test_bundled_refactor_queries_compile`.
+- `RefactorCodeGen: Language` capability trait + `as_refactor_codegen()` default-`None` (mirrors `LanguageSymbols`/`as_symbols`). Methods: `format_param`, `render_binding`, `render_function`, `render_call_site`, `supports_multi_return`, `uses_result_for_exceptions`. Owned spec structs `ExtractedFnSpec`/`CallSiteSpec`/`GenParam`/`GenReturn` live in `normalize-languages` (dep direction verified: refactor → languages, never reverse). Impls for Rust, Python, Go, TypeScript, Tsx, JavaScript, Java (JS/TS/TSX share `ecmascript.rs` helpers). Byte-identical to the current `generate_*` output — parity locked by relocated exact-output tests in each language's `refactor_codegen_tests` module.
+- Stale node-kind found: the TS/JS recipe's `function_item_kinds` listed `"function"`, but the arborium JS/TS grammars use `function_expression` — the `.scm` uses the correct kind.
+
+**Phase B — broadening worklist** (the recipe-migration stage migrates recipes to the new infra; THIS list is the per-language fan-out to give every GP language full refactor support). Each needs `<lang>.refactor.scm` + `RefactorCodeGen` impl. Codegen for a new language is real per-language design work (not mechanical), so each is its own staged effort. Recipe-supported today: rust, python, javascript, typescript, tsx (have both). Go + Java have `RefactorCodeGen` but still need `.refactor.scm` to become recipe targets. GP languages (those with a `module_resolver`) still needing BOTH:
+- [ ] go (needs `.refactor.scm`; codegen done)
+- [ ] java (needs `.refactor.scm`; codegen done)
+- [ ] ruby
+- [ ] kotlin
+- [ ] scala
+- [ ] groovy
+- [ ] c-sharp
+- [ ] vb
+- [ ] fsharp
+- [ ] swift
+- [ ] dart
+- [ ] zig
+- [ ] d
+- [ ] elixir
+- [ ] erlang
+- [ ] haskell
+- [ ] ocaml
+- [ ] lua
+- [ ] php
+- [ ] perl
+- [ ] clojure
+- [ ] commonlisp
+- [ ] scheme
+- [ ] gleam
+- [ ] rescript
+- [ ] elm
+- [ ] nix
+- [ ] r
+- [ ] julia
+- [ ] matlab
+- [ ] prolog
+
 ~~**MEDIUM — `normalize-filter/src/lib.rs` ~94-103**~~
 
 ~~The `build` filter alias hardcodes `target/`, `node_modules/`, `.next/`, `.nuxt/`, `__pycache__/` (Cargo/npm/Next/Nuxt/Python conventions) in a library crate. Mitigated by being applied only on explicit `build` alias request (not silently). Judgment call per CLAUDE.md: curated-default-alias vs. hardcoded-third-party-convention. CLAUDE.md says these belong in project config; however this is explicitly a *named alias* the user opts into. Flag for decision, not emergency fix.~~

@@ -27,6 +27,10 @@ impl Language for Go {
         Some(self)
     }
 
+    fn as_refactor_codegen(&self) -> Option<&dyn crate::RefactorCodeGen> {
+        Some(self)
+    }
+
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }
@@ -179,6 +183,113 @@ impl Language for Go {
 }
 
 impl LanguageSymbols for Go {}
+
+impl crate::RefactorCodeGen for Go {
+    fn format_param(&self, name: &str, ty: Option<&str>) -> String {
+        // Go is not a recipe target for add-parameter today; match the recipe's
+        // generic default (`name: type`) so migration is behaviour-preserving.
+        match ty {
+            Some(t) => format!("{}: {}", name, t),
+            None => name.to_string(),
+        }
+    }
+
+    fn render_binding(&self, name: &str, expr: &str, indent: &str) -> String {
+        // Matches the recipe's generic default binding form.
+        format!("{}let {} = {};\n", indent, name, expr)
+    }
+
+    fn render_function(&self, spec: &crate::ExtractedFnSpec) -> String {
+        use crate::GenReturn;
+        let param_str = spec
+            .params
+            .iter()
+            .map(|p| match &p.inferred_type {
+                Some(ty) => format!("{} {}", p.name, ty),
+                None => format!("{} interface{{}}", p.name),
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let ret_str = match &spec.ret {
+            GenReturn::Unit => String::new(),
+            GenReturn::Single(v) => format!(" /* {} */", v),
+            GenReturn::Tuple(vs) => format!(" ({} /* multi-return */)", vs.join(", ")),
+            GenReturn::Result(ok, _) => format!(" ({}, error)", ok),
+        };
+        let indent = &spec.indent;
+        let return_stmt = match &spec.ret {
+            GenReturn::Unit => String::new(),
+            GenReturn::Single(v) => format!("\n{}    return {}", indent, v),
+            GenReturn::Tuple(vs) => format!("\n{}    return {}", indent, vs.join(", ")),
+            GenReturn::Result(ok, _) => format!("\n{}    return {}, nil", indent, ok),
+        };
+
+        let body = spec
+            .body_lines
+            .iter()
+            .map(|l| format!("{}    {}", indent, l))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            "\n{}func {}({}){} {{\n{}{}\n{}}}\n",
+            indent, spec.name, param_str, ret_str, body, return_stmt, indent
+        )
+    }
+
+    fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
+        use crate::GenReturn;
+        let args = spec
+            .params
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let indent = &spec.indent;
+        let name = &spec.name;
+        match &spec.ret {
+            GenReturn::Unit => format!("{}{}({})\n", indent, name, args),
+            GenReturn::Single(v) => format!("{}{} := {}({})\n", indent, v, name, args),
+            GenReturn::Tuple(vs) => {
+                format!("{}{} := {}({})\n", indent, vs.join(", "), name, args)
+            }
+            GenReturn::Result(ok, _) => format!(
+                "{}{}, err := {}({})\n{}if err != nil {{ return err }}\n",
+                indent, ok, name, args, indent
+            ),
+        }
+    }
+
+    fn supports_multi_return(&self) -> bool {
+        true
+    }
+}
+
+#[cfg(test)]
+mod refactor_codegen_tests {
+    use super::Go;
+    use crate::{ExtractedFnSpec, GenParam, GenReturn, RefactorCodeGen};
+
+    #[test]
+    fn go_fn_basic() {
+        let spec = ExtractedFnSpec {
+            name: "double".to_string(),
+            params: vec![GenParam {
+                name: "n".to_string(),
+                inferred_type: Some("int".to_string()),
+                mutable: false,
+            }],
+            ret: GenReturn::Single("result".to_string()),
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["result := n * 2".to_string()],
+            indent: String::new(),
+        };
+        let out = Go.render_function(&spec);
+        assert!(out.contains("func double(n int)"));
+        assert!(out.contains("return result"));
+    }
+}
 
 // =============================================================================
 // Go Module Resolver

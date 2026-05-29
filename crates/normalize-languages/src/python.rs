@@ -30,6 +30,10 @@ impl Language for Python {
         Some(self)
     }
 
+    fn as_refactor_codegen(&self) -> Option<&dyn crate::RefactorCodeGen> {
+        Some(self)
+    }
+
     fn extract_docstring(&self, node: &Node, content: &str) -> Option<String> {
         extract_docstring(node, content)
     }
@@ -341,6 +345,141 @@ impl Language for Python {
 }
 
 impl LanguageSymbols for Python {}
+
+impl crate::RefactorCodeGen for Python {
+    fn format_param(&self, name: &str, _ty: Option<&str>) -> String {
+        name.to_string()
+    }
+
+    fn render_binding(&self, name: &str, expr: &str, indent: &str) -> String {
+        format!("{}{} = {}\n", indent, name, expr)
+    }
+
+    fn render_function(&self, spec: &crate::ExtractedFnSpec) -> String {
+        use crate::GenReturn;
+        let async_kw = if spec.is_async { "async " } else { "" };
+        let param_str = spec
+            .params
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let indent = &spec.indent;
+        let return_stmt = match &spec.ret {
+            GenReturn::Unit => String::new(),
+            GenReturn::Single(v) => format!("\n{}    return {}", indent, v),
+            GenReturn::Tuple(vs) => format!("\n{}    return {}", indent, vs.join(", ")),
+            GenReturn::Result(ok, _) => format!("\n{}    return {}", indent, ok),
+        };
+
+        let body = spec
+            .body_lines
+            .iter()
+            .map(|l| format!("{}    {}", indent, l))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            "\n{}{}def {}({}):\n{}{}\n",
+            indent, async_kw, spec.name, param_str, body, return_stmt
+        )
+    }
+
+    fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
+        use crate::GenReturn;
+        let args = spec
+            .params
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let await_kw = if spec.is_async { "await " } else { "" };
+        let indent = &spec.indent;
+        let name = &spec.name;
+        match &spec.ret {
+            GenReturn::Unit => {
+                format!(
+                    "{}{}{}{}",
+                    indent,
+                    await_kw,
+                    name,
+                    format_args!("({})", args)
+                )
+            }
+            GenReturn::Single(v) => {
+                format!("{}{} = {}{}({})\n", indent, v, await_kw, name, args)
+            }
+            GenReturn::Tuple(vs) => {
+                format!(
+                    "{}{} = {}{}({})\n",
+                    indent,
+                    vs.join(", "),
+                    await_kw,
+                    name,
+                    args
+                )
+            }
+            GenReturn::Result(ok, _) => format!("{}{} = {}({})\n", indent, ok, name, args),
+        }
+    }
+
+    fn supports_multi_return(&self) -> bool {
+        true
+    }
+}
+
+#[cfg(test)]
+mod refactor_codegen_tests {
+    use super::Python;
+    use crate::{CallSiteSpec, ExtractedFnSpec, GenParam, GenReturn, RefactorCodeGen};
+
+    #[test]
+    fn python_fn_basic() {
+        let spec = ExtractedFnSpec {
+            name: "show".to_string(),
+            params: vec![GenParam {
+                name: "x".to_string(),
+                inferred_type: None,
+                mutable: false,
+            }],
+            ret: GenReturn::Unit,
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["print(x)".to_string()],
+            indent: String::new(),
+        };
+        let out = Python.render_function(&spec);
+        assert!(out.contains("def show(x):"));
+        assert!(out.contains("print(x)"));
+    }
+
+    #[test]
+    fn python_fn_multi_return() {
+        let spec = ExtractedFnSpec {
+            name: "two_values".to_string(),
+            params: vec![],
+            ret: GenReturn::Tuple(vec!["a".to_string(), "b".to_string()]),
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["a = 1".to_string(), "b = 2".to_string()],
+            indent: String::new(),
+        };
+        let out = Python.render_function(&spec);
+        assert!(out.contains("return a, b"));
+    }
+
+    #[test]
+    fn python_call_site_multi_return() {
+        let spec = CallSiteSpec {
+            name: "two_vals".to_string(),
+            params: vec![],
+            ret: GenReturn::Tuple(vec!["a".to_string(), "b".to_string()]),
+            is_async: false,
+            indent: String::new(),
+        };
+        assert_eq!(Python.render_call_site(&spec), "a, b = two_vals()\n");
+    }
+}
 
 // =============================================================================
 // Python Module Resolver

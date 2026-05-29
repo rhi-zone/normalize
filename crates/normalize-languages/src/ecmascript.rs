@@ -3,8 +3,132 @@
 //! This module contains common logic shared between JavaScript, TypeScript, and TSX.
 //! Each language struct delegates to these functions for DRY implementation.
 
-use crate::{ImplementsInfo, Import, InterfaceResolver, Symbol, SymbolKind, Visibility};
+use crate::{
+    CallSiteSpec, ExtractedFnSpec, GenReturn, ImplementsInfo, Import, InterfaceResolver, Symbol,
+    SymbolKind, Visibility,
+};
 use tree_sitter::Node;
+
+// ============================================================================
+// Refactor codegen (shared JS/TS/TSX)
+// ============================================================================
+
+/// Format a single parameter for a JS/TS function signature.
+/// `typed` is true for TypeScript/TSX (emit `name: type`), false for JavaScript.
+pub fn refactor_format_param(typed: bool, name: &str, ty: Option<&str>) -> String {
+    match ty {
+        Some(t) if typed => format!("{}: {}", name, t),
+        _ => name.to_string(),
+    }
+}
+
+/// Render a JS/TS variable binding statement (`const name = expr;\n`).
+pub fn refactor_render_binding(name: &str, expr: &str, indent: &str) -> String {
+    format!("{}const {} = {};\n", indent, name, expr)
+}
+
+/// Render an extracted JS/TS function definition.
+/// `typed` is true for TypeScript/TSX (emit type annotations), false for JavaScript.
+pub fn refactor_render_function(typed: bool, spec: &ExtractedFnSpec) -> String {
+    let ExtractedFnSpec {
+        name,
+        params,
+        ret,
+        is_async,
+        body_lines,
+        indent,
+        ..
+    } = spec;
+    let async_kw = if *is_async { "async " } else { "" };
+    let param_str = params
+        .iter()
+        .map(|p| match &p.inferred_type {
+            Some(ty) if typed => format!("{}: {}", p.name, ty),
+            _ => p.name.clone(),
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let ret_annotation = if typed {
+        match ret {
+            GenReturn::Unit => ": void".to_string(),
+            GenReturn::Single(v) => format!(": /* {} */", v),
+            GenReturn::Tuple(vs) => format!(
+                ": [{}]",
+                vs.iter()
+                    .map(|v| format!("/* {} */", v))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            GenReturn::Result(ok, _) => format!(": {} | Error", ok),
+        }
+    } else {
+        String::new()
+    };
+
+    let return_stmt = match ret {
+        GenReturn::Unit => String::new(),
+        GenReturn::Single(v) => format!("\n{}    return {};", indent, v),
+        GenReturn::Tuple(vs) => format!("\n{}    return [{}];", indent, vs.join(", ")),
+        GenReturn::Result(ok, _) => format!("\n{}    return {};", indent, ok),
+    };
+
+    let body = body_lines
+        .iter()
+        .map(|l| format!("{}    {}", indent, l))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    format!(
+        "\n{}{}function {}({}){} {{\n{}{}\n{}}}\n",
+        indent, async_kw, name, param_str, ret_annotation, body, return_stmt, indent
+    )
+}
+
+/// Render the JS/TS call site that replaces an extracted region.
+pub fn refactor_render_call_site(spec: &CallSiteSpec) -> String {
+    let CallSiteSpec {
+        name,
+        params,
+        ret,
+        is_async,
+        indent,
+    } = spec;
+    let args = params
+        .iter()
+        .map(|p| p.name.as_str())
+        .collect::<Vec<_>>()
+        .join(", ");
+    let await_kw = if *is_async { "await " } else { "" };
+    match ret {
+        GenReturn::Unit => format!(
+            "{}{}{}{}",
+            indent,
+            await_kw,
+            name,
+            format_args!("({});", args)
+        ),
+        GenReturn::Single(v) => {
+            let prefix = if await_kw == "await " { "await " } else { "" };
+            format!("{}const {} = {}{}({});\n", indent, v, prefix, name, args)
+        }
+        GenReturn::Tuple(vs) => {
+            let prefix = if await_kw == "await " { "await " } else { "" };
+            format!(
+                "{}const [{}] = {}{}({});\n",
+                indent,
+                vs.join(", "),
+                prefix,
+                name,
+                args
+            )
+        }
+        GenReturn::Result(ok, _) => {
+            let prefix = if await_kw == "await " { "await " } else { "" };
+            format!("{}const {} = {}{}({});\n", indent, ok, prefix, name, args)
+        }
+    }
+}
 
 // ============================================================================
 // Visibility

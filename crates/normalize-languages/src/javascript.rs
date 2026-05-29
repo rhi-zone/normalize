@@ -27,6 +27,10 @@ impl Language for JavaScript {
         Some(self)
     }
 
+    fn as_refactor_codegen(&self) -> Option<&dyn crate::RefactorCodeGen> {
+        Some(self)
+    }
+
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }
@@ -133,6 +137,21 @@ impl Language for JavaScript {
 }
 
 impl LanguageSymbols for JavaScript {}
+
+impl crate::RefactorCodeGen for JavaScript {
+    fn format_param(&self, name: &str, ty: Option<&str>) -> String {
+        ecmascript::refactor_format_param(false, name, ty)
+    }
+    fn render_binding(&self, name: &str, expr: &str, indent: &str) -> String {
+        ecmascript::refactor_render_binding(name, expr, indent)
+    }
+    fn render_function(&self, spec: &crate::ExtractedFnSpec) -> String {
+        ecmascript::refactor_render_function(false, spec)
+    }
+    fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
+        ecmascript::refactor_render_call_site(spec)
+    }
+}
 
 // =============================================================================
 // JavaScript Module Resolver

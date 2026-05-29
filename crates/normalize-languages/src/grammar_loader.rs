@@ -99,6 +99,8 @@ pub struct GrammarLoader {
     imports_cache: RwLock<HashMap<String, Arc<String>>>,
     /// Cached decorations queries.
     decorations_cache: RwLock<HashMap<String, Arc<String>>>,
+    /// Cached refactor queries.
+    refactor_cache: RwLock<HashMap<String, Arc<String>>>,
     /// Cached test-regions queries.
     test_regions_cache: RwLock<HashMap<String, Arc<String>>>,
     /// Cached CFG queries.
@@ -142,6 +144,7 @@ impl GrammarLoader {
             tags_cache: RwLock::new(HashMap::new()),
             imports_cache: RwLock::new(HashMap::new()),
             decorations_cache: RwLock::new(HashMap::new()),
+            refactor_cache: RwLock::new(HashMap::new()),
             test_regions_cache: RwLock::new(HashMap::new()),
             cfg_cache: RwLock::new(HashMap::new()),
             compiled_query_cache: RwLock::new(HashMap::new()),
@@ -162,6 +165,7 @@ impl GrammarLoader {
             tags_cache: RwLock::new(HashMap::new()),
             imports_cache: RwLock::new(HashMap::new()),
             decorations_cache: RwLock::new(HashMap::new()),
+            refactor_cache: RwLock::new(HashMap::new()),
             test_regions_cache: RwLock::new(HashMap::new()),
             cfg_cache: RwLock::new(HashMap::new()),
             compiled_query_cache: RwLock::new(HashMap::new()),
@@ -426,6 +430,40 @@ impl GrammarLoader {
         let bundled = bundled_decorations_query(name)?;
         let query = Arc::new(bundled.to_string());
         self.decorations_cache
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(name.to_string(), Arc::clone(&query));
+        Some(query)
+    }
+
+    /// Get the refactor query for a grammar.
+    ///
+    /// Returns the bundled query for supported languages, or an external file if one
+    /// exists at `{name}.refactor.scm` in the grammar search paths (external wins).
+    /// Uses `@refactor.*` captures (function_def, param_list, call, arg_list,
+    /// var_decl, reassign, scope, statement, block) to classify the structural nodes
+    /// the refactoring recipes operate on — replacing hardcoded `match grammar`
+    /// node-kind dispatch in normalize-refactor.
+    pub fn get_refactor(&self, name: &str) -> Option<Arc<String>> {
+        // Check cache first
+        if let Some(query) = self
+            .refactor_cache
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+        {
+            return Some(Arc::clone(query));
+        }
+
+        // External file takes priority over bundled
+        if let Some(q) = self.load_query(name, "refactor", &self.refactor_cache) {
+            return Some(q);
+        }
+
+        // Fall back to bundled query
+        let bundled = bundled_refactor_query(name)?;
+        let query = Arc::new(bundled.to_string());
+        self.refactor_cache
             .write()
             .unwrap_or_else(|e| e.into_inner())
             .insert(name.to_string(), Arc::clone(&query));
@@ -1166,6 +1204,22 @@ fn bundled_decorations_query(name: &str) -> Option<&'static str> {
     }
 }
 
+/// Return a bundled refactor query for a grammar, if available.
+///
+/// Uses `@refactor.*` captures to classify the structural nodes the refactoring
+/// recipes operate on (function definitions, parameter/argument lists, calls,
+/// variable declarations, reassignment targets, scopes, statements, blocks).
+fn bundled_refactor_query(name: &str) -> Option<&'static str> {
+    match name {
+        "rust" => Some(include_str!("queries/rust.refactor.scm")),
+        "python" => Some(include_str!("queries/python.refactor.scm")),
+        "javascript" => Some(include_str!("queries/javascript.refactor.scm")),
+        "typescript" => Some(include_str!("queries/typescript.refactor.scm")),
+        "tsx" => Some(include_str!("queries/tsx.refactor.scm")),
+        _ => None,
+    }
+}
+
 /// Return a bundled test-regions query for a grammar, if available.
 ///
 /// Captures `@test_region` for byte ranges of test-only source regions
@@ -1802,6 +1856,29 @@ mod tests {
             }
         }
         walk(tree.root_node(), 0);
+    }
+
+    #[test]
+    fn test_bundled_refactor_queries_exist() {
+        for lang in &["rust", "python", "javascript", "typescript", "tsx"] {
+            let q = bundled_refactor_query(lang);
+            assert!(q.is_some(), "Missing bundled refactor query for {lang}");
+            assert!(!q.unwrap().is_empty(), "Empty refactor query for {lang}");
+        }
+    }
+
+    #[test]
+    fn test_bundled_refactor_queries_compile() {
+        let loader = GrammarLoader::new();
+        for lang in &["rust", "python", "javascript", "typescript", "tsx"] {
+            let Some(g) = loader.get(lang).ok() else {
+                eprintln!("{lang}: grammar .so not found — skipping refactor query compile");
+                continue;
+            };
+            let q = bundled_refactor_query(lang).expect("bundled refactor query");
+            tree_sitter::Query::new(&g, q)
+                .unwrap_or_else(|e| panic!("refactor query for {lang} failed to compile: {e:?}"));
+        }
     }
 
     #[test]
