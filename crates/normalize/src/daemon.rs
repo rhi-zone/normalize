@@ -201,7 +201,7 @@ mod unix_impl {
     use std::collections::{HashMap, HashSet};
     use std::os::unix::net::UnixStream;
     use std::sync::mpsc::{Sender, channel};
-    use std::sync::{Arc, Mutex};
+    use std::sync::{Arc, Condvar, Mutex};
     use std::time::{Duration, Instant};
     use tokio::io::{AsyncBufReadExt, AsyncReadExt};
     use tokio::net::UnixListener;
@@ -555,6 +555,84 @@ mod unix_impl {
         }
     }
 
+    /// Coalescing queue of roots whose native rules need re-running.
+    ///
+    /// Replaces the old unbounded `mpsc::channel::<PathBuf>` that backed
+    /// `native_refresh_tx`. The native-rules refresh always re-reads the root's
+    /// *current* on-disk state, so N queued refreshes of the same root are
+    /// redundant — only one current-state refresh is ever needed. The old channel
+    /// kept one entry per `.git/index` notify event, so during heavy git churn the
+    /// producer enqueued faster (~5/s) than the consumer drained (~0.9/s), building
+    /// an unbounded backlog that took ~20h to drain after activity stopped.
+    ///
+    /// This structure holds a *set* of dirty roots instead of a queue of events.
+    /// Marking the same root dirty M times collapses to a single pending refresh,
+    /// so the backlog can never exceed the number of distinct watched roots
+    /// regardless of churn. Coalescing is exact, not lossy: because each refresh
+    /// recomputes from current disk state, dropping the intermediate
+    /// re-computations produces the identical final index.
+    ///
+    /// Roots are independent — each refresh writes only its own repo's
+    /// `.normalize/index.sqlite`, with no cross-root ordering dependency — so the
+    /// consumer may drain and process them in any order.
+    struct DirtyRoots {
+        /// `(set of dirty roots, shutdown flag)`. The shutdown flag lets a
+        /// graceful stop wake a blocked consumer so its thread can exit.
+        state: Mutex<(HashSet<PathBuf>, bool)>,
+        signal: Condvar,
+    }
+
+    impl DirtyRoots {
+        fn new() -> Self {
+            Self {
+                state: Mutex::new((HashSet::new(), false)),
+                signal: Condvar::new(),
+            }
+        }
+
+        /// Mark a root dirty (idempotent within a drain cycle) and wake the consumer.
+        fn mark(&self, root: PathBuf) {
+            let mut guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
+            guard.0.insert(root);
+            self.signal.notify_one();
+        }
+
+        /// Signal the consumer to stop and wake it so it can exit. The production
+        /// daemon tears down via `std::process::exit` (which abandons the consumer
+        /// thread), so this graceful-stop path is currently exercised only by the
+        /// blocking-contract test — but it keeps `drain_blocking`'s shutdown
+        /// semantics (`None` on empty + shutdown) honest and testable.
+        #[cfg(test)]
+        fn shutdown(&self) {
+            let mut guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
+            guard.1 = true;
+            self.signal.notify_all();
+        }
+
+        /// Block until at least one root is dirty (or shutdown is requested), then
+        /// take and return all currently-dirty roots. Returns `None` once shutdown
+        /// has been requested and the set is empty, signalling the consumer to exit.
+        fn drain_blocking(&self) -> Option<Vec<PathBuf>> {
+            let mut guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
+            loop {
+                if !guard.0.is_empty() {
+                    let drained: Vec<PathBuf> = guard.0.drain().collect();
+                    return Some(drained);
+                }
+                if guard.1 {
+                    return None;
+                }
+                guard = self.signal.wait(guard).unwrap_or_else(|e| e.into_inner());
+            }
+        }
+
+        /// Number of roots currently pending a refresh. Used by the spin detector
+        /// to surface coalesced-queue pressure.
+        fn pending_len(&self) -> usize {
+            self.state.lock().unwrap_or_else(|e| e.into_inner()).0.len()
+        }
+    }
+
     /// A watched root. The shared watcher is owned by `DaemonServer`; this struct
     /// tracks per-root metadata only.
     struct WatchedRoot {
@@ -654,8 +732,9 @@ mod unix_impl {
         /// self-reporting instead of silently burning CPU.
         spin_warnings: Mutex<Vec<SpinWarning>>,
         refresh_tx: Sender<PathBuf>,
-        /// Sender for native-rules-only refresh requests (triggered by .git/index changes).
-        native_refresh_tx: Sender<PathBuf>,
+        /// Coalescing queue for native-rules-only refresh requests (triggered by
+        /// `.git/index` changes). Per-root "latest wins" — see [`DirtyRoots`].
+        native_dirty: Arc<DirtyRoots>,
         /// Sender for config-reload requests (triggered by `.normalize/config.toml`
         /// or `.normalize/rules/**` changes). Handled by clearing all cached
         /// diagnostic blobs and triggering a full reprime.
@@ -683,7 +762,7 @@ mod unix_impl {
     impl DaemonServer {
         fn new(
             refresh_tx: Sender<PathBuf>,
-            native_refresh_tx: Sender<PathBuf>,
+            native_dirty: Arc<DirtyRoots>,
             config_reload_tx: Sender<PathBuf>,
             runtime_handle: tokio::runtime::Handle,
             watcher: RecommendedWatcher,
@@ -696,7 +775,7 @@ mod unix_impl {
                 roots: Mutex::new(HashMap::new()),
                 spin_warnings: Mutex::new(Vec::new()),
                 refresh_tx,
-                native_refresh_tx,
+                native_dirty,
                 config_reload_tx,
                 start_time: Instant::now(),
                 event_tx,
@@ -2052,6 +2131,83 @@ mod unix_impl {
             true
         }
 
+        /// Spin detection for the native-rules (`.git/index`-driven) refresh path.
+        ///
+        /// The original [`record_refresh_and_detect_spin`] only fires when the
+        /// changed-file set overlaps the root's own `.normalize/` state dir. A
+        /// `.git/index`-driven backlog touches paths *outside* `.normalize/`, so
+        /// that detector never trips on it — which is exactly the failure mode that
+        /// let a 57k-deep native-refresh backlog peg two cores for hours.
+        ///
+        /// This is the complementary signal: it records the native-refresh into the
+        /// per-root sliding window and flags a spin when the refresh density is high
+        /// (≥[`SPIN_DENSITY_THRESHOLD`] in [`SPIN_WINDOW`]) **and** the coalescing
+        /// queue still has this or other roots pending. With coalescing in place a
+        /// true runaway is nearly impossible — the queue can hold at most one entry
+        /// per watched root — but a pathological producer (e.g. a tool rewriting
+        /// `.git/index` in a tight loop) can still drive repeated current-state
+        /// refreshes; this catches that and backs the root off.
+        ///
+        /// Unlike the source-file detector, the backoff is consulted by the
+        /// dispatch loop's `.git/index` branch (see the dispatch loop) so a flagged
+        /// root stops being marked dirty until [`SPIN_COOLDOWN`] elapses.
+        fn record_native_refresh_and_detect_spin(&self, root: &Path, now: Instant) -> bool {
+            let refresh_count = {
+                let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+                let Some(watched) = roots.get_mut(root) else {
+                    return false;
+                };
+                watched.refresh_window.push_back(now);
+                while let Some(front) = watched.refresh_window.front() {
+                    if now.duration_since(*front) > SPIN_WINDOW {
+                        watched.refresh_window.pop_front();
+                    } else {
+                        break;
+                    }
+                }
+                watched.refresh_window.len()
+            };
+
+            // Queue pressure: roots still pending after this drain. A healthy
+            // system drains to zero between churn bursts; sustained pressure
+            // alongside high density indicates a producer outrunning the consumer.
+            let pending = self.native_dirty.pending_len();
+            if refresh_count < SPIN_DENSITY_THRESHOLD || pending == 0 {
+                return false;
+            }
+
+            {
+                let mut roots = self.roots.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(watched) = roots.get_mut(root) {
+                    watched.spin_flagged_until = Some(now + SPIN_COOLDOWN);
+                }
+            }
+
+            tracing::warn!(
+                root = %root.display(),
+                refreshes_in_window = refresh_count,
+                pending_roots = pending,
+                "spin loop detected: native-rules refresh is running at high density \
+                 with a non-draining queue; backing off {}s",
+                SPIN_COOLDOWN.as_secs(),
+            );
+
+            {
+                let mut warnings = self.spin_warnings.lock().unwrap_or_else(|e| e.into_inner());
+                warnings.push(SpinWarning {
+                    root: root.display().to_string(),
+                    overlapping_paths: vec![format!(".git/index ({pending} roots pending)")],
+                    refresh_count,
+                    at_uptime_secs: self.start_time.elapsed().as_secs(),
+                });
+                let len = warnings.len();
+                if len > MAX_SPIN_WARNINGS {
+                    warnings.drain(0..len - MAX_SPIN_WARNINGS);
+                }
+            }
+            true
+        }
+
         fn refresh_root(&self, root: &Path) {
             // Check root is still watched and retrieve the persistent index.
             let idx_arc = {
@@ -2351,6 +2507,14 @@ mod unix_impl {
                 native = new_native_issues.len(),
                 ".git/index refresh: native rules updated"
             );
+
+            // Spin detection for the `.git/index` path. Records this refresh into
+            // the per-root density window and flags a backoff if density is high
+            // while the coalescing queue is not draining. We still persist this
+            // refresh's results — backoff only suppresses *future* dirty-marks for
+            // the root (see the dispatch loop's `.git/index` branch); indexing is
+            // never silently dropped.
+            self.record_native_refresh_and_detect_spin(root, Instant::now());
 
             // Persist to SQLite and drop immediately.
             let config_hash = compute_config_hash(root);
@@ -2778,8 +2942,10 @@ mod unix_impl {
 
         // Channel for full refresh requests from file watchers
         let (refresh_tx, refresh_rx) = channel::<PathBuf>();
-        // Channel for native-rules-only refresh requests triggered by .git/index changes
-        let (native_refresh_tx, native_refresh_rx) = channel::<PathBuf>();
+        // Coalescing queue for native-rules-only refresh requests triggered by
+        // .git/index changes. Unlike an unbounded channel, this collapses repeated
+        // requests for the same root into a single pending refresh (see DirtyRoots).
+        let native_dirty = Arc::new(DirtyRoots::new());
         // Channel for config-reload requests triggered by `.normalize/config.toml`
         // or `.normalize/rules/**` changes.
         let (config_reload_tx, config_reload_rx) = channel::<PathBuf>();
@@ -2791,7 +2957,7 @@ mod unix_impl {
 
         let server = Arc::new(DaemonServer::new(
             refresh_tx,
-            native_refresh_tx,
+            native_dirty.clone(),
             config_reload_tx,
             tokio::runtime::Handle::current(),
             shared_watcher,
@@ -2909,6 +3075,33 @@ mod unix_impl {
                             to_watch_new_dir.push((path.clone(), root.clone()));
                         }
 
+                        // Spin backoff (per-root): while a root is flagged as
+                        // spinning, skip dispatching *any* refresh for it (full or
+                        // native) so the feedback loop can't keep firing. When the
+                        // cooldown expires, clear the flag and log the resume. This
+                        // applies to both the source-file spin signal
+                        // (`record_refresh_and_detect_spin`) and the `.git/index`
+                        // spin signal (`record_native_refresh_and_detect_spin`).
+                        let now = Instant::now();
+                        let backed_off = match roots.get_mut(root) {
+                            Some(w) => match w.spin_flagged_until {
+                                Some(until) if now < until => true,
+                                Some(_) => {
+                                    w.spin_flagged_until = None;
+                                    tracing::info!(
+                                        root = %root.display(),
+                                        "spin backoff lifted; resuming refreshes",
+                                    );
+                                    false
+                                }
+                                None => false,
+                            },
+                            None => false,
+                        };
+                        if backed_off {
+                            continue;
+                        }
+
                         // Check if this is a .git/index change (triggers native-rules refresh)
                         let git_index = root.join(".git").join("index");
                         if path == &git_index {
@@ -2920,29 +3113,6 @@ mod unix_impl {
                                 *last = Instant::now();
                             }
                         } else {
-                            // Spin backoff (per-root): while a root is flagged as
-                            // spinning, skip dispatching refreshes for it so the
-                            // self-write feedback loop can't keep firing. When the
-                            // cooldown expires, clear the flag and log the resume.
-                            let now = Instant::now();
-                            let backed_off = match roots.get_mut(root) {
-                                Some(w) => match w.spin_flagged_until {
-                                    Some(until) if now < until => true,
-                                    Some(_) => {
-                                        w.spin_flagged_until = None;
-                                        tracing::info!(
-                                            root = %root.display(),
-                                            "spin backoff lifted; resuming refreshes",
-                                        );
-                                        false
-                                    }
-                                    None => false,
-                                },
-                                None => false,
-                            };
-                            if backed_off {
-                                continue;
-                            }
                             let last = last_refresh
                                 .entry(root.clone())
                                 .or_insert(Instant::now() - debounce * 2);
@@ -3004,7 +3174,7 @@ mod unix_impl {
                     let _ = server_dispatch.refresh_tx.send(root);
                 }
                 for root in to_native {
-                    let _ = server_dispatch.native_refresh_tx.send(root);
+                    server_dispatch.native_dirty.mark(root);
                 }
                 for root in to_config_reload {
                     let _ = server_dispatch.config_reload_tx.send(root);
@@ -3032,11 +3202,19 @@ mod unix_impl {
             }
         });
 
-        // Spawn native-rules-only refresh handler (for .git/index changes)
+        // Spawn native-rules-only refresh handler (for .git/index changes).
+        // Drains the coalescing `DirtyRoots` set: each wake yields the set of
+        // distinct roots dirtied since the last drain, and each is refreshed
+        // exactly once from its current on-disk state. Repeated `.git/index`
+        // events for the same root collapse to a single refresh, so the backlog
+        // is bounded by the number of watched roots rather than by git churn.
         let server_native = server.clone();
+        let native_dirty_consumer = native_dirty.clone();
         std::thread::spawn(move || {
-            for root in native_refresh_rx {
-                server_native.refresh_native_rules(&root);
+            while let Some(roots) = native_dirty_consumer.drain_blocking() {
+                for root in roots {
+                    server_native.refresh_native_rules(&root);
+                }
             }
         });
 
@@ -3110,6 +3288,17 @@ mod unix_impl {
                 let resp_str = serde_json::to_string(&resp).unwrap();
                 let _ = writer.write_all(resp_str.as_bytes()).await;
                 let _ = writer.write_all(b"\n").await;
+                let _ = writer.flush().await;
+                // Graceful cleanup before exit. The OS releases the flock on
+                // process exit regardless (flock is fd/process-scoped, not
+                // file-existence-scoped — startup tolerates a leftover lock file
+                // from a crashed daemon), but removing the lock + socket files
+                // here keeps the config dir clean and avoids confusing users who
+                // inspect `~/.config/normalize/`. `std::process::exit` skips
+                // destructors, so this explicit removal is the only chance to do
+                // it on a graceful stop.
+                let _ = std::fs::remove_file(global_socket_path());
+                let _ = std::fs::remove_file(daemon_lock_path());
                 std::process::exit(0);
             }
             Ok(Request::Subscribe { root }) => {
@@ -3673,14 +3862,13 @@ mod unix_impl {
         /// unused — these tests never trigger refreshes or file events.
         async fn make_test_server(root: &Path) -> Arc<DaemonServer> {
             let (refresh_tx, _refresh_rx) = std::sync::mpsc::channel::<PathBuf>();
-            let (native_tx, _native_rx) = std::sync::mpsc::channel::<PathBuf>();
             let (config_reload_tx, _config_reload_rx) = std::sync::mpsc::channel::<PathBuf>();
             let (notify_tx, _notify_rx) =
                 std::sync::mpsc::channel::<notify::Result<notify::Event>>();
             let watcher = RecommendedWatcher::new(notify_tx, Config::default()).unwrap();
             let server = Arc::new(DaemonServer::new(
                 refresh_tx,
-                native_tx,
+                Arc::new(DirtyRoots::new()),
                 config_reload_tx,
                 tokio::runtime::Handle::current(),
                 watcher,
@@ -4093,13 +4281,12 @@ allow = ["a.rs"]
         /// valid `WatchedRoot` for the detector to mutate.
         async fn server_with_root(root: &Path) -> Arc<DaemonServer> {
             let (refresh_tx, _r) = std::sync::mpsc::channel::<PathBuf>();
-            let (native_tx, _n) = std::sync::mpsc::channel::<PathBuf>();
             let (config_reload_tx, _c) = std::sync::mpsc::channel::<PathBuf>();
             let (notify_tx, _nx) = std::sync::mpsc::channel::<notify::Result<notify::Event>>();
             let watcher = RecommendedWatcher::new(notify_tx, Config::default()).unwrap();
             let server = Arc::new(DaemonServer::new(
                 refresh_tx,
-                native_tx,
+                Arc::new(DirtyRoots::new()),
                 config_reload_tx,
                 tokio::runtime::Handle::current(),
                 watcher,
@@ -4223,6 +4410,118 @@ allow = ["a.rs"]
                 after >= until,
                 "cooldown endpoint should be in the past now"
             );
+        }
+
+        /// Marking the same root dirty M times collapses to a single pending
+        /// refresh — the coalescing property that bounds the backlog.
+        #[test]
+        fn dirty_roots_coalesces_same_root() {
+            let dirty = DirtyRoots::new();
+            let root = PathBuf::from("/repo/a");
+            for _ in 0..1000 {
+                dirty.mark(root.clone());
+            }
+            assert_eq!(dirty.pending_len(), 1, "1000 marks collapse to one entry");
+            let drained = dirty.drain_blocking().expect("non-empty drain");
+            assert_eq!(drained, vec![root]);
+            assert_eq!(dirty.pending_len(), 0, "drain empties the set");
+        }
+
+        /// Distinct roots are all retained and all drained — coalescing is per-root,
+        /// it never drops a root that needs refreshing.
+        #[test]
+        fn dirty_roots_keeps_distinct_roots() {
+            let dirty = DirtyRoots::new();
+            let roots: Vec<PathBuf> = (0..5)
+                .map(|i| PathBuf::from(format!("/repo/{i}")))
+                .collect();
+            // Interleave marks so each root is dirtied multiple times.
+            for _ in 0..3 {
+                for r in &roots {
+                    dirty.mark(r.clone());
+                }
+            }
+            assert_eq!(dirty.pending_len(), 5, "5 distinct roots, deduped");
+            let mut drained = dirty.drain_blocking().expect("non-empty drain");
+            drained.sort();
+            assert_eq!(drained, roots);
+        }
+
+        /// A consumer blocked on an empty queue wakes when a root is marked, and
+        /// exits (returns `None`) when shutdown is requested with an empty queue.
+        #[test]
+        fn dirty_roots_blocks_then_wakes_and_shuts_down() {
+            use std::sync::Arc as StdArc;
+            let dirty = StdArc::new(DirtyRoots::new());
+
+            // Consumer thread: first drain blocks until we mark a root.
+            let consumer = {
+                let dirty = dirty.clone();
+                std::thread::spawn(move || {
+                    let first = dirty.drain_blocking();
+                    let second = dirty.drain_blocking();
+                    (first, second)
+                })
+            };
+
+            // Give the consumer a moment to block, then mark.
+            std::thread::sleep(Duration::from_millis(50));
+            dirty.mark(PathBuf::from("/repo/x"));
+            // Then request shutdown so the second drain returns None.
+            std::thread::sleep(Duration::from_millis(50));
+            dirty.shutdown();
+
+            let (first, second) = consumer.join().unwrap();
+            assert_eq!(first, Some(vec![PathBuf::from("/repo/x")]));
+            assert_eq!(second, None, "shutdown with empty queue returns None");
+        }
+
+        /// The `.git/index` spin signal: high refresh density combined with a
+        /// non-draining coalescing queue trips the flag and records a warning.
+        /// This is the signal the old detector missed — `.git/index` changes touch
+        /// paths outside `.normalize/`, so the overlap-based detector never fired.
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn native_refresh_density_with_queue_pressure_trips_spin() {
+            let dir = tempfile::tempdir().unwrap();
+            let root = dir.path();
+            let server = server_with_root(root).await;
+
+            // Simulate a non-draining queue: mark this root dirty so pending_len > 0.
+            server.native_dirty.mark(root.to_path_buf());
+
+            let now = Instant::now();
+            for _ in 0..(SPIN_DENSITY_THRESHOLD - 1) {
+                assert!(!server.record_native_refresh_and_detect_spin(root, now));
+            }
+            assert!(flagged_until(&server, root).is_none());
+            // The threshold-th refresh, with the queue still non-empty, trips it.
+            assert!(server.record_native_refresh_and_detect_spin(root, now));
+            assert!(flagged_until(&server, root).is_some());
+
+            let warnings = server.spin_warnings.lock().unwrap();
+            assert_eq!(warnings.len(), 1);
+            assert!(
+                warnings[0]
+                    .overlapping_paths
+                    .iter()
+                    .any(|p| p.contains(".git/index"))
+            );
+        }
+
+        /// High native-refresh density with a *draining* queue (pending == 0) does
+        /// not trip — a busy-but-healthy repo whose consumer keeps up is not a spin.
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn native_refresh_density_without_queue_pressure_does_not_trip() {
+            let dir = tempfile::tempdir().unwrap();
+            let root = dir.path();
+            let server = server_with_root(root).await;
+            // Queue is empty (pending_len == 0) — the consumer kept up.
+            let now = Instant::now();
+            for _ in 0..(SPIN_DENSITY_THRESHOLD * 4) {
+                assert!(!server.record_native_refresh_and_detect_spin(root, now));
+            }
+            assert!(flagged_until(&server, root).is_none());
+            assert!(server.spin_warnings.lock().unwrap().is_empty());
         }
 
         /// The daemon log path follows the same dir convention as the socket and

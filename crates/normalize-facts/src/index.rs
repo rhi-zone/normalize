@@ -733,6 +733,34 @@ impl FileIndex {
         )
         .await?;
 
+        // Self-heal the diagnostics tables if a prior daemon left them with a
+        // stale column shape (e.g. an interrupted schema migration, or a table
+        // created under an older in-version layout before `issues_blob` existed).
+        // The `version != SCHEMA_VERSION` block above only drops these on a
+        // version *bump*; if the shape drifted without a bump, `CREATE TABLE IF
+        // NOT EXISTS` is a no-op and every write fails with
+        // "table daemon_diagnostics has no column named issues_blob". Checking
+        // the actual columns and dropping on mismatch closes that gap.
+        for table in ["daemon_diagnostics", "daemon_diagnostics_per_file"] {
+            let mut cols = conn
+                .query(&format!("PRAGMA table_info({table})"), ())
+                .await?;
+            let mut has_issues_blob = false;
+            let mut table_exists = false;
+            while let Some(row) = cols.next().await? {
+                table_exists = true;
+                let name: String = row.get(1).unwrap_or_default();
+                if name == "issues_blob" {
+                    has_issues_blob = true;
+                }
+            }
+            if table_exists && !has_issues_blob {
+                conn.execute(&format!("DROP TABLE IF EXISTS {table}"), ())
+                    .await
+                    .ok();
+            }
+        }
+
         // Daemon diagnostics cache: one row per engine. `config_hash` mismatch on load = cache miss.
         conn.execute(
             "CREATE TABLE IF NOT EXISTS daemon_diagnostics (
@@ -1016,6 +1044,42 @@ impl FileIndex {
         self.incremental_refresh_force().await
     }
 
+    /// Begin a write transaction on the persistent connection, first clearing any
+    /// transaction that a *previous* call may have left open after erroring out.
+    ///
+    /// The connection in `FileIndex` is long-lived and reused across every daemon
+    /// refresh. If a prior `BEGIN ... COMMIT` block returned early on an error
+    /// without rolling back, the transaction stays open and the next bare `BEGIN`
+    /// fails with "cannot start a transaction within a transaction" — wedging the
+    /// daemon into a state where every subsequent refresh cycle fails. Issuing a
+    /// best-effort `ROLLBACK` first guarantees we start from a clean slate even if
+    /// some other code path leaked a transaction. Pair with [`commit_or_rollback`].
+    async fn begin_clean(&self) -> Result<(), libsql::Error> {
+        // ROLLBACK is a no-op (and harmless error) when no transaction is active.
+        let _ = self.conn.execute("ROLLBACK", ()).await;
+        self.conn.execute("BEGIN", ()).await?;
+        Ok(())
+    }
+
+    /// Commit a transaction opened by [`begin_clean`] when `body` succeeded, or
+    /// roll it back when it failed. Always leaves the connection with no open
+    /// transaction so the next [`begin_clean`] is guaranteed to succeed.
+    async fn commit_or_rollback(
+        &self,
+        body: Result<(), libsql::Error>,
+    ) -> Result<(), libsql::Error> {
+        match body {
+            Ok(()) => {
+                self.conn.execute("COMMIT", ()).await?;
+                Ok(())
+            }
+            Err(e) => {
+                let _ = self.conn.execute("ROLLBACK", ()).await;
+                Err(e)
+            }
+        }
+    }
+
     /// Refresh only files that have changed, bypassing the `needs_refresh()`
     /// staleness gate.
     ///
@@ -1033,54 +1097,57 @@ impl FileIndex {
             return Ok(Vec::new());
         }
 
-        self.conn.execute("BEGIN", ()).await?;
+        self.begin_clean().await?;
 
-        // Delete removed files
-        for path in &changed.deleted {
-            self.conn
-                .execute("DELETE FROM files WHERE path = ?1", params![path.clone()])
-                .await?;
-        }
+        let body: Result<(), libsql::Error> = async {
+            // Delete removed files
+            for path in &changed.deleted {
+                self.conn
+                    .execute("DELETE FROM files WHERE path = ?1", params![path.clone()])
+                    .await?;
+            }
 
-        // Update/insert changed files
-        for path in changed.added.iter().chain(changed.modified.iter()) {
-            let full_path = self.root.join(path);
-            let is_dir = full_path.is_dir();
-            let mtime = full_path
-                .metadata()
-                .ok()
-                .and_then(|m| m.modified().ok())
-                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            // Update/insert changed files
+            for path in changed.added.iter().chain(changed.modified.iter()) {
+                let full_path = self.root.join(path);
+                let is_dir = full_path.is_dir();
+                let mtime = full_path
+                    .metadata()
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0);
+                // Count lines for text files (binary files will fail read_to_string and get 0)
+                let lines = if is_dir {
+                    0
+                } else {
+                    std::fs::read_to_string(&full_path)
+                        .map(|s| s.lines().count())
+                        .unwrap_or(0)
+                };
+
+                self.conn.execute(
+                    "INSERT OR REPLACE INTO files (path, is_dir, mtime, lines) VALUES (?1, ?2, ?3, ?4)",
+                    params![path.clone(), is_dir as i64, mtime, lines as i64],
+                ).await?;
+            }
+
+            // Update last indexed time
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
                 .map(|d| d.as_secs() as i64)
                 .unwrap_or(0);
-            // Count lines for text files (binary files will fail read_to_string and get 0)
-            let lines = if is_dir {
-                0
-            } else {
-                std::fs::read_to_string(&full_path)
-                    .map(|s| s.lines().count())
-                    .unwrap_or(0)
-            };
-
-            self.conn.execute(
-                "INSERT OR REPLACE INTO files (path, is_dir, mtime, lines) VALUES (?1, ?2, ?3, ?4)",
-                params![path.clone(), is_dir as i64, mtime, lines as i64],
-            ).await?;
+            self.conn
+                .execute(
+                    "INSERT OR REPLACE INTO meta (key, value) VALUES ('last_indexed', ?1)",
+                    params![now.to_string()],
+                )
+                .await?;
+            Ok(())
         }
-
-        // Update last indexed time
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs() as i64)
-            .unwrap_or(0);
-        self.conn
-            .execute(
-                "INSERT OR REPLACE INTO meta (key, value) VALUES ('last_indexed', ?1)",
-                params![now.to_string()],
-            )
-            .await?;
-
-        self.conn.execute("COMMIT", ()).await?;
+        .await;
+        self.commit_or_rollback(body).await?;
 
         // Collect all changed paths as absolute PathBufs
         let all_changed: Vec<PathBuf> = changed
@@ -1164,10 +1231,7 @@ impl FileIndex {
         });
         let walker = builder.build();
 
-        self.conn.execute("BEGIN", ()).await?;
-
-        // Clear existing files
-        self.conn.execute("DELETE FROM files", ()).await?;
+        self.begin_clean().await?;
 
         let pb = if self.progress && std::io::IsTerminal::is_terminal(&std::io::stderr()) {
             let pb = ProgressBar::new_spinner();
@@ -1182,58 +1246,64 @@ impl FileIndex {
         };
 
         let mut count = 0;
-        for entry in walker.flatten() {
-            let path = entry.path();
-            if let Ok(rel) = path.strip_prefix(&self.root) {
-                let rel_str = rel.to_string_lossy().to_string();
-                if rel_str.is_empty() {
-                    continue;
+        let body: Result<(), libsql::Error> = async {
+            // Clear existing files
+            self.conn.execute("DELETE FROM files", ()).await?;
+
+            for entry in walker.flatten() {
+                let path = entry.path();
+                if let Ok(rel) = path.strip_prefix(&self.root) {
+                    let rel_str = rel.to_string_lossy().to_string();
+                    if rel_str.is_empty() {
+                        continue;
+                    }
+
+                    let is_dir = path.is_dir();
+                    let mtime = path
+                        .metadata()
+                        .ok()
+                        .and_then(|m| m.modified().ok())
+                        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                        .map(|d| d.as_secs() as i64)
+                        .unwrap_or(0);
+                    // Count lines for text files (binary files will fail read_to_string and get 0)
+                    let lines = if is_dir {
+                        0
+                    } else {
+                        std::fs::read_to_string(path)
+                            .map(|s| s.lines().count())
+                            .unwrap_or(0)
+                    };
+
+                    self.conn
+                        .execute(
+                            "INSERT INTO files (path, is_dir, mtime, lines) VALUES (?1, ?2, ?3, ?4)",
+                            params![rel_str, is_dir as i64, mtime, lines as i64],
+                        )
+                        .await?;
+                    count += 1;
+                    pb.set_message(format!("Scanning files... {count}"));
+                    pb.tick();
                 }
-
-                let is_dir = path.is_dir();
-                let mtime = path
-                    .metadata()
-                    .ok()
-                    .and_then(|m| m.modified().ok())
-                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                    .map(|d| d.as_secs() as i64)
-                    .unwrap_or(0);
-                // Count lines for text files (binary files will fail read_to_string and get 0)
-                let lines = if is_dir {
-                    0
-                } else {
-                    std::fs::read_to_string(path)
-                        .map(|s| s.lines().count())
-                        .unwrap_or(0)
-                };
-
-                self.conn
-                    .execute(
-                        "INSERT INTO files (path, is_dir, mtime, lines) VALUES (?1, ?2, ?3, ?4)",
-                        params![rel_str, is_dir as i64, mtime, lines as i64],
-                    )
-                    .await?;
-                count += 1;
-                pb.set_message(format!("Scanning files... {count}"));
-                pb.tick();
             }
+
+            pb.finish_and_clear();
+
+            // Update last indexed time
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            self.conn
+                .execute(
+                    "INSERT OR REPLACE INTO meta (key, value) VALUES ('last_indexed', ?1)",
+                    params![now.to_string()],
+                )
+                .await?;
+            Ok(())
         }
-
-        pb.finish_and_clear();
-
-        // Update last indexed time
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs() as i64)
-            .unwrap_or(0);
-        self.conn
-            .execute(
-                "INSERT OR REPLACE INTO meta (key, value) VALUES ('last_indexed', ?1)",
-                params![now.to_string()],
-            )
-            .await?;
-
-        self.conn.execute("COMMIT", ()).await?;
+        .await;
+        self.commit_or_rollback(body).await?;
 
         Ok(count)
     }
@@ -2977,7 +3047,7 @@ impl FileIndex {
             ProgressBar::hidden()
         };
 
-        self.conn.execute("BEGIN", ()).await?;
+        self.begin_clean().await?;
 
         // Clear existing data
         self.conn.execute("DELETE FROM symbols", ()).await?;
@@ -3531,7 +3601,7 @@ impl FileIndex {
         let changed_files: Vec<String> = changed
             .added
             .into_iter()
-            .chain(changed.modified.into_iter())
+            .chain(changed.modified)
             .filter(|f| is_source_file(f))
             .collect();
 
@@ -3545,11 +3615,20 @@ impl FileIndex {
             return Ok(CallGraphStats::default());
         }
 
-        self.conn.execute("BEGIN", ()).await?;
-        let stats = self
+        self.begin_clean().await?;
+        let stats = match self
             .reindex_files(&deleted_source_files, &changed_files)
-            .await?;
-        self.conn.execute("COMMIT", ()).await?;
+            .await
+        {
+            Ok(stats) => {
+                self.conn.execute("COMMIT", ()).await?;
+                stats
+            }
+            Err(e) => {
+                let _ = self.conn.execute("ROLLBACK", ()).await;
+                return Err(e);
+            }
+        };
 
         // Resolve any newly inserted imports to root-relative file paths.
         self.resolve_all_imports().await.unwrap_or_else(|e| {
@@ -3606,13 +3685,22 @@ impl FileIndex {
             return Ok(CallGraphStats::default());
         }
 
-        self.conn.execute("BEGIN", ()).await?;
-        let stats = if exists {
-            self.reindex_files(&[], &[rel_path.to_string()]).await?
+        self.begin_clean().await?;
+        let reindex_result = if exists {
+            self.reindex_files(&[], &[rel_path.to_string()]).await
         } else {
-            self.reindex_files(&[rel_path.to_string()], &[]).await?
+            self.reindex_files(&[rel_path.to_string()], &[]).await
         };
-        self.conn.execute("COMMIT", ()).await?;
+        let stats = match reindex_result {
+            Ok(stats) => {
+                self.conn.execute("COMMIT", ()).await?;
+                stats
+            }
+            Err(e) => {
+                let _ = self.conn.execute("ROLLBACK", ()).await;
+                return Err(e);
+            }
+        };
 
         self.resolve_all_imports().await.unwrap_or_else(|e| {
             tracing::warn!("normalize-facts: resolve_all_imports error: {}", e);
@@ -3996,7 +4084,7 @@ impl FileIndex {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs() as i64;
-        self.conn.execute("BEGIN", ()).await?;
+        self.begin_clean().await?;
         let result: Result<(), libsql::Error> = async {
             for (path, blob) in upserts {
                 self.conn
@@ -4445,7 +4533,7 @@ fn apply_fanout_cap(
     // For each file, keep only the top `cap` partners.
     let mut allowed: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
     for (file, mut partners) in file_partners {
-        partners.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+        partners.sort_unstable_by_key(|p| std::cmp::Reverse(p.1));
         partners.truncate(cap);
         for (partner, _) in partners {
             // Canonical key: lexicographically smaller goes first.

@@ -6,6 +6,37 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Daemon native-rules refresh no longer builds an unbounded backlog.** The
+  daemon watched each repo's `.git/index` and pushed the root into an unbounded
+  channel on every change; under heavy git churn the producer (~5/s) outran the
+  consumer (~0.9/s), building a backlog (~57k deep in one observed case) that
+  pegged ~2 cores for hours after activity stopped. Because each native refresh
+  re-reads the root's current on-disk state, repeated refreshes of the same root
+  are redundant. The channel is replaced by a per-root coalescing set ("latest
+  wins") so the backlog can never exceed the number of watched roots regardless
+  of churn — coalescing is exact (identical final index), not lossy.
+- **Daemon spin detector now catches `.git/index`-driven runaways.** The
+  existing detector only fired when a refresh's changed-set overlapped the root's
+  own `.normalize/` state dir, so a `.git/index`-driven backlog (paths outside
+  `.normalize/`) never tripped it. A second signal flags a root when native-rules
+  refresh density is high *and* the coalescing queue is not draining, and the
+  dispatch loop now applies per-root spin backoff to both the full-refresh and
+  native-refresh paths.
+- **Daemon diagnostics writes no longer fail with SQLite errors.** Fixed
+  `table daemon_diagnostics has no column named issues_blob` (the diagnostics
+  tables are now self-healed at index open if a stale column shape is detected)
+  and `cannot start a transaction within a transaction` (every `BEGIN…COMMIT`
+  block in the structural index now rolls back on error and clears any leaked
+  transaction before starting a new one, instead of leaving the reused connection
+  wedged after a mid-transaction failure).
+- **`normalize daemon stop` now removes the socket and lock files.** Graceful
+  shutdown previously left `~/.config/normalize/daemon.lock` and the socket on
+  disk; both are now removed before exit. (The OS already released the advisory
+  flock on process exit, and startup tolerates a stale lock file from a crashed
+  daemon — this is a cleanliness fix.)
+
 ### Changed
 
 - **`normalize docs` bodies are now source-native with a `doc_format` tag.**

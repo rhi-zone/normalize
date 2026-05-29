@@ -89,10 +89,10 @@ fn load_walk_config(root: &Path) -> WalkConfig {
         walk: WalkConfig,
     }
     let config_path = root.join(".normalize").join("config.toml");
-    if let Ok(contents) = std::fs::read_to_string(&config_path) {
-        if let Ok(cfg) = toml::from_str::<MinimalConfig>(&contents) {
-            return cfg.walk.with_daemon_baseline();
-        }
+    if let Ok(contents) = std::fs::read_to_string(&config_path)
+        && let Ok(cfg) = toml::from_str::<MinimalConfig>(&contents)
+    {
+        return cfg.walk.with_daemon_baseline();
     }
     // File absent or malformed — bootstrap default already has the baseline.
     WalkConfig {

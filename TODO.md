@@ -169,7 +169,37 @@ second look — none are blocking, none are strictly committed:
 - **Daemon flake `config_edit_triggers_reload_event`** — failed once in
   a workspace test run, passed in isolation and on subsequent runs. The
   agent who chased it called it transient (possibly inotify saturation
-  under parallel test load). Watch for recurrences.
+  under parallel test load). Watch for recurrences. (Reproduced again during
+  the 2026-05-29 native-refresh-coalescing work: fails only when interleaved
+  with the full `-p normalize` test run, passes in isolation and on repeated
+  full `daemon_push` runs. Confirmed test-interaction/timing, not a product
+  bug — multiple test daemons sharing the socket dir + inotify under load.)
+
+- [x] **Daemon native-refresh backlog: unbounded channel → per-root coalescing**
+  (2026-05-29). The daemon watched each repo's `.git/index` and pushed the root
+  into an unbounded `mpsc::channel` on every change; the consumer drained ~0.9/s
+  while heavy git churn enqueued ~5/s, building a ~57k-deep backlog that pegged
+  ~2 cores for hours. Because each native refresh re-reads current disk state, N
+  queued refreshes of the same root are redundant — coalescing to "latest wins"
+  is exact, not lossy. Replaced the channel with a `DirtyRoots` set
+  (`Mutex<(HashSet<PathBuf>, bool)>` + `Condvar`): producer marks a root dirty,
+  consumer blocks then drains all distinct dirty roots and refreshes each once.
+  Backlog is now bounded by the number of watched roots regardless of churn.
+  Also: (a) added a second spin signal `record_native_refresh_and_detect_spin`
+  for the `.git/index` path (the overlap-based detector only fired on
+  `.normalize/`-overlapping changes, so a `.git/index`-driven backlog never
+  tripped it) — flags when refresh density is high AND the coalescing queue is
+  not draining; the dispatch loop now consults spin backoff for *both* the full
+  and native refresh branches. (b) Fixed the SQLite write failures: the
+  `daemon_diagnostics has no column named issues_blob` error is now self-healed
+  at `FileIndex::open` (PRAGMA table_info check → drop+recreate on stale shape),
+  and the `cannot start a transaction within a transaction` error is fixed by
+  rollback-on-error + a defensive ROLLBACK-before-BEGIN (`begin_clean` /
+  `commit_or_rollback`) at every `BEGIN…COMMIT` site in `normalize-facts/index.rs`
+  (previously, an error mid-transaction returned early leaving the txn open on the
+  reused connection, wedging every subsequent refresh). (c) Graceful `daemon stop`
+  now removes the socket + lock files before `process::exit` (flock is released by
+  the OS on exit regardless; startup already tolerates a stale lock file).
 
 - [x] **Daemon spin observability + self-defense** (follow-up to commit
   365f9ee6, which fixed the acute walk-exclude cause). Two features landed:
