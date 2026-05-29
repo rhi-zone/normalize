@@ -300,6 +300,81 @@ impl crate::RefactorCodeGen for Java {
     }
 }
 
+#[cfg(test)]
+mod refactor_codegen_tests {
+    use super::Java;
+    use crate::{CallSiteSpec, ExtractedFnSpec, GenParam, GenReturn, RefactorCodeGen};
+
+    #[test]
+    fn java_fn_basic() {
+        let spec = ExtractedFnSpec {
+            name: "doubleIt".to_string(),
+            params: vec![GenParam {
+                name: "n".to_string(),
+                inferred_type: Some("int".to_string()),
+                mutable: false,
+            }],
+            ret: GenReturn::Single("result".to_string()),
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["int result = n * 2;".to_string()],
+            indent: String::new(),
+        };
+        let out = Java.render_function(&spec);
+        assert_eq!(
+            out,
+            "\nprivate /* result */ doubleIt(int n) {\n    int result = n * 2;\n    return result;\n}\n"
+        );
+    }
+
+    #[test]
+    fn java_fn_void() {
+        let spec = ExtractedFnSpec {
+            name: "log".to_string(),
+            params: vec![],
+            ret: GenReturn::Unit,
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["System.out.println(x);".to_string()],
+            indent: String::new(),
+        };
+        let out = Java.render_function(&spec);
+        assert_eq!(
+            out,
+            "\nprivate void log() {\n    System.out.println(x);\n}\n"
+        );
+    }
+
+    #[test]
+    fn java_call_site_single() {
+        let spec = CallSiteSpec {
+            name: "doubleIt".to_string(),
+            params: vec![GenParam {
+                name: "n".to_string(),
+                inferred_type: Some("int".to_string()),
+                mutable: false,
+            }],
+            ret: GenReturn::Single("result".to_string()),
+            is_async: false,
+            indent: "    ".to_string(),
+        };
+        assert_eq!(
+            Java.render_call_site(&spec),
+            "    var result = doubleIt(n);\n"
+        );
+    }
+
+    #[test]
+    fn java_binding_and_param() {
+        assert_eq!(
+            Java.render_binding("x", "compute()", "  "),
+            "  let x = compute();\n"
+        );
+        assert_eq!(Java.format_param("n", Some("int")), "n: int");
+        assert_eq!(Java.format_param("n", None), "n");
+    }
+}
+
 // =============================================================================
 // Java Module Resolver
 // =============================================================================

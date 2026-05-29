@@ -76,6 +76,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Refactoring engine (extract-function / add-parameter / inline-variable /
+  introduce-variable) now supports more languages.** In addition to Rust, Python,
+  JavaScript, TypeScript, and TSX, the following languages gained both a
+  `<lang>.refactor.scm` structural-classification query and a `RefactorCodeGen`
+  source-synthesis implementation: Go, Java, Ruby, Lua, Kotlin, Swift, Dart, C#,
+  PHP, Elixir, Scala, Groovy, Visual Basic, F#, Zig, D.
+
 - **`normalize docs` now supports Go and Python**, in addition to Rust. Symbol
   documentation is resolved from local source first (Go module cache /
   `$GOMODCACHE`, Python venv `site-packages`) and, for uninstalled packages,

@@ -1013,8 +1013,8 @@ RESOLVED 2026-05-30: Added CommonJS `require()` patterns (simple binding, shorth
 - Stale node-kind found: the TS/JS recipe's `function_item_kinds` listed `"function"`, but the arborium JS/TS grammars use `function_expression` — the `.scm` uses the correct kind.
 
 **Phase B — broadening worklist** (the recipe-migration stage migrates recipes to the new infra; THIS list is the per-language fan-out to give every GP language full refactor support). Each needs `<lang>.refactor.scm` + `RefactorCodeGen` impl. Codegen for a new language is real per-language design work (not mechanical), so each is its own staged effort. Recipe-supported today: rust, python, javascript, typescript, tsx (have both). Go + Java have `RefactorCodeGen` but still need `.refactor.scm` to become recipe targets. GP languages (those with a `module_resolver`) still needing BOTH:
-- [ ] go (needs `.refactor.scm`; codegen done)
-- [ ] java (needs `.refactor.scm`; codegen done)
+- [x] go (`.refactor.scm` + codegen done)
+- [x] java (`.refactor.scm` + codegen done)
 - [ ] ruby
 - [ ] kotlin
 - [ ] scala

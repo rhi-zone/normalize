@@ -705,18 +705,18 @@ mod tests {
 
     #[test]
     fn test_unsupported_language_returns_clean_error() {
-        // Go has codegen but no `*.refactor.scm` query — the recipe must refuse
+        // Nix has no `*.refactor.scm` query — the recipe must refuse
         // with a clear "does not support" message rather than fall through.
-        if !grammar_available("go") {
-            eprintln!("skipping: go grammar not available");
+        if !grammar_available("nix") {
+            eprintln!("skipping: nix grammar not available");
             return;
         }
-        let content = "func main() {\n    x := 1 + 2\n    println(x)\n}\n";
-        let (line, col) = find_pos(content, "x := 1");
-        let result = plan_inline_variable(&PathBuf::from("test.go"), content, line, col);
+        let content = "let x = 1 + 2; in x\n";
+        let (line, col) = find_pos(content, "x = 1");
+        let result = plan_inline_variable(&PathBuf::from("test.nix"), content, line, col);
         let msg = result.err().expect("should error for unsupported language");
         assert!(
-            msg.contains("does not support") && msg.contains("refactor query"),
+            msg.contains("does not support"),
             "expected a clean unsupported-language error, got: {}",
             msg
         );

@@ -289,6 +289,37 @@ mod refactor_codegen_tests {
         assert!(out.contains("func double(n int)"));
         assert!(out.contains("return result"));
     }
+
+    #[test]
+    fn go_fn_multi_return() {
+        let spec = ExtractedFnSpec {
+            name: "pair".to_string(),
+            params: vec![],
+            ret: GenReturn::Tuple(vec!["a".to_string(), "b".to_string()]),
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["a := 1".to_string(), "b := 2".to_string()],
+            indent: String::new(),
+        };
+        let out = Go.render_function(&spec);
+        assert!(out.contains("(a, b /* multi-return */)"));
+        assert!(out.contains("return a, b"));
+    }
+
+    #[test]
+    fn go_call_site_and_binding() {
+        use crate::CallSiteSpec;
+        let spec = CallSiteSpec {
+            name: "pair".to_string(),
+            params: vec![],
+            ret: GenReturn::Tuple(vec!["a".to_string(), "b".to_string()]),
+            is_async: false,
+            indent: "\t".to_string(),
+        };
+        assert_eq!(Go.render_call_site(&spec), "\ta, b := pair()\n");
+        assert_eq!(Go.render_binding("x", "f()", "\t"), "\tlet x = f();\n");
+        assert_eq!(Go.format_param("n", Some("int")), "n: int");
+    }
 }
 
 // =============================================================================

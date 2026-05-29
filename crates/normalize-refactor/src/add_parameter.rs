@@ -801,15 +801,15 @@ mod tests {
 
     #[test]
     fn unsupported_language_returns_clean_error() {
-        // Go has no `*.refactor.scm` query — add-parameter must refuse with a
+        // Nix has no `*.refactor.scm` query — add-parameter must refuse with a
         // clear "does not support" message rather than fall through.
-        if !grammar_available("go") {
-            eprintln!("skipping: go grammar not available");
+        if !grammar_available("nix") {
+            eprintln!("skipping: nix grammar not available");
             return;
         }
         let dir = tempfile::tempdir().unwrap();
-        let file = dir.path().join("test.go");
-        let content = "func myFunc(a int) bool {\n    return true\n}\n";
+        let file = dir.path().join("test.nix");
+        let content = "myFunc = a: a + 1;\n";
         std::fs::write(&file, content).unwrap();
 
         let res = plan_add_param_in_definition(&file, content, "myFunc", "b", Some("string"), None);
