@@ -1016,13 +1016,13 @@ RESOLVED 2026-05-30: Added CommonJS `require()` patterns (simple binding, shorth
 - [x] go (`.refactor.scm` + codegen done)
 - [x] java (`.refactor.scm` + codegen done)
 - [x] ruby
-- [ ] kotlin
+- [x] kotlin
 - [ ] scala
 - [ ] groovy
 - [ ] c-sharp
 - [ ] vb
 - [ ] fsharp
-- [ ] swift
+- [x] swift (extract/inline/introduce; add-parameter N/A — grammar has no single param-list node)
 - [ ] dart
 - [ ] zig
 - [ ] d

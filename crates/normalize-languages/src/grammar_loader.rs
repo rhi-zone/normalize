@@ -1220,6 +1220,8 @@ fn bundled_refactor_query(name: &str) -> Option<&'static str> {
         "java" => Some(include_str!("queries/java.refactor.scm")),
         "ruby" => Some(include_str!("queries/ruby.refactor.scm")),
         "lua" => Some(include_str!("queries/lua.refactor.scm")),
+        "kotlin" => Some(include_str!("queries/kotlin.refactor.scm")),
+        "swift" => Some(include_str!("queries/swift.refactor.scm")),
         _ => None,
     }
 }
@@ -1237,6 +1239,8 @@ const BUNDLED_REFACTOR_LANGS: &[&str] = &[
     "java",
     "ruby",
     "lua",
+    "kotlin",
+    "swift",
 ];
 
 /// Return a bundled test-regions query for a grammar, if available.

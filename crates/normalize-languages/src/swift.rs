@@ -41,6 +41,10 @@ impl Language for Swift {
         Some(self)
     }
 
+    fn as_refactor_codegen(&self) -> Option<&dyn crate::RefactorCodeGen> {
+        Some(self)
+    }
+
     fn signature_suffix(&self) -> &'static str {
         " {}"
     }
@@ -293,6 +297,151 @@ impl Language for Swift {
 }
 
 impl LanguageSymbols for Swift {}
+
+impl crate::RefactorCodeGen for Swift {
+    fn format_param(&self, name: &str, ty: Option<&str>) -> String {
+        match ty {
+            Some(t) => format!("{}: {}", name, t),
+            None => name.to_string(),
+        }
+    }
+
+    fn render_binding(&self, name: &str, expr: &str, indent: &str) -> String {
+        format!("{}let {} = {}\n", indent, name, expr)
+    }
+
+    fn render_function(&self, spec: &crate::ExtractedFnSpec) -> String {
+        use crate::GenReturn;
+        let param_str = spec
+            .params
+            .iter()
+            .map(|p| match &p.inferred_type {
+                Some(ty) => format!("{}: {}", p.name, ty),
+                None => format!("{}: Any", p.name),
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let ret_anno = match &spec.ret {
+            GenReturn::Unit => String::new(),
+            GenReturn::Single(v) => format!(" -> /* {} */", v),
+            GenReturn::Tuple(vs) => format!(" -> ({})", vs.join(", ")),
+            GenReturn::Result(ok, err) => format!(" throws -> /* {} */ /* {} */", ok, err),
+        };
+        let indent = &spec.indent;
+        let return_stmt = match &spec.ret {
+            GenReturn::Unit => String::new(),
+            GenReturn::Single(v) => format!("\n{}    return {}", indent, v),
+            GenReturn::Tuple(vs) => format!("\n{}    return ({})", indent, vs.join(", ")),
+            GenReturn::Result(ok, _) => format!("\n{}    return {}", indent, ok),
+        };
+
+        let body = spec
+            .body_lines
+            .iter()
+            .map(|l| format!("{}    {}", indent, l))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            "\n{}private func {}({}){} {{\n{}{}\n{}}}\n",
+            indent, spec.name, param_str, ret_anno, body, return_stmt, indent
+        )
+    }
+
+    fn render_call_site(&self, spec: &crate::CallSiteSpec) -> String {
+        use crate::GenReturn;
+        let args = spec
+            .params
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let indent = &spec.indent;
+        let name = &spec.name;
+        match &spec.ret {
+            GenReturn::Unit => format!("{}{}({})\n", indent, name, args),
+            GenReturn::Single(v) => format!("{}let {} = {}({})\n", indent, v, name, args),
+            GenReturn::Tuple(vs) => {
+                format!("{}let ({}) = {}({})\n", indent, vs.join(", "), name, args)
+            }
+            GenReturn::Result(ok, _) => {
+                format!("{}let {} = try {}({})\n", indent, ok, name, args)
+            }
+        }
+    }
+
+    fn supports_multi_return(&self) -> bool {
+        // Swift returns tuples natively: `-> (Int, String)`, `let (a, b) = f()`.
+        true
+    }
+
+    fn infer_param_type(&self, content: &str, name: &str) -> Option<String> {
+        // Swift parameters/bindings: `name: Type`.
+        let pattern = format!("{}: ", name);
+        let pos = content.find(&pattern)?;
+        let after = &content[pos + pattern.len()..];
+        let end = after.find([',', ')', '=', '\n']).unwrap_or(after.len());
+        let ty = after[..end].trim().to_string();
+        if ty.is_empty() { None } else { Some(ty) }
+    }
+}
+
+#[cfg(test)]
+mod refactor_codegen_tests {
+    use super::Swift;
+    use crate::{CallSiteSpec, ExtractedFnSpec, GenParam, GenReturn, RefactorCodeGen};
+
+    #[test]
+    fn swift_fn_basic() {
+        let spec = ExtractedFnSpec {
+            name: "double".to_string(),
+            params: vec![GenParam {
+                name: "n".to_string(),
+                inferred_type: Some("Int".to_string()),
+                mutable: false,
+            }],
+            ret: GenReturn::Single("result".to_string()),
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["let result = n * 2".to_string()],
+            indent: String::new(),
+        };
+        assert_eq!(
+            Swift.render_function(&spec),
+            "\nprivate func double(n: Int) -> /* result */ {\n    let result = n * 2\n    return result\n}\n"
+        );
+    }
+
+    #[test]
+    fn swift_fn_tuple_return() {
+        let spec = ExtractedFnSpec {
+            name: "pair".to_string(),
+            params: vec![],
+            ret: GenReturn::Tuple(vec!["a".to_string(), "b".to_string()]),
+            is_async: false,
+            is_generator: false,
+            body_lines: vec!["let a = 1".to_string(), "let b = 2".to_string()],
+            indent: String::new(),
+        };
+        let out = Swift.render_function(&spec);
+        assert!(out.contains("-> (a, b)"), "got: {out}");
+        assert!(out.contains("return (a, b)"), "got: {out}");
+    }
+
+    #[test]
+    fn swift_call_site_and_binding() {
+        let spec = CallSiteSpec {
+            name: "pair".to_string(),
+            params: vec![],
+            ret: GenReturn::Tuple(vec!["a".to_string(), "b".to_string()]),
+            is_async: false,
+            indent: "    ".to_string(),
+        };
+        assert_eq!(Swift.render_call_site(&spec), "    let (a, b) = pair()\n");
+        assert_eq!(Swift.render_binding("x", "f()", "  "), "  let x = f()\n");
+        assert_eq!(Swift.format_param("n", Some("Int")), "n: Int");
+    }
+}
 
 // =============================================================================
 // Swift Module Resolver
