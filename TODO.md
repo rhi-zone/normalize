@@ -1030,7 +1030,7 @@ RESOLVED 2026-05-30: Added CommonJS `require()` patterns (simple binding, shorth
 - [ ] erlang
 - [ ] haskell
 - [ ] ocaml
-- [ ] lua
+- [x] lua
 - [ ] php
 - [ ] perl
 - [ ] clojure

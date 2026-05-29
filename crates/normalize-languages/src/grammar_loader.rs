@@ -1219,6 +1219,7 @@ fn bundled_refactor_query(name: &str) -> Option<&'static str> {
         "go" => Some(include_str!("queries/go.refactor.scm")),
         "java" => Some(include_str!("queries/java.refactor.scm")),
         "ruby" => Some(include_str!("queries/ruby.refactor.scm")),
+        "lua" => Some(include_str!("queries/lua.refactor.scm")),
         _ => None,
     }
 }
@@ -1235,6 +1236,7 @@ const BUNDLED_REFACTOR_LANGS: &[&str] = &[
     "go",
     "java",
     "ruby",
+    "lua",
 ];
 
 /// Return a bundled test-regions query for a grammar, if available.
