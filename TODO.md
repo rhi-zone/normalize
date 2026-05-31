@@ -1761,6 +1761,13 @@ Depends on: `normalize-code-similarity` (instance bucketing), `normalize-cfg`,
 `normalize-scope` (feature source), rule + refactor + edit + ratchet crates
 (compile target + enforcement).
 
+Prerequisite (first work item): infrastructure to enforce AND measure arbitrary
+constraints globally, including non-numeric/categorical ones. Goal is *exponential*
+collapse of the valid-program space (constrain a whole decision-class everywhere =
+`m^N`), not the linear flagging today's diagnostics do. Open question: ratchet holds
+numeric *counts* of non-conformance today (`f64`-only), but categorical/set-valued
+global measures need a new value type on `Metric::measure_all`.
+
 ### `normalize docs` follow-ups (from 2026-05-29 multi-language landing)
 
 - **`DocFormat`-aware doc rendering for Go/Python.** Go/Python doc bodies are currently
