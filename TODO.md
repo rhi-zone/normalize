@@ -1746,6 +1746,21 @@ find_cycles_dfs iterative conversion (was stack depth ever actually a problem?).
 
 ## Deferred
 
+### Inferred opinionation: guess configuration / taste / consensus for free
+
+Design: `docs/design/inferred-opinionation.md`.
+
+Infer style conventions directly from the corpus via a per-decision-class decision
+tree (features = normalize's AST/CFG/scope context; label = form chosen). Leaf
+purity = strictness; residual impurity = genuine free decisions surfaced to the
+decision stream. Learned tree emits directly as `normalize-rules`/`-syntax-rules`
+and is enforced via `normalize-refactor`/`-edit`/`-ratchet`. Scoped to
+style/formatting/control-flow only — unsafe for semantic canonicalization.
+
+Depends on: `normalize-code-similarity` (instance bucketing), `normalize-cfg`,
+`normalize-scope` (feature source), rule + refactor + edit + ratchet crates
+(compile target + enforcement).
+
 ### `normalize docs` follow-ups (from 2026-05-29 multi-language landing)
 
 - **`DocFormat`-aware doc rendering for Go/Python.** Go/Python doc bodies are currently
