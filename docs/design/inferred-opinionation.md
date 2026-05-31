@@ -99,6 +99,72 @@ What "enforce and measure arbitrary constraints globally" requires:
 Until this measure-and-enforce-arbitrary-constraints substrate exists, inferred
 opinionation cannot be deployed; building it is the first work item.
 
+### Expressiveness ceiling: the fact schema, not the language
+
+The measure-and-enforce prerequisite is about *global* infrastructure. There is a
+second, orthogonal ceiling: **how much can a rule express at all?** This matters because
+fact-richness determines what the decision-tree learner can place in internal nodes, and
+what conventions can be stated as rules.
+
+**normalize's declarative rule language is not the bottleneck.** The Ascent/Datalog
+engine (`normalize-facts-rules-interpret`) supports full recursion, stratified negation,
+aggregation (`count`), arithmetic guards, tree-sitter local syntax rules, and a
+native-Rust escape hatch. For most *decidable* conventions, the language can express
+them.
+
+**The actual wall is the fact base.** Rules reason over a near-purely-syntactic schema:
+symbols, visibility, nesting/parent hierarchy, attribute text, implements, cross-file
+resolved imports and calls, and a shallow intra-procedural CFG (def/use/effect sites).
+There are essentially no semantic facts. The `PREAMBLE` in
+`normalize-facts-rules-interpret/src/lib.rs` is the complete enumeration; `type_ref` is
+absent.
+
+**Corollary: "express more design decisions" ≈ "extract more semantic facts."** This
+makes the normalize↔crescent boundary concrete — it *is* the fact-richness frontier:
+
+```
+structural facts (normalize today)
+  → types
+  → dataflow / taint
+  → effects / purity / mutability
+  → full semantics (crescent)
+  → genuinely undecidable tail (notes)
+```
+
+Each tier you add unlocks a class of expressible conventions; you climb until
+undecidability, at which point the work hands off to crescent. These sit *underneath*
+the inference layer: the decision-tree can only learn/enforce conventions over facts that
+exist. The three concrete gaps, ordered by leverage:
+
+**1. Type facts are extracted but never wired to rules — the cheap, highest-ROI gap.**
+`TypeRef` / `TypeRefKind` (field/param/return/extends/generic-bound types) is *already
+extracted* by `find_type_refs()` in `normalize-facts/src/symbols.rs` across ten
+languages, stored in the SQLite `type_refs` table (created/indexed in
+`normalize-facts/src/index.rs`), but the `Relations` struct
+(`normalize-facts-rules-api/src/relations.rs`) has no `type_refs` field and no
+`add_type_ref` builder, and `type_ref` is absent from the `PREAMBLE` relation
+declarations in `normalize-facts-rules-interpret/src/lib.rs` — so rules are completely
+blind to types despite the data existing. Wiring `type_ref` into `Relations` / `PREAMBLE`
+and populating it in `normalize-rules/src/runner.rs` is a wiring change, not new
+analysis. It immediately unlocks type-visibility conventions ("public API may only expose
+types from module X") and dependency-surface rules. Flag as highest-ROI.
+
+**2. No dataflow / taint / purity / effect / mutability facts.** Blocks the entire "data
+X must not reach Y" (security/taint), "every `Result` is handled," "this function stays
+pure / this field stays immutable" convention class. The CFG def/use facts enable
+liveness analysis but not value-level taint; the `cfg_effect` relation is a fixed
+syntactic vocab (await, defer, yield, acquire, release, send, receive), not inferred
+purity.
+
+**3. Native rules are a closed compile-time set.** `NATIVE_RULES` in
+`normalize-native-rules/src/lib.rs` is a static array — any convention requiring
+imperative logic or external state cannot be added without forking normalize. Opening
+this to extension is a third axis independent of the first two.
+
+Taken together: the prerequisite for inferred opinionation is not only "global
+enforce/measure infra" — it is also **fact-extraction depth**. Both tracks must advance
+in parallel; neither is sufficient alone.
+
 ---
 
 ## Configuration by Consensus
