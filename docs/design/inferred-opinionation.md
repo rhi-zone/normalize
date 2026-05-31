@@ -434,4 +434,4 @@ but real: counts are covered; categorical global measures are not.
 - Companion essays in the rhi docs repo (the broader Shannon → decision-stream →
   crescent arc this design sits inside):
   `docs/decision-stream.md` @1d1ad10,
-  `docs/deterministic-simulation-testing.md` @90a6350.
+  `docs/deterministic-simulation-testing.md` @1d1ad10.
