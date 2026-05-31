@@ -84,20 +84,74 @@ codebase.** This is the precondition, and it is currently only partially present
 must be a first-class build-out, not an afterthought, or the rest of the pipeline has
 nothing to stand on.
 
-What "enforce and measure arbitrary constraints globally" requires:
+Two output-side prerequisites rank above fact-extraction in priority for the collapse
+goal. The reason: even where a convention *is* already expressible, normalize today can
+neither conform it nor report it well. The output side is the more urgent bottleneck.
+
+### Output prerequisite 1: Conform (autofix) — the load-bearing gap
+
+"Collapse the valid-program space" is a *conform* operation: rewrite non-canonical
+instances to their canonical form. But normalize today is **detect-only**:
+
+- Autofix is syntax-engine-only, and of the **94 shipped builtin syntax rules** (22
+  `.dl` Datalog rules + 26 native Rust descriptors + the tree-sitter syntax set),
+  exactly **~1 ships a `fix`**. The rest are diagnose-only.
+- The `diagnostic(severity, rule_id, file, line, message)` Datalog output relation has
+  **no fix column**. Facts rules structurally cannot autofix — the output schema has no
+  place for rewrite instructions.
+- `normalize-refactor` and `normalize-edit` exist as a capable rewrite engine but are
+  **not plumbed as rule fixers**. They are separate commands, not consequences of a
+  diagnosed rule firing.
+
+The result: every cross-file convention, and every consensus-learned canonical form the
+pipeline will eventually produce, lands as a diagnostic the human must act on manually.
+"Collapse the valid-program space" silently assumes autofix is solved; it is not.
+
+**Closing the gap:** add a fix/suggestion channel to the Datalog readout and plumb
+`normalize-refactor` as a rule autofixer — medium cost, foundational. Without it the
+collapse goal produces a to-do list, not a canonical codebase.
+
+### Output prerequisite 2: Detect with smooth UX — co-equal, not consolation
+
+Not everything should be auto-conformed. The essential decisions — the non-confluence
+residual, the decision-tree leaf impurity the learner cannot resolve — must be
+**surfaced for humans, not silently fixed**. And the convention-inference engine's
+value depends entirely on presenting what it found *digestibly*:
+
+- The **inferred conventions** themselves (which canonical form won, at what
+  confidence).
+- The **per-decision-class consensus distribution** (how sharp or flat the vote was,
+  how many legitimate modes exist).
+- The **deviation map**: where does the live codebase depart from the inferred norm,
+  and how significantly?
+- The **genuine decisions** the engine cannot resolve — the residual impurity that
+  belongs in the decision stream, not swallowed silently.
+
+Today's output is flat per-line `diagnostic(severity, rule_id, file, line, message)`
+records — a format designed for single-rule violations, not for conveying a learned
+distribution over a decision class. There is no presentation layer that says "this
+decision-class is 91% unimodal; 7 deviations found; 2 sites are genuinely ambiguous."
+A reporting / presentation layer for inference output — legible summaries of learned
+conventions + deviation map + surfaced decisions — is a first-class prerequisite
+*alongside* autofix, not an afterthought to be added later.
+
+### Infrastructure prerequisites (global view and measurement)
+
+With the output-side prerequisites framed, the infrastructure requirements are:
 
 1. **A global view.** Conventions are corpus-level facts ("the consensus form for
    this construct, across the whole tree"), not file-local. Measuring and enforcing
    them needs whole-codebase indexing of instances per decision-class.
 2. **Enforcement (constructive).** Conform every instance to its canonical form via
-   the rewrite/refactor/edit engine — the representational collapse above.
+   the rewrite/refactor/edit engine — the representational collapse above. (This is
+   the autofix gap in concrete form.)
 3. **Measurement (a held quantity).** A way to *measure* conformance globally and
    hold the line so it cannot regress. **This is where the gap bites:** see the
    ratchet open question below — today's measurement substrate is numeric-scalar
    only, which covers *counts* but not genuinely categorical/set-valued measures.
 
-Until this measure-and-enforce-arbitrary-constraints substrate exists, inferred
-opinionation cannot be deployed; building it is the first work item.
+Until the output-side prerequisites and this measure-and-enforce-arbitrary-constraints
+substrate exist, inferred opinionation cannot be deployed; they are the first work items.
 
 ### Expressiveness ceiling: the fact schema, not the language
 
