@@ -149,13 +149,25 @@ async fn main() -> std::process::ExitCode {
             .init();
     }
 
-    let argv: Vec<std::ffi::OsString> = std::env::args_os().collect();
+    let mut argv: Vec<std::ffi::OsString> = std::env::args_os().collect();
 
-    let argv0 = argv
+    // Normalize argv[0] to its file stem so clap usage strings always show
+    // "normalize" regardless of the on-disk binary name (e.g. normalize.elf
+    // when invoked via the musl-loader wrapper in the release install).
+    let stem0: String = argv
         .first()
-        .and_then(|p| std::path::Path::new(p).file_stem())
-        .and_then(|n| n.to_str())
-        .unwrap_or("");
+        .map(|p| {
+            std::path::Path::new(p)
+                .file_stem()
+                .and_then(|n| n.to_str())
+                .unwrap_or("normalize")
+                .to_owned()
+        })
+        .unwrap_or_else(|| "normalize".to_owned());
+    if let Some(first) = argv.first_mut() {
+        *first = stem0.as_str().into();
+    }
+    let argv0: &str = &stem0;
 
     // argv[0] dispatch: symlink `jq -> normalize` runs jq directly.
     #[cfg(feature = "jq-cli")]

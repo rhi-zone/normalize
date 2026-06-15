@@ -8,6 +8,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Usage strings no longer show `normalize.elf` in the installed release binary.**
+  `main.rs` now rewrites `argv[0]` to its `file_stem()` before passing to clap, so
+  usage lines always print `normalize` regardless of the on-disk binary name (which is
+  `normalize.elf` in the musl-loader release layout).
 - **CommonJS `require()` imports and re-exports now extracted via `.scm` queries
   for JavaScript, TypeScript, and TSX.** Previously JS/TS/TSX bypassed the
   language-agnostic `.scm` path via a hand-rolled AST walker; the walker handled
