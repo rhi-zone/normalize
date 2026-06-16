@@ -117,7 +117,7 @@ pub struct CallComplexityReport {
     pub unresolved_callees_pct: f64,
     /// Highest amplification ratio — thin dispatchers into complex code.
     pub top_amplified: Vec<FunctionCallComplexity>,
-    /// Highest absolute reachable CC — deep complexity sinks.
+    /// Highest absolute reachable complexity — deep complexity sinks.
     pub top_reachable: Vec<FunctionCallComplexity>,
     pub modules: Vec<ModuleCallComplexity>,
 }
@@ -146,7 +146,7 @@ impl OutputFormatter for CallComplexityReport {
             let entries: Vec<ReachableEntry<'_>> =
                 self.top_reachable.iter().map(ReachableEntry).collect();
             out.push(format_ranked_table(
-                "## Highest Reachable CC (deepest complexity sinks)",
+                "## Highest Reachable Complexity (deepest complexity sinks)",
                 &entries,
                 None,
             ));
@@ -196,7 +196,7 @@ impl OutputFormatter for CallComplexityReport {
             let entries: Vec<ReachableEntry<'_>> =
                 self.top_reachable.iter().map(ReachableEntry).collect();
             out.push(crate::output::pretty_ranked_table(
-                "## Highest Reachable CC (deepest complexity sinks)",
+                "## Highest Reachable Complexity (deepest complexity sinks)",
                 &entries,
                 None,
                 |_| None,
