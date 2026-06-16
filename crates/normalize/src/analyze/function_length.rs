@@ -1,8 +1,9 @@
 //! Function length analysis.
 //!
 //! Identifies long functions that may be candidates for refactoring.
-use crate::output::OutputFormatter;
+use crate::output::{OutputFormatter, tier_color};
 use crate::parsers;
+use normalize_analyze::ranked::{Column, RankEntry, RiskTier, format_ranked_table};
 use normalize_languages::{Language, support_for_path};
 use serde::Serialize;
 use std::path::Path;
@@ -40,6 +41,16 @@ impl LengthCategory {
             LengthCategory::TooLong => "Too Long",
         }
     }
+
+    /// Map onto the shared [`RiskTier`] used by the `Risk` table column.
+    pub fn tier(&self) -> RiskTier {
+        match self {
+            LengthCategory::Short => RiskTier::Low,
+            LengthCategory::Medium => RiskTier::Moderate,
+            LengthCategory::Long => RiskTier::High,
+            LengthCategory::TooLong => RiskTier::Critical,
+        }
+    }
 }
 
 /// Function length data.
@@ -59,6 +70,34 @@ pub struct FunctionLength {
 impl normalize_analyze::Entity for FunctionLength {
     fn label(&self) -> &str {
         &self.name
+    }
+}
+
+impl RankEntry for FunctionLength {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("Lines"),
+            Column::left("Risk"),
+            Column::left("Function"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        let lines_str = match self.delta {
+            Some(d) if d > 0 => format!("{} (+{d})", self.lines),
+            Some(d) if d < 0 => format!("{} ({d})", self.lines),
+            Some(_) => format!("{} (±0)", self.lines),
+            None => self.lines.to_string(),
+        };
+        let display_name = match &self.file_path {
+            Some(fp) => format!("{}:{}", fp, self.short_name()),
+            None => self.short_name(),
+        };
+        vec![
+            lines_str,
+            self.category().as_title().to_string(),
+            display_name,
+        ]
     }
 }
 
@@ -126,269 +165,57 @@ impl LengthReport {
     }
 }
 
+impl LengthReport {
+    /// House-style title with summary stats inline (no preamble block).
+    fn title(&self) -> String {
+        let (total, avg, max, too_long, long) = match &self.full_stats {
+            Some(s) => (
+                s.total_count,
+                s.total_avg,
+                s.total_max,
+                s.critical_count,
+                s.high_count,
+            ),
+            None => (
+                self.functions.len(),
+                self.avg_length(),
+                self.max_length(),
+                self.too_long_count(),
+                self.long_count(),
+            ),
+        };
+        let prefix = match &self.diff_ref {
+            Some(r) => format!("# Function Length Diff vs {r}"),
+            None => "# Function Length".to_string(),
+        };
+        format!(
+            "{prefix} — {total} functions, avg {avg:.1}, max {max}, {too_long} too long, {long} long"
+        )
+    }
+
+    fn empty_hint(&self) -> Option<&'static str> {
+        if self.functions.is_empty() && self.full_stats.is_none() {
+            Some(
+                "no supported source files found — pass a file path or a directory containing code",
+            )
+        } else {
+            None
+        }
+    }
+}
+
 impl OutputFormatter for LengthReport {
     fn format_text(&self) -> String {
-        let mut lines = Vec::new();
-        let is_diff = self.diff_ref.is_some();
-        if let Some(ref r) = self.diff_ref {
-            lines.push(format!("# Function Length Diff vs {r}"));
-        } else {
-            lines.push("# Function Length Analysis".to_string());
-        }
-        lines.push(String::new());
-
-        if let Some(ref stats) = self.full_stats {
-            let shown = self.functions.len();
-            if stats.total_count > shown {
-                lines.push(format!(
-                    "Functions: {} (showing {})",
-                    stats.total_count, shown
-                ));
-            } else {
-                lines.push(format!("Functions: {}", stats.total_count));
-            }
-            lines.push(format!("Average: {:.1} lines", stats.total_avg));
-            lines.push(format!("Maximum: {} lines", stats.total_max));
-
-            if stats.critical_count > 0 {
-                lines.push(format!("Too Long (>100): {}", stats.critical_count));
-            }
-            if stats.high_count > 0 || stats.critical_count == 0 {
-                lines.push(format!("Long (51-100): {}", stats.high_count));
-            }
-        } else {
-            lines.push(format!("Functions: {}", self.functions.len()));
-            lines.push(format!("Average: {:.1} lines", self.avg_length()));
-            lines.push(format!("Maximum: {} lines", self.max_length()));
-
-            let too_long = self.too_long_count();
-            let long = self.long_count();
-            if too_long > 0 {
-                lines.push(format!("Too Long (>100): {}", too_long));
-            }
-            if long > 0 || too_long == 0 {
-                lines.push(format!("Long (51-100): {}", long));
-            }
-        }
-
-        if !self.functions.is_empty() {
-            lines.push(String::new());
-            if is_diff {
-                lines.push("## Most Changed Functions".to_string());
-                for func in &self.functions {
-                    let display_name = if let Some(ref fp) = func.file_path {
-                        format!("{}:{}", fp, func.short_name())
-                    } else {
-                        func.short_name()
-                    };
-                    let delta_str = match func.delta {
-                        Some(d) if d > 0 => format!(" (+{d})"),
-                        Some(d) if d < 0 => format!(" ({d})"),
-                        Some(_) => " (±0)".to_string(),
-                        None => " (new)".to_string(),
-                    };
-                    lines.push(format!("{}{} {}", func.lines, delta_str, display_name));
-                }
-            } else {
-                lines.push("## Longest Functions".to_string());
-
-                let mut current_cat: Option<LengthCategory> = None;
-                for func in &self.functions {
-                    let cat = func.category();
-                    if Some(cat) != current_cat {
-                        lines.push(format!("### {}", cat.as_title()));
-                        current_cat = Some(cat);
-                    }
-                    let display_name = if let Some(ref fp) = func.file_path {
-                        format!("{}:{}", fp, func.short_name())
-                    } else {
-                        func.short_name()
-                    };
-                    lines.push(format!("{} {}", func.lines, display_name));
-                }
-            }
-        }
-
-        lines.join("\n")
+        format_ranked_table(&self.title(), &self.functions, self.empty_hint())
     }
 
     fn format_pretty(&self) -> String {
-        use nu_ansi_term::{Color, Style};
-
-        let mut lines = Vec::new();
-        let is_diff = self.diff_ref.is_some();
-        if let Some(ref r) = self.diff_ref {
-            lines.push(
-                Style::new()
-                    .bold()
-                    .paint(format!("Function Length Diff vs {r}"))
-                    .to_string(),
-            );
-        } else {
-            lines.push(
-                Style::new()
-                    .bold()
-                    .paint("Function Length Analysis")
-                    .to_string(),
-            );
-        }
-        lines.push(String::new());
-
-        if let Some(ref stats) = self.full_stats {
-            let shown = self.functions.len();
-            if stats.total_count > shown {
-                lines.push(format!(
-                    "{}: {} (showing {})",
-                    Style::new().bold().paint("Functions"),
-                    stats.total_count,
-                    shown
-                ));
-            } else {
-                lines.push(format!(
-                    "{}: {}",
-                    Style::new().bold().paint("Functions"),
-                    stats.total_count
-                ));
-            }
-            lines.push(format!(
-                "{}: {:.1} lines",
-                Style::new().bold().paint("Average"),
-                stats.total_avg
-            ));
-            lines.push(format!(
-                "{}: {} lines",
-                Style::new().bold().paint("Maximum"),
-                stats.total_max
-            ));
-
-            if stats.critical_count > 0 {
-                lines.push(format!(
-                    "{}: {}",
-                    Color::Red.bold().paint("Too Long (>100)"),
-                    stats.critical_count
-                ));
-            }
-            if stats.high_count > 0 || stats.critical_count == 0 {
-                lines.push(format!(
-                    "{}: {}",
-                    Color::Yellow.bold().paint("Long (51-100)"),
-                    stats.high_count
-                ));
-            }
-        } else {
-            lines.push(format!(
-                "{}: {}",
-                Style::new().bold().paint("Functions"),
-                self.functions.len()
-            ));
-            lines.push(format!(
-                "{}: {:.1} lines",
-                Style::new().bold().paint("Average"),
-                self.avg_length()
-            ));
-            lines.push(format!(
-                "{}: {} lines",
-                Style::new().bold().paint("Maximum"),
-                self.max_length()
-            ));
-
-            let too_long = self.too_long_count();
-            let long = self.long_count();
-            if too_long > 0 {
-                lines.push(format!(
-                    "{}: {}",
-                    Color::Red.bold().paint("Too Long (>100)"),
-                    too_long
-                ));
-            }
-            if long > 0 || too_long == 0 {
-                lines.push(format!(
-                    "{}: {}",
-                    Color::Yellow.bold().paint("Long (51-100)"),
-                    long
-                ));
-            }
-        }
-
-        if !self.functions.is_empty() {
-            lines.push(String::new());
-            if is_diff {
-                lines.push(
-                    Style::new()
-                        .bold()
-                        .paint("Most Changed Functions")
-                        .to_string(),
-                );
-                for func in &self.functions {
-                    let display_name = if let Some(ref fp) = func.file_path {
-                        format!("{}:{}", fp, func.short_name())
-                    } else {
-                        func.short_name()
-                    };
-                    let (delta_color, _) = match func.delta {
-                        Some(d) if d > 0 => (
-                            Color::Red.paint(format!(" (+{d})")).to_string(),
-                            format!(" (+{d})"),
-                        ),
-                        Some(d) if d < 0 => (
-                            Color::Green.paint(format!(" ({d})")).to_string(),
-                            format!(" ({d})"),
-                        ),
-                        Some(_) => (" (±0)".to_string(), " (±0)".to_string()),
-                        None => (
-                            Color::Yellow.paint(" (new)").to_string(),
-                            " (new)".to_string(),
-                        ),
-                    };
-                    let lines_str = match func.category() {
-                        LengthCategory::TooLong => {
-                            Color::Red.bold().paint(func.lines.to_string()).to_string()
-                        }
-                        LengthCategory::Long => Color::Yellow
-                            .bold()
-                            .paint(func.lines.to_string())
-                            .to_string(),
-                        _ => func.lines.to_string(),
-                    };
-                    lines.push(format!("{}{} {}", lines_str, delta_color, display_name));
-                }
-            } else {
-                lines.push(Style::new().bold().paint("Longest Functions").to_string());
-
-                let mut current_cat: Option<LengthCategory> = None;
-                for func in &self.functions {
-                    let cat = func.category();
-                    if Some(cat) != current_cat {
-                        let cat_color = match cat {
-                            LengthCategory::TooLong => Color::Red,
-                            LengthCategory::Long => Color::Yellow,
-                            LengthCategory::Medium => Color::Blue,
-                            LengthCategory::Short => Color::Green,
-                        };
-                        lines.push(cat_color.bold().paint(cat.as_title()).to_string());
-                        current_cat = Some(cat);
-                    }
-                    let display_name = if let Some(ref fp) = func.file_path {
-                        format!("{}:{}", fp, func.short_name())
-                    } else {
-                        func.short_name()
-                    };
-                    let lines_str = match func.category() {
-                        LengthCategory::TooLong => {
-                            Color::Red.bold().paint(func.lines.to_string()).to_string()
-                        }
-                        LengthCategory::Long => Color::Yellow
-                            .bold()
-                            .paint(func.lines.to_string())
-                            .to_string(),
-                        _ => func.lines.to_string(),
-                    };
-                    lines.push(format!("{} {}", lines_str, display_name));
-                }
-            }
-        }
-
-        lines.join("\n")
+        crate::output::pretty_ranked_table(
+            &self.title(),
+            &self.functions,
+            self.empty_hint(),
+            |func| Some(tier_color(func.category().tier())),
+        )
     }
 }
 

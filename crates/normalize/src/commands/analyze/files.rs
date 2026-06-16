@@ -11,6 +11,22 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 
+/// Entry for the By Language breakdown table.
+struct ByLanguage<'a> {
+    language: &'a str,
+    lines: usize,
+}
+
+impl RankEntry for ByLanguage<'_> {
+    fn columns() -> Vec<Column> {
+        vec![Column::left("Language"), Column::right("Lines")]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![self.language.to_string(), self.lines.to_string()]
+    }
+}
+
 /// File length info
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct FileLength {
@@ -62,24 +78,58 @@ pub struct FileLengthReport {
     pub diff_ref: Option<String>,
 }
 
+impl FileLengthReport {
+    fn main_title(&self) -> String {
+        let prefix = match &self.diff_ref {
+            Some(r) => format!("# Longest Files Diff vs {r}"),
+            None => "# Longest Files".to_string(),
+        };
+        format!("{prefix} — {} lines across all files", self.total_lines)
+    }
+}
+
 impl OutputFormatter for FileLengthReport {
     fn format_text(&self) -> String {
-        let mut out = format_ranked_table(
-            &format!(
-                "# Longest Files — {} lines across all files",
-                self.total_lines
-            ),
-            &self.files,
-            None,
-        );
+        let mut out = format_ranked_table(&self.main_title(), &self.files, None);
 
         if !self.by_language.is_empty() {
-            out.push_str("\n\n## By Language\n");
-            let mut langs: Vec<_> = self.by_language.iter().collect();
-            langs.sort_by(|a, b| b.1.cmp(a.1));
-            for (lang, count) in langs {
-                out.push_str(&format!("{:>6} lines  {}\n", count, lang));
-            }
+            let mut langs: Vec<ByLanguage<'_>> = self
+                .by_language
+                .iter()
+                .map(|(lang, &lines)| ByLanguage {
+                    language: lang.as_str(),
+                    lines,
+                })
+                .collect();
+            langs.sort_by_key(|b| std::cmp::Reverse(b.lines));
+            out.push_str("\n\n");
+            out.push_str(&format_ranked_table("## By Language", &langs, None));
+        }
+
+        out
+    }
+
+    fn format_pretty(&self) -> String {
+        let mut out =
+            crate::output::pretty_ranked_table(&self.main_title(), &self.files, None, |_e| None);
+
+        if !self.by_language.is_empty() {
+            let mut langs: Vec<ByLanguage<'_>> = self
+                .by_language
+                .iter()
+                .map(|(lang, &lines)| ByLanguage {
+                    language: lang.as_str(),
+                    lines,
+                })
+                .collect();
+            langs.sort_by_key(|b| std::cmp::Reverse(b.lines));
+            out.push_str("\n\n");
+            out.push_str(&crate::output::pretty_ranked_table(
+                "## By Language",
+                &langs,
+                None,
+                |_e| None,
+            ));
         }
 
         out

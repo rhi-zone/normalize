@@ -30,8 +30,8 @@ impl RankEntry for ImportEntry {
     fn columns() -> Vec<Column> {
         vec![
             Column::left("Module"),
-            Column::right("Fan-in"),
-            Column::left("Imported names"),
+            Column::right("Fan-In"),
+            Column::left("Imported Names"),
         ]
     }
 

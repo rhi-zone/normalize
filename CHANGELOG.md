@@ -20,6 +20,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     Column headers are now spelled out (`Bus Factor` not `BF`, `Authors` not `Auth`,
     `Shared Commits` not `Shared`, `Confidence` not `Conf%`), and the Top Author
     column is no longer mid-string truncated.
+- **`normalize rank` house-style migration — wave 2:**
+  - `rank length` now renders an auto-width table with `Lines`, `Risk`, and `Function`
+    columns (dropping `### Too Long`/`### Long`/`### Medium` subsections and the
+    `N lines` unit suffix inside values). The `Risk` column uses shared `RiskTier`
+    vocabulary (Low/Moderate/High/Critical). Summary stats are inline in the `#` title
+    (`# Function Length — 56 functions, avg 13.5, max 172, 2 too long, 1 long`).
+  - `rank test-gaps` now renders an auto-width table with a `Risk` column and spelled-out
+    headers (`Risk Score`, `Risk`, `Function`, `Location`, `Complexity`, `Callers`, `Lines`).
+    The hand-rolled fixed-width columns and 24/36-char path truncation are gone. Title
+    follows the `# Name — stat, stat` spec.
+  - `rank test-ratio` title fixed to the standard `# Test/Impl Ratio — stat, stat` shape
+    (was `# Test/Impl Ratio: path — …`). Diff mode now uses `# Test/Impl Ratio Diff vs
+    <ref>` prefix. A `format_pretty()` implementation was added.
+  - `rank imports` column headers corrected to title-case: `Fan-In` (was `Fan-in`),
+    `Imported Names` (was `Imported names`).
+  - `rank files`'s `## By Language` section is now rendered via `format_ranked_table`
+    (`Language`, `Lines` columns) instead of a hand-rolled `N lines  Lang` format.
+    `format_pretty()` was added.
 
 ### Fixed
 

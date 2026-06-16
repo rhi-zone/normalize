@@ -4,7 +4,8 @@
 //! directly called from test context. Computes a risk score based on
 //! complexity, caller count, and lines of code.
 
-use crate::output::OutputFormatter;
+use crate::output::{OutputFormatter, tier_color};
+use normalize_analyze::ranked::{Column, RankEntry, RiskTier, format_ranked_table};
 use serde::Serialize;
 
 /// A public function analyzed for test coverage gaps.
@@ -52,6 +53,48 @@ impl FunctionTestGap {
         } else {
             self.name.clone()
         }
+    }
+
+    /// Map risk score onto the shared [`RiskTier`] for the `Risk` table column.
+    pub fn risk_tier(&self) -> RiskTier {
+        match self.risk as u64 {
+            0 => RiskTier::Low,
+            1..=9 => RiskTier::Moderate,
+            10..=49 => RiskTier::High,
+            _ => RiskTier::Critical,
+        }
+    }
+}
+
+impl RankEntry for FunctionTestGap {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("Risk Score"),
+            Column::left("Risk"),
+            Column::left("Function"),
+            Column::left("Location"),
+            Column::right("Complexity"),
+            Column::right("Callers"),
+            Column::right("Lines"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        let risk_str = if self.test_caller_count == 0 {
+            format!("{:.1}", self.risk)
+        } else {
+            "-".to_string()
+        };
+        let location = format!("{}:{}", self.file_path, self.start_line);
+        vec![
+            risk_str,
+            self.risk_tier().title().to_string(),
+            self.short_name(),
+            location,
+            self.complexity.to_string(),
+            self.caller_count.to_string(),
+            self.loc.to_string(),
+        ]
     }
 }
 
@@ -130,91 +173,35 @@ pub struct TestGapsReport {
     pub show_all: bool,
 }
 
-impl OutputFormatter for TestGapsReport {
-    fn format_text(&self) -> String {
-        let mut lines = Vec::new();
-
-        lines.push(format!(
-            "Test Gaps: {} of {} public functions have no direct test",
-            self.untested_count, self.total_public
-        ));
-
-        if self.allowed_count > 0 {
-            lines.push(format!("Allowed: {} functions", self.allowed_count));
-        }
-
-        if self.functions.is_empty() {
-            return lines.join("\n");
-        }
-
-        lines.push(String::new());
-
-        if self.show_all {
-            lines.push(format!(
-                " {:>5}  {:>6}  {:<36}  {:<24}  {:>10}  {:>7}  {:>3}",
-                "Tests", "Risk", "Function", "File", "Complexity", "Callers", "LOC"
-            ));
-            lines.push(format!(
-                " {:─>5}  {:─>6}  {:─<36}  {:─<24}  {:─>10}  {:─>7}  {:─>3}",
-                "", "", "", "", "", "", ""
-            ));
-
-            for func in &self.functions {
-                let risk_str = if func.test_caller_count == 0 {
-                    format!("{:.1}", func.risk)
-                } else {
-                    "-".to_string()
-                };
-                let location = format!("{}:{}", func.file_path, func.start_line);
-                lines.push(format!(
-                    " {:>5}  {:>6}  {:<36}  {:<24}  {:>10}  {:>7}  {:>3}",
-                    func.test_caller_count,
-                    risk_str,
-                    truncate_str(&func.short_name(), 36),
-                    truncate_str(&location, 24),
-                    func.complexity,
-                    func.caller_count,
-                    func.loc,
-                ));
-            }
+impl TestGapsReport {
+    fn title(&self) -> String {
+        let suffix = if self.allowed_count > 0 {
+            format!(", {} allowed", self.allowed_count)
         } else {
-            lines.push(format!(
-                " {:>6}  {:<36}  {:<24}  {:>10}  {:>7}  {:>3}",
-                "Risk", "Function", "File", "Complexity", "Callers", "LOC"
-            ));
-            lines.push(format!(
-                " {:─>6}  {:─<36}  {:─<24}  {:─>10}  {:─>7}  {:─>3}",
-                "", "", "", "", "", ""
-            ));
-
-            for func in &self.functions {
-                if func.test_caller_count > 0 {
-                    continue;
-                }
-                let location = format!("{}:{}", func.file_path, func.start_line);
-                lines.push(format!(
-                    " {:>6.1}  {:<36}  {:<24}  {:>10}  {:>7}  {:>3}",
-                    func.risk,
-                    truncate_str(&func.short_name(), 36),
-                    truncate_str(&location, 24),
-                    func.complexity,
-                    func.caller_count,
-                    func.loc,
-                ));
-            }
-        }
-
-        lines.join("\n")
+            String::new()
+        };
+        format!(
+            "# Test Gaps — {} of {} public functions untested{}",
+            self.untested_count, self.total_public, suffix
+        )
     }
 }
 
-/// Truncate a string to max_len, adding "..." if truncated.
-fn truncate_str(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
-        s.to_string()
-    } else if max_len > 3 {
-        format!("{}...", &s[..max_len - 3])
-    } else {
-        s[..max_len].to_string()
+impl OutputFormatter for TestGapsReport {
+    fn format_text(&self) -> String {
+        format_ranked_table(
+            &self.title(),
+            &self.functions,
+            Some("no untested public functions found"),
+        )
+    }
+
+    fn format_pretty(&self) -> String {
+        crate::output::pretty_ranked_table(
+            &self.title(),
+            &self.functions,
+            Some("no untested public functions found"),
+            |func| Some(tier_color(func.risk_tier())),
+        )
     }
 }

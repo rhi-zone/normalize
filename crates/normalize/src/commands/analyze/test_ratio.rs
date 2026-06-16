@@ -84,24 +84,28 @@ pub struct TestRatioReport {
     pub diff_ref: Option<String>,
 }
 
+impl TestRatioReport {
+    fn title(&self) -> String {
+        let prefix = match &self.diff_ref {
+            Some(r) => format!("# Test/Impl Ratio Diff vs {r}"),
+            None => "# Test/Impl Ratio".to_string(),
+        };
+        format!(
+            "{prefix} — {:.1}% ({} impl, {} test)",
+            self.overall_ratio * 100.0,
+            self.total_impl_lines,
+            self.total_test_lines,
+        )
+    }
+}
+
 impl OutputFormatter for TestRatioReport {
     fn format_text(&self) -> String {
-        let diff_suffix = self
-            .diff_ref
-            .as_ref()
-            .map_or(String::new(), |r| format!("  [diff vs {}]", r));
-        format_ranked_table(
-            &format!(
-                "# Test/Impl Ratio: {} — {:.1}% ({} impl, {} test){}",
-                self.root,
-                self.overall_ratio * 100.0,
-                self.total_impl_lines,
-                self.total_test_lines,
-                diff_suffix,
-            ),
-            &self.entries,
-            None,
-        )
+        format_ranked_table(&self.title(), &self.entries, None)
+    }
+
+    fn format_pretty(&self) -> String {
+        crate::output::pretty_ranked_table(&self.title(), &self.entries, None, |_e| None)
     }
 }
 
