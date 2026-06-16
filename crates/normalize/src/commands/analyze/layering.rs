@@ -42,9 +42,9 @@ impl RankEntry for LayeringEntry {
             Column::left("Module"),
             Column::left("Layer"),
             Column::right("Cross"),
-            Column::right("Down"),
-            Column::right("Up"),
-            Column::right("Self"),
+            Column::right("Downward"),
+            Column::right("Upward"),
+            Column::right("Same Layer"),
             Column::right("Compliance"),
         ]
     }
@@ -302,152 +302,28 @@ impl OutputFormatter for LayeringReport {
     }
 
     fn format_pretty(&self) -> String {
-        let mut out = Vec::new();
-
-        out.push(format!(
-            "\x1b[1;36m# Layering\x1b[0m — \x1b[1m{}\x1b[0m files, \x1b[1m{}\x1b[0m layers, avg compliance \x1b[1m{:.0}%\x1b[0m, worst: \x1b[1;31m{}\x1b[0m (\x1b[31m{:.0}%\x1b[0m)",
+        let title = format!(
+            "# Layering — {} files, {} layers, avg compliance {:.0}%, worst: {} ({:.0}%)",
             self.stats.total_files,
             self.stats.total_layers,
             self.stats.avg_compliance * 100.0,
             self.stats.worst_layer,
             self.stats.worst_compliance * 100.0,
-        ));
-        out.push(String::new());
+        );
+        let empty_msg = "No import data found. Run `normalize structure rebuild` first.";
+        let mut out =
+            crate::output::pretty_ranked_table(&title, &self.modules, Some(empty_msg), |_| None);
 
-        if self.modules.is_empty() {
-            out.push("No import data found. Run `normalize structure rebuild` first.".to_string());
-            return out.join("\n");
-        }
-
-        let max_mod_len = self
-            .modules
-            .iter()
-            .map(|e| e.module.len())
-            .max()
-            .unwrap_or(10)
-            .min(50);
-        let max_layer_len = self
-            .modules
-            .iter()
-            .map(|e| e.layer.len())
-            .max()
-            .unwrap_or(5)
-            .min(20);
-
-        out.push(format!(
-            "\x1b[1m{:<mw$}  {:<lw$}  {:>5}  {:>4}  {:>4}  {:>4}  {:>10}\x1b[0m",
-            "Module",
-            "Layer",
-            "Cross",
-            "Down",
-            "Up",
-            "Self",
-            "Compliance",
-            mw = max_mod_len,
-            lw = max_layer_len,
-        ));
-        out.push(format!(
-            "{}--{}-------------------------------",
-            "-".repeat(max_mod_len),
-            "-".repeat(max_layer_len),
-        ));
-
-        for entry in &self.modules {
-            let module = if entry.module.len() > max_mod_len {
-                format!(
-                    "...{}",
-                    &entry.module[entry.module.len() - (max_mod_len - 3)..]
-                )
-            } else {
-                entry.module.clone()
-            };
-            let layer = if entry.layer.len() > max_layer_len {
-                format!(
-                    "...{}",
-                    &entry.layer[entry.layer.len() - (max_layer_len - 3)..]
-                )
-            } else {
-                entry.layer.clone()
-            };
-
-            let compliance_color = if entry.compliance >= 0.8 {
-                "\x1b[32m"
-            } else if entry.compliance >= 0.5 {
-                "\x1b[33m"
-            } else {
-                "\x1b[1;31m"
-            };
-
-            let up_color = if entry.upward_imports > 0 {
-                "\x1b[31m"
-            } else {
-                "\x1b[0m"
-            };
-
-            out.push(format!(
-                "{:<mw$}  {:<lw$}  {:>5}  {:>4}  {}{:>4}\x1b[0m  {:>4}  {}{:>9.0}%\x1b[0m",
-                module,
-                layer,
-                entry.total_imports,
-                entry.downward_imports,
-                up_color,
-                entry.upward_imports,
-                entry.self_imports,
-                compliance_color,
-                entry.compliance * 100.0,
-                mw = max_mod_len,
-                lw = max_layer_len,
+        if !self.layers.is_empty() {
+            out.push_str("\n\n");
+            out.push_str(&crate::output::pretty_ranked_table(
+                "## Layer Summary",
+                &self.layers,
+                None,
+                |_| None,
             ));
         }
 
-        // Layer summary
-        out.push(String::new());
-        out.push("\x1b[1;36m## Layer Summary\x1b[0m".to_string());
-        out.push(String::new());
-
-        let max_lname = self
-            .layers
-            .iter()
-            .map(|l| l.layer.len())
-            .max()
-            .unwrap_or(5)
-            .min(20);
-
-        out.push(format!(
-            "\x1b[1m{:<lw$}  {:>7}  {:>9}  {:>10}  {:>8}\x1b[0m",
-            "Layer",
-            "Modules",
-            "Avg Depth",
-            "Compliance",
-            "Upward",
-            lw = max_lname,
-        ));
-        out.push(format!(
-            "{}----------------------------------------------",
-            "-".repeat(max_lname),
-        ));
-
-        for layer in &self.layers {
-            let compliance_color = if layer.avg_compliance >= 0.8 {
-                "\x1b[32m"
-            } else if layer.avg_compliance >= 0.5 {
-                "\x1b[33m"
-            } else {
-                "\x1b[1;31m"
-            };
-
-            out.push(format!(
-                "{:<lw$}  {:>7}  {:>9.1}  {}{:>9.0}%\x1b[0m  {:>8}",
-                layer.layer,
-                layer.module_count,
-                layer.avg_depth,
-                compliance_color,
-                layer.avg_compliance * 100.0,
-                layer.upward_import_count,
-                lw = max_lname,
-            ));
-        }
-
-        out.join("\n")
+        out
     }
 }

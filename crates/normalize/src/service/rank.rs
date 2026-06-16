@@ -846,8 +846,17 @@ impl RankService {
     /// Rank modules by information density: compression ratio combined with token uniqueness.
     ///
     /// Modules with high density pack more distinct concepts per line. Low-density modules
-    /// may have excessive boilerplate or copy-paste. Returns a `DensityReport` with per-module
-    /// scores and the overall compression ratio and token uniqueness.
+    /// may have excessive boilerplate or copy-paste.
+    ///
+    /// Metrics:
+    /// - **Compression ratio**: `compressed_bytes / original_bytes` (gzip) — lower = more
+    ///   repetitive structure (boilerplate, templated code).
+    /// - **Token uniqueness**: `unique_tokens / total_tokens` — lower = more repeated
+    ///   vocabulary (copy-paste, uniform naming patterns).
+    /// - **Density score**: `(compression_ratio + token_uniqueness) / 2` — combined score;
+    ///   lower = more repetitive overall. Modules are ranked lowest-first.
+    ///
+    /// Returns a `DensityReport` with per-module scores and the worst individual files.
     #[server(group = "modules")]
     #[cli(display_with = "display_density")]
     pub fn density(
@@ -1040,8 +1049,12 @@ impl RankService {
     /// Also known as: public API size, interface bloat, over-exposed modules. Modules with large
     /// surfaces are harder to evolve without breaking callers (high blast radius).
     ///
-    /// The constraint score combines symbol count with type complexity. Returns a `SurfaceReport`
-    /// with per-module rankings.
+    /// The constraint score is `public_symbols × fan_in` — modules with many public symbols that
+    /// are widely imported are the hardest to change safely. A module with 50 public symbols and
+    /// 20 importers scores 1000; a module with 5 public symbols and 2 importers scores 10.
+    ///
+    /// Requires the facts index (`normalize structure rebuild`). Returns a `SurfaceReport`
+    /// with per-module rankings sorted by constraint score (highest first).
     #[server(group = "modules")]
     #[cli(display_with = "display_surface")]
     pub async fn surface(
@@ -1094,9 +1107,14 @@ impl RankService {
     /// Modules deep in the import graph that are also widely imported have the highest ripple
     /// risk — changes to them affect many other modules.
     ///
-    /// Computes the longest import chain reaching each module (depth) and estimates how
-    /// many modules would be affected by a change (ripple). Returns a `DepthMapReport`
-    /// sorted by combined risk score.
+    /// Metrics:
+    /// - **Depth**: longest chain of transitive importers reaching this module (0 = entry point,
+    ///   nothing imports it).
+    /// - **Downstream**: transitive reverse-dependency count (BFS through importers).
+    /// - **Ripple Score**: `fan_out × depth × downstream` — composite blast-radius estimate.
+    ///
+    /// Requires the facts index (`normalize structure rebuild`). Returns a `DepthMapReport`
+    /// sorted by ripple score (highest first).
     #[server(group = "modules")]
     #[cli(display_with = "display_depth_map")]
     pub async fn depth_map(
@@ -1150,8 +1168,17 @@ impl RankService {
     /// circular dependency detection at the layer level. Detects imports that violate
     /// a clean layered architecture (e.g., core importing from UI).
     ///
-    /// Returns a `LayeringReport` with per-module violation counts and the full list
-    /// of problematic import edges.
+    /// Layer is inferred from the first directory component of each module path. Imports are
+    /// classified as:
+    /// - **Downward**: importing a module in a deeper layer (good — correct direction).
+    /// - **Upward**: importing a module in a shallower layer (bad — coupling violation).
+    /// - **Same Layer**: importing a module in the same layer (neutral).
+    ///
+    /// Compliance = `downward / (downward + upward)` for cross-layer imports; 1.0 if there are
+    /// no cross-layer imports. Modules are ranked worst-first (lowest compliance).
+    ///
+    /// Requires the facts index (`normalize structure rebuild`). Returns a `LayeringReport`
+    /// with per-module violation counts and a per-layer summary.
     #[server(group = "modules")]
     #[cli(display_with = "display_layering")]
     pub async fn layering(

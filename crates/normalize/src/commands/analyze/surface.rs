@@ -213,87 +213,17 @@ impl OutputFormatter for SurfaceReport {
     }
 
     fn format_pretty(&self) -> String {
-        let mut out = Vec::new();
-
-        out.push(format!(
-            "\x1b[1;36m# Surface Area\x1b[0m — \x1b[1m{}\x1b[0m files, avg public ratio \x1b[33m{:.0}%\x1b[0m, \x1b[32m{}\x1b[0m fully public, max constraint \x1b[1;33m{}\x1b[0m",
-            self.stats.total_files,
-            self.stats.avg_public_ratio * 100.0,
-            self.stats.fully_public_count,
-            self.stats.max_constraint_score,
-        ));
-        out.push(String::new());
-
-        if self.modules.is_empty() {
-            out.push("No symbol data found. Run `normalize structure rebuild` first.".to_string());
-            return out.join("\n");
-        }
-
-        let max_mod_len = self
-            .modules
-            .iter()
-            .map(|e| e.module.len())
-            .max()
-            .unwrap_or(10)
-            .min(50);
-
-        out.push(format!(
-            "\x1b[1m{:<width$}  {:>5}  {:>6}  {:>7}  {:>6}  {:>6}  {:>10}\x1b[0m",
-            "Module",
-            "Total",
-            "Public",
-            "Private",
-            "Ratio",
-            "Fan-in",
-            "Constraint",
-            width = max_mod_len
-        ));
-        out.push(format!(
-            "{}----------------------------------------------",
-            "-".repeat(max_mod_len),
-        ));
-
-        for entry in &self.modules {
-            let module = if entry.module.len() > max_mod_len {
-                format!(
-                    "...{}",
-                    &entry.module[entry.module.len() - (max_mod_len - 3)..]
-                )
-            } else {
-                entry.module.clone()
-            };
-
-            let ratio_color = if entry.public_ratio >= 0.9 {
-                "\x1b[1;31m"
-            } else if entry.public_ratio >= 0.7 {
-                "\x1b[33m"
-            } else {
-                "\x1b[32m"
-            };
-
-            let constraint_color = if entry.constraint_score > 100 {
-                "\x1b[1;31m"
-            } else if entry.constraint_score > 20 {
-                "\x1b[33m"
-            } else {
-                "\x1b[0m"
-            };
-
-            out.push(format!(
-                "{:<width$}  {:>5}  {:>6}  {:>7}  {}{:>5.0}%\x1b[0m  {:>6}  {}{:>10}\x1b[0m",
-                module,
-                entry.total_symbols,
-                entry.public_symbols,
-                entry.private_symbols,
-                ratio_color,
-                entry.public_ratio * 100.0,
-                entry.fan_in,
-                constraint_color,
-                entry.constraint_score,
-                width = max_mod_len
-            ));
-        }
-
-        out.join("\n")
+        crate::output::pretty_ranked_table(
+            &format!(
+                "# Surface Area — {} files, avg public ratio {:.0}%, {} fully public, max constraint {}",
+                self.stats.total_files,
+                self.stats.avg_public_ratio * 100.0,
+                self.stats.fully_public_count,
+                self.stats.max_constraint_score,
+            ),
+            &self.modules,
+            Some("No symbol data found. Run `normalize structure rebuild` first."),
+            |_| None,
+        )
     }
 }

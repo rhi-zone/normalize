@@ -38,6 +38,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `rank files`'s `## By Language` section is now rendered via `format_ranked_table`
     (`Language`, `Lines` columns) instead of a hand-rolled `N lines  Lang` format.
     `format_pretty()` was added.
+- **`normalize rank` house-style migration — wave 2, batch B:** raw `\x1b[...]` escape
+  sequences replaced with `nu_ansi_term` throughout four commands:
+  - `rank surface` `format_pretty()` replaced with `pretty_ranked_table`.
+  - `rank depth-map` `format_pretty()` replaced with `pretty_ranked_table`.
+  - `rank layering` `format_pretty()` replaced with `pretty_ranked_table`; abbreviated
+    column headers expanded to spelled-out title-case (`Down` → `Downward`,
+    `Up` → `Upward`, `Self` → `Same Layer`).
+  - `rank density` preamble key-value block (`Root:`, `Files analyzed:`,
+    `Compression ratio:`, `Token uniqueness:`) folded into the `#` title as inline
+    stats. Precision inconsistency fixed: both overall stats and table columns now use
+    `.3` decimal places consistently (was `.2` in the preamble, `.3` in the table).
+    `format_pretty()` replaced with `pretty_ranked_table`. Metric explanations moved
+    to `--help`.
 
 ### Fixed
 

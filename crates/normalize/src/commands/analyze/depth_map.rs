@@ -212,85 +212,17 @@ impl OutputFormatter for DepthMapReport {
     }
 
     fn format_pretty(&self) -> String {
-        let mut out = Vec::new();
-
-        out.push(format!(
-            "\x1b[1;36m# Depth Map\x1b[0m — \x1b[1m{}\x1b[0m modules, max depth \x1b[1;33m{}\x1b[0m, avg \x1b[33m{:.1}\x1b[0m, \x1b[32m{}\x1b[0m entry points",
-            self.stats.total_modules,
-            self.stats.max_depth,
-            self.stats.avg_depth,
-            self.stats.modules_at_depth_0,
-        ));
-        out.push(String::new());
-
-        if self.modules.is_empty() {
-            out.push("No import data found. Run `normalize structure rebuild` first.".to_string());
-            return out.join("\n");
-        }
-
-        let max_mod_len = self
-            .modules
-            .iter()
-            .map(|e| e.module.len())
-            .max()
-            .unwrap_or(10)
-            .min(50);
-
-        out.push(format!(
-            "\x1b[1m{:<width$}  {:>5}  {:>6}  {:>7}  {:>10}  {:>12}\x1b[0m",
-            "Module",
-            "Depth",
-            "Fan-in",
-            "Fan-out",
-            "Downstream",
-            "Ripple Score",
-            width = max_mod_len
-        ));
-        out.push(format!(
-            "{}--------------------------------------------------",
-            "-".repeat(max_mod_len),
-        ));
-
-        for entry in &self.modules {
-            let module = if entry.module.len() > max_mod_len {
-                format!(
-                    "...{}",
-                    &entry.module[entry.module.len() - (max_mod_len - 3)..]
-                )
-            } else {
-                entry.module.clone()
-            };
-
-            let depth_color = if entry.depth >= 5 {
-                "\x1b[1;31m"
-            } else if entry.depth >= 3 {
-                "\x1b[33m"
-            } else {
-                "\x1b[32m"
-            };
-
-            let ripple_color = if entry.ripple_score > 100 {
-                "\x1b[1;31m"
-            } else if entry.ripple_score > 20 {
-                "\x1b[33m"
-            } else {
-                "\x1b[0m"
-            };
-
-            out.push(format!(
-                "{:<width$}  {}{:>5}\x1b[0m  {:>6}  {:>7}  {:>10}  {}{:>12}\x1b[0m",
-                module,
-                depth_color,
-                entry.depth,
-                entry.fan_in,
-                entry.fan_out,
-                entry.downstream,
-                ripple_color,
-                entry.ripple_score,
-                width = max_mod_len
-            ));
-        }
-
-        out.join("\n")
+        crate::output::pretty_ranked_table(
+            &format!(
+                "# Depth Map — {} modules, max depth {}, avg {:.1}, {} entry points",
+                self.stats.total_modules,
+                self.stats.max_depth,
+                self.stats.avg_depth,
+                self.stats.modules_at_depth_0,
+            ),
+            &self.modules,
+            Some("No import data found. Run `normalize structure rebuild` first."),
+            |_| None,
+        )
     }
 }

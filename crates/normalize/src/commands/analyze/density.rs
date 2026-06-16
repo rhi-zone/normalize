@@ -135,21 +135,20 @@ pub struct DensityReport {
 
 impl OutputFormatter for DensityReport {
     fn format_text(&self) -> String {
-        let mut out = String::new();
-        let diff_suffix = self
+        let diff_prefix = self
             .diff_ref
             .as_ref()
-            .map_or(String::new(), |r| format!("\nDiff vs:           {}", r));
-        out.push_str(&format!(
-            "# Code Density Analysis\n\nRoot:              {}\nFiles analyzed:    {}\nCompression ratio: {:.2}  (lower = more repetitive)\nToken uniqueness:  {:.2}  (lower = more repetitive){}\n\n",
-            self.root, self.files_analyzed, self.overall_compression_ratio, self.overall_token_uniqueness, diff_suffix
-        ));
+            .map_or(String::new(), |r| format!("Diff vs {} — ", r));
+        let title = format!(
+            "# {}Code Density — {}, {} files, compression {:.3}, uniqueness {:.3}",
+            diff_prefix,
+            self.root,
+            self.files_analyzed,
+            self.overall_compression_ratio,
+            self.overall_token_uniqueness,
+        );
 
-        out.push_str(&format_ranked_table(
-            "## Modules (most repetitive first)",
-            &self.modules,
-            Some("No modules found."),
-        ));
+        let mut out = format_ranked_table(&title, &self.modules, Some("No modules found."));
 
         if !self.worst_files.is_empty() {
             out.push_str("\n\n");
@@ -164,103 +163,37 @@ impl OutputFormatter for DensityReport {
     }
 
     fn format_pretty(&self) -> String {
-        use nu_ansi_term::Color;
-        let mut out = Vec::new();
-        out.push(
-            Color::Cyan
-                .bold()
-                .paint("# Code Density Analysis")
-                .to_string(),
+        let diff_prefix = self
+            .diff_ref
+            .as_ref()
+            .map_or(String::new(), |r| format!("Diff vs {} — ", r));
+        let title = format!(
+            "# {}Code Density — {}, {} files, compression {:.3}, uniqueness {:.3}",
+            diff_prefix,
+            self.root,
+            self.files_analyzed,
+            self.overall_compression_ratio,
+            self.overall_token_uniqueness,
         );
-        out.push(String::new());
-        out.push(format!("Root:              {}", self.root));
-        out.push(format!("Files analyzed:    {}", self.files_analyzed));
-        out.push(format!(
-            "Compression ratio: {:.3}  (lower = more repetitive)",
-            self.overall_compression_ratio
-        ));
-        out.push(format!(
-            "Token uniqueness:  {:.3}  (lower = more repetitive)",
-            self.overall_token_uniqueness
-        ));
-        out.push(String::new());
 
-        if self.modules.is_empty() {
-            out.push("No modules found.".to_string());
-            return out.join("\n");
-        }
-
-        out.push(
-            Color::Yellow
-                .bold()
-                .paint("## Modules (most repetitive first)")
-                .to_string(),
+        let mut out = crate::output::pretty_ranked_table(
+            &title,
+            &self.modules,
+            Some("No modules found."),
+            |_| None,
         );
-        out.push(String::new());
 
-        let w = self
-            .modules
-            .iter()
-            .map(|m| m.module.len())
-            .max()
-            .unwrap_or(20);
-        out.push(format!(
-            "  {:<w$}  {:>6}  {:>8}  {:>8}  {:>8}  {:>6}",
-            Color::White.bold().paint("module"),
-            Color::White.bold().paint("files"),
-            Color::White.bold().paint("compress"),
-            Color::White.bold().paint("unique"),
-            Color::White.bold().paint("density"),
-            Color::White.bold().paint("lines"),
-            w = w
-        ));
-
-        for m in &self.modules {
-            let color = density_color(m.density_score);
-            out.push(format!(
-                "  {:<w$}  {:>6}  {:>8.3}  {:>8.3}  {:>8}  {:>6}",
-                m.module,
-                m.total_files,
-                m.avg_compression_ratio,
-                m.avg_token_uniqueness,
-                color.paint(format!("{:.3}", m.density_score)),
-                m.total_lines,
-                w = w
+        if !self.worst_files.is_empty() {
+            out.push_str("\n\n");
+            out.push_str(&crate::output::pretty_ranked_table(
+                "## Most Repetitive Files",
+                &self.worst_files,
+                None,
+                |_| None,
             ));
         }
 
-        if !self.worst_files.is_empty() {
-            out.push(String::new());
-            out.push(
-                Color::Yellow
-                    .bold()
-                    .paint("## Most Repetitive Files")
-                    .to_string(),
-            );
-            out.push(String::new());
-            for f in &self.worst_files {
-                let color = density_color(f.density_score);
-                out.push(format!(
-                    "  {}  {}  ({} lines)",
-                    color.paint(format!("{:.3}", f.density_score)),
-                    f.path,
-                    f.lines
-                ));
-            }
-        }
-
-        out.join("\n")
-    }
-}
-
-fn density_color(score: f64) -> nu_ansi_term::Color {
-    use nu_ansi_term::Color;
-    if score < 0.4 {
-        Color::Red
-    } else if score < 0.6 {
-        Color::Yellow
-    } else {
-        Color::Green
+        out
     }
 }
 
