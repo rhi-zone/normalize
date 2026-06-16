@@ -106,32 +106,23 @@ pub struct UniquenessReport {
 impl OutputFormatter for UniquenessReport {
     fn format_text(&self) -> String {
         let mut out = Vec::new();
-        out.push("# Function Uniqueness Analysis".to_string());
-        out.push(String::new());
-        out.push(format!("Root:                 {}", self.root));
-        out.push(format!("Files analyzed:       {}", self.files_analyzed));
-        out.push(format!("Functions analyzed:   {}", self.total_functions));
-        out.push(format!(
-            "Unique functions:     {}  ({:.1}%)",
-            self.unique_functions,
-            self.overall_uniqueness_ratio * 100.0
-        ));
-        out.push(format!(
-            "Clustered functions:  {}  ({:.1}%)",
-            self.clustered_functions,
-            if self.total_functions > 0 {
-                self.clustered_functions as f64 / self.total_functions as f64 * 100.0
-            } else {
-                0.0
-            }
-        ));
-        out.push(format!(
-            "Similarity threshold: {:.0}%",
-            self.similarity_threshold * 100.0
-        ));
+        let clustered_pct = if self.total_functions > 0 {
+            self.clustered_functions as f64 / self.total_functions as f64 * 100.0
+        } else {
+            0.0
+        };
+        let mut title = format!(
+            "# Function Uniqueness — {}, {} functions, {:.1}% unique, {:.1}% clustered, threshold {:.0}%",
+            self.root,
+            self.total_functions,
+            self.overall_uniqueness_ratio * 100.0,
+            clustered_pct,
+            self.similarity_threshold * 100.0,
+        );
         if let Some(ref r) = self.diff_ref {
-            out.push(format!("Diff vs:              {}", r));
+            title.push_str(&format!(", diff vs {}", r));
         }
+        out.push(title);
         out.push(String::new());
 
         if !self.modules.is_empty() {
@@ -170,85 +161,51 @@ impl OutputFormatter for UniquenessReport {
     }
 
     fn format_pretty(&self) -> String {
-        use nu_ansi_term::Color;
-        let mut out = Vec::new();
-        out.push(
-            Color::Cyan
-                .bold()
-                .paint("# Function Uniqueness Analysis")
-                .to_string(),
+        use crate::output::pretty_ranked_table;
+        use nu_ansi_term::{Color, Style};
+
+        let clustered_pct = if self.total_functions > 0 {
+            self.clustered_functions as f64 / self.total_functions as f64 * 100.0
+        } else {
+            0.0
+        };
+        let mut title = format!(
+            "# Function Uniqueness — {}, {} functions, {:.1}% unique, {:.1}% clustered, threshold {:.0}%",
+            self.root,
+            self.total_functions,
+            self.overall_uniqueness_ratio * 100.0,
+            clustered_pct,
+            self.similarity_threshold * 100.0,
         );
-        out.push(String::new());
-        out.push(format!("Root:                 {}", self.root));
-        out.push(format!("Files analyzed:       {}", self.files_analyzed));
-        out.push(format!("Functions analyzed:   {}", self.total_functions));
-        out.push(format!(
-            "Unique functions:     {}  ({:.1}%)",
-            self.unique_functions,
-            self.overall_uniqueness_ratio * 100.0
-        ));
-        out.push(format!(
-            "Clustered functions:  {}  ({:.1}%)",
-            self.clustered_functions,
-            if self.total_functions > 0 {
-                self.clustered_functions as f64 / self.total_functions as f64 * 100.0
-            } else {
-                0.0
-            }
-        ));
-        out.push(format!(
-            "Similarity threshold: {:.0}%",
-            self.similarity_threshold * 100.0
-        ));
+        if let Some(ref r) = self.diff_ref {
+            title.push_str(&format!(", diff vs {}", r));
+        }
+
+        let mut out = Vec::new();
+        out.push(Style::new().bold().paint(title).to_string());
         out.push(String::new());
 
         if !self.modules.is_empty() {
-            out.push(
-                Color::Yellow
-                    .bold()
-                    .paint("## Modules (most clustered first)")
-                    .to_string(),
-            );
-            out.push(String::new());
-            let w = self
-                .modules
-                .iter()
-                .map(|m| m.module.len())
-                .max()
-                .unwrap_or(20);
-            out.push(format!(
-                "  {:<w$}  {:>5}  {:>9}  {:>9}  {:>8}",
-                Color::White.bold().paint("module"),
-                Color::White.bold().paint("fns"),
-                Color::White.bold().paint("unique"),
-                Color::White.bold().paint("clustered"),
-                Color::White.bold().paint("ratio"),
-                w = w
+            out.push(pretty_ranked_table(
+                "## Modules (most clustered first)",
+                &self.modules,
+                None,
+                |m| {
+                    if m.uniqueness_ratio < 0.5 {
+                        Some(Color::Red)
+                    } else if m.uniqueness_ratio < 0.75 {
+                        Some(Color::Yellow)
+                    } else {
+                        Some(Color::Green)
+                    }
+                },
             ));
-            for m in &self.modules {
-                let color = if m.uniqueness_ratio < 0.5 {
-                    Color::Red
-                } else if m.uniqueness_ratio < 0.75 {
-                    Color::Yellow
-                } else {
-                    Color::Green
-                };
-                out.push(format!(
-                    "  {:<w$}  {:>5}  {:>9}  {:>9}  {}",
-                    m.module,
-                    m.total_functions,
-                    m.unique_functions,
-                    m.clustered_functions,
-                    color.paint(format!("{:.1}%", m.uniqueness_ratio * 100.0)),
-                    w = w
-                ));
-            }
         }
 
         if !self.top_clusters.is_empty() {
             out.push(String::new());
             out.push(
-                Color::Yellow
+                Style::new()
                     .bold()
                     .paint("## Top Structural Clusters")
                     .to_string(),

@@ -80,6 +80,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     `.3` decimal places consistently (was `.2` in the preamble, `.3` in the table).
     `format_pretty()` replaced with `pretty_ranked_table`. Metric explanations moved
     to `--help`.
+- **`normalize rank` house-style migration — wave 2, batch D (final):** remaining 6
+  subcommands brought to spec:
+  - `rank budget`: numbers are now bare integers throughout (no thousands commas, no `K`
+    suffix on module line counts). Title changed to `# Line Budget — N lines, root`.
+    `format_pretty()` replaced: category table rendered via `pretty_ranked_table` with
+    per-category colors, followed by a bar-chart distribution section.
+  - `rank duplicate-types`: `#` title added with inline stats (`files scanned`, `types`,
+    `pairs`, `min overlap`); the key-value preamble block is gone. `To suppress:` command
+    hint removed from the body (guidance belongs in `--help`).
+  - `rank size`: title changed to `# Code Size — N lines, root` (no trailing `\n`/extra
+    blank line). `format_pretty()` added (bold title + tree body via `nu_ansi_term`).
+    Tree body kept as-is (hierarchical, not a table).
+  - `rank duplicates`: `#` title added with inline stats (`groups/pairs`, `files scanned`,
+    `items analyzed`, `threshold` when applicable). `format_pretty()` title updated to
+    match.
+  - `rank uniqueness`: key-value preamble (`Root:`, `Files analyzed:`, `Functions
+    analyzed:`, etc.) folded into the `#` title. `format_pretty()` now uses
+    `pretty_ranked_table` for the modules section with uniqueness-ratio coloring.
+  - `rank fragments`: raw `\x1b[...]` escape codes replaced with `nu_ansi_term`
+    throughout `format_pretty()`. Column headers spelled out in title-case (`Total Lines`
+    not `TotalLn`, `Avg Lines` not `AvgLn`). Title changed to `# Fragment Analysis —
+    stat, stat, …` format. Fixed hardcoded column widths in `format_text()`.
 
 ### Fixed
 

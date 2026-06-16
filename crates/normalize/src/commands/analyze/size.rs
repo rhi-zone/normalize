@@ -28,9 +28,22 @@ impl OutputFormatter for SizeReport {
     fn format_text(&self) -> String {
         let mut out = Vec::new();
         out.push(format!(
-            "# Code Size: {} ({} lines)\n",
-            self.root, self.total_lines
+            "# Code Size — {} lines, {}",
+            self.total_lines, self.root
         ));
+        out.push(String::new());
+        for node in &self.tree {
+            render_node(&mut out, node, "", true);
+        }
+        out.join("\n")
+    }
+
+    fn format_pretty(&self) -> String {
+        use nu_ansi_term::Style;
+        let title = format!("# Code Size — {} lines, {}", self.total_lines, self.root);
+        let mut out = Vec::new();
+        out.push(Style::new().bold().paint(title).to_string());
+        out.push(String::new());
         for node in &self.tree {
             render_node(&mut out, node, "", true);
         }

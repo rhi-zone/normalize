@@ -90,12 +90,13 @@ pub struct DuplicateTypesReport {
 impl OutputFormatter for DuplicateTypesReport {
     fn format_text(&self) -> String {
         let mut lines = Vec::new();
-        lines.push("Duplicate Type Detection".to_string());
-        lines.push(String::new());
-        lines.push(format!("Files scanned: {}", self.files_scanned));
-        lines.push(format!("Types analyzed: {}", self.types_analyzed));
-        lines.push(format!("Duplicate pairs: {}", self.duplicates.len()));
-        lines.push(format!("Min overlap: {}%", self.min_overlap_percent));
+        lines.push(format!(
+            "# Duplicate Types — {} files scanned, {} types, {} pairs, min overlap {}%",
+            self.files_scanned,
+            self.types_analyzed,
+            self.duplicates.len(),
+            self.min_overlap_percent
+        ));
         lines.push(String::new());
 
         if self.duplicates.is_empty() {
@@ -112,14 +113,14 @@ impl OutputFormatter for DuplicateTypesReport {
                     dup.common_fields.len()
                 ));
                 lines.push(format!(
-                    "   {} ({}:{}) - {} fields",
+                    "   {} ({}:{}) — {} fields",
                     dup.type1.name,
                     dup.type1.file,
                     dup.type1.start_line,
                     dup.type1.fields.len()
                 ));
                 lines.push(format!(
-                    "   {} ({}:{}) - {} fields",
+                    "   {} ({}:{}) — {} fields",
                     dup.type2.name,
                     dup.type2.file,
                     dup.type2.start_line,
@@ -132,9 +133,6 @@ impl OutputFormatter for DuplicateTypesReport {
             if self.duplicates.len() > 20 {
                 lines.push(format!("... and {} more pairs", self.duplicates.len() - 20));
             }
-
-            lines.push(String::new());
-            lines.push("To suppress: normalize analyze duplicate-types --allow TypeName1 TypeName2 --reason \"explanation\"".to_string());
         }
 
         lines.join("\n")

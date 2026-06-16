@@ -76,7 +76,7 @@ impl RankEntry for CategoryEntry {
     fn values(&self) -> Vec<String> {
         vec![
             self.category.to_string(),
-            format_num(self.lines),
+            self.lines.to_string(),
             format!("{:.1}%", self.pct),
         ]
     }
@@ -95,12 +95,8 @@ impl RankEntry for ModuleBudget {
 
     fn values(&self) -> Vec<String> {
         let lines_str = match self.delta {
-            Some(d) => format!(
-                "{:.0}K ({})",
-                self.total_lines as f64 / 1000.0,
-                format_delta(d, false)
-            ),
-            None => format!("{:.0}K", self.total_lines as f64 / 1000.0),
+            Some(d) => format!("{} ({})", self.total_lines, format_delta(d, false)),
+            None => self.total_lines.to_string(),
         };
         vec![
             self.module.clone(),
@@ -141,9 +137,8 @@ pub struct LineBudgetReport {
 
 impl OutputFormatter for LineBudgetReport {
     fn format_text(&self) -> String {
-        let total_k = self.total_lines as f64 / 1000.0;
         let mut out = format_ranked_table(
-            &format!("# Line Budget: {} ({:.0}K lines)", self.root, total_k),
+            &format!("# Line Budget — {} lines, {}", self.total_lines, self.root),
             &self.categories,
             None,
         );
@@ -157,70 +152,38 @@ impl OutputFormatter for LineBudgetReport {
     }
 
     fn format_pretty(&self) -> String {
-        use nu_ansi_term::Color;
+        use crate::output::pretty_ranked_table;
+        use nu_ansi_term::Style;
 
-        let mut out = Vec::new();
+        let title = format!("# Line Budget — {} lines, {}", self.total_lines, self.root);
 
-        let total_k = self.total_lines as f64 / 1000.0;
-        out.push(format!(
-            "{}",
-            Color::White.bold().paint(format!(
-                "Line Budget: {} ({:.0}K lines)",
-                self.root, total_k
-            )),
-        ));
-        out.push(String::new());
-        out.push(format!(
-            "  {:<18} {:>8}  {:>6}  {}",
-            Color::DarkGray.paint("category"),
-            Color::DarkGray.paint("lines"),
-            Color::DarkGray.paint("pct"),
-            Color::DarkGray.paint("bar"),
-        ));
-        out.push(format!("  {}", Color::DarkGray.paint("-".repeat(60))));
+        // Category table: color rows by category
+        let mut out = pretty_ranked_table(&title, &self.categories, None, |entry| {
+            Some(category_color(entry.category))
+        });
 
-        let bar_width = 25;
-        for entry in &self.categories {
-            let filled = ((entry.pct / 100.0) * bar_width as f64).round() as usize;
-            let bar_str = format!(
-                "{}{}",
-                "#".repeat(filled.min(bar_width)),
-                " ".repeat(bar_width.saturating_sub(filled)),
-            );
-            let color = category_color(entry.category);
-            out.push(format!(
-                "  {:<18} {:>8}  {:>5.1}%  {}",
-                color.paint(entry.category.to_string()),
-                format_num(entry.lines),
-                entry.pct,
-                color.paint(bar_str),
+        // Bar-chart suffix: append after the table
+        let bar_section = render_bar_chart(&self.categories, self.total_lines);
+        if !bar_section.is_empty() {
+            out.push('\n');
+            out.push('\n');
+            out.push_str(&Style::new().bold().paint("Distribution").to_string());
+            out.push('\n');
+            out.push('\n');
+            out.push_str(&bar_section);
+        }
+
+        if !self.modules.is_empty() {
+            out.push_str("\n\n");
+            out.push_str(&pretty_ranked_table(
+                "## By Module",
+                &self.modules,
+                None,
+                |_| None,
             ));
         }
 
-        out.push(format!("  {}", Color::DarkGray.paint("-".repeat(60))));
-        out.push(format!(
-            "  {:<18} {:>8}  {:>5.1}%",
-            "total",
-            format_num(self.total_lines),
-            100.0,
-        ));
-
-        if !self.modules.is_empty() {
-            out.push(String::new());
-            out.push(format!("{}", Color::White.bold().paint("By Module"),));
-            for m in &self.modules {
-                out.push(format!(
-                    "  {:<40} {:>5.0}K  ({:.0}% logic, {:.0}% test, {:.0}% other)",
-                    truncate_path(&m.module, 40),
-                    m.total_lines as f64 / 1000.0,
-                    m.logic_pct,
-                    m.test_pct,
-                    m.other_pct,
-                ));
-            }
-        }
-
-        out.join("\n")
+        out
     }
 }
 
@@ -236,27 +199,40 @@ fn category_color(cat: BudgetCategory) -> nu_ansi_term::Color {
     }
 }
 
-fn format_num(n: usize) -> String {
-    if n >= 1_000_000 {
-        format!(
-            "{},{:03},{:03}",
-            n / 1_000_000,
-            (n / 1_000) % 1_000,
-            n % 1_000
-        )
-    } else if n >= 1_000 {
-        format!("{},{:03}", n / 1_000, n % 1_000)
-    } else {
-        format!("{}", n)
+fn render_bar_chart(categories: &[CategoryEntry], total: usize) -> String {
+    use nu_ansi_term::Color;
+    let bar_width = 25_usize;
+    let mut lines = Vec::new();
+    lines.push(format!(
+        "  {:<18} {:>8}  {:>6}  {}",
+        Color::DarkGray.paint("Category"),
+        Color::DarkGray.paint("Lines"),
+        Color::DarkGray.paint("Pct"),
+        Color::DarkGray.paint("Bar"),
+    ));
+    lines.push(format!("  {}", Color::DarkGray.paint("-".repeat(60))));
+    for entry in categories {
+        let filled = ((entry.pct / 100.0) * bar_width as f64).round() as usize;
+        let bar_str = format!(
+            "{}{}",
+            "#".repeat(filled.min(bar_width)),
+            " ".repeat(bar_width.saturating_sub(filled)),
+        );
+        let color = category_color(entry.category);
+        lines.push(format!(
+            "  {:<18} {:>8}  {:>5.1}%  {}",
+            color.paint(entry.category.to_string()),
+            entry.lines,
+            entry.pct,
+            color.paint(bar_str),
+        ));
     }
-}
-
-fn truncate_path(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        s.to_string()
-    } else {
-        format!("…{}", &s[s.len() - (max - 1)..])
-    }
+    lines.push(format!("  {}", Color::DarkGray.paint("-".repeat(60))));
+    lines.push(format!(
+        "  {:<18} {:>8}  {:>5.1}%",
+        "total", total, 100.0_f64
+    ));
+    lines.join("\n")
 }
 
 /// Generated-file marker strings (checked in first 5 lines).

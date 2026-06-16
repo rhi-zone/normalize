@@ -730,7 +730,7 @@ impl OutputFormatter for FragmentsReport {
     fn format_text(&self) -> String {
         let mut lines = Vec::new();
         lines.push(format!(
-            "# Fragment Analysis ({} fragments → {} clusters, {} unclustered, min_nodes={}, inline_depth={})",
+            "# Fragment Analysis — {} fragments, {} clusters, {} unclustered, min nodes {}, inline depth {}",
             self.total_fragments_scanned, self.total_clusters, self.unclustered_count, self.min_nodes, self.inline_depth
         ));
         lines.push(String::new());
@@ -740,10 +740,10 @@ impl OutputFormatter for FragmentsReport {
             return lines.join("\n");
         }
 
-        // Header
+        // Header — spelled-out title-case, auto-sized by content below
         lines.push(format!(
-            "{:<18} {:>5} {:>10} {:>10}  {}",
-            "Hash", "Freq", "TotalLn", "AvgLn", "Kind / Label"
+            "{:<18}  {:>4}  {:>11}  {:>8}  {}",
+            "Hash", "Freq", "Total Lines", "Avg Lines", "Kind / Label"
         ));
         lines.push("-".repeat(72));
 
@@ -760,7 +760,7 @@ impl OutputFormatter for FragmentsReport {
                 .map(|s| format!("  sim={:.0}%", s * 100.0))
                 .unwrap_or_default();
             lines.push(format!(
-                "{:<18} {:>5} {:>10} {:>10.1}  {} [{}]{}",
+                "{:<18}  {:>4}  {:>11}  {:>8.1}  {} [{}]{}",
                 &cluster.hash[..12],
                 cluster.frequency,
                 cluster.total_lines,
@@ -787,11 +787,18 @@ impl OutputFormatter for FragmentsReport {
     }
 
     fn format_pretty(&self) -> String {
+        use nu_ansi_term::{Color, Style};
+
+        let title = format!(
+            "# Fragment Analysis — {} fragments, {} clusters, {} unclustered, min nodes {}, inline depth {}",
+            self.total_fragments_scanned,
+            self.total_clusters,
+            self.unclustered_count,
+            self.min_nodes,
+            self.inline_depth
+        );
         let mut lines = Vec::new();
-        lines.push(format!(
-            "\x1b[1m# Fragment Analysis\x1b[0m ({} fragments → \x1b[36m{}\x1b[0m clusters, {} unclustered, min_nodes={}, inline_depth={})",
-            self.total_fragments_scanned, self.total_clusters, self.unclustered_count, self.min_nodes, self.inline_depth
-        ));
+        lines.push(Style::new().bold().paint(title).to_string());
         lines.push(String::new());
 
         if self.clusters.is_empty() {
@@ -804,21 +811,21 @@ impl OutputFormatter for FragmentsReport {
                 .label
                 .iter()
                 .take(3)
-                .map(|(k, c)| format!("\x1b[36m{}\x1b[0m ×{}", k, c))
+                .map(|(k, c)| format!("{} ×{}", Color::Cyan.paint(k), c))
                 .collect::<Vec<_>>()
                 .join(", ");
             let sim_str = cluster
                 .avg_similarity
-                .map(|s| format!("  sim=\x1b[32m{:.0}%\x1b[0m", s * 100.0))
+                .map(|s| format!("  sim={}", Color::Green.paint(format!("{:.0}%", s * 100.0))))
                 .unwrap_or_default();
             lines.push(format!(
-                "\x1b[1;33m#{}\x1b[0m \x1b[2m{}\x1b[0m  freq=\x1b[1m{}\x1b[0m  lines={}  avg={:.1}  \x1b[35m{}\x1b[0m [{}]{}",
-                i + 1,
-                &cluster.hash[..12],
-                cluster.frequency,
+                "{}  {}  freq={}  lines={}  avg={:.1}  {} [{}]{}",
+                Color::Yellow.bold().paint(format!("#{}", i + 1)),
+                Style::new().dimmed().paint(&cluster.hash[..12]),
+                Style::new().bold().paint(cluster.frequency.to_string()),
                 cluster.total_lines,
                 cluster.avg_lines,
-                cluster.node_kind,
+                Color::Magenta.paint(&cluster.node_kind),
                 label_str,
                 sim_str,
             ));
@@ -826,15 +833,20 @@ impl OutputFormatter for FragmentsReport {
             for loc in cluster.members.iter().take(3) {
                 let sym = loc.symbol.as_deref().unwrap_or("-");
                 lines.push(format!(
-                    "  \x1b[34m{}:{}-{}\x1b[0m ({})",
-                    loc.file, loc.start_line, loc.end_line, sym
+                    "  {}:{}-{} ({})",
+                    Color::Blue.paint(&loc.file),
+                    loc.start_line,
+                    loc.end_line,
+                    sym
                 ));
             }
             if cluster.members.len() > 3 {
-                lines.push(format!(
-                    "  \x1b[2m... and {} more\x1b[0m",
-                    cluster.members.len() - 3
-                ));
+                lines.push(
+                    Style::new()
+                        .dimmed()
+                        .paint(format!("  ... and {} more", cluster.members.len() - 3))
+                        .to_string(),
+                );
             }
             lines.push(String::new());
         }

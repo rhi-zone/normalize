@@ -217,68 +217,64 @@ impl OutputFormatter for DuplicatesReport {
     fn format_text(&self) -> String {
         let mut out = Vec::new();
 
-        // Header
-        let title = match (self.mode, self.scope) {
-            (DuplicateMode::Exact, DuplicateScope::Functions) => "Duplicate Function Detection",
-            (DuplicateMode::Exact, DuplicateScope::Blocks) => "Duplicate Block Detection",
-            (DuplicateMode::Similar, DuplicateScope::Functions) => {
-                "Similar Function Detection (fuzzy)"
+        // Header with inline stats
+        let (base_title, group_stat) = match (self.mode, self.scope) {
+            (DuplicateMode::Exact, DuplicateScope::Functions) => (
+                "# Duplicate Function Detection",
+                format!("{} groups", self.groups.len()),
+            ),
+            (DuplicateMode::Exact, DuplicateScope::Blocks) => (
+                "# Duplicate Block Detection",
+                format!("{} groups", self.groups.len()),
+            ),
+            (DuplicateMode::Similar, DuplicateScope::Functions) => (
+                "# Similar Function Detection",
+                format!("{} pairs", self.groups.len()),
+            ),
+            (DuplicateMode::Similar, DuplicateScope::Blocks) => (
+                "# Similar Block Detection",
+                format!("{} pairs", self.groups.len()),
+            ),
+            (DuplicateMode::Clusters, _) => {
+                let total_fns: usize = self.groups.iter().map(|g| g.locations.len()).sum();
+                (
+                    "# Structural Clusters",
+                    format!("{} clusters, {} functions", self.groups.len(), total_fns),
+                )
             }
-            (DuplicateMode::Similar, DuplicateScope::Blocks) => "Similar Block Detection (fuzzy)",
-            (DuplicateMode::Clusters, _) => "Structural Clusters",
         };
-        out.push(title.to_string());
+        let items_label = match (self.mode, self.scope) {
+            (DuplicateMode::Exact, DuplicateScope::Functions) => "functions hashed",
+            (DuplicateMode::Exact, DuplicateScope::Blocks) => "blocks hashed",
+            (DuplicateMode::Similar, DuplicateScope::Functions) => "functions analyzed",
+            (DuplicateMode::Similar, DuplicateScope::Blocks) => "blocks analyzed",
+            (DuplicateMode::Clusters, _) => "functions analyzed",
+        };
+        let mut title_parts = vec![
+            group_stat,
+            format!("{} files", self.files_scanned),
+            format!("{} {}", self.items_analyzed, items_label),
+        ];
+        if let Some(threshold) = self.threshold {
+            title_parts.push(format!("threshold {:.0}%", threshold * 100.0));
+        }
+        out.push(format!("{} — {}", base_title, title_parts.join(", ")));
         out.push(String::new());
 
-        // Stats
-        out.push(format!("Files scanned:      {}", self.files_scanned));
-        let items_label = match (self.mode, self.scope) {
-            (DuplicateMode::Exact, DuplicateScope::Functions) => "Functions hashed",
-            (DuplicateMode::Exact, DuplicateScope::Blocks) => "Blocks hashed",
-            (DuplicateMode::Similar, DuplicateScope::Functions) => "Functions analyzed",
-            (DuplicateMode::Similar, DuplicateScope::Blocks) => "Blocks analyzed",
-            (DuplicateMode::Clusters, _) => "Functions analyzed",
-        };
-        out.push(format!(
-            "{:<20}{}",
-            items_label.to_string() + ":",
-            self.items_analyzed
-        ));
-
+        // Suppression summaries
+        if let Some(dl) = self.duplicated_lines {
+            out.push(format!("Duplicated lines: ~{}", dl));
+        }
+        if let Some(suppressed) = self.suppressed_same_name
+            && suppressed > 0
+        {
+            out.push(format!(
+                "Suppressed: {} same-name groups (likely trait impls; use --include-trait-impls to show)",
+                suppressed
+            ));
+        }
         if let Some(pairs) = self.pairs_analyzed {
-            out.push(format!("Pairs analyzed:     {}", pairs));
-        }
-
-        if let Some(threshold) = self.threshold {
-            out.push(format!("Threshold:          {:.0}%", threshold * 100.0));
-        }
-
-        match self.mode {
-            DuplicateMode::Exact => {
-                out.push(format!("Duplicate groups:   {}", self.groups.len()));
-                if let Some(dl) = self.duplicated_lines {
-                    out.push(format!("Duplicated lines:   ~{}", dl));
-                }
-                if let Some(suppressed) = self.suppressed_same_name
-                    && suppressed > 0
-                {
-                    out.push(format!(
-                        "Suppressed: {} same-name groups (likely trait impls; use --include-trait-impls to show)",
-                        suppressed
-                    ));
-                }
-            }
-            DuplicateMode::Similar => {
-                out.push(format!("Similar pairs:      {}", self.groups.len()));
-            }
-            DuplicateMode::Clusters => {
-                let total_fns: usize = self.groups.iter().map(|g| g.locations.len()).sum();
-                out.push(format!(
-                    "Clusters found:     {}  ({} functions)",
-                    self.groups.len(),
-                    total_fns
-                ));
-            }
+            out.push(format!("Pairs analyzed: {}", pairs));
         }
 
         if !self.suppressed_directory_pairs.is_empty() {
@@ -508,62 +504,60 @@ impl OutputFormatter for DuplicatesReport {
 
         let mut out = Vec::new();
 
-        let title = match (self.mode, self.scope) {
-            (DuplicateMode::Exact, DuplicateScope::Functions) => "# Duplicate Function Detection",
-            (DuplicateMode::Exact, DuplicateScope::Blocks) => "# Duplicate Block Detection",
-            (DuplicateMode::Similar, DuplicateScope::Functions) => {
-                "# Similar Function Detection (fuzzy)"
+        let (base_title, group_stat) = match (self.mode, self.scope) {
+            (DuplicateMode::Exact, DuplicateScope::Functions) => (
+                "# Duplicate Function Detection",
+                format!("{} groups", self.groups.len()),
+            ),
+            (DuplicateMode::Exact, DuplicateScope::Blocks) => (
+                "# Duplicate Block Detection",
+                format!("{} groups", self.groups.len()),
+            ),
+            (DuplicateMode::Similar, DuplicateScope::Functions) => (
+                "# Similar Function Detection",
+                format!("{} pairs", self.groups.len()),
+            ),
+            (DuplicateMode::Similar, DuplicateScope::Blocks) => (
+                "# Similar Block Detection",
+                format!("{} pairs", self.groups.len()),
+            ),
+            (DuplicateMode::Clusters, _) => {
+                let total_fns: usize = self.groups.iter().map(|g| g.locations.len()).sum();
+                (
+                    "# Structural Clusters",
+                    format!("{} clusters, {} functions", self.groups.len(), total_fns),
+                )
             }
-            (DuplicateMode::Similar, DuplicateScope::Blocks) => "# Similar Block Detection (fuzzy)",
-            (DuplicateMode::Clusters, _) => "# Structural Clusters",
         };
+        let items_label = match (self.mode, self.scope) {
+            (DuplicateMode::Exact, DuplicateScope::Functions) => "functions hashed",
+            (DuplicateMode::Exact, DuplicateScope::Blocks) => "blocks hashed",
+            (DuplicateMode::Similar, DuplicateScope::Functions) => "functions analyzed",
+            (DuplicateMode::Similar, DuplicateScope::Blocks) => "blocks analyzed",
+            (DuplicateMode::Clusters, _) => "functions analyzed",
+        };
+        let mut title_parts = vec![
+            group_stat,
+            format!("{} files", self.files_scanned),
+            format!("{} {}", self.items_analyzed, items_label),
+        ];
+        if let Some(threshold) = self.threshold {
+            title_parts.push(format!("threshold {:.0}%", threshold * 100.0));
+        }
+        let title = format!("{} — {}", base_title, title_parts.join(", "));
         out.push(Color::Cyan.bold().paint(title).to_string());
         out.push(String::new());
 
-        out.push(format!("Files scanned:      {}", self.files_scanned));
-        let items_label = match (self.mode, self.scope) {
-            (DuplicateMode::Exact, DuplicateScope::Functions) => "Functions hashed",
-            (DuplicateMode::Exact, DuplicateScope::Blocks) => "Blocks hashed",
-            (DuplicateMode::Similar, DuplicateScope::Functions) => "Functions analyzed",
-            (DuplicateMode::Similar, DuplicateScope::Blocks) => "Blocks analyzed",
-            (DuplicateMode::Clusters, _) => "Functions analyzed",
-        };
-        out.push(format!(
-            "{:<20}{}",
-            items_label.to_string() + ":",
-            self.items_analyzed
-        ));
-
+        if let Some(dl) = self.duplicated_lines {
+            out.push(format!("Duplicated lines: ~{}", dl));
+        }
+        if let Some(suppressed) = self.suppressed_same_name
+            && suppressed > 0
+        {
+            out.push(format!("Suppressed: {} same-name groups", suppressed));
+        }
         if let Some(pairs) = self.pairs_analyzed {
-            out.push(format!("Pairs analyzed:     {}", pairs));
-        }
-        if let Some(threshold) = self.threshold {
-            out.push(format!("Threshold:          {:.0}%", threshold * 100.0));
-        }
-
-        match self.mode {
-            DuplicateMode::Exact => {
-                out.push(format!("Duplicate groups:   {}", self.groups.len()));
-                if let Some(dl) = self.duplicated_lines {
-                    out.push(format!("Duplicated lines:   ~{}", dl));
-                }
-                if let Some(suppressed) = self.suppressed_same_name
-                    && suppressed > 0
-                {
-                    out.push(format!("Suppressed: {} same-name groups", suppressed));
-                }
-            }
-            DuplicateMode::Similar => {
-                out.push(format!("Similar pairs:      {}", self.groups.len()));
-            }
-            DuplicateMode::Clusters => {
-                let total_fns: usize = self.groups.iter().map(|g| g.locations.len()).sum();
-                out.push(format!(
-                    "Clusters found:     {}  ({} functions)",
-                    self.groups.len(),
-                    total_fns
-                ));
-            }
+            out.push(format!("Pairs analyzed: {}", pairs));
         }
 
         if !self.suppressed_directory_pairs.is_empty() {
