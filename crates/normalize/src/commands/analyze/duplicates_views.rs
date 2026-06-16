@@ -269,7 +269,7 @@ impl OutputFormatter for DuplicatesReport {
             && suppressed > 0
         {
             out.push(format!(
-                "Suppressed: {} same-name groups (likely trait impls; use --include-trait-impls to show)",
+                "Suppressed: {} same-name groups (likely trait impls)",
                 suppressed
             ));
         }
@@ -284,7 +284,7 @@ impl OutputFormatter for DuplicatesReport {
                 .map(|s| s.pair_count)
                 .sum();
             out.push(format!(
-                "Suppressed: {} pairs across {} directory groups (likely parallel implementations; use --include-trait-impls to show)",
+                "Suppressed: {} pairs across {} directory groups (likely parallel implementations)",
                 total,
                 self.suppressed_directory_pairs.len()
             ));
@@ -307,7 +307,7 @@ impl OutputFormatter for DuplicatesReport {
                 .map(|g| g.pair_count)
                 .sum();
             out.push(format!(
-                "Suppressed: {} pairs across {} body-pattern clusters (same body across many files, different method names; use --include-trait-impls to show)",
+                "Suppressed: {} pairs across {} body-pattern clusters (same body across many files, different method names)",
                 total_pairs,
                 self.suppressed_body_pattern_groups.len()
             ));

@@ -96,8 +96,22 @@ fn format_coupling_data(pairs: &[CoupledPair]) -> String {
     // Confidence formula (shared / max(commits_a, commits_b)) and the
     // hidden-dependency caveat live in the command's `--help`, not in a
     // trailing footnote — see `RankService::coupling`.
+    let count = pairs.len();
+    let max_confidence = pairs
+        .iter()
+        .map(|p| p.confidence)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let title = if pairs.is_empty() {
+        "# Temporal Coupling".to_string()
+    } else {
+        format!(
+            "# Temporal Coupling — {} pairs, max confidence {:.0}%",
+            count,
+            max_confidence * 100.0
+        )
+    };
     format_ranked_table(
-        "# Temporal Coupling (files that change together)",
+        &title,
         pairs,
         Some("No temporal coupling found (no files change together frequently)"),
     )

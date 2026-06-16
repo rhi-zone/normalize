@@ -31,7 +31,7 @@ impl RankEntry for ModuleUniqueness {
     fn columns() -> Vec<Column> {
         vec![
             Column::left("Module"),
-            Column::right("Fns"),
+            Column::right("Functions"),
             Column::right("Unique"),
             Column::right("Clustered"),
             Column::right("Ratio"),

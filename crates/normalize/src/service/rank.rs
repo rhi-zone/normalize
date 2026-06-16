@@ -1320,6 +1320,10 @@ impl RankService {
     /// Modes: `exact` (default) finds byte-identical bodies; `similar` uses MinHash fuzzy
     /// matching; `clusters` groups near-duplicates into connected components. Returns a
     /// `DuplicatesReport` with grouped matches and similarity scores.
+    ///
+    /// Groups where all items share the same name (likely trait implementations), parallel
+    /// implementations across sibling directories, and same-body-pattern clusters are
+    /// suppressed by default. Use `--include-trait-impls` to include them in output.
     #[server(group = "code")]
     #[cli(display_with = "display_duplicates")]
     #[allow(clippy::too_many_arguments)]

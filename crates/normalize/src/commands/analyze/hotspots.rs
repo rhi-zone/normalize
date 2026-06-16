@@ -97,12 +97,26 @@ pub struct HotspotsReport {
     pub repos: Option<Vec<HotspotsRepoEntry>>,
 }
 
-fn hotspots_title(recency_weighted: bool) -> &'static str {
-    if recency_weighted {
-        "# Git Hotspots (recency-weighted churn)"
+fn hotspots_title(hotspots: &[FileHotspot], recency_weighted: bool) -> String {
+    let count = hotspots.len();
+    let top_score = hotspots
+        .iter()
+        .map(|h| h.score)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let top_churn = hotspots
+        .iter()
+        .map(|h| h.lines_added + h.lines_deleted)
+        .max()
+        .unwrap_or(0);
+    let prefix = if recency_weighted {
+        "# Git Hotspots (recency-weighted)"
     } else {
-        "# Git Hotspots (high churn)"
-    }
+        "# Git Hotspots"
+    };
+    format!(
+        "{} — {} files, top score {:.0}, max churn {}",
+        prefix, count, top_score, top_churn
+    )
 }
 
 fn format_hotspots_data(
@@ -110,13 +124,13 @@ fn format_hotspots_data(
     has_complexity: bool,
     recency_weighted: bool,
 ) -> String {
-    let title = hotspots_title(recency_weighted);
+    let title = hotspots_title(hotspots, recency_weighted);
     if has_complexity {
-        format_ranked_table(title, hotspots, None)
+        format_ranked_table(&title, hotspots, None)
     } else {
         let entries: Vec<FileHotspotNoComplexity<'_>> =
             hotspots.iter().map(FileHotspotNoComplexity).collect();
-        format_ranked_table(title, &entries, None)
+        format_ranked_table(&title, &entries, None)
     }
 }
 
@@ -125,13 +139,13 @@ fn pretty_hotspots_data(
     has_complexity: bool,
     recency_weighted: bool,
 ) -> String {
-    let title = hotspots_title(recency_weighted);
+    let title = hotspots_title(hotspots, recency_weighted);
     if has_complexity {
-        crate::output::pretty_ranked_table(title, hotspots, None, |_| None)
+        crate::output::pretty_ranked_table(&title, hotspots, None, |_| None)
     } else {
         let entries: Vec<FileHotspotNoComplexity<'_>> =
             hotspots.iter().map(FileHotspotNoComplexity).collect();
-        crate::output::pretty_ranked_table(title, &entries, None, |_| None)
+        crate::output::pretty_ranked_table(&title, &entries, None, |_| None)
     }
 }
 

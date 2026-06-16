@@ -74,7 +74,7 @@ impl RankEntry for FileCeremony {
     fn columns() -> Vec<Column> {
         vec![
             Column::right("Ratio"),
-            Column::right("Impl"),
+            Column::right("Implementations"),
             Column::right("Total"),
             Column::left("File"),
         ]

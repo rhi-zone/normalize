@@ -107,22 +107,33 @@ pub struct ContributorsReport {
     pub overlaps: Vec<OverlapPair>,
 }
 
+impl ContributorsReport {
+    fn title(&self) -> String {
+        let total_authors = self.authors.len();
+        let total_repos = self.repos.len();
+        let total_commits: usize = self.authors.iter().map(|a| a.commits).sum();
+        format!(
+            "# Contributors — {} authors, {} repos, {} commits",
+            total_authors, total_repos, total_commits
+        )
+    }
+}
+
 impl OutputFormatter for ContributorsReport {
     fn format_text(&self) -> String {
-        let mut out = Vec::new();
-        out.push(format_ranked_table(
-            "# Author Summary",
-            &self.authors,
-            Some("No authors found."),
-        ));
-        out.push(format_ranked_table(
-            "# Repo Summary",
-            &self.repos,
-            Some("No repos found."),
-        ));
+        let mut out = vec![
+            self.title(),
+            String::new(),
+            format_ranked_table(
+                "## Author Summary",
+                &self.authors,
+                Some("No authors found."),
+            ),
+            format_ranked_table("## Repo Summary", &self.repos, Some("No repos found.")),
+        ];
         if !self.overlaps.is_empty() {
             out.push(format_ranked_table(
-                "# Author Overlap",
+                "## Author Overlap",
                 &self.overlaps,
                 None,
             ));
@@ -131,22 +142,26 @@ impl OutputFormatter for ContributorsReport {
     }
 
     fn format_pretty(&self) -> String {
-        let mut out = Vec::new();
-        out.push(crate::output::pretty_ranked_table(
-            "# Author Summary",
-            &self.authors,
-            Some("No authors found."),
-            |_| None,
-        ));
-        out.push(crate::output::pretty_ranked_table(
-            "# Repo Summary",
-            &self.repos,
-            Some("No repos found."),
-            |_| None,
-        ));
+        use nu_ansi_term::Style;
+        let mut out = vec![
+            Style::new().bold().paint(self.title()).to_string(),
+            String::new(),
+            crate::output::pretty_ranked_table(
+                "## Author Summary",
+                &self.authors,
+                Some("No authors found."),
+                |_| None,
+            ),
+            crate::output::pretty_ranked_table(
+                "## Repo Summary",
+                &self.repos,
+                Some("No repos found."),
+                |_| None,
+            ),
+        ];
         if !self.overlaps.is_empty() {
             out.push(crate::output::pretty_ranked_table(
-                "# Author Overlap",
+                "## Author Overlap",
                 &self.overlaps,
                 None,
                 |_| None,

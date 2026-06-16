@@ -61,7 +61,7 @@ impl RankEntry for ModuleDensity {
         vec![
             Column::left("Module"),
             Column::right("Files"),
-            Column::right("Compress"),
+            Column::right("Compression"),
             Column::right("Unique"),
             Column::right("Density"),
             Column::right("Lines"),

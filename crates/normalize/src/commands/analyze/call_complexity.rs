@@ -32,8 +32,8 @@ impl RankEntry for AmplifiedEntry<'_> {
     fn columns() -> Vec<Column> {
         vec![
             Column::right("Amplification"),
-            Column::right("Local CC"),
-            Column::right("Reachable CC"),
+            Column::right("Local Complexity"),
+            Column::right("Reachable Complexity"),
             Column::right("Reachable Count"),
             Column::left("Symbol"),
         ]
@@ -57,8 +57,8 @@ struct ReachableEntry<'a>(&'a FunctionCallComplexity);
 impl RankEntry for ReachableEntry<'_> {
     fn columns() -> Vec<Column> {
         vec![
-            Column::right("Reachable CC"),
-            Column::right("Local CC"),
+            Column::right("Reachable Complexity"),
+            Column::right("Local Complexity"),
             Column::right("Reachable Count"),
             Column::left("Symbol"),
         ]
@@ -90,8 +90,8 @@ impl RankEntry for ModuleCallComplexity {
         vec![
             Column::right("Functions"),
             Column::right("Avg Amplification"),
-            Column::right("Max Reachable CC"),
-            Column::right("Local CC"),
+            Column::right("Max Reachable Complexity"),
+            Column::right("Local Complexity"),
             Column::left("Module"),
         ]
     }

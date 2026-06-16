@@ -102,6 +102,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     throughout `format_pretty()`. Column headers spelled out in title-case (`Total Lines`
     not `TotalLn`, `Avg Lines` not `AvgLn`). Title changed to `# Fragment Analysis —
     stat, stat, …` format. Fixed hardcoded column widths in `format_text()`.
+- **`normalize rank` house-style migration — wave 3 (post-audit fixes):** eight remaining
+  deviations identified by the 2026-06-16 independent audit are now resolved:
+  - `rank hotspots` title now includes inline stats (`# Git Hotspots — N files, top score
+    S, max churn C`); the parenthetical descriptor `(high churn)` is dropped (context
+    belongs in `--help`). The recency variant retains a brief qualifier in the command
+    name: `# Git Hotspots (recency-weighted) — …`.
+  - `rank coupling` title now includes inline stats (`# Temporal Coupling — N pairs, max
+    confidence P%`); the parenthetical `(files that change together)` is gone.
+  - `rank ownership` title now includes inline stats (`# File Ownership — N files, avg bus
+    factor F, N single-author`); the parenthetical `(git blame)` is gone.
+  - `rank contributors` gains an outer command-level title with aggregate stats
+    (`# Contributors — N authors, N repos, N commits`) ahead of the sub-section tables;
+    the three sub-section headers are demoted from `#` to `##`.
+  - `rank call-complexity` column headers: `Local CC` → `Local Complexity`, `Reachable CC`
+    → `Reachable Complexity`, `Max Reachable CC` → `Max Reachable Complexity` (CC was
+    unexplained in output; spelling out avoids the ambiguity).
+  - `rank uniqueness` column header: `Fns` → `Functions`.
+  - `rank ceremony` per-file column header: `Impl` → `Implementations`.
+  - `rank density` column header: `Compress` → `Compression`.
+  - `rank test-ratio` title word and column header: `Impl` → `Implementation`; full title
+    is now `# Test/Implementation Ratio — …`.
+  - `rank duplicates` suppression lines no longer embed CLI flag guidance (`use
+    --include-trait-impls to show`); the guidance moved to the `--help` doc comment. The
+    factual `Suppressed: N …` counts remain in the output body.
 
 ### Fixed
 

@@ -32,7 +32,7 @@ impl RankEntry for TestRatioEntry {
     fn columns() -> Vec<Column> {
         vec![
             Column::left("Module"),
-            Column::right("Impl"),
+            Column::right("Implementation"),
             Column::right("Test"),
             Column::right("Ratio"),
         ]
@@ -87,11 +87,11 @@ pub struct TestRatioReport {
 impl TestRatioReport {
     fn title(&self) -> String {
         let prefix = match &self.diff_ref {
-            Some(r) => format!("# Test/Impl Ratio Diff vs {r}"),
-            None => "# Test/Impl Ratio".to_string(),
+            Some(r) => format!("# Test/Implementation Ratio Diff vs {r}"),
+            None => "# Test/Implementation Ratio".to_string(),
         };
         format!(
-            "{prefix} — {:.1}% ({} impl, {} test)",
+            "{prefix} — {:.1}% ({} implementation, {} test)",
             self.overall_ratio * 100.0,
             self.total_impl_lines,
             self.total_test_lines,

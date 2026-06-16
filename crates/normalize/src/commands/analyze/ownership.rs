@@ -96,11 +96,22 @@ fn format_ownership_data(files: &[FileOwnership]) -> String {
     // Bus-factor semantics ("authors needed for >50% ownership") and the
     // single-author-risk caveat live in the command's `--help`, not in a
     // trailing footnote — see `RankService::ownership`.
-    format_ranked_table(
-        "# File Ownership (git blame)",
-        files,
-        Some("No ownership data found"),
-    )
+    let count = files.len();
+    let avg_bus_factor = if count > 0 {
+        files.iter().map(|f| f.bus_factor as f64).sum::<f64>() / count as f64
+    } else {
+        0.0
+    };
+    let single_author = files.iter().filter(|f| f.bus_factor == 1).count();
+    let title = if files.is_empty() {
+        "# File Ownership".to_string()
+    } else {
+        format!(
+            "# File Ownership — {} files, avg bus factor {:.1}, {} single-author",
+            count, avg_bus_factor, single_author
+        )
+    };
+    format_ranked_table(&title, files, Some("No ownership data found"))
 }
 
 impl OutputFormatter for OwnershipReport {
