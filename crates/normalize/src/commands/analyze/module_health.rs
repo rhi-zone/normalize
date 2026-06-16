@@ -7,6 +7,7 @@ use crate::commands::analyze::density::analyze_density;
 use crate::commands::analyze::test_ratio::{analyze_test_ratio, discover_module_dirs, module_key};
 use crate::commands::analyze::uniqueness::analyze_uniqueness;
 use crate::output::OutputFormatter;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 
 /// Per-module health score and metrics.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -26,6 +27,34 @@ pub struct ModuleHealthEntry {
     pub logic_pct: f64,
 }
 
+impl RankEntry for ModuleHealthEntry {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("Score"),
+            Column::right("Test"),
+            Column::right("Uniqueness"),
+            Column::right("Density"),
+            Column::right("Ceremony"),
+            Column::right("Logic"),
+            Column::right("Lines"),
+            Column::left("Module"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            format!("{:.0}%", self.score * 100.0),
+            format!("{:.0}%", self.test_ratio * 100.0),
+            format!("{:.0}%", self.uniqueness_ratio * 100.0),
+            format!("{:.3}", self.density_score),
+            format!("{:.0}%", self.ceremony_ratio * 100.0),
+            format!("{:.0}%", self.logic_pct * 100.0),
+            self.total_lines.to_string(),
+            self.module.clone(),
+        ]
+    }
+}
+
 /// Report returned by `analyze module-health`.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ModuleHealthReport {
@@ -37,119 +66,30 @@ pub struct ModuleHealthReport {
 
 impl OutputFormatter for ModuleHealthReport {
     fn format_text(&self) -> String {
-        let mut out = Vec::new();
-        out.push("# Module Health".to_string());
-        out.push(String::new());
-        out.push(format!("Root:            {}", self.root));
-        out.push(format!("Modules scored:  {}", self.modules_scored));
-        out.push(String::new());
-
-        if self.modules.is_empty() {
-            out.push("No modules found.".to_string());
-            return out.join("\n");
-        }
-
-        let w = self
-            .modules
-            .iter()
-            .map(|m| m.module.len())
-            .max()
-            .unwrap_or(20);
-        out.push(format!(
-            "  {:<w$}  {:>5}  {:>5}  {:>5}  {:>7}  {:>7}  {:>7}  {:>6}",
-            "module",
-            "score",
-            "test",
-            "uniq",
-            "density",
-            "cerem",
-            "logic",
-            "lines",
-            w = w
-        ));
-        out.push(format!(
-            "  {:<w$}  {:>5}  {:>5}  {:>5}  {:>7}  {:>7}  {:>7}  {:>6}",
-            "-".repeat(w),
-            "-----",
-            "-----",
-            "-----",
-            "-------",
-            "-------",
-            "-------",
-            "------",
-            w = w
-        ));
-        for m in &self.modules {
-            out.push(format!(
-                "  {:<w$}  {:>4.0}%  {:>4.0}%  {:>4.0}%  {:>7.3}  {:>6.0}%  {:>6.0}%  {:>6}",
-                m.module,
-                m.score * 100.0,
-                m.test_ratio * 100.0,
-                m.uniqueness_ratio * 100.0,
-                m.density_score,
-                m.ceremony_ratio * 100.0,
-                m.logic_pct * 100.0,
-                m.total_lines,
-                w = w
-            ));
-        }
-        out.join("\n")
+        let title = format!(
+            "# Module Health — {}, {} modules scored",
+            self.root, self.modules_scored
+        );
+        format_ranked_table(&title, &self.modules, Some("No modules found."))
     }
 
     fn format_pretty(&self) -> String {
-        use nu_ansi_term::Color;
-        let mut out = Vec::new();
-        out.push(Color::Cyan.bold().paint("# Module Health").to_string());
-        out.push(String::new());
-        out.push(format!("Root:            {}", self.root));
-        out.push(format!("Modules scored:  {}", self.modules_scored));
-        out.push(String::new());
-
-        if self.modules.is_empty() {
-            out.push("No modules found.".to_string());
-            return out.join("\n");
-        }
-
-        let w = self
-            .modules
-            .iter()
-            .map(|m| m.module.len())
-            .max()
-            .unwrap_or(20);
-        out.push(format!(
-            "  {:<w$}  {:>5}  {:>5}  {:>5}  {:>7}  {:>7}  {:>7}  {:>6}",
-            Color::White.bold().paint("module"),
-            Color::White.bold().paint("score"),
-            Color::White.bold().paint("test"),
-            Color::White.bold().paint("uniq"),
-            Color::White.bold().paint("density"),
-            Color::White.bold().paint("cerem"),
-            Color::White.bold().paint("logic"),
-            Color::White.bold().paint("lines"),
-            w = w
-        ));
-        for m in &self.modules {
-            let score_color = if m.score >= 0.75 {
-                Color::Green
-            } else if m.score >= 0.55 {
-                Color::Yellow
+        let title = format!(
+            "# Module Health — {}, {} modules scored",
+            self.root, self.modules_scored
+        );
+        crate::output::pretty_ranked_table(&title, &self.modules, Some("No modules found."), |e| {
+            use crate::output::tier_color;
+            use normalize_analyze::ranked::RiskTier;
+            let tier = if e.score >= 0.75 {
+                RiskTier::Low
+            } else if e.score >= 0.55 {
+                RiskTier::Moderate
             } else {
-                Color::Red
+                RiskTier::High
             };
-            out.push(format!(
-                "  {:<w$}  {}  {:>4.0}%  {:>4.0}%  {:>7.3}  {:>6.0}%  {:>6.0}%  {:>6}",
-                m.module,
-                score_color.paint(format!("{:>4.0}%", m.score * 100.0)),
-                m.test_ratio * 100.0,
-                m.uniqueness_ratio * 100.0,
-                m.density_score,
-                m.ceremony_ratio * 100.0,
-                m.logic_pct * 100.0,
-                m.total_lines,
-                w = w
-            ));
-        }
-        out.join("\n")
+            Some(tier_color(tier))
+        })
     }
 }
 

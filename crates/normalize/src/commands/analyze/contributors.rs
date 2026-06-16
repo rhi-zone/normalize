@@ -2,6 +2,7 @@
 
 use super::git_utils;
 use crate::output::OutputFormatter;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
@@ -17,6 +18,27 @@ pub struct ContributorInfo {
     pub top_repo_pct: f64,
 }
 
+impl RankEntry for ContributorInfo {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("Repos"),
+            Column::right("Commits"),
+            Column::left("Top Repo (%)"),
+            Column::left("Author"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        let top = format!("{} ({:.0}%)", self.top_repo, self.top_repo_pct * 100.0);
+        vec![
+            self.repos.to_string(),
+            self.commits.to_string(),
+            top,
+            self.name.clone(),
+        ]
+    }
+}
+
 /// Per-repo summary
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct RepoSummary {
@@ -28,12 +50,53 @@ pub struct RepoSummary {
     pub top_author_pct: f64,
 }
 
+impl RankEntry for RepoSummary {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("Authors"),
+            Column::right("Commits"),
+            Column::right("Bus Factor"),
+            Column::left("Top Author (%)"),
+            Column::left("Repo"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        let top = format!("{} ({:.0}%)", self.top_author, self.top_author_pct * 100.0);
+        vec![
+            self.authors.to_string(),
+            self.commits.to_string(),
+            self.bus_factor.to_string(),
+            top,
+            self.name.clone(),
+        ]
+    }
+}
+
 /// A pair of repos sharing contributors
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct OverlapPair {
     pub repo_a: String,
     pub repo_b: String,
     pub shared_authors: usize,
+}
+
+impl RankEntry for OverlapPair {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("Shared Authors"),
+            Column::left("Repo A"),
+            Column::left("Repo B"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            self.shared_authors.to_string(),
+            self.repo_a.clone(),
+            self.repo_b.clone(),
+        ]
+    }
 }
 
 /// Cross-repo contributors report
@@ -46,80 +109,50 @@ pub struct ContributorsReport {
 
 impl OutputFormatter for ContributorsReport {
     fn format_text(&self) -> String {
-        let mut lines = Vec::new();
-
-        // Section 1: Author Summary
-        lines.push("Author Summary".to_string());
-        lines.push(String::new());
-        lines.push(format!(
-            "{:<30} {:>5} {:>8} {}",
-            "Author", "Repos", "Commits", "Top Repo (%)"
+        let mut out = Vec::new();
+        out.push(format_ranked_table(
+            "# Author Summary",
+            &self.authors,
+            Some("No authors found."),
         ));
-        lines.push("-".repeat(70));
-
-        for a in &self.authors {
-            let top = format!("{} ({:.0}%)", a.top_repo, a.top_repo_pct * 100.0);
-            lines.push(format!(
-                "{:<30} {:>5} {:>8} {}",
-                truncate(&a.name, 28),
-                a.repos,
-                a.commits,
-                top,
-            ));
-        }
-
-        // Section 2: Repo Summary
-        lines.push(String::new());
-        lines.push("Repo Summary".to_string());
-        lines.push(String::new());
-        lines.push(format!(
-            "{:<25} {:>7} {:>8} {:>3} {}",
-            "Repo", "Authors", "Commits", "BF", "Top Author (%)"
+        out.push(format_ranked_table(
+            "# Repo Summary",
+            &self.repos,
+            Some("No repos found."),
         ));
-        lines.push("-".repeat(75));
-
-        for r in &self.repos {
-            let top = format!("{} ({:.0}%)", r.top_author, r.top_author_pct * 100.0);
-            lines.push(format!(
-                "{:<25} {:>7} {:>8} {:>3} {}",
-                truncate(&r.name, 23),
-                r.authors,
-                r.commits,
-                r.bus_factor,
-                top,
-            ));
-        }
-
-        // Section 3: Author Overlap
         if !self.overlaps.is_empty() {
-            lines.push(String::new());
-            lines.push("Author Overlap".to_string());
-            lines.push(String::new());
-            lines.push(format!(
-                "{:<25} {:<25} {:>14}",
-                "Repo A", "Repo B", "Shared Authors"
+            out.push(format_ranked_table(
+                "# Author Overlap",
+                &self.overlaps,
+                None,
             ));
-            lines.push("-".repeat(66));
-
-            for o in &self.overlaps {
-                lines.push(format!(
-                    "{:<25} {:<25} {:>14}",
-                    truncate(&o.repo_a, 23),
-                    truncate(&o.repo_b, 23),
-                    o.shared_authors,
-                ));
-            }
         }
-
-        lines.join("\n")
+        out.join("\n\n")
     }
-}
 
-fn truncate(s: &str, max_len: usize) -> String {
-    if s.len() > max_len {
-        format!("{}...", &s[..max_len.saturating_sub(3)])
-    } else {
-        s.to_string()
+    fn format_pretty(&self) -> String {
+        let mut out = Vec::new();
+        out.push(crate::output::pretty_ranked_table(
+            "# Author Summary",
+            &self.authors,
+            Some("No authors found."),
+            |_| None,
+        ));
+        out.push(crate::output::pretty_ranked_table(
+            "# Repo Summary",
+            &self.repos,
+            Some("No repos found."),
+            |_| None,
+        ));
+        if !self.overlaps.is_empty() {
+            out.push(crate::output::pretty_ranked_table(
+                "# Author Overlap",
+                &self.overlaps,
+                None,
+                |_| None,
+            ));
+        }
+        out.join("\n\n")
     }
 }
 

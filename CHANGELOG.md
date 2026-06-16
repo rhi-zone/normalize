@@ -38,6 +38,35 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `rank files`'s `## By Language` section is now rendered via `format_ranked_table`
     (`Language`, `Lines` columns) instead of a hand-rolled `N lines  Lang` format.
     `format_pretty()` was added.
+- **`normalize rank` house-style migration — wave 2, batch C:** five hand-rolled-table
+  offenders converted to `RankEntry` + `format_ranked_table`:
+  - `rank module-health`: preamble key-value block (`Root:`, `Modules scored:`) folded
+    into the `#` title. Table migrated from hand-rolled fixed-width columns to
+    `format_ranked_table`; `RankEntry` implemented on `ModuleHealthEntry`. Column headers
+    title-cased and spelled out (`Score`, `Test`, `Uniqueness`, `Density`, `Ceremony`,
+    `Logic`, `Lines`, `Module`). Two-space row indentation dropped. `format_pretty()`
+    now uses `pretty_ranked_table` with score-based tier coloring.
+  - `rank call-complexity`: three hand-rolled sections (`Top Amplified`, `Highest
+    Reachable CC`, `By Module`) converted to `format_ranked_table` calls. Abbreviated
+    headers expanded (`amplif` → `Amplification`, `reach#` → `Reachable Count`,
+    `avg_amp` → `Avg Amplification`, `max_reach` → `Max Reachable CC`). The `x` suffix
+    moved from value cells to the `Amplification` / `Avg Amplification` column values
+    (kept as unit suffix on the value string, matching convention). Summary stats folded
+    into the `#` title. `format_pretty()` added via `pretty_ranked_table` with
+    amplification-based tier coloring on the Top Amplified section. Formula explanations
+    moved to `--help`.
+  - `rank ceremony`: key-value preamble block (`Interface impl methods`, `Inherent/class
+    methods`, `Free functions`) folded into the `#` title as inline stats. `## By
+    Language` section migrated from a hand-rolled three-column format to
+    `format_ranked_table` with `Ratio`, `Interface Impl`, `Total`, `Language` columns.
+    `format_pretty()` added via `pretty_ranked_table`.
+  - `rank hotspots`: title now `#`-prefixed. Table converted from hand-rolled fixed-width
+    columns with 48-char path truncation to `format_ranked_table` (auto-width, no
+    truncation). Footer formula footnotes moved to `--help`. `format_pretty()` added.
+  - `rank contributors`: all three sections (`Author Summary`, `Repo Summary`, `Author
+    Overlap`) given `#` titles and converted from hand-rolled fixed-width tables to
+    `format_ranked_table`. `BF` abbreviation expanded to `Bus Factor`. `format_pretty()`
+    added via `pretty_ranked_table`. Bus Factor explanation moved to `--help`.
 - **`normalize rank` house-style migration — wave 2, batch B:** raw `\x1b[...]` escape
   sequences replaced with `nu_ansi_term` throughout four commands:
   - `rank surface` `format_pretty()` replaced with `pretty_ranked_table`.

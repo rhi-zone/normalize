@@ -5,7 +5,7 @@ use super::is_source_file;
 use crate::analyze::complexity::ComplexityAnalyzer;
 use crate::output::OutputFormatter;
 use glob::Pattern;
-use normalize_analyze::truncate_path;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -21,6 +21,58 @@ pub struct FileHotspot {
     pub max_complexity: Option<usize>,
     #[serde(skip)]
     pub score: f64,
+}
+
+impl RankEntry for FileHotspot {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("Score"),
+            Column::right("Commits"),
+            Column::right("Churn"),
+            Column::right("Complexity"),
+            Column::left("File"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        let churn = self.lines_added + self.lines_deleted;
+        let cplx = match self.max_complexity {
+            Some(c) => c.to_string(),
+            None => "-".to_string(),
+        };
+        vec![
+            format!("{:.0}", self.score),
+            self.commits.to_string(),
+            churn.to_string(),
+            cplx,
+            self.path.clone(),
+        ]
+    }
+}
+
+/// Hotspot data for a file (without complexity column).
+struct FileHotspotNoComplexity<'a>(&'a FileHotspot);
+
+impl RankEntry for FileHotspotNoComplexity<'_> {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("Score"),
+            Column::right("Commits"),
+            Column::right("Churn"),
+            Column::left("File"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        let h = self.0;
+        let churn = h.lines_added + h.lines_deleted;
+        vec![
+            format!("{:.0}", h.score),
+            h.commits.to_string(),
+            churn.to_string(),
+            h.path.clone(),
+        ]
+    }
 }
 
 /// Per-repo hotspots entry for multi-repo runs
@@ -45,79 +97,42 @@ pub struct HotspotsReport {
     pub repos: Option<Vec<HotspotsRepoEntry>>,
 }
 
+fn hotspots_title(recency_weighted: bool) -> &'static str {
+    if recency_weighted {
+        "# Git Hotspots (recency-weighted churn)"
+    } else {
+        "# Git Hotspots (high churn)"
+    }
+}
+
 fn format_hotspots_data(
     hotspots: &[FileHotspot],
     has_complexity: bool,
     recency_weighted: bool,
 ) -> String {
-    let mut lines = Vec::new();
-    let title = if recency_weighted {
-        "Git Hotspots (recency-weighted churn)"
-    } else {
-        "Git Hotspots (high churn)"
-    };
-    lines.push(title.to_string());
-    lines.push(String::new());
-
+    let title = hotspots_title(recency_weighted);
     if has_complexity {
-        lines.push(format!(
-            "{:<50} {:>8} {:>8} {:>6} {:>8}",
-            "File", "Commits", "Churn", "Cplx", "Score"
-        ));
-        lines.push("-".repeat(86));
+        format_ranked_table(title, hotspots, None)
     } else {
-        lines.push(format!(
-            "{:<50} {:>8} {:>8} {:>8}",
-            "File", "Commits", "Churn", "Score"
-        ));
-        lines.push("-".repeat(80));
+        let entries: Vec<FileHotspotNoComplexity<'_>> =
+            hotspots.iter().map(FileHotspotNoComplexity).collect();
+        format_ranked_table(title, &entries, None)
     }
+}
 
-    for h in hotspots {
-        let churn = h.lines_added + h.lines_deleted;
-        let display_path = truncate_path(&h.path, 48);
-        if has_complexity {
-            let cplx_str = match h.max_complexity {
-                Some(c) => format!("{}", c),
-                None => "-".to_string(),
-            };
-            lines.push(format!(
-                "{:<50} {:>8} {:>8} {:>6} {:>8.0}",
-                display_path, h.commits, churn, cplx_str, h.score
-            ));
-        } else {
-            lines.push(format!(
-                "{:<50} {:>8} {:>8} {:>8.0}",
-                display_path, h.commits, churn, h.score
-            ));
-        }
-    }
-
-    lines.push(String::new());
-
-    let base_formula = if recency_weighted {
-        "\u{2211}(e^(-\u{03bb}\u{00b7}age) \u{00d7} \u{221a}churn_i)"
-    } else {
-        "commits \u{00d7} \u{221a}churn"
-    };
-
+fn pretty_hotspots_data(
+    hotspots: &[FileHotspot],
+    has_complexity: bool,
+    recency_weighted: bool,
+) -> String {
+    let title = hotspots_title(recency_weighted);
     if has_complexity {
-        lines.push(format!(
-            "Score = {} \u{00d7} log\u{2082}(1 + max_complexity)",
-            base_formula
-        ));
-        lines.push("High scores indicate complex, bug-prone files that change often.".to_string());
+        crate::output::pretty_ranked_table(title, hotspots, None, |_| None)
     } else {
-        lines.push(format!("Score = {}", base_formula));
-        lines.push("High scores indicate bug-prone files that change often.".to_string());
-        lines.push("Run with complexity data for risk-weighted scores.".to_string());
+        let entries: Vec<FileHotspotNoComplexity<'_>> =
+            hotspots.iter().map(FileHotspotNoComplexity).collect();
+        crate::output::pretty_ranked_table(title, &entries, None, |_| None)
     }
-
-    if recency_weighted {
-        lines.push("Recency half-life: 180 days (recent changes weighted higher).".to_string());
-    }
-
-    lines.join("\n")
 }
 
 impl OutputFormatter for HotspotsReport {
@@ -146,6 +161,33 @@ impl OutputFormatter for HotspotsReport {
             return "No hotspots found (no git history or source files)".to_string();
         }
         format_hotspots_data(&self.hotspots, self.has_complexity, self.recency_weighted)
+    }
+
+    fn format_pretty(&self) -> String {
+        if let Some(ref repos) = self.repos {
+            let mut parts = Vec::new();
+            for entry in repos {
+                parts.push(format!("=== {} ===", entry.name));
+                if let Some(ref err) = entry.error {
+                    parts.push(format!("Error: {}", err));
+                } else if entry.hotspots.is_empty() {
+                    parts.push("No hotspots found (no git history or source files)".to_string());
+                } else {
+                    parts.push(pretty_hotspots_data(
+                        &entry.hotspots,
+                        entry.has_complexity,
+                        entry.recency_weighted,
+                    ));
+                }
+                parts.push(String::new());
+            }
+            return parts.join("\n");
+        }
+
+        if self.hotspots.is_empty() {
+            return "No hotspots found (no git history or source files)".to_string();
+        }
+        pretty_hotspots_data(&self.hotspots, self.has_complexity, self.recency_weighted)
     }
 }
 

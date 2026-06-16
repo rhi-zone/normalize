@@ -28,6 +28,34 @@ impl CeremonyLangStats {
     }
 }
 
+/// Per-language ceremony breakdown for table rendering.
+struct LangCeremonyEntry {
+    language: String,
+    interface_impl: usize,
+    total: usize,
+    ratio: f64,
+}
+
+impl RankEntry for LangCeremonyEntry {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("Ratio"),
+            Column::right("Interface Impl"),
+            Column::right("Total"),
+            Column::left("Language"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            format!("{:.1}%", self.ratio * 100.0),
+            self.interface_impl.to_string(),
+            self.total.to_string(),
+            self.language.clone(),
+        ]
+    }
+}
+
 /// Per-file ceremony breakdown
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct FileCeremony {
@@ -107,71 +135,79 @@ pub struct CeremonyReport {
     pub diff_ref: Option<String>,
 }
 
-impl OutputFormatter for CeremonyReport {
-    fn format_text(&self) -> String {
-        let mut out = String::new();
-
-        out.push_str(&format!(
-            "# Ceremony Ratio — {:.1}% ({} of {} callables are interface boilerplate)\n\n",
+impl CeremonyReport {
+    fn title(&self) -> String {
+        let prefix = match &self.diff_ref {
+            Some(r) => format!("# Ceremony Diff vs {r}"),
+            None => "# Ceremony".to_string(),
+        };
+        format!(
+            "{prefix} — {:.1}% ceremony, {} interface impl, {} inherent, {} free",
             self.ceremony_ratio * 100.0,
             self.interface_impl_methods,
-            self.total_functions,
-        ));
-        out.push_str(&format!(
-            "  Interface impl methods : {:>5}  ({:.1}%)\n",
-            self.interface_impl_methods,
-            self.ceremony_ratio * 100.0
-        ));
-        out.push_str(&format!(
-            "  Inherent/class methods : {:>5}  ({:.1}%)\n",
             self.inherent_methods,
-            if self.total_functions > 0 {
-                self.inherent_methods as f64 / self.total_functions as f64 * 100.0
-            } else {
-                0.0
-            }
-        ));
-        out.push_str(&format!(
-            "  Free functions         : {:>5}  ({:.1}%)\n",
             self.free_functions,
-            if self.total_functions > 0 {
-                self.free_functions as f64 / self.total_functions as f64 * 100.0
-            } else {
-                0.0
-            }
+        )
+    }
+
+    fn lang_entries(&self) -> Vec<LangCeremonyEntry> {
+        let mut langs: Vec<LangCeremonyEntry> = self
+            .by_language
+            .iter()
+            .filter(|(_, s)| s.total > 0)
+            .map(|(lang, stats)| LangCeremonyEntry {
+                language: lang.clone(),
+                interface_impl: stats.interface_impl,
+                total: stats.total,
+                ratio: stats.ceremony_ratio(),
+            })
+            .collect();
+        langs.sort_by(|a, b| {
+            b.ratio
+                .partial_cmp(&a.ratio)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        langs
+    }
+}
+
+impl OutputFormatter for CeremonyReport {
+    fn format_text(&self) -> String {
+        let mut out = Vec::new();
+        out.push(format_ranked_table(
+            &self.title(),
+            &self.top_files,
+            Some("No ceremony found."),
         ));
 
         if !self.by_language.is_empty() {
-            out.push_str("\n## By Language\n");
-            let mut langs: Vec<_> = self.by_language.iter().collect();
-            langs.sort_by(|a, b| {
-                b.1.ceremony_ratio()
-                    .partial_cmp(&a.1.ceremony_ratio())
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-            for (lang, stats) in langs {
-                if stats.total > 0 {
-                    out.push_str(&format!(
-                        "  {:>5.1}%  ({:>4}/{:>4})  {}\n",
-                        stats.ceremony_ratio() * 100.0,
-                        stats.interface_impl,
-                        stats.total,
-                        lang,
-                    ));
-                }
-            }
+            let langs = self.lang_entries();
+            out.push(format_ranked_table("## By Language", &langs, None));
         }
 
-        if !self.top_files.is_empty() {
-            out.push('\n');
-            out.push_str(&format_ranked_table(
-                "## Highest-Ceremony Files",
-                &self.top_files,
+        out.join("\n\n")
+    }
+
+    fn format_pretty(&self) -> String {
+        let mut out = Vec::new();
+        out.push(crate::output::pretty_ranked_table(
+            &self.title(),
+            &self.top_files,
+            Some("No ceremony found."),
+            |_| None,
+        ));
+
+        if !self.by_language.is_empty() {
+            let langs = self.lang_entries();
+            out.push(crate::output::pretty_ranked_table(
+                "## By Language",
+                &langs,
                 None,
+                |_| None,
             ));
         }
 
-        out
+        out.join("\n\n")
     }
 }
 

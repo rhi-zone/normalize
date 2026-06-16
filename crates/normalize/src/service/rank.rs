@@ -416,6 +416,13 @@ impl RankService {
     /// Combines git churn (commit frequency) with cyclomatic complexity to surface
     /// files that change often and are hard to reason about. Use `recency` to weight
     /// recent commits higher. Returns a `HotspotsReport` with per-file risk scores.
+    ///
+    /// **Score formula (without `--recency`):** `commits × √churn × log₂(1 + max_complexity)`.
+    /// High scores indicate complex, bug-prone files that change often.
+    ///
+    /// **Score formula (with `--recency`):** `Σ(e^(-λ·age) × √churn_i) × log₂(1 + max_complexity)`,
+    /// where λ = ln(2)/180 (half-life of 180 days). Recent changes are weighted higher.
+    /// The `Churn` column is the total lines added + deleted across all commits.
     #[server(group = "git")]
     #[cli(display_with = "display_hotspots")]
     pub fn hotspots(
@@ -1269,6 +1276,12 @@ impl RankService {
     /// Uses BFS on the call graph (requires facts index) to compute the total complexity
     /// reachable from each entry point. High scores indicate functions that are simple
     /// locally but call many complex sub-functions. Returns a `CallComplexityReport`.
+    ///
+    /// **Amplification** (`Top Amplified` table): `reachable_cc / local_cc`. A high ratio
+    /// means the function is a thin dispatcher into complex territory — simple locally but
+    /// triggering many complex sub-functions. **Reachable CC** is the sum of cyclomatic
+    /// complexity over all functions reachable via BFS from this entry point.
+    /// **Reachable Count** is the number of distinct functions reachable.
     #[server(group = "code")]
     #[cli(display_with = "display_call_complexity")]
     pub fn call_complexity(
@@ -1569,6 +1582,11 @@ impl RankService {
     /// Aggregates git log data per author, computing commit counts, lines added/removed,
     /// and active periods. When `repos_dir` is provided, results span all discovered repos.
     /// Returns a `ContributorsReport` with per-author statistics.
+    ///
+    /// **Bus Factor** (Repo Summary table): the minimum number of authors whose combined
+    /// commit history covers more than 50% of a repo's total commits. A bus factor of 1
+    /// means a single author accounts for the majority of contributions — a knowledge
+    /// concentration risk. Repos are ranked lowest bus factor first (highest risk first).
     #[server(group = "git")]
     #[cli(display_with = "display_contributors")]
     pub fn contributors(

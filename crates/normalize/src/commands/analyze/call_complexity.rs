@@ -7,6 +7,7 @@ use std::path::Path;
 use crate::analyze::complexity::ComplexityAnalyzer;
 use crate::commands::analyze::test_ratio::{discover_module_dirs, module_key};
 use crate::output::OutputFormatter;
+use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 
 /// Per-function call-complexity entry.
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
@@ -24,6 +25,56 @@ pub struct FunctionCallComplexity {
     pub reachable_count: usize,
 }
 
+/// Wrapper to render the top-amplified section as a RankEntry table.
+struct AmplifiedEntry<'a>(&'a FunctionCallComplexity);
+
+impl RankEntry for AmplifiedEntry<'_> {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("Amplification"),
+            Column::right("Local CC"),
+            Column::right("Reachable CC"),
+            Column::right("Reachable Count"),
+            Column::left("Symbol"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        let f = self.0;
+        vec![
+            format!("{:.1}x", f.amplification),
+            f.local_cc.to_string(),
+            f.reachable_cc.to_string(),
+            f.reachable_count.to_string(),
+            format!("{}:{}", f.file, f.symbol),
+        ]
+    }
+}
+
+/// Wrapper to render the top-reachable section as a RankEntry table.
+struct ReachableEntry<'a>(&'a FunctionCallComplexity);
+
+impl RankEntry for ReachableEntry<'_> {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("Reachable CC"),
+            Column::right("Local CC"),
+            Column::right("Reachable Count"),
+            Column::left("Symbol"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        let f = self.0;
+        vec![
+            f.reachable_cc.to_string(),
+            f.local_cc.to_string(),
+            f.reachable_count.to_string(),
+            format!("{}:{}", f.file, f.symbol),
+        ]
+    }
+}
+
 /// Per-module aggregated call complexity.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ModuleCallComplexity {
@@ -32,6 +83,28 @@ pub struct ModuleCallComplexity {
     pub max_reachable_cc: usize,
     pub total_local_cc: usize,
     pub function_count: usize,
+}
+
+impl RankEntry for ModuleCallComplexity {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("Functions"),
+            Column::right("Avg Amplification"),
+            Column::right("Max Reachable CC"),
+            Column::right("Local CC"),
+            Column::left("Module"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            self.function_count.to_string(),
+            format!("{:.1}x", self.avg_amplification),
+            self.max_reachable_cc.to_string(),
+            self.total_local_cc.to_string(),
+            self.module.clone(),
+        ]
+    }
 }
 
 /// Report returned by `analyze call-complexity`.
@@ -51,212 +124,95 @@ pub struct CallComplexityReport {
 
 impl OutputFormatter for CallComplexityReport {
     fn format_text(&self) -> String {
+        let title = format!(
+            "# Call Complexity — {}, {} functions, {:.1}% unresolved callees",
+            self.root, self.total_functions, self.unresolved_callees_pct
+        );
         let mut out = Vec::new();
-        out.push("# Call-Complexity Analysis".to_string());
-        out.push(String::new());
-        out.push(format!("Root:               {}", self.root));
-        out.push(format!("Index available:    {}", self.index_available));
-        out.push(format!("Functions analyzed: {}", self.total_functions));
-        out.push(format!(
-            "Unresolved callees: {:.1}%",
-            self.unresolved_callees_pct
-        ));
-        out.push(String::new());
 
         if !self.top_amplified.is_empty() {
-            out.push("## Top Amplified (dispatcher → complex territory)".to_string());
-            out.push(String::new());
-            out.push(format!(
-                "  {:<8}  {:<8}  {:<8}  {:<8}  symbol",
-                "amplif", "local", "reach", "reach#"
+            let entries: Vec<AmplifiedEntry<'_>> =
+                self.top_amplified.iter().map(AmplifiedEntry).collect();
+            out.push(format_ranked_table(
+                &format!("{title}\n\n## Top Amplified (dispatcher → complex territory)"),
+                &entries,
+                None,
             ));
-            for f in &self.top_amplified {
-                out.push(format!(
-                    "  {:>8.1}x {:>8}  {:>8}  {:>8}  {}:{}",
-                    f.amplification,
-                    f.local_cc,
-                    f.reachable_cc,
-                    f.reachable_count,
-                    f.file,
-                    f.symbol
-                ));
-            }
-            out.push(String::new());
+        } else {
+            out.push(format!("{title}\n"));
         }
 
         if !self.top_reachable.is_empty() {
-            out.push("## Highest Reachable CC (deepest complexity sinks)".to_string());
-            out.push(String::new());
-            out.push(format!(
-                "  {:<8}  {:<8}  {:<8}  symbol",
-                "reach", "local", "reach#"
+            let entries: Vec<ReachableEntry<'_>> =
+                self.top_reachable.iter().map(ReachableEntry).collect();
+            out.push(format_ranked_table(
+                "## Highest Reachable CC (deepest complexity sinks)",
+                &entries,
+                None,
             ));
-            for f in &self.top_reachable {
-                out.push(format!(
-                    "  {:>8}  {:>8}  {:>8}  {}:{}",
-                    f.reachable_cc, f.local_cc, f.reachable_count, f.file, f.symbol
-                ));
-            }
-            out.push(String::new());
         }
 
         if !self.modules.is_empty() {
-            out.push("## Modules".to_string());
-            out.push(String::new());
-            let w = self
-                .modules
-                .iter()
-                .map(|m| m.module.len())
-                .max()
-                .unwrap_or(20);
-            out.push(format!(
-                "  {:<w$}  {:>5}  {:>8}  {:>10}  {:>8}",
-                "module",
-                "fns",
-                "avg_amp",
-                "max_reach",
-                "local_cc",
-                w = w
-            ));
-            out.push(format!(
-                "  {:<w$}  {:>5}  {:>8}  {:>10}  {:>8}",
-                "-".repeat(w),
-                "-----",
-                "--------",
-                "----------",
-                "--------",
-                w = w
-            ));
-            for m in &self.modules {
-                out.push(format!(
-                    "  {:<w$}  {:>5}  {:>8.1}x {:>10}  {:>8}",
-                    m.module,
-                    m.function_count,
-                    m.avg_amplification,
-                    m.max_reachable_cc,
-                    m.total_local_cc,
-                    w = w
-                ));
-            }
+            out.push(format_ranked_table("## By Module", &self.modules, None));
         }
 
-        out.join("\n")
+        out.join("\n\n")
     }
 
     fn format_pretty(&self) -> String {
-        use nu_ansi_term::Color;
-        let mut out = Vec::new();
-        out.push(
-            Color::Cyan
-                .bold()
-                .paint("# Call-Complexity Analysis")
-                .to_string(),
+        let title = format!(
+            "# Call Complexity — {}, {} functions, {:.1}% unresolved callees",
+            self.root, self.total_functions, self.unresolved_callees_pct
         );
-        out.push(String::new());
-        out.push(format!("Root:               {}", self.root));
-        out.push(format!("Index available:    {}", self.index_available));
-        out.push(format!("Functions analyzed: {}", self.total_functions));
-        out.push(format!(
-            "Unresolved callees: {:.1}%",
-            self.unresolved_callees_pct
-        ));
-        out.push(String::new());
+        let mut out = Vec::new();
 
         if !self.top_amplified.is_empty() {
-            out.push(
-                Color::Yellow
-                    .bold()
-                    .paint("## Top Amplified (dispatcher → complex territory)")
-                    .to_string(),
-            );
-            out.push(String::new());
-            out.push(format!(
-                "  {:<8}  {:<8}  {:<8}  {:<8}  symbol",
-                Color::White.bold().paint("amplif"),
-                Color::White.bold().paint("local"),
-                Color::White.bold().paint("reach"),
-                Color::White.bold().paint("reach#")
+            let entries: Vec<AmplifiedEntry<'_>> =
+                self.top_amplified.iter().map(AmplifiedEntry).collect();
+            out.push(crate::output::pretty_ranked_table(
+                &format!("{title}\n\n## Top Amplified (dispatcher → complex territory)"),
+                &entries,
+                None,
+                |e| {
+                    use crate::output::tier_color;
+                    use normalize_analyze::ranked::RiskTier;
+                    let tier = if e.0.amplification > 20.0 {
+                        RiskTier::Critical
+                    } else if e.0.amplification > 10.0 {
+                        RiskTier::High
+                    } else if e.0.amplification > 5.0 {
+                        RiskTier::Moderate
+                    } else {
+                        RiskTier::Low
+                    };
+                    Some(tier_color(tier))
+                },
             ));
-            for f in &self.top_amplified {
-                let color = if f.amplification > 20.0 {
-                    Color::Red
-                } else if f.amplification > 10.0 {
-                    Color::Yellow
-                } else {
-                    Color::Green
-                };
-                out.push(format!(
-                    "  {}  {:>8}  {:>8}  {:>8}  {}:{}",
-                    color.paint(format!("{:>8.1}x", f.amplification)),
-                    f.local_cc,
-                    f.reachable_cc,
-                    f.reachable_count,
-                    f.file,
-                    f.symbol
-                ));
-            }
-            out.push(String::new());
+        } else {
+            out.push(format!("{title}\n"));
         }
 
         if !self.top_reachable.is_empty() {
-            out.push(
-                Color::Yellow
-                    .bold()
-                    .paint("## Highest Reachable CC (deepest complexity sinks)")
-                    .to_string(),
-            );
-            out.push(String::new());
-            out.push(format!(
-                "  {:<8}  {:<8}  {:<8}  symbol",
-                Color::White.bold().paint("reach"),
-                Color::White.bold().paint("local"),
-                Color::White.bold().paint("reach#")
+            let entries: Vec<ReachableEntry<'_>> =
+                self.top_reachable.iter().map(ReachableEntry).collect();
+            out.push(crate::output::pretty_ranked_table(
+                "## Highest Reachable CC (deepest complexity sinks)",
+                &entries,
+                None,
+                |_| None,
             ));
-            for f in &self.top_reachable {
-                out.push(format!(
-                    "  {:>8}  {:>8}  {:>8}  {}:{}",
-                    Color::Red.paint(f.reachable_cc.to_string()),
-                    f.local_cc,
-                    f.reachable_count,
-                    f.file,
-                    f.symbol
-                ));
-            }
-            out.push(String::new());
         }
 
         if !self.modules.is_empty() {
-            out.push(Color::Yellow.bold().paint("## Modules").to_string());
-            out.push(String::new());
-            let w = self
-                .modules
-                .iter()
-                .map(|m| m.module.len())
-                .max()
-                .unwrap_or(20);
-            out.push(format!(
-                "  {:<w$}  {:>5}  {:>8}  {:>10}  {:>8}",
-                Color::White.bold().paint("module"),
-                Color::White.bold().paint("fns"),
-                Color::White.bold().paint("avg_amp"),
-                Color::White.bold().paint("max_reach"),
-                Color::White.bold().paint("local_cc"),
-                w = w
+            out.push(crate::output::pretty_ranked_table(
+                "## By Module",
+                &self.modules,
+                None,
+                |_| None,
             ));
-            for m in &self.modules {
-                out.push(format!(
-                    "  {:<w$}  {:>5}  {:>8.1}x {:>10}  {:>8}",
-                    m.module,
-                    m.function_count,
-                    m.avg_amplification,
-                    m.max_reachable_cc,
-                    m.total_local_cc,
-                    w = w
-                ));
-            }
         }
 
-        out.join("\n")
+        out.join("\n\n")
     }
 }
 
