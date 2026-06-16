@@ -34,19 +34,14 @@ impl RankEntry for FileOwnership {
         vec![
             Column::left("File"),
             Column::right("Lines"),
-            Column::right("Auth"),
-            Column::right("BF"),
+            Column::right("Authors"),
+            Column::right("Bus Factor"),
             Column::left("Top Author"),
         ]
     }
 
     fn values(&self) -> Vec<String> {
         let top = format!("{} ({:.0}%)", self.top_author, self.top_author_pct * 100.0);
-        let top_display = if top.len() > 28 {
-            format!("{}...", &top[..25])
-        } else {
-            top
-        };
         let bf_str = match self.delta {
             Some(d) => format!("{} ({})", self.bus_factor, format_delta(d, false)),
             None => self.bus_factor.to_string(),
@@ -56,7 +51,7 @@ impl RankEntry for FileOwnership {
             self.total_lines.to_string(),
             self.authors.to_string(),
             bf_str,
-            top_display,
+            top,
         ]
     }
 }
@@ -98,13 +93,14 @@ pub struct OwnershipReport {
 }
 
 fn format_ownership_data(files: &[FileOwnership]) -> String {
-    let mut out = format_ranked_table(
+    // Bus-factor semantics ("authors needed for >50% ownership") and the
+    // single-author-risk caveat live in the command's `--help`, not in a
+    // trailing footnote — see `RankService::ownership`.
+    format_ranked_table(
         "# File Ownership (git blame)",
         files,
         Some("No ownership data found"),
-    );
-    out.push_str("\n\nBF = Bus Factor (authors needed for >50% ownership)\nLow bus factor (1) means single-author risk.");
-    out
+    )
 }
 
 impl OutputFormatter for OwnershipReport {

@@ -82,6 +82,95 @@ Corollary: never add a special-cased filter that only works alone or only works 
 ### 9. Global flags at root level
 Output format flags (`--json`, `--jq`, `--pretty`, `--compact`) are defined once at root, not duplicated per command.
 
+## Rank output house style
+
+All 22 `normalize rank` subcommands share one text-output house style. This is the
+single source of truth; the audit at `docs/artifacts/cli-fixes-2026-06-16/rank-formatting-audit.md`
+catalogues the pre-migration divergences. When migrating a subcommand or adding a new
+one, conform to every rule below. The migrated **`complexity`**, **`ownership`**, and
+**`coupling`** commands are the reference exemplars — copy their structure.
+
+### Title
+
+`# <Command Name> — <stat>, <stat>, …`
+
+- Always `#`-prefixed (one `#`, never `##`/`###` for the title).
+- Summary stats go **inline in the title**, comma-separated, never in a separate
+  key-value preamble block. There is no `Root: …` / `Functions: …` block above the table.
+- Diff mode prepends `Diff vs <ref>` to the command name
+  (`# Complexity Diff vs HEAD~5 — …`).
+
+Example: `# Complexity — 30 functions, avg 2.4, max 9, 0 critical, 0 high`
+
+### Body: one `format_ranked_table`
+
+Tabular subcommands render their body with a **single** call to
+`normalize_analyze::ranked::format_ranked_table(title, &entries, empty_message)`.
+The entry type implements `RankEntry` (`columns()` + `values()`). This gives:
+auto-width columns, `-` separators with `--` between columns, no hardcoded widths,
+**no path truncation**, no row indentation. Do not hand-roll a table, do not call
+`"-".repeat(n)`, do not `format!("{:<50}", …)`.
+
+### Headers
+
+Title-case, spelled out, no unexplained abbreviations. `Bus Factor` not `BF`,
+`Confidence` not `Conf%`, `Authors` not `Auth`, `Shared Commits` not `Shared`.
+
+### Risk tiers are a **column**, not subsections
+
+Commands that classify rows into severity bands (`complexity`, `length`, `test-gaps`)
+must NOT emit `### Critical` / `### High Risk` subsections. Instead add a `Risk` column
+whose cell is the tier title. Map the command's domain thresholds onto the shared
+`normalize_analyze::ranked::RiskTier` (`Low`/`Moderate`/`High`/`Critical`) — see
+`RiskLevel::tier()` in `complexity.rs` for the pattern. `RiskTier::title()` is the cell
+text; `RiskTier::rank()` drives pretty-mode coloring via `output::tier_color`.
+
+### Footnotes move to `--help`
+
+No trailing footer footnotes in text output. Formula explanations
+(`Confidence = shared / max(...)`), abbreviation legends, and caveats
+(`low bus factor means single-author risk`) go in the subcommand's `#[cli]`
+doc-comment (its `--help`), not after the table. See `RankService::coupling` /
+`RankService::ownership` doc comments for where the removed footnotes landed.
+
+### `format_pretty()` uses `nu_ansi_term`
+
+Never raw `\x1b[...]` escapes. For row-colored tables (severity coloring) call
+`output::pretty_ranked_table(title, &entries, empty_message, |e| Some(color))`, which
+bolds the `#` title and colors whole data rows (alignment-safe — ANSI escapes wrap the
+already-padded line and never enter the width math). Pass `|_| None` for a
+bold-title-only table.
+
+### Numbers
+
+Bare integers. No thousands commas (`254925`, not `254,925`), no `K` suffix (`90000`,
+not `90K`), no unit suffixes inside values (`13`, not `13 lines` — the unit belongs in
+the column header).
+
+### Non-tabular subcommands
+
+`size` (tree), `duplicates` (prose groups), `duplicate-types` (numbered pairs),
+`fragments` (cluster + location sub-rows), `uniqueness` (cluster list) are inherently
+non-tabular. They still get the `#` title with inline stats and `nu_ansi_term`
+pretty-mode, but keep their tree/prose body — they are **not** simple
+`format_ranked_table` swaps. The flat-table rules (one table, spelled-out headers, no
+footnotes, bare integers) still apply to any tabular sub-section they contain.
+
+### Before / after (complexity)
+
+```
+# before                          # after
+# Complexity Analysis             # Complexity — 30 functions, avg 2.4, max 9, 0 critical, 0 high
+                                  
+Functions: 6771 (showing 5)       Complexity  Risk      Function
+Average: 4.2                      -------------------------------------------
+Maximum: 90                                9  Moderate  format_ranked_table
+Critical (>20): 213                        6  Moderate  compute_ranked_diff
+## Complex Functions                       1  Low       Column.left
+### Critical
+90 file.rs:HealthReport.score
+```
+
 ## Entry Points
 
 Total: ~110 entry points (21 top-level + subcommands)

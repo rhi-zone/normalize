@@ -210,6 +210,9 @@ impl RankService {
     /// Accepts an optional `target` path, a complexity `threshold`, and a `limit` on results.
     /// Use `diff` to compare against a git ref and show deltas. Returns a `ComplexityReport`
     /// with per-function complexity scores, file locations, and optional delta values.
+    ///
+    /// The `Risk` column bands each function by McCabe cyclomatic complexity:
+    /// Low (1-5), Moderate (6-10), High (11-20), Critical (21+).
     #[server(group = "code")]
     #[cli(display_with = "display_complexity")]
     #[allow(clippy::too_many_arguments)]
@@ -478,6 +481,10 @@ impl RankService {
     /// hidden dependencies. High coupling scores indicate implicit dependencies not visible in
     /// the import graph. `min_commits` sets the minimum shared-commit threshold. Returns
     /// a `CouplingReport` with ranked pairs and their shared-commit counts.
+    ///
+    /// The `Confidence` column is `shared commits / max(commits_a, commits_b)`. High coupling
+    /// may indicate hidden dependencies or shotgun surgery (one logical change spread across
+    /// many files).
     #[server(group = "git")]
     #[cli(display_with = "display_coupling")]
     #[allow(clippy::too_many_arguments)]
@@ -532,6 +539,10 @@ impl RankService {
     /// Uses git blame to compute the fraction of lines owned by the top contributor.
     /// High concentration (single-author files) indicates bus-factor risk. Returns an
     /// `OwnershipReport` with per-file scores and optional cross-repo aggregation.
+    ///
+    /// The `Bus Factor` column is the number of authors needed to cover >50% of a file's
+    /// lines. A bus factor of 1 means the file has a single effective owner — a knowledge
+    /// concentration risk.
     #[server(group = "git")]
     #[cli(display_with = "display_ownership")]
     pub fn ownership(

@@ -37,8 +37,8 @@ impl RankEntry for CoupledPair {
         vec![
             Column::left("File A"),
             Column::left("File B"),
-            Column::right("Shared"),
-            Column::right("Conf%"),
+            Column::right("Shared Commits"),
+            Column::right("Confidence"),
         ]
     }
 
@@ -93,13 +93,14 @@ pub struct CouplingReport {
 }
 
 fn format_coupling_data(pairs: &[CoupledPair]) -> String {
-    let mut out = format_ranked_table(
+    // Confidence formula (shared / max(commits_a, commits_b)) and the
+    // hidden-dependency caveat live in the command's `--help`, not in a
+    // trailing footnote — see `RankService::coupling`.
+    format_ranked_table(
         "# Temporal Coupling (files that change together)",
         pairs,
         Some("No temporal coupling found (no files change together frequently)"),
-    );
-    out.push_str("\n\nConfidence = shared commits / max(commits_a, commits_b)\nHigh coupling may indicate hidden dependencies or shotgun surgery.");
-    out
+    )
 }
 
 impl OutputFormatter for CouplingReport {

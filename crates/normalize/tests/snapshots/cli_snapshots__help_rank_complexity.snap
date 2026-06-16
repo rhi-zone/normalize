@@ -29,3 +29,6 @@ Options:
 Accepts an optional `target` path, a complexity `threshold`, and a `limit` on results.
 Use `diff` to compare against a git ref and show deltas. Returns a `ComplexityReport`
 with per-function complexity scores, file locations, and optional delta values.
+
+The `Risk` column bands each function by McCabe cyclomatic complexity:
+Low (1-5), Moderate (6-10), High (11-20), Critical (21+).

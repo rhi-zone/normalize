@@ -47,6 +47,51 @@ impl Column {
     }
 }
 
+// ── Risk tiers ─────────────────────────────────────────────────────────
+
+/// A severity tier for a ranked entry, rendered as a `Risk` column.
+///
+/// This replaces the old `### Critical` / `### High Risk` subsection style:
+/// commands that classify entries into severity bands (complexity, length,
+/// test-gaps) map their thresholds onto a `RiskTier` and emit `title()` as a
+/// plain table column value. Pretty-mode coloring is applied by the consumer
+/// (which owns the `nu_ansi_term` dependency) via the tier's [`RiskTier::rank`].
+///
+/// The canonical band is four levels so every command shares one vocabulary.
+/// A command whose domain has different band *labels* (e.g. length's
+/// "Too Long") should still map onto these four tiers for color/ordering and
+/// override only the displayed `title` string at its call site if needed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
+pub enum RiskTier {
+    Low,
+    Moderate,
+    High,
+    Critical,
+}
+
+impl RiskTier {
+    /// Title-case label for the `Risk` column cell.
+    pub fn title(self) -> &'static str {
+        match self {
+            RiskTier::Low => "Low",
+            RiskTier::Moderate => "Moderate",
+            RiskTier::High => "High",
+            RiskTier::Critical => "Critical",
+        }
+    }
+
+    /// Severity rank (0 = lowest). Consumers map this to a color so the
+    /// `nu_ansi_term` dependency stays out of this library crate.
+    pub fn rank(self) -> u8 {
+        match self {
+            RiskTier::Low => 0,
+            RiskTier::Moderate => 1,
+            RiskTier::High => 2,
+            RiskTier::Critical => 3,
+        }
+    }
+}
+
 // ── RankEntry trait ────────────────────────────────────────────────────
 
 /// Trait for entries that can be rendered in a ranked table.
@@ -604,6 +649,18 @@ mod tests {
 
         // Everything is "new" — delta = score
         assert!((current[0].delta.unwrap() - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_risk_tier_title_and_rank() {
+        assert_eq!(RiskTier::Low.title(), "Low");
+        assert_eq!(RiskTier::Critical.title(), "Critical");
+        // Ordering: Low < Moderate < High < Critical by both Ord and rank().
+        assert!(RiskTier::Low < RiskTier::Critical);
+        assert_eq!(RiskTier::Low.rank(), 0);
+        assert_eq!(RiskTier::Moderate.rank(), 1);
+        assert_eq!(RiskTier::High.rank(), 2);
+        assert_eq!(RiskTier::Critical.rank(), 3);
     }
 
     #[test]

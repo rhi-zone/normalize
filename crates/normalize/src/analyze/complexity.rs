@@ -3,8 +3,9 @@
 //! Calculates McCabe cyclomatic complexity for functions.
 //! Complexity = number of decision points + 1
 
-use crate::output::OutputFormatter;
+use crate::output::{OutputFormatter, tier_color};
 use crate::parsers;
+use normalize_analyze::ranked::{Column, RankEntry, RiskTier, format_ranked_table};
 use normalize_facts::extract::compute_complexity;
 use normalize_languages::{GrammarLoader, Language, support_for_path};
 use serde::Serialize;
@@ -41,6 +42,16 @@ impl RiskLevel {
             RiskLevel::Moderate => "Moderate",
             RiskLevel::High => "High",
             RiskLevel::Critical => "Critical",
+        }
+    }
+
+    /// Map onto the shared [`RiskTier`] used by the `Risk` table column.
+    pub fn tier(&self) -> RiskTier {
+        match self {
+            RiskLevel::Low => RiskTier::Low,
+            RiskLevel::Moderate => RiskTier::Moderate,
+            RiskLevel::High => RiskTier::High,
+            RiskLevel::Critical => RiskTier::Critical,
         }
     }
 }
@@ -112,6 +123,34 @@ impl FunctionComplexity {
     }
 }
 
+impl RankEntry for FunctionComplexity {
+    fn columns() -> Vec<Column> {
+        vec![
+            Column::right("Complexity"),
+            Column::left("Risk"),
+            Column::left("Function"),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        let score = match self.delta {
+            Some(d) if d > 0 => format!("{} (+{d})", self.complexity),
+            Some(d) if d < 0 => format!("{} ({d})", self.complexity),
+            Some(_) => format!("{} (±0)", self.complexity),
+            None => self.complexity.to_string(),
+        };
+        let display_name = match &self.file_path {
+            Some(fp) => format!("{}:{}", fp, self.short_name()),
+            None => self.short_name(),
+        };
+        vec![
+            score,
+            self.risk_level().as_title().to_string(),
+            display_name,
+        ]
+    }
+}
+
 /// Complexity report for a file
 pub type ComplexityReport = super::FileReport<FunctionComplexity>;
 
@@ -166,287 +205,57 @@ impl ComplexityReport {
     }
 }
 
+impl ComplexityReport {
+    /// House-style title with summary stats inline (no preamble block).
+    fn title(&self) -> String {
+        let (total, avg, max, crit, high) = match &self.full_stats {
+            Some(s) => (
+                s.total_count,
+                s.total_avg,
+                s.total_max,
+                s.critical_count,
+                s.high_count,
+            ),
+            None => (
+                self.functions.len(),
+                self.avg_complexity(),
+                self.max_complexity(),
+                self.critical_risk_count(),
+                self.high_risk_count(),
+            ),
+        };
+        let prefix = match &self.diff_ref {
+            Some(r) => format!("# Complexity Diff vs {r}"),
+            None => "# Complexity".to_string(),
+        };
+        format!(
+            "{prefix} — {total} functions, avg {avg:.1}, max {max}, {crit} critical, {high} high"
+        )
+    }
+
+    fn empty_hint(&self) -> Option<&'static str> {
+        if self.functions.is_empty() && self.full_stats.is_none() {
+            Some(
+                "no supported source files found — pass a file path or a directory containing code",
+            )
+        } else {
+            None
+        }
+    }
+}
+
 impl OutputFormatter for ComplexityReport {
     fn format_text(&self) -> String {
-        let mut lines = Vec::new();
-        let is_diff = self.diff_ref.is_some();
-        if let Some(ref r) = self.diff_ref {
-            lines.push(format!("# Complexity Diff vs {r}"));
-        } else {
-            lines.push("# Complexity Analysis".to_string());
-        }
-        lines.push(String::new());
-
-        if let Some(ref stats) = self.full_stats {
-            let shown = self.functions.len();
-            if stats.total_count > shown {
-                lines.push(format!(
-                    "Functions: {} (showing {})",
-                    stats.total_count, shown
-                ));
-            } else {
-                lines.push(format!("Functions: {}", stats.total_count));
-            }
-            lines.push(format!("Average: {:.1}", stats.total_avg));
-            lines.push(format!("Maximum: {}", stats.total_max));
-
-            if stats.critical_count > 0 {
-                lines.push(format!("Critical (>20): {}", stats.critical_count));
-            }
-            if stats.high_count > 0 || stats.critical_count == 0 {
-                lines.push(format!("High risk (11-20): {}", stats.high_count));
-            }
-        } else {
-            lines.push(format!("Functions: {}", self.functions.len()));
-            lines.push(format!("Average: {:.1}", self.avg_complexity()));
-            lines.push(format!("Maximum: {}", self.max_complexity()));
-
-            let crit = self.critical_risk_count();
-            let high = self.high_risk_count();
-            if crit > 0 {
-                lines.push(format!("Critical (>20): {}", crit));
-            }
-            if high > 0 || crit == 0 {
-                lines.push(format!("High risk (11-20): {}", high));
-            }
-        }
-
-        if self.functions.is_empty() && self.full_stats.is_none() {
-            lines.push(String::new());
-            lines.push(
-                "hint: no supported source files found — pass a file path or a directory \
-                 containing code"
-                    .to_string(),
-            );
-        } else if !self.functions.is_empty() {
-            lines.push(String::new());
-            if is_diff {
-                lines.push("## Most Changed Functions".to_string());
-                for func in &self.functions {
-                    let display_name = if let Some(ref fp) = func.file_path {
-                        format!("{}:{}", fp, func.short_name())
-                    } else {
-                        func.short_name()
-                    };
-                    let delta_str = match func.delta {
-                        Some(d) if d > 0 => format!(" (+{d})"),
-                        Some(d) if d < 0 => format!(" ({d})"),
-                        Some(_) => " (±0)".to_string(),
-                        None => " (new)".to_string(),
-                    };
-                    lines.push(format!("{}{} {}", func.complexity, delta_str, display_name));
-                }
-            } else {
-                lines.push("## Complex Functions".to_string());
-
-                let mut current_risk: Option<RiskLevel> = None;
-                for func in &self.functions {
-                    let risk = func.risk_level();
-                    if Some(risk) != current_risk {
-                        lines.push(format!("### {}", risk.as_title()));
-                        current_risk = Some(risk);
-                    }
-                    let display_name = if let Some(ref fp) = func.file_path {
-                        format!("{}:{}", fp, func.short_name())
-                    } else {
-                        func.short_name()
-                    };
-                    lines.push(format!("{} {}", func.complexity, display_name));
-                }
-            }
-        }
-
-        lines.join("\n")
+        format_ranked_table(&self.title(), &self.functions, self.empty_hint())
     }
 
     fn format_pretty(&self) -> String {
-        use nu_ansi_term::{Color, Style};
-
-        let mut lines = Vec::new();
-        let is_diff = self.diff_ref.is_some();
-        if let Some(ref r) = self.diff_ref {
-            lines.push(
-                Style::new()
-                    .bold()
-                    .paint(format!("Complexity Diff vs {r}"))
-                    .to_string(),
-            );
-        } else {
-            lines.push(Style::new().bold().paint("Complexity Analysis").to_string());
-        }
-        lines.push(String::new());
-
-        if let Some(ref stats) = self.full_stats {
-            let shown = self.functions.len();
-            if stats.total_count > shown {
-                lines.push(format!(
-                    "{}: {} (showing {})",
-                    Style::new().bold().paint("Functions"),
-                    stats.total_count,
-                    shown
-                ));
-            } else {
-                lines.push(format!(
-                    "{}: {}",
-                    Style::new().bold().paint("Functions"),
-                    stats.total_count
-                ));
-            }
-            lines.push(format!(
-                "{}: {:.1}",
-                Style::new().bold().paint("Average"),
-                stats.total_avg
-            ));
-            lines.push(format!(
-                "{}: {}",
-                Style::new().bold().paint("Maximum"),
-                stats.total_max
-            ));
-
-            if stats.critical_count > 0 {
-                lines.push(format!(
-                    "{}: {}",
-                    Color::Red.bold().paint("Critical (>20)"),
-                    stats.critical_count
-                ));
-            }
-            if stats.high_count > 0 || stats.critical_count == 0 {
-                lines.push(format!(
-                    "{}: {}",
-                    Color::Yellow.bold().paint("High risk (11-20)"),
-                    stats.high_count
-                ));
-            }
-        } else {
-            lines.push(format!(
-                "{}: {}",
-                Style::new().bold().paint("Functions"),
-                self.functions.len()
-            ));
-            lines.push(format!(
-                "{}: {:.1}",
-                Style::new().bold().paint("Average"),
-                self.avg_complexity()
-            ));
-            lines.push(format!(
-                "{}: {}",
-                Style::new().bold().paint("Maximum"),
-                self.max_complexity()
-            ));
-
-            let crit = self.critical_risk_count();
-            let high = self.high_risk_count();
-            if crit > 0 {
-                lines.push(format!(
-                    "{}: {}",
-                    Color::Red.bold().paint("Critical (>20)"),
-                    crit
-                ));
-            }
-            if high > 0 || crit == 0 {
-                lines.push(format!(
-                    "{}: {}",
-                    Color::Yellow.bold().paint("High risk (11-20)"),
-                    high
-                ));
-            }
-        }
-
-        if self.functions.is_empty() && self.full_stats.is_none() {
-            lines.push(String::new());
-            lines.push(
-                Color::Yellow
-                    .paint(
-                        "hint: no supported source files found — pass a file path or a \
-                         directory containing code",
-                    )
-                    .to_string(),
-            );
-        } else if !self.functions.is_empty() {
-            lines.push(String::new());
-            if is_diff {
-                lines.push(
-                    Style::new()
-                        .bold()
-                        .paint("Most Changed Functions")
-                        .to_string(),
-                );
-                for func in &self.functions {
-                    let display_name = if let Some(ref fp) = func.file_path {
-                        format!("{}:{}", fp, func.short_name())
-                    } else {
-                        func.short_name()
-                    };
-                    let (delta_str, delta_color) = match func.delta {
-                        Some(d) if d > 0 => (
-                            format!(" (+{d})"),
-                            Color::Red.paint(format!(" (+{d})")).to_string(),
-                        ),
-                        Some(d) if d < 0 => (
-                            format!(" ({d})"),
-                            Color::Green.paint(format!(" ({d})")).to_string(),
-                        ),
-                        Some(_) => (" (±0)".to_string(), " (±0)".to_string()),
-                        None => (
-                            " (new)".to_string(),
-                            Color::Yellow.paint(" (new)").to_string(),
-                        ),
-                    };
-                    let _ = delta_str;
-                    let complexity_str = match func.risk_level() {
-                        RiskLevel::Critical => Color::Red
-                            .bold()
-                            .paint(func.complexity.to_string())
-                            .to_string(),
-                        RiskLevel::High => Color::Yellow
-                            .bold()
-                            .paint(func.complexity.to_string())
-                            .to_string(),
-                        _ => func.complexity.to_string(),
-                    };
-                    lines.push(format!(
-                        "{}{} {}",
-                        complexity_str, delta_color, display_name
-                    ));
-                }
-            } else {
-                lines.push(Style::new().bold().paint("Complex Functions").to_string());
-
-                let mut current_risk: Option<RiskLevel> = None;
-                for func in &self.functions {
-                    let risk = func.risk_level();
-                    if Some(risk) != current_risk {
-                        let risk_color = match risk {
-                            RiskLevel::Critical => Color::Red,
-                            RiskLevel::High => Color::Yellow,
-                            RiskLevel::Moderate => Color::Blue,
-                            RiskLevel::Low => Color::Green,
-                        };
-                        lines.push(risk_color.bold().paint(risk.as_title()).to_string());
-                        current_risk = Some(risk);
-                    }
-                    let display_name = if let Some(ref fp) = func.file_path {
-                        format!("{}:{}", fp, func.short_name())
-                    } else {
-                        func.short_name()
-                    };
-                    let complexity_str = match func.risk_level() {
-                        RiskLevel::Critical => Color::Red
-                            .bold()
-                            .paint(func.complexity.to_string())
-                            .to_string(),
-                        RiskLevel::High => Color::Yellow
-                            .bold()
-                            .paint(func.complexity.to_string())
-                            .to_string(),
-                        _ => func.complexity.to_string(),
-                    };
-                    lines.push(format!("{} {}", complexity_str, display_name));
-                }
-            }
-        }
-
-        lines.join("\n")
+        crate::output::pretty_ranked_table(
+            &self.title(),
+            &self.functions,
+            self.empty_hint(),
+            |func| Some(tier_color(func.risk_level().tier())),
+        )
     }
 }
 

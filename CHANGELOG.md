@@ -6,6 +6,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **`normalize rank` text output is converging on one house style** (documented in
+  `docs/cli-design.md`, "Rank output house style"). First wave of the migration:
+  - `rank complexity` now renders a single auto-width table with a `Risk` column
+    (Low/Moderate/High/Critical) instead of `### Critical` / `### High Risk`
+    subsections, and folds its summary stats into the `#` title
+    (`# Complexity — 30 functions, avg 2.4, max 9, 0 critical, 0 high`) rather than a
+    key-value preamble block. The risk-band thresholds moved to `--help`.
+  - `rank ownership` and `rank coupling` dropped their trailing footnotes; the
+    bus-factor and confidence-formula explanations moved into each command's `--help`.
+    Column headers are now spelled out (`Bus Factor` not `BF`, `Authors` not `Auth`,
+    `Shared Commits` not `Shared`, `Confidence` not `Conf%`), and the Top Author
+    column is no longer mid-string truncated.
+
 ### Fixed
 
 - **Usage strings no longer show `normalize.elf` in the installed release binary.**
