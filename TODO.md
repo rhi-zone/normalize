@@ -642,6 +642,29 @@ Candidates: `[workflow]` (directory, auto-run)
 - Propose `#[config]` proc macro to server-less (stretch goal — superseded by `#[derive(Config)]`;
   filed nested struct support + merge semantics requests in server-less TODO.md 2026-03-10)
 
+### Retire `--schema` hack in `main.rs`
+
+`handle_schema_flag()` in `crates/normalize/src/main.rs` reads raw `std::env::args()` before
+clap and prints `schemars::schema_for!(NormalizeConfig)`. It is stranded legacy from before the
+server-less `#[cli]` migration.
+
+The sanctioned replacement exists: `NormalizeConfig` already derives `server_less::Config`, and
+server-less `#[program(config = T)]` generates a `config schema` subcommand automatically.
+
+**Cleanup steps:**
+1. Wire `config = NormalizeConfig` into the `#[cli]`/`#[program]` attribute on `NormalizeService`.
+2. Delete `handle_schema_flag()` and its call site.
+
+**Caveat before deleting:** The current `--schema` output is an envelope
+`{ config_path, format, schema }` consumed by Nursery integration (introduced in moss commit
+d19654c9, "Nursery integration"). The server-less `config schema` subcommand emits raw JSON
+Schema. Reconcile the envelope shape with the Nursery consumer before removing the hack — don't
+break Nursery silently.
+
+**Why this matters:** The hack squats the root `--schema` name and blurs two distinct concepts
+(config-file schema vs CLI-tree schema), blocking the naming space needed for a planned
+server-less whole-tree "manual" surface (design doc in progress in the server-less repo).
+
 ### ~~Complexity Hotspots~~ (resolved - max now 22)
 
 All original hotspots resolved. Remaining max is `split_query_patterns` (22) in runner.rs.
