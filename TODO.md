@@ -283,13 +283,37 @@ return `true` when the pattern starts with `[`. Unit test added in `query.rs`.
 Empirically verified: `[(identifier) @i (line_comment) @c]` now returns matches; nested
 alternation and ast-grep patterns unaffected.
 
-### `normalize context context` duplicate subcommand — fixed in server-less, pending publish
+### `normalize context context` duplicate subcommand — fixed in server-less, unblocked by 0.5.0
 
 `normalize context --help` shows `context` as a named subcommand (duplicate of the service itself).
 Root cause: server-less registered `#[cli(default)]` methods as BOTH the default action AND a
 named subcommand. Fixed in server-less (commit f7bc30b): default methods are now suppressed from
-the subcommand list entirely. Will be resolved in normalize once server-less is next published
-and the version bumped in Cargo.toml.
+the subcommand list entirely. server-less 0.5.0 is now published (2026-06-19) carrying this fix —
+the bump to 0.5.0 (see "server-less 0.5.0 adoption" below) lands it in normalize.
+
+## server-less 0.5.0 adoption
+
+server-less 0.5.0 shipped 2026-06-19 with `--manual` (a whole-tree CLI reference surface)
+motivated by normalize's ~150-command nested CLI. Adoption tasks:
+
+- [ ] **Bump server-less 0.4.9 → 0.5.0 across the workspace.** Workspace `Cargo.toml`
+  (features `cli`/`jsonschema`/`config`) plus the three separately-pinned crates:
+  `normalize-cfg` (0.4.9), `normalize-budget` (0.4.7), `normalize-ratchet` (0.4.7).
+  Precondition for the items below; also lands the already-filed `normalize context context`
+  duplicate-subcommand fix. Run a clean `cargo build` afterward (see the collision-guard check).
+- [ ] **Adopt `--manual` for the nested command tree.** `normalize --manual` (and
+  `normalize <subtree> --manual`) now emits the entire ~150-command surface as one greppable
+  document — text by default, `--json`/`--jsonl`/`--jq` for structured. Closes the "no whole-tree
+  docs dump" gap (server-less `docs/artifacts/normalize-cli-docs/cli-surface.md`).
+- [ ] **Retire whole-tree-docs workarounds obsoleted by `--manual`.** Re-evaluate
+  `normalize generate cli-snapshot` (recursively walks `--help` to enumerate the tree — `--manual`
+  now does this natively) and complete the `--schema` pre-clap-hack retirement (cross-reference the
+  existing "Retire `--schema` hack" entry — its blocking dependency, the manual surface, has now
+  shipped).
+- [ ] **Verify the reserved-flag collision guard after the bump (low risk).** 0.5.0 turns a
+  `#[param]` name colliding with an injected global flag (`manual`, `json`, `jq`, `*-schema`, etc.)
+  into a compile error. A grep found no colliding param names in normalize today, so a clean build
+  after the bump should confirm — flagged for awareness, not a known breakage.
 
 ### server-less UX issues — ~~all fixed~~ (server-less commit 9c294b2)
 
@@ -662,8 +686,13 @@ Schema. Reconcile the envelope shape with the Nursery consumer before removing t
 break Nursery silently.
 
 **Why this matters:** The hack squats the root `--schema` name and blurs two distinct concepts
-(config-file schema vs CLI-tree schema), blocking the naming space needed for a planned
-server-less whole-tree "manual" surface (design doc in progress in the server-less repo).
+(config-file schema vs CLI-tree schema), blocking the naming space needed for the
+server-less whole-tree "manual" surface.
+
+**Dependency satisfied (2026-06-19):** that whole-tree surface has now shipped as `--manual` in
+server-less 0.5.0, so the blocking dependency is gone — the retirement is now actionable once the
+0.5.0 bump lands (see "server-less 0.5.0 adoption" below). Still honor the Nursery envelope caveat
+above before deleting `handle_schema_flag()`.
 
 ### ~~Complexity Hotspots~~ (resolved - max now 22)
 
