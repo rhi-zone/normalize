@@ -68,3 +68,14 @@ Investigation into `normalize sessions stats --pretty` silently falling back to 
   same `&root`-after-move `E0382` bug); D SOUND (macro provably sees globals + all method
   params together; `check_reserved_flag_collisions` precedent; lowest mechanism risk).
   Mechanism-risk ranking D < C < A < B.
+- `judge-migration.md` — Adversarial bake-off judgment on MIGRATION COST / BLAST RADIUS /
+  SEQUENCING / ARCHITECTURE FIT. Ground-truth counts (65 `format_pretty` overrides — not B's
+  "~16"; 164 `OutputFormatter` impls; 161 `display_with` of which ~68 are bespoke non-pretty
+  renderers that survive every redesign). Refutes B's "near-zero blast radius outside the main
+  crate" (real `format_pretty` in ≥5 published feature crates) and flags B's unaddressed
+  `sessions stats` exit-path compile hole; refutes C's "services already homogeneous" (the main
+  `NormalizeService` impl mixes `display_output` with bespoke renderers → unscoped service
+  split). All four need a server-less publish+bump (D's "landable now" holds only for its weak
+  test-only arm). Migration verdicts: A/B/C HIGH, D MED. Sequencing pain B ≫ C > A ≈ D.
+  Universal residual no design closes: pretty-bytes == text-bytes — a behavioural distinctness
+  CI test is required regardless of winner.
