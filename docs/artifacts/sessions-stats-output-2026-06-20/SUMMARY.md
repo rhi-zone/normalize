@@ -57,3 +57,14 @@ Investigation into `normalize sessions stats --pretty` silently falling back to 
   defaulted `format_pretty` root cause). Recommends grafting D's `compile_error!(a)` as an
   interim bridge (it becomes dead once A/B/C delete the `global`/param tokens it inspects)
   and adopting D's behavioural distinctness test permanently regardless of winner.
+- `judge-feasibility.md` — Adversarial feasibility judgment attacking each design's
+  type-system/proc-macro mechanism with real `rustc 1.95.0` probes. Verdicts: A
+  SOUND-WITH-CAVEAT (render rewrite + impl hook sound, but the `render_root` param is moved
+  into the method call → `E0382` as written, fixable by re-reading `sub_matches`); B
+  SOUND-WITH-CAVEAT (the dual inherent-beats-trait specialization for dispatch AND advertise
+  *compiles and resolves correctly at concrete types* — verified — but degrades silently to
+  the fallback in generic context, and B's "near-zero blast radius" is FALSE: ≥4 feature
+  crates override `format_pretty`); C SOUND-WITH-CAVEAT (blanket-impl dispatch is the calmest,
+  same `&root`-after-move `E0382` bug); D SOUND (macro provably sees globals + all method
+  params together; `check_reserved_flag_collisions` precedent; lowest mechanism risk).
+  Mechanism-risk ranking D < C < A < B.
