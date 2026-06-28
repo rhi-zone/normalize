@@ -331,9 +331,12 @@ normalize adopted it (2026-06-29) via a local `[patch.crates-io]` dogfood overri
   `cross_repo_health`, `rank files`/`size`/`ceremony`/`contributors`) — `--pretty` now
   dispatches `format_pretty()`. Rules resolves lazily in its display bridges (root-independent).
   `normalize-ratchet`/`normalize-budget`/`package` had no real `format_pretty`, so their
-  `--pretty` advertisement (own `global = [...]` + dead `pretty` Cell) was removed entirely
-  rather than wired to an inert sink. See `docs/artifacts/sessions-stats-output-2026-06-20/
-  pretty-wiring-audit.md`.
+  service-level `--pretty` advertisement (own `global = [...]` + dead `pretty` Cell) was
+  removed entirely rather than wired to an inert sink. **Correction:** only the service-level
+  flag was removed; the root-level `--pretty`/`--compact` globals (injected by server-less
+  into every command) still appear in help and are accepted — they are silently inert on these
+  commands and on any `analyze` method whose report has no real `format_pretty` (see advertised-no-op
+  item below). See `docs/artifacts/sessions-stats-output-2026-06-20/pretty-wiring-audit.md`.
 - [ ] **Publish server-less 0.6.0, then drop the `[patch.crates-io]` override.** Adoption
   currently relies on a local path patch in the workspace `Cargo.toml` (`[patch.crates-io]
   server-less = { path = ... }`). Once 0.6.0 is on crates.io, remove the patch block; the
@@ -344,6 +347,15 @@ normalize adopted it (2026-06-29) via a local `[patch.crates-io]` dogfood overri
   not the global-flag class). Server-less 0.6 did NOT subtract `display_with` (design-A
   deferred). Fix these by making their display fns dispatch on the pretty state, or adopt the
   upstream `render(mode)` if it lands.
+- [ ] **Root-global `--pretty` advertised-no-op (framework-level).** The root `--pretty`/
+  `--compact` globals (injected by server-less into every subcommand) are silently accepted
+  but do nothing on commands whose report has no real `format_pretty`. Affected: the 7 `analyze`
+  methods whose reports only have the default `format_pretty` (`security`, `docs`, `activity`,
+  `repo_coupling`, `liveness`, `effects`, `exceptions`), plus `normalize-ratchet`/`normalize-budget`/
+  `package`. Decision deferred: whether server-less should suppress root globals on commands
+  whose report type has no real pretty (needs type-visibility at macro-expansion time, i.e.
+  the same design-A/B tradeoff explored in the capability-wiring design doc). Known limitation
+  for now; tracked here for Phase 2+ consideration.
 - [ ] **Audit normalize for `#[param(name)]` / `#[param(default)]` on `#[cli]` methods.**
   0.6 honors `#[param(name)]` (renames the flag) — grep to confirm no unintended renames.
 
