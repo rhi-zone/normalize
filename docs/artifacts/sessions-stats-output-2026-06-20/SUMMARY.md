@@ -19,3 +19,22 @@ Investigation into `normalize sessions stats --pretty` silently falling back to 
   macro always calls, with mode resolved by the macro from the flags (+ TTY + config via a
   one-per-service hook, root threaded via a `#[param(render_root)]` marker). Makes the (a)
   and (c) defect classes impossible by construction and dissolves (b).
+- `design-B-type-property.md` — Design (TYPE-PROPERTY frame): pretty-ness becomes one
+  type-level fact, `impl PrettyFormat for Report` (a non-defaulted sub-trait split out of
+  `OutputFormatter`). The macro emits identical generic code for every command; the
+  *compiler* resolves it per return type via inherent-vs-trait specialization — dispatch
+  (`Render(&v).render(want)`) and advertising (`<PrettyProbe<RetTy>>::HAS_PRETTY` gates the
+  `--pretty` flag) both fall out of that one fact. `global=[pretty]` and all per-method
+  Cell/param/`resolve_pretty` plumbing are retired; (a)/(b)/(c) become unrepresentable.
+  Includes the honest token-only-macro limit and a verified `rustc` probe of both
+  specialization patterns. Root reaches resolution via the macro reading the `root` param
+  token into a `PrettyPolicy` hook.
+- `design-C-invert.md` — Design (INVERT THE DEPENDENCY frame): the macro owns rendering
+  end-to-end. A per-impl `#[cli(..., render)]` flag switches every method into renderer
+  mode; the method returns pure typed data and writes zero flag/Cell/display plumbing.
+  The macro extracts `--pretty`/`--compact`, resolves the config root (via
+  `#[param(config_root)]` > a param named `root` > cwd) coerced through an `AsConfigRoot`
+  trait, and calls a consumer-supplied `CliTextRender<T>` policy (one blanket impl in
+  normalize). Removes `display_with` and `self.pretty` Cell. Additive macro change (zero
+  blast radius for other server-less consumers); (a)/(c) impossible by construction, (b)
+  dissolves into an always-honest flag.
