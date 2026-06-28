@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 391
 expression: "snapshot_help(&[\"generate\", \"types\"])"
 ---
 Generate types/validators from schema
@@ -23,9 +22,10 @@ Options:
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --infer-types                Generate type inference (for Zod/Valibot)
       --output-schema              Print JSON Schema of the subcommand's return type and exit
-      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --manual                     Emit the reference manual for the command subtree rooted here and exit
       --readonly                   Make types readonly/frozen
       --package <package>          Package name (for Go)
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
       --dry-run                    Preview output without writing any files
       --split                      Emit one file per top-level type into the output directory (requires --output)
   -h, --help                       Print help

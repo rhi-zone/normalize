@@ -21,9 +21,10 @@ Options:
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --format <format>            Force specific format: claude, codex, gemini, normalize
       --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --manual                     Emit the reference manual for the command subtree rooted here and exit
   -n, --limit <limit>              Maximum number of sessions (0 = all, default: all)
-      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
       --group-by <group-by>        Group results by comma-separated fields: project, day (e.g. project,day)
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -r, --root <root>                Root directory (defaults to current directory)
       --mode <mode>                Session mode: interactive (default), subagent, or all
       --agent-type <agent-type>    Filter by agent type (e.g. Explore, general-purpose, Plan)

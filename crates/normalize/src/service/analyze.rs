@@ -45,12 +45,16 @@ fn discover_repos(dir: &str, depth: usize) -> Result<Vec<PathBuf>, AnalyzeError>
 /// Analyze sub-service (health, complexity, security, duplicates, docs).
 pub struct AnalyzeService {
     pretty: Cell<bool>,
+    pretty_raw: Cell<bool>,
+    compact_raw: Cell<bool>,
 }
 
 impl AnalyzeService {
     pub fn new(pretty: &Cell<bool>) -> Self {
         Self {
             pretty: Cell::new(pretty.get()),
+            pretty_raw: Cell::new(false),
+            compact_raw: Cell::new(false),
         }
     }
 
@@ -65,10 +69,11 @@ impl AnalyzeService {
         )
     }
 
-    fn resolve_format(&self, pretty: bool, compact: bool, root: &std::path::Path) {
+    fn resolve_format(&self, root: &std::path::Path) {
         use crate::config::NormalizeConfig;
         let config = NormalizeConfig::load(root);
-        let is_pretty = !compact && (pretty || config.pretty.enabled());
+        let is_pretty =
+            !self.compact_raw.get() && (self.pretty_raw.get() || config.pretty.enabled());
         self.pretty.set(is_pretty);
     }
 
@@ -104,6 +109,16 @@ impl AnalyzeService {
         let mut excludes = config.excludes_for(subcommand);
         excludes.extend(cli_exclude.iter().cloned());
         Self::build_filter(root, &excludes, only)
+    }
+}
+
+impl server_less::CliGlobals for AnalyzeService {
+    fn set_global_flag(&self, name: &str, value: bool) {
+        match name {
+            "pretty" => self.pretty_raw.set(value),
+            "compact" => self.compact_raw.set(value),
+            _ => {}
+        }
     }
 }
 
@@ -148,6 +163,7 @@ impl AnalyzeService {
         limit: Option<usize>,
     ) -> Result<ArchitectureReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
+        self.resolve_format(&root_path);
         let idx = crate::index::ensure_ready(&root_path).await?;
         let mut report = crate::commands::analyze::architecture::analyze_architecture(&idx)
             .await
@@ -178,8 +194,6 @@ impl AnalyzeService {
             help = "Maximum number of large files to include in output (0 = no limit, default 10)"
         )]
         limit: Option<usize>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<AnalyzeReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         // Validate target path exists (catches typos and unknown subcommands routed here via #[cli(default)])
@@ -189,7 +203,7 @@ impl AnalyzeService {
                 return Err(AnalyzeError::Message(format!("path not found: {t}")));
             }
         }
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let filter =
             Self::build_filter_with_config(&root_path, &config.analyze, "health", &exclude, &only);
@@ -226,11 +240,9 @@ impl AnalyzeService {
         >,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<AnalyzeReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let filter =
             Self::build_filter_with_config(&root_path, &config.analyze, "all", &exclude, &only);
@@ -330,11 +342,9 @@ impl AnalyzeService {
         >,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<CouplingClustersReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let mut merged_exclude = config.analyze.excludes_for("coupling-clusters");
         merged_exclude.extend(exclude);
@@ -422,6 +432,7 @@ impl AnalyzeService {
         #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
     ) -> Result<CrossRepoHealthReport, AnalyzeError> {
         let repos = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
+        self.resolve_format(&std::env::current_dir().unwrap_or_default());
         Ok(crate::commands::analyze::cross_repo_health::analyze_cross_repo_health(&repos))
     }
 
@@ -437,11 +448,9 @@ impl AnalyzeService {
             help = "Maximum number of worst modules to show in concerns (0=no limit)"
         )]
         limit: Option<usize>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<SummaryReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let effective_limit = match limit.unwrap_or(5) {
             0 => usize::MAX,
             n => n,
@@ -574,11 +583,9 @@ impl AnalyzeService {
         >,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<SkeletonDiffReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let mut merged_exclude = config.analyze.excludes_for("skeleton-diff");
         merged_exclude.extend(exclude);

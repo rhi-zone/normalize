@@ -7,6 +7,7 @@ Edit code by symbol name. Use for batch renames, signature changes, or pattern-b
 Usage: normalize edit [OPTIONS] [COMMAND]
 
 Commands:
+  history             View shadow git edit history
   delete              Delete a symbol.
   replace             Replace a symbol with new content.
   swap                Swap two symbols
@@ -22,7 +23,6 @@ Commands:
   add-parameter       Add a parameter to a function signature and update all call sites.
   inline-function     Inline a single-use function at its call site.
   extract-function    Extract a block of code into a new function.
-  history             View shadow git edit history
   help                Print this message or the help of the given subcommand(s)
 
 Options:
@@ -33,6 +33,7 @@ Options:
       --jq <jq>                    Filter output through jq expression
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --manual                     Emit the reference manual for the command subtree rooted here and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
   -V, --version                    Print version

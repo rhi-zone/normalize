@@ -40,12 +40,16 @@ fn discover_repos(dir: &str, depth: usize) -> Result<Vec<PathBuf>, String> {
 /// Rank sub-service: ranked-list commands (ordered by a metric).
 pub struct RankService {
     pretty: Cell<bool>,
+    pretty_raw: Cell<bool>,
+    compact_raw: Cell<bool>,
 }
 
 impl RankService {
     pub fn new(pretty: &Cell<bool>) -> Self {
         Self {
             pretty: Cell::new(pretty.get()),
+            pretty_raw: Cell::new(false),
+            compact_raw: Cell::new(false),
         }
     }
 
@@ -56,10 +60,11 @@ impl RankService {
         )
     }
 
-    fn resolve_format(&self, pretty: bool, compact: bool, root: &std::path::Path) {
+    fn resolve_format(&self, root: &std::path::Path) {
         use crate::config::NormalizeConfig;
         let config = NormalizeConfig::load(root);
-        let is_pretty = !compact && (pretty || config.pretty.enabled());
+        let is_pretty =
+            !self.compact_raw.get() && (self.pretty_raw.get() || config.pretty.enabled());
         self.pretty.set(is_pretty);
     }
 
@@ -189,6 +194,16 @@ impl RankService {
     }
 }
 
+impl server_less::CliGlobals for RankService {
+    fn set_global_flag(&self, name: &str, value: bool) {
+        match name {
+            "pretty" => self.pretty_raw.set(value),
+            "compact" => self.compact_raw.set(value),
+            _ => {}
+        }
+    }
+}
+
 #[cli(
     name = "rank",
     description = "Rank files and functions by metrics. Use to find the most complex, longest, or most coupled code.",
@@ -232,11 +247,9 @@ impl RankService {
         #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ComplexityReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let filter = Self::build_filter_with_config(
             &root_path,
@@ -323,6 +336,7 @@ impl RankService {
         >,
     ) -> Result<FileLengthReport, String> {
         let root_path = Self::root_path(root)?;
+        self.resolve_format(&root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let mut merged_exclude = config.analyze.excludes_for("files");
         merged_exclude.extend(exclude);
@@ -363,6 +377,7 @@ impl RankService {
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
     ) -> Result<SizeReport, String> {
         let root_path = Self::root_path(root)?;
+        self.resolve_format(&root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let mut merged_exclude = config.analyze.excludes_for("size");
         merged_exclude.extend(exclude);
@@ -392,6 +407,7 @@ impl RankService {
         >,
     ) -> Result<CeremonyReport, String> {
         let root_path = Self::root_path(root)?;
+        self.resolve_format(&root_path);
         let mut report =
             crate::commands::analyze::ceremony::analyze_ceremony(&root_path, limit.unwrap_or(15));
         if let Some(ref diff_ref) = diff {
@@ -433,11 +449,9 @@ impl RankService {
         >,
         #[param(help = "Run across all git repos under DIR")] repos_dir: Option<String>,
         #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<HotspotsReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         // Merge: global excludes + [analyze.hotspots] excludes + hotspots_exclude
         let mut excludes = config.analyze.excludes_for("hotspots");
@@ -507,11 +521,9 @@ impl RankService {
         #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<CouplingReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let mut merged_exclude = config.analyze.excludes_for("coupling");
         merged_exclude.extend(exclude);
@@ -645,11 +657,9 @@ impl RankService {
         #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<TestRatioReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let effective_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
             n => n,
@@ -693,11 +703,9 @@ impl RankService {
         #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<LengthReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let filter =
             Self::build_filter_with_config(&root_path, &config.analyze, "length", &exclude, &only);
@@ -776,11 +784,9 @@ impl RankService {
         limit: Option<usize>,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<TestGapsReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let config = crate::config::NormalizeConfig::load(&root_path);
         let filter = Self::build_filter_with_config(
             &root_path,
@@ -823,11 +829,9 @@ impl RankService {
         #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<LineBudgetReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let effective_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
             n => n,
@@ -879,11 +883,9 @@ impl RankService {
         #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<DensityReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let module_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
             n => n,
@@ -941,11 +943,9 @@ impl RankService {
         #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<UniquenessReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let module_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
             n => n,
@@ -1014,11 +1014,9 @@ impl RankService {
         #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ImportCentralityReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let effective_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
             n => n,
@@ -1074,11 +1072,9 @@ impl RankService {
         #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<SurfaceReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let effective_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
             n => n,
@@ -1134,11 +1130,9 @@ impl RankService {
         #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<DepthMapReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let effective_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
             n => n,
@@ -1198,11 +1192,9 @@ impl RankService {
         #[param(help = "Show delta vs this git ref (branch, tag, commit, HEAD~N)")] diff: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<LayeringReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let effective_limit = match limit.unwrap_or(30) {
             0 => usize::MAX,
             n => n,
@@ -1249,11 +1241,9 @@ impl RankService {
         limit: Option<usize>,
         #[param(help = "Minimum lines for a module to be included (default: 100)")]
         min_lines: Option<usize>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ModuleHealthReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let effective_limit = match limit.unwrap_or(0) {
             0 => usize::MAX,
             n => n,
@@ -1293,11 +1283,9 @@ impl RankService {
         limit: Option<usize>,
         #[param(short = 'm', help = "Maximum number of modules to show (0=no limit)")]
         module_limit: Option<usize>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<CallComplexityReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let effective_limit = limit.unwrap_or(20);
         let effective_module_limit = match module_limit.unwrap_or(30) {
             0 => usize::MAX,
@@ -1348,8 +1336,6 @@ impl RankService {
         >,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-        pretty: bool,
-        compact: bool,
         #[param(help = "Minimum similarity threshold (0.0-1.0, similar/clusters mode)")]
         similarity: Option<f64>,
         #[param(help = "Match on control-flow structure (similar/clusters mode)")] skeleton: bool,
@@ -1364,7 +1350,7 @@ impl RankService {
         limit: Option<usize>,
     ) -> Result<DuplicatesReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let scope = scope.unwrap_or(DuplicateScope::Functions);
         let mode = mode.unwrap_or(DuplicateMode::Exact);
         let config = crate::config::NormalizeConfig::load(&root_path);
@@ -1553,11 +1539,9 @@ impl RankService {
         min_members: Option<usize>,
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<FragmentsReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let scope_val: FragmentScope = scope
             .as_deref()
             .unwrap_or("all")
@@ -1599,6 +1583,7 @@ impl RankService {
         #[param(help = "Max depth to search for repos (default: 1)")] repos_depth: Option<usize>,
     ) -> Result<ContributorsReport, String> {
         let repos = discover_repos(&repos_dir, repos_depth.unwrap_or(1))?;
+        self.resolve_format(&std::env::current_dir().unwrap_or_default());
         crate::commands::analyze::contributors::analyze_contributors(&repos)
     }
 }

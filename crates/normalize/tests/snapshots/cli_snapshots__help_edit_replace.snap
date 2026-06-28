@@ -23,8 +23,9 @@ Options:
       --multiple                   Allow glob patterns to match multiple symbols
       --output-schema              Print JSON Schema of the subcommand's return type and exit
   -m, --message <message>          Message for shadow history
-      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --manual                     Emit the reference manual for the command subtree rooted here and exit
   -i, --case-insensitive           Case-insensitive matching
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -r, --root <root>                Root directory
       --each                       Replace in every file matching --only that contains the symbol
   -h, --help                       Print help

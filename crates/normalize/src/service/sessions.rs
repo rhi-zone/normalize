@@ -1,6 +1,5 @@
 //! Sessions management service for server-less CLI.
 
-use super::resolve_pretty;
 use crate::commands::sessions::{
     CostReport, HeatmapReport, MarkReport, MessagesReport, NgramRole, NgramsReport,
     ParallelizationReport, PatternsReport, PlanContent, PlansListReport, SessionListReport,
@@ -14,12 +13,34 @@ use std::cell::Cell;
 /// Sessions management sub-service.
 pub struct SessionsService {
     pretty: Cell<bool>,
+    pretty_raw: Cell<bool>,
+    compact_raw: Cell<bool>,
 }
 
 impl SessionsService {
     pub fn new(pretty: &Cell<bool>) -> Self {
         Self {
             pretty: Cell::new(pretty.get()),
+            pretty_raw: Cell::new(false),
+            compact_raw: Cell::new(false),
+        }
+    }
+
+    fn resolve_format(&self, root: &std::path::Path) {
+        self.pretty.set(super::resolve_pretty(
+            root,
+            self.pretty_raw.get(),
+            self.compact_raw.get(),
+        ));
+    }
+}
+
+impl server_less::CliGlobals for SessionsService {
+    fn set_global_flag(&self, name: &str, value: bool) {
+        match name {
+            "pretty" => self.pretty_raw.set(value),
+            "compact" => self.compact_raw.set(value),
+            _ => {}
         }
     }
 }
@@ -112,15 +133,12 @@ impl SessionsService {
         sort: Option<String>,
         #[param(help = "Only show sessions marked as reviewed")] reviewed: bool,
         #[param(help = "Only show sessions not yet reviewed")] unreviewed: bool,
-        pretty: bool,
-        compact: bool,
     ) -> Result<SessionListReport, String> {
         let limit = limit.unwrap_or(20);
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
-        self.pretty
-            .set(resolve_pretty(resolved_root, pretty, compact));
+        self.resolve_format(resolved_root);
         let mode = mode.unwrap_or_default();
         let mut report = crate::commands::sessions::build_session_list(
             root_path,
@@ -164,14 +182,11 @@ impl SessionsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<SessionShowReport, String> {
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
-        self.pretty
-            .set(super::resolve_pretty(resolved_root, pretty, compact));
+        self.resolve_format(resolved_root);
         let effective_project = project_path.or(root_path);
         crate::commands::sessions::build_show_report(
             &session,
@@ -207,16 +222,13 @@ impl SessionsService {
         >,
         #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
         agent_type: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<SessionAnalysisReport, String> {
         let _mode = mode; // session resolution already searches subagents
         let _agent_type = agent_type; // session resolution already searches subagents
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
-        self.pretty
-            .set(super::resolve_pretty(resolved_root, pretty, compact));
+        self.resolve_format(resolved_root);
         let effective_project = project_path.or(root_path);
         crate::commands::sessions::build_analyze_report(
             &session,
@@ -275,6 +287,8 @@ impl SessionsService {
         let limit = limit.unwrap_or(0);
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
+        let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
+        self.resolve_format(resolved_root);
         let mode = mode.unwrap_or_default();
 
         // --by-repo: delegate to the repo stats path which exits directly after printing.
@@ -480,15 +494,12 @@ impl SessionsService {
         >,
         #[param(help = "Minimum message length in characters")] min_chars: Option<usize>,
         #[param(help = "Maximum message length in characters")] max_chars: Option<usize>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<MessagesReport, String> {
         let limit = limit.unwrap_or(20);
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
-        self.pretty
-            .set(resolve_pretty(resolved_root, pretty, compact));
+        self.resolve_format(resolved_root);
         let context_lines = context.unwrap_or(0);
         if context_lines > 0 && grep.is_none() {
             return Err("--context requires --grep".to_string());
@@ -578,6 +589,8 @@ impl SessionsService {
     ) -> Result<SubagentsReport, String> {
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
+        let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
+        self.resolve_format(resolved_root);
         let effective_project = project_path.or(root_path);
         crate::commands::sessions::subagents::build_subagents_report(
             &session,
@@ -625,15 +638,12 @@ impl SessionsService {
             help = "Sort outlier rows (comma-separated, prefix with - for desc or + for asc): divergence, tool_count, turn_count, path. E.g. tool_count, +path"
         )]
         sort: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<PatternsReport, String> {
         let limit = limit.unwrap_or(0);
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
-        self.pretty
-            .set(resolve_pretty(resolved_root, pretty, compact));
+        self.resolve_format(resolved_root);
         let mode = mode.unwrap_or_default();
         crate::commands::sessions::build_patterns_report(
             root_path,
@@ -691,16 +701,13 @@ impl SessionsService {
         >,
         #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
         agent_type: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ParallelizationReport, String> {
         let threshold = threshold.unwrap_or(2);
         let limit = limit.unwrap_or(0);
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
-        self.pretty
-            .set(resolve_pretty(resolved_root, pretty, compact));
+        self.resolve_format(resolved_root);
         let mode = mode.unwrap_or_default();
         let effective_project = project_path.or(root_path);
         if let Some(ref session_id) = session {
@@ -769,16 +776,13 @@ impl SessionsService {
         >,
         #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
         agent_type: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<HeatmapReport, String> {
         let top = top.unwrap_or(20);
         let limit = limit.unwrap_or(0);
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
-        self.pretty
-            .set(resolve_pretty(resolved_root, pretty, compact));
+        self.resolve_format(resolved_root);
         let mode = mode.unwrap_or_default();
         let effective_project = project_path.or(root_path);
         if let Some(ref session_id) = session {
@@ -846,15 +850,12 @@ impl SessionsService {
         >,
         #[param(help = "Filter by agent type (e.g. Explore, general-purpose, Plan)")]
         agent_type: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<CostReport, String> {
         let limit = limit.unwrap_or(0);
         let root_path = root.as_deref().map(std::path::Path::new);
         let project_path = project.as_deref().map(std::path::Path::new);
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
-        self.pretty
-            .set(resolve_pretty(resolved_root, pretty, compact));
+        self.resolve_format(resolved_root);
         let mode = mode.unwrap_or_default();
         let effective_project = project_path.or(root_path);
         if let Some(ref session_id) = session {

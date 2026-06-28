@@ -24,9 +24,10 @@ Options:
       --since <since>              Filter sessions since date (YYYY-MM-DD)
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --until <until>              Filter sessions until date (YYYY-MM-DD)
-      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --manual                     Emit the reference manual for the command subtree rooted here and exit
       --project <project>          Filter by specific project path
       --all-projects               Show sessions from all projects
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
       --format <format>            Force specific format: claude, codex, gemini, normalize
   -n, --limit <limit>              Maximum number of sessions (0 = all, default: all)
   -r, --root <root>                Root directory (defaults to current directory)

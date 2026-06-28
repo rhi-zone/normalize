@@ -151,19 +151,24 @@ fn resolve_context_blocks(
 /// Context sub-service: frontmatter-filtered context resolution and migration.
 pub struct ContextService {
     pretty: Cell<bool>,
+    pretty_raw: Cell<bool>,
+    compact_raw: Cell<bool>,
 }
 
 impl ContextService {
     pub fn new(pretty: &Cell<bool>) -> Self {
         Self {
             pretty: Cell::new(pretty.get()),
+            pretty_raw: Cell::new(false),
+            compact_raw: Cell::new(false),
         }
     }
 
-    fn resolve_format(&self, pretty: bool, compact: bool, root: &std::path::Path) {
+    fn resolve_format(&self, root: &std::path::Path) {
         use crate::config::NormalizeConfig;
         let config = NormalizeConfig::load(root);
-        let is_pretty = !compact && (pretty || config.pretty.enabled());
+        let is_pretty =
+            !self.compact_raw.get() && (self.pretty_raw.get() || config.pretty.enabled());
         self.pretty.set(is_pretty);
     }
 
@@ -186,6 +191,16 @@ impl ContextService {
                     r.format_text()
                 }
             }
+        }
+    }
+}
+
+impl server_less::CliGlobals for ContextService {
+    fn set_global_flag(&self, name: &str, value: bool) {
+        match name {
+            "pretty" => self.pretty_raw.set(value),
+            "compact" => self.compact_raw.set(value),
+            _ => {}
         }
     }
 }
@@ -270,8 +285,6 @@ impl ContextService {
             help = "Load a structured file into caller context as PREFIX=PATH (repeatable; supports .json, .toml, .yaml/.yml)"
         )]
         file: Vec<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ContextKindReport, String> {
         let root_path = root
             .map(PathBuf::from)
@@ -279,7 +292,7 @@ impl ContextService {
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
 
         let dir_name = from.as_deref().unwrap_or("context");
 
@@ -335,8 +348,6 @@ impl ContextService {
         &self,
         #[param(help = "Root directory to search (default: cwd)")] root: Option<String>,
         #[param(help = "Perform the migration (default: dry-run preview)")] apply: bool,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ContextMigrateReport, String> {
         let root_path = root
             .map(PathBuf::from)
@@ -344,7 +355,7 @@ impl ContextService {
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
 
         let legacy_names = ["CONTEXT.md", ".context.md"];
         let mut migrations = Vec::new();

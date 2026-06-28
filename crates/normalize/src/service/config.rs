@@ -646,6 +646,8 @@ fn set_in_table(
 /// to annotate output and validate writes.
 pub struct ConfigService {
     pub(crate) pretty: Cell<bool>,
+    pretty_raw: Cell<bool>,
+    compact_raw: Cell<bool>,
 }
 
 impl ConfigService {
@@ -653,6 +655,8 @@ impl ConfigService {
         // Share parent pretty cell value but own our Cell
         Self {
             pretty: Cell::new(pretty.get()),
+            pretty_raw: Cell::new(false),
+            compact_raw: Cell::new(false),
         }
     }
 
@@ -695,9 +699,22 @@ impl ConfigService {
             .map_err(|e| format!("Failed to get current directory: {e}"))
     }
 
-    fn resolve_format(&self, pretty: bool, compact: bool, root: &Path) {
-        self.pretty
-            .set(super::resolve_pretty(root, pretty, compact));
+    fn resolve_format(&self, root: &Path) {
+        self.pretty.set(super::resolve_pretty(
+            root,
+            self.pretty_raw.get(),
+            self.compact_raw.get(),
+        ));
+    }
+}
+
+impl server_less::CliGlobals for ConfigService {
+    fn set_global_flag(&self, name: &str, value: bool) {
+        match name {
+            "pretty" => self.pretty_raw.set(value),
+            "compact" => self.compact_raw.set(value),
+            _ => {}
+        }
     }
 }
 
@@ -716,10 +733,10 @@ impl ConfigService {
     ///   normalize config schema              # print the full JSON Schema
     ///   normalize config schema --json       # machine-readable JSON output
     #[cli(display_with = "display_schema")]
-    pub fn schema(&self, pretty: bool, compact: bool) -> Result<ConfigSchemaReport, String> {
+    pub fn schema(&self) -> Result<ConfigSchemaReport, String> {
         let root =
             std::env::current_dir().map_err(|e| format!("cannot access current directory: {e}"))?;
-        self.resolve_format(pretty, compact, &root);
+        self.resolve_format(&root);
         let schema = schemars::schema_for!(NormalizeConfig);
         let value =
             serde_json::to_value(schema).map_err(|e| format!("Schema serialization error: {e}"))?;
@@ -752,11 +769,9 @@ impl ConfigService {
         )]
         section: Option<String>,
         #[param(help = "Only show fields that have a value set in the config file")] set_only: bool,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ConfigShowReport, String> {
         let root_path = Self::resolve_root(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let config_path = file.unwrap_or_else(|| default_config_file(&root_path));
         let schema_json = load_schema(schema.as_deref())?;
         // Config file is optional — show schema even if no file exists yet
@@ -789,11 +804,9 @@ impl ConfigService {
         >,
         #[param(help = "Path to JSON Schema file (default: NormalizeConfig schema)")]
         schema: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ConfigValidateReport, String> {
         let root_path = Self::resolve_root(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let schema_source = schema
             .clone()
             .unwrap_or_else(|| "NormalizeConfig (built-in)".to_string());
@@ -957,11 +970,9 @@ impl ConfigService {
         schema: Option<String>,
         #[param(help = "Preview changes without writing")] dry_run: bool,
         #[param(help = "Write even if the value fails schema validation")] force: bool,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ConfigSetReport, String> {
         let root_path = Self::resolve_root(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let config_path = file.unwrap_or_else(|| default_config_file(&root_path));
 
         // Only TOML supported for writes

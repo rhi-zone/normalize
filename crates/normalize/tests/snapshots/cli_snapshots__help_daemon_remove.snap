@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 195
 expression: "snapshot_help(&[\"daemon\", \"remove\"])"
 ---
 Remove a root from watching
@@ -19,6 +18,7 @@ Options:
       --jq <jq>                    Filter output through jq expression
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --manual                     Emit the reference manual for the command subtree rooted here and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
 

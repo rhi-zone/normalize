@@ -12,12 +12,16 @@ use std::path::PathBuf;
 /// Trend sub-service: time-series commands tracking health metrics over git history.
 pub struct TrendService {
     pretty: Cell<bool>,
+    pretty_raw: Cell<bool>,
+    compact_raw: Cell<bool>,
 }
 
 impl TrendService {
     pub fn new(pretty: &Cell<bool>) -> Self {
         Self {
             pretty: Cell::new(pretty.get()),
+            pretty_raw: Cell::new(false),
+            compact_raw: Cell::new(false),
         }
     }
 
@@ -28,10 +32,11 @@ impl TrendService {
         )
     }
 
-    fn resolve_format(&self, pretty: bool, compact: bool, root: &std::path::Path) {
+    fn resolve_format(&self, root: &std::path::Path) {
         use crate::config::NormalizeConfig;
         let config = NormalizeConfig::load(root);
-        let is_pretty = !compact && (pretty || config.pretty.enabled());
+        let is_pretty =
+            !self.compact_raw.get() && (self.pretty_raw.get() || config.pretty.enabled());
         self.pretty.set(is_pretty);
     }
 
@@ -41,6 +46,16 @@ impl TrendService {
             r.format_pretty()
         } else {
             r.format_text()
+        }
+    }
+}
+
+impl server_less::CliGlobals for TrendService {
+    fn set_global_flag(&self, name: &str, value: bool) {
+        match name {
+            "pretty" => self.pretty_raw.set(value),
+            "compact" => self.compact_raw.set(value),
+            _ => {}
         }
     }
 }
@@ -67,11 +82,9 @@ impl TrendService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<TrendReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         crate::commands::analyze::trend::analyze_trend(&root_path, snapshots.unwrap_or(6))
     }
 
@@ -88,11 +101,9 @@ impl TrendService {
         >,
         #[param(short = 'n', help = "Number of snapshots to collect (default: 10)")]
         snapshots: Option<usize>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ScalarTrendReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         crate::commands::analyze::trend::analyze_scalar_trend(
             &root_path,
             "avg_complexity",
@@ -123,11 +134,9 @@ impl TrendService {
         >,
         #[param(short = 'n', help = "Number of snapshots to collect (default: 10)")]
         snapshots: Option<usize>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ScalarTrendReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         crate::commands::analyze::trend::analyze_scalar_trend(
             &root_path,
             "avg_length",
@@ -158,11 +167,9 @@ impl TrendService {
         >,
         #[param(short = 'n', help = "Number of snapshots to collect (default: 10)")]
         snapshots: Option<usize>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ScalarTrendReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         crate::commands::analyze::trend::analyze_scalar_trend(
             &root_path,
             "overall_density_score",
@@ -188,11 +195,9 @@ impl TrendService {
         >,
         #[param(short = 'n', help = "Number of snapshots to collect (default: 10)")]
         snapshots: Option<usize>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ScalarTrendReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         crate::commands::analyze::trend::analyze_scalar_trend(
             &root_path,
             "overall_test_ratio",

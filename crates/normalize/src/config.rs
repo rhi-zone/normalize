@@ -224,9 +224,9 @@ impl NormalizeConfig {
             sources.push(server_less::ConfigSource::File(global_path));
         }
         sources.push(server_less::ConfigSource::File(project_config.clone()));
-        <Self as server_less::ConfigTrait>::load(&sources).unwrap_or_else(|e| {
+        <Self as server_less::ConfigLoad>::load(&sources).unwrap_or_else(|e| {
             // Warn on parse errors so the user knows their config is being ignored.
-            // Missing files are silently skipped by ConfigTrait; only real errors surface here.
+            // Missing files are silently skipped by ConfigLoad; only real errors surface here.
             eprintln!(
                 "warning: failed to load {}: {} (using defaults — run `normalize config validate` for details)",
                 project_config.display(),
@@ -346,7 +346,7 @@ config = []
     fn test_global_project_layering() {
         // Global sets enabled=false; project only sets auto_start=true.
         // Config::load(File(global), File(project)) must preserve enabled=false.
-        use server_less::{ConfigSource, ConfigTrait};
+        use server_less::{ConfigLoad, ConfigSource};
 
         let tmp = TempDir::new().unwrap();
         let global = tmp.path().join("global.toml");
@@ -357,7 +357,7 @@ config = []
         std::fs::write(&global, "[daemon]\nenabled = false\n").unwrap();
         std::fs::write(&project, "[daemon]\nauto_start = true\n").unwrap();
 
-        let config = <NormalizeConfig as ConfigTrait>::load(&[
+        let config = <NormalizeConfig as ConfigLoad>::load(&[
             ConfigSource::Defaults,
             ConfigSource::File(global),
             ConfigSource::File(project),

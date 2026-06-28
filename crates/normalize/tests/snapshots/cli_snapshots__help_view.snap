@@ -31,12 +31,13 @@ Options:
       --jq <jq>                    Filter output through jq expression
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --manual                     Emit the reference manual for the command subtree rooted here and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -r, --root <root>                Root directory (defaults to current directory)
   -d, --depth <depth>              Depth of expansion (0=names only, 1=signatures, 2=with children, -1=all)
   -n, --line-numbers               Show line numbers
       --deps                       Show dependencies (imports/exports)
-  -k, --kind <kind>                Filter by symbol kind: class, function, method
+  -k, --kind <kind>                Filter by symbol kind: class, function, method [possible values: class, function, method]
       --types-only                 Show only type definitions
       --tests                      Include test functions and test modules
       --raw                        Disable smart display (no collapsing single-child dirs)

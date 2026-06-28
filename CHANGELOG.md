@@ -6,7 +6,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`--pretty` now works on 8 commands where it was silently inert.** `sessions stats`,
+  `sessions subagents`, `analyze architecture`, `analyze cross_repo_health`, `rank files`,
+  `rank size`, `rank ceremony`, and `rank contributors` advertised `--pretty` in `--help` but
+  fell back to plain text — the flag never reached the renderer. They now produce the rich
+  colored output (`--compact` and TTY auto-detection likewise resolve correctly, against the
+  command's target root).
+
 ### Changed
+
+- **Adopted server-less 0.6 (CLI capability-wiring invariant).** Global `--pretty`/`--compact`
+  flags are now delivered through a single `CliGlobals` sink per service instead of per-method
+  parameters, removing a class of silently-inert flags. `normalize-ratchet`, `normalize-budget`,
+  and `package` no longer carry a private `--pretty` advertisement (they have no distinct pretty
+  output); `--pretty` remains available as a root-level global. Subcommand `--help` now lists
+  `--manual` and shows `[possible values: …]` for enum flags (server-less 0.6).
 
 - **`normalize rank` text output is converging on one house style** (documented in
   `docs/cli-design.md`, "Rank output house style"). First wave of the migration:

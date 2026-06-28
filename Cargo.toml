@@ -120,7 +120,7 @@ roxmltree = "0.21"
 gix = { version = "0.81", default-features = false, features = ["sha1", "revision", "blob-diff", "index", "blame", "status"] }
 
 # Service framework
-server-less = { version = "0.4.9", default-features = false, features = ["cli", "jsonschema", "config"] }
+server-less = { version = "0.6", default-features = false, features = ["cli", "jsonschema", "config"] }
 
 # JSON Schema validation
 jsonschema = "0.26"
@@ -140,3 +140,8 @@ lto = true
 codegen-units = 1
 strip = true
 
+
+# Local dogfood override for server-less 0.6.0 (feat/cli-capability-wiring-invariant).
+# Stripped on publish — keeps published crates version-based, no path coupling.
+[patch.crates-io]
+server-less = { path = "/home/me/git/rhizone/server-less/crates/server-less" }

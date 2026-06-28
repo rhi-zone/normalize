@@ -6,19 +6,15 @@ use crate::commands::package::{
 use crate::output::OutputFormatter;
 use normalize_ecosystems::{Dependency, DependencyTree, PackageInfo, Vulnerability};
 use server_less::cli;
-use std::cell::Cell;
 use std::path::Path;
 
 /// Package management sub-service.
-pub struct PackageService {
-    _pretty: Cell<bool>,
-}
+#[derive(Default)]
+pub struct PackageService;
 
 impl PackageService {
-    pub fn new(pretty: &Cell<bool>) -> Self {
-        Self {
-            _pretty: Cell::new(pretty.get()),
-        }
+    pub fn new() -> Self {
+        Self
     }
 
     /// Generic display bridge that routes to `OutputFormatter::format_text()`.
@@ -220,11 +216,7 @@ impl OutputFormatter for PackageAuditReport {
 
 #[cli(
     name = "package",
-    description = "Query package metadata and dependencies. Use to check versions, find outdated deps, or view dep trees.",
-    global = [
-        pretty = "Human-friendly output with colors and formatting",
-        compact = "Compact output without colors (overrides TTY detection)",
-    ]
+    description = "Query package metadata and dependencies. Use to check versions, find outdated deps, or view dep trees."
 )]
 impl PackageService {
     /// Query package info from registry
@@ -242,10 +234,7 @@ impl PackageService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<PackageInfoReport, String> {
-        let _ = (pretty, compact);
         let root_path = root.as_deref().map(Path::new).unwrap_or(Path::new("."));
         let (eco, info) =
             crate::commands::package::get_info(&package, ecosystem.as_deref(), root_path)?;
@@ -268,10 +257,7 @@ impl PackageService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<PackageListReport, String> {
-        let _ = (pretty, compact);
         let root_path = root.as_deref().map(Path::new).unwrap_or(Path::new("."));
         let (eco, packages, ecosystems_detected) =
             crate::commands::package::get_list(ecosystem.as_deref(), root_path)?;
@@ -301,10 +287,7 @@ impl PackageService {
             help = "Maximum dependency depth to show (0 = roots only, default = unlimited)"
         )]
         depth: Option<usize>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<PackageTreeReport, String> {
-        let _ = (pretty, compact);
         let root_path = root.as_deref().map(Path::new).unwrap_or(Path::new("."));
         let (eco, tree) = crate::commands::package::get_tree(ecosystem.as_deref(), root_path)?;
         Ok(PackageTreeReport {
@@ -327,10 +310,7 @@ impl PackageService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<PackageWhyReport, String> {
-        let _ = (pretty, compact);
         let root_path = root.as_deref().map(Path::new).unwrap_or(Path::new("."));
         let (eco, tree) = crate::commands::package::get_tree(ecosystem.as_deref(), root_path)?;
         let raw_paths = find_dependency_paths(&tree, &package);
@@ -362,10 +342,7 @@ impl PackageService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<PackageOutdatedReport, String> {
-        let _ = (pretty, compact);
         let root_path = root.as_deref().map(Path::new).unwrap_or(Path::new("."));
         let (eco, outdated, errors) = show_outdated_data(ecosystem.as_deref(), root_path)?;
         let outdated = outdated
@@ -397,10 +374,7 @@ impl PackageService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<PackageAuditReport, String> {
-        let _ = (pretty, compact);
         let root_path = root.as_deref().map(Path::new).unwrap_or(Path::new("."));
         let (eco, vulns) = crate::commands::package::get_audit(ecosystem.as_deref(), root_path)?;
         Ok(PackageAuditReport {

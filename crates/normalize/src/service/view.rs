@@ -36,6 +36,8 @@ impl std::fmt::Display for TraceReport {
 /// View sub-service: directory/file/symbol navigation and graph navigation.
 pub struct ViewService {
     pretty: Cell<bool>,
+    pretty_raw: Cell<bool>,
+    compact_raw: Cell<bool>,
     /// Text prefix to prepend to the default view output (used for --dir-context).
     view_prefix: Cell<String>,
     /// Raw context content (without display separator) for populating `ViewReport::dir_context`.
@@ -46,6 +48,8 @@ impl ViewService {
     pub fn new(pretty: &Cell<bool>) -> Self {
         Self {
             pretty: Cell::new(pretty.get()),
+            pretty_raw: Cell::new(false),
+            compact_raw: Cell::new(false),
             view_prefix: Cell::new(String::new()),
             dir_context_content: std::cell::RefCell::new(None),
         }
@@ -58,10 +62,11 @@ impl ViewService {
         )
     }
 
-    fn resolve_format(&self, pretty: bool, compact: bool, root: &std::path::Path) {
+    fn resolve_format(&self, root: &std::path::Path) {
         use crate::config::NormalizeConfig;
         let config = NormalizeConfig::load(root);
-        let is_pretty = !compact && (pretty || config.pretty.enabled());
+        let is_pretty =
+            !self.compact_raw.get() && (self.pretty_raw.get() || config.pretty.enabled());
         self.pretty.set(is_pretty);
     }
 
@@ -123,6 +128,16 @@ impl ViewService {
 
     fn display_import_path(&self, r: &ImportPathReport) -> String {
         self.display_output(r)
+    }
+}
+
+impl server_less::CliGlobals for ViewService {
+    fn set_global_flag(&self, name: &str, value: bool) {
+        match name {
+            "pretty" => self.pretty_raw.set(value),
+            "compact" => self.compact_raw.set(value),
+            _ => {}
+        }
     }
 }
 
@@ -191,8 +206,6 @@ impl ViewService {
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
         #[param(short = 'i', help = "Case-insensitive symbol matching")] case_insensitive: bool,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ViewReport, String> {
         let root_path = root
             .map(PathBuf::from)
@@ -200,7 +213,7 @@ impl ViewService {
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
 
         let config = crate::config::NormalizeConfig::load(&root_path);
 
@@ -335,8 +348,6 @@ impl ViewService {
         )]
         context_lines: Option<usize>,
         #[param(help = "Which match to show (1-indexed, default: 1)")] match_index: Option<usize>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ChunkedViewReport, String> {
         let root_path = root
             .map(PathBuf::from)
@@ -344,7 +355,7 @@ impl ViewService {
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
 
         match (chunk, around) {
             (Some(n), None) => {
@@ -426,8 +437,6 @@ impl ViewService {
         #[param(help = "Exclude paths matching pattern")] exclude: Vec<String>,
         #[param(help = "Include only paths matching pattern")] only: Vec<String>,
         #[param(short = 'i', help = "Case-insensitive symbol matching")] case_insensitive: bool,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ViewListReport, String> {
         let root_path = root
             .map(std::path::PathBuf::from)
@@ -435,7 +444,7 @@ impl ViewService {
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
 
         let config = crate::config::NormalizeConfig::load(&root_path);
 
@@ -539,11 +548,9 @@ impl ViewService {
         #[param(help = "Graph nodes: modules (default), symbols, or types")] on: Option<
             GraphTarget,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<DependentsReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let graph_target = on.unwrap_or(GraphTarget::Modules);
         let idx = crate::index::ensure_ready(&root_path).await?;
         crate::commands::analyze::graph::analyze_dependents(&idx, &target, graph_target)
@@ -597,11 +604,9 @@ impl ViewService {
         >,
         #[param(short = 'l', help = "Max examples per section (0=no limit)")] limit: Option<usize>,
         #[param(help = "Graph nodes: modules (default) or symbols")] on: Option<GraphTarget>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<GraphReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let effective_limit = match limit.unwrap_or(10) {
             0 => usize::MAX,
             n => n,
@@ -667,11 +672,9 @@ impl ViewService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ProvenanceReport, String> {
         let root_path = Self::root_path(root)?;
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
         let effective_limit = match limit.unwrap_or(50) {
             0 => usize::MAX,
             n => n,

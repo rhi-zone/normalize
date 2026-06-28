@@ -23,8 +23,9 @@ Options:
   -m, --message <message>          Message for shadow history
   -i, --case-insensitive           Case-insensitive matching
       --output-schema              Print JSON Schema of the subcommand's return type and exit
-      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --manual                     Emit the reference manual for the command subtree rooted here and exit
   -r, --root <root>                Root directory
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
 
 Examples:

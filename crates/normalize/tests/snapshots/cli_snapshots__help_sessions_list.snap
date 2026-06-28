@@ -21,6 +21,7 @@ Options:
       --input-schema               Print JSON Schema of the subcommand's input parameters and exit
       --format <format>            Force specific format: claude, codex, gemini, normalize
       --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --manual                     Emit the reference manual for the command subtree rooted here and exit
   -n, --limit <limit>              Maximum number of sessions
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -r, --root <root>                Root directory (defaults to current directory)

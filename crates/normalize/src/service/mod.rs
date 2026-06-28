@@ -53,6 +53,10 @@ use std::path::PathBuf;
 pub struct NormalizeService {
     /// Whether pretty output is active (resolved per-command from globals + config).
     pretty: Cell<bool>,
+    /// Raw `--pretty`/`--compact` flag values delivered by `CliGlobals`, resolved
+    /// per-command against the target root (TTY/config) into `pretty`.
+    pretty_raw: Cell<bool>,
+    compact_raw: Cell<bool>,
     analyze: analyze::AnalyzeService,
     config: config::ConfigService,
     context: context::ContextService,
@@ -90,6 +94,16 @@ pub(crate) fn resolve_pretty(root: &std::path::Path, pretty: bool, compact: bool
     !compact && (pretty || config.pretty.enabled())
 }
 
+impl server_less::CliGlobals for NormalizeService {
+    fn set_global_flag(&self, name: &str, value: bool) {
+        match name {
+            "pretty" => self.pretty_raw.set(value),
+            "compact" => self.compact_raw.set(value),
+            _ => {}
+        }
+    }
+}
+
 impl NormalizeService {
     /// Construct a new `NormalizeService` with all sub-services initialized.
     ///
@@ -110,12 +124,12 @@ impl NormalizeService {
             grammars: grammars::GrammarService::new(&pretty),
             guide: guide::GuideService,
             generate: generate::GenerateService,
-            package: package::PackageService::new(&pretty),
+            package: package::PackageService::new(),
             rank: rank::RankService::new(&pretty),
-            budget: normalize_budget::service::BudgetService::new(pretty.get()),
+            budget: normalize_budget::service::BudgetService::new(),
             cfg: normalize_cfg::service::CfgService::new(),
             kg: normalize_knowledge_graph::service::KgCliService::new(),
-            ratchet: normalize_ratchet::service::RatchetService::new(pretty.get()),
+            ratchet: normalize_ratchet::service::RatchetService::new(),
             rules: normalize_rules::RulesService::new(&pretty),
             serve: serve::ServeService,
             syntax: syntax::SyntaxService::new(),
@@ -124,6 +138,8 @@ impl NormalizeService {
             trend: trend::TrendService::new(&pretty),
             view: view::ViewService::new(&pretty),
             pretty,
+            pretty_raw: Cell::new(false),
+            compact_raw: Cell::new(false),
         }
     }
 
@@ -142,9 +158,14 @@ impl NormalizeService {
         }
     }
 
-    /// Resolve pretty/compact state from globals and config, store in `self.pretty`.
-    fn resolve_format(&self, pretty: bool, compact: bool, root: &std::path::Path) {
-        self.pretty.set(resolve_pretty(root, pretty, compact));
+    /// Resolve pretty/compact state from the sink-delivered raw global flags and
+    /// config (TTY auto-detection), resolved against `root`, into `self.pretty`.
+    fn resolve_format(&self, root: &std::path::Path) {
+        self.pretty.set(resolve_pretty(
+            root,
+            self.pretty_raw.get(),
+            self.compact_raw.get(),
+        ));
     }
 
     /// Generic display bridge that respects pretty/compact state.
@@ -282,8 +303,6 @@ impl NormalizeService {
         #[param(short = 'i', help = "Case-insensitive search")] ignore_case: bool,
         #[param(help = "Exclude files matching patterns or aliases")] exclude: Vec<String>,
         #[param(help = "Only include files matching patterns or aliases")] only: Vec<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<GrepReport, String> {
         // `path` positional takes precedence over `--root` flag.
         let root_path = path
@@ -293,7 +312,7 @@ impl NormalizeService {
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
 
         let config = NormalizeConfig::load(&root_path);
         let limit = limit.unwrap_or_else(|| config.text_search.limit());
@@ -809,8 +828,6 @@ impl NormalizeService {
         ecosystem: Option<String>,
         #[param(help = "Bypass the local knowledge-graph cache and always fetch from the network")]
         no_cache: bool,
-        pretty: bool,
-        compact: bool,
     ) -> Result<docs::DocsReport, String> {
         let root_path = root
             .map(PathBuf::from)
@@ -818,7 +835,7 @@ impl NormalizeService {
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
 
         docs::fetch_docs(&symbol, root_path, no_cache, ecosystem)
     }
@@ -875,8 +892,6 @@ impl NormalizeService {
         repo: Option<String>,
         #[param(help = "Exclude projects whose path matches this glob (--all only)")]
         exclude: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<commands::sync::SyncReport, String> {
         use commands::sync::{
             SyncFileItem, SyncManifest, SyncReport, common_prefix, copy_tree_incremental,
@@ -896,7 +911,7 @@ impl NormalizeService {
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
-        self.resolve_format(pretty, compact, &root_path);
+        self.resolve_format(&root_path);
 
         // Determine the list of project roots to sync.
         let project_roots: Vec<PathBuf> = if all {
@@ -1187,8 +1202,6 @@ impl NormalizeService {
         #[param(help = "Maximum number of issues to show in detail (default: 50)")] limit: Option<
             usize,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<commands::ci::CiReport, String> {
         use normalize_output::diagnostics::{DiagnosticsReport, Issue, Severity};
         use normalize_rules::{
@@ -1202,7 +1215,7 @@ impl NormalizeService {
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        self.resolve_format(pretty, compact, &effective_root);
+        self.resolve_format(&effective_root);
 
         // Target scope: --path scopes runs to a subdirectory (defaults to project root).
         let target_root = path

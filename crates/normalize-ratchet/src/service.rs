@@ -299,32 +299,27 @@ impl OutputFormatter for RemoveReport {
 
 /// CLI service implementing `normalize ratchet` subcommands.
 pub struct RatchetService {
-    pretty: std::cell::Cell<bool>,
     metric_factory: MetricFactory,
+}
+
+impl Default for RatchetService {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RatchetService {
     /// Create a service using the default metric registry.
-    pub fn new(pretty: bool) -> Self {
+    pub fn new() -> Self {
         Self {
-            pretty: std::cell::Cell::new(pretty),
             metric_factory: default_metrics,
         }
     }
 
     /// Create a service with a custom metric factory, for testing or alternative metric sets.
-    pub fn with_factory(pretty: bool, factory: MetricFactory) -> Self {
+    pub fn with_factory(factory: MetricFactory) -> Self {
         Self {
-            pretty: std::cell::Cell::new(pretty),
             metric_factory: factory,
-        }
-    }
-
-    fn resolve_format(&self, pretty: bool, compact: bool) {
-        if pretty {
-            self.pretty.set(true);
-        } else if compact {
-            self.pretty.set(false);
         }
     }
 
@@ -353,10 +348,7 @@ impl RatchetService {
     }
 }
 
-#[cli(global = [
-    pretty = "Human-friendly output with colors and formatting",
-    compact = "Compact output without colors (overrides TTY detection)",
-])]
+#[cli]
 impl RatchetService {
     /// Compute and display the current value for a path+metric. No side effects.
     #[cli(display_with = "display_measure")]
@@ -379,11 +371,8 @@ impl RatchetService {
         >,
         #[param(help = "Compute diff against this git ref (measure delta vs this ref)")]
         diff_ref: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<MeasureReport, String> {
         let root_path = resolve_root(root)?;
-        self.resolve_format(pretty, compact);
         let config = load_ratchet_config(&root_path);
         let agg: Aggregate = aggregate.unwrap_or_else(|| config.effective_aggregate(&metric));
 
@@ -413,11 +402,8 @@ impl RatchetService {
         metric: String,
         #[param(short = 'a', help = "Aggregation strategy")] aggregate: Option<Aggregate>,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<AddReport, String> {
         let root_path = resolve_root(root)?;
-        self.resolve_format(pretty, compact);
         let config = load_ratchet_config(&root_path);
         let agg: Aggregate = aggregate.unwrap_or_else(|| config.effective_aggregate(&metric));
 
@@ -474,11 +460,8 @@ impl RatchetService {
         #[param(short = 'a', help = "Aggregation strategy (used with --baseline-ref)")]
         aggregate: Option<Aggregate>,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<CheckReport, String> {
         let root_path = resolve_root(root)?;
-        self.resolve_format(pretty, compact);
 
         if let Some(ref base_ref) = baseline_ref {
             let config = load_ratchet_config(&root_path);
@@ -527,11 +510,8 @@ impl RatchetService {
         #[param(short = 'm', help = "Filter by metric")] metric: Option<String>,
         #[param(help = "Also raise values (not just lower them)")] force: bool,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<UpdateReport, String> {
         let root_path = resolve_root(root)?;
-        self.resolve_format(pretty, compact);
 
         let mut baseline = BaselineFile::load(&root_path)
             .map_err(|e| e.to_string())?
@@ -619,11 +599,8 @@ impl RatchetService {
         #[param(positional, help = "Filter by path prefix")] path: Option<String>,
         #[param(short = 'm', help = "Filter by metric")] metric: Option<String>,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ShowReport, String> {
         let root_path = resolve_root(root)?;
-        self.resolve_format(pretty, compact);
         let baseline = BaselineFile::load(&root_path)
             .map_err(|e| e.to_string())?
             .unwrap_or_default();
@@ -647,11 +624,8 @@ impl RatchetService {
         #[param(positional, help = "Path of the entry to remove")] path: String,
         #[param(short = 'm', help = "Metric of the entry to remove")] metric: String,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<RemoveReport, String> {
         let root_path = resolve_root(root)?;
-        self.resolve_format(pretty, compact);
         let mut baseline = BaselineFile::load(&root_path)
             .map_err(|e| e.to_string())?
             .unwrap_or_default();

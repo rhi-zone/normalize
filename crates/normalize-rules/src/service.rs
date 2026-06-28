@@ -362,7 +362,8 @@ impl OutputFormatter for RulesFixtureTestReport {
 
 /// Rules management sub-service.
 pub struct RulesService {
-    pretty: Cell<bool>,
+    pretty_raw: Cell<bool>,
+    compact_raw: Cell<bool>,
     /// Set to true when --sarif is active; display_run emits SARIF instead of text.
     sarif: Cell<bool>,
     /// Issue display limit for text output (default 50).
@@ -372,14 +373,21 @@ pub struct RulesService {
 impl RulesService {
     pub fn new(pretty: &Cell<bool>) -> Self {
         Self {
-            pretty: Cell::new(pretty.get()),
+            pretty_raw: Cell::new(pretty.get()),
+            compact_raw: Cell::new(false),
             sarif: Cell::new(false),
             limit: Cell::new(50),
         }
     }
+}
 
-    fn resolve_format(&self, pretty: bool, compact: bool) {
-        self.pretty.set(resolve_pretty(pretty, compact));
+impl server_less::CliGlobals for RulesService {
+    fn set_global_flag(&self, name: &str, value: bool) {
+        match name {
+            "pretty" => self.pretty_raw.set(value),
+            "compact" => self.compact_raw.set(value),
+            _ => {}
+        }
     }
 }
 
@@ -404,9 +412,13 @@ impl OutputFormatter for RuleShowReport {
 }
 
 impl RulesService {
+    fn pretty_active(&self) -> bool {
+        resolve_pretty(self.pretty_raw.get(), self.compact_raw.get())
+    }
+
     /// Generic display bridge that routes to `OutputFormatter::format_text()`.
     fn display_output<T: OutputFormatter>(&self, value: &T) -> String {
-        if self.pretty.get() {
+        if self.pretty_active() {
             value.format_pretty()
         } else {
             value.format_text()
@@ -417,7 +429,7 @@ impl RulesService {
         if self.sarif.get() {
             return r.format_sarif();
         }
-        if self.pretty.get() {
+        if self.pretty_active() {
             r.format_pretty()
         } else {
             r.format_text_limited(Some(self.limit.get()))
@@ -453,8 +465,6 @@ impl RulesService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<RulesListReport, String> {
         let effective_root = root
             .as_deref()
@@ -462,7 +472,6 @@ impl RulesService {
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        self.resolve_format(pretty, compact);
         let config = load_rules_config(&effective_root);
         let rule_type: RuleKind = r#type
             .as_deref()
@@ -518,8 +527,6 @@ impl RulesService {
         #[param(help = "Only include files matching glob patterns")] only: Vec<String>,
         #[param(help = "Exclude files matching glob patterns")] exclude: Vec<String>,
         #[param(help = "Explicit file paths to check (bypasses file walker)")] files: Vec<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<DiagnosticsReport, String> {
         let effective_root = root
             .as_deref()
@@ -527,7 +534,6 @@ impl RulesService {
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        self.resolve_format(pretty, compact);
         self.sarif.set(sarif);
         // Cap limit to prevent accidental OOM from huge values (e.g. usize::MAX).
         let limit = limit.unwrap_or(50).min(10_000);
@@ -1238,8 +1244,6 @@ impl RulesService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<RuleInfoReport, String> {
         let effective_root = root
             .as_deref()
@@ -1247,7 +1251,6 @@ impl RulesService {
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        self.resolve_format(pretty, compact);
         let config = load_rules_config(&effective_root);
         show_rule_structured(&effective_root, &id, &config)
     }
@@ -1263,8 +1266,6 @@ impl RulesService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<RulesTagsReport, String> {
         let effective_root = root
             .as_deref()
@@ -1272,7 +1273,6 @@ impl RulesService {
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        self.resolve_format(pretty, compact);
         let config = load_rules_config(&effective_root);
         list_tags_structured(&effective_root, tag.as_deref(), &config)
     }
@@ -1359,8 +1359,6 @@ impl RulesService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<RulesValidateReport, String> {
         let effective_root = root
             .as_deref()
@@ -1368,7 +1366,6 @@ impl RulesService {
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        self.pretty.set(resolve_pretty(pretty, compact));
 
         let config_file = effective_root.join(".normalize").join("config.toml");
         let config_path = if config_file.exists() {
@@ -1456,12 +1453,8 @@ impl RulesService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<RulesCompileReport, String> {
         use normalize_facts_rules_interpret::{compile_rules_source, parse_rule_content};
-
-        self.resolve_format(pretty, compact);
 
         let effective_root = root
             .as_deref()
@@ -1546,11 +1539,7 @@ impl RulesService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<RulesTestReport, String> {
-        self.resolve_format(pretty, compact);
-
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)
@@ -1716,11 +1705,7 @@ impl RulesService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
-        pretty: bool,
-        compact: bool,
     ) -> Result<RulesFixtureTestReport, String> {
-        self.resolve_format(pretty, compact);
-
         let effective_root = root
             .as_deref()
             .map(std::path::PathBuf::from)

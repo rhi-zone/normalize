@@ -21,9 +21,10 @@ Options:
       --project <project>              Filter by specific project path
       --all-projects                   Show sessions from all projects
       --output-schema                  Print JSON Schema of the subcommand's return type and exit
-      --params-json <params-json>      Provide all parameters as a JSON object instead of individual flags
+      --manual                         Emit the reference manual for the command subtree rooted here and exit
       --session <session>              Filter to a specific session ID
       --format <format>                Force specific format: claude, codex, gemini, normalize
+      --params-json <params-json>      Provide all parameters as a JSON object instead of individual flags
   -n, --limit <limit>                  Maximum number of sessions
       --show-usage                     Show per-turn token usage (input/output/cache)
       --sort <sort>                    Sort keys (comma-separated, prefix with - for desc or + for asc): tokens, timestamp, session. E.g. -tokens, +session,-tokens, timestamp

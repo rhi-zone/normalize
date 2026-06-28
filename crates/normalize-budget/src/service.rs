@@ -242,32 +242,27 @@ impl OutputFormatter for RemoveReport {
 
 /// CLI service implementing `normalize budget` subcommands.
 pub struct BudgetService {
-    pretty: std::cell::Cell<bool>,
     diff_factory: DiffMetricFactory,
+}
+
+impl Default for BudgetService {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl BudgetService {
     /// Create a service using the default diff metric registry.
-    pub fn new(pretty: bool) -> Self {
+    pub fn new() -> Self {
         Self {
-            pretty: std::cell::Cell::new(pretty),
             diff_factory: default_diff_metrics,
         }
     }
 
     /// Create a service with a custom diff metric factory.
-    pub fn with_factory(pretty: bool, factory: DiffMetricFactory) -> Self {
+    pub fn with_factory(factory: DiffMetricFactory) -> Self {
         Self {
-            pretty: std::cell::Cell::new(pretty),
             diff_factory: factory,
-        }
-    }
-
-    fn resolve_format(&self, pretty: bool, compact: bool) {
-        if pretty {
-            self.pretty.set(true);
-        } else if compact {
-            self.pretty.set(false);
         }
     }
 
@@ -296,10 +291,7 @@ impl BudgetService {
     }
 }
 
-#[cli(global = [
-    pretty = "Human-friendly output with colors and formatting",
-    compact = "Compact output without colors (overrides TTY detection)",
-])]
+#[cli]
 impl BudgetService {
     /// Compute current diff stats for a path+metric. No side effects.
     #[cli(display_with = "display_measure")]
@@ -323,11 +315,8 @@ impl BudgetService {
             help = "Aggregation strategy (mean|median|max|min|sum|count)"
         )]
         aggregate: Option<Aggregate>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<MeasureReport, String> {
         let root = resolve_root(root)?;
-        self.resolve_format(pretty, compact);
         let config = load_budget_config(&root);
         let base_ref = base_ref
             .as_deref()
@@ -353,11 +342,8 @@ impl BudgetService {
         #[param(help = "Maximum items removed")] max_removed: Option<f64>,
         #[param(help = "Maximum total churn (added + removed)")] max_total: Option<f64>,
         #[param(help = "Maximum net change (added - removed)")] max_net: Option<f64>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<AddReport, String> {
         let root = resolve_root(root)?;
-        self.resolve_format(pretty, compact);
         let config = load_budget_config(&root);
         let base_ref = base_ref
             .as_deref()
@@ -419,11 +405,8 @@ impl BudgetService {
         #[param(positional, help = "Filter by path prefix")] path: Option<String>,
         #[param(short = 'm', help = "Filter by metric name")] metric: Option<String>,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<CheckReport, String> {
         let root = resolve_root(root)?;
-        self.resolve_format(pretty, compact);
         let budget = BudgetFile::load(&root)
             .map_err(|e| e.to_string())?
             .unwrap_or_default();
@@ -498,11 +481,8 @@ impl BudgetService {
         #[param(help = "New maximum items removed")] max_removed: Option<f64>,
         #[param(help = "New maximum total churn")] max_total: Option<f64>,
         #[param(help = "New maximum net change")] max_net: Option<f64>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<UpdateReport, String> {
         let root = resolve_root(root)?;
-        self.resolve_format(pretty, compact);
         let mut budget = BudgetFile::load(&root)
             .map_err(|e| e.to_string())?
             .unwrap_or_default();
@@ -548,11 +528,8 @@ impl BudgetService {
         #[param(positional, help = "Filter by path prefix")] path: Option<String>,
         #[param(short = 'm', help = "Filter by metric name")] metric: Option<String>,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<ShowReport, String> {
         let root = resolve_root(root)?;
-        self.resolve_format(pretty, compact);
         let budget = BudgetFile::load(&root)
             .map_err(|e| e.to_string())?
             .unwrap_or_default();
@@ -581,11 +558,8 @@ impl BudgetService {
         #[param(positional, help = "Path of the entry to remove")] path: String,
         #[param(short = 'm', help = "Metric of the entry to remove")] metric: String,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
-        pretty: bool,
-        compact: bool,
     ) -> Result<RemoveReport, String> {
         let root = resolve_root(root)?;
-        self.resolve_format(pretty, compact);
         let mut budget = BudgetFile::load(&root)
             .map_err(|e| e.to_string())?
             .unwrap_or_default();

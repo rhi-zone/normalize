@@ -296,11 +296,12 @@ the bump to 0.5.0 (see "server-less 0.5.0 adoption" below) lands it in normalize
 server-less 0.5.0 shipped 2026-06-19 with `--manual` (a whole-tree CLI reference surface)
 motivated by normalize's ~150-command nested CLI. Adoption tasks:
 
-- [ ] **Bump server-less 0.4.9 → 0.5.0 across the workspace.** Workspace `Cargo.toml`
-  (features `cli`/`jsonschema`/`config`) plus the three separately-pinned crates:
-  `normalize-cfg` (0.4.9), `normalize-budget` (0.4.7), `normalize-ratchet` (0.4.7).
-  Precondition for the items below; also lands the already-filed `normalize context context`
-  duplicate-subcommand fix. Run a clean `cargo build` afterward (see the collision-guard check).
+- [x] **Bump server-less → 0.6 across the workspace (2026-06-29).** Went straight to 0.6
+  (skipping the 0.5.0 step) for the CliGlobals capability-wiring fix. Workspace `Cargo.toml`
+  plus the three separately-pinned crates (`normalize-cfg`, `normalize-budget`,
+  `normalize-ratchet`) now require `0.6`, resolved via a local `[patch.crates-io]` dogfood
+  override pending the 0.6.0 publish. Also adapted to the 0.6 `ConfigTrait`→`ConfigLoad`
+  rename in `crates/normalize/src/config.rs`. Clean `cargo build`/`clippy`/`test` confirmed.
 - [ ] **Adopt `--manual` for the nested command tree.** `normalize --manual` (and
   `normalize <subtree> --manual`) now emits the entire ~150-command surface as one greppable
   document — text by default, `--json`/`--jsonl`/`--jq` for structured. Closes the "no whole-tree
@@ -315,27 +316,36 @@ motivated by normalize's ~150-command nested CLI. Adoption tasks:
   into a compile error. A grep found no colliding param names in normalize today, so a clean build
   after the bump should confirm — flagged for awareness, not a known breakage.
 
-### CLI capability-wiring invariant (consumer-side adoption, blocked on server-less)
+### CLI capability-wiring invariant (consumer-side adoption)
 
 server-less audit (2026-06-28) generalized the `--pretty` footgun into a class:
-`docs/design/cli-capability-wiring-invariant.md` in the server-less repo. The framework-side
-fixes are tracked in server-less TODO ("CLI capability-wiring invariant"). normalize is the
-primary consumer and adopts once they land:
+`docs/design/cli-capability-wiring-invariant.md` in the server-less repo. server-less 0.6.0
+(branch `feat/cli-capability-wiring-invariant`) shipped the `CliGlobals` sink mechanism;
+normalize adopted it (2026-06-29) via a local `[patch.crates-io]` dogfood override.
 
-- [ ] **Wire the 8 BROKEN `--pretty` commands now (in-repo, pre-framework).** Independent of
-  server-less: `sessions stats`/`subagents`, `analyze architecture`/`cross_repo_health`,
-  `rank files`/`size`/`ceremony`/`contributors` advertise `--pretty` but silently fall back to
-  text (no `pretty`/`compact` params, no `resolve_pretty`). See
-  `docs/artifacts/sessions-stats-output-2026-06-20/pretty-wiring-audit.md`. Also reach the 7
-  unreachable-`format_pretty` display fns (`edit` ×6, `syntax node-types`).
-- [ ] **Adopt `CliGlobals` (or design-A `render`) when server-less ships it.** Removes the
-  per-method `pretty`/`compact` params + `resolve_pretty` calls + `self.pretty: Cell` across
-  ~12 services / ~50 methods, replacing them with one sink per service. Decision (incremental
-  hook vs. full render redesign) is the open question in the server-less design doc §8 — track
-  the upstream choice before migrating.
-- [ ] **Audit normalize for `#[param(name)]` / `#[param(default)]` on `#[cli]` methods.** Both
-  are silently ignored by the current CLI projection; the upstream fix changes behavior
-  (`#[param(name)]` will rename flags). Grep before the bump so the rename is intentional.
+- [x] **Adopt `CliGlobals` + fix the 8 BROKEN `--pretty` commands (2026-06-29).** Replaced the
+  per-method `pretty`/`compact` params + `resolve_*` calls across 12 services with one
+  `CliGlobals` sink per service that stashes the raw flags into `pretty_raw`/`compact_raw`
+  cells; root-aware TTY/config resolution stays per-command via `resolve_format(root)`. This
+  fixed the 8 strict-BROKEN commands (`sessions stats`/`subagents`, `analyze architecture`/
+  `cross_repo_health`, `rank files`/`size`/`ceremony`/`contributors`) — `--pretty` now
+  dispatches `format_pretty()`. Rules resolves lazily in its display bridges (root-independent).
+  `normalize-ratchet`/`normalize-budget`/`package` had no real `format_pretty`, so their
+  `--pretty` advertisement (own `global = [...]` + dead `pretty` Cell) was removed entirely
+  rather than wired to an inert sink. See `docs/artifacts/sessions-stats-output-2026-06-20/
+  pretty-wiring-audit.md`.
+- [ ] **Publish server-less 0.6.0, then drop the `[patch.crates-io]` override.** Adoption
+  currently relies on a local path patch in the workspace `Cargo.toml` (`[patch.crates-io]
+  server-less = { path = ... }`). Once 0.6.0 is on crates.io, remove the patch block; the
+  version requirements are already `0.6`.
+- [ ] **Phase 2 — `display_with`→`render` (dead-dispatch class).** The 6 `edit` refactor
+  commands + `syntax node-types` have real `format_pretty` impls reached by a `display_with`
+  fn that calls `format_text()` unconditionally (3b in the design doc — opaque-body footgun,
+  not the global-flag class). Server-less 0.6 did NOT subtract `display_with` (design-A
+  deferred). Fix these by making their display fns dispatch on the pretty state, or adopt the
+  upstream `render(mode)` if it lands.
+- [ ] **Audit normalize for `#[param(name)]` / `#[param(default)]` on `#[cli]` methods.**
+  0.6 honors `#[param(name)]` (renames the flag) — grep to confirm no unintended renames.
 
 ### server-less UX issues — ~~all fixed~~ (server-less commit 9c294b2)
 
