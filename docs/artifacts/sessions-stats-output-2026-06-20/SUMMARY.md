@@ -49,3 +49,11 @@ Investigation into `normalize sessions stats --pretty` silently falling back to 
   compile-time; (b)/(c) are CI tests with real reliability limits; resolution-correctness
   (root/TTY) is detectable but not fixable by guards — pair with `CliGlobals` to fix it.
   Lowest blast radius, but strictly weaker than the trait redesigns on (b)/(c).
+- `judge-completeness.md` — Adversarial bake-off judgment: for each design, the concrete
+  defects that SURVIVE it (with escape code) and a survivor count. Identifies two universal
+  residuals no design closes via types — U1 (pretty bytes == text bytes) and U2 (body
+  bypasses the render path) — both needing a behavioural CI test. Ranks B (eliminates
+  false-advertising structurally) ≳ A > D (detects, doesn't prevent) > C (retains the
+  defaulted `format_pretty` root cause). Recommends grafting D's `compile_error!(a)` as an
+  interim bridge (it becomes dead once A/B/C delete the `global`/param tokens it inspects)
+  and adopting D's behavioural distinctness test permanently regardless of winner.
