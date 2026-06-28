@@ -38,3 +38,14 @@ Investigation into `normalize sessions stats --pretty` silently falling back to 
   normalize). Removes `display_with` and `self.pretty` Cell. Additive macro change (zero
   blast radius for other server-less consumers); (a)/(c) impossible by construction, (b)
   dissolves into an always-honest flag.
+- `design-D-build-guard.md` — Design (BUILD-TIME GUARD / EXHAUSTIVENESS frame): keep the
+  runtime dispatch as-is and bolt on a guard layer. Layer 1 is a macro `compile_error!`
+  (sibling of `check_reserved_flag_collisions`) enforcing "impl declares
+  `global=[pretty,compact]` ⇒ every method declares the params" — makes defect (a) a hard
+  compile error, guarded itself by trybuild cases. Layer 2 replaces the hand-maintained
+  `assert_output_formatter` list with a macro-emitted `inventory` manifest + exhaustiveness
+  test (catches (a), and (b) via a `HAS_REAL_PRETTY` marker const). Layer 3 is a fixture-
+  driven `--pretty`-vs-text snapshot test for (c). Honest verdict: only (a) is genuinely
+  compile-time; (b)/(c) are CI tests with real reliability limits; resolution-correctness
+  (root/TTY) is detectable but not fixable by guards — pair with `CliGlobals` to fix it.
+  Lowest blast radius, but strictly weaker than the trait redesigns on (b)/(c).
