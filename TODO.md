@@ -315,6 +315,28 @@ motivated by normalize's ~150-command nested CLI. Adoption tasks:
   into a compile error. A grep found no colliding param names in normalize today, so a clean build
   after the bump should confirm — flagged for awareness, not a known breakage.
 
+### CLI capability-wiring invariant (consumer-side adoption, blocked on server-less)
+
+server-less audit (2026-06-28) generalized the `--pretty` footgun into a class:
+`docs/design/cli-capability-wiring-invariant.md` in the server-less repo. The framework-side
+fixes are tracked in server-less TODO ("CLI capability-wiring invariant"). normalize is the
+primary consumer and adopts once they land:
+
+- [ ] **Wire the 8 BROKEN `--pretty` commands now (in-repo, pre-framework).** Independent of
+  server-less: `sessions stats`/`subagents`, `analyze architecture`/`cross_repo_health`,
+  `rank files`/`size`/`ceremony`/`contributors` advertise `--pretty` but silently fall back to
+  text (no `pretty`/`compact` params, no `resolve_pretty`). See
+  `docs/artifacts/sessions-stats-output-2026-06-20/pretty-wiring-audit.md`. Also reach the 7
+  unreachable-`format_pretty` display fns (`edit` ×6, `syntax node-types`).
+- [ ] **Adopt `CliGlobals` (or design-A `render`) when server-less ships it.** Removes the
+  per-method `pretty`/`compact` params + `resolve_pretty` calls + `self.pretty: Cell` across
+  ~12 services / ~50 methods, replacing them with one sink per service. Decision (incremental
+  hook vs. full render redesign) is the open question in the server-less design doc §8 — track
+  the upstream choice before migrating.
+- [ ] **Audit normalize for `#[param(name)]` / `#[param(default)]` on `#[cli]` methods.** Both
+  are silently ignored by the current CLI projection; the upstream fix changes behavior
+  (`#[param(name)]` will rename flags). Grep before the bump so the rename is intentional.
+
 ### server-less UX issues — ~~all fixed~~ (server-less commit 9c294b2)
 
 1. ~~**`name` attribute ignored for nested services**~~: Fixed — `#[cli(name = "...")]` now works on individual methods (leaf and mount). `get_cli_name()` helper added.
