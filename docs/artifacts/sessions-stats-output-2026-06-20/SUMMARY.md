@@ -79,3 +79,11 @@ Investigation into `normalize sessions stats --pretty` silently falling back to 
   test-only arm). Migration verdicts: A/B/C HIGH, D MED. Sequencing pain B ≫ C > A ≈ D.
   Universal residual no design closes: pretty-bytes == text-bytes — a behavioural distinctness
   CI test is required regardless of winner.
+- `adoption-verification.md` — Independent post-implementation verification of the shipped
+  CliGlobals migration (commit `9b31c6de`, server-less 0.6.0 via local `[patch.crates-io]`).
+  Build/clippy/test all pass. Confirms all 8 formerly-broken `--pretty` commands are fixed
+  (6 by live output, 2 wired-but-no-local-data), no regression in previously-working commands,
+  root-aware + TTY resolution correct, and all 9 `CliGlobals` impls route flags without dropping
+  values (no re-introduced no-op). Verdict: sound and ready. Two non-blocking CONCERNs: the
+  commit overstates the ratchet/budget/package change (`--pretty` still shown via root global,
+  still inert), and 7 analyze methods have pre-existing pretty inertness (out of scope).
