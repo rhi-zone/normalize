@@ -140,8 +140,3 @@ lto = true
 codegen-units = 1
 strip = true
 
-
-# Local dogfood override for server-less 0.6.0 (feat/cli-capability-wiring-invariant).
-# Stripped on publish — keeps published crates version-based, no path coupling.
-[patch.crates-io]
-server-less = { path = "/home/me/git/rhizone/server-less/crates/server-less" }
