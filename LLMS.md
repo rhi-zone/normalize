@@ -56,8 +56,8 @@ normalize view FILE/ClassName  # View specific symbol
 ```bash
 normalize view FILE/symbol                        # See signature and docstring
 normalize view --full FILE/symbol                 # Full source code
-normalize analyze call-graph FILE/symbol --callers  # What calls it?
-normalize analyze call-graph FILE/symbol --callees  # What does it call?
+normalize view referenced-by FILE/symbol          # What calls it?
+normalize view references FILE/symbol              # What does it call?
 ```
 
 **After making changes:**
@@ -98,9 +98,9 @@ normalize view -d 2                # Depth 2 (nested symbols)
 ```bash
 normalize analyze health           # Health metrics
 normalize analyze security         # Security scan
-normalize analyze call-graph symbol --callers  # What calls this?
-normalize analyze call-graph symbol --callees  # What does this call?
-normalize analyze graph            # Dependency graph analysis
+normalize view referenced-by symbol  # What calls this?
+normalize view references symbol      # What does this call?
+normalize view graph               # Dependency graph analysis
 ```
 
 ### rank - Ranked Metrics

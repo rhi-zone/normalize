@@ -180,6 +180,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     --include-trait-impls to show`); the guidance moved to the `--help` doc comment. The
     factual `Suppressed: N …` counts remain in the output body.
 
+- **`budget measure` and `budget add` flag `--base-ref` renamed to `--diff-ref`.**
+  The old name was inherited from an earlier draft; `--diff-ref` correctly describes
+  the flag — it specifies the git ref to diff against when measuring line/function
+  growth. Behaviour is unchanged; only the flag name changed.
+
 ### Fixed
 
 - **`trend complexity/length/density/test-ratio` commands now work when historical

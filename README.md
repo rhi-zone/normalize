@@ -76,13 +76,13 @@ Unified analysis with subcommands:
 
 ```bash
 normalize analyze health             # Codebase metrics and health score
-normalize analyze complexity         # Cyclomatic complexity report
-normalize analyze length             # Function length analysis
+normalize rank complexity            # Cyclomatic complexity report
+normalize rank length                # Function length analysis
 normalize analyze security           # Security vulnerability scan
-normalize analyze hotspots            # Git history analysis (churn + complexity)
-normalize analyze duplicates         # Detect code clones
-normalize analyze duplicate-types    # Detect duplicate type definitions
-normalize analyze graph              # Dependency graph analysis
+normalize rank hotspots              # Git history analysis (churn + complexity)
+normalize rank duplicates            # Detect code clones
+normalize rank duplicate-types       # Detect duplicate type definitions
+normalize view graph                 # Dependency graph analysis
 normalize analyze docs               # Documentation coverage
 ```
 

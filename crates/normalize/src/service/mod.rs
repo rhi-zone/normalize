@@ -1143,10 +1143,9 @@ impl NormalizeService {
     /// Edges are directed typed relationships, stored append-only in `edges.jsonl`.
     ///
     /// Examples:
-    ///   echo "Design notes." | normalize kg create --id my-design --metadata tag=design
-    ///   normalize kg link --from my-design --to api-spec --kind references
-    ///   normalize kg query --match tag=design
-    ///   normalize kg show my-design
+    ///   echo "Design notes." | normalize kg write --id my-design --metadata tag=design
+    ///   normalize kg read my-design
+    ///   normalize kg walk my-design --depth 2
     #[server(group = "core")]
     pub fn kg(&self) -> &normalize_knowledge_graph::service::KgCliService {
         &self.kg

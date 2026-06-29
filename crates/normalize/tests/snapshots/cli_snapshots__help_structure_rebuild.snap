@@ -21,8 +21,8 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --manual                     Emit the reference manual for the command subtree rooted here and exit
       --strict                     Exit non-zero if any tree-sitter grammar is missing (instead of warning and continuing)
-      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
       --dry-run                    Dry run - show what would be rebuilt without writing the index
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
 
 Walks the project directory, parses source files, and populates the SQLite index
