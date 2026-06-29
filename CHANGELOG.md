@@ -163,6 +163,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`trend complexity/length/density/test-ratio` commands now work when historical
+  commits contain a stale `[embeddings]` config section.** The config loader
+  previously called `process::exit(1)` on any config containing the removed
+  `[embeddings]` section. Spawned git worktrees created by `trend` commands check
+  out historical `.normalize/config.toml` files that may still have this section;
+  the hard abort caused all four metric-trend commands to fail entirely.
+  The check is now a recoverable warning — the section is silently ignored by serde
+  since it no longer appears in `NormalizeConfig` — and the command continues.
+
 - **Usage strings no longer show `normalize.elf` in the installed release binary.**
   `main.rs` now rewrites `argv[0]` to its `file_stem()` before passing to clap, so
   usage lines always print `normalize` regardless of the on-disk binary name (which is

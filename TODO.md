@@ -291,6 +291,35 @@ named subcommand. Fixed in server-less (commit f7bc30b): default methods are now
 the subcommand list entirely. server-less 0.5.0 is now published (2026-06-19) carrying this fix —
 the bump to 0.5.0 (see "server-less 0.5.0 adoption" below) lands it in normalize.
 
+
+## CLI Audit Backlog (2026-06-29)
+
+Catalogue from `docs/artifacts/cli-audit-2026-06-29/00-triage.md`. T1 = hard-constraint
+violations or actively broken; T2 = correctness/consistency; T3 = polish.
+
+### Tier 1 — Actively broken / hard-constraint violations
+
+- [x] **T1-3 — All `trend` metric commands broken (stale worktree `[embeddings]` config)** — FIXED.
+  Downgraded `process::exit(1)` in `NormalizeConfig::load` to a recoverable warning; serde
+  already ignores unknown sections. All four commands (`trend complexity`, `trend length`,
+  `trend density`, `trend test-ratio`) now work.
+- [ ] **T1-1 — Index-dependent commands exit 0 + empty JSON on missing index** (HIGH, HC violation).
+  `view graph`, `view dependents`, `view import-path`, `rank imports`, `rank depth-map`,
+  `rank layering`, `rank call-complexity`, `analyze architecture` — all return empty results
+  with exit 0 when the index has not been built. Fix: exit non-zero + include `"requires_index": true`
+  in JSON when source files exist but the index table is empty.
+- [ ] **T1-2 — 22 mutating commands ship without `--dry-run`** (HIGH, HC violation).
+  Priority order: `edit redo` (1-line fix), `rules run --fix`, `kg write null-transform`,
+  `rules add/update/remove`, `ratchet`/`budget` CRUD, `sessions mark/unmark`. Borderline:
+  `daemon start/stop`, `update`, `generate client/cli-snapshot`.
+- [ ] **T1-4 — `structure packages` silently succeeds with zero output** (HIGH, HC violation).
+  Should emit at minimum `{"indexed":0,"ecosystems":[]}` + needs `--dry-run` (T1-2).
+- [ ] **T1-5 — `rules show stale-summary` lookup bug** — rule in `list`, not found by `show`.
+  Likely a registry split (native vs fact rules) that `show` does not search.
+- [ ] **T1-6 — Broken guides + stale `kg --help` examples** — `guide analyze` references moved
+  commands; `guide rules` references `analyze node-types` (now `syntax node-types`); `kg --help`
+  epilogue references `kg create/link/query/show` (none exist).
+
 ## server-less 0.5.0 adoption
 
 server-less 0.5.0 shipped 2026-06-19 with `--manual` (a whole-tree CLI reference surface)
