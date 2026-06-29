@@ -750,23 +750,68 @@ Audit doc: `docs/artifacts/cli-audit-2026-06-29/05-command-structure.md`.
 rename logged in CHANGELOG.md [Unreleased]. The rename was a consequence of server-less 0.6 work;
 ref-flag taxonomy unification (rest of T2-3) is deferred — no blocking issues.
 
-**Guide regression guard (deferred):** A test that validates guide command examples exist
-would prevent T1-6-class regressions. Not added now — the guide is plain text in a Rust `const &str`;
-parsing it for command names + running them in tests requires non-trivial harness work.
-Track as: add integration test that runs each guide through a smoke-check (parse command lines,
-verify top-level subcommand exists). Low priority, medium lift.
+**Guide regression guard (now scheduled as retree R0):** A test that validates guide
+command examples exist prevents T1-6-class regressions. It is now the **first** step of the
+CLI full-retree (must land before any rename) — see "CLI command-taxonomy FULL RETREE" below
+and plan §6. Harness: parse each guide's `const &str` body for `normalize …` lines, resolve
+each against the live command tree, fail CI on any unresolved example.
 ---
 
-### `analyze` Architecture Redesign (high priority)
+### CLI command-taxonomy FULL RETREE (high priority)
 
-**Done (2026-03-16):** `normalize rank` introduced with 20+ commands migrated from `analyze`. Graph navigation (`call_graph`, `trace`, `dependents`, `provenance`) folded into `view` (`referenced-by`, `references`, `dependents`, `trace`, `graph`, `history`, `blame`). `ViewOutput` enum dissolved; `ViewReport`/`ViewNode` unified. `view list` added.
+**Decision made (2026-06-29): full retree.** Supersedes the old "analyze stays until a
+clear home emerges" framing below. Authoritative plan + complete command→new-home
+mapping: `docs/artifacts/cli-taxonomy-2026-06-29/00-retree-plan.md` (built on 4 candidate
+designs + 3 adversarial judges in the same dir). Cross-refs audit T2-6 (`rank budget`
+collision), T2-7 (`cfg cfg`), T2-10 (`edit history`), T3-4 (architecture/view-graph
+near-dup), and the T1-6 guide-regression follow-up.
 
-**Remaining in `analyze`:** git history (activity, coupling-clusters, repo-coupling, cross-repo-health), big-picture (health, architecture, summary), plus docs/security/skeleton-diff. Trend commands moved to `normalize trend`. `length` and `test-gaps` moved to `rank` (2026-03-28). These stay until a clear home emerges.
+**Axis:** primary membership = output SHAPE (lint-enforceable via `RankEntry`); verb NAMES
+human-guessable; two-level (verb + topic); `analyze` dissolved; NO enum-wrapping;
+one-release transitional aliases. Blast radius ~22 commands (~13% of ~165).
 
-**Not yet decided:**
-- Where big-picture commands live (`architecture`, `summary`, `health`) — synthesized understanding, not ranking, not navigation. No trait identified yet.
-- Whether `analyze` dissolves entirely or gets a new identity — will become clear over time.
-- Health-style findings → rules (see Rules Unification item 6).
+**Final verbs:** `rank` (Vec<T: RankEntry>), `view` (single artifact/derived structure),
+`check` (verdict — NEW facade), `trend` (time-series), `overview` (aggregate dashboard —
+NEW, name TBD), `edit` (mutation) + kept specialist/admin domains.
+
+Implementation order (each step build+`cargo test -q` green; docs synced in same commit):
+- [ ] **R0 — land gates FIRST:** guide/help regression test (parse guide bodies, assert
+  every `normalize …` example resolves) + topic-snapshot test (§2/§6 of plan). Then add
+  shape marker traits (`RankedReport`/`Verdict`/`TimeSeriesReport`) + the CI lint with the
+  current tree green (expect `rank size` as the one flagged failure).
+- [ ] **R1 — server-less prereq:** add `#[cli(alias = "...")]` (hidden clap alias) to
+  server-less; publish + bump dep. (server-less has `#[server(hidden)]` but no alias attr.)
+- [ ] **R2 — `view` gains:** `cfg cfg`→`view cfg`; `rank size`→`view size`; analyze
+  dataflow/graph/diff members (`liveness/effects/exceptions/coupling-clusters/repo-coupling/
+  skeleton-diff`)→`view`; **MERGE `analyze architecture` into `view graph`** (genuine
+  struct-union — the only real code-merge; not an enum-wrap).
+- [ ] **R3 — `rank`:** `rank budget`→`rank purposes` (T2-6); `analyze cross-repo-health`→
+  `rank cross-repo-health` (+ `impl RankEntry for RepoHealthEntry`).
+- [ ] **R4 — `trend`:** `analyze activity`→`trend activity` (flagged soft fit).
+- [ ] **R5 — `overview` (NEW):** `analyze health/summary/all`→`overview` (decide
+  `all`→`--full` collapse; verb name is an open question).
+- [ ] **R6 — `check` (NEW facade):** `ci`→bare `check`; `budget check`/`ratchet check`/
+  `rules run`→`check budget/ratchet/rules`; `check rules --fix` (the diagnostic+mutation
+  straddler — flag on check, not a separate edit cmd); `analyze security/docs`→`check`.
+- [ ] **R7 — retire `analyze`:** verb empty → delete service; remaining old paths become
+  `#[server(hidden)]` one-release shims.
+- [ ] **R8 — `edit`:** `edit history`→`edit log` (T2-10).
+- [ ] **R9 — alias sunset:** all hidden aliases/shims removed at 1.0.
+- [ ] **Doc sync (every batch):** `docs/cli/`, `README.md`, `LLMS.md`, `docs/cli-design.md`,
+  all guide bodies, `CHANGELOG.md`, touched `SUMMARY.md`s, regenerate `cli-snapshot`.
+
+**Open naming questions for the human (confirm before implementing — plan §8):**
+`overview` verb name (vs report/dashboard); retire `ci` vs keep permanent alias; move
+`rules run`→`check rules` (splits a coherent service — C argued against); `view` as home
+for whole-graph/tree reports. Flagged soft spots: `trend activity`, the multi-repo trio
+(activity/repo-coupling/cross-repo-health scatter across verbs — D's rejected `fleet`
+cohesion lost), `check docs` (coverage dashboard with embedded ranked list).
+
+**Prior-decision history (superseded by the retree above):**
+- Done 2026-03-16: `rank` introduced; graph navigation folded into `view`; `ViewOutput`
+  dissolved. Done 2026-03-28: trend commands → `trend`; `length`/`test-gaps` → `rank`.
+- The old open questions ("where do big-picture commands live", "does analyze dissolve")
+  are now answered: `health/summary/all`→`overview`; `analyze` dissolves entirely.
 
 ### Language trait: remaining .scm migration
 
