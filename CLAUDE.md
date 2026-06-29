@@ -97,7 +97,7 @@ Every directory with files should have a `SUMMARY.md` describing its purpose and
 ```
 ./target/debug/normalize view [path[/symbol]] [--types-only]
 ./target/debug/normalize view path:start-end
-./target/debug/normalize analyze complexity [path]
+./target/debug/normalize rank complexity [path]
 ./target/debug/normalize grep <pattern> [--only <glob>]
 ```
 
