@@ -1019,7 +1019,28 @@ pub fn show_rule(
             out.push('\n');
             out.push_str(&format_config_snippet(&r.id, config.rules.rules.get(&r.id)));
         }
-        _ => return Err(format!("Rule not found: {}", id)),
+        // Native rules are searched separately (see `native_rule_info`): they
+        // appear in `rules list` and must be resolvable by `rules show` too.
+        _ => match native_rule_info(id, config) {
+            Some(info) => {
+                out.push_str(&format!("{} [native]\n", info.id));
+                out.push_str(&format!(
+                    "  severity: {}\n",
+                    paint_severity(&info.severity, use_colors)
+                ));
+                out.push_str(&format!("  enabled:  {}\n", info.enabled));
+                if !info.tags.is_empty() {
+                    out.push_str(&format!(
+                        "  tags:     {}\n",
+                        paint_tags(&info.tags, use_colors)
+                    ));
+                }
+                out.push_str(&format!("  message:  {}\n", info.message));
+                out.push('\n');
+                out.push_str(&format_config_snippet(id, config.rules.rules.get(id)));
+            }
+            None => return Err(format!("Rule not found: {}", id)),
+        },
     }
 
     Ok(out)
@@ -1209,8 +1230,52 @@ pub fn show_rule_structured(
             description: r.doc.clone(),
             allow: r.allow.iter().map(|p| p.as_str().to_string()).collect(),
         }),
-        _ => Err(format!("Rule not found: {}", id)),
+        // Native rules are static descriptors (not loaded from .scm/.fact files),
+        // so they're searched separately. `build_list_report` enumerates them the
+        // same way, so `rules show` must resolve against the same set — otherwise
+        // an id that appears in `rules list` (e.g. `stale-summary`) is reported as
+        // "Rule not found".
+        _ => match native_rule_info(id, config) {
+            Some(report) => Ok(report),
+            None => Err(format!("Rule not found: {}", id)),
+        },
     }
+}
+
+/// Build a [`RuleInfoReport`] for a native rule descriptor, applying any
+/// project-level config overrides (severity, enabled, extra tags).
+///
+/// Returns `None` if `id` is not a known native rule. Native rules have no
+/// source file, so `languages`, `fix`, `description`, and `allow` are empty.
+fn native_rule_info(id: &str, config: &RulesRunConfig) -> Option<RuleInfoReport> {
+    let desc = normalize_native_rules::NATIVE_RULES
+        .iter()
+        .find(|d| d.id == id)?;
+    let override_ = config.rules.rules.get(desc.id);
+    let severity = override_
+        .and_then(|o| o.severity.as_deref())
+        .unwrap_or(desc.default_severity)
+        .to_string();
+    let enabled = override_
+        .and_then(|o| o.enabled)
+        .unwrap_or(desc.default_enabled);
+    let mut tags: Vec<String> = desc.tags.iter().map(|t| t.to_string()).collect();
+    if let Some(o) = override_ {
+        tags.extend(o.tags.iter().cloned());
+    }
+    Some(RuleInfoReport {
+        id: desc.id.to_string(),
+        rule_type: "native".to_string(),
+        severity,
+        enabled,
+        builtin: true,
+        tags,
+        languages: Vec::new(),
+        message: desc.message.to_string(),
+        fix: None,
+        description: None,
+        allow: Vec::new(),
+    })
 }
 
 /// Structured variant of `list_tags` — returns a `RulesTagsReport` instead of a pre-formatted

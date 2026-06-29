@@ -371,10 +371,18 @@ Recording reality, not a commitment to do it all now. Items already tracked else
 cross-referenced, not duplicated.
 
 **Tier 1 — hard-constraint violations + actively broken (do first):**
-- [ ] **T1-1: Index-dependent commands exit 0 + empty JSON on missing index** (HARD CONSTRAINT —
-  "never silently return empty results"). `view graph/dependents/import-path`, `rank imports/
-  depth-map/layering/call-complexity`, `analyze architecture`. Exit non-zero + emit
-  `"requires_index": true` in JSON when the prerequisite table is empty but source files exist.
+- [x] **T1-1: Index-dependent commands exit 0 + empty JSON on missing index** (HARD CONSTRAINT —
+  "never silently return empty results"). DONE: centralized `index::require_import_graph` guard
+  keys on the raw `imports` row count; `view graph/dependents/import-path`, `rank imports/
+  depth-map/layering`, and `analyze architecture` now exit non-zero with an actionable
+  `structure rebuild` message when the import graph is empty. A populated index with a
+  genuinely-empty *query* (e.g. `import-path A B` with no path) still exits 0. Errors now emit
+  `{"error": "<msg>"}` under `--json` (server-less generic error path; closes the JSON half of
+  T2-2 too). NOTE: `rank call-complexity` was in the audit list but builds its call graph by
+  parsing files directly (no sqlite index) — it has no missing-index state, so no guard was
+  added (audit HIGH-6 was a misdiagnosis). FOLLOW-UP: a discrete `"requires_index": true` JSON
+  field (vs. the generic `{"error":…}`) would need typed errors through server-less; the message
+  names the rebuild step, which is sufficient for now.
 - [ ] **T1-2: 22 mutating commands ship without `--dry-run`** (HARD CONSTRAINT). Priority:
   `edit redo` (one-line; asymmetric with `edit undo`), `rules run --fix`, `kg write` null-delete,
   `rules add/update/remove/setup`, `ratchet`/`budget` CRUD, `sessions mark/unmark`,
@@ -382,10 +390,13 @@ cross-referenced, not duplicated.
   Decide whether idempotent rebuilds get a documented exemption (amend the constraint if so).
 - [ ] **T1-3: all `trend` metric commands broken** — temp worktree's stale `[embeddings]` config
   hard-aborts validation. Confirm spawn-path root cause; ignore unknown config in spawned worktrees.
-- [ ] **T1-4: `structure packages` silently succeeds with zero output** (HARD CONSTRAINT). Emit a
-  real report; also needs `--dry-run` (writes global cache; counts toward T1-2).
-- [ ] **T1-5: `rules show <id>` lookup bug** — `stale-summary` in `rules list` but "not found" by
-  `rules show` (native vs fact registry split). Error is also plain text (see T2-2).
+- [x] **T1-4: `structure packages` silently succeeds with zero output** (HARD CONSTRAINT). DONE
+  (output half): `PackagesReport::format_text` now prints an explicit "No package ecosystems
+  detected" message when empty instead of a bare line; `--json` emits `{"ecosystems": []}`.
+  FOLLOW-UP: still needs `--dry-run` (writes global cache; counts toward T1-2).
+- [x] **T1-5: `rules show <id>` lookup bug** — DONE: `show_rule`/`show_rule_structured` now search
+  the native-rules registry too (new `native_rule_info` helper), matching what `rules list`
+  enumerates, so `stale-summary` et al. resolve. JSON errors now structured via server-less.
 - [ ] **T1-6: broken guides + stale `kg --help` examples** — `guide analyze`/`guide rules` reference
   pre-rename `analyze *` paths; `kg --help` references nonexistent `kg create/link/query/show`. Fix
   strings + add a `guide test`/snapshot parsing guide bodies against the real command tree.
@@ -393,8 +404,12 @@ cross-referenced, not duplicated.
 **Tier 2 — correctness / consistency:**
 - [ ] **T2-1: `--jsonl` doesn't unwrap inner arrays** — object-wrapping reports (`structure files`,
   `rank complexity`, `rules list`, `grep`) emit the wrapper as one line. Add a `jsonl_items()` hook.
-- [ ] **T2-2: service-layer errors are plain text under `--json`** (`docs`, `view references/
-  referenced-by/trace`, `serve mcp`, missing-arg). Emit a JSON error object when `--json` is active.
+- [x] **T2-2: service-layer errors are plain text under `--json`** — DONE (generic path): the
+  server-less CLI `Err` arm now emits `{"error": "<msg>"}` on stdout (exit non-zero) under
+  `--json`/`--jsonl`/`--jq` for all commands, so `docs`, `view references/referenced-by/trace`,
+  `serve mcp`, and service-layer failures get a parseable error object. (Clap-level
+  missing-arg/validation errors fire before the service runs and are still plain text — separate
+  server-less concern.)
 - [ ] **T2-3: `budget --base-ref`→`--diff-ref`** — keep rename, add CHANGELOG entry (see resolved
   `#[param(name)]` item above). Separable: unify git-ref flag taxonomy (`--diff` / `--diff-ref` /
   `--baseline-ref` / positional `[base]`).

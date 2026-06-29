@@ -8,6 +8,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Import-graph commands no longer silently succeed with an empty result when the import
+  graph is empty.** `view graph`, `view dependents`, `view import-path`, `rank imports`,
+  `rank depth-map`, `rank layering`, and `analyze architecture` now exit non-zero with an
+  actionable message (`Run \`normalize structure rebuild\` …`) when the index contains no
+  import data, instead of returning a zeroed/empty report with exit 0 (a hard-constraint
+  violation). The guard is centralized in `index::require_import_graph` and keys on the raw
+  `imports` row count, so a populated index with a genuinely-empty *query* (e.g.
+  `view import-path A B` with no path between them) still exits 0 as before.
+- **Errors are now structured under `--json`/`--jsonl`/`--jq`.** Service-layer failures emit
+  `{"error": "<message>"}` on stdout (exit non-zero) for programmatic consumers, instead of
+  plain text on stderr. (server-less generic CLI error path.)
+- **`rules show <id>` now resolves native rules.** IDs that appear in `rules list` but live in
+  the native-rules registry (e.g. `stale-summary`, `missing-summary`, `ratchet/*`, `budget/*`)
+  previously reported `Rule not found`; `rules show` now searches syntax, fact, **and** native
+  rules — the same set `rules list` enumerates.
+- **`structure packages` no longer emits an empty result.** When no package ecosystems are
+  detected it now prints an explicit message (text) instead of a bare/blank line; `--json`
+  continues to emit `{"ecosystems": []}`.
 - **`--pretty` now works on 8 commands where it was silently inert.** `sessions stats`,
   `sessions subagents`, `analyze architecture`, `analyze cross_repo_health`, `rank files`,
   `rank size`, `rank ceremony`, and `rank contributors` advertised `--pretty` in `--help` but

@@ -12,6 +12,8 @@ index, queryable by meaning rather than by name.
 - `schema.rs` — SQLite DDL for the `embeddings` table (migrates-in alongside existing schema)
 - `store.rs` — read/write embeddings to/from SQLite (upsert, bulk-load, delete-by-path)
 - `search.rs` — brute-force ANN search + staleness re-ranking (`score = cosine_sim * (1 - 0.3 * staleness)`)
+- `git_staleness.rs` — git-based staleness signal feeding the search re-ranking
+- `vec_ext.rs` — vector helpers (cosine similarity / norm) shared by search and store
 - `populate.rs` — walks all symbols from the structural index, builds context windows, and embeds in batches
 - `service.rs` — `SearchReport` type and `run_search()` function called from `FactsService::search` in the main crate
 

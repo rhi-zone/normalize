@@ -99,7 +99,9 @@ pub async fn analyze_import_centrality(
     limit: usize,
     internal_only: bool,
 ) -> Result<ImportCentralityReport, String> {
-    let idx = crate::index::ensure_ready(root).await?;
+    // Guard: empty `imports` table → actionable error + non-zero exit, rather
+    // than a silently-empty `{"entries":[],"total_imports":0}` report.
+    let idx = crate::index::require_import_graph(root).await?;
 
     let raw = idx
         .all_imports()

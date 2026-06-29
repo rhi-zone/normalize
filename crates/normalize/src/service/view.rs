@@ -552,7 +552,7 @@ impl ViewService {
         let root_path = Self::root_path(root)?;
         self.resolve_format(&root_path);
         let graph_target = on.unwrap_or(GraphTarget::Modules);
-        let idx = crate::index::ensure_ready(&root_path).await?;
+        let idx = crate::index::require_import_graph(&root_path).await?;
         crate::commands::analyze::graph::analyze_dependents(&idx, &target, graph_target)
             .await
             .map_err(|e| format!("Dependents query failed: {}", e))
@@ -612,7 +612,7 @@ impl ViewService {
             n => n,
         };
         let target = on.unwrap_or(GraphTarget::Modules);
-        let idx = crate::index::ensure_ready(&root_path).await?;
+        let idx = crate::index::require_import_graph(&root_path).await?;
         crate::commands::analyze::graph::analyze_graph(&idx, effective_limit, target)
             .await
             .map_err(|e| format!("Graph analysis failed: {}", e))
@@ -646,7 +646,7 @@ impl ViewService {
     ) -> Result<ImportPathReport, String> {
         let root_path = Self::root_path(root)?;
         let path_limit = limit.unwrap_or(5);
-        let idx = crate::index::ensure_ready(&root_path).await?;
+        let idx = crate::index::require_import_graph(&root_path).await?;
         crate::commands::analyze::import_path::find_import_path_command(
             &idx, &root_path, &from, &to, all, path_limit, reverse,
         )

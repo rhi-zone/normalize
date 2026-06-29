@@ -90,6 +90,43 @@ pub async fn ensure_ready(root: &Path) -> Result<FileIndex, String> {
     Ok(idx)
 }
 
+/// Ensure the index is ready **and** contains import-graph data.
+///
+/// Like [`ensure_ready`], but additionally fails when the `imports` table is
+/// empty — the state in which import-graph commands (`view graph`,
+/// `view dependents`, `view import-path`, `rank imports`, `rank depth-map`,
+/// `rank layering`, `analyze architecture`) cannot produce a meaningful answer.
+///
+/// This centralizes the distinction the CLI must make:
+/// - **no import data at all** (`imports == 0`) → return `Err` so the command
+///   exits non-zero with an actionable message instead of silently emitting a
+///   zeroed report (a hard-constraint violation: "never silently return empty
+///   results").
+/// - **import data present, but this particular query is empty** (e.g.
+///   `view import-path A B` with no path between them, or `view dependents X`
+///   for an unimported module) → the guard passes and the command returns its
+///   genuinely-empty result with exit 0.
+///
+/// The check is on the raw `imports` row count, not on post-filter results, so
+/// legitimately-empty queries over a populated index are never misclassified.
+pub async fn require_import_graph(root: &Path) -> Result<FileIndex, String> {
+    let idx = ensure_ready(root).await?;
+    let stats = idx
+        .call_graph_stats()
+        .await
+        .map_err(|e| format!("Failed to read index stats: {}", e))?;
+    if stats.imports == 0 {
+        return Err(NO_IMPORT_DATA.to_string());
+    }
+    Ok(idx)
+}
+
+/// Actionable message returned by [`require_import_graph`] when the import graph
+/// is empty. Names the rebuild command so both humans and agents know the fix.
+pub const NO_IMPORT_DATA: &str = "No import data in the index — the import graph is empty. \
+Run `normalize structure rebuild` to (re)build it. \
+(If this codebase genuinely has no imports between its own files, that is expected.)";
+
 /// Like [`ensure_ready`] but returns `Option` instead of `Result`.
 ///
 /// When the index is unavailable (disabled, can't be opened, build fails),

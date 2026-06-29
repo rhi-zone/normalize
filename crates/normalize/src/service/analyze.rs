@@ -164,7 +164,7 @@ impl AnalyzeService {
     ) -> Result<ArchitectureReport, AnalyzeError> {
         let root_path = Self::root_path(root)?;
         self.resolve_format(&root_path);
-        let idx = crate::index::ensure_ready(&root_path).await?;
+        let idx = crate::index::require_import_graph(&root_path).await?;
         let mut report = crate::commands::analyze::architecture::analyze_architecture(&idx)
             .await
             .map_err(|e| AnalyzeError::Message(format!("Architecture analysis failed: {}", e)))?;

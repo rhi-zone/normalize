@@ -1137,7 +1137,7 @@ impl RankService {
             0 => usize::MAX,
             n => n,
         };
-        let idx = crate::index::ensure_ready(&root_path).await?;
+        let idx = crate::index::require_import_graph(&root_path).await?;
         let mut report =
             crate::commands::analyze::depth_map::analyze_depth_map(&idx, effective_limit)
                 .await
@@ -1199,7 +1199,7 @@ impl RankService {
             0 => usize::MAX,
             n => n,
         };
-        let idx = crate::index::ensure_ready(&root_path).await?;
+        let idx = crate::index::require_import_graph(&root_path).await?;
         let mut report =
             crate::commands::analyze::layering::analyze_layering(&idx, effective_limit)
                 .await

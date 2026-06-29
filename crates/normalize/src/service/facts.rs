@@ -270,6 +270,14 @@ pub struct EcosystemCounts {
 impl OutputFormatter for PackagesReport {
     fn format_text(&self) -> String {
         use std::fmt::Write as _;
+        // Never return an empty string: an agent or user must always see a clear
+        // outcome. When no ecosystems were indexed, say so explicitly rather than
+        // printing a bare "Indexing complete:" with no rows (or nothing at all).
+        if self.ecosystems.is_empty() {
+            return "No package ecosystems detected to index. \
+Add dependencies (e.g. a Cargo.toml or requirements.txt) or pass --only <ecosystem>."
+                .to_string();
+        }
         let mut out = String::new();
         let _ = writeln!(out, "Indexing complete:");
         for eco in &self.ecosystems {
