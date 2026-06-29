@@ -356,8 +356,74 @@ normalize adopted it (2026-06-29) via a local `[patch.crates-io]` dogfood overri
   whose report type has no real pretty (needs type-visibility at macro-expansion time, i.e.
   the same design-A/B tradeoff explored in the capability-wiring design doc). Known limitation
   for now; tracked here for Phase 2+ consideration.
-- [ ] **Audit normalize for `#[param(name)]` / `#[param(default)]` on `#[cli]` methods.**
-  0.6 honors `#[param(name)]` (renames the flag) — grep to confirm no unintended renames.
+- [x] **Audit normalize for `#[param(name)]` / `#[param(default)]` on `#[cli]` methods.**
+  0.6 honors `#[param(name)]` (renames the flag). Audited 2026-06-29 (see CLI audit T2-3):
+  exactly two annotations exist, both in `normalize-budget/src/service.rs` (`measure`, `add`),
+  both `name = "diff-ref"` on field `base_ref` — so `budget measure`/`budget add` `--base-ref`
+  (0.5.x) silently became `--diff-ref` (0.6.x). **Verdict: keep the rename** (the author opted
+  in deliberately; 0.6 made the CLI match the help text). Follow-up: add a CHANGELOG `[Unreleased]`
+  entry documenting the rename; optionally accept `--base-ref` as a hidden alias for one release.
+
+### CLI audit 2026-06-29 backlog
+
+Full catalogue: `docs/artifacts/cli-audit-2026-06-29/00-triage.md` (consolidates five audits).
+Recording reality, not a commitment to do it all now. Items already tracked elsewhere are
+cross-referenced, not duplicated.
+
+**Tier 1 — hard-constraint violations + actively broken (do first):**
+- [ ] **T1-1: Index-dependent commands exit 0 + empty JSON on missing index** (HARD CONSTRAINT —
+  "never silently return empty results"). `view graph/dependents/import-path`, `rank imports/
+  depth-map/layering/call-complexity`, `analyze architecture`. Exit non-zero + emit
+  `"requires_index": true` in JSON when the prerequisite table is empty but source files exist.
+- [ ] **T1-2: 22 mutating commands ship without `--dry-run`** (HARD CONSTRAINT). Priority:
+  `edit redo` (one-line; asymmetric with `edit undo`), `rules run --fix`, `kg write` null-delete,
+  `rules add/update/remove/setup`, `ratchet`/`budget` CRUD, `sessions mark/unmark`,
+  `structure rebuild/packages`, `daemon start/stop`, `generate client/cli-snapshot`, `update`.
+  Decide whether idempotent rebuilds get a documented exemption (amend the constraint if so).
+- [ ] **T1-3: all `trend` metric commands broken** — temp worktree's stale `[embeddings]` config
+  hard-aborts validation. Confirm spawn-path root cause; ignore unknown config in spawned worktrees.
+- [ ] **T1-4: `structure packages` silently succeeds with zero output** (HARD CONSTRAINT). Emit a
+  real report; also needs `--dry-run` (writes global cache; counts toward T1-2).
+- [ ] **T1-5: `rules show <id>` lookup bug** — `stale-summary` in `rules list` but "not found" by
+  `rules show` (native vs fact registry split). Error is also plain text (see T2-2).
+- [ ] **T1-6: broken guides + stale `kg --help` examples** — `guide analyze`/`guide rules` reference
+  pre-rename `analyze *` paths; `kg --help` references nonexistent `kg create/link/query/show`. Fix
+  strings + add a `guide test`/snapshot parsing guide bodies against the real command tree.
+
+**Tier 2 — correctness / consistency:**
+- [ ] **T2-1: `--jsonl` doesn't unwrap inner arrays** — object-wrapping reports (`structure files`,
+  `rank complexity`, `rules list`, `grep`) emit the wrapper as one line. Add a `jsonl_items()` hook.
+- [ ] **T2-2: service-layer errors are plain text under `--json`** (`docs`, `view references/
+  referenced-by/trace`, `serve mcp`, missing-arg). Emit a JSON error object when `--json` is active.
+- [ ] **T2-3: `budget --base-ref`→`--diff-ref`** — keep rename, add CHANGELOG entry (see resolved
+  `#[param(name)]` item above). Separable: unify git-ref flag taxonomy (`--diff` / `--diff-ref` /
+  `--baseline-ref` / positional `[base]`).
+- [ ] **T2-4: `--ignore-case` (grep) vs `--case-insensitive` (view family)** — canonicalize on
+  `--ignore-case`.
+- [ ] **T2-5: `--limit` drift** — `-l` vs `-n` short form; long-only `--n` (ngram size);
+  `--top`/`--worst` aliases; `syntax ast -l` = `--at-line`. Canonicalize on `-l, --limit`.
+- [ ] **T2-6: `rank budget` collides with `budget` service** — rename to `rank line-breakdown`/`rank purposes`.
+- [ ] **T2-7: `cfg cfg` redundant double-wrapping** — collapse to `normalize cfg <path>`.
+- [ ] **T2-8: git ref/target as positional vs flag** — `view trace --target`, `skeleton-diff [base]`
+  deviate from the prevailing form.
+- [ ] **T2-9: inverted dry-run default** — `edit extract-function`, `context migrate` require
+  `--apply`. Either flip to write-by-default + `--dry-run`, or document `extract-function` as a
+  deliberate-safety exception (recommended: document the exception).
+- [ ] **T2-10: `edit history` vs `view history`** — rename `edit history` → `edit log`/`edit trail`.
+
+**Tier 3 — polish:**
+- [ ] **T3-1: root-global flag noise** (~9 server-less globals on every leaf `--help`). server-less
+  rendering concern — collapse into a `[global options]` footer. Broader than (but related to) the
+  already-tracked "Root-global `--pretty` advertised-no-op" item above.
+- [ ] **T3-2: help-text gaps** — `rules remove/update` no examples; `analyze all` no body + opaque
+  scope; `analyze activity/repo-coupling/cross-repo-health` no examples; `syntax ast --compact`
+  truncated description; `analyze` category labels don't scan.
+- [ ] **T3-3: short-flag overloading + clashes** — `-d`/`-t` overloaded; `syntax ast --compact`
+  clashes with global `--compact` (rename to `--outline`); `view blame --sessions` → `--sessions-dir`.
+- [ ] **T3-4: soft feature overlaps** — `analyze architecture`≈`view graph`,
+  `analyze coupling-clusters`≈`rank coupling`. Add "see also" or merge.
+- [ ] **T3-5: unactionable errors** — `grep <nonexistent path>` silent "no matches";
+  `analyze complexity` doesn't hint `rank complexity`.
 
 ### server-less UX issues — ~~all fixed~~ (server-less commit 9c294b2)
 
