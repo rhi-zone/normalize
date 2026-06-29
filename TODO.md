@@ -535,6 +535,23 @@ Follow-ups: see Deferred — `DocFormat`-aware rendering, Rust source-archive un
 
 **Future (low priority):** `security` → SARIF rules engine. `docs`/`security` → rules migration (~-3 commands).
 
+
+**T1-6 fixed (2026-06-29):** `kg --help` footer examples updated from nonexistent
+`kg create`/`kg link`/`kg query`/`kg show` to actual `kg write`/`kg read`/`kg walk`.
+Guide content in `guide.rs` updated: `analyze complexity/length/duplicates/ceremony/size/density`
+→ `rank` equivalents; `analyze node-types` → `syntax node-types`; `analyze graph/dependents/call-graph`
+→ `view graph`/`view dependents`/`view references`; `analyze complexity-trend` → `trend complexity`.
+Audit doc: `docs/artifacts/cli-audit-2026-06-29/05-command-structure.md`.
+
+**T2-3 documented (2026-06-29):** `budget measure` and `budget add` `--base-ref` → `--diff-ref`
+rename logged in CHANGELOG.md [Unreleased]. The rename was a consequence of server-less 0.6 work;
+ref-flag taxonomy unification (rest of T2-3) is deferred — no blocking issues.
+
+**Guide regression guard (deferred):** A test that validates guide command examples exist
+would prevent T1-6-class regressions. Not added now — the guide is plain text in a Rust `const &str`;
+parsing it for command names + running them in tests requires non-trivial harness work.
+Track as: add integration test that runs each guide through a smoke-check (parse command lines,
+verify top-level subcommand exists). Low priority, medium lift.
 ---
 
 ### `analyze` Architecture Redesign (high priority)

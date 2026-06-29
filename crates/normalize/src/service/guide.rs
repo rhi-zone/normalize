@@ -86,7 +86,7 @@ The workflow: inspect the grammar → draft a query → test it → ship it.
 
 ## 1. Find the right node types
 
-  normalize analyze node-types python --search raise
+  normalize syntax node-types python --search raise
 
 Shows all named types, anonymous types, and field names matching "raise".
 
@@ -169,14 +169,14 @@ const GUIDE_EXPLORE: &str = r#"# Exploring a Codebase
 ## Structural overview
 
   normalize analyze summary               # auto-generated codebase overview
-  normalize analyze size                   # hierarchical LOC (ncdu-style)
+  normalize rank size                   # hierarchical LOC (ncdu-style)
   normalize analyze architecture           # coupling, cycles, hubs
 
 ## Import/dependency graph
 
-  normalize analyze imports                # modules ranked by import fan-in
-  normalize analyze graph --on modules     # dependency graph properties
-  normalize analyze dependents --file path # who depends on this?
+  normalize rank imports                # modules ranked by import fan-in
+  normalize view graph     # dependency graph properties
+  normalize view dependents path # who depends on this?
 "#;
 
 const GUIDE_SETUP: &str = r#"# Setting Up Normalize
@@ -235,34 +235,34 @@ const GUIDE_ANALYZE: &str = r#"# Running Analysis
 
 ## Code quality
 
-  normalize analyze complexity             # cyclomatic complexity ranking
-  normalize analyze length                 # long functions
-  normalize analyze duplicates             # copy-paste detection
-  normalize analyze duplicates --scope blocks  # block-level duplicates
-  normalize analyze ceremony              # boilerplate ratio
+  normalize rank complexity             # cyclomatic complexity ranking
+  normalize rank length                 # long functions
+  normalize rank duplicates             # copy-paste detection
+  normalize rank duplicates --scope blocks  # block-level duplicates
+  normalize rank ceremony             # boilerplate ratio
 
 ## Module structure
 
-  normalize analyze size                   # LOC breakdown
-  normalize analyze density                # information density per module
-  normalize analyze module-health          # composite score (tests + uniqueness + density)
-  normalize analyze surface                # public API surface per module
-  normalize analyze layering               # are imports flowing downward?
+  normalize rank size                   # LOC breakdown
+  normalize rank density                # information density per module
+  normalize rank module-health          # composite score (tests + uniqueness + density)
+  normalize rank surface                # public API surface per module
+  normalize rank layering               # are imports flowing downward?
 
 ## Dependencies and graphs
 
   normalize analyze architecture           # coupling + cycles + hubs
-  normalize analyze graph --on modules     # graph-theoretic properties
-  normalize analyze dependents --file path # reverse dependency closure
-  normalize analyze call-graph symbol      # callers and callees
-  normalize analyze depth-map              # dependency depth + ripple risk
+  normalize view graph     # graph-theoretic properties
+  normalize view dependents path # reverse dependency closure
+  normalize view references symbol      # callers and callees
+  normalize rank depth-map              # dependency depth + ripple risk
 
 ## Git history
 
-  normalize analyze hotspots               # churn x complexity
-  normalize analyze coupling               # files that change together
-  normalize analyze ownership              # per-file ownership concentration
-  normalize analyze complexity-trend       # complexity over git history
+  normalize rank hotspots               # churn x complexity
+  normalize rank coupling               # files that change together
+  normalize rank ownership              # per-file ownership concentration
+  normalize trend complexity       # complexity over git history
 
 ## Security
 
@@ -285,9 +285,9 @@ Three commands for working with tree-sitter grammars and queries.
 
 ## List node types for a grammar
 
-  normalize analyze node-types rust
-  normalize analyze node-types python --search "raise"
-  normalize analyze node-types go --search "block"
+  normalize syntax node-types rust
+  normalize syntax node-types python --search "raise"
+  normalize syntax node-types go --search "block"
 
 Shows named types, anonymous types (operators, punctuation), and field names.
 
@@ -328,7 +328,7 @@ Shows each match with captures:
 
 ## Workflow: unknown grammar
 
-  normalize analyze node-types <lang>                    # what types exist?
+  normalize syntax node-types <lang>                    # what types exist?
   normalize syntax ast sample.<ext> --depth 2         # how does it parse?
   normalize syntax query sample.<ext> '(type) @m'       # does my query match?
 "#;
