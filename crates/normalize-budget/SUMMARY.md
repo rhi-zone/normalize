@@ -4,3 +4,4 @@ Diff-based budget system for normalize: tracks how much a codebase is allowed to
 
 - `Cargo.toml` — crate manifest; `cli` feature gates `server-less` dependency
 - `src/` — implementation (see `src/SUMMARY.md`)
+

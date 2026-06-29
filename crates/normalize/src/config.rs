@@ -199,7 +199,10 @@ impl NormalizeConfig {
         }
 
         // Pre-parse check: if any config file contains [embeddings] (removed in
-        // 0.3.0), emit a clear migration error before the generic parse failure.
+        // 0.3.0), emit a migration warning. The section is unknown to the current
+        // schema and will be ignored by serde — we do not abort so that commands
+        // running inside spawned git worktrees (e.g. `trend complexity`) which
+        // check out historical commits with older configs still work correctly.
         for path in [Some(&project_config), global_config.as_ref()]
             .into_iter()
             .flatten()
@@ -210,12 +213,11 @@ impl NormalizeConfig {
                 && value.get("embeddings").is_some()
             {
                 eprintln!(
-                    "error: {} contains [embeddings] which was removed in 0.3.0.\n\
-                     Remove the [embeddings] section from {} and try again.",
+                    "warning: {} contains [embeddings] which was removed in 0.3.0.\n\
+                     Remove the [embeddings] section from {} to silence this warning.",
                     path.display(),
                     path.display()
                 );
-                std::process::exit(1);
             }
         }
 
@@ -517,6 +519,32 @@ todo = ["TODO.md"]
             excludes.contains(&".normalize/"),
             ".normalize/ must be excluded; got: {:?}",
             excludes
+        );
+    }
+
+    /// Regression: a config file with [embeddings] (removed in 0.3.0) must NOT abort.
+    /// The trend commands spawn git worktrees that check out historical configs which may
+    /// still contain the removed section — the load must succeed as a warning, not exit(1).
+    #[test]
+    fn test_embeddings_section_is_tolerated_as_warning() {
+        let dir = TempDir::new().unwrap();
+        let normalize_dir = dir.path().join(".normalize");
+        std::fs::create_dir_all(&normalize_dir).unwrap();
+        std::fs::write(
+            normalize_dir.join("config.toml"),
+            "[daemon]
+enabled = false
+
+[embeddings]
+enabled = true
+",
+        )
+        .unwrap();
+        // Must not abort; must still load valid sections.
+        let config = NormalizeConfig::load(dir.path());
+        assert!(
+            !config.daemon.enabled(),
+            "daemon.enabled must come from the config"
         );
     }
 }
