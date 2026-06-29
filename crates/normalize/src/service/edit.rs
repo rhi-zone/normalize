@@ -801,10 +801,14 @@ fn do_undo_redo(
     }
 
     if redo {
-        let result = shadow.redo().map_err(|e| e.to_string())?;
+        let result = shadow.redo(dry_run).map_err(|e| e.to_string())?;
         return Ok(UndoOutput {
-            operation: "redo".to_string(),
-            dry_run: false,
+            operation: if dry_run {
+                "redo_preview".to_string()
+            } else {
+                "redo".to_string()
+            },
+            dry_run,
             changes: vec![UndoChange {
                 description: result.description,
                 commit: result.undone_commit,
@@ -1268,8 +1272,10 @@ impl EditService {
     ///
     /// Examples:
     ///   normalize edit redo                          # redo the last undone edit
+    ///   normalize edit redo --dry-run                # preview what would change
     pub fn redo(
         &self,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
     ) -> Result<EditResult, String> {
         do_undo_redo(
@@ -1279,7 +1285,7 @@ impl EditService {
             None,
             None,
             false,
-            false,
+            dry_run,
             false,
         )
         .map(|out| EditResult {

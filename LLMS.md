@@ -155,6 +155,7 @@ normalize kg write my-design '.metadata.status = "approved"'
 normalize kg write my-design '.metadata.links += [{"kind":"references","to":"api-spec"}]'
 normalize kg write my-design '.body += "\nMore notes."'
 normalize kg write my-design 'null'  # delete
+normalize kg write my-design 'null' --dry-run  # preview the delete, write nothing
 
 # walk: BFS graph traversal via jq-extracted link IDs
 normalize kg walk my-design '.metadata.links[].to'

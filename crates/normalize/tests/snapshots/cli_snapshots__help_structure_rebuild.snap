@@ -22,6 +22,7 @@ Options:
       --manual                     Emit the reference manual for the command subtree rooted here and exit
       --strict                     Exit non-zero if any tree-sitter grammar is missing (instead of warning and continuing)
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --dry-run                    Dry run - show what would be rebuilt without writing the index
   -h, --help                       Print help
 
 Walks the project directory, parses source files, and populates the SQLite index
@@ -34,3 +35,4 @@ normalize structure rebuild --include symbols            # only extract symbols
 normalize structure rebuild --include calls,imports      # extract calls and imports
 normalize structure rebuild --only "src/**"              # only index files under src/
 normalize structure rebuild --exclude "vendor/**"        # skip vendor directory
+normalize structure rebuild --dry-run                    # preview scope without writing

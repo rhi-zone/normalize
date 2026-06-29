@@ -53,6 +53,9 @@ normalize edit undo 3
 # Redo last undone edit
 normalize edit redo
 
+# Preview a redo without applying it
+normalize edit redo --dry-run
+
 # View edit history
 normalize edit history
 

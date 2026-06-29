@@ -108,14 +108,19 @@ impl normalize_output::OutputFormatter for ReadReport {
 #[cfg_attr(feature = "cli", derive(JsonSchema))]
 pub struct WriteReport {
     pub unit: Option<UnitReport>,
+    /// True if this was a dry-run preview (nothing was written or deleted).
+    #[serde(default)]
+    pub dry_run: bool,
 }
 
 #[cfg(feature = "cli")]
 impl normalize_output::OutputFormatter for WriteReport {
     fn format_text(&self) -> String {
-        match &self.unit {
-            Some(u) => u.format_text(),
-            None => "Deleted.\n".to_string(),
+        match (&self.unit, self.dry_run) {
+            (Some(u), false) => u.format_text(),
+            (Some(u), true) => format!("[dry-run] Would write unit:\n{}", u.format_text()),
+            (None, false) => "Deleted.\n".to_string(),
+            (None, true) => "[dry-run] Would delete unit.\n".to_string(),
         }
     }
 }

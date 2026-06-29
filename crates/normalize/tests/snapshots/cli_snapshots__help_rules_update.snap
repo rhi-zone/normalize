@@ -10,6 +10,7 @@ Arguments:
   [rule-id]  Specific rule ID to update (updates all if omitted)
 
 Options:
+      --dry-run                    Dry run - show what would change
       --pretty                     Human-friendly output with colors and formatting
       --compact                    Compact output without colors (overrides TTY detection)
       --jsonl                      Output one JSON object per line (for arrays)
@@ -20,3 +21,7 @@ Options:
       --manual                     Emit the reference manual for the command subtree rooted here and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Examples:
+normalize rules update                   # re-download all imported rules
+normalize rules update --dry-run         # preview which rules would update

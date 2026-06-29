@@ -146,6 +146,7 @@ impl KgCliService {
     ///   echo '{"id":"a","metadata":{},"body":"Hello"}' | normalize kg write
     ///   normalize kg write my-design '.metadata.tag = "approved"'
     ///   normalize kg write my-design 'null'
+    ///   normalize kg write my-design 'null' --dry-run   # preview the delete
     #[cli(display_with = "display_output")]
     pub fn write(
         &self,
@@ -154,6 +155,7 @@ impl KgCliService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(help = "Dry run - show what would change without writing")] dry_run: bool,
     ) -> Result<WriteReport, String> {
         let root_path = resolve_root(root)?;
         let kg = open_kg(&root_path)?;
@@ -170,9 +172,12 @@ impl KgCliService {
                 if unit.id.is_empty() {
                     return Err("Unit JSON must have a non-empty .id field.".to_string());
                 }
-                store::write_unit(&kg, &unit)?;
+                if !dry_run {
+                    store::write_unit(&kg, &unit)?;
+                }
                 Ok(WriteReport {
                     unit: Some(UnitReport::from_unit(&unit)),
+                    dry_run,
                 })
             }
             (Some(id), Some(expr)) => {
@@ -180,13 +185,21 @@ impl KgCliService {
                     .ok_or_else(|| format!("Unit '{}' not found.", id))?;
                 match store::apply_jq_transform(&existing, &expr)? {
                     None => {
-                        store::delete_unit(&kg, &id)?;
-                        Ok(WriteReport { unit: None })
+                        if !dry_run {
+                            store::delete_unit(&kg, &id)?;
+                        }
+                        Ok(WriteReport {
+                            unit: None,
+                            dry_run,
+                        })
                     }
                     Some(updated) => {
-                        store::write_unit(&kg, &updated)?;
+                        if !dry_run {
+                            store::write_unit(&kg, &updated)?;
+                        }
                         Ok(WriteReport {
                             unit: Some(UnitReport::from_unit(&updated)),
+                            dry_run,
                         })
                     }
                 }

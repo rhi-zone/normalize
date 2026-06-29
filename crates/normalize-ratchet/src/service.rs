@@ -145,6 +145,9 @@ pub struct UpdateReport {
     pub updated: Vec<UpdateEntry>,
     /// Entries that were not updated (no improvement, or value unchanged).
     pub skipped: Vec<UpdateEntry>,
+    /// True if this was a dry-run preview (nothing was written).
+    #[serde(default)]
+    pub dry_run: bool,
 }
 
 /// A single entry in an [`UpdateReport`].
@@ -187,15 +190,31 @@ impl std::fmt::Display for UpdateReason {
 impl OutputFormatter for UpdateReport {
     fn format_text(&self) -> String {
         let mut lines = Vec::new();
+        let prefix = if self.dry_run { "[dry-run] " } else { "" };
         lines.push(format!(
-            "Ratchet update: {} updated, {} skipped",
+            "{}Ratchet update: {} {}, {} skipped",
+            prefix,
             self.updated.len(),
+            if self.dry_run {
+                "would update"
+            } else {
+                "updated"
+            },
             self.skipped.len()
         ));
         for e in &self.updated {
             lines.push(format!(
-                "  updated {} ({}/{}): {:.4} → {:.4}",
-                e.path, e.metric, e.reason, e.old_value, e.new_value
+                "  {} {} ({}/{}): {:.4} → {:.4}",
+                if self.dry_run {
+                    "would update"
+                } else {
+                    "updated"
+                },
+                e.path,
+                e.metric,
+                e.reason,
+                e.old_value,
+                e.new_value
             ));
         }
         for e in &self.skipped {
@@ -258,13 +277,21 @@ pub struct AddReport {
     pub value: f64,
     /// Number of individual measurement items that were aggregated.
     pub item_count: usize,
+    /// True if this was a dry-run preview (nothing was written).
+    #[serde(default)]
+    pub dry_run: bool,
 }
 
 impl OutputFormatter for AddReport {
     fn format_text(&self) -> String {
+        let verb = if self.dry_run {
+            "[dry-run] Would add baseline"
+        } else {
+            "Added baseline"
+        };
         format!(
-            "Added baseline: {} ({}/{}) = {:.4} ({} items)",
-            self.path, self.metric, self.aggregate, self.value, self.item_count
+            "{}: {} ({}/{}) = {:.4} ({} items)",
+            verb, self.path, self.metric, self.aggregate, self.value, self.item_count
         )
     }
 }
@@ -278,12 +305,20 @@ pub struct RemoveReport {
     pub metric: String,
     /// Whether an entry was actually found and removed.
     pub removed: bool,
+    /// True if this was a dry-run preview (nothing was written).
+    #[serde(default)]
+    pub dry_run: bool,
 }
 
 impl OutputFormatter for RemoveReport {
     fn format_text(&self) -> String {
         if self.removed {
-            format!("Removed baseline entry: {} ({})", self.path, self.metric)
+            let verb = if self.dry_run {
+                "[dry-run] Would remove baseline entry"
+            } else {
+                "Removed baseline entry"
+            };
+            format!("{}: {} ({})", verb, self.path, self.metric)
         } else {
             format!(
                 "No baseline entry found for {} ({})",
@@ -392,6 +427,7 @@ impl RatchetService {
 
     /// Measure and pin as a new baseline entry. Errors if entry already exists.
     #[cli(display_with = "display_add")]
+    #[allow(clippy::too_many_arguments)]
     pub fn add(
         &self,
         #[param(positional, help = "Path to track")] path: String,
@@ -402,6 +438,7 @@ impl RatchetService {
         metric: String,
         #[param(short = 'a', help = "Aggregation strategy")] aggregate: Option<Aggregate>,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
     ) -> Result<AddReport, String> {
         let root_path = resolve_root(root)?;
         let config = load_ratchet_config(&root_path);
@@ -424,13 +461,15 @@ impl RatchetService {
 
         let result = measure(&root_path, &path, &metric, agg, &self.metric_factory)?;
 
-        baseline.entries.push(BaselineEntry {
-            path: path.clone(),
-            metric: metric.clone(),
-            aggregate: agg,
-            value: result.value,
-        });
-        baseline.save(&root_path).map_err(|e| e.to_string())?;
+        if !dry_run {
+            baseline.entries.push(BaselineEntry {
+                path: path.clone(),
+                metric: metric.clone(),
+                aggregate: agg,
+                value: result.value,
+            });
+            baseline.save(&root_path).map_err(|e| e.to_string())?;
+        }
 
         Ok(AddReport {
             path,
@@ -438,6 +477,7 @@ impl RatchetService {
             aggregate: agg,
             value: result.value,
             item_count: result.item_count,
+            dry_run,
         })
     }
 
@@ -504,12 +544,14 @@ impl RatchetService {
     /// Without --force: only lowers values (true ratchet behaviour).
     /// With --force: also raises values.
     #[cli(display_with = "display_update")]
+    #[allow(clippy::too_many_arguments)]
     pub fn update(
         &self,
         #[param(positional, help = "Filter by path prefix")] path: Option<String>,
         #[param(short = 'm', help = "Filter by metric")] metric: Option<String>,
         #[param(help = "Also raise values (not just lower them)")] force: bool,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
     ) -> Result<UpdateReport, String> {
         let root_path = resolve_root(root)?;
 
@@ -585,11 +627,15 @@ impl RatchetService {
             }
         }
 
-        if !updated.is_empty() {
+        if !updated.is_empty() && !dry_run {
             baseline.save(&root_path).map_err(|e| e.to_string())?;
         }
 
-        Ok(UpdateReport { updated, skipped })
+        Ok(UpdateReport {
+            updated,
+            skipped,
+            dry_run,
+        })
     }
 
     /// Display matching baseline entries.
@@ -624,6 +670,7 @@ impl RatchetService {
         #[param(positional, help = "Path of the entry to remove")] path: String,
         #[param(short = 'm', help = "Metric of the entry to remove")] metric: String,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
     ) -> Result<RemoveReport, String> {
         let root_path = resolve_root(root)?;
         let mut baseline = BaselineFile::load(&root_path)
@@ -634,13 +681,14 @@ impl RatchetService {
             .entries
             .retain(|e| !(e.path == path && e.metric == metric));
         let removed = baseline.entries.len() < before;
-        if removed {
+        if removed && !dry_run {
             baseline.save(&root_path).map_err(|e| e.to_string())?;
         }
         Ok(RemoveReport {
             path,
             metric,
             removed,
+            dry_run,
         })
     }
 }

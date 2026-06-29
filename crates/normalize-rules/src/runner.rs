@@ -2242,12 +2242,9 @@ fn detect_extension(url: &str) -> &'static str {
     if url.ends_with(".dl") { "dl" } else { "scm" }
 }
 
-pub fn add_rule(url: &str, global: bool) -> Result<(), String> {
+pub fn add_rule(url: &str, global: bool, dry_run: bool) -> Result<String, String> {
     let rules_dir =
         rules_dir(global).ok_or_else(|| "Could not determine rules directory".to_string())?;
-
-    std::fs::create_dir_all(&rules_dir)
-        .map_err(|e| format!("Failed to create rules directory: {e}"))?;
 
     let content = download_url(url).map_err(|e| format!("Failed to download rule: {e}"))?;
 
@@ -2257,6 +2254,22 @@ pub fn add_rule(url: &str, global: bool) -> Result<(), String> {
 
     let ext = detect_extension(url);
     let rule_path = rules_dir.join(format!("{}.{}", rule_id, ext));
+
+    if dry_run {
+        return Ok(format!(
+            "[dry-run] Would add rule '{}' from {}\n[dry-run] Would write: {}\n[dry-run] Would record in lock file: {}",
+            rule_id,
+            url,
+            rule_path.display(),
+            lock_file_path(global)
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| "(unknown)".to_string())
+        ));
+    }
+
+    std::fs::create_dir_all(&rules_dir)
+        .map_err(|e| format!("Failed to create rules directory: {e}"))?;
+
     std::fs::write(&rule_path, &content).map_err(|e| format!("Failed to save rule: {e}"))?;
 
     let lock_path =
@@ -2276,13 +2289,15 @@ pub fn add_rule(url: &str, global: bool) -> Result<(), String> {
         eprintln!("Warning: Failed to update lock file: {}", e);
     }
 
-    println!("Added rule '{}' from {}", rule_id, url);
-    println!("Saved to: {}", rule_path.display());
-
-    Ok(())
+    Ok(format!(
+        "Added rule '{}' from {}\nSaved to: {}",
+        rule_id,
+        url,
+        rule_path.display()
+    ))
 }
 
-pub fn update_rules(rule_id: Option<&str>) -> Result<(), String> {
+pub fn update_rules(rule_id: Option<&str>, dry_run: bool) -> Result<String, String> {
     let mut updated = Vec::new();
     let mut errors: Vec<(String, String)> = Vec::new();
 
@@ -2291,6 +2306,16 @@ pub fn update_rules(rule_id: Option<&str>) -> Result<(), String> {
             let lock = RulesLock::load(&lock_path);
             for (id, entry) in &lock.rules {
                 if rule_id.is_some() && rule_id != Some(id.as_str()) {
+                    continue;
+                }
+                if dry_run {
+                    let ext = detect_extension(&entry.source);
+                    let path = rules_dir.join(format!("{}.{}", id, ext));
+                    // Verify the source is reachable without writing.
+                    match download_url(&entry.source) {
+                        Ok(_) => updated.push(format!("{} -> {}", id, path.display())),
+                        Err(e) => errors.push((id.clone(), e.to_string())),
+                    }
                     continue;
                 }
                 match download_url(&entry.source) {
@@ -2311,11 +2336,17 @@ pub fn update_rules(rule_id: Option<&str>) -> Result<(), String> {
         }
     }
 
+    let mut lines = Vec::new();
+    let prefix = if dry_run { "[dry-run] " } else { "" };
     if updated.is_empty() && errors.is_empty() {
-        println!("No imported rules to update.");
+        lines.push("No imported rules to update.".to_string());
     } else {
         for id in &updated {
-            println!("Updated: {}", id);
+            if dry_run {
+                lines.push(format!("{}Would update: {}", prefix, id));
+            } else {
+                lines.push(format!("Updated: {}", id));
+            }
         }
         for (id, err) in &errors {
             eprintln!("Failed to update {}: {}", id, err);
@@ -2323,14 +2354,15 @@ pub fn update_rules(rule_id: Option<&str>) -> Result<(), String> {
     }
 
     if errors.is_empty() {
-        Ok(())
+        Ok(lines.join("\n"))
     } else {
         Err(format!("{} rule(s) failed to update", errors.len()))
     }
 }
 
-pub fn remove_rule(rule_id: &str) -> Result<(), String> {
+pub fn remove_rule(rule_id: &str, dry_run: bool) -> Result<String, String> {
     let mut removed = false;
+    let mut targets = Vec::new();
 
     for global in [false, true] {
         if removed {
@@ -2338,6 +2370,19 @@ pub fn remove_rule(rule_id: &str) -> Result<(), String> {
         }
         if let (Some(lock_path), Some(rules_dir)) = (lock_file_path(global), rules_dir(global)) {
             let mut lock = RulesLock::load(&lock_path);
+            if dry_run {
+                if lock.rules.contains_key(rule_id) {
+                    for ext in ["scm", "dl"] {
+                        let rule_path = rules_dir.join(format!("{}.{}", rule_id, ext));
+                        if rule_path.exists() {
+                            targets.push(rule_path.display().to_string());
+                        }
+                    }
+                    targets.push(format!("lock entry in {}", lock_path.display()));
+                    removed = true;
+                }
+                continue;
+            }
             if lock.rules.remove(rule_id).is_some() {
                 let _ = lock.save(&lock_path);
                 // Try both extensions
@@ -2351,8 +2396,15 @@ pub fn remove_rule(rule_id: &str) -> Result<(), String> {
     }
 
     if removed {
-        println!("Removed rule '{}'", rule_id);
-        Ok(())
+        if dry_run {
+            Ok(format!(
+                "[dry-run] Would remove rule '{}'\n[dry-run] Would delete: {}",
+                rule_id,
+                targets.join(", ")
+            ))
+        } else {
+            Ok(format!("Removed rule '{}'", rule_id))
+        }
     } else {
         Err(format!("Rule '{}' not found in lock file", rule_id))
     }

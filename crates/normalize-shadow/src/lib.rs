@@ -792,7 +792,7 @@ impl Shadow {
 
     /// Redo the most recently undone edit.
     /// Only works if the last operation was an undo.
-    pub fn redo(&self) -> Result<UndoResult, ShadowError> {
+    pub fn redo(&self, dry_run: bool) -> Result<UndoResult, ShadowError> {
         if !self.exists() {
             return Err(ShadowError::Undo("No shadow history exists".to_string()));
         }
@@ -834,6 +834,15 @@ impl Shadow {
             .filter(|l| !l.is_empty())
             .map(String::from)
             .collect();
+
+        if dry_run {
+            return Ok(UndoResult {
+                files: files.iter().map(PathBuf::from).collect(),
+                undone_commit: undone_hash.to_string(),
+                description: format!("redo: {}", latest.target),
+                conflicts: vec![],
+            });
+        }
 
         // For each file, restore from the undone commit state
         self.restore_files_from_ref(&files, undone_hash)?;

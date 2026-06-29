@@ -49,22 +49,14 @@ fn primary_tag(tags: &[String]) -> &str {
 }
 
 /// Run the interactive setup wizard. Returns an exit code (0 = success).
-pub fn run_setup_wizard(root: &Path) -> i32 {
+/// Build a `rule_id -> RuleMeta` map across both the syntax and fact rule engines,
+/// used by the setup wizard to describe each rule.
+fn build_rule_meta(root: &Path, config: &RulesRunConfig) -> HashMap<String, RuleMeta> {
     use normalize_facts_rules_interpret as interpret;
 
-    let use_colors = io::stdout().is_terminal();
-
-    println!("Rule Setup Wizard");
-    println!("=================");
-    println!("Running all rules against the codebase...\n");
-
-    let config = load_rules_config(root);
-
-    // Load rule metadata for descriptions
     let syntax_rules = normalize_syntax_rules::load_all_rules(root, &config.rules);
     let fact_rules = interpret::load_all_rules(root, &config.rules);
 
-    // Build map: rule_id -> RuleMeta
     let mut rule_meta: HashMap<String, RuleMeta> = HashMap::new();
     for r in &syntax_rules {
         rule_meta.insert(
@@ -92,6 +84,34 @@ pub fn run_setup_wizard(root: &Path) -> i32 {
             },
         );
     }
+    rule_meta
+}
+
+pub fn run_setup_wizard(root: &Path, dry_run: bool) -> i32 {
+    let use_colors = io::stdout().is_terminal();
+
+    println!("Rule Setup Wizard");
+    println!("=================");
+    if dry_run {
+        println!("[dry-run] No configuration will be written.");
+    }
+    println!("Running all rules against the codebase...\n");
+
+    // In dry-run mode, skip the actual config mutation but report the decision.
+    let apply = |id: &str, enable: bool, rules_config: &RulesRunConfig| -> Result<(), String> {
+        if dry_run {
+            Ok(())
+        } else {
+            enable_disable(root, id, enable, false, rules_config).map(|_| ())
+        }
+    };
+    let verb_enabled = if dry_run { "would enable" } else { "Enabled" };
+    let verb_disabled = if dry_run { "would disable" } else { "Disabled" };
+
+    let config = load_rules_config(root);
+
+    // Load rule metadata (id -> description/severity/tags) for both engines.
+    let rule_meta = build_rule_meta(root, &config);
 
     // Run all rules to collect violations
     let rules_config = RulesRunConfig {
@@ -336,9 +356,9 @@ pub fn run_setup_wizard(root: &Path) -> i32 {
             match line.trim().to_lowercase().as_str() {
                 "e" | "enable" => {
                     if !enabled {
-                        match enable_disable(root, rule_id, true, false, &rules_config) {
+                        match apply(rule_id, true, &rules_config) {
                             Ok(_) => {
-                                println!("  → Enabled {}", rule_id);
+                                println!("  → {} {}", verb_enabled, rule_id);
                                 enabled_rules.push(rule_id.clone());
                             }
                             Err(e) => eprintln!("  Error enabling {}: {}", rule_id, e),
@@ -349,9 +369,9 @@ pub fn run_setup_wizard(root: &Path) -> i32 {
                 }
                 "d" | "disable" => {
                     if enabled {
-                        match enable_disable(root, rule_id, false, false, &rules_config) {
+                        match apply(rule_id, false, &rules_config) {
                             Ok(_) => {
-                                println!("  → Disabled {}", rule_id);
+                                println!("  → {} {}", verb_disabled, rule_id);
                                 disabled_rules.push(rule_id.clone());
                             }
                             Err(e) => eprintln!("  Error disabling {}: {}", rule_id, e),
@@ -397,9 +417,9 @@ pub fn run_setup_wizard(root: &Path) -> i32 {
                         let already_disabled = disabled_rules.contains(id);
                         // If we just disabled it in this session, re-enable
                         if !currently_enabled || already_disabled {
-                            match enable_disable(root, id, true, false, &rules_config) {
+                            match apply(id, true, &rules_config) {
                                 Ok(_) => {
-                                    println!("      enabled {}", id);
+                                    println!("      {} {}", verb_enabled, id);
                                     enabled_rules.push(id.clone());
                                     // Remove from disabled if it was just disabled
                                     disabled_rules.retain(|x| x != id);
@@ -417,9 +437,9 @@ pub fn run_setup_wizard(root: &Path) -> i32 {
                         let currently_enabled = rule_meta.get(id).is_some_and(|m| m.enabled)
                             || enabled_rules.contains(id);
                         if currently_enabled {
-                            match enable_disable(root, id, false, false, &rules_config) {
+                            match apply(id, false, &rules_config) {
                                 Ok(_) => {
-                                    println!("      disabled {}", id);
+                                    println!("      {} {}", verb_disabled, id);
                                     disabled_rules.push(id.clone());
                                     // Remove from enabled if it was just enabled
                                     enabled_rules.retain(|x| x != id);
@@ -463,7 +483,11 @@ pub fn run_setup_wizard(root: &Path) -> i32 {
                 println!("    {}", id);
             }
         }
-        println!("\nConfiguration saved to .normalize/config.toml");
+        if dry_run {
+            println!("\n[dry-run] No changes written to .normalize/config.toml.");
+        } else {
+            println!("\nConfiguration saved to .normalize/config.toml");
+        }
         println!("Run 'normalize rules show-config' to see the full configuration.");
     }
 

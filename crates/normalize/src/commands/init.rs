@@ -216,7 +216,7 @@ exclude = [
 /// Delegates to `normalize_rules::setup::run_setup_wizard` which is also
 /// available as `normalize rules setup`.
 pub fn run_setup_wizard(root: &Path) -> i32 {
-    normalize_rules::setup::run_setup_wizard(root)
+    normalize_rules::setup::run_setup_wizard(root, false)
 }
 
 /// Detect scratch directories in `root` that exist and are not already

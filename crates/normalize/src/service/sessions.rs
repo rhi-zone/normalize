@@ -910,6 +910,7 @@ impl SessionsService {
     ///
     /// Examples:
     ///   normalize sessions mark abc123               # mark session as reviewed
+    ///   normalize sessions mark abc123 --dry-run     # preview without writing
     #[cli(display_with = "display_output")]
     pub fn mark(
         &self,
@@ -917,15 +918,17 @@ impl SessionsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
     ) -> Result<MarkReport, String> {
         let root_path = root.as_deref().map(std::path::Path::new);
-        crate::commands::sessions::mark_session(&session, root_path)
+        crate::commands::sessions::mark_session(&session, root_path, dry_run)
     }
 
     /// Remove a session from the reviewed list
     ///
     /// Examples:
     ///   normalize sessions unmark abc123             # remove reviewed mark from session
+    ///   normalize sessions unmark abc123 --dry-run   # preview without writing
     #[cli(display_with = "display_output")]
     pub fn unmark(
         &self,
@@ -933,8 +936,9 @@ impl SessionsService {
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
     ) -> Result<MarkReport, String> {
         let root_path = root.as_deref().map(std::path::Path::new);
-        crate::commands::sessions::unmark_session(&session, root_path)
+        crate::commands::sessions::unmark_session(&session, root_path, dry_run)
     }
 }
