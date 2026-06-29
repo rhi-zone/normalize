@@ -45,12 +45,24 @@ pub struct MarkReport {
     pub session_id: String,
     pub action: String,
     pub already: bool,
+    /// True if this was a dry-run preview (nothing was written).
+    #[serde(default)]
+    pub dry_run: bool,
 }
 
 impl OutputFormatter for MarkReport {
     fn format_text(&self) -> String {
+        let prefix = if self.dry_run { "[dry-run] " } else { "" };
         if self.already {
-            format!("Session {} was already {}d.", self.session_id, self.action)
+            format!(
+                "{}Session {} was already {}d.",
+                prefix, self.session_id, self.action
+            )
+        } else if self.dry_run {
+            format!(
+                "[dry-run] Would mark session {} as {}.",
+                self.session_id, self.action
+            )
         } else {
             format!("Session {} marked as {}.", self.session_id, self.action)
         }
@@ -58,10 +70,14 @@ impl OutputFormatter for MarkReport {
 }
 
 /// Mark a session as reviewed.
-pub fn mark_session(session_id: &str, root: Option<&Path>) -> Result<MarkReport, String> {
+pub fn mark_session(
+    session_id: &str,
+    root: Option<&Path>,
+    dry_run: bool,
+) -> Result<MarkReport, String> {
     let mut ids = load_reviewed(root);
     let already = ids.contains(session_id);
-    if !already {
+    if !already && !dry_run {
         ids.insert(session_id.to_string());
         save_reviewed(root, &ids)?;
     }
@@ -69,14 +85,19 @@ pub fn mark_session(session_id: &str, root: Option<&Path>) -> Result<MarkReport,
         session_id: session_id.to_string(),
         action: "reviewed".to_string(),
         already,
+        dry_run,
     })
 }
 
 /// Unmark a session (remove from reviewed list).
-pub fn unmark_session(session_id: &str, root: Option<&Path>) -> Result<MarkReport, String> {
+pub fn unmark_session(
+    session_id: &str,
+    root: Option<&Path>,
+    dry_run: bool,
+) -> Result<MarkReport, String> {
     let mut ids = load_reviewed(root);
     let already = !ids.contains(session_id);
-    if !already {
+    if !already && !dry_run {
         ids.remove(session_id);
         save_reviewed(root, &ids)?;
     }
@@ -84,5 +105,6 @@ pub fn unmark_session(session_id: &str, root: Option<&Path>) -> Result<MarkRepor
         session_id: session_id.to_string(),
         action: "unreview".to_string(),
         already,
+        dry_run,
     })
 }

@@ -6,6 +6,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`--dry-run` on mutating commands that lacked it** (CLAUDE.md hard-constraint
+  remediation, audit T1-2). Each previews what would change and writes nothing:
+  - `edit redo` (mirrors the existing `edit undo --dry-run`; fixes the undo/redo asymmetry).
+  - `rules run --fix --dry-run` — lists every issue that would be fixed, per file, without
+    applying any edits.
+  - `rules add`, `rules update`, `rules remove` — preview which rule files would be
+    written/deleted (downloads are still performed to compute the preview, but nothing is saved).
+  - `rules setup` — walks the enable/disable decisions without writing `config.toml`.
+  - `ratchet add`, `ratchet update`, `ratchet remove` — preview baseline config changes.
+  - `budget add`, `budget update`, `budget remove` — preview budget config changes.
+  - `kg write` — preview unit writes and deletes (including the destructive `null`-transform
+    delete) without touching the knowledge graph.
+  - `sessions mark`, `sessions unmark` — preview reviewed-list changes.
+  - `structure rebuild` — reports the rebuild scope (full vs incremental, content types,
+    root, filters, target index path) without opening or writing `.normalize/index.sqlite`.
+  - The dry-run state is reflected in the typed report (`dry_run` field) for programmatic
+    consumers, not just the text output.
+
 ### Changed
 
 - **`normalize rank` text output is converging on one house style** (documented in

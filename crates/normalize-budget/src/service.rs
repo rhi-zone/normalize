@@ -121,12 +121,20 @@ pub struct AddReport {
     pub metric: String,
     /// True if the entry was created; false if it already existed.
     pub added: bool,
+    /// True if this was a dry-run preview (nothing was written).
+    #[serde(default)]
+    pub dry_run: bool,
 }
 
 impl OutputFormatter for AddReport {
     fn format_text(&self) -> String {
         if self.added {
-            format!("added budget entry: {}  metric={}", self.path, self.metric)
+            let verb = if self.dry_run {
+                "[dry-run] would add budget entry"
+            } else {
+                "added budget entry"
+            };
+            format!("{}: {}  metric={}", verb, self.path, self.metric)
         } else {
             format!(
                 "budget entry already exists for {}/{}; use `budget update` to modify",
@@ -145,15 +153,20 @@ pub struct UpdateReport {
     pub metric: String,
     /// True if the entry was found and modified.
     pub updated: bool,
+    /// True if this was a dry-run preview (nothing was written).
+    #[serde(default)]
+    pub dry_run: bool,
 }
 
 impl OutputFormatter for UpdateReport {
     fn format_text(&self) -> String {
         if self.updated {
-            format!(
-                "updated budget entry: {}  metric={}",
-                self.path, self.metric
-            )
+            let verb = if self.dry_run {
+                "[dry-run] would update budget entry"
+            } else {
+                "updated budget entry"
+            };
+            format!("{}: {}  metric={}", verb, self.path, self.metric)
         } else {
             "entry not found".to_string()
         }
@@ -221,15 +234,20 @@ pub struct RemoveReport {
     pub metric: String,
     /// True if the entry was found and removed.
     pub removed: bool,
+    /// True if this was a dry-run preview (nothing was written).
+    #[serde(default)]
+    pub dry_run: bool,
 }
 
 impl OutputFormatter for RemoveReport {
     fn format_text(&self) -> String {
         if self.removed {
-            format!(
-                "removed budget entry: {}  metric={}",
-                self.path, self.metric
-            )
+            let verb = if self.dry_run {
+                "[dry-run] would remove budget entry"
+            } else {
+                "removed budget entry"
+            };
+            format!("{}: {}  metric={}", verb, self.path, self.metric)
         } else {
             format!("no entry found for {}  metric={}", self.path, self.metric)
         }
@@ -353,6 +371,7 @@ impl BudgetService {
         #[param(help = "Maximum items removed")] max_removed: Option<f64>,
         #[param(help = "Maximum total churn (added + removed)")] max_total: Option<f64>,
         #[param(help = "Maximum net change (added - removed)")] max_net: Option<f64>,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
         pretty: bool,
         compact: bool,
     ) -> Result<AddReport, String> {
@@ -392,6 +411,7 @@ impl BudgetService {
                 path,
                 metric,
                 added: false,
+                dry_run,
             });
         }
 
@@ -403,12 +423,15 @@ impl BudgetService {
             limits,
         };
         budget.entries.push(entry);
-        budget.save(&root).map_err(|e| e.to_string())?;
+        if !dry_run {
+            budget.save(&root).map_err(|e| e.to_string())?;
+        }
 
         Ok(AddReport {
             path,
             metric,
             added: true,
+            dry_run,
         })
     }
 
@@ -498,6 +521,7 @@ impl BudgetService {
         #[param(help = "New maximum items removed")] max_removed: Option<f64>,
         #[param(help = "New maximum total churn")] max_total: Option<f64>,
         #[param(help = "New maximum net change")] max_net: Option<f64>,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
         pretty: bool,
         compact: bool,
     ) -> Result<UpdateReport, String> {
@@ -517,6 +541,7 @@ impl BudgetService {
                 path,
                 metric,
                 updated: false,
+                dry_run,
             }),
             Some(e) => {
                 if max_added.is_some() {
@@ -531,11 +556,14 @@ impl BudgetService {
                 if max_net.is_some() {
                     e.limits.max_net = max_net;
                 }
-                budget.save(&root).map_err(|e| e.to_string())?;
+                if !dry_run {
+                    budget.save(&root).map_err(|e| e.to_string())?;
+                }
                 Ok(UpdateReport {
                     path,
                     metric,
                     updated: true,
+                    dry_run,
                 })
             }
         }
@@ -581,6 +609,7 @@ impl BudgetService {
         #[param(positional, help = "Path of the entry to remove")] path: String,
         #[param(short = 'm', help = "Metric of the entry to remove")] metric: String,
         #[param(short = 'r', help = "Root directory")] root: Option<String>,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
         pretty: bool,
         compact: bool,
     ) -> Result<RemoveReport, String> {
@@ -596,7 +625,7 @@ impl BudgetService {
             .retain(|e| !(e.path == path && e.metric == metric));
         let removed = budget.entries.len() < len_before;
 
-        if removed {
+        if removed && !dry_run {
             budget.save(&root).map_err(|e| e.to_string())?;
         }
 
@@ -604,6 +633,7 @@ impl BudgetService {
             path,
             metric,
             removed,
+            dry_run,
         })
     }
 }

@@ -10,6 +10,7 @@ Arguments:
   [rule-id]  Rule ID to remove
 
 Options:
+      --dry-run                    Dry run - show what would change
       --pretty                     Human-friendly output with colors and formatting
       --compact                    Compact output without colors (overrides TTY detection)
       --jsonl                      Output one JSON object per line (for arrays)
@@ -19,3 +20,7 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Examples:
+normalize rules remove my-rule           # delete an imported rule
+normalize rules remove my-rule --dry-run # preview what would be deleted

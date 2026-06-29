@@ -45,6 +45,7 @@ normalize rules run --type fact                  # Fact rules only
 normalize rules run --type native                # Native checks only (stale-summary, ratchet, budget)
 normalize rules run --rule rust/unwrap-in-impl   # Specific rule
 normalize rules run --fix                        # Apply auto-fixes (syntax only)
+normalize rules run --fix --dry-run              # Preview fixes without writing
 normalize rules run --sarif                      # SARIF output
 normalize rules run src/                         # Target specific path
 normalize rules run --files src/main.rs src/lib.rs  # Explicit file list (bypasses walker)
@@ -58,6 +59,7 @@ Options:
 - `--rule <RULE>` — Specific rule ID to run
 - `-t, --type <TYPE>` — Filter by rule type: `all`, `syntax`, `fact`, `native`, `sarif` (default: `all`)
 - `--fix` — Apply auto-fixes (syntax rules only)
+- `--dry-run` — With `--fix`, list the issues that would be fixed (per file) without writing
 - `--sarif` — Output in SARIF 2.1.0 format (for IDE/CI integration)
 - `--no-fail` — Exit 0 even when error-severity issues are found
 - `--pretty` — Colored terminal output
@@ -82,6 +84,11 @@ normalize rules add https://example.com/rules/security.scm --global
 
 Options:
 - `--global` — Install to global rules (`~/.config/normalize/rules/`) instead of project
+- `--dry-run` — Show what would be downloaded and written without saving
+
+`rules update`, `rules remove`, and `rules setup` also accept `--dry-run` to preview
+which rule files would be overwritten/deleted (or which enable/disable config changes the
+setup wizard would write) without mutating anything.
 
 The rule file must have TOML frontmatter with an `id` field. Syntax rules use `.scm`:
 

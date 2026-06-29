@@ -10,6 +10,43 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ---
 
+## CLI audit 2026-06-29 — T1-2: `--dry-run` on mutating commands (CLAUDE.md hard constraint)
+
+Source: `docs/artifacts/cli-audit-2026-06-29/03-dry-run.md`. Constraint: "Ship mutating
+commands without `--dry-run`" is forbidden.
+
+**Done (this pass):**
+- [x] `edit redo` — threaded `dry_run` through `Shadow::redo()`; mirrors `edit undo --dry-run`
+      (operation `redo_preview`). Fixes the undo/redo asymmetry.
+- [x] `rules run --fix --dry-run` — previews every fixable finding per file, applies nothing.
+- [x] `rules add` / `rules update` / `rules remove` — `dry_run` threaded through the runner
+      helpers (now return a message `String` carried in `RuleShowReport.message`).
+- [x] `rules setup` — `run_setup_wizard(root, dry_run)`; walks decisions, skips `enable_disable`
+      writes, prints `[dry-run]`.
+- [x] `ratchet add` / `ratchet update` / `ratchet remove` — gated `BaselineFile::save`; `dry_run`
+      field on `AddReport`/`UpdateReport`/`RemoveReport`.
+- [x] `budget add` / `budget update` / `budget remove` — gated `BudgetFile::save`; `dry_run`
+      field on reports.
+- [x] `kg write` — gated `store::write_unit`/`delete_unit`; `dry_run` field on `WriteReport`
+      (covers the destructive `null`-transform delete).
+- [x] `sessions mark` / `sessions unmark` — gated `save_reviewed`; `dry_run` field on `MarkReport`.
+- [x] `structure rebuild` — early-returns a plan (full vs incremental, content types, root,
+      filters, target index path) before opening the index; `dry_run`+`plan` fields on
+      `RebuildReport`. (Note: `.normalize/index.sqlite` is auto-created by *any* command on
+      startup, independent of this command; the dry-run leaves its contents/hash unchanged.)
+
+**Judged out of scope (recorded, not forced):**
+- `daemon start` / `daemon stop` — process lifecycle, not content mutation. A `--dry-run` would
+  only print "would start/stop daemon"; low value, and the audit ranks these borderline. Skip.
+- `update` — already has `--check` (checks for a newer release without installing), which is the
+  functional dry-run. Adding a second near-identical flag is redundant. Skip.
+- `generate client` / `generate cli-snapshot` — write to **stdout by default**; only mutate when
+  `-o <file>` is passed, so stdout output is already a de-facto dry-run. Marginal value; skip.
+- `structure packages` — writes to the global grammar cache; deferred with the separate T1-4
+  fix (it also has a silent-empty-output bug) rather than handled here.
+
+---
+
 ## CFG (Control Flow Graph) — Phase 1 ✓ + Phase 2 ✓ + Phase 3 ✓ + Phase 4 ✓
 
 **Goal:** `normalize cfg <file> -f <function>` renders a Mermaid flowchart of a function's control flow.

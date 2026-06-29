@@ -176,6 +176,7 @@ View the history of structural edits:
 normalize edit history               # Recent edit history
 normalize edit undo                  # Undo last edit
 normalize edit redo                  # Redo last undone edit
+normalize edit redo --dry-run        # Preview a redo without applying
 normalize edit goto <ref>            # Jump to a shadow commit
 ```
 
@@ -196,8 +197,9 @@ Manage and run syntax + fact rules:
 ```bash
 normalize rules list                 # List all rules
 normalize rules run                  # Run all rules
+normalize rules run --fix --dry-run  # Preview auto-fixes without writing
 normalize rules setup                # Interactive rule configuration
-normalize rules add <url>            # Add a rule from URL
+normalize rules add <url>            # Add a rule from URL (--dry-run to preview)
 normalize rules enable <id>          # Enable a rule
 normalize rules tags                 # List rule tags
 ```
@@ -219,6 +221,7 @@ Manage the structural index (symbols, imports, calls):
 ```bash
 normalize structure stats            # Index stats
 normalize structure rebuild          # Rebuild the index
+normalize structure rebuild --dry-run # Preview the rebuild scope without writing
 normalize structure files            # List indexed files
 normalize structure query "SELECT name, kind FROM symbols WHERE kind = 'function' LIMIT 10"  # SQL query
 ```

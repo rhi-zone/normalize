@@ -500,6 +500,7 @@ impl RulesService {
         #[param(help = "Specific rule ID to run")] rule: Option<String>,
         #[param(help = "Filter by tag")] tag: Option<String>,
         #[param(help = "Apply auto-fixes (syntax rules only)")] fix: bool,
+        #[param(help = "With --fix, show what would be fixed without writing")] dry_run: bool,
         #[param(help = "Output in SARIF format")] sarif: bool,
         #[param(positional, help = "Target directory or file")] target: Option<String>,
         #[param(
@@ -603,9 +604,34 @@ impl RulesService {
                         &fix_filter,
                         &config.walk,
                     );
-                    let fixable_count = findings.iter().filter(|f| f.fix.is_some()).count();
+                    let fixable: Vec<_> = findings.iter().filter(|f| f.fix.is_some()).collect();
+                    let fixable_count = fixable.len();
                     if fixable_count == 0 {
                         break;
+                    }
+                    if dry_run {
+                        // Preview only: report what would be fixed, write nothing.
+                        let mut files: Vec<String> = fixable
+                            .iter()
+                            .map(|f| f.file.display().to_string())
+                            .collect();
+                        files.sort();
+                        files.dedup();
+                        println!(
+                            "[dry-run] Would fix {} issue(s) in {} file(s):",
+                            fixable_count,
+                            files.len()
+                        );
+                        for f in &fixable {
+                            println!(
+                                "[dry-run]   {}:{} {} ({})",
+                                f.file.display(),
+                                f.start_line,
+                                f.message,
+                                f.rule_id
+                            );
+                        }
+                        return Ok(());
                     }
                     match apply_fixes(&findings) {
                         Ok(0) => break,
@@ -1281,19 +1307,25 @@ impl RulesService {
     ///
     /// Examples:
     ///   normalize rules add https://example.com/rule.scm   # import a rule from URL
+    ///   normalize rules add https://example.com/rule.scm --dry-run   # preview without writing
     #[cli(display_with = "display_output")]
     pub fn add(
         &self,
         #[param(positional, help = "URL to download the rule from")] url: String,
         #[param(help = "Install to global rules instead of project")] global: bool,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
     ) -> Result<RuleShowReport, String> {
-        add_rule(&url, global).map(|_| RuleShowReport {
+        add_rule(&url, global, dry_run).map(|message| RuleShowReport {
             success: true,
-            message: None,
+            message: Some(message),
         })
     }
 
     /// Update imported rules from their sources
+    ///
+    /// Examples:
+    ///   normalize rules update                   # re-download all imported rules
+    ///   normalize rules update --dry-run         # preview which rules would update
     #[cli(display_with = "display_output")]
     pub fn update(
         &self,
@@ -1302,22 +1334,28 @@ impl RulesService {
             help = "Specific rule ID to update (updates all if omitted)"
         )]
         rule_id: Option<String>,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
     ) -> Result<RuleShowReport, String> {
-        update_rules(rule_id.as_deref()).map(|_| RuleShowReport {
+        update_rules(rule_id.as_deref(), dry_run).map(|message| RuleShowReport {
             success: true,
-            message: None,
+            message: Some(message),
         })
     }
 
     /// Remove an imported rule
+    ///
+    /// Examples:
+    ///   normalize rules remove my-rule           # delete an imported rule
+    ///   normalize rules remove my-rule --dry-run # preview what would be deleted
     #[cli(display_with = "display_output")]
     pub fn remove(
         &self,
         #[param(positional, help = "Rule ID to remove")] rule_id: String,
+        #[param(help = "Dry run - show what would change")] dry_run: bool,
     ) -> Result<RuleShowReport, String> {
-        remove_rule(&rule_id).map(|_| RuleShowReport {
+        remove_rule(&rule_id, dry_run).map(|message| RuleShowReport {
             success: true,
-            message: None,
+            message: Some(message),
         })
     }
 
@@ -1325,12 +1363,14 @@ impl RulesService {
     ///
     /// Examples:
     ///   normalize rules setup                    # interactive rule configuration
+    ///   normalize rules setup --dry-run          # walk decisions without writing config
     #[cli(display_with = "display_output")]
     pub fn setup(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
             String,
         >,
+        #[param(help = "Dry run - walk decisions without writing config")] dry_run: bool,
     ) -> Result<RuleShowReport, String> {
         let effective_root = root
             .as_deref()
@@ -1338,7 +1378,7 @@ impl RulesService {
             .map(Ok)
             .unwrap_or_else(std::env::current_dir)
             .map_err(|e| format!("Failed to get current directory: {e}"))?;
-        let exit_code = crate::setup::run_setup_wizard(&effective_root);
+        let exit_code = crate::setup::run_setup_wizard(&effective_root, dry_run);
         if exit_code == 0 {
             Ok(RuleShowReport {
                 success: true,

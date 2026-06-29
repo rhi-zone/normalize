@@ -13,6 +13,7 @@ Options:
       --global                     Install to global rules instead of project
       --pretty                     Human-friendly output with colors and formatting
       --compact                    Compact output without colors (overrides TTY detection)
+      --dry-run                    Dry run - show what would change
       --jsonl                      Output one JSON object per line (for arrays)
       --json                       Output machine-readable JSON
       --jq <jq>                    Filter output through jq expression
@@ -23,3 +24,4 @@ Options:
 
 Examples:
 normalize rules add https://example.com/rule.scm   # import a rule from URL
+normalize rules add https://example.com/rule.scm --dry-run   # preview without writing

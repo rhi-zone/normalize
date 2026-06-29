@@ -20,10 +20,15 @@ Rebuild the file index from scratch. Scans source files and extracts symbols, ca
 normalize structure rebuild
 normalize structure rebuild --include symbols
 normalize structure rebuild --include symbols --include calls
+normalize structure rebuild --dry-run
 ```
 
 Options:
 - `--include <WHAT>` — What to extract: `symbols`, `calls`, `imports` (default: all). Can be repeated.
+- `--only <GLOB>` / `--exclude <GLOB>` — Restrict which files are indexed.
+- `--full` — Force a full rebuild even if an incremental one is possible.
+- `--dry-run` — Report the rebuild scope (full vs incremental, content types, root, filters,
+  target index path) without opening or writing `.normalize/index.sqlite`.
 
 ## stats
 

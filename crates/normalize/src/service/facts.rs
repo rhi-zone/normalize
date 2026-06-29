@@ -66,10 +66,22 @@ pub struct RebuildReport {
     /// Files needing those grammars were skipped, leaving the index incomplete.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub missing_grammars: Vec<MissingGrammarEntry>,
+    /// True if this was a dry-run preview (the index was not opened or written).
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub dry_run: bool,
+    /// In dry-run mode, a human-readable description of what would be rebuilt.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub plan: Option<String>,
 }
 
 impl OutputFormatter for RebuildReport {
     fn format_text(&self) -> String {
+        if self.dry_run {
+            return self
+                .plan
+                .clone()
+                .unwrap_or_else(|| "[dry-run] Would rebuild the index.".to_string());
+        }
         if self.incremental && self.files == 0 {
             return "Index up to date".to_string();
         }
@@ -513,6 +525,7 @@ async fn index_language_packages(
 // Async data functions
 // =============================================================================
 
+#[allow(clippy::too_many_arguments)]
 async fn rebuild_data(
     root: Option<&Path>,
     include: &[FactsContent],
@@ -520,6 +533,7 @@ async fn rebuild_data(
     exclude: &[String],
     full: bool,
     strict: bool,
+    dry_run: bool,
 ) -> Result<RebuildReport, String> {
     // Reset the missing-grammar tracker so this rebuild starts fresh — any
     // missing grammars surfaced below belong to *this* rebuild only.
@@ -531,6 +545,53 @@ async fn rebuild_data(
         .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
     let filter = crate::commands::build_filter(&root, exclude, only);
+
+    if dry_run {
+        let mode = if full {
+            "full rebuild"
+        } else {
+            "incremental rebuild"
+        };
+        let content: Vec<&str> = include
+            .iter()
+            .filter(|c| **c != FactsContent::None)
+            .map(|c| match c {
+                FactsContent::Symbols => "symbols",
+                FactsContent::Calls => "calls",
+                FactsContent::Imports => "imports",
+                FactsContent::None => "",
+            })
+            .collect();
+        let content_str = if content.is_empty() {
+            "file tree only".to_string()
+        } else {
+            content.join(", ")
+        };
+        let index_path = root.join(".normalize").join("index.sqlite");
+        let mut plan = format!(
+            "[dry-run] Would perform a {mode} of the index at {}.\n[dry-run] Root: {}\n[dry-run] Content: {content_str}",
+            index_path.display(),
+            root.display(),
+        );
+        if !only.is_empty() {
+            plan.push_str(&format!("\n[dry-run] Only: {}", only.join(", ")));
+        }
+        if !exclude.is_empty() {
+            plan.push_str(&format!("\n[dry-run] Exclude: {}", exclude.join(", ")));
+        }
+        plan.push_str("\n[dry-run] No files were parsed and the index was not modified.");
+        return Ok(RebuildReport {
+            files: 0,
+            symbols: None,
+            calls: None,
+            imports: None,
+            co_change_edges: None,
+            incremental: !full,
+            missing_grammars: Vec::new(),
+            dry_run: true,
+            plan: Some(plan),
+        });
+    }
 
     let mut idx = index::open(&root)
         .await
@@ -585,6 +646,8 @@ async fn rebuild_data(
         co_change_edges: None,
         incremental: !full,
         missing_grammars: Vec::new(),
+        dry_run: false,
+        plan: None,
     };
 
     if !include.is_empty() && !include.contains(&FactsContent::None) {
@@ -875,7 +938,9 @@ impl FactsService {
     ///   normalize structure rebuild --include calls,imports      # extract calls and imports
     ///   normalize structure rebuild --only "src/**"              # only index files under src/
     ///   normalize structure rebuild --exclude "vendor/**"        # skip vendor directory
+    ///   normalize structure rebuild --dry-run                    # preview scope without writing
     #[cli(display_with = "display_output")]
+    #[allow(clippy::too_many_arguments)]
     pub async fn rebuild(
         &self,
         #[param(help = "What to extract: symbols, calls, imports (comma-separated)")] include: Vec<
@@ -891,6 +956,8 @@ impl FactsService {
             help = "Exit non-zero if any tree-sitter grammar is missing (instead of warning and continuing)"
         )]
         strict: bool,
+        #[param(help = "Dry run - show what would be rebuilt without writing the index")]
+        dry_run: bool,
     ) -> Result<RebuildReport, String> {
         let include: Vec<FactsContent> = if include.is_empty() {
             vec![
@@ -912,6 +979,7 @@ impl FactsService {
             &exclude,
             full,
             strict,
+            dry_run,
         )
         .await
     }

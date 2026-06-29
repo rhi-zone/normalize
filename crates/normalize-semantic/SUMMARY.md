@@ -27,3 +27,5 @@ index, queryable by meaning rather than by name.
 - TTY + enabled + model missing: fastembed downloads with progress
 - Non-TTY + enabled + model missing: silent download (it's configured)
 - Non-TTY + not configured: clear error to stderr, exit non-zero
+
+Published as a standalone crate on crates.io (part of the 38-crate normalize workspace).
