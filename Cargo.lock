@@ -5210,6 +5210,7 @@ dependencies = [
  "normalize-facts-rules-api",
  "normalize-facts-rules-interpret",
  "normalize-filter",
+ "normalize-git",
  "normalize-graph",
  "normalize-knowledge-graph",
  "normalize-languages",
@@ -5301,6 +5302,7 @@ dependencies = [
  "anyhow",
  "gix",
  "normalize-facts",
+ "normalize-git",
  "normalize-languages",
  "normalize-metrics",
  "normalize-output",
@@ -5516,6 +5518,14 @@ dependencies = [
  "server-less",
  "thiserror 2.0.18",
  "tokio",
+]
+
+[[package]]
+name = "normalize-git"
+version = "0.3.2"
+dependencies = [
+ "anyhow",
+ "gix",
 ]
 
 [[package]]
@@ -5796,6 +5806,7 @@ dependencies = [
  "anyhow",
  "gix",
  "normalize-facts",
+ "normalize-git",
  "normalize-languages",
  "normalize-metrics",
  "normalize-output",
@@ -5890,6 +5901,7 @@ dependencies = [
  "gix",
  "libsql",
  "normalize-facts",
+ "normalize-git",
  "normalize-output",
  "schemars",
  "serde",

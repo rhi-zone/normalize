@@ -6,6 +6,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`normalize-git` crate** — new standalone crate (`crates/normalize-git`) consolidating all
+  pure-Rust gix read operations previously duplicated across `normalize-budget`,
+  `normalize-ratchet`, `normalize-semantic`, and the main `normalize` crate. Public API:
+  `open_repo`, `read_blob_text`, `read_blob_bytes`, `walk_tree_at_ref`, `diff_base_to_head`,
+  `FileChangeKind`/`FileChange`, `git_head`, `git_head_branch`, `git_commit_timestamps`,
+  `git_log_timestamps`, `resolve_ref`, `resolve_merge_base`, `git_show`,
+  `git_diff_name_status`, `git_ls_files`, `git_remote_origin_url`,
+  `git_has_uncommitted_content_changes`, `git_summary_has_uncommitted_changes`,
+  `git_last_commit_for_path`, `git_commit_count_for_path`, `git_file_churn_stats`,
+  `git_author_commit_counts`, `git_activity_commits`, `git_per_commit_files`,
+  `format_unix_date`, `run_in_worktree`. All dependent crates migrated in the same batch (B1
+  of the CLI taxonomy migration).
+
 ### Fixed
 
 - **Import-graph commands no longer silently succeed with an empty result when the import

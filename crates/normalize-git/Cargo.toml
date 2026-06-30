@@ -1,0 +1,11 @@
+[package]
+name = "normalize-git"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Pure-Rust read-only git operations for normalize: repo open, blob read, tree walk, diff, blame, churn, history"
+
+[dependencies]
+anyhow = "1"
+gix = { workspace = true }

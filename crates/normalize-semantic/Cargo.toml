@@ -11,6 +11,7 @@ default = []
 cli = ["dep:server-less", "dep:schemars"]
 
 [dependencies]
+normalize-git = { workspace = true }
 normalize-facts = { path = "../normalize-facts", version = "0.3.2" }
 normalize-output = { path = "../normalize-output", version = "0.3.2" }
 

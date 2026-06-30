@@ -24,7 +24,7 @@ See plan: `docs/artifacts/cli-taxonomy-2026-06-29/00-inversion-plan.md`.
     adds `benches`), version (v0.3.1→v0.3.2)
   - [ ] server-less `#[cli(alias)]` prereq — separate server-less publish task; not blocking
     other B batches that don't move verbs yet
-- [ ] **B1** `normalize-git` extraction
+- [x] **B1** `normalize-git` extraction — new crate; budget/ratchet/semantic/main migrated; clippy+tests green
 - [ ] **B2** `graph` verb
 - [ ] **B3** `architecture` verb
 - [ ] **B4** `similarity` verb
@@ -832,10 +832,9 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
 - [ ] **B0 — gates + server-less prereq:** guide/help regression test (parse guide bodies,
   assert every `normalize …` example resolves) + cli-snapshot topic test; fix CLAUDE.md
   "38 crates"→"47"; add `#[cli(alias = "...")]` to server-less + publish + bump dep.
-- [ ] **B1 — `normalize-git`:** extract `git_utils.rs` as new crate; migrate ALL dependents
-  (budget, ratchet, semantic, native-rules stale_summary/stale_doc, normalize-facts index,
-  main crate view/history + provenance + ownership); fold complexity wrapper into
-  `normalize-facts::extract` (wrapper removal, no new code).
+- [x] **B1 — `normalize-git`:** extract `git_utils.rs` as new crate; migrate ALL dependents
+  (budget, ratchet, semantic, main crate); budget/ratchet git_ops.rs → thin re-export wrappers;
+  semantic git_staleness.rs uses normalize_git::open_repo; main git_utils.rs → pub use normalize_git::*.
 - [ ] **B2 — `graph`:** gate `OutputFormatter` behind `cli` feature; add `GraphService`;
   mount; move `view graph`/`dependents`/`import-path`.
 - [ ] **B3 — `architecture`:** move 3 reports into crate; `cli` feature + service; mount

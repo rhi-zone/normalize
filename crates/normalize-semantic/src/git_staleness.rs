@@ -20,6 +20,7 @@
 //! a populate run. The function deduplicates paths and walks history once per
 //! unique file.
 
+use normalize_git::open_repo;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -131,8 +132,4 @@ fn compute_staleness_for_file(repo: &gix::Repository, rel_path: &str) -> f64 {
     }
 
     (commits_before_last_touch as f64 / 50.0).min(1.0)
-}
-
-fn open_repo(path: &Path) -> Option<gix::Repository> {
-    gix::discover(path).ok()
 }

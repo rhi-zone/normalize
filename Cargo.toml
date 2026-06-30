@@ -27,6 +27,7 @@ members = [
     "crates/normalize-session-analysis",
     "crates/normalize-facts-rules-interpret",
 
+    "crates/normalize-git",
     "crates/normalize-path-resolve",
     "crates/normalize-shadow",
     "crates/normalize-edit",
@@ -112,6 +113,9 @@ toml = "0.8"
 
 # XML parsing (read-only tree)
 roxmltree = "0.21"
+
+# Intra-workspace crates available as workspace deps
+normalize-git = { path = "crates/normalize-git", version = "0.3.2" }
 
 # Git library (pure-Rust, no PATH dependency)
 # sha1: required hash algorithm; revision: walk commits/resolve refs;

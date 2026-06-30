@@ -6,6 +6,8 @@ findings, or reference snapshots from a specific session.
 
 ## Contents
 
+- `cli-taxonomy-2026-06-28/` — B0–B12 CLI taxonomy migration audit: surfaced service/command duplication, planned extraction batches (`normalize-git`, globals, pretty output wiring).
+
 - `cli-fixes-2026-06-16/` — CLI formatting audit for `normalize rank` subcommands,
   cataloguing inconsistencies in output style across all 22 subcommands. Also
   contains `elf-program-name.md`: investigation into `normalize.elf` appearing
