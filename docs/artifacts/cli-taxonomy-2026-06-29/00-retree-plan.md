@@ -1,3 +1,8 @@
+> **SUPERSEDED (2026-06-30) by `00-inversion-plan.md`.** The axis decision changed from
+> output-shape to crate-ownership (top-level verb = owning compute crate). This shape plan
+> is retained for its candidate/judge synthesis and contested-command analysis, but the
+> implementation path is the inversion plan.
+
 # 00 — Authoritative FULL-RETREE Plan: normalize CLI Command Taxonomy
 
 *2026-06-29. Decision record + concrete command→new-home mapping. Implementation

@@ -7,17 +7,27 @@ because commands silently migrated between services (`analyze`→`rank`) and bro
 
 ## The decision
 
-**Full retree.** Primary membership axis = output **shape** (lint-enforceable via the
-`RankEntry` trait); verb **names** stay human-guessable; structure is two-level
-(verb + topic); `analyze` is dissolved; no enum-wrapping; one-release transitional
-aliases allowed. See `00-retree-plan.md`.
+**Full inversion (2026-06-30, supersedes the shape retree).** Primary membership axis =
+**crate ownership**: push the `#[cli]` service DOWN into the compute crate so the
+top-level verb *is* the owning crate (per CLAUDE.md's "a crate that owns a subcommand
+includes its own `#[cli]` service"). Central honest finding: inversion cleanly extracts
+the genuinely crate-owned families (`graph`, `architecture`, `similarity`, dataflow→
+`structure`) and fixes the mounting bugs, but the **metric core of `rank` + git-history
+cluster + dashboards + `trend` have no compute crate** (compute lives in the main crate),
+so inversion does NOT dissolve them — they stay main-crate verbs unless a prior
+compute-extraction phase runs. See `00-inversion-plan.md`.
 
 ## Contents
 
 **Authoritative plan (implement from this):**
-- `00-retree-plan.md` — final verb set, two-level topic structure, complete command→
-  new-home mapping, CI lint spec, transitional alias plan, guide regression test,
-  migration execution plan, and open naming questions.
+- `00-inversion-plan.md` — command→owning-crate mapping (ground truth), the inverted verb
+  set, struct/wiring moves per crate, bug-cluster fixes (structure/filter/syntax-rules/
+  semantic/graph-gating), batched execution plan + blast radius, ownership CI lint, and
+  open naming questions. The §0 STOP-flag on the ownerless metric residual is load-bearing.
+
+**Superseded plan (retained for its candidate/judge synthesis):**
+- `00-retree-plan.md` — the output-shape retree (rank/view/check/trend/overview). Marked
+  SUPERSEDED; its contested-command analysis still informs the residual's editorial homes.
 
 **Candidate designs (four decorrelated frames, design-only):**
 - `candidate-A-subtract.md` — minimize: 4 shape verbs (view/rank/check/edit) + admin tier.
@@ -34,9 +44,22 @@ aliases allowed. See `00-retree-plan.md`.
 - `judge-migration.md` — migration cost / API-first / merge legality. Flagged the
   enum-wrap risks; established that one-release transitional aliases are permitted.
 
+**Crate-ownership investigations (ground the inversion plan):**
+- `crate-cli-surface-census.md` — the 47-crate A/B/C census: which crates have a `#[cli]`
+  service, which are mounted, which carry partial CLI surface (graph's ungated
+  `OutputFormatter`, the semantic orphan).
+- `crate-ownership-map.md` — current mount structure; proves analyze/rank/trend are one
+  main-crate body over pure-library compute crates (no crate boundary backs the 3-way split).
+
 ## Synthesis
 
-The plan = B's mechanical shape *rule* (the drift-proof tiebreak, lint-enforced) +
-C's human-guessable verb *names* + an enforced topic second level inside the populous
-verbs. Final verbs: `rank`, `view`, `check`, `trend`, `overview` (name TBD), `edit`,
-plus the kept specialist/admin domains. Blast radius ~22 commands (~13%).
+**Inversion plan (current):** organize by crate ownership. Crate-owned verbs reachable now
+= `graph`, `architecture`, `similarity`, `structure` (facts), `filter`, `search` (semantic)
++ kept `budget`/`cfg`/`kg`/`ratchet`/`rules`. Reachable blast radius ~18 commands (~11%).
+The ownerless metric/git-history/dashboard residual stays main-crate (`rank`/`trend`) —
+flagged, not forced. See `00-inversion-plan.md` §0.
+
+**Superseded shape synthesis (retained):** B's mechanical shape *rule* + C's human verb
+*names* + a topic second level. Final shape verbs were `rank`/`view`/`check`/`trend`/
+`overview`/`edit`. Its contested-command analysis still informs where the inversion's
+ownerless residual could land editorially.
