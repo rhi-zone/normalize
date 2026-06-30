@@ -142,6 +142,7 @@ libc = "0.2"
 tempfile = "3"
 insta = "1"
 assert_cmd = "2"
+server-less = { workspace = true }
 
 [build-dependencies]
 flate2 = "1"

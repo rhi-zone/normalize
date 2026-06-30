@@ -15,7 +15,7 @@ index, queryable by meaning rather than by name.
 - `git_staleness.rs` — git-based staleness signal feeding the search re-ranking
 - `vec_ext.rs` — vector helpers (cosine similarity / norm) shared by search and store
 - `populate.rs` — walks all symbols from the structural index, builds context windows, and embeds in batches
-- `service.rs` — `SearchReport` type and `run_search()` function called from `FactsService::search` in the main crate
+- `service.rs` — `SearchReport`, `ContextSearchReport`, and `run_search()` / `run_context_search()` called from `FactsService::search` and `FactsService::context_search` in the main crate
 
 ## Exposed surface
 

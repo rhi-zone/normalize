@@ -10,6 +10,35 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ---
 
+## CLI Taxonomy Migration (feat/cli-globals-pretty-wiring)
+
+See plan: `docs/artifacts/cli-taxonomy-2026-06-29/00-inversion-plan.md`.
+
+- [x] **B0 Gates** — Guide/help regression test + CLAUDE.md crate count fix
+  - [x] `crates/normalize/tests/guide_links.rs`: parses every `normalize <…>` example in guide
+    bodies and resolves against `NormalizeService::cli_command()` — no binary spawned; fails if any
+    referenced subcommand is missing from the live CLI
+  - [x] Fixed 27 stale `normalize analyze X` references in guide bodies (moved to `rank`, `syntax`,
+    `view`, `trend`)
+  - [x] CLAUDE.md Publishing section: corrected crate count (38→44), publish=false list (2→3,
+    adds `benches`), version (v0.3.1→v0.3.2)
+  - [ ] server-less `#[cli(alias)]` prereq — separate server-less publish task; not blocking
+    other B batches that don't move verbs yet
+- [ ] **B1** `normalize-git` extraction
+- [ ] **B2** `graph` verb
+- [ ] **B3** `architecture` verb
+- [ ] **B4** `similarity` verb
+- [ ] **B5** `structure` fix + dataflow
+- [ ] **B6** `filter` + syntax-rules consolidation
+- [ ] **B7** `search` verb
+- [ ] **B8** `normalize-git-history` extraction
+- [ ] **B9** `history` verb
+- [ ] **B10** syntax-rules consolidation
+- [ ] **B11** small fixes + `overview` verb + CI lint
+- [ ] **B12** alias sunset (at 1.0)
+
+---
+
 ## Follow-ups (2026-06-29 branch consolidation)
 
 - [ ] **`missing-summary` commit count looks inflated.** When adding `tooling/claude-hooks/SUMMARY.md`

@@ -32,6 +32,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   fell back to plain text — the flag never reached the renderer. They now produce the rich
   colored output (`--compact` and TTY auto-detection likewise resolve correctly, against the
   command's target root).
+- **Guide bodies corrected**: 27 stale `normalize analyze <X>` examples updated to their
+  current locations (`rank`, `syntax`, `view`, `trend`). The commands moved in earlier
+  releases but guide text lagged. A new regression test (`guide_links.rs`) now catches
+  this class of staleness automatically by resolving every `normalize <…>` example
+  against the live CLI command tree.
+
 ### Added
 
 - **`--dry-run` on mutating commands that lacked it** (CLAUDE.md hard-constraint
