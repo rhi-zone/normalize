@@ -757,63 +757,84 @@ and plan §6. Harness: parse each guide's `const &str` body for `normalize …` 
 each against the live command tree, fail CI on any unresolved example.
 ---
 
-### CLI command-taxonomy FULL INVERSION (high priority)
+### CLI command-taxonomy FULL INVERSION — seam-corrected final scope (high priority)
 
 **Decision made (2026-06-30): full inversion by CRATE OWNERSHIP** — push the `#[cli]`
 service DOWN into the owning compute crate so the top-level verb *is* the crate (per
 CLAUDE.md's crate-owns-its-CLI rule). **Supersedes the 2026-06-29 output-shape retree.**
-Authoritative plan + command→owning-crate mapping:
-`docs/artifacts/cli-taxonomy-2026-06-29/00-inversion-plan.md` (built on the crate census +
-ownership map in the same dir; shape `00-retree-plan.md` marked SUPERSEDED but retained for
-its contested-command analysis). Cross-refs audit T2-6 (`rank budget`), T2-7 (`cfg cfg`),
-T2-10 (`edit history`), T3-4 (architecture/view-graph near-dup), T1-6 guide-regression.
+Authoritative plan (FINAL SCOPE section is canonical; body is supporting evidence):
+`docs/artifacts/cli-taxonomy-2026-06-29/00-inversion-plan.md`. Seam evidence:
+`docs/artifacts/cli-taxonomy-2026-06-29/seam-evaluation.md`. Cross-refs audit T2-6
+(`rank budget`), T2-7 (`cfg cfg`), T2-10 (`edit history`), T3-4 (architecture near-dup),
+T1-6 guide-regression.
 
-**CENTRAL FINDING (plan §0 — load-bearing):** inversion cleanly extracts the genuinely
-crate-owned families and fixes the mounting bugs, but the **metric core of `rank` +
-git-history cluster + dashboards + `trend` have NO compute crate** — their compute lives in
-the main crate (`src/analyze/`, `commands/analyze/git_history.rs`, etc.). `normalize-analyze`
-is ranking *infra* (RankEntry/scoring), not the metric owner; `normalize-metrics` is an
-aggregate helper used only by budget/ratchet. So there is **no `metrics` verb** to be had,
-and `rank`/`trend` stay main-crate verbs unless a prior compute-extraction phase runs.
-Inversion does NOT fix the analyze↔rank metric drift (H-4/H-5) — those commands don't move.
+**Architecture extractions (decided, independent of verb taxonomy):**
+- `normalize-git` — verbatim `open_repo`/`read_blob_text`/`walk_tree_at_ref`/
+  `traverse_tree_entries` duplicated across budget/ratchet/semantic/native-rules + `blame_file`
+  duplicated within main crate. 6+ actual dependents = duplication bug today, not speculation.
+  Extract `git_utils.rs` as new crate; migrate all dependents in same batch (B1).
+- `normalize-git-history` — hotspot/coupling/bus-factor/activity analysis is a recognized
+  standalone tool category (code-maat/git-of-theseus). Passes standalone-useful criterion.
+  Extract typed data API; OutputFormatter stays in main crate. Depends on normalize-git.
+  Becomes the `history` verb (B8 extraction, B9 mount).
+- Fold cyclomatic-complexity tags-walking from main `analyze/complexity.rs` into
+  `normalize-facts::extract` (dedup of the `compute_complexity` wrapper; not a new crate; B5).
 
-**Open Question A (decide first):** A1 (recommended) accept `rank`/`trend` as main-crate
-residual verbs, do only the reachable crate-owned moves; A2 first extract metric compute
-into a `normalize-metrics`-family crate (large), then mount a real `metrics` verb.
+**Metric core stays A1 — confirmed by seam evaluation (no metrics crate):**
+Complexity, length, ceremony, density, imports, surface, size, files, test-ratio, test-gaps
+have no coherent compute crate. Two disjoint dependency groups: AST-group (no SQLite) and
+index-group (entangled with `crate::index::FileIndex`). A `normalize-metrics`-AST crate
+would collide with the existing ratchet `normalize-metrics`, have one dependent, duplicate
+`compute_complexity`, and exist solely to back a verb. **`rank` and `trend` stay main-crate
+verbs.** CI lint (RankEntry-based, B11) holds against future drift.
 
-**Reachable crate-owned verbs (A1):** `graph` (normalize-graph), `architecture`
+**Reachable crate-owned verbs:** `graph` (normalize-graph), `architecture`
 (normalize-architecture), `similarity` (normalize-code-similarity), `structure`
-(normalize-facts — mount the real service, drop the main-crate dup), `filter`
-(normalize-filter), `search` (normalize-semantic — wire the orphan) + kept
-`budget`/`cfg`/`kg`/`ratchet`/`rules`. Blast radius ~18 commands (~11% of ~165).
+(normalize-facts — mount real service, drop main-crate dup, absorb dataflow trio), `filter`
+(normalize-filter), `search` (normalize-semantic — wire the orphan), `history`
+(normalize-git-history). Kept: `budget`/`cfg`/`kg`/`ratchet`/`rules`. Verb names confirmed:
+architecture, graph, similarity, structure, search, filter, history, overview.
 
-Implementation order (each batch build+`cargo test -q` green; docs synced same commit):
-- [ ] **B0 — gates FIRST:** guide/help regression test (parse guide bodies, assert every
-  `normalize …` example resolves) + topic snapshot test; fix CLAUDE.md "38 crates"→"47".
-- [ ] **B1 — server-less prereq:** add `#[cli(alias = "...")]` (hidden clap alias);
-  publish + bump dep. (server-less has `#[server(hidden)]` but no alias attr.)
-- [ ] **B2 — `graph`:** gate normalize-graph `OutputFormatter` behind `cli`; add
-  `GraphService`; mount; move `view graph/dependents/import-path`.
+**Blast radius (total):** 2 new crates (normalize-git, normalize-git-history); 5 crates
+gain `cli` feature (graph, architecture, code-similarity, facts, semantic); 6+ crates
+migrated to normalize-git; ~20 commands re-pathed (~12% of ~165); ~5 renames.
+
+Implementation order (each batch: build + `cargo test -q` green; docs synced same commit):
+- [ ] **B0 — gates + server-less prereq:** guide/help regression test (parse guide bodies,
+  assert every `normalize …` example resolves) + cli-snapshot topic test; fix CLAUDE.md
+  "38 crates"→"47"; add `#[cli(alias = "...")]` to server-less + publish + bump dep.
+- [ ] **B1 — `normalize-git`:** extract `git_utils.rs` as new crate; migrate ALL dependents
+  (budget, ratchet, semantic, native-rules stale_summary/stale_doc, normalize-facts index,
+  main crate view/history + provenance + ownership); fold complexity wrapper into
+  `normalize-facts::extract` (wrapper removal, no new code).
+- [ ] **B2 — `graph`:** gate `OutputFormatter` behind `cli` feature; add `GraphService`;
+  mount; move `view graph`/`dependents`/`import-path`.
 - [ ] **B3 — `architecture`:** move 3 reports into crate; `cli` feature + service; mount
   (`architecture`, `depth-map`, `layering`).
 - [ ] **B4 — `similarity`:** move duplicates/duplicate-types/fragments reports; service; mount.
-- [ ] **B5 — `structure` fix:** mount real `FactsCliService` (rename→`structure`); delete
-  main-crate dup; absorb dataflow `liveness/effects/exceptions`; activate `features=["cli"]`.
-- [ ] **B6 — `filter` + syntax-rules:** mount `FilterCliService` (rename→`filter`); retire
-  `aliases` leaf; consolidate/delete the `normalize-syntax-rules` dup into `rules`.
-- [ ] **B7 — `search`:** add `#[cli]` to normalize-semantic; mount.
-- [ ] **B8 — small fixes:** `cfg cfg`→`cfg` (T2-7); `edit history`→`edit log` (T2-10);
-  `rank budget`→`rank purposes` (T2-6, stays main-crate); dashboards `health/summary/all`→
-  `overview` (thin main-crate composition verb; decide `all`→`--full`).
-- [ ] **B9 — alias sunset:** all hidden aliases/shims removed at 1.0.
+- [ ] **B5 — `structure` fix + dataflow:** mount real `FactsCliService` (rename→`structure`);
+  delete main-crate `service/facts.rs` dup; absorb `liveness`/`effects`/`exceptions`;
+  activate `features=["cli"]`.
+- [ ] **B6 — `filter`:** mount `FilterCliService` (rename `name`→`filter`); retire main-crate
+  `aliases` leaf; add hidden top-level `aliases` transitional alias.
+- [ ] **B7 — `search`:** add `#[cli(name="search")]` to normalize-semantic; mount.
+- [ ] **B8 — `normalize-git-history` extraction:** define typed data API (`ChurnStats`,
+  `CoupledPair`, `OwnershipEntry`, `HotspotEntry`, etc.); disentangle compute from
+  `OutputFormatter` in each command file; move compute fns into new crate; OutputFormatter
+  stays in main crate.
+- [ ] **B9 — `history` verb:** add `#[cli(name="history")]` to normalize-git-history; mount;
+  move `rank hotspots`/`rank coupling`/`rank ownership`/`rank contributors`/`analyze
+  activity`/`analyze repo-coupling`/`analyze cross-repo-health`.
+- [ ] **B10 — syntax-rules consolidation:** confirm `rules run --type syntax` routes syntax
+  rules; if confirmed, delete standalone `SyntaxRulesService` CLI from normalize-syntax-rules
+  (do NOT add a second verb).
+- [ ] **B11 — small fixes + overview + CI lint:** `cfg cfg`→`cfg`; `edit history`→`edit log`;
+  `rank budget`→`rank purposes`; dashboards `health`/`summary`/`all`→`overview` (thin
+  main-crate composition verb); add RankEntry-based CI lint (flags metric commands drifting
+  to wrong verb; rank/trend explicitly allow-listed).
+- [ ] **B12 — alias sunset:** remove all hidden transitional aliases/shims at 1.0.
 - [ ] **Doc sync (every batch):** `docs/cli/`, `README.md`, `LLMS.md`, `docs/cli-design.md`,
   all guide bodies, `CHANGELOG.md`, touched `SUMMARY.md`s, regenerate `cli-snapshot`.
-
-**Open naming questions for the human (plan §7):** Question A (residual: A1 vs A2 — the
-load-bearing call); verb names `architecture` (vs `arch`), `similarity` (vs `clones`),
-`search` (vs `semantic`), dashboards `overview` (vs report/dashboard) + `all`→`--full`?;
-keep `cfg` as its own crate verb (vs `view cfg`); `normalize-semantic` product scope (wire
-vs out-of-scope); confirm `rules` routes syntax rules so the syntax-rules dup can be deleted.
 
 **Prior-decision history (superseded by the retree above):**
 - Done 2026-03-16: `rank` introduced; graph navigation folded into `view`; `ViewOutput`

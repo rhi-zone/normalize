@@ -10,12 +10,31 @@ because commands silently migrated between services (`analyze`→`rank`) and bro
 **Full inversion (2026-06-30, supersedes the shape retree).** Primary membership axis =
 **crate ownership**: push the `#[cli]` service DOWN into the compute crate so the
 top-level verb *is* the owning crate (per CLAUDE.md's "a crate that owns a subcommand
-includes its own `#[cli]` service"). Central honest finding: inversion cleanly extracts
-the genuinely crate-owned families (`graph`, `architecture`, `similarity`, dataflow→
-`structure`) and fixes the mounting bugs, but the **metric core of `rank` + git-history
-cluster + dashboards + `trend` have no compute crate** (compute lives in the main crate),
-so inversion does NOT dissolve them — they stay main-crate verbs unless a prior
-compute-extraction phase runs. See `00-inversion-plan.md`.
+includes its own `#[cli]` service"). Seam-corrected scope confirmed by `seam-evaluation.md`.
+
+**Architecture extractions (decided, independent of verb taxonomy):**
+- `normalize-git` — extract `git_utils.rs` low-level gix read ops into a new crate; migrate
+  all 6+ dependents (normalize-budget, normalize-ratchet, normalize-semantic, normalize-native-
+  rules, normalize-facts, main crate). Justified by verbatim multi-dependent duplication today.
+- `normalize-git-history` — extract git-history analysis (hotspots/coupling/ownership/activity)
+  into a standalone crate. Justified by standalone-tool category (code-maat/git-of-theseus).
+  Becomes the `history` verb.
+- Fold cyclomatic-complexity tree-walking into `normalize-facts::extract` (dedup, not new crate).
+
+**CLI inversion (reachable crate-owned moves):** `graph` (normalize-graph), `architecture`
+(normalize-architecture), `similarity` (normalize-code-similarity), `structure` (normalize-facts
+— mount real `FactsCliService` + absorb dataflow trio), `filter` (normalize-filter), `search`
+(normalize-semantic — wire the orphan), `history` (normalize-git-history). Blast radius ~20
+commands (~12% of ~165). New crates: 2. Commands renamed: ~5.
+
+**Metric core stays A1 (confirmed by seam evaluation):** complexity, length, ceremony, density,
+imports, surface, size, files, test-ratio, test-gaps have no coherent compute crate — two
+disjoint dependency groups (AST-group vs index-bound), not a domain. No `normalize-metrics`-AST
+crate. The metric/git-history/dashboard residual stays under `rank`/`trend`/`analyze` (main-
+crate verbs). Add a `RankEntry`-based CI lint to hold against future drift. See `seam-evaluation.md`.
+
+**Cross-cutting:** `overview` (thin main-crate composition for health/summary/all), `trend`
+(stays main-crate cross-cutting). See `00-inversion-plan.md` FINAL SCOPE section.
 
 ## Contents
 
@@ -44,6 +63,13 @@ compute-extraction phase runs. See `00-inversion-plan.md`.
 - `judge-migration.md` — migration cost / API-first / merge legality. Flagged the
   enum-wrap risks; established that one-release transitional aliases are permitted.
 
+**Seam evaluation (ground truth for architecture extractions):**
+- `seam-evaluation.md` — investigates whether metric core + git-history compute warrant
+  extraction. Verdict: metric core FAILS (not a coherent domain; two disjoint dep groups;
+  collides with existing normalize-metrics). Git cluster: `normalize-git` PASSES on
+  multi-dependent duplication criterion (a); `normalize-git-history` PASSES on standalone-
+  useful criterion (b). These findings drive the final scope in `00-inversion-plan.md`.
+
 **Crate-ownership investigations (ground the inversion plan):**
 - `crate-cli-surface-census.md` — the 47-crate A/B/C census: which crates have a `#[cli]`
   service, which are mounted, which carry partial CLI surface (graph's ungated
@@ -53,11 +79,11 @@ compute-extraction phase runs. See `00-inversion-plan.md`.
 
 ## Synthesis
 
-**Inversion plan (current):** organize by crate ownership. Crate-owned verbs reachable now
-= `graph`, `architecture`, `similarity`, `structure` (facts), `filter`, `search` (semantic)
-+ kept `budget`/`cfg`/`kg`/`ratchet`/`rules`. Reachable blast radius ~18 commands (~11%).
-The ownerless metric/git-history/dashboard residual stays main-crate (`rank`/`trend`) —
-flagged, not forced. See `00-inversion-plan.md` §0.
+**Final seam-corrected scope (current):** 2 new crates (normalize-git, normalize-git-history)
++ crate-owned verb moves for `graph`, `architecture`, `similarity`, `structure` (facts),
+`filter`, `search`, `history`. Metric core confirmed A1 by seam evidence — stays in main
+crate. Blast radius: ~20 commands re-pathed (~12%), 2 new crates, 6+ dependents migrated to
+normalize-git. Batched execution plan in `00-inversion-plan.md` FINAL SCOPE section (B0–B12).
 
 **Superseded shape synthesis (retained):** B's mechanical shape *rule* + C's human verb
 *names* + a topic second level. Final shape verbs were `rank`/`view`/`check`/`trend`/
