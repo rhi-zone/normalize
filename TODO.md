@@ -1,43 +1,24 @@
 # Normalize Roadmap
 
-Last triaged: 2026-05-09
+Last triaged: 2026-07-01
 
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
-> *Open threads accumulated across sessions. Treat as starting context, not instructions —
-> verify relevance before acting. Items reflect the state of thinking when they were
-> written, not a current mandate.*
+> *Open threads from a previous session. Treat as starting context, not instructions — verify relevance before acting.*
+
+## Active open threads (advisory)
+
+Three live threads from the 2026-06-29/07-01 session — verify state before acting:
+
+- **CLI taxonomy inversion (B2–B12)**: most batches blocked on the graph-crate split below; only B0+B1 have landed. See [CLI command-taxonomy FULL INVERSION](#cli-command-taxonomy-full-inversion--seam-corrected-final-scope-high-priority) below.
+- **Graph-crate split**: decided in principle, deferred to a focused effort. Decision record at `docs/artifacts/cli-taxonomy-2026-06-29/DECISION-graph-crate.md`. Open questions: trait-based vs closure-based generic API, own repo vs workspace crate. This unblocks B2 and B3. See [Graph crate extraction](#graph-crate-extraction-decided-deferred--prerequisite-for-b2b3) below.
+- **Main-crate decomposition audit**: no systematic audit of `crates/normalize/src/` has been run — only three surfaces spot-checked. Advisory; may or may not be worth prioritizing. See [Main-crate decomposition audit](#main-crate-decomposition-audit-not-yet-done) below.
 
 ---
 
-## CLI Taxonomy Migration (feat/cli-globals-pretty-wiring)
+## CLI Taxonomy Migration
 
-See plan: `docs/artifacts/cli-taxonomy-2026-06-29/00-inversion-plan.md`.
-
-- [x] **B0 Gates** — Guide/help regression test + CLAUDE.md crate count fix
-  - [x] `crates/normalize/tests/guide_links.rs`: parses every `normalize <…>` example in guide
-    bodies and resolves against `NormalizeService::cli_command()` — no binary spawned; fails if any
-    referenced subcommand is missing from the live CLI
-  - [x] Fixed 27 stale `normalize analyze X` references in guide bodies (moved to `rank`, `syntax`,
-    `view`, `trend`)
-  - [x] CLAUDE.md Publishing section: corrected crate count (38→44), publish=false list (2→3,
-    adds `benches`), version (v0.3.1→v0.3.2)
-  - [ ] server-less `#[cli(alias)]` prereq — separate server-less publish task; not blocking
-    other B batches that don't move verbs yet
-- [x] **B1** `normalize-git` extraction — new crate; budget/ratchet/semantic/main migrated; clippy+tests green
-- [ ] **B2** `graph` verb
-- [ ] **B3** `architecture` verb
-- [ ] **B4** `similarity` verb
-- [ ] **B5** `structure` fix + dataflow
-- [ ] **B6** `filter` + syntax-rules consolidation
-- [ ] **B7** `search` verb
-- [ ] **B8** `normalize-git-history` extraction
-- [ ] **B9** `history` verb
-- [ ] **B10** syntax-rules consolidation
-- [ ] **B11** small fixes + `overview` verb + CI lint
-- [ ] **B12** alias sunset (at 1.0)
-
----
+B0 (guide-regression test, CLAUDE.md crate count) and B1 (`normalize-git` extraction) have landed. B2–B12 are **blocked on the graph-crate split** (see above and the FULL INVERSION section below for details). The `#[cli(alias)]` server-less prereq is a separate server-less task; it does not block batches that don't move verbs yet.
 
 ## Follow-ups (2026-06-29 branch consolidation)
 
@@ -48,43 +29,6 @@ See plan: `docs/artifacts/cli-taxonomy-2026-06-29/00-inversion-plan.md`.
   commits (deleting the cache surfaced it). Investigate whether `missing-summary`/`stale-summary`
   over-count (gix commit-walk vs `git log`) and whether the incremental cache can hide a
   newly-crossed threshold. Low priority; the SUMMARY.md fix stands regardless.
-
----
-
-## CLI audit 2026-06-29 — T1-2: `--dry-run` on mutating commands (CLAUDE.md hard constraint)
-
-Source: `docs/artifacts/cli-audit-2026-06-29/03-dry-run.md`. Constraint: "Ship mutating
-commands without `--dry-run`" is forbidden.
-
-**Done (this pass):**
-- [x] `edit redo` — threaded `dry_run` through `Shadow::redo()`; mirrors `edit undo --dry-run`
-      (operation `redo_preview`). Fixes the undo/redo asymmetry.
-- [x] `rules run --fix --dry-run` — previews every fixable finding per file, applies nothing.
-- [x] `rules add` / `rules update` / `rules remove` — `dry_run` threaded through the runner
-      helpers (now return a message `String` carried in `RuleShowReport.message`).
-- [x] `rules setup` — `run_setup_wizard(root, dry_run)`; walks decisions, skips `enable_disable`
-      writes, prints `[dry-run]`.
-- [x] `ratchet add` / `ratchet update` / `ratchet remove` — gated `BaselineFile::save`; `dry_run`
-      field on `AddReport`/`UpdateReport`/`RemoveReport`.
-- [x] `budget add` / `budget update` / `budget remove` — gated `BudgetFile::save`; `dry_run`
-      field on reports.
-- [x] `kg write` — gated `store::write_unit`/`delete_unit`; `dry_run` field on `WriteReport`
-      (covers the destructive `null`-transform delete).
-- [x] `sessions mark` / `sessions unmark` — gated `save_reviewed`; `dry_run` field on `MarkReport`.
-- [x] `structure rebuild` — early-returns a plan (full vs incremental, content types, root,
-      filters, target index path) before opening the index; `dry_run`+`plan` fields on
-      `RebuildReport`. (Note: `.normalize/index.sqlite` is auto-created by *any* command on
-      startup, independent of this command; the dry-run leaves its contents/hash unchanged.)
-
-**Judged out of scope (recorded, not forced):**
-- `daemon start` / `daemon stop` — process lifecycle, not content mutation. A `--dry-run` would
-  only print "would start/stop daemon"; low value, and the audit ranks these borderline. Skip.
-- `update` — already has `--check` (checks for a newer release without installing), which is the
-  functional dry-run. Adding a second near-identical flag is redundant. Skip.
-- `generate client` / `generate cli-snapshot` — write to **stdout by default**; only mutate when
-  `-o <file>` is passed, so stdout output is already a de-facto dry-run. Marginal value; skip.
-- `structure packages` — writes to the global grammar cache; deferred with the separate T1-4
-  fix (it also has a silent-empty-output bug) rather than handled here.
 
 ---
 
@@ -381,19 +325,10 @@ violations or actively broken; T2 = correctness/consistency; T3 = polish.
   Downgraded `process::exit(1)` in `NormalizeConfig::load` to a recoverable warning; serde
   already ignores unknown sections. All four commands (`trend complexity`, `trend length`,
   `trend density`, `trend test-ratio`) now work.
-- [ ] **T1-1 — Index-dependent commands exit 0 + empty JSON on missing index** (HIGH, HC violation).
-  `view graph`, `view dependents`, `view import-path`, `rank imports`, `rank depth-map`,
-  `rank layering`, `rank call-complexity`, `analyze architecture` — all return empty results
-  with exit 0 when the index has not been built. Fix: exit non-zero + include `"requires_index": true`
-  in JSON when source files exist but the index table is empty.
-- [x] **T1-2 — 22 mutating commands ship without `--dry-run`** (HIGH, HC violation).
-  Priority order: `edit redo` (1-line fix), `rules run --fix`, `kg write null-transform`,
-  `rules add/update/remove`, `ratchet`/`budget` CRUD, `sessions mark/unmark`. Borderline:
-  `daemon start/stop`, `update`, `generate client/cli-snapshot`.
-- [ ] **T1-4 — `structure packages` silently succeeds with zero output** (HIGH, HC violation).
-  Should emit at minimum `{"indexed":0,"ecosystems":[]}` + needs `--dry-run` (T1-2).
-- [ ] **T1-5 — `rules show stale-summary` lookup bug** — rule in `list`, not found by `show`.
-  Likely a registry split (native vs fact rules) that `show` does not search.
+- [x] **T1-1 — Index-dependent commands exit 0 + empty JSON on missing index** — FIXED. Centralized `index::require_import_graph` guard; `view graph/dependents/import-path`, `rank imports/depth-map/layering`, and `analyze architecture` now exit non-zero with an actionable message when the import graph is empty.
+- [x] **T1-2 — 22 mutating commands ship without `--dry-run`** — FIXED. `edit redo`, `rules run --fix`, `kg write`, `rules add/update/remove/setup`, `ratchet`/`budget` CRUD, `sessions mark/unmark`, `structure rebuild` all have `--dry-run`. `daemon start/stop`, `update`, `generate client/cli-snapshot` judged out of scope (see CHANGELOG). `structure packages` still needs `--dry-run` (see T1-4).
+- [ ] **T1-4 — `structure packages`** — output half fixed (no longer silently empty); still needs `--dry-run` (writes global grammar cache).
+- [x] **T1-5 — `rules show stale-summary` lookup bug** — FIXED. `show_rule` now searches native-rules registry too.
 - [x] **T1-6 — Broken guides + stale `kg --help` examples** — `guide analyze` references moved
   commands; `guide rules` references `analyze node-types` (now `syntax node-types`); `kg --help`
   epilogue references `kg create/link/query/show` (none exist).
@@ -403,12 +338,7 @@ violations or actively broken; T2 = correctness/consistency; T3 = polish.
 server-less 0.5.0 shipped 2026-06-19 with `--manual` (a whole-tree CLI reference surface)
 motivated by normalize's ~150-command nested CLI. Adoption tasks:
 
-- [x] **Bump server-less → 0.6 across the workspace (2026-06-29).** Went straight to 0.6
-  (skipping the 0.5.0 step) for the CliGlobals capability-wiring fix. Workspace `Cargo.toml`
-  plus the three separately-pinned crates (`normalize-cfg`, `normalize-budget`,
-  `normalize-ratchet`) now require `0.6`, resolved via a local `[patch.crates-io]` dogfood
-  override pending the 0.6.0 publish. Also adapted to the 0.6 `ConfigTrait`→`ConfigLoad`
-  rename in `crates/normalize/src/config.rs`. Clean `cargo build`/`clippy`/`test` confirmed.
+- [x] **Bump server-less → 0.6 and publish** — Done. Workspace + three separately-pinned crates (`normalize-cfg`, `normalize-budget`, `normalize-ratchet`) require `0.6`. Adapted to the `ConfigTrait`→`ConfigLoad` rename. 0.6.0 published; `[patch.crates-io]` override removed (2026-07-01).
 - [ ] **Adopt `--manual` for the nested command tree.** `normalize --manual` (and
   `normalize <subtree> --manual`) now emits the entire ~150-command surface as one greppable
   document — text by default, `--json`/`--jsonl`/`--jq` for structured. Closes the "no whole-tree
@@ -444,10 +374,7 @@ normalize adopted it (2026-06-29) via a local `[patch.crates-io]` dogfood overri
   into every command) still appear in help and are accepted — they are silently inert on these
   commands and on any `analyze` method whose report has no real `format_pretty` (see advertised-no-op
   item below). See `docs/artifacts/sessions-stats-output-2026-06-20/pretty-wiring-audit.md`.
-- [ ] **Publish server-less 0.6.0, then drop the `[patch.crates-io]` override.** Adoption
-  currently relies on a local path patch in the workspace `Cargo.toml` (`[patch.crates-io]
-  server-less = { path = ... }`). Once 0.6.0 is on crates.io, remove the patch block; the
-  version requirements are already `0.6`.
+- [x] **Publish server-less 0.6.0 and drop the `[patch.crates-io]` override** — DONE (2026-07-01). 0.6.0 published to crates.io; patch block removed from workspace `Cargo.toml`.
 - [ ] **Phase 2 — `display_with`→`render` (dead-dispatch class).** The 6 `edit` refactor
   commands + `syntax node-types` have real `format_pretty` impls reached by a `display_with`
   fn that calls `format_text()` unconditionally (3b in the design doc — opaque-body footgun,
