@@ -4,7 +4,7 @@
 //! Report structs and OutputFormatter impls live in the `normalize` crate.
 
 use normalize_facts::FileIndex;
-pub use normalize_graph::ImportChain;
+pub use normalize_graph::{ImportChain, find_longest_chains, longest_path_from};
 use normalize_languages::is_programming_language;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -483,92 +483,8 @@ pub fn find_cycles(graph: &HashMap<String, HashSet<String>>) -> Vec<Cycle> {
 
 // ── Longest chain detection ───────────────────────────────────────────────────
 
-/// Find the longest import chains (dependency paths) in the graph.
-///
-/// Returns up to 5 chains (hard-coded limit), sorted by depth (longest first).
-/// Only chains with more than 3 nodes (depth > 3) are included.
-///
-/// Chains dominated by a suffix of a longer chain are removed: if chain B's
-/// modules are a suffix of chain A's modules, B is dropped. This keeps the
-/// result set non-redundant — each returned chain represents a unique root.
-///
-/// Uses DFS from each node with memoization to find the longest path, avoiding cycles.
-pub fn find_longest_chains(graph: &HashMap<String, HashSet<String>>) -> Vec<ImportChain> {
-    let mut longest_paths: Vec<ImportChain> = Vec::new();
-    let mut memo: HashMap<String, Vec<String>> = HashMap::new();
-
-    for start in graph.keys() {
-        let mut visited: HashSet<String> = HashSet::new();
-        let path = longest_path_from(start, graph, &mut visited, &mut memo);
-        if path.len() > 3 {
-            longest_paths.push(ImportChain {
-                depth: path.len() - 1,
-                modules: path,
-            });
-        }
-    }
-
-    longest_paths.sort_by_key(|b| std::cmp::Reverse(b.depth));
-
-    let mut unique_chains: Vec<ImportChain> = Vec::new();
-    for chain in longest_paths {
-        let dominated = unique_chains.iter().any(|existing| {
-            existing.modules.len() > chain.modules.len()
-                && existing.modules.ends_with(&chain.modules)
-        });
-        if !dominated {
-            unique_chains.push(chain);
-        }
-        if unique_chains.len() >= 5 {
-            break;
-        }
-    }
-
-    unique_chains
-}
-
-/// Find the longest path from a node using DFS with memoization.
-///
-/// # Memoization limitation
-///
-/// Results are cached keyed only by `node`. When the same node is reached from
-/// two different roots the first cached result is reused, even though the
-/// `visited` set differs between the two calls. This means the cached result
-/// may be shorter than what would be computed from a different root (because
-/// some successors were marked visited in the first traversal). The trade-off
-/// is acceptable: the memo avoids O(n²) worst-case work and the goal is
-/// finding representative longest paths, not an exhaustive enumeration.
-fn longest_path_from(
-    node: &str,
-    graph: &HashMap<String, HashSet<String>>,
-    visited: &mut HashSet<String>,
-    memo: &mut HashMap<String, Vec<String>>,
-) -> Vec<String> {
-    if let Some(cached) = memo.get(node) {
-        return cached.clone();
-    }
-
-    visited.insert(node.to_string());
-
-    let mut longest: Vec<String> = vec![node.to_string()];
-
-    if let Some(neighbors) = graph.get(node) {
-        for neighbor in neighbors {
-            if !visited.contains(neighbor) {
-                let sub_path = longest_path_from(neighbor, graph, visited, memo);
-                if sub_path.len() + 1 > longest.len() {
-                    let mut new_path = vec![node.to_string()];
-                    new_path.extend(sub_path);
-                    longest = new_path;
-                }
-            }
-        }
-    }
-
-    visited.remove(node);
-    memo.insert(node.to_string(), longest.clone());
-    longest
-}
+// Longest-chain graph logic (`find_longest_chains`, `longest_path_from`) lives in
+// `normalize-graph` and is re-exported above — see the top-of-file `pub use`.
 
 // ── Layer extraction ──────────────────────────────────────────────────────────
 

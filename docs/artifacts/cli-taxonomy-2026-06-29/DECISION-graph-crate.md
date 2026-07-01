@@ -89,11 +89,18 @@ list API that avoids petgraph's index-handle overhead.
 - Edge production (index → adjacency list) → `normalize-facts` (owns the index)
 - `build_import_graph` and `ImportGraph` → `normalize-architecture` or `normalize-facts`
 
-### Kill the duplication
+### Kill the duplication — RESOLVED 2026-07-01
 
-`normalize-architecture` reimplements `find_longest_chains`/`longest_path_from` with
-slightly different thresholds (>3 nodes vs. MIN_CHAIN_NODE_COUNT=4). This is an outright
-bug. Consolidate to one implementation when executing this split.
+`normalize-architecture` reimplemented `find_longest_chains`/`longest_path_from` with a
+threshold that *looked* different (`>3` nodes vs. `>= MIN_CHAIN_NODE_COUNT` where the
+constant is 4) but was in fact numerically identical (`> 3` ≡ `>= 4`) — a magic-number vs.
+named-constant inconsistency, not a behavioral divergence. The only real difference was a
+hard-coded limit of 5 in the architecture copy vs. the parameterized `limit` in the
+canonical version. The duplicate had no callers anywhere in the workspace. Fixed by deleting
+both functions from `normalize-architecture` and re-exporting the canonical versions from
+`normalize-graph` (`pub use normalize_graph::{find_longest_chains, longest_path_from}`).
+Pure internal dedup, no user-facing behavior change. The larger graph-crate split remains
+deferred.
 
 ### Design so standalone extraction is mechanical
 
@@ -138,7 +145,7 @@ work that depends on this decision.
 
 3. **Naming:** user decides; not a question for this record.
 
-4. **Duplication dedup timing:** the `find_longest_chains` duplication in
-   `normalize-architecture` is a bug independent of this extraction. It can be fixed before
-   the full split by having `normalize-architecture` call `normalize-graph`'s version — but
-   that's a short-term patch; the extraction resolves it permanently.
+4. **Duplication dedup timing:** RESOLVED 2026-07-01 — done independently of the extraction.
+   `normalize-architecture` now re-exports the canonical `find_longest_chains`/
+   `longest_path_from` from `normalize-graph`; the local copies are deleted. The threshold
+   "difference" was cosmetic (`> 3` ≡ `>= 4`). See "Kill the duplication" above.

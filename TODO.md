@@ -818,8 +818,11 @@ The clean boundary:
   `DependentEntry.has_tests`/`fan_in` enrichment, `BlastRadius`, `GraphReport`/
   `DependentsReport`, all `OutputFormatter` impls, and edge-production (→ normalize-facts,
   which owns the index).
-- **Kill duplication:** `find_longest_chains`/`longest_path_from` independently reimplemented
-  in normalize-architecture (concrete bug — slightly different thresholds). Consolidate.
+- **Kill duplication:** ✅ RESOLVED 2026-07-01 (independently of the split). The
+  `find_longest_chains`/`longest_path_from` duplicates were deleted from
+  normalize-architecture and the canonical versions re-exported from normalize-graph. The
+  "slightly different thresholds" turned out cosmetic (`> 3` ≡ `>= MIN_CHAIN_NODE_COUNT=4`);
+  the duplicate had no callers. Pure internal dedup, no behavior change.
 
 **This is a PREREQUISITE for B2 and B3** — those batches cannot cleanly land until the
 boundary is resolved (it determines what normalize-graph's `cli` feature gates, what
@@ -832,8 +835,8 @@ decides). Design it twice before building.
 
 - [ ] Design the generic-half API (trait-based vs. closure-based; two independent designs)
 - [ ] Decide: standalone repo vs. workspace crate with `publish = true`
-- [ ] Execute the split: extract generic half, move normalize-flavored pieces to callers,
-      kill `find_longest_chains` duplication in normalize-architecture
+- [ ] Execute the split: extract generic half, move normalize-flavored pieces to callers
+      (`find_longest_chains` duplication already killed 2026-07-01)
 - [ ] B2 and B3 can proceed after the split is done
 
 ### Main-crate decomposition audit (not yet done)
