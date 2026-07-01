@@ -880,8 +880,12 @@ legit wiring; latent: dual "parallelization savings" vocab, `module_health.rs` v
   call sites (`duplicates.rs` functions + blocks pipelines, `fragments.rs::group_fuzzy`);
   command-specific scoring/thresholding stays in main. The blocks site's serial single-map
   variant now shares the parallel path — same candidate set. Pure dedup, user-invisible.
-- [ ] **D3 — dedup hand-rolled `UnionFind`**: collapse `clusters.rs:48-79` and
-  `duplicates.rs:577-604` onto existing `normalize_code_similarity::UnionFind`. Effort S / trivial.
+- [x] **D3 — dedup hand-rolled `UnionFind`** (2026-07-02): deleted the local `UnionFind`
+  struct in `clusters.rs` and the inline `find`/`union` fns in `duplicates.rs`
+  (`suppress_widespread_body_patterns`), routing both onto
+  `normalize_code_similarity::UnionFind`. Also repointed `coupling_clusters.rs` (was
+  importing the clusters-local copy). Crate API (`new`/`find`/`union`) covered every
+  caller — no extension needed. Same semantics (union-by-rank + path compression).
 - [ ] **D4 — `aggregate_sessions` fold → `normalize-session-analysis`**: move the
   ~80-120 LOC fold (`commands/sessions/analyze.rs`) into session-analysis as
   `aggregate_reports`/`SessionAnalysisReport::aggregate` (fixes encapsulation leak into

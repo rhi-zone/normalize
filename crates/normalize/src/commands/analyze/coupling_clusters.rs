@@ -1,7 +1,7 @@
 //! Change coupling clusters — group files into connected components of temporal coupling.
 
-use crate::commands::analyze::clusters::UnionFind;
 use crate::output::OutputFormatter;
+use normalize_code_similarity::UnionFind;
 use serde::Serialize;
 use std::path::Path;
 

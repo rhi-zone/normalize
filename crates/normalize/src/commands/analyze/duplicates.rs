@@ -7,7 +7,7 @@ use crate::output::OutputFormatter;
 use crate::parsers;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use normalize_code_similarity::{
-    MINHASH_N, SHINGLE_K, compute_function_hash, compute_minhash, find_function_node,
+    MINHASH_N, SHINGLE_K, UnionFind, compute_function_hash, compute_minhash, find_function_node,
     flatten_symbols, jaccard_estimate, lsh_candidate_pairs, serialize_subtree_tokens,
 };
 use normalize_languages::support_for_path;
@@ -570,35 +570,9 @@ fn suppress_widespread_body_patterns(
     }
 
     let n = fn_names.len();
-    // Union-find with path compression + union by rank.
-    let mut parent: Vec<usize> = (0..n).collect();
-    let mut rank: Vec<usize> = vec![0; n];
-
-    fn find(parent: &mut [usize], x: usize) -> usize {
-        if parent[x] != x {
-            parent[x] = find(parent, parent[x]);
-        }
-        parent[x]
-    }
-
-    fn union(parent: &mut [usize], rank: &mut [usize], a: usize, b: usize) {
-        let ra = find(parent, a);
-        let rb = find(parent, b);
-        if ra == rb {
-            return;
-        }
-        if rank[ra] < rank[rb] {
-            parent[ra] = rb;
-        } else if rank[ra] > rank[rb] {
-            parent[rb] = ra;
-        } else {
-            parent[rb] = ra;
-            rank[ra] += 1;
-        }
-    }
-
+    let mut uf = UnionFind::new(n);
     for &(a, b) in &edges {
-        union(&mut parent, &mut rank, a, b);
+        uf.union(a, b);
     }
 
     // For each component root: collect distinct files, distinct names, and pair count.
@@ -606,7 +580,7 @@ fn suppress_widespread_body_patterns(
     let mut component_names: HashMap<usize, HashMap<String, usize>> = HashMap::new();
 
     for i in 0..n {
-        let root = find(&mut parent, i);
+        let root = uf.find(i);
         component_files
             .entry(root)
             .or_default()
@@ -621,8 +595,8 @@ fn suppress_widespread_body_patterns(
     // Count pairs per component.
     let mut component_pair_counts: HashMap<usize, usize> = HashMap::new();
     for &(a, b) in &edges {
-        let root = find(&mut parent, a);
-        debug_assert_eq!(root, find(&mut parent, b));
+        let root = uf.find(a);
+        debug_assert_eq!(root, uf.find(b));
         *component_pair_counts.entry(root).or_default() += 1;
     }
 
@@ -649,7 +623,7 @@ fn suppress_widespread_body_patterns(
 
     for p in pairs {
         let a = fn_id_map[&(p.file_a.clone(), p.symbol_a.clone(), p.start_line_a)];
-        let root = find(&mut parent, a);
+        let root = uf.find(a);
         if hot_components.contains(&root) {
             *suppressed_by_component.entry(root).or_default() += 1;
         } else {
