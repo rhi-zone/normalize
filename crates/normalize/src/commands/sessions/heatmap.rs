@@ -2,7 +2,7 @@
 
 use crate::output::OutputFormatter;
 use crate::sessions::{
-    ContentBlock, FormatRegistry, LogFormat, Role, SessionFile, parse_session,
+    ContentBlock, FormatRegistry, LogFormat, Role, SessionFile, normalize_path, parse_session,
     parse_session_with_format,
 };
 use serde::{Deserialize, Serialize};
@@ -146,23 +146,6 @@ fn extract_file_path(tool_name: &str, input: &serde_json::Value) -> Option<Strin
             .map(normalize_path),
         _ => None,
     }
-}
-
-/// Normalize an absolute path to a short relative form.
-fn normalize_path(path: &str) -> String {
-    if !path.starts_with('/') {
-        return path.to_string();
-    }
-    let parts: Vec<&str> = path.split('/').collect();
-    for (i, part) in parts.iter().enumerate() {
-        if matches!(
-            *part,
-            "src" | "lib" | "crates" | "tests" | "docs" | "packages"
-        ) {
-            return parts[i..].join("/");
-        }
-    }
-    path.to_string()
 }
 
 /// Accumulate file operations from a session into a HashMap.

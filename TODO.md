@@ -890,8 +890,9 @@ legit wiring; latent: dual "parallelization savings" vocab, `module_health.rs` v
   Fold moved into the crate as inherent method `SessionAnalysisReport::aggregate(&[SessionAnalysisReport])
   -> SessionAnalysisReport` (behavior preserved; unit tests added). Main's `aggregate_sessions`
   now parses paths into reports and delegates; print/dispatch wrapper stays in main.
-- [ ] **D5 — dedup heatmap `normalize_path`**: `commands/sessions/heatmap.rs` calls the
-  already-`pub` `normalize_session_analysis::normalize_path` instead of its copy. Effort S / trivial.
+- [x] **D5 — dedup heatmap `normalize_path`**: ✅ DONE 2026-07-02. Byte-for-byte copy in
+  `commands/sessions/heatmap.rs` deleted; now imports the canonical
+  `normalize_session_analysis::normalize_path` via `crate::sessions`.
 - [x] **D6 — extraction-fixture harness → `normalize-facts`** (judgment call): ✅ DONE 2026-07-02.
   Moved the golden-diff engine (discovery + `run_case` + `expected.json` schema) into
   `crates/normalize-facts/src/extraction_fixtures.rs` (`discover_cases`/`run_case`,
