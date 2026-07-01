@@ -12,7 +12,7 @@ Three live threads from the 2026-06-29/07-01 session — verify state before act
 
 - **CLI taxonomy inversion (B2–B12)**: B0+B1 landed; the graph-crate blocker on B2/B3 is now resolved (see below). See [CLI command-taxonomy FULL INVERSION](#cli-command-taxonomy-full-inversion--seam-corrected-final-scope-high-priority) below.
 - **Graph-crate split**: ✅ RESOLVED 2026-07-02 — refactored `normalize-graph` in place (pure algorithms split from presentation; deps `normalize-output`/`nu-ansi-term` dropped; characterization tests added). No standalone crate, no node-type genericization. Decision record (superseded resolution at top): `docs/artifacts/cli-taxonomy-2026-06-29/DECISION-graph-crate.md`. This unblocks B2 and B3. See [Graph crate refactor](#graph-crate-refactor-resolved-2026-07-02) below.
-- **Main-crate decomposition audit**: no systematic audit of `crates/normalize/src/` has been run — only three surfaces spot-checked. Advisory; may or may not be worth prioritizing. See [Main-crate decomposition audit](#main-crate-decomposition-audit-not-yet-done) below.
+- **Main-crate decomposition audit**: ✅ DONE 2026-07-02 — full audit run; findings recorded in `docs/audit-2026-07-02.md`. Headline: the main crate is NOT a reservoir of extractable domain logic (reusable algorithms already in feature crates). Six small execution items + one rename remain (D1–D6 below), to be executed this session. See [Main-crate decomposition audit](#main-crate-decomposition-audit-done-2026-07-02) below.
 
 ---
 
@@ -847,14 +847,50 @@ Follow-up discovered during the refactor:
       untangling the service layer; the mutual `output.rs` ↔ command/service coupling is the
       likely knot.
 
-### Main-crate decomposition audit (not yet done)
+### Main-crate decomposition audit (DONE 2026-07-02)
 
-Systematically enumerate everything in `crates/normalize/src/` (analyze/, commands/, service/, index, etc.) and classify each as (a) legitimate CLI wiring [service layer, dispatch, output formatting — belongs in main] vs (b) domain logic that violates "domain logic belongs in a crate, not normalize" and should be extracted [against the strict crate bar: multiple workspace dependents OR clearly-useful-standalone]. Known-undecomposed already found via spot-checks: the metric core (src/analyze/ complexity/length/ceremony/density — judged not-one-clean-crate but may need a different cut), git-history analysis (queued as normalize-git-history), graph analysis (resolved 2026-07-02 — refactored in place, presentation now correctly in the main crate; see DECISION-graph-crate.md). The full audit has NOT been run — only three surfaces spot-checked because the taxonomy work walked into them. This is the real answer to "is the main CLI fully decomposed" — it is not.
+✅ **Full audit complete — findings in `docs/audit-2026-07-02.md`.** Five cluster audits
+(similarity, sessions, CFG dataflow, scoring/extraction, service layer) run against the
+strict crate bar (multiple actual dependents OR genuine standalone value).
 
-- [ ] Enumerate all modules in `crates/normalize/src/` and classify each as wiring vs. domain logic
-- [ ] For any domain-logic module: evaluate against the strict crate bar (multiple dependents OR clearly-useful-standalone)
-- [ ] Decide cuts for un-decomposed surfaces (metric core, any others found)
-- [ ] Track findings here as they are discovered
+**Headline:** the main `normalize` crate is NOT a reservoir of extractable domain logic.
+The reusable algorithms (MinHash/LSH, cyclomatic complexity, symbol extraction, model
+pricing, refactor transforms, liveness solver) are already in feature crates. The ~84k
+LOC is CLI-surface breadth, not leaked domain logic — this partially refutes the handoff
+premise. The March P2 "extract analysis algorithms" item is effectively already
+satisfied; only small dedups/extractions remain.
+
+Explicit non-extractions and latent notes are recorded in the audit doc so they are not
+re-litigated (keep both session crates; `normalize-cfg` stays; `health.rs` /
+`skeleton.rs` / `extract.rs` / `service/edit.rs` / `service/facts.rs` core all stay as
+legit wiring; latent: dual "parallelization savings" vocab, `module_health.rs` vs
+`health.rs` scorer overlap).
+
+**Execution items (plan of record — executed this session in subsequent commits):**
+
+- [ ] **D1 — liveness dataflow → `normalize-facts`** (`facts::cfg_dataflow`): move the
+  backward-dataflow solver (~50 LOC) + 4 cfg-table loaders (~130 LOC), deduping
+  `commands/analyze/liveness.rs:246-294` against
+  `normalize-refactor/src/extract_function.rs:700`. `BlockLiveness`/`LivenessReport` +
+  OutputFormatter stay in main. Target facts (owns tables + libsql), NOT cfg. Effort M / risk S.
+- [ ] **D2 — LSH candidate-pair loop → `normalize-code-similarity`**: collapse the 3×
+  copy-pasted band-bucket/emit/dedup loop (`duplicates.rs` ~937-985, ~1648-1668;
+  `fragments.rs` ~587-620) beside `lsh_band_hash`. ~25 LOC. Effort S / risk S.
+- [ ] **D3 — dedup hand-rolled `UnionFind`**: collapse `clusters.rs:48-79` and
+  `duplicates.rs:577-604` onto existing `normalize_code_similarity::UnionFind`. Effort S / trivial.
+- [ ] **D4 — `aggregate_sessions` fold → `normalize-session-analysis`**: move the
+  ~80-120 LOC fold (`commands/sessions/analyze.rs`) into session-analysis as
+  `aggregate_reports`/`SessionAnalysisReport::aggregate` (fixes encapsulation leak into
+  report internals); print/dispatch wrapper stays in main. Effort S / risk S.
+- [ ] **D5 — dedup heatmap `normalize_path`**: `commands/sessions/heatmap.rs` calls the
+  already-`pub` `normalize_session_analysis::normalize_path` instead of its copy. Effort S / trivial.
+- [ ] **D6 — extraction-fixture harness → `normalize-facts`** (judgment call): move the
+  ~380 LOC golden-diff engine (`service/facts.rs:1209-1590`); `test_fixtures` `#[cli]`
+  stays a thin wrapper. Clears standalone-value bar (b), 1 caller so not bar (a); justified
+  by coherent module weight. Effort M / risk S.
+- [ ] **Rename `normalize-analyze` → `normalize-rank`**: crate is NOT dead (consumed via
+  `Entity`/`RankEntry`/`format_ranked_table`); name misdescribes the shared rank/render
+  layer. Effort S / risk S.
 
 ### Language trait: remaining .scm migration
 
