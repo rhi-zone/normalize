@@ -8,6 +8,7 @@
 //! - Trait definitions for fact extraction
 
 mod ca_cache;
+pub mod cfg_dataflow;
 pub mod extract;
 mod index;
 mod parsers;

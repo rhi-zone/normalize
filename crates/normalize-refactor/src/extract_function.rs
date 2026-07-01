@@ -18,6 +18,8 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
+use normalize_facts::cfg_dataflow::{self, CfgBlockRow, CfgEdgeRow};
+
 use crate::{PlannedEdit, RefactoringPlan};
 
 // ─── Public data model ────────────────────────────────────────────────────────
@@ -120,23 +122,6 @@ impl ExtractionWarning {
 // ─── Internal intermediate structs (from index) ───────────────────────────────
 
 #[derive(Debug)]
-struct BlockRow {
-    block_id: u32,
-    #[allow(dead_code)]
-    kind: String,
-    start_line: u32,
-    end_line: u32,
-}
-
-#[derive(Debug)]
-struct EdgeRow {
-    from: u32,
-    to: u32,
-    kind: String,
-    exception_type: Option<String>,
-}
-
-#[derive(Debug)]
 struct EffectRow {
     block_id: u32,
     kind: String,
@@ -203,11 +188,13 @@ pub async fn plan_extract_function(
         }
     };
 
-    // Load all blocks for this function.
-    let block_rows = load_blocks(conn, &rel_path, &func_qname, func_start_line).await?;
-    let edge_rows = load_edges(conn, &rel_path, &func_qname, func_start_line).await?;
-    let def_rows = load_defs(conn, &rel_path, &func_qname, func_start_line).await?;
-    let use_rows = load_uses(conn, &rel_path, &func_qname, func_start_line).await?;
+    // Load all blocks for this function (cfg_* tables owned by normalize-facts).
+    let block_rows: Vec<CfgBlockRow> =
+        cfg_dataflow::load_blocks(conn, &rel_path, &func_qname, func_start_line).await?;
+    let edge_rows: Vec<CfgEdgeRow> =
+        cfg_dataflow::load_edges(conn, &rel_path, &func_qname, func_start_line).await?;
+    let def_rows = cfg_dataflow::load_defs(conn, &rel_path, &func_qname, func_start_line).await?;
+    let use_rows = cfg_dataflow::load_uses(conn, &rel_path, &func_qname, func_start_line).await?;
     let effect_rows = load_effects(conn, &rel_path, &func_qname, func_start_line).await?;
 
     // ── 3. Identify region blocks ─────────────────────────────────────────────
@@ -248,7 +235,7 @@ pub async fn plan_extract_function(
         succs.entry(e.from).or_default().push(e.to);
     }
 
-    let (live_in, live_out) = compute_liveness(&block_ids, &defs, &uses_map, &succs);
+    let (live_in, live_out) = cfg_dataflow::compute_liveness(&block_ids, &defs, &uses_map, &succs);
 
     // ── 5. Derive parameters and return vars ──────────────────────────────────
     let vars_defined_in_region: BTreeSet<String> = def_rows
@@ -528,137 +515,6 @@ async fn find_enclosing_function(
     }
 }
 
-async fn load_blocks(
-    conn: &libsql::Connection,
-    file: &str,
-    func_qname: &str,
-    func_start_line: u32,
-) -> Result<Vec<BlockRow>, String> {
-    let mut rows = conn
-        .query(
-            "SELECT block_id, kind, start_line, end_line \
-             FROM cfg_blocks \
-             WHERE file = ?1 AND function_qname = ?2 AND function_start_line = ?3 \
-             ORDER BY block_id",
-            libsql::params![
-                file.to_string(),
-                func_qname.to_string(),
-                func_start_line as i64
-            ],
-        )
-        .await
-        .map_err(|e| format!("DB error: {}", e))?;
-
-    let mut out = Vec::new();
-    while let Some(row) = rows.next().await.map_err(|e| format!("DB error: {}", e))? {
-        let block_id: i64 = row.get(0).map_err(|e| format!("DB error: {}", e))?;
-        let kind: String = row.get(1).map_err(|e| format!("DB error: {}", e))?;
-        let start_line: i64 = row.get(2).map_err(|e| format!("DB error: {}", e))?;
-        let end_line: i64 = row.get(3).map_err(|e| format!("DB error: {}", e))?;
-        out.push(BlockRow {
-            block_id: block_id as u32,
-            kind,
-            start_line: start_line as u32,
-            end_line: end_line as u32,
-        });
-    }
-    Ok(out)
-}
-
-async fn load_edges(
-    conn: &libsql::Connection,
-    file: &str,
-    func_qname: &str,
-    func_start_line: u32,
-) -> Result<Vec<EdgeRow>, String> {
-    let mut rows = conn
-        .query(
-            "SELECT from_block, to_block, kind, COALESCE(exception_type, '') \
-             FROM cfg_edges \
-             WHERE file = ?1 AND function_qname = ?2 AND function_start_line = ?3",
-            libsql::params![
-                file.to_string(),
-                func_qname.to_string(),
-                func_start_line as i64
-            ],
-        )
-        .await
-        .map_err(|e| format!("DB error: {}", e))?;
-
-    let mut out = Vec::new();
-    while let Some(row) = rows.next().await.map_err(|e| format!("DB error: {}", e))? {
-        let from: i64 = row.get(0).map_err(|e| format!("DB error: {}", e))?;
-        let to: i64 = row.get(1).map_err(|e| format!("DB error: {}", e))?;
-        let kind: String = row.get(2).map_err(|e| format!("DB error: {}", e))?;
-        let exc: String = row.get(3).map_err(|e| format!("DB error: {}", e))?;
-        out.push(EdgeRow {
-            from: from as u32,
-            to: to as u32,
-            kind,
-            exception_type: if exc.is_empty() { None } else { Some(exc) },
-        });
-    }
-    Ok(out)
-}
-
-async fn load_defs(
-    conn: &libsql::Connection,
-    file: &str,
-    func_qname: &str,
-    func_start_line: u32,
-) -> Result<Vec<(u32, String)>, String> {
-    let mut rows = conn
-        .query(
-            "SELECT block_id, name \
-             FROM cfg_defs \
-             WHERE file = ?1 AND function_qname = ?2 AND function_start_line = ?3",
-            libsql::params![
-                file.to_string(),
-                func_qname.to_string(),
-                func_start_line as i64
-            ],
-        )
-        .await
-        .map_err(|e| format!("DB error: {}", e))?;
-
-    let mut out = Vec::new();
-    while let Some(row) = rows.next().await.map_err(|e| format!("DB error: {}", e))? {
-        let block_id: i64 = row.get(0).map_err(|e| format!("DB error: {}", e))?;
-        let name: String = row.get(1).map_err(|e| format!("DB error: {}", e))?;
-        out.push((block_id as u32, name));
-    }
-    Ok(out)
-}
-
-async fn load_uses(
-    conn: &libsql::Connection,
-    file: &str,
-    func_qname: &str,
-    func_start_line: u32,
-) -> Result<Vec<(u32, String)>, String> {
-    let mut rows = conn
-        .query(
-            "SELECT block_id, name \
-             FROM cfg_uses \
-             WHERE file = ?1 AND function_qname = ?2 AND function_start_line = ?3",
-            libsql::params![
-                file.to_string(),
-                func_qname.to_string(),
-                func_start_line as i64
-            ],
-        )
-        .await
-        .map_err(|e| format!("DB error: {}", e))?;
-
-    let mut out = Vec::new();
-    while let Some(row) = rows.next().await.map_err(|e| format!("DB error: {}", e))? {
-        let block_id: i64 = row.get(0).map_err(|e| format!("DB error: {}", e))?;
-        let name: String = row.get(1).map_err(|e| format!("DB error: {}", e))?;
-        out.push((block_id as u32, name));
-    }
-    Ok(out)
-}
-
 async fn load_effects(
     conn: &libsql::Connection,
     file: &str,
@@ -693,61 +549,6 @@ async fn load_effects(
         });
     }
     Ok(out)
-}
-
-// ─── Liveness ─────────────────────────────────────────────────────────────────
-
-fn compute_liveness(
-    block_ids: &[u32],
-    defs: &HashMap<u32, BTreeSet<String>>,
-    uses_map: &HashMap<u32, BTreeSet<String>>,
-    succs: &HashMap<u32, Vec<u32>>,
-    // normalize-syntax-allow: rust/tuple-return
-) -> (
-    HashMap<u32, BTreeSet<String>>,
-    HashMap<u32, BTreeSet<String>>,
-) {
-    let mut live_in: HashMap<u32, BTreeSet<String>> = HashMap::new();
-    let mut live_out: HashMap<u32, BTreeSet<String>> = HashMap::new();
-    for id in block_ids {
-        live_in.insert(*id, BTreeSet::new());
-        live_out.insert(*id, BTreeSet::new());
-    }
-
-    let empty: BTreeSet<String> = BTreeSet::new();
-    let mut changed = true;
-    while changed {
-        changed = false;
-        for &bid in block_ids.iter().rev() {
-            let mut new_lo: BTreeSet<String> = BTreeSet::new();
-            if let Some(succ_list) = succs.get(&bid) {
-                for &s in succ_list {
-                    if let Some(li) = live_in.get(&s) {
-                        new_lo.extend(li.iter().cloned());
-                    }
-                }
-            }
-
-            let block_uses = uses_map.get(&bid).unwrap_or(&empty);
-            let block_defs = defs.get(&bid).unwrap_or(&empty);
-            let mut new_li: BTreeSet<String> = block_uses.clone();
-            for v in &new_lo {
-                if !block_defs.contains(v) {
-                    new_li.insert(v.clone());
-                }
-            }
-
-            if new_lo != *live_out.get(&bid).unwrap_or(&empty)
-                || new_li != *live_in.get(&bid).unwrap_or(&empty)
-            {
-                changed = true;
-                live_out.insert(bid, new_lo);
-                live_in.insert(bid, new_li);
-            }
-        }
-    }
-
-    (live_in, live_out)
 }
 
 // ─── Spec mapping (recipe types → normalize-languages codegen inputs) ──────────

@@ -868,11 +868,12 @@ legit wiring; latent: dual "parallelization savings" vocab, `module_health.rs` v
 
 **Execution items (plan of record — executed this session in subsequent commits):**
 
-- [ ] **D1 — liveness dataflow → `normalize-facts`** (`facts::cfg_dataflow`): move the
-  backward-dataflow solver (~50 LOC) + 4 cfg-table loaders (~130 LOC), deduping
-  `commands/analyze/liveness.rs:246-294` against
-  `normalize-refactor/src/extract_function.rs:700`. `BlockLiveness`/`LivenessReport` +
-  OutputFormatter stay in main. Target facts (owns tables + libsql), NOT cfg. Effort M / risk S.
+- [x] **D1 — liveness dataflow → `normalize-facts`** (`facts::cfg_dataflow`): ✅ DONE 2026-07-02.
+  New module `crates/normalize-facts/src/cfg_dataflow.rs` exposes `compute_liveness()` +
+  `load_blocks`/`load_edges`/`load_defs`/`load_uses` (rows `CfgBlockRow`/`CfgEdgeRow`).
+  `commands/analyze/liveness.rs` and `normalize-refactor/src/extract_function.rs` both rewired to
+  it; the near-verbatim `compute_liveness` copy + 4 duplicated loaders deleted from refactor.
+  `BlockLiveness`/`LivenessReport` + OutputFormatter stayed in main. Pure dedup, user-invisible.
 - [ ] **D2 — LSH candidate-pair loop → `normalize-code-similarity`**: collapse the 3×
   copy-pasted band-bucket/emit/dedup loop (`duplicates.rs` ~937-985, ~1648-1668;
   `fragments.rs` ~587-620) beside `lsh_band_hash`. ~25 LOC. Effort S / risk S.
