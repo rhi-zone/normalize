@@ -1478,14 +1478,17 @@ WONTFIX: `CargoLocalDocsExtractor` is intentionally Cargo/Rust-scoped (module do
 
 WONTFIX: Test plumbing mapping a language to its interpreter binary is environment configuration, not library-crate classification; the dispatch-rule does not apply to test harnesses.
 
-**INTERMITTENT — `normalize-facts/tests/extract_fixtures.rs` (javascript `add_numbers` import mismatch)**
+~~**INTERMITTENT — `normalize-facts/tests/extract_fixtures.rs` (javascript `add_numbers` import mismatch)**~~
 
-During the 2026-07-02 main-crate decomposition work this fixture case failed on some
-runs (a javascript `add_numbers` import expectation mismatch) but passed green on a later
-full run — so it is order/environment-dependent, not a hard break. Not chased during the
-rename. Worth a proper look later: determine whether the import extraction is
-non-deterministic (ordering) or whether the runtime/interpreter environment differs
-between runs.
+RESOLVED (2026-07-02): not a runtime race — a stale fixture. The JS `add_numbers`
+`expected/imports.json` was `[]`, predating the commits that routed JS imports through
+the generic `.scm` query path (13ffe6a5) and added CommonJS `require` patterns to
+`javascript.imports.scm` (db7ec044). Once those landed, extraction correctly reports
+`const { Calculator } = require("./math")` as an import; runs before/after the code change
+in-session flipped the result, which read as "intermittent." Extraction itself is
+deterministic (Vec-preserving dedup, deterministic tree-sitter cursor). Fix: regenerated
+the fixture to expect the `Calculator` import. Verified stable green over 30 runs (20
+default-thread + 10 single-thread).
 
 ---
 

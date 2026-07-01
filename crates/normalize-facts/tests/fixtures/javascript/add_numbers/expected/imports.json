@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "alias": null,
+    "file": "index.js",
+    "line": 1,
+    "module": "./math",
+    "name": "Calculator"
+  }
+]
