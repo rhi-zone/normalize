@@ -77,6 +77,22 @@ crate verbs). Add a `RankEntry`-based CI lint to hold against future drift. See 
 - `crate-ownership-map.md` — current mount structure; proves analyze/rank/trend are one
   main-crate body over pure-library compute crates (no crate boundary backs the 3-way split).
 
+**normalize-graph architecture investigations (B2/B3 prerequisite):**
+- `graph-crate-reality.md` — reality check: the crate's "pure primitives" claim is false;
+  `GraphTarget`/`DependentEntry.has_tests`/`BlastRadius`/`OutputFormatter` impls are all
+  normalize-specific; domain is split across two crates with concrete duplication
+  (`find_longest_chains` independently reimplemented in normalize-architecture).
+- `graph-crate-justification.md` — justification audit: petgraph absent from workspace and a
+  poor fit for adjacency-list API; algorithms String-pinned but not semantically entangled
+  (genericization is mechanical); exactly 2 workspace consumers, one thin; ~60% generic
+  algorithm bodies vs ~40% normalize-specific; several algorithms (diamond detection,
+  longest-path-with-suffix-dedup, directional bridge) have no petgraph equivalent.
+- `DECISION-graph-crate.md` — decision record: separate the generic and normalize-flavored
+  halves; generic half → datatype-agnostic functions (bring-your-own-representation, zero
+  normalize deps); normalize-flavored half → dependency-analysis callers + normalize-facts;
+  kill the `find_longest_chains` duplication. DECIDED IN PRINCIPLE, DEFERRED — not to
+  execute mid-taxonomy migration. B2/B3 are blocked on resolving this boundary.
+
 ## Synthesis
 
 **Final seam-corrected scope (current):** 2 new crates (normalize-git, normalize-git-history)

@@ -836,9 +836,13 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   (budget, ratchet, semantic, main crate); budget/ratchet git_ops.rs → thin re-export wrappers;
   semantic git_staleness.rs uses normalize_git::open_repo; main git_utils.rs → pub use normalize_git::*.
 - [ ] **B2 — `graph`:** gate `OutputFormatter` behind `cli` feature; add `GraphService`;
-  mount; move `view graph`/`dependents`/`import-path`.
+  mount; move `view graph`/`dependents`/`import-path`. **BLOCKED on graph-crate split
+  (see "Graph crate extraction" below)** — the split defines which types stay in
+  normalize-graph, what the `cli` feature gates, and where `OutputFormatter` impls live.
 - [ ] **B3 — `architecture`:** move 3 reports into crate; `cli` feature + service; mount
-  (`architecture`, `depth-map`, `layering`).
+  (`architecture`, `depth-map`, `layering`). **BLOCKED on graph-crate split (same reason
+  as B2** — `ImportGraph`/`build_import_graph` placement and the `find_longest_chains`
+  duplication must be resolved first).
 - [ ] **B4 — `similarity`:** move duplicates/duplicate-types/fragments reports; service; mount.
 - [ ] **B5 — `structure` fix + dataflow:** mount real `FactsCliService` (rename→`structure`);
   delete main-crate `service/facts.rs` dup; absorb `liveness`/`effects`/`exceptions`;
@@ -869,6 +873,41 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   dissolved. Done 2026-03-28: trend commands → `trend`; `length`/`test-gaps` → `rank`.
 - The old open questions ("where do big-picture commands live", "does analyze dissolve")
   are now answered: `health/summary/all`→`overview`; `analyze` dissolves entirely.
+
+### Graph crate extraction (decided, deferred — prerequisite for B2/B3)
+
+**Decision (2026-07-01): separate the generic and normalize-flavored halves of
+`normalize-graph`.** Decision record: `docs/artifacts/cli-taxonomy-2026-06-29/DECISION-graph-crate.md`.
+Evidence: `graph-crate-reality.md`, `graph-crate-justification.md` (same dir).
+
+**User has green-lit (in principle) spinning the generic half out to its own crate/repo.**
+
+The clean boundary:
+- **Generic half** → datatype-agnostic graph-algorithm functions, generic over node type /
+  a minimal "neighbors" interface (bring-your-own-representation, NOT a Graph container).
+  Zero normalize dependencies. Includes the algorithms petgraph lacks: diamond detection,
+  longest-path-with-suffix-dedup, directional bridge filter.
+- **Normalize-flavored half** → moves to the dependency-analysis callers: `GraphTarget`,
+  `DependentEntry.has_tests`/`fan_in` enrichment, `BlastRadius`, `GraphReport`/
+  `DependentsReport`, all `OutputFormatter` impls, and edge-production (→ normalize-facts,
+  which owns the index).
+- **Kill duplication:** `find_longest_chains`/`longest_path_from` independently reimplemented
+  in normalize-architecture (concrete bug — slightly different thresholds). Consolidate.
+
+**This is a PREREQUISITE for B2 and B3** — those batches cannot cleanly land until the
+boundary is resolved (it determines what normalize-graph's `cli` feature gates, what
+`GraphService` exposes, and where `OutputFormatter` impls live).
+
+**Not to execute mid-taxonomy migration.** This is a deliberate standalone project
+requiring: API design (trait-based vs. plain generic functions over neighbors-closure);
+positioning vs. petgraph / pathfinding crate; repo-vs-workspace decision; naming (user
+decides). Design it twice before building.
+
+- [ ] Design the generic-half API (trait-based vs. closure-based; two independent designs)
+- [ ] Decide: standalone repo vs. workspace crate with `publish = true`
+- [ ] Execute the split: extract generic half, move normalize-flavored pieces to callers,
+      kill `find_longest_chains` duplication in normalize-architecture
+- [ ] B2 and B3 can proceed after the split is done
 
 ### Language trait: remaining .scm migration
 
