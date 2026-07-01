@@ -87,11 +87,13 @@ crate verbs). Add a `RankEntry`-based CI lint to hold against future drift. See 
   (genericization is mechanical); exactly 2 workspace consumers, one thin; ~60% generic
   algorithm bodies vs ~40% normalize-specific; several algorithms (diamond detection,
   longest-path-with-suffix-dedup, directional bridge) have no petgraph equivalent.
-- `DECISION-graph-crate.md` — decision record: separate the generic and normalize-flavored
-  halves; generic half → datatype-agnostic functions (bring-your-own-representation, zero
-  normalize deps); normalize-flavored half → dependency-analysis callers + normalize-facts;
-  kill the `find_longest_chains` duplication. DECIDED IN PRINCIPLE, DEFERRED — not to
-  execute mid-taxonomy migration. B2/B3 are blocked on resolving this boundary.
+- `DECISION-graph-crate.md` — decision record. RESOLVED 2026-07-02 (resolution at top of the
+  doc supersedes the original body): refactor `normalize-graph` in place — pure algorithms
+  split from presentation (moved to `commands/analyze/graph.rs`), `normalize-output`/
+  `nu-ansi-term` deps dropped, characterization tests added. No standalone crate and no
+  node-type genericization (an ecosystem survey found no plumbing gap; `find_longest_chains`
+  is an approximate heuristic that stays internal). B2/B3 unblocked. The original body's
+  "separate the generic half into its own crate / genericize" framing is superseded.
 
 ## Synthesis
 

@@ -7,8 +7,6 @@
 //! Algorithms: Tarjan SCC, bridge-finding, diamond detection,
 //! transitive edge detection, longest chains, weakly connected components.
 
-use normalize_output::OutputFormatter;
-use nu_ansi_term::Color;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -23,70 +21,6 @@ const MIN_CHAIN_NODE_COUNT: usize = 4;
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-/// What the graph nodes represent.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize, schemars::JsonSchema,
-)]
-#[serde(rename_all = "lowercase")]
-pub enum GraphTarget {
-    /// Nodes are files, edges are imports
-    Modules,
-    /// Nodes are functions (file:symbol), edges are calls
-    Symbols,
-    /// Nodes are types, edges are type references (fields, params, inheritance, etc.)
-    Types,
-}
-
-impl std::str::FromStr for GraphTarget {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "modules" => Ok(Self::Modules),
-            "symbols" => Ok(Self::Symbols),
-            "types" => Ok(Self::Types),
-            _ => Err(format!(
-                "unknown graph target '{}', expected 'modules', 'symbols', or 'types'",
-                s
-            )),
-        }
-    }
-}
-
-impl std::fmt::Display for GraphTarget {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Modules => write!(f, "modules"),
-            Self::Symbols => write!(f, "symbols"),
-            Self::Types => write!(f, "types"),
-        }
-    }
-}
-
-/// Overall graph statistics.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct GraphStats {
-    pub nodes: usize,
-    pub edges: usize,
-    /// Edge density: edges / (nodes × (nodes − 1)); 0.0 for graphs with fewer than 2 nodes.
-    pub density: f64,
-    pub weakly_connected_components: usize,
-    pub largest_component_size: usize,
-    pub scc_count: usize,
-    /// Number of strongly connected components with more than one node (actual circular-dependency clusters).
-    pub nontrivial_scc_count: usize,
-    pub diamond_count: usize,
-    /// Number of bridge edges whose removal would disconnect the graph.
-    pub bridge_count: usize,
-    /// Number of redundant transitive edges (A→C where A→B→C already exists).
-    pub transitive_edge_count: usize,
-    /// Depth (edge count) of the longest import chain.
-    pub max_chain_depth: usize,
-    /// Total number of import chains at or exceeding the depth threshold.
-    pub chain_count: usize,
-    /// Number of nodes with no inbound edges (unreachable or potentially dead code).
-    pub dead_node_count: usize,
-}
 
 /// A strongly connected component (circular-dependency cluster).
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -155,224 +89,6 @@ pub struct BlastRadius {
     pub transitive_count: usize,
     pub untested_count: usize,
     pub max_depth: usize,
-}
-
-/// Report for reverse dependency queries: what depends on a given file/symbol.
-///
-/// For `--on modules` (default): structured output with depth, test coverage,
-/// fan-in, and blast radius statistics.
-/// For `--on symbols` / `--on types`: flat alphabetical list of dependents.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct DependentsReport {
-    /// The file or symbol being queried.
-    pub target: String,
-    /// Graph node kind used for the query.
-    pub graph_target: GraphTarget,
-    /// Direct dependents (depth = 1) — populated for modules graph.
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub direct: Vec<DependentEntry>,
-    /// Transitive dependents (depth > 1) — populated for modules graph.
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub transitive: Vec<DependentEntry>,
-    /// Blast radius summary — populated for modules graph.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub blast_radius: Option<BlastRadius>,
-    /// Untested impact paths — populated for modules graph.
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub untested_paths: Vec<String>,
-    /// Flat dependent list — populated for symbols/types graph.
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub dependents: Vec<String>,
-}
-
-impl normalize_output::OutputFormatter for DependentsReport {
-    fn format_text(&self) -> String {
-        match self.graph_target {
-            GraphTarget::Modules => self.format_modules_text(false),
-            GraphTarget::Symbols | GraphTarget::Types => self.format_flat_text(false),
-        }
-    }
-
-    fn format_pretty(&self) -> String {
-        match self.graph_target {
-            GraphTarget::Modules => self.format_modules_text(true),
-            GraphTarget::Symbols | GraphTarget::Types => self.format_flat_text(true),
-        }
-    }
-}
-
-impl DependentsReport {
-    fn format_modules_text(&self, pretty: bool) -> String {
-        let mut lines = Vec::new();
-        let total = self.direct.len() + self.transitive.len();
-
-        if pretty {
-            lines.push(
-                Color::Cyan
-                    .bold()
-                    .paint(format!("# Dependents of {}", self.target))
-                    .to_string(),
-            );
-        } else {
-            lines.push(format!("# Dependents of {}", self.target));
-        }
-        lines.push(String::new());
-
-        if let Some(ref br) = self.blast_radius {
-            if pretty {
-                lines.push(format!(
-                    "{} files affected · {} direct · {} transitive · {} untested · max depth {}",
-                    Color::Default.bold().paint(total.to_string()),
-                    Color::Green.paint(br.direct_count.to_string()),
-                    Color::Yellow.paint(br.transitive_count.to_string()),
-                    Color::Red.paint(br.untested_count.to_string()),
-                    br.max_depth
-                ));
-            } else {
-                lines.push(format!(
-                    "{} files affected · {} direct · {} transitive · {} untested · max depth {}",
-                    total, br.direct_count, br.transitive_count, br.untested_count, br.max_depth
-                ));
-            }
-        }
-
-        if !self.direct.is_empty() {
-            lines.push(String::new());
-            if pretty {
-                lines.push(
-                    Color::Green
-                        .bold()
-                        .paint(format!("## Direct ({})", self.direct.len()))
-                        .to_string(),
-                );
-            } else {
-                lines.push(format!("## Direct ({})", self.direct.len()));
-            }
-            for e in &self.direct {
-                let tested = if e.has_tests {
-                    if pretty {
-                        Color::Green.paint("tested").to_string()
-                    } else {
-                        "tested".to_string()
-                    }
-                } else if pretty {
-                    Color::Red.bold().paint("UNTESTED").to_string()
-                } else {
-                    "UNTESTED".to_string()
-                };
-                lines.push(format!(
-                    "  {:<40} depth {}  {}  fan-in {}",
-                    e.file, e.depth, tested, e.fan_in
-                ));
-            }
-        }
-
-        if !self.transitive.is_empty() {
-            lines.push(String::new());
-            if pretty {
-                lines.push(
-                    Color::Yellow
-                        .bold()
-                        .paint(format!("## Transitive ({})", self.transitive.len()))
-                        .to_string(),
-                );
-            } else {
-                lines.push(format!("## Transitive ({})", self.transitive.len()));
-            }
-            for e in &self.transitive {
-                let tested = if e.has_tests {
-                    if pretty {
-                        Color::Green.paint("tested").to_string()
-                    } else {
-                        "tested".to_string()
-                    }
-                } else if pretty {
-                    Color::Red.bold().paint("UNTESTED").to_string()
-                } else {
-                    "UNTESTED".to_string()
-                };
-                lines.push(format!(
-                    "  {:<40} depth {}  {}  fan-in {}",
-                    e.file, e.depth, tested, e.fan_in
-                ));
-            }
-        }
-
-        if !self.untested_paths.is_empty() {
-            lines.push(String::new());
-            if pretty {
-                lines.push(
-                    Color::Red
-                        .bold()
-                        .paint(format!(
-                            "## Untested Impact Paths ({})",
-                            self.untested_paths.len()
-                        ))
-                        .to_string(),
-                );
-            } else {
-                lines.push(format!(
-                    "## Untested Impact Paths ({})",
-                    self.untested_paths.len()
-                ));
-            }
-            for p in &self.untested_paths {
-                lines.push(format!("  {}", p));
-            }
-        }
-
-        lines.join("\n")
-    }
-
-    fn format_flat_text(&self, pretty: bool) -> String {
-        let kind = match self.graph_target {
-            GraphTarget::Modules => "modules",
-            GraphTarget::Symbols => "symbols",
-            GraphTarget::Types => "types",
-        };
-        let mut out = Vec::new();
-        if pretty {
-            out.push(format!(
-                "{} {} {}",
-                Color::Cyan.bold().paint("# Dependents of"),
-                Color::Default.bold().paint(&self.target),
-                Color::Default.dimmed().paint(format!(
-                    "({} {} depend on it)",
-                    self.dependents.len(),
-                    kind
-                )),
-            ));
-            for dep in &self.dependents {
-                out.push(format!("  {}", Color::White.paint(dep.as_str())));
-            }
-        } else {
-            out.push(format!(
-                "# Dependents of {} ({} {} depend on it)",
-                self.target,
-                self.dependents.len(),
-                kind
-            ));
-            for dep in &self.dependents {
-                out.push(format!("  {}", dep));
-            }
-        }
-        out.join("\n")
-    }
-}
-
-/// Full graph analysis report.
-#[derive(Debug, Serialize, schemars::JsonSchema)]
-pub struct GraphReport {
-    pub target: GraphTarget,
-    pub stats: GraphStats,
-    pub sccs: Vec<Scc>,
-    pub diamonds: Vec<Diamond>,
-    pub bridges: Vec<BridgeEdge>,
-    pub longest_chains: Vec<ImportChain>,
-    pub transitive_edges: Vec<TransitiveEdge>,
-    /// Nodes with no inbound edges (files/symbols that nothing imports/calls).
-    /// Sorted alphabetically. Does not include fully isolated nodes (no edges at all).
-    pub dead_nodes: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -949,484 +665,221 @@ pub fn longest_path_from(
 }
 
 // ---------------------------------------------------------------------------
-// Top-level analysis function
+// Characterization tests
 // ---------------------------------------------------------------------------
+//
+// These pin the CURRENT observable behavior of every pure algorithm so the
+// presentation split (moving report/formatting code into the `normalize` crate)
+// is provably behavior-preserving. Graphs are chosen so results are
+// deterministic despite `HashSet`/`HashMap` iteration-order nondeterminism:
+// unambiguous longest paths, single-witness transitive edges, sorted outputs.
+//
+// `find_longest_chains` is an APPROXIMATE, cycle-tolerant longest-SIMPLE-path
+// heuristic with node-keyed memoization and suffix-dominance dedup — these tests
+// pin its current output, they do NOT assert it is a correct longest-path solver.
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-/// Analyze graph-theoretic properties of an abstract dependency graph.
-///
-/// Takes an adjacency list (`HashMap<String, HashSet<String>>`) and a limit
-/// for the number of items to return in each section. Pass `0` or `usize::MAX`
-/// for no limit — `0` is treated as "unlimited" so callers do not accidentally
-/// truncate all results to empty Vecs while stats counts still reflect the
-/// full data (which would produce misleading reports). The `target` parameter
-/// is recorded in the report for display.
-pub fn analyze_graph_data(
-    imports: &HashMap<String, HashSet<String>>,
-    target: GraphTarget,
-    limit: usize,
-) -> GraphReport {
-    // Treat 0 as "no limit" — callers should pass usize::MAX explicitly when
-    // they want unlimited, but 0 is a common default and should not silently
-    // truncate every result Vec to empty.
-    let limit = if limit == 0 { usize::MAX } else { limit };
-    let nodes = all_nodes(imports);
-    let node_count = nodes.len();
-    let edges = edge_count(imports);
-    let density = if node_count > 1 {
-        edges as f64 / (node_count as f64 * (node_count as f64 - 1.0))
-    } else {
-        0.0
-    };
-
-    let wcc = weakly_connected_components(imports);
-    let wcc_count = wcc.len();
-    let largest_component = wcc.first().map(|c| c.len()).unwrap_or(0);
-
-    let all_sccs = tarjan_sccs(imports);
-    let scc_count = all_sccs.len();
-    let mut sccs = find_sccs(imports);
-    let nontrivial_scc_count = sccs.len();
-
-    let mut diamonds = find_diamonds(
-        imports,
-        if limit == usize::MAX {
-            usize::MAX
-        } else {
-            limit * 10
-        },
-    );
-    let diamond_count = diamonds.len();
-
-    let bridges = find_bridges(imports);
-    let bridge_count = bridges.len();
-
-    let mut longest_chains = find_longest_chains(
-        imports,
-        if limit == usize::MAX {
-            usize::MAX
-        } else {
-            limit
-        },
-    );
-    let max_chain_depth = longest_chains.first().map(|c| c.depth).unwrap_or(0);
-    let chain_count = longest_chains.len();
-
-    let transitive_edge_count = count_transitive_edges(imports);
-    let mut transitive_edges = find_transitive_edges(
-        imports,
-        if limit == usize::MAX {
-            usize::MAX
-        } else {
-            limit
-        },
-    );
-
-    let mut dead_nodes = find_dead_nodes(imports);
-    let dead_node_count = dead_nodes.len();
-
-    // Apply limits
-    sccs.truncate(limit);
-    diamonds.truncate(limit);
-    longest_chains.truncate(limit);
-    transitive_edges.truncate(limit);
-    dead_nodes.truncate(limit);
-
-    let stats = GraphStats {
-        nodes: node_count,
-        edges,
-        density,
-        weakly_connected_components: wcc_count,
-        largest_component_size: largest_component,
-        scc_count,
-        nontrivial_scc_count,
-        diamond_count,
-        bridge_count,
-        transitive_edge_count,
-        max_chain_depth,
-        chain_count,
-        dead_node_count,
-    };
-
-    GraphReport {
-        target,
-        stats,
-        sccs,
-        diamonds,
-        bridges,
-        longest_chains,
-        transitive_edges,
-        dead_nodes,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Output formatting
-// ---------------------------------------------------------------------------
-
-fn truncate_path(path: &str, max_len: usize) -> String {
-    if path.len() <= max_len {
-        path.to_string()
-    } else {
-        // Use char_indices to find a safe character boundary, avoiding a byte-index
-        // slice into a multi-byte UTF-8 sequence which would panic.
-        let suffix = path
-            .char_indices()
-            .rev()
-            .find(|(i, _)| path.len() - i <= max_len - 3)
-            .map(|(i, _)| &path[i..])
-            .unwrap_or(path);
-        format!("...{}", suffix)
-    }
-}
-
-impl OutputFormatter for GraphReport {
-    fn format_text(&self) -> String {
-        let mut out = Vec::new();
-        let s = &self.stats;
-
-        let label = match self.target {
-            GraphTarget::Modules => "Module graph",
-            GraphTarget::Symbols => "Symbol graph",
-            GraphTarget::Types => "Type graph",
-        };
-        out.push(format!(
-            "# {} — {} nodes, {} edges, density {:.3}",
-            label, s.nodes, s.edges, s.density
-        ));
-        out.push(format!(
-            "  {} weakly connected components (largest: {})",
-            s.weakly_connected_components, s.largest_component_size
-        ));
-        out.push(format!(
-            "  {} circular-dependency clusters, {} diamonds, {} bridges, {} transitive edges",
-            s.nontrivial_scc_count, s.diamond_count, s.bridge_count, s.transitive_edge_count
-        ));
-        if s.max_chain_depth > 0 {
-            out.push(format!(
-                "  max chain depth {}, {} deep chains (depth > 2)",
-                s.max_chain_depth, s.chain_count
-            ));
+    /// Build an adjacency list from `(from, to)` edge pairs.
+    fn g(edges: &[(&str, &str)]) -> HashMap<String, HashSet<String>> {
+        let mut m: HashMap<String, HashSet<String>> = HashMap::new();
+        for (a, b) in edges {
+            m.entry(a.to_string()).or_default().insert(b.to_string());
         }
-        if s.dead_node_count > 0 {
-            out.push(format!(
-                "  {} unreferenced nodes (no inbound edges)",
-                s.dead_node_count
-            ));
-        }
-        out.push(String::new());
-
-        if s.nodes == 0 {
-            out.push("No data found. Run `normalize structure rebuild` first.".to_string());
-            return out.join("\n");
-        }
-
-        // SCCs
-        if !self.sccs.is_empty() {
-            out.push(format!(
-                "## Circular dependency clusters ({} SCCs)",
-                self.sccs.len()
-            ));
-            for scc in &self.sccs {
-                let modules: Vec<String> =
-                    scc.modules.iter().map(|m| truncate_path(m, 40)).collect();
-                out.push(format!(
-                    "  [{} modules, {} edges] {}",
-                    scc.modules.len(),
-                    scc.internal_edges,
-                    modules.join(", ")
-                ));
-            }
-            out.push(String::new());
-        }
-
-        // Diamonds
-        if !self.diamonds.is_empty() {
-            out.push(format!(
-                "## Diamond dependencies ({} found)",
-                self.stats.diamond_count
-            ));
-            for d in &self.diamonds {
-                out.push(format!(
-                    "  {} → {{{}, {}}} → {}",
-                    truncate_path(&d.source, 30),
-                    truncate_path(&d.left, 25),
-                    truncate_path(&d.right, 25),
-                    truncate_path(&d.target, 30),
-                ));
-            }
-            out.push(String::new());
-        }
-
-        // Bridges
-        if !self.bridges.is_empty() {
-            out.push(format!(
-                "## Bridge edges ({} critical dependencies)",
-                self.bridges.len()
-            ));
-            for b in &self.bridges {
-                out.push(format!(
-                    "  {} → {}",
-                    truncate_path(&b.from, 40),
-                    truncate_path(&b.to, 40),
-                ));
-            }
-            out.push(String::new());
-        }
-
-        // Longest chains
-        if !self.longest_chains.is_empty() {
-            out.push(format!(
-                "## Deep import chains ({}, max depth {})",
-                self.longest_chains.len(),
-                self.stats.max_chain_depth
-            ));
-            for chain in &self.longest_chains {
-                let short_modules: Vec<String> =
-                    chain.modules.iter().map(|m| truncate_path(m, 30)).collect();
-                out.push(format!(
-                    "  [depth {}] {}",
-                    chain.depth,
-                    short_modules.join(" → ")
-                ));
-            }
-            out.push(String::new());
-        }
-
-        // Transitive edges
-        if !self.transitive_edges.is_empty() {
-            let showing = if self.transitive_edges.len() < self.stats.transitive_edge_count {
-                format!(" (showing {})", self.transitive_edges.len())
-            } else {
-                String::new()
-            };
-            out.push(format!(
-                "## Transitive edges ({} redundant{})",
-                self.stats.transitive_edge_count, showing
-            ));
-            for te in &self.transitive_edges {
-                out.push(format!(
-                    "  {} → {}  (via {})",
-                    truncate_path(&te.from, 30),
-                    truncate_path(&te.to, 30),
-                    truncate_path(&te.via, 30),
-                ));
-            }
-            out.push(String::new());
-        }
-
-        // Dead nodes (no inbound edges)
-        if !self.dead_nodes.is_empty() {
-            let label = match self.target {
-                GraphTarget::Modules => "Unreferenced modules",
-                GraphTarget::Symbols => "Uncalled symbols",
-                GraphTarget::Types => "Unreferenced types",
-            };
-            out.push(format!(
-                "## {} ({} nodes with no inbound edges)",
-                label,
-                self.dead_nodes.len()
-            ));
-            for node in &self.dead_nodes {
-                out.push(format!("  {}", node));
-            }
-            out.push(String::new());
-        }
-
-        out.join("\n")
+        m
     }
 
-    fn format_pretty(&self) -> String {
-        let mut out = Vec::new();
-        let s = &self.stats;
+    #[test]
+    fn all_nodes_and_edge_count() {
+        let graph = g(&[("a", "b"), ("b", "c"), ("a", "c")]);
+        let nodes = all_nodes(&graph);
+        assert_eq!(nodes.len(), 3);
+        assert!(nodes.contains("a") && nodes.contains("b") && nodes.contains("c"));
+        assert_eq!(edge_count(&graph), 3);
+    }
 
-        let label = match self.target {
-            GraphTarget::Modules => "Module graph",
-            GraphTarget::Symbols => "Symbol graph",
-            GraphTarget::Types => "Type graph",
-        };
-        out.push(format!(
-            "\x1b[1;36m# {}\x1b[0m — \x1b[1m{}\x1b[0m nodes, \x1b[1m{}\x1b[0m edges, density \x1b[33m{:.3}\x1b[0m",
-            label, s.nodes, s.edges, s.density
-        ));
-        out.push(format!(
-            "  \x1b[32m{}\x1b[0m weakly connected components (largest: \x1b[1m{}\x1b[0m)",
-            s.weakly_connected_components, s.largest_component_size
-        ));
+    #[test]
+    fn reverse_graph_transposes_edges() {
+        let graph = g(&[("a", "b"), ("a", "c")]);
+        let rev = reverse_graph(&graph);
+        assert_eq!(rev.get("b").unwrap().iter().collect::<Vec<_>>(), vec!["a"]);
+        assert_eq!(rev.get("c").unwrap().iter().collect::<Vec<_>>(), vec!["a"]);
+        assert!(!rev.contains_key("a"));
+    }
 
-        let scc_color = if s.nontrivial_scc_count > 0 {
-            "\x1b[1;31m"
-        } else {
-            "\x1b[32m"
-        };
-        let diamond_color = if s.diamond_count > 0 {
-            "\x1b[33m"
-        } else {
-            "\x1b[32m"
-        };
-        let bridge_color = if s.bridge_count > 0 {
-            "\x1b[1;33m"
-        } else {
-            "\x1b[32m"
-        };
-        let trans_color = if s.transitive_edge_count > 0 {
-            "\x1b[33m"
-        } else {
-            "\x1b[32m"
-        };
+    #[test]
+    fn find_dependents_reverse_bfs_sorted() {
+        // a -> b -> c ; d -> c
+        let graph = g(&[("a", "b"), ("b", "c"), ("d", "c")]);
+        assert_eq!(find_dependents(&graph, "c"), vec!["a", "b", "d"]);
+        assert_eq!(find_dependents(&graph, "b"), vec!["a"]);
+        assert!(find_dependents(&graph, "a").is_empty());
+    }
 
-        out.push(format!(
-            "  {}{}\x1b[0m circular-dependency clusters, {}{}\x1b[0m diamonds, {}{}\x1b[0m bridges, {}{}\x1b[0m transitive edges",
-            scc_color, s.nontrivial_scc_count,
-            diamond_color, s.diamond_count,
-            bridge_color, s.bridge_count,
-            trans_color, s.transitive_edge_count,
-        ));
-        if s.max_chain_depth > 0 {
-            let depth_color = if s.max_chain_depth >= 5 {
-                "\x1b[1;31m"
-            } else if s.max_chain_depth >= 3 {
-                "\x1b[33m"
-            } else {
-                "\x1b[32m"
-            };
-            out.push(format!(
-                "  max chain depth {}{}\x1b[0m, {} deep chains (depth > 2)",
-                depth_color, s.max_chain_depth, s.chain_count
-            ));
-        }
-        if s.dead_node_count > 0 {
-            out.push(format!(
-                "  \x1b[2m{} unreferenced nodes (no inbound edges)\x1b[0m",
-                s.dead_node_count
-            ));
-        }
-        out.push(String::new());
+    #[test]
+    fn find_dead_nodes_no_inbound_with_outbound() {
+        // a and d have no inbound edges; c has no outbound so is not "dead" here.
+        let graph = g(&[("a", "b"), ("b", "c"), ("d", "b")]);
+        assert_eq!(find_dead_nodes(&graph), vec!["a", "d"]);
+    }
 
-        if s.nodes == 0 {
-            out.push("No data found. Run `normalize structure rebuild` first.".to_string());
-            return out.join("\n");
-        }
+    #[test]
+    fn weakly_connected_components_two_islands() {
+        // {a,b,c} and {x,y}
+        let graph = g(&[("a", "b"), ("b", "c"), ("x", "y")]);
+        let wcc = weakly_connected_components(&graph);
+        assert_eq!(wcc.len(), 2);
+        assert_eq!(wcc[0], vec!["a", "b", "c"]); // largest first, members sorted
+        assert_eq!(wcc[1], vec!["x", "y"]);
+    }
 
-        // SCCs
-        if !self.sccs.is_empty() {
-            out.push(format!(
-                "\x1b[1;31m## Circular dependency clusters ({} SCCs)\x1b[0m",
-                self.sccs.len()
-            ));
-            for scc in &self.sccs {
-                let modules: Vec<String> =
-                    scc.modules.iter().map(|m| truncate_path(m, 40)).collect();
-                out.push(format!(
-                    "  \x1b[31m[{} modules, {} edges]\x1b[0m {}",
-                    scc.modules.len(),
-                    scc.internal_edges,
-                    modules.join(", ")
-                ));
-            }
-            out.push(String::new());
-        }
+    #[test]
+    fn tarjan_and_find_sccs_current_behavior() {
+        // KNOWN BUG being characterized (NOT endorsed): the iterative Tarjan
+        // pushes its `Frame::Resume(node, "")` sentinel AFTER the neighbor
+        // frames, so the SCC-root check runs before children update `lowlink`.
+        // Consequence: `tarjan_sccs` returns ALL singletons even for a real
+        // cycle, so `find_sccs` (circular-dependency detection) always returns
+        // empty. This test pins that current output so the presentation split
+        // is provably behavior-preserving; it does NOT assert correctness.
+        // See TODO.md "tarjan_sccs is broken" for the fix (a separate change).
+        let graph = g(&[("a", "b"), ("b", "c"), ("c", "a"), ("c", "d")]);
+        assert!(
+            find_sccs(&graph).is_empty(),
+            "current (buggy) behavior: no SCC detected"
+        );
+        // Every node is reported as its own trivial SCC.
+        assert_eq!(tarjan_sccs(&graph).len(), 4);
+        // A correct Tarjan would instead group {a,b,c}; pin the singleton bug.
+        let two = g(&[("a", "b"), ("b", "a")]);
+        assert_eq!(tarjan_sccs(&two).len(), 2);
+        assert!(find_sccs(&two).is_empty());
+    }
 
-        // Diamonds
-        if !self.diamonds.is_empty() {
-            out.push(format!(
-                "\x1b[1;33m## Diamond dependencies ({} found)\x1b[0m",
-                self.stats.diamond_count
-            ));
-            for d in &self.diamonds {
-                out.push(format!(
-                    "  {} \x1b[33m→\x1b[0m {{{}, {}}} \x1b[33m→\x1b[0m {}",
-                    truncate_path(&d.source, 30),
-                    truncate_path(&d.left, 25),
-                    truncate_path(&d.right, 25),
-                    truncate_path(&d.target, 30),
-                ));
-            }
-            out.push(String::new());
-        }
+    #[test]
+    fn find_diamonds_strict_motif() {
+        // S -> {L, R} -> T
+        let graph = g(&[("S", "L"), ("S", "R"), ("L", "T"), ("R", "T")]);
+        let diamonds = find_diamonds(&graph, usize::MAX);
+        assert_eq!(diamonds.len(), 1);
+        let d = &diamonds[0];
+        assert_eq!(
+            (
+                d.source.as_str(),
+                d.left.as_str(),
+                d.right.as_str(),
+                d.target.as_str()
+            ),
+            ("S", "L", "R", "T")
+        );
+    }
 
-        // Bridges
-        if !self.bridges.is_empty() {
-            out.push(format!(
-                "\x1b[1;33m## Bridge edges ({} critical dependencies)\x1b[0m",
-                self.bridges.len()
-            ));
-            for b in &self.bridges {
-                out.push(format!(
-                    "  {} \x1b[1;33m→\x1b[0m {}",
-                    truncate_path(&b.from, 40),
-                    truncate_path(&b.to, 40),
-                ));
-            }
-            out.push(String::new());
-        }
+    #[test]
+    fn find_diamonds_limit_caps_count() {
+        // Two independent diamonds; limit=1 returns only the first (by sorted source).
+        let graph = g(&[
+            ("A", "L1"),
+            ("A", "R1"),
+            ("L1", "T1"),
+            ("R1", "T1"),
+            ("B", "L2"),
+            ("B", "R2"),
+            ("L2", "T2"),
+            ("R2", "T2"),
+        ]);
+        assert_eq!(find_diamonds(&graph, usize::MAX).len(), 2);
+        let capped = find_diamonds(&graph, 1);
+        assert_eq!(capped.len(), 1);
+        assert_eq!(capped[0].source, "A");
+    }
 
-        // Longest chains
-        if !self.longest_chains.is_empty() {
-            out.push(format!(
-                "\x1b[1m## Deep import chains ({}, max depth {})\x1b[0m",
-                self.longest_chains.len(),
-                self.stats.max_chain_depth
-            ));
-            for chain in &self.longest_chains {
-                let short_modules: Vec<String> =
-                    chain.modules.iter().map(|m| truncate_path(m, 30)).collect();
-                let depth_color = if chain.depth >= 5 {
-                    "\x1b[1;31m"
-                } else if chain.depth >= 3 {
-                    "\x1b[33m"
-                } else {
-                    "\x1b[32m"
-                };
-                out.push(format!(
-                    "  {}[depth {}]\x1b[0m {}",
-                    depth_color,
-                    chain.depth,
-                    short_modules.join(" \x1b[2m→\x1b[0m ")
-                ));
-            }
-            out.push(String::new());
-        }
+    #[test]
+    fn find_bridges_linear_chain_all_bridges() {
+        // Each unidirectional edge in a tree is a bridge.
+        let graph = g(&[("a", "b"), ("b", "c")]);
+        let bridges = find_bridges(&graph);
+        let pairs: Vec<(String, String)> = bridges
+            .iter()
+            .map(|b| (b.from.clone(), b.to.clone()))
+            .collect();
+        assert_eq!(
+            pairs,
+            vec![("a".into(), "b".into()), ("b".into(), "c".into())]
+        );
+    }
 
-        // Transitive edges
-        if !self.transitive_edges.is_empty() {
-            let showing = if self.transitive_edges.len() < self.stats.transitive_edge_count {
-                format!(" (showing {})", self.transitive_edges.len())
-            } else {
-                String::new()
-            };
-            out.push(format!(
-                "\x1b[33m## Transitive edges ({} redundant{})\x1b[0m",
-                self.stats.transitive_edge_count, showing
-            ));
-            for te in &self.transitive_edges {
-                out.push(format!(
-                    "  {} → {}  \x1b[2m(via {})\x1b[0m",
-                    truncate_path(&te.from, 30),
-                    truncate_path(&te.to, 30),
-                    truncate_path(&te.via, 30),
-                ));
-            }
-            out.push(String::new());
-        }
+    #[test]
+    fn find_bridges_excludes_bidirectional_and_cycle() {
+        // A 3-cycle has no bridges; a bidirectional edge is not a bridge.
+        let cycle = g(&[("a", "b"), ("b", "c"), ("c", "a")]);
+        assert!(find_bridges(&cycle).is_empty());
+        let bidir = g(&[("a", "b"), ("b", "a")]);
+        assert!(find_bridges(&bidir).is_empty());
+    }
 
-        // Dead nodes (no inbound edges)
-        if !self.dead_nodes.is_empty() {
-            let label = match self.target {
-                GraphTarget::Modules => "Unreferenced modules",
-                GraphTarget::Symbols => "Uncalled symbols",
-                GraphTarget::Types => "Unreferenced types",
-            };
-            out.push(format!(
-                "\x1b[2m## {} ({} with no inbound edges)\x1b[0m",
-                label,
-                self.dead_nodes.len()
-            ));
-            for node in &self.dead_nodes {
-                out.push(format!("  \x1b[2m{}\x1b[0m", node));
-            }
-            out.push(String::new());
-        }
+    #[test]
+    fn transitive_edges_single_witness() {
+        // A->B, A->C, B->C : A->C is redundant via B.
+        let graph = g(&[("A", "B"), ("A", "C"), ("B", "C")]);
+        let te = find_transitive_edges(&graph, usize::MAX);
+        assert_eq!(te.len(), 1);
+        assert_eq!(
+            (te[0].from.as_str(), te[0].to.as_str(), te[0].via.as_str()),
+            ("A", "C", "B")
+        );
+        assert_eq!(count_transitive_edges(&graph), 1);
+    }
 
-        out.join("\n")
+    #[test]
+    fn longest_chains_linear() {
+        // a->b->c->d->e : one chain of depth 4 (5 nodes).
+        let graph = g(&[("a", "b"), ("b", "c"), ("c", "d"), ("d", "e")]);
+        let chains = find_longest_chains(&graph, usize::MAX);
+        assert_eq!(chains.len(), 1);
+        assert_eq!(chains[0].depth, 4);
+        assert_eq!(chains[0].modules, vec!["a", "b", "c", "d", "e"]);
+    }
+
+    #[test]
+    fn longest_chains_below_threshold_excluded() {
+        // a->b->c is only 3 nodes (< MIN_CHAIN_NODE_COUNT = 4): no chains.
+        let graph = g(&[("a", "b"), ("b", "c")]);
+        assert!(find_longest_chains(&graph, usize::MAX).is_empty());
+    }
+
+    #[test]
+    fn longest_chains_cycle_tolerant() {
+        // Cycle tolerance: `find_longest_chains` must terminate on cyclic input
+        // (no infinite recursion) rather than hang. A pure 3-cycle yields only
+        // 3-node simple paths, all below MIN_CHAIN_NODE_COUNT = 4, so the result
+        // is deterministically empty regardless of start order.
+        let cycle = g(&[("a", "b"), ("b", "c"), ("c", "a")]);
+        assert!(find_longest_chains(&cycle, usize::MAX).is_empty());
+
+        // A linear chain co-existing with a disjoint 2-cycle: the algorithm
+        // tolerates the cycle and still deterministically reports the linear
+        // chain [a,b,c,d,e] (depth 4). The 2-cycle {x,y} contributes only
+        // 2-node paths (excluded).
+        //
+        // NOTE: a chain routed *through* cycle nodes is intentionally NOT pinned
+        // here — it is nondeterministic by design. The node-keyed APPROXIMATE
+        // memoization caches whichever (possibly suboptimal) path first reaches a
+        // cycle node, so the winning chain's length/membership varies with
+        // HashMap start-order. That approximation is characterized behavior, not
+        // a bug to "fix"; pinning it would require a determinism guarantee the
+        // heuristic does not make.
+        let mixed = g(&[
+            ("a", "b"),
+            ("b", "c"),
+            ("c", "d"),
+            ("d", "e"),
+            ("x", "y"),
+            ("y", "x"),
+        ]);
+        let chains = find_longest_chains(&mixed, usize::MAX);
+        assert_eq!(chains.len(), 1);
+        assert_eq!(chains[0].depth, 4);
+        assert_eq!(chains[0].modules, vec!["a", "b", "c", "d", "e"]);
     }
 }

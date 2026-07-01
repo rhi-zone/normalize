@@ -10,15 +10,15 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 Three live threads from the 2026-06-29/07-01 session — verify state before acting:
 
-- **CLI taxonomy inversion (B2–B12)**: most batches blocked on the graph-crate split below; only B0+B1 have landed. See [CLI command-taxonomy FULL INVERSION](#cli-command-taxonomy-full-inversion--seam-corrected-final-scope-high-priority) below.
-- **Graph-crate split**: decided in principle, deferred to a focused effort. Decision record at `docs/artifacts/cli-taxonomy-2026-06-29/DECISION-graph-crate.md`. Open questions: trait-based vs closure-based generic API, own repo vs workspace crate. This unblocks B2 and B3. See [Graph crate extraction](#graph-crate-extraction-decided-deferred--prerequisite-for-b2b3) below.
+- **CLI taxonomy inversion (B2–B12)**: B0+B1 landed; the graph-crate blocker on B2/B3 is now resolved (see below). See [CLI command-taxonomy FULL INVERSION](#cli-command-taxonomy-full-inversion--seam-corrected-final-scope-high-priority) below.
+- **Graph-crate split**: ✅ RESOLVED 2026-07-02 — refactored `normalize-graph` in place (pure algorithms split from presentation; deps `normalize-output`/`nu-ansi-term` dropped; characterization tests added). No standalone crate, no node-type genericization. Decision record (superseded resolution at top): `docs/artifacts/cli-taxonomy-2026-06-29/DECISION-graph-crate.md`. This unblocks B2 and B3. See [Graph crate refactor](#graph-crate-refactor-resolved-2026-07-02) below.
 - **Main-crate decomposition audit**: no systematic audit of `crates/normalize/src/` has been run — only three surfaces spot-checked. Advisory; may or may not be worth prioritizing. See [Main-crate decomposition audit](#main-crate-decomposition-audit-not-yet-done) below.
 
 ---
 
 ## CLI Taxonomy Migration
 
-B0 (guide-regression test, CLAUDE.md crate count) and B1 (`normalize-git` extraction) have landed. B2–B12 are **blocked on the graph-crate split** (see above and the FULL INVERSION section below for details). The `#[cli(alias)]` server-less prereq is a separate server-less task; it does not block batches that don't move verbs yet.
+B0 (guide-regression test, CLAUDE.md crate count) and B1 (`normalize-git` extraction) have landed. The graph-crate blocker on B2/B3 is **resolved** (2026-07-02, refactor-in-place — see below); B2–B12 can now proceed. The `#[cli(alias)]` server-less prereq is a separate server-less task; it does not block batches that don't move verbs yet.
 
 ## Follow-ups (2026-06-29 branch consolidation)
 
@@ -763,13 +763,15 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   (budget, ratchet, semantic, main crate); budget/ratchet git_ops.rs → thin re-export wrappers;
   semantic git_staleness.rs uses normalize_git::open_repo; main git_utils.rs → pub use normalize_git::*.
 - [ ] **B2 — `graph`:** gate `OutputFormatter` behind `cli` feature; add `GraphService`;
-  mount; move `view graph`/`dependents`/`import-path`. **BLOCKED on graph-crate split
-  (see "Graph crate extraction" below)** — the split defines which types stay in
-  normalize-graph, what the `cli` feature gates, and where `OutputFormatter` impls live.
+  mount; move `view graph`/`dependents`/`import-path`. **UNBLOCKED (2026-07-02).** The graph
+  refactor settled the boundary: `normalize-graph` is pure algorithms + plain result types;
+  the report structs, `GraphTarget`, and `OutputFormatter` impls now live in
+  `crates/normalize/src/commands/analyze/graph.rs`. B2 relocates that presentation into a
+  `graph` verb/service.
 - [ ] **B3 — `architecture`:** move 3 reports into crate; `cli` feature + service; mount
-  (`architecture`, `depth-map`, `layering`). **BLOCKED on graph-crate split (same reason
-  as B2** — `ImportGraph`/`build_import_graph` placement and the `find_longest_chains`
-  duplication must be resolved first).
+  (`architecture`, `depth-map`, `layering`). **UNBLOCKED (2026-07-02).** The
+  `find_longest_chains` duplication was already killed and the graph boundary is resolved;
+  `ImportGraph`/`build_import_graph` placement is the remaining B3-local decision.
 - [ ] **B4 — `similarity`:** move duplicates/duplicate-types/fragments reports; service; mount.
 - [ ] **B5 — `structure` fix + dataflow:** mount real `FactsCliService` (rename→`structure`);
   delete main-crate `service/facts.rs` dup; absorb `liveness`/`effects`/`exceptions`;
@@ -801,47 +803,44 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
 - The old open questions ("where do big-picture commands live", "does analyze dissolve")
   are now answered: `health/summary/all`→`overview`; `analyze` dissolves entirely.
 
-### Graph crate extraction (decided, deferred — prerequisite for B2/B3)
+### Graph crate refactor (RESOLVED 2026-07-02)
 
-**Decision (2026-07-01): separate the generic and normalize-flavored halves of
-`normalize-graph`.** Decision record: `docs/artifacts/cli-taxonomy-2026-06-29/DECISION-graph-crate.md`.
-Evidence: `graph-crate-reality.md`, `graph-crate-justification.md` (same dir).
+**Resolved: refactor `normalize-graph` in place — no standalone crate, no node-type
+genericization.** Decision record (with the superseding resolution at its top):
+`docs/artifacts/cli-taxonomy-2026-06-29/DECISION-graph-crate.md`.
 
-**User has green-lit (in principle) spinning the generic half out to its own crate/repo.**
+Why the earlier "spin the generic half into its own crate" plan was dropped: a
+petgraph/ecosystem survey found **no plumbing gap** — petgraph's `Visitable`/`VisitMap` +
+trait-generic algorithms already give bring-your-own-node-type; `pathfinding` gives
+closure-based SCC over raw `HashMap`s. `find_longest_chains` is an admitted APPROXIMATE
+heuristic (correct DAG-longest-path exists in rustworkx-core), so it stays internal.
+Motif/diamond detection is a real ecosystem gap but the coupling cost of an external dep for
+one ~50-line algorithm isn't worth it — normalize keeps its own `find_diamonds`. Every caller
+uses `String`, so genericizing over node type served only the abandoned standalone ambition.
 
-The clean boundary:
-- **Generic half** → datatype-agnostic graph-algorithm functions, generic over node type /
-  a minimal "neighbors" interface (bring-your-own-representation, NOT a Graph container).
-  Zero normalize dependencies. Includes the algorithms petgraph lacks: diamond detection,
-  longest-path-with-suffix-dedup, directional bridge filter.
-- **Normalize-flavored half** → moves to the dependency-analysis callers: `GraphTarget`,
-  `DependentEntry.has_tests`/`fan_in` enrichment, `BlastRadius`, `GraphReport`/
-  `DependentsReport`, all `OutputFormatter` impls, and edge-production (→ normalize-facts,
-  which owns the index).
-- **Kill duplication:** ✅ RESOLVED 2026-07-01 (independently of the split). The
-  `find_longest_chains`/`longest_path_from` duplicates were deleted from
-  normalize-architecture and the canonical versions re-exported from normalize-graph. The
-  "slightly different thresholds" turned out cosmetic (`> 3` ≡ `>= MIN_CHAIN_NODE_COUNT=4`);
-  the duplicate had no callers. Pure internal dedup, no behavior change.
+Done:
+- [x] Characterization test suite added to `normalize-graph` (14 tests, deterministic).
+- [x] Split presentation out: `GraphTarget`/`GraphStats`/`GraphReport`/`DependentsReport` +
+      `OutputFormatter` impls + `assemble_graph_report` moved to
+      `crates/normalize/src/commands/analyze/graph.rs`. `normalize-graph` dropped
+      `normalize-output` and `nu-ansi-term` deps — now genuinely pure algorithms.
+- [x] Dead duplicate `find_longest_chains`/`longest_path_from` already removed from
+      normalize-architecture (re-exports the canonical versions).
+- [x] Behavior preserved (clippy clean, tests green); B2/B3 unblocked.
 
-**This is a PREREQUISITE for B2 and B3** — those batches cannot cleanly land until the
-boundary is resolved (it determines what normalize-graph's `cli` feature gates, what
-`GraphService` exposes, and where `OutputFormatter` impls live).
-
-**Not to execute mid-taxonomy migration.** This is a deliberate standalone project
-requiring: API design (trait-based vs. plain generic functions over neighbors-closure);
-positioning vs. petgraph / pathfinding crate; repo-vs-workspace decision; naming (user
-decides). Design it twice before building.
-
-- [ ] Design the generic-half API (trait-based vs. closure-based; two independent designs)
-- [ ] Decide: standalone repo vs. workspace crate with `publish = true`
-- [ ] Execute the split: extract generic half, move normalize-flavored pieces to callers
-      (`find_longest_chains` duplication already killed 2026-07-01)
-- [ ] B2 and B3 can proceed after the split is done
+Follow-up discovered during the refactor:
+- [ ] **BUG: `tarjan_sccs` is broken — returns all singletons for real cycles**, so
+      `find_sccs` (circular-dependency clusters in `view graph`) always returns empty. Root
+      cause: the iterative Tarjan pushes its `Frame::Resume(node, "")` sentinel AFTER the
+      neighbor frames, so the SCC-root check (`lowlink == index`) runs before children update
+      `lowlink`. The characterization test `tarjan_and_find_sccs_current_behavior` PINS the
+      current (buggy) output — fix it and update that test together. Fixing likely means
+      pushing the sentinel FIRST (before neighbor frames) or restructuring the frame protocol.
+      Verify against a 3-cycle (`a→b→c→a` should be one SCC) and the self-loop case.
 
 ### Main-crate decomposition audit (not yet done)
 
-Systematically enumerate everything in `crates/normalize/src/` (analyze/, commands/, service/, index, etc.) and classify each as (a) legitimate CLI wiring [service layer, dispatch, output formatting — belongs in main] vs (b) domain logic that violates "domain logic belongs in a crate, not normalize" and should be extracted [against the strict crate bar: multiple workspace dependents OR clearly-useful-standalone]. Known-undecomposed already found via spot-checks: the metric core (src/analyze/ complexity/length/ceremony/density — judged not-one-clean-crate but may need a different cut), git-history analysis (queued as normalize-git-history), graph analysis (deferred, see DECISION-graph-crate.md). The full audit has NOT been run — only three surfaces spot-checked because the taxonomy work walked into them. This is the real answer to "is the main CLI fully decomposed" — it is not.
+Systematically enumerate everything in `crates/normalize/src/` (analyze/, commands/, service/, index, etc.) and classify each as (a) legitimate CLI wiring [service layer, dispatch, output formatting — belongs in main] vs (b) domain logic that violates "domain logic belongs in a crate, not normalize" and should be extracted [against the strict crate bar: multiple workspace dependents OR clearly-useful-standalone]. Known-undecomposed already found via spot-checks: the metric core (src/analyze/ complexity/length/ceremony/density — judged not-one-clean-crate but may need a different cut), git-history analysis (queued as normalize-git-history), graph analysis (resolved 2026-07-02 — refactored in place, presentation now correctly in the main crate; see DECISION-graph-crate.md). The full audit has NOT been run — only three surfaces spot-checked because the taxonomy work walked into them. This is the real answer to "is the main CLI fully decomposed" — it is not.
 
 - [ ] Enumerate all modules in `crates/normalize/src/` and classify each as wiring vs. domain logic
 - [ ] For any domain-logic module: evaluate against the strict crate bar (multiple dependents OR clearly-useful-standalone)

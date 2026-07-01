@@ -1,8 +1,50 @@
 # Decision Record: normalize-graph Crate Architecture
 
 **Decided:** 2026-07-01
-**Status:** DECIDED IN PRINCIPLE — DEFERRED (not to execute mid-taxonomy migration)
+**Resolved:** 2026-07-02
+**Status:** RESOLVED — refactored in place (no standalone crate; no node-type genericization)
 **Evidence artifacts:** `graph-crate-reality.md`, `graph-crate-justification.md`
+
+---
+
+## Resolution (2026-07-02) — supersedes the "separate the halves / defer" framing below
+
+A petgraph/ecosystem capability survey closed the question the opposite way to the
+original "spin the generic half into its own crate" plan:
+
+- **No plumbing gap over the existing ecosystem.** petgraph's `Visitable`/`VisitMap` +
+  trait-generic algorithms already provide bring-your-own-node-type with optimal per-type
+  visit maps; the `pathfinding` crate provides a ~5-line closure-based SCC directly over raw
+  `HashMap`s. There is no missing "generic graph-algorithms crate" for normalize to build.
+- **`find_longest_chains` is an admitted APPROXIMATE, normalize-flavored heuristic** — a
+  cycle-tolerant longest-*simple*-path DFS with node-keyed memoization and suffix-dominance
+  dedup, whose through-cycle output is order-dependent by design. It is *not* a correct
+  longest-path algorithm (correct DAG-longest-path already exists in rustworkx-core). It
+  stays internal; extracting it would advertise a correctness it does not have.
+- **Motif/diamond detection IS a genuine ecosystem gap** (only exact VF2 subgraph
+  isomorphism exists in Rust). It *could* be a worthwhile INDEPENDENT library — but it is
+  deliberately NOT extracted from normalize and NOT made a normalize dependency: the coupling
+  cost of an external dep for one ~50-line algorithm dwarfs the benefit. normalize keeps its
+  own `find_diamonds`.
+
+**Resolution: refactor `normalize-graph` in place.** Split pure algorithms from
+presentation (report structs, `GraphTarget`, `OutputFormatter` impls, `assemble_graph_report`
+moved to `crates/normalize/src/commands/analyze/graph.rs`); `normalize-graph` drops its
+`normalize-output` and `nu-ansi-term` deps and is now genuinely "pure algorithms, no
+normalize types"; the dead duplicate `find_longest_chains` was already removed from
+`normalize-architecture`; a `#[cfg(test)]` characterization suite now pins behavior.
+
+**Node-type genericization is DROPPED.** Every caller uses `String`; the datatype-agnostic
+goal only served the abandoned standalone-crate ambition. No standalone crate will be built.
+
+The refactor also **surfaced a pre-existing bug**: the iterative `tarjan_sccs` runs its
+SCC-root check before children update `lowlink` (sentinel push-order), so it returns all
+singletons and `find_sccs` never reports a circular-dependency cluster. Characterized (pinned)
+but not fixed here; tracked in `TODO.md`.
+
+The material below is the ORIGINAL 2026-07-01 record, retained for provenance. Where it says
+"separate the generic half into its own crate" / "genericize over node type" / "DEFERRED",
+read it as superseded by the resolution above.
 
 ---
 

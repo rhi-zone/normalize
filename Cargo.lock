@@ -5636,8 +5636,6 @@ dependencies = [
 name = "normalize-graph"
 version = "0.3.2"
 dependencies = [
- "normalize-output",
- "nu-ansi-term",
  "schemars",
  "serde",
 ]
