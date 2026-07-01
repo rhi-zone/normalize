@@ -874,9 +874,12 @@ legit wiring; latent: dual "parallelization savings" vocab, `module_health.rs` v
   `commands/analyze/liveness.rs` and `normalize-refactor/src/extract_function.rs` both rewired to
   it; the near-verbatim `compute_liveness` copy + 4 duplicated loaders deleted from refactor.
   `BlockLiveness`/`LivenessReport` + OutputFormatter stayed in main. Pure dedup, user-invisible.
-- [ ] **D2 — LSH candidate-pair loop → `normalize-code-similarity`**: collapse the 3×
-  copy-pasted band-bucket/emit/dedup loop (`duplicates.rs` ~937-985, ~1648-1668;
-  `fragments.rs` ~587-620) beside `lsh_band_hash`. ~25 LOC. Effort S / risk S.
+- [x] **D2 — LSH candidate-pair loop → `normalize-code-similarity`** (2026-07-02): added
+  `lsh_candidate_pairs(&[[u64; MINHASH_N]]) -> Vec<(usize, usize)>` (parallel per-band
+  bucketing + merge/dedup, rayon) beside `lsh_band_hash`, with unit tests. Rewired all 3
+  call sites (`duplicates.rs` functions + blocks pipelines, `fragments.rs::group_fuzzy`);
+  command-specific scoring/thresholding stays in main. The blocks site's serial single-map
+  variant now shares the parallel path — same candidate set. Pure dedup, user-invisible.
 - [ ] **D3 — dedup hand-rolled `UnionFind`**: collapse `clusters.rs:48-79` and
   `duplicates.rs:577-604` onto existing `normalize_code_similarity::UnionFind`. Effort S / trivial.
 - [ ] **D4 — `aggregate_sessions` fold → `normalize-session-analysis`**: move the

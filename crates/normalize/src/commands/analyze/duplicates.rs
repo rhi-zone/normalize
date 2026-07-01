@@ -7,8 +7,8 @@ use crate::output::OutputFormatter;
 use crate::parsers;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use normalize_code_similarity::{
-    LSH_BANDS, MINHASH_N, SHINGLE_K, compute_function_hash, compute_minhash, find_function_node,
-    flatten_symbols, jaccard_estimate, lsh_band_hash, serialize_subtree_tokens,
+    MINHASH_N, SHINGLE_K, compute_function_hash, compute_minhash, find_function_node,
+    flatten_symbols, jaccard_estimate, lsh_candidate_pairs, serialize_subtree_tokens,
 };
 use normalize_languages::support_for_path;
 use rayon::prelude::*;
@@ -936,44 +936,9 @@ pub(crate) fn find_similar_function_pairs(
 
     let functions_analyzed = all_fns.len();
 
-    // LSH bucketing + candidate generation (parallelized per band).
-    // Each band independently collects candidate pairs, then we merge and deduplicate.
-    let band_candidates: Vec<Vec<(usize, usize)>> = (0..LSH_BANDS)
-        .into_par_iter()
-        .map(|band| {
-            // Build buckets for this band only.
-            let mut buckets: HashMap<u64, Vec<usize>> = HashMap::new();
-            for (idx, (_, _, _, _, sig)) in all_fns.iter().enumerate() {
-                let bh = lsh_band_hash(sig, band);
-                buckets.entry(bh).or_default().push(idx);
-            }
-            // Generate candidate pairs from buckets.
-            let mut pairs = Vec::new();
-            for bucket in buckets.values() {
-                if bucket.len() < 2 {
-                    continue;
-                }
-                for i in 0..bucket.len() {
-                    for j in i + 1..bucket.len() {
-                        let (a, b) = (bucket[i].min(bucket[j]), bucket[i].max(bucket[j]));
-                        pairs.push((a, b));
-                    }
-                }
-            }
-            pairs
-        })
-        .collect();
-
-    // Merge and deduplicate candidates across bands.
-    let mut seen: HashSet<(usize, usize)> = HashSet::new();
-    let mut candidates: Vec<(usize, usize)> = Vec::new();
-    for band_pairs in band_candidates {
-        for pair in band_pairs {
-            if seen.insert(pair) {
-                candidates.push(pair);
-            }
-        }
-    }
+    // LSH bucketing + candidate generation.
+    let signatures: Vec<[u64; MINHASH_N]> = all_fns.iter().map(|(_, _, _, _, sig)| *sig).collect();
+    let candidates = lsh_candidate_pairs(&signatures);
 
     // Score and filter (parallel — can be 90K+ candidates).
     let mut pairs: Vec<SimilarFunctionPair> = candidates
@@ -1645,30 +1610,8 @@ pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> DuplicatesRe
 
     let blocks_analyzed = all_blocks.len();
 
-    let mut band_buckets: HashMap<u64, Vec<usize>> = HashMap::new();
-    for (idx, (_, sig)) in all_blocks.iter().enumerate() {
-        for band in 0..LSH_BANDS {
-            let bh = lsh_band_hash(sig, band);
-            let key = bh.wrapping_add((band as u64).wrapping_mul(0x9e3779b97f4a7c15));
-            band_buckets.entry(key).or_default().push(idx);
-        }
-    }
-
-    let mut seen: HashSet<(usize, usize)> = HashSet::new();
-    let mut candidates: Vec<(usize, usize)> = Vec::new();
-    for bucket in band_buckets.values() {
-        if bucket.len() < 2 {
-            continue;
-        }
-        for i in 0..bucket.len() {
-            for j in i + 1..bucket.len() {
-                let (a, b) = (bucket[i].min(bucket[j]), bucket[i].max(bucket[j]));
-                if seen.insert((a, b)) {
-                    candidates.push((a, b));
-                }
-            }
-        }
-    }
+    let signatures: Vec<[u64; MINHASH_N]> = all_blocks.iter().map(|(_, sig)| *sig).collect();
+    let candidates = lsh_candidate_pairs(&signatures);
 
     let mut pairs: Vec<SimilarBlockPair> = candidates
         .into_iter()

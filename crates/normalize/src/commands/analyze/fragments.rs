@@ -10,8 +10,8 @@
 use crate::extract::Extractor;
 use crate::output::OutputFormatter;
 use normalize_code_similarity::{
-    LSH_BANDS, MINHASH_N, UnionFind, compute_minhash, find_function_node, flatten_symbols,
-    jaccard_estimate, lsh_band_hash, serialize_subtree_tokens,
+    MINHASH_N, UnionFind, compute_minhash, find_function_node, flatten_symbols, jaccard_estimate,
+    lsh_candidate_pairs, serialize_subtree_tokens,
 };
 use normalize_languages::{parsers, support_for_path};
 use rayon::prelude::*;
@@ -583,40 +583,8 @@ fn group_fuzzy(fragments: &[Fragment], similarity: f64) -> FuzzyGroups {
         .map(|f| compute_minhash(&f.tokens))
         .collect();
 
-    // LSH bucketing
-    let band_candidates: Vec<Vec<(usize, usize)>> = (0..LSH_BANDS)
-        .into_par_iter()
-        .map(|band| {
-            let mut buckets: HashMap<u64, Vec<usize>> = HashMap::new();
-            for (idx, sig) in sigs.iter().enumerate() {
-                let bh = lsh_band_hash(sig, band);
-                buckets.entry(bh).or_default().push(idx);
-            }
-            let mut pairs = Vec::new();
-            for bucket in buckets.values() {
-                if bucket.len() < 2 {
-                    continue;
-                }
-                for i in 0..bucket.len() {
-                    for j in i + 1..bucket.len() {
-                        let (a, b) = (bucket[i].min(bucket[j]), bucket[i].max(bucket[j]));
-                        pairs.push((a, b));
-                    }
-                }
-            }
-            pairs
-        })
-        .collect();
-
-    let mut seen = std::collections::HashSet::new();
-    let mut candidates = Vec::new();
-    for band_pairs in band_candidates {
-        for pair in band_pairs {
-            if seen.insert(pair) {
-                candidates.push(pair);
-            }
-        }
-    }
+    // LSH bucketing + candidate generation.
+    let candidates = lsh_candidate_pairs(&sigs);
 
     let mut uf = UnionFind::new(fragments.len());
     let mut pair_sims: HashMap<(usize, usize), f64> = HashMap::new();

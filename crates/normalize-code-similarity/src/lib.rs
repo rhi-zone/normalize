@@ -63,6 +63,51 @@ pub fn lsh_band_hash(sig: &[u64; MINHASH_N], band: usize) -> u64 {
     h.finish()
 }
 
+/// Generate LSH candidate pairs from a slice of MinHash signatures.
+///
+/// Buckets the signatures per band (via [`lsh_band_hash`]), emits every
+/// within-bucket unordered pair `(i, j)` with `i < j`, then merges and
+/// deduplicates the pairs across all bands. The result is the candidate set to
+/// feed into a similarity scoring/thresholding pass; scoring is intentionally
+/// left to the caller. Band bucketing is parallelized across [`LSH_BANDS`].
+pub fn lsh_candidate_pairs(signatures: &[[u64; MINHASH_N]]) -> Vec<(usize, usize)> {
+    use rayon::prelude::*;
+
+    let band_candidates: Vec<Vec<(usize, usize)>> = (0..LSH_BANDS)
+        .into_par_iter()
+        .map(|band| {
+            let mut buckets: HashMap<u64, Vec<usize>> = HashMap::new();
+            for (idx, sig) in signatures.iter().enumerate() {
+                let bh = lsh_band_hash(sig, band);
+                buckets.entry(bh).or_default().push(idx);
+            }
+            let mut pairs = Vec::new();
+            for bucket in buckets.values() {
+                if bucket.len() < 2 {
+                    continue;
+                }
+                for i in 0..bucket.len() {
+                    for j in i + 1..bucket.len() {
+                        pairs.push((bucket[i].min(bucket[j]), bucket[i].max(bucket[j])));
+                    }
+                }
+            }
+            pairs
+        })
+        .collect();
+
+    let mut seen: HashSet<(usize, usize)> = HashSet::new();
+    let mut candidates: Vec<(usize, usize)> = Vec::new();
+    for band_pairs in band_candidates {
+        for pair in band_pairs {
+            if seen.insert(pair) {
+                candidates.push(pair);
+            }
+        }
+    }
+    candidates
+}
+
 // ── Normalized AST hashing ────────────────────────────────────────────────────
 
 /// Compute a normalized AST hash for duplicate function detection.
@@ -428,4 +473,45 @@ fn find_node_at_line_recursive<'a>(
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    fn sig_from(seed: u64) -> [u64; MINHASH_N] {
+        [seed; MINHASH_N]
+    }
+
+    #[test]
+    fn lsh_candidate_pairs_finds_identical_signatures() {
+        // Three identical signatures + one distinct one.
+        let sigs = vec![sig_from(1), sig_from(1), sig_from(1), sig_from(2)];
+        let pairs: HashSet<(usize, usize)> = lsh_candidate_pairs(&sigs).into_iter().collect();
+        // All pairs among the three identical entries must be candidates.
+        assert!(pairs.contains(&(0, 1)));
+        assert!(pairs.contains(&(0, 2)));
+        assert!(pairs.contains(&(1, 2)));
+        // The distinct signature shares no band bucket with the others.
+        assert!(!pairs.contains(&(0, 3)));
+        assert!(!pairs.contains(&(1, 3)));
+        assert!(!pairs.contains(&(2, 3)));
+    }
+
+    #[test]
+    fn lsh_candidate_pairs_are_unique_and_ordered() {
+        let sigs = vec![sig_from(7), sig_from(7), sig_from(7)];
+        let pairs = lsh_candidate_pairs(&sigs);
+        let unique: HashSet<(usize, usize)> = pairs.iter().copied().collect();
+        assert_eq!(pairs.len(), unique.len(), "no duplicate pairs across bands");
+        for (a, b) in pairs {
+            assert!(a < b, "pairs are ordered (a < b)");
+        }
+    }
+
+    #[test]
+    fn lsh_candidate_pairs_empty_input() {
+        assert!(lsh_candidate_pairs(&[]).is_empty());
+    }
 }
