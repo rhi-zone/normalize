@@ -10,6 +10,7 @@
 mod ca_cache;
 pub mod cfg_dataflow;
 pub mod extract;
+pub mod extraction_fixtures;
 mod index;
 mod parsers;
 mod symbols;

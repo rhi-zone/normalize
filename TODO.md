@@ -885,10 +885,12 @@ legit wiring; latent: dual "parallelization savings" vocab, `module_health.rs` v
   report internals); print/dispatch wrapper stays in main. Effort S / risk S.
 - [ ] **D5 — dedup heatmap `normalize_path`**: `commands/sessions/heatmap.rs` calls the
   already-`pub` `normalize_session_analysis::normalize_path` instead of its copy. Effort S / trivial.
-- [ ] **D6 — extraction-fixture harness → `normalize-facts`** (judgment call): move the
-  ~380 LOC golden-diff engine (`service/facts.rs:1209-1590`); `test_fixtures` `#[cli]`
-  stays a thin wrapper. Clears standalone-value bar (b), 1 caller so not bar (a); justified
-  by coherent module weight. Effort M / risk S.
+- [x] **D6 — extraction-fixture harness → `normalize-facts`** (judgment call): ✅ DONE 2026-07-02.
+  Moved the golden-diff engine (discovery + `run_case` + `expected.json` schema) into
+  `crates/normalize-facts/src/extraction_fixtures.rs` (`discover_cases`/`run_case`,
+  `FixtureCase`/`FixtureCaseResult`). `service/facts.rs::test_fixtures` `#[cli]` is now a thin
+  wrapper mapping `FixtureCaseResult` → its `ExtractionFixtureCaseResult` report; the report
+  structs + `OutputFormatter` stayed in main. ~380 LOC left the service layer.
 - [ ] **Rename `normalize-analyze` → `normalize-rank`**: crate is NOT dead (consumed via
   `Entity`/`RankEntry`/`format_ranked_table`); name misdescribes the shared rank/render
   layer. Effort S / risk S.
