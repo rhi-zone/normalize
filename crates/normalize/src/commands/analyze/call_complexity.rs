@@ -7,7 +7,7 @@ use std::path::Path;
 use crate::analyze::complexity::ComplexityAnalyzer;
 use crate::commands::analyze::test_ratio::{discover_module_dirs, module_key};
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
+use normalize_rank::ranked::{Column, RankEntry, format_ranked_table};
 
 /// Per-function call-complexity entry.
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
@@ -175,7 +175,7 @@ impl OutputFormatter for CallComplexityReport {
                 None,
                 |e| {
                     use crate::output::tier_color;
-                    use normalize_analyze::ranked::RiskTier;
+                    use normalize_rank::ranked::RiskTier;
                     let tier = if e.0.amplification > 20.0 {
                         RiskTier::Critical
                     } else if e.0.amplification > 10.0 {

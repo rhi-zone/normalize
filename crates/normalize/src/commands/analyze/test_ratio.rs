@@ -4,10 +4,10 @@
 //! Shows which parts of the codebase have thin or no test coverage by LOC.
 
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{
+use normalize_languages::is_test_path;
+use normalize_rank::ranked::{
     Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
 };
-use normalize_languages::is_test_path;
 use rayon::prelude::*;
 use serde::Serialize;
 use std::path::Path;
@@ -261,7 +261,7 @@ pub fn analyze_test_ratio(root: &Path, limit: usize) -> TestRatioReport {
         .collect();
 
     // Sort: lowest ratio first (least tested at top), then largest impl for ties
-    normalize_analyze::ranked::rank_and_truncate(
+    normalize_rank::ranked::rank_and_truncate(
         &mut entries,
         limit,
         |a, b| {

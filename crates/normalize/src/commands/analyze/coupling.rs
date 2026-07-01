@@ -4,7 +4,7 @@ use super::git_utils;
 use super::is_source_file;
 use crate::output::OutputFormatter;
 use glob::Pattern;
-use normalize_analyze::ranked::{
+use normalize_rank::ranked::{
     Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
 };
 use serde::Serialize;
@@ -229,7 +229,7 @@ pub fn analyze_coupling(
         .collect();
 
     // Sort by shared commits descending, then confidence descending
-    normalize_analyze::ranked::rank_and_truncate(
+    normalize_rank::ranked::rank_and_truncate(
         &mut pairs,
         limit,
         |a, b| {

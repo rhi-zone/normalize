@@ -7,7 +7,7 @@ use crate::commands::analyze::density::analyze_density;
 use crate::commands::analyze::test_ratio::{analyze_test_ratio, discover_module_dirs, module_key};
 use crate::commands::analyze::uniqueness::analyze_uniqueness;
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
+use normalize_rank::ranked::{Column, RankEntry, format_ranked_table};
 
 /// Per-module health score and metrics.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -80,7 +80,7 @@ impl OutputFormatter for ModuleHealthReport {
         );
         crate::output::pretty_ranked_table(&title, &self.modules, Some("No modules found."), |e| {
             use crate::output::tier_color;
-            use normalize_analyze::ranked::RiskTier;
+            use normalize_rank::ranked::RiskTier;
             let tier = if e.score >= 0.75 {
                 RiskTier::Low
             } else if e.score >= 0.55 {
@@ -267,7 +267,7 @@ pub fn analyze_module_health(root: &Path, limit: usize, min_lines: usize) -> Mod
 
     let modules_scored = entries.len();
 
-    normalize_analyze::ranked::rank_and_truncate(
+    normalize_rank::ranked::rank_and_truncate(
         &mut entries,
         limit,
         |a, b| {

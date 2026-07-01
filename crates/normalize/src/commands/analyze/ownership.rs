@@ -4,7 +4,7 @@ use super::git_utils;
 use super::is_source_file;
 use crate::output::OutputFormatter;
 use glob::Pattern;
-use normalize_analyze::ranked::{
+use normalize_rank::ranked::{
     Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
 };
 use rayon::prelude::*;
@@ -246,7 +246,7 @@ pub fn analyze_ownership(
         .collect();
 
     // Sort by bus factor ascending (riskiest first), then by top_author_pct descending
-    normalize_analyze::ranked::rank_and_truncate(
+    normalize_rank::ranked::rank_and_truncate(
         &mut files,
         limit,
         |a, b| {

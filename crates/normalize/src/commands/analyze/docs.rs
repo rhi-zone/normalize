@@ -2,8 +2,8 @@
 
 use crate::filter::Filter;
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
 use normalize_languages::is_test_path;
+use normalize_rank::ranked::{Column, RankEntry, format_ranked_table};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;

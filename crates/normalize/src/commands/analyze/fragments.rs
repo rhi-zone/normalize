@@ -88,7 +88,7 @@ pub struct FragmentsReport {
     pub unclustered_count: usize,
     pub inline_depth: usize,
     pub min_nodes: usize,
-    pub stats: normalize_analyze::ranked::RankStats,
+    pub stats: normalize_rank::ranked::RankStats,
 }
 
 // ── Internal types ────────────────────────────────────────────────────────────
@@ -271,7 +271,7 @@ pub fn analyze_fragments(
             unclustered_count: 0,
             inline_depth,
             min_nodes,
-            stats: normalize_analyze::ranked::RankStats::from_scores(std::iter::empty()),
+            stats: normalize_rank::ranked::RankStats::from_scores(std::iter::empty()),
         });
     }
 
@@ -302,7 +302,7 @@ pub fn analyze_fragments(
         .map(|idxs| build_cluster(&all_fragments, &idxs, is_fuzzy, &pair_sims))
         .collect();
 
-    let stats = normalize_analyze::ranked::rank_and_truncate(
+    let stats = normalize_rank::ranked::rank_and_truncate(
         &mut result_clusters,
         limit,
         |a, b| {

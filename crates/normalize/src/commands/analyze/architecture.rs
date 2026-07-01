@@ -6,7 +6,6 @@
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
 use indicatif::{ProgressBar, ProgressStyle};
-use normalize_analyze::truncate_path;
 pub use normalize_architecture::{
     CrossImport, Cycle, HubModule, ImportChain, ImportGraph, LayerFlow, ModuleCoupling,
     OrphanModule, SymbolMetrics, build_import_graph,
@@ -16,6 +15,7 @@ use normalize_architecture::{
     find_symbol_hotspots,
 };
 use normalize_languages::is_programming_language;
+use normalize_rank::truncate_path;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::path::Path;

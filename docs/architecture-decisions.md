@@ -458,7 +458,7 @@ where each subcommand variant is an implementation? If not, the commands belong 
 is `Rankable`: produce an ordered list of (item, score) pairs. Input tier (file-only, git,
 index) is an implementation detail, not a user-facing concept. `normalize rank complexity`,
 `normalize rank coupling`, etc. The `RankEntry` infrastructure already existed in
-`normalize-analyze::ranked`.
+`normalize-rank::ranked`.
 
 **3. `normalize view <target> <subcommand>` — target-first navigation.**
 Graph operations (`call_graph`, `trace`, `dependents`, `provenance`) and `--history` are

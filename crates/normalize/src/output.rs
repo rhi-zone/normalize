@@ -2,7 +2,7 @@
 
 pub use normalize_output::*;
 
-use normalize_analyze::ranked::{RankEntry, RiskTier, format_ranked_table};
+use normalize_rank::ranked::{RankEntry, RiskTier, format_ranked_table};
 use nu_ansi_term::{Color, Style};
 
 /// Map a [`RiskTier`] to its house-style color for `format_pretty()` output.
@@ -10,7 +10,7 @@ use nu_ansi_term::{Color, Style};
 /// This is the single mapping from severity to color across all rank
 /// subcommands — complexity, length, and test-gaps all route their tier
 /// coloring through here so the palette stays consistent. Keeping the
-/// `nu_ansi_term` dependency here (rather than in `normalize-analyze`) lets the
+/// `nu_ansi_term` dependency here (rather than in `normalize-rank`) lets the
 /// library crate stay color-free; consumers ask for the color by tier.
 pub fn tier_color(tier: RiskTier) -> Color {
     match tier {

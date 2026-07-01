@@ -5,7 +5,7 @@
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{
+use normalize_rank::ranked::{
     Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
 };
 use serde::Serialize;
@@ -178,7 +178,7 @@ pub async fn analyze_surface(
         fully_public_count,
     };
 
-    normalize_analyze::ranked::rank_and_truncate(
+    normalize_rank::ranked::rank_and_truncate(
         &mut entries,
         limit,
         |a, b| {

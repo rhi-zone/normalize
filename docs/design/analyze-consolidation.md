@@ -340,7 +340,7 @@ It doesn't work when parameter signatures diverge — that means they're differe
 - Old command: `impact` — deleted
 
 **`rank` table infrastructure** (Phase 3, 2026-03-12):
-- `RankEntry` trait + `Column`/`Align` types + `format_ranked_table()` in `normalize-analyze::ranked`
+- `RankEntry` trait + `Column`/`Align` types + `format_ranked_table()` in `normalize-rank::ranked`
 - Entry structs implement `RankEntry` to define column names/alignment and per-row values
 - `format_ranked_table(title, entries, empty_message)` renders: title line, dynamic-width columns, separator, rows
 - Migrated 8 commands: files, imports, ownership, docs, ceremony, surface, depth-map, layering
@@ -350,7 +350,7 @@ It doesn't work when parameter signatures diverge — that means they're differe
 - **Next steps:** add `--diff` to remaining rank commands (files, imports, ownership, ceremony, surface, depth-map, layering, budget, coupling)
 
 **`DiffableRankEntry` trait + `--diff` infrastructure** (Phase 3, 2026-03-12):
-- `DiffableRankEntry` trait in `normalize-analyze::ranked`: `diff_key()`, `diff_score()`, `set_delta()`, `delta()`
+- `DiffableRankEntry` trait in `normalize-rank::ranked`: `diff_key()`, `diff_score()`, `set_delta()`, `delta()`
 - `compute_ranked_diff(current, baseline)`: matches entries by key, computes `current - baseline`, sorts by |delta| descending
 - `format_delta(value, as_pct)`: formats signed delta with `+`/`-` prefix
 - Entry structs add `delta: Option<f64>`, reports add `diff_ref: Option<String>`

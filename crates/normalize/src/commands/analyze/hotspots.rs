@@ -5,7 +5,7 @@ use super::is_source_file;
 use crate::analyze::complexity::ComplexityAnalyzer;
 use crate::output::OutputFormatter;
 use glob::Pattern;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
+use normalize_rank::ranked::{Column, RankEntry, format_ranked_table};
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -371,7 +371,7 @@ pub fn analyze_hotspots(
         })
         .collect();
 
-    normalize_analyze::ranked::rank_and_truncate(
+    normalize_rank::ranked::rank_and_truncate(
         &mut hotspots,
         20,
         |a, b| {

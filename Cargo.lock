@@ -5193,7 +5193,6 @@ dependencies = [
  "libc",
  "libsql",
  "log",
- "normalize-analyze",
  "normalize-architecture",
  "normalize-budget",
  "normalize-cfg",
@@ -5219,6 +5218,7 @@ dependencies = [
  "normalize-openapi",
  "normalize-output",
  "normalize-path-resolve",
+ "normalize-rank",
  "normalize-ratchet",
  "normalize-refactor",
  "normalize-rules",
@@ -5262,14 +5262,6 @@ dependencies = [
  "utoipa",
  "walkdir",
  "zip",
-]
-
-[[package]]
-name = "normalize-analyze"
-version = "0.3.2"
-dependencies = [
- "schemars",
- "serde",
 ]
 
 [[package]]
@@ -5796,6 +5788,14 @@ dependencies = [
  "ignore",
  "nucleo-matcher",
  "tempfile",
+]
+
+[[package]]
+name = "normalize-rank"
+version = "0.3.2"
+dependencies = [
+ "schemars",
+ "serde",
 ]
 
 [[package]]

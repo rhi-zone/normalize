@@ -21,6 +21,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `format_unix_date`, `run_in_worktree`. All dependent crates migrated in the same batch (B1
   of the CLI taxonomy migration).
 
+### Changed
+
+- **`normalize-analyze` crate renamed to `normalize-rank`.** The crate never held analysis
+  logic — it is the shared rank/render layer (`Entity` trait, `RankEntry`, `RankStats`,
+  `rank_pipeline`, `format_ranked_table`, `truncate_path`). The old name oversold and
+  miscategorized it. Consumers must update the dependency name (`normalize-analyze` →
+  `normalize-rank`) and Rust paths (`normalize_analyze::` → `normalize_rank::`). Crate count
+  unchanged (still 44 published crates).
+
 ### Fixed
 
 - **Circular-dependency detection (`normalize view graph`) now works.** SCC computation

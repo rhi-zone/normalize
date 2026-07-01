@@ -3,8 +3,8 @@
 //! Identifies long functions that may be candidates for refactoring.
 use crate::output::{OutputFormatter, tier_color};
 use crate::parsers;
-use normalize_analyze::ranked::{Column, RankEntry, RiskTier, format_ranked_table};
 use normalize_languages::{Language, support_for_path};
+use normalize_rank::ranked::{Column, RankEntry, RiskTier, format_ranked_table};
 use serde::Serialize;
 use std::path::Path;
 use streaming_iterator::StreamingIterator;
@@ -67,7 +67,7 @@ pub struct FunctionLength {
     pub delta: Option<i64>,
 }
 
-impl normalize_analyze::Entity for FunctionLength {
+impl normalize_rank::Entity for FunctionLength {
     fn label(&self) -> &str {
         &self.name
     }

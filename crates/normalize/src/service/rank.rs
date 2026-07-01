@@ -347,7 +347,7 @@ impl RankService {
         );
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
-            use normalize_analyze::ranked::compute_ranked_diff;
+            use normalize_rank::ranked::compute_ranked_diff;
             let hash = resolve_ref(&root_path, diff_ref)?;
             let baseline = run_in_worktree(&root_path, &hash, |wt| {
                 Ok(crate::commands::analyze::files::analyze_files(
@@ -412,7 +412,7 @@ impl RankService {
             crate::commands::analyze::ceremony::analyze_ceremony(&root_path, limit.unwrap_or(15));
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
-            use normalize_analyze::ranked::compute_ranked_diff;
+            use normalize_rank::ranked::compute_ranked_diff;
             let hash = resolve_ref(&root_path, diff_ref)?;
             let baseline = run_in_worktree(&root_path, &hash, |wt| {
                 Ok(crate::commands::analyze::ceremony::analyze_ceremony(
@@ -537,7 +537,7 @@ impl RankService {
         )?;
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
-            use normalize_analyze::ranked::compute_ranked_diff;
+            use normalize_rank::ranked::compute_ranked_diff;
             let hash = resolve_ref(&root_path, diff_ref)?;
             let baseline = run_in_worktree(&root_path, &hash, |wt| {
                 crate::commands::analyze::coupling::analyze_coupling(
@@ -625,7 +625,7 @@ impl RankService {
         )?;
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
-            use normalize_analyze::ranked::compute_ranked_diff;
+            use normalize_rank::ranked::compute_ranked_diff;
             let hash = resolve_ref(&root_path, diff_ref)?;
             let baseline = run_in_worktree(&root_path, &hash, |wt| {
                 crate::commands::analyze::ownership::analyze_ownership(
@@ -668,7 +668,7 @@ impl RankService {
             crate::commands::analyze::test_ratio::analyze_test_ratio(&root_path, effective_limit);
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
-            use normalize_analyze::ranked::compute_ranked_diff;
+            use normalize_rank::ranked::compute_ranked_diff;
             let hash = resolve_ref(&root_path, diff_ref)?;
             let baseline = run_in_worktree(&root_path, &hash, |wt| {
                 Ok(crate::commands::analyze::test_ratio::analyze_test_ratio(
@@ -840,7 +840,7 @@ impl RankService {
             crate::commands::analyze::budget::analyze_budget(&root_path, effective_limit);
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
-            use normalize_analyze::ranked::compute_ranked_diff;
+            use normalize_rank::ranked::compute_ranked_diff;
             let hash = resolve_ref(&root_path, diff_ref)?;
             let baseline = run_in_worktree(&root_path, &hash, |wt| {
                 Ok(crate::commands::analyze::budget::analyze_budget(
@@ -897,7 +897,7 @@ impl RankService {
         );
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
-            use normalize_analyze::ranked::compute_ranked_diff;
+            use normalize_rank::ranked::compute_ranked_diff;
             let hash = resolve_ref(&root_path, diff_ref)?;
             let baseline = run_in_worktree(&root_path, &hash, |wt| {
                 Ok(crate::commands::analyze::density::analyze_density(
@@ -973,7 +973,7 @@ impl RankService {
         );
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
-            use normalize_analyze::ranked::compute_ranked_diff;
+            use normalize_rank::ranked::compute_ranked_diff;
             let hash = resolve_ref(&root_path, diff_ref)?;
             let baseline = run_in_worktree(&root_path, &hash, |wt| {
                 Ok(crate::commands::analyze::uniqueness::analyze_uniqueness(
@@ -1029,7 +1029,7 @@ impl RankService {
         .await?;
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
-            use normalize_analyze::ranked::compute_ranked_diff;
+            use normalize_rank::ranked::compute_ranked_diff;
             let hash = resolve_ref(&root_path, diff_ref)?;
             let baseline = run_in_worktree(&root_path, &hash, |wt| {
                 let handle = tokio::runtime::Handle::current();
@@ -1085,7 +1085,7 @@ impl RankService {
             .map_err(|e| format!("Surface analysis failed: {}", e))?;
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
-            use normalize_analyze::ranked::compute_ranked_diff;
+            use normalize_rank::ranked::compute_ranked_diff;
             let hash = resolve_ref(&root_path, diff_ref)?;
             let baseline = run_in_worktree(&root_path, &hash, |wt| {
                 let handle = tokio::runtime::Handle::current();
@@ -1144,7 +1144,7 @@ impl RankService {
                 .map_err(|e| format!("Depth map analysis failed: {}", e))?;
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
-            use normalize_analyze::ranked::compute_ranked_diff;
+            use normalize_rank::ranked::compute_ranked_diff;
             let hash = resolve_ref(&root_path, diff_ref)?;
             let baseline = run_in_worktree(&root_path, &hash, |wt| {
                 let handle = tokio::runtime::Handle::current();
@@ -1206,7 +1206,7 @@ impl RankService {
                 .map_err(|e| format!("Layering analysis failed: {}", e))?;
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
-            use normalize_analyze::ranked::compute_ranked_diff;
+            use normalize_rank::ranked::compute_ranked_diff;
             let hash = resolve_ref(&root_path, diff_ref)?;
             let baseline = run_in_worktree(&root_path, &hash, |wt| {
                 let handle = tokio::runtime::Handle::current();

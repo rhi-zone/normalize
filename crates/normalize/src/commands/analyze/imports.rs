@@ -5,7 +5,7 @@
 //! Requires a built facts index (`normalize structure rebuild`).
 
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{
+use normalize_rank::ranked::{
     Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
 };
 use serde::Serialize;
@@ -157,7 +157,7 @@ pub async fn analyze_import_centrality(
         })
         .collect();
 
-    normalize_analyze::ranked::rank_and_truncate(
+    normalize_rank::ranked::rank_and_truncate(
         &mut entries,
         limit,
         |a, b| b.fan_in.cmp(&a.fan_in).then(a.module.cmp(&b.module)),

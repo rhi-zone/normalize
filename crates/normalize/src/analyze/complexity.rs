@@ -5,9 +5,9 @@
 
 use crate::output::{OutputFormatter, tier_color};
 use crate::parsers;
-use normalize_analyze::ranked::{Column, RankEntry, RiskTier, format_ranked_table};
 use normalize_facts::extract::compute_complexity;
 use normalize_languages::{GrammarLoader, Language, support_for_path};
+use normalize_rank::ranked::{Column, RankEntry, RiskTier, format_ranked_table};
 use serde::Serialize;
 use std::path::Path;
 use streaming_iterator::StreamingIterator;
@@ -71,7 +71,7 @@ pub struct FunctionComplexity {
     pub delta: Option<i64>,
 }
 
-impl normalize_analyze::Entity for FunctionComplexity {
+impl normalize_rank::Entity for FunctionComplexity {
     fn label(&self) -> &str {
         &self.name
     }

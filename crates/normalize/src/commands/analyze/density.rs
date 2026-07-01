@@ -1,8 +1,8 @@
 use flate2::{Compression, write::GzEncoder};
-use normalize_analyze::ranked::{
+use normalize_languages::support_for_path;
+use normalize_rank::ranked::{
     Column, DiffableRankEntry, RankEntry, Scored, format_delta, format_ranked_table, rank_pipeline,
 };
-use normalize_languages::support_for_path;
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
@@ -44,13 +44,13 @@ pub struct ModuleDensity {
     pub delta: Option<f64>,
 }
 
-impl normalize_analyze::Entity for FileDensity {
+impl normalize_rank::Entity for FileDensity {
     fn label(&self) -> &str {
         &self.path
     }
 }
 
-impl normalize_analyze::Entity for ModuleDensity {
+impl normalize_rank::Entity for ModuleDensity {
     fn label(&self) -> &str {
         &self.module
     }

@@ -688,7 +688,7 @@ Follow-ups: see Deferred — `DocFormat`-aware rendering, Rust source-archive un
 **Current: ~35 commands** (after 2026-03-15/16 consolidation: deleted `analyze parse`, `analyze query`, `analyze all`, `analyze node-types` → moved to `syntax`; merged 4 trend commands; deleted `normalize-rules-loader`). Trend commands moved to `normalize trend` on 2026-03-28 (5 methods removed from analyze, 5 added to trend service). `analyze length` and `analyze test-gaps` moved to `rank`; `analyze node-types` duplicate removed (2026-03-28).
 
 **Phase 3 rank infrastructure (done 2026-03-12):**
-- `RankEntry` trait + `Column`/`Align` + `format_ranked_table()` in `normalize-analyze::ranked`
+- `RankEntry` trait + `Column`/`Align` + `format_ranked_table()` in `normalize-rank::ranked`
 - Migrated 13 commands to shared tabular rendering
 - `DiffableRankEntry` + `--diff` on all 12 rank commands
 
@@ -899,9 +899,11 @@ legit wiring; latent: dual "parallelization savings" vocab, `module_health.rs` v
   `FixtureCase`/`FixtureCaseResult`). `service/facts.rs::test_fixtures` `#[cli]` is now a thin
   wrapper mapping `FixtureCaseResult` → its `ExtractionFixtureCaseResult` report; the report
   structs + `OutputFormatter` stayed in main. ~380 LOC left the service layer.
-- [ ] **Rename `normalize-analyze` → `normalize-rank`**: crate is NOT dead (consumed via
-  `Entity`/`RankEntry`/`format_ranked_table`); name misdescribes the shared rank/render
-  layer. Effort S / risk S.
+- [x] **Rename `normalize-analyze` → `normalize-rank`**: ✅ DONE 2026-07-02. Crate dir,
+  package name, workspace member, the single dependent (`normalize`) dep line, all
+  `normalize_analyze::` Rust paths, SUMMARYs and living docs (cli-design,
+  architecture-decisions, analyze-consolidation, POLISH) renamed in one commit. No
+  `package =` aliasing existed. Crate count unchanged (44). User-facing → CHANGELOG.
 
 ### Language trait: remaining .scm migration
 
@@ -1475,6 +1477,15 @@ WONTFIX: `CargoLocalDocsExtractor` is intentionally Cargo/Rust-scoped (module do
 ~~Hardcoded runtime→command map (`python`→`python3`, etc.) in tests. Test-only, out of the library-crate rule's scope.~~
 
 WONTFIX: Test plumbing mapping a language to its interpreter binary is environment configuration, not library-crate classification; the dispatch-rule does not apply to test harnesses.
+
+**INTERMITTENT — `normalize-facts/tests/extract_fixtures.rs` (javascript `add_numbers` import mismatch)**
+
+During the 2026-07-02 main-crate decomposition work this fixture case failed on some
+runs (a javascript `add_numbers` import expectation mismatch) but passed green on a later
+full run — so it is order/environment-dependent, not a hard break. Not chased during the
+rename. Worth a proper look later: determine whether the import extraction is
+non-deterministic (ordering) or whether the runtime/interpreter environment differs
+between runs.
 
 ---
 

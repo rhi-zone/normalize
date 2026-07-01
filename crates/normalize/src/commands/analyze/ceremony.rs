@@ -1,7 +1,7 @@
 //! Ceremony ratio analysis: fraction of callable code that is trait/interface boilerplate.
 
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{
+use normalize_rank::ranked::{
     Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
 };
 use rayon::prelude::*;

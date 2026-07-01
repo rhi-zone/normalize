@@ -5,7 +5,7 @@
 //! complexity, caller count, and lines of code.
 
 use crate::output::{OutputFormatter, tier_color};
-use normalize_analyze::ranked::{Column, RankEntry, RiskTier, format_ranked_table};
+use normalize_rank::ranked::{Column, RankEntry, RiskTier, format_ranked_table};
 use serde::Serialize;
 
 /// A public function analyzed for test coverage gaps.

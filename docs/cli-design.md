@@ -105,7 +105,7 @@ Example: `# Complexity — 30 functions, avg 2.4, max 9, 0 critical, 0 high`
 ### Body: one `format_ranked_table`
 
 Tabular subcommands render their body with a **single** call to
-`normalize_analyze::ranked::format_ranked_table(title, &entries, empty_message)`.
+`normalize_rank::ranked::format_ranked_table(title, &entries, empty_message)`.
 The entry type implements `RankEntry` (`columns()` + `values()`). This gives:
 auto-width columns, `-` separators with `--` between columns, no hardcoded widths,
 **no path truncation**, no row indentation. Do not hand-roll a table, do not call
@@ -121,7 +121,7 @@ Title-case, spelled out, no unexplained abbreviations. `Bus Factor` not `BF`,
 Commands that classify rows into severity bands (`complexity`, `length`, `test-gaps`)
 must NOT emit `### Critical` / `### High Risk` subsections. Instead add a `Risk` column
 whose cell is the tier title. Map the command's domain thresholds onto the shared
-`normalize_analyze::ranked::RiskTier` (`Low`/`Moderate`/`High`/`Critical`) — see
+`normalize_rank::ranked::RiskTier` (`Low`/`Moderate`/`High`/`Critical`) — see
 `RiskLevel::tier()` in `complexity.rs` for the pattern. `RiskTier::title()` is the cell
 text; `RiskTier::rank()` drives pretty-mode coloring via `output::tier_color`.
 

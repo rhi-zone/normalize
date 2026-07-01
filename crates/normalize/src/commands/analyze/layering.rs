@@ -5,11 +5,11 @@
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{
-    Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
-};
 use normalize_architecture::{
     build_import_graph, compute_depth, compute_layering_compliance, extract_layer,
+};
+use normalize_rank::ranked::{
+    Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
 };
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};

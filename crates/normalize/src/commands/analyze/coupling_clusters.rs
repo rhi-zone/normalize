@@ -189,7 +189,7 @@ pub fn analyze_coupling_clusters(
     }
 
     // Sort by total shared commits descending
-    normalize_analyze::ranked::rank_and_truncate(
+    normalize_rank::ranked::rank_and_truncate(
         &mut clusters,
         limit,
         |a, b| {

@@ -5,10 +5,10 @@
 
 use crate::index::FileIndex;
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{
+use normalize_architecture::{build_import_graph, compute_depth, compute_downstream};
+use normalize_rank::ranked::{
     Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
 };
-use normalize_architecture::{build_import_graph, compute_depth, compute_downstream};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
@@ -177,7 +177,7 @@ pub async fn analyze_depth_map(
         modules_at_depth_0,
     };
 
-    normalize_analyze::ranked::rank_and_truncate(
+    normalize_rank::ranked::rank_and_truncate(
         &mut entries,
         limit,
         |a, b| {

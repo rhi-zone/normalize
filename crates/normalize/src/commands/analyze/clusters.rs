@@ -192,7 +192,7 @@ pub(crate) fn build_clusters_report_multi(
         .collect();
 
     // Sort by total lines descending (largest families first)
-    normalize_analyze::ranked::rank_and_truncate(
+    normalize_rank::ranked::rank_and_truncate(
         &mut clusters,
         limit,
         |a, b| {

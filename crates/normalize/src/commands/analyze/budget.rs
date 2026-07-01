@@ -6,10 +6,10 @@ use crate::commands::analyze::test_ratio::{
     discover_module_dirs, module_key, split_rust_test_lines,
 };
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{
+use normalize_languages::is_test_path;
+use normalize_rank::ranked::{
     Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
 };
-use normalize_languages::is_test_path;
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::BTreeMap;

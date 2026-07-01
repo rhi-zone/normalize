@@ -2,8 +2,8 @@
 //! similar-functions, similar-blocks, and clusters behind `--scope`, `--similar`,
 //! and `--cluster` flags.
 
-use normalize_analyze::ranked::RankStats;
 use normalize_output::OutputFormatter;
+use normalize_rank::ranked::RankStats;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;

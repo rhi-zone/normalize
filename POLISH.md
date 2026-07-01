@@ -188,7 +188,7 @@ None.
 
 ### adversarial
 
-- [DONE] `crates/normalize-analyze/src/lib.rs:63` — `truncate_path` slices by raw byte offset; panics on non-ASCII input (char boundary) AND panics when `max_len < 4` (usize underflow) — guard `max_len >= 4`, use `char_indices` to find safe boundary _(severity: high)_
+- [DONE] `crates/normalize-rank/src/lib.rs:63` — `truncate_path` slices by raw byte offset; panics on non-ASCII input (char boundary) AND panics when `max_len < 4` (usize underflow) — guard `max_len >= 4`, use `char_indices` to find safe boundary _(severity: high)_
 
 - [DONE] `crates/normalize-architecture/src/lib.rs:303` — `symbol_count as usize` from `i64` DB column without negative check; `-1i64 as usize` = `usize::MAX` — guard with `if symbol_count < 0 { 0 } else { symbol_count as usize }` _(severity: high)_
 
@@ -414,7 +414,7 @@ None.
 - [DONE] `crates/normalize-architecture/src/lib.rs:448-477` — `find_cycles_dfs` is recursive with no depth limit; large codebases with long import chains will stack-overflow — convert to iterative DFS as other graph algorithms do _(severity: high)_
 - [DONE] `crates/normalize-facts/src/index.rs:2299-2306` — `find_like` caps `parts` to 4 AFTER constructing SQL conditions for all parts; when len > 4 the WHERE clause references `?1..?N` but only 4 params are bound → libsql panic or mis-bind — cap `parts` before building `conditions` _(severity: high)_
 - [DONE] `crates/normalize-facts-rules-builtins/src/lib.rs:27-43` — `run()` and `run_rule()` are `#[sabi_extern_fn]` (FFI) but do not call `catch_unwind`; the `rule_pack.rs` doc explicitly requires this — wrap in `std::panic::catch_unwind` _(severity: high)_
-- [DONE] `crates/normalize-graph/src/lib.rs:~1023` — private `truncate_path` copy uses the old byte-slice version (`&path[path.len() - (max_len - 3)..]`) that panics on multi-byte UTF-8; the fixed version is in `normalize-analyze` — call `normalize_analyze::truncate_path` instead _(severity: high)_
+- [DONE] `crates/normalize-graph/src/lib.rs:~1023` — private `truncate_path` copy uses the old byte-slice version (`&path[path.len() - (max_len - 3)..]`) that panics on multi-byte UTF-8; the fixed version is in `normalize-rank` — call `normalize_rank::truncate_path` instead _(severity: high)_
 
 ---
 

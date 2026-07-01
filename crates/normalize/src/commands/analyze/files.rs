@@ -3,7 +3,7 @@
 use crate::output::OutputFormatter;
 use crate::path_resolve;
 use glob::Pattern;
-use normalize_analyze::ranked::{
+use normalize_rank::ranked::{
     Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
 };
 use rayon::prelude::*;
@@ -181,7 +181,7 @@ pub fn analyze_files(root: &Path, limit: usize, exclude: &[String]) -> FileLengt
     }
 
     let mut sorted = file_lengths;
-    normalize_analyze::ranked::rank_and_truncate(
+    normalize_rank::ranked::rank_and_truncate(
         &mut sorted,
         limit,
         |a, b| b.lines.cmp(&a.lines),

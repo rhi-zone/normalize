@@ -2,7 +2,7 @@
 
 use super::git_utils;
 use crate::output::OutputFormatter;
-use normalize_analyze::ranked::{Column, RankEntry, format_ranked_table};
+use normalize_rank::ranked::{Column, RankEntry, format_ranked_table};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;

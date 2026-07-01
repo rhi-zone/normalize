@@ -3,7 +3,7 @@
 use crate::analyze::complexity::{ComplexityAnalyzer, ComplexityReport};
 use crate::filter::Filter;
 use crate::path_resolve;
-use normalize_analyze::ranked::{Scored, rank_pipeline};
+use normalize_rank::ranked::{Scored, rank_pipeline};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
