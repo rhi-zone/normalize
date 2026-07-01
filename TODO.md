@@ -909,6 +909,15 @@ decides). Design it twice before building.
       kill `find_longest_chains` duplication in normalize-architecture
 - [ ] B2 and B3 can proceed after the split is done
 
+### Main-crate decomposition audit (not yet done)
+
+Systematically enumerate everything in `crates/normalize/src/` (analyze/, commands/, service/, index, etc.) and classify each as (a) legitimate CLI wiring [service layer, dispatch, output formatting — belongs in main] vs (b) domain logic that violates "domain logic belongs in a crate, not normalize" and should be extracted [against the strict crate bar: multiple workspace dependents OR clearly-useful-standalone]. Known-undecomposed already found via spot-checks: the metric core (src/analyze/ complexity/length/ceremony/density — judged not-one-clean-crate but may need a different cut), git-history analysis (queued as normalize-git-history), graph analysis (deferred, see DECISION-graph-crate.md). The full audit has NOT been run — only three surfaces spot-checked because the taxonomy work walked into them. This is the real answer to "is the main CLI fully decomposed" — it is not.
+
+- [ ] Enumerate all modules in `crates/normalize/src/` and classify each as wiring vs. domain logic
+- [ ] For any domain-logic module: evaluate against the strict crate bar (multiple dependents OR clearly-useful-standalone)
+- [ ] Decide cuts for un-decomposed surfaces (metric core, any others found)
+- [ ] Track findings here as they are discovered
+
 ### Language trait: remaining .scm migration
 
 **Known locals.scm scope engine limitation:**
