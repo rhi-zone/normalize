@@ -1,8 +1,7 @@
 //! Session analysis functions.
 
 use crate::sessions::{
-    DedupTokenStats, SessionAnalysisReport, ToolStats, analyze_session, parse_session,
-    parse_session_with_format,
+    SessionAnalysisReport, analyze_session, parse_session, parse_session_with_format,
 };
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
@@ -50,12 +49,10 @@ pub fn aggregate_sessions(
     paths: &[PathBuf],
     format: Option<&str>,
 ) -> Option<SessionAnalysisReport> {
-    let mut aggregate = SessionAnalysisReport::new(PathBuf::from("."), "aggregate");
-    let mut session_count = 0;
-    let mut all_chains = Vec::new();
-
+    // Parse and analyze each session into a per-session report. The pure fold
+    // over these reports lives with the model in `normalize-session-analysis`.
+    let mut reports = Vec::new();
     for path in paths {
-        // Parse the session
         let session = if let Some(fmt) = format {
             parse_session_with_format(path, fmt)
         } else {
@@ -63,161 +60,18 @@ pub fn aggregate_sessions(
         };
 
         match session {
-            Ok(s) => {
-                let a = analyze_session(&s);
-                session_count += 1;
-
-                // Aggregate message counts
-                for (k, v) in a.message_counts {
-                    *aggregate.message_counts.entry(k).or_insert(0) += v;
-                }
-
-                // Aggregate tool stats
-                for (k, v) in a.tool_stats {
-                    let stat = aggregate
-                        .tool_stats
-                        .entry(k.clone())
-                        .or_insert_with(|| ToolStats::new(&k));
-                    stat.calls += v.calls;
-                    stat.errors += v.errors;
-                    stat.output_chars += v.output_chars;
-                }
-
-                // Collect largest tool results for later re-ranking
-                aggregate
-                    .largest_tool_results
-                    .extend(a.largest_tool_results);
-
-                // Aggregate token stats
-                aggregate.token_stats.total_input += a.token_stats.total_input;
-                aggregate.token_stats.total_output += a.token_stats.total_output;
-                aggregate.token_stats.cache_read += a.token_stats.cache_read;
-                aggregate.token_stats.cache_create += a.token_stats.cache_create;
-                aggregate.token_stats.api_calls += a.token_stats.api_calls;
-                if a.token_stats.min_context > 0 {
-                    aggregate
-                        .token_stats
-                        .update_context(a.token_stats.min_context);
-                }
-                if a.token_stats.max_context > 0 {
-                    aggregate
-                        .token_stats
-                        .update_context(a.token_stats.max_context);
-                }
-
-                // Aggregate file tokens
-                for (k, v) in a.file_tokens {
-                    *aggregate.file_tokens.entry(k).or_insert(0) += v;
-                }
-
-                aggregate.total_turns += a.total_turns;
-                aggregate.parallel_opportunities += a.parallel_opportunities;
-
-                // Collect tool chains for pattern analysis
-                all_chains.extend(a.tool_chains);
-
-                // Aggregate command stats by category
-                for cs in a.command_stats {
-                    if let Some(existing) = aggregate
-                        .command_stats
-                        .iter_mut()
-                        .find(|s| s.category == cs.category)
-                    {
-                        existing.total_calls += cs.total_calls;
-                        existing.total_errors += cs.total_errors;
-                        existing.output_tokens += cs.output_tokens;
-                        // Merge command details
-                        for detail in cs.commands {
-                            if let Some(ed) = existing
-                                .commands
-                                .iter_mut()
-                                .find(|d| d.pattern == detail.pattern)
-                            {
-                                ed.calls += detail.calls;
-                                ed.errors += detail.errors;
-                            } else {
-                                existing.commands.push(detail);
-                            }
-                        }
-                    } else {
-                        aggregate.command_stats.push(cs);
-                    }
-                }
-
-                // Aggregate retry hotspots by pattern
-                for rh in a.retry_hotspots {
-                    if let Some(existing) = aggregate
-                        .retry_hotspots
-                        .iter_mut()
-                        .find(|h| h.pattern == rh.pattern)
-                    {
-                        existing.attempts += rh.attempts;
-                        existing.failures += rh.failures;
-                        existing.output_tokens += rh.output_tokens;
-                        existing.turn_indices.extend(rh.turn_indices);
-                    } else {
-                        aggregate.retry_hotspots.push(rh);
-                    }
-                }
-
-                // Aggregate actual cost
-                if let Some(cost) = a.actual_cost {
-                    *aggregate.actual_cost.get_or_insert(0.0) += cost;
-                }
-
-                // Aggregate dedup token stats
-                if let Some(dedup) = a.dedup_tokens {
-                    let agg = aggregate
-                        .dedup_tokens
-                        .get_or_insert(DedupTokenStats::default());
-                    agg.unique_input += dedup.unique_input;
-                    agg.unique_output += dedup.unique_output;
-                    agg.total_billed += dedup.total_billed;
-                }
-            }
+            Ok(s) => reports.push(analyze_session(&s)),
             Err(e) => {
                 eprintln!("Warning: Failed to parse {}: {}", path.display(), e);
             }
         }
     }
 
-    if session_count == 0 {
+    if reports.is_empty() {
         return None;
     }
 
-    // Sort aggregated command stats and details
-    aggregate
-        .command_stats
-        .sort_by_key(|b| std::cmp::Reverse(b.total_calls));
-    for cs in &mut aggregate.command_stats {
-        cs.commands.sort_by_key(|b| std::cmp::Reverse(b.calls));
-    }
-    aggregate
-        .retry_hotspots
-        .sort_by_key(|b| std::cmp::Reverse(b.failures));
-
-    // Extract common tool patterns from all chains
-    use crate::sessions::extract_tool_patterns;
-    aggregate.tool_patterns = extract_tool_patterns(&all_chains);
-
-    // Recompute uniqueness_ratio for aggregate dedup stats
-    if let Some(dedup) = &mut aggregate.dedup_tokens
-        && dedup.total_billed > 0
-    {
-        dedup.uniqueness_ratio =
-            (dedup.unique_input + dedup.unique_output) as f64 / dedup.total_billed as f64;
-    }
-
-    // Re-rank and trim largest tool results across all sessions
-    aggregate
-        .largest_tool_results
-        .sort_by_key(|b| std::cmp::Reverse(b.chars));
-    aggregate.largest_tool_results.truncate(10);
-
-    // Update format to show aggregate info
-    aggregate.format = format!("aggregate ({} sessions)", session_count);
-
-    Some(aggregate)
+    Some(SessionAnalysisReport::aggregate(&reports))
 }
 
 /// Apply jq filter to each line of a JSONL file.

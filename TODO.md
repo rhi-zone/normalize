@@ -886,10 +886,10 @@ legit wiring; latent: dual "parallelization savings" vocab, `module_health.rs` v
   `normalize_code_similarity::UnionFind`. Also repointed `coupling_clusters.rs` (was
   importing the clusters-local copy). Crate API (`new`/`find`/`union`) covered every
   caller — no extension needed. Same semantics (union-by-rank + path compression).
-- [ ] **D4 — `aggregate_sessions` fold → `normalize-session-analysis`**: move the
-  ~80-120 LOC fold (`commands/sessions/analyze.rs`) into session-analysis as
-  `aggregate_reports`/`SessionAnalysisReport::aggregate` (fixes encapsulation leak into
-  report internals); print/dispatch wrapper stays in main. Effort S / risk S.
+- [x] **D4 — `aggregate_sessions` fold → `normalize-session-analysis`**: ✅ DONE 2026-07-02.
+  Fold moved into the crate as inherent method `SessionAnalysisReport::aggregate(&[SessionAnalysisReport])
+  -> SessionAnalysisReport` (behavior preserved; unit tests added). Main's `aggregate_sessions`
+  now parses paths into reports and delegates; print/dispatch wrapper stays in main.
 - [ ] **D5 — dedup heatmap `normalize_path`**: `commands/sessions/heatmap.rs` calls the
   already-`pub` `normalize_session_analysis::normalize_path` instead of its copy. Effort S / trivial.
 - [x] **D6 — extraction-fixture harness → `normalize-facts`** (judgment call): ✅ DONE 2026-07-02.

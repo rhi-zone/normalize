@@ -475,6 +475,163 @@ impl SessionAnalysisReport {
         }
     }
 
+    /// Fold multiple per-session reports into a single aggregate report.
+    ///
+    /// This owns the aggregation semantics of the model: summing message and
+    /// tool statistics, merging command/retry stats by pattern, re-ranking
+    /// largest tool results, and extracting common tool patterns across all
+    /// sessions. Callers parse sessions into reports, then call this to combine
+    /// them. The resulting report's `format` is set to `"aggregate (N sessions)"`.
+    pub fn aggregate(reports: &[SessionAnalysisReport]) -> SessionAnalysisReport {
+        let mut aggregate = SessionAnalysisReport::new(PathBuf::from("."), "aggregate");
+        let mut all_chains = Vec::new();
+
+        for a in reports {
+            // Aggregate message counts
+            for (k, v) in &a.message_counts {
+                *aggregate.message_counts.entry(k.clone()).or_insert(0) += v;
+            }
+
+            // Aggregate tool stats
+            for (k, v) in &a.tool_stats {
+                let stat = aggregate
+                    .tool_stats
+                    .entry(k.clone())
+                    .or_insert_with(|| ToolStats::new(k));
+                stat.calls += v.calls;
+                stat.errors += v.errors;
+                stat.output_chars += v.output_chars;
+            }
+
+            // Collect largest tool results for later re-ranking
+            aggregate
+                .largest_tool_results
+                .extend(a.largest_tool_results.iter().cloned());
+
+            // Aggregate token stats
+            aggregate.token_stats.total_input += a.token_stats.total_input;
+            aggregate.token_stats.total_output += a.token_stats.total_output;
+            aggregate.token_stats.cache_read += a.token_stats.cache_read;
+            aggregate.token_stats.cache_create += a.token_stats.cache_create;
+            aggregate.token_stats.api_calls += a.token_stats.api_calls;
+            if a.token_stats.min_context > 0 {
+                aggregate
+                    .token_stats
+                    .update_context(a.token_stats.min_context);
+            }
+            if a.token_stats.max_context > 0 {
+                aggregate
+                    .token_stats
+                    .update_context(a.token_stats.max_context);
+            }
+
+            // Aggregate file tokens
+            for (k, v) in &a.file_tokens {
+                *aggregate.file_tokens.entry(k.clone()).or_insert(0) += v;
+            }
+
+            aggregate.total_turns += a.total_turns;
+            aggregate.parallel_opportunities += a.parallel_opportunities;
+
+            // Collect tool chains for pattern analysis
+            all_chains.extend(a.tool_chains.iter().cloned());
+
+            // Aggregate command stats by category
+            for cs in &a.command_stats {
+                if let Some(existing) = aggregate
+                    .command_stats
+                    .iter_mut()
+                    .find(|s| s.category == cs.category)
+                {
+                    existing.total_calls += cs.total_calls;
+                    existing.total_errors += cs.total_errors;
+                    existing.output_tokens += cs.output_tokens;
+                    // Merge command details
+                    for detail in &cs.commands {
+                        if let Some(ed) = existing
+                            .commands
+                            .iter_mut()
+                            .find(|d| d.pattern == detail.pattern)
+                        {
+                            ed.calls += detail.calls;
+                            ed.errors += detail.errors;
+                        } else {
+                            existing.commands.push(detail.clone());
+                        }
+                    }
+                } else {
+                    aggregate.command_stats.push(cs.clone());
+                }
+            }
+
+            // Aggregate retry hotspots by pattern
+            for rh in &a.retry_hotspots {
+                if let Some(existing) = aggregate
+                    .retry_hotspots
+                    .iter_mut()
+                    .find(|h| h.pattern == rh.pattern)
+                {
+                    existing.attempts += rh.attempts;
+                    existing.failures += rh.failures;
+                    existing.output_tokens += rh.output_tokens;
+                    existing
+                        .turn_indices
+                        .extend(rh.turn_indices.iter().cloned());
+                } else {
+                    aggregate.retry_hotspots.push(rh.clone());
+                }
+            }
+
+            // Aggregate actual cost
+            if let Some(cost) = a.actual_cost {
+                *aggregate.actual_cost.get_or_insert(0.0) += cost;
+            }
+
+            // Aggregate dedup token stats
+            if let Some(dedup) = &a.dedup_tokens {
+                let agg = aggregate
+                    .dedup_tokens
+                    .get_or_insert(DedupTokenStats::default());
+                agg.unique_input += dedup.unique_input;
+                agg.unique_output += dedup.unique_output;
+                agg.total_billed += dedup.total_billed;
+            }
+        }
+
+        // Sort aggregated command stats and details
+        aggregate
+            .command_stats
+            .sort_by_key(|b| std::cmp::Reverse(b.total_calls));
+        for cs in &mut aggregate.command_stats {
+            cs.commands.sort_by_key(|b| std::cmp::Reverse(b.calls));
+        }
+        aggregate
+            .retry_hotspots
+            .sort_by_key(|b| std::cmp::Reverse(b.failures));
+
+        // Extract common tool patterns from all chains
+        aggregate.tool_patterns = extract_tool_patterns(&all_chains);
+
+        // Recompute uniqueness_ratio for aggregate dedup stats
+        if let Some(dedup) = &mut aggregate.dedup_tokens
+            && dedup.total_billed > 0
+        {
+            dedup.uniqueness_ratio =
+                (dedup.unique_input + dedup.unique_output) as f64 / dedup.total_billed as f64;
+        }
+
+        // Re-rank and trim largest tool results across all sessions
+        aggregate
+            .largest_tool_results
+            .sort_by_key(|b| std::cmp::Reverse(b.chars));
+        aggregate.largest_tool_results.truncate(10);
+
+        // Update format to show aggregate info
+        aggregate.format = format!("aggregate ({} sessions)", reports.len());
+
+        aggregate
+    }
+
     /// Format as compact text (markdown, LLM-friendly, no colors).
     pub fn format_text(&self) -> String {
         let mut lines = vec![
@@ -2192,4 +2349,48 @@ pub fn analyze_session(session: &Session) -> SessionAnalysisReport {
         .sort_by_key(|b| std::cmp::Reverse(b.count));
 
     analysis
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn report_with(tool: &str, calls: usize, errors: usize, input: u64) -> SessionAnalysisReport {
+        let mut r = SessionAnalysisReport::new(PathBuf::from("s"), "claude");
+        let mut stat = ToolStats::new(tool);
+        stat.calls = calls;
+        stat.errors = errors;
+        stat.output_chars = 100;
+        r.tool_stats.insert(tool.to_string(), stat);
+        r.message_counts.insert("assistant".to_string(), calls);
+        r.token_stats.total_input = input;
+        r.total_turns = calls;
+        r
+    }
+
+    #[test]
+    fn aggregate_sums_tool_and_token_stats() {
+        let a = report_with("Read", 3, 1, 10);
+        let b = report_with("Read", 2, 0, 5);
+        let agg = SessionAnalysisReport::aggregate(&[a, b]);
+
+        let read = agg.tool_stats.get("Read").expect("Read tool present");
+        assert_eq!(read.calls, 5);
+        assert_eq!(read.errors, 1);
+        assert_eq!(read.output_chars, 200);
+        assert_eq!(agg.token_stats.total_input, 15);
+        assert_eq!(agg.total_turns, 5);
+        assert_eq!(agg.message_counts.get("assistant"), Some(&5));
+        assert_eq!(agg.format, "aggregate (2 sessions)");
+    }
+
+    #[test]
+    fn aggregate_merges_distinct_tools() {
+        let a = report_with("Read", 1, 0, 1);
+        let b = report_with("Edit", 4, 2, 2);
+        let agg = SessionAnalysisReport::aggregate(&[a, b]);
+        assert_eq!(agg.tool_stats.get("Read").unwrap().calls, 1);
+        assert_eq!(agg.tool_stats.get("Edit").unwrap().calls, 4);
+        assert_eq!(agg.total_tool_calls(), 5);
+    }
 }
