@@ -829,14 +829,23 @@ Done:
 - [x] Behavior preserved (clippy clean, tests green); B2/B3 unblocked.
 
 Follow-up discovered during the refactor:
-- [ ] **BUG: `tarjan_sccs` is broken — returns all singletons for real cycles**, so
-      `find_sccs` (circular-dependency clusters in `view graph`) always returns empty. Root
-      cause: the iterative Tarjan pushes its `Frame::Resume(node, "")` sentinel AFTER the
-      neighbor frames, so the SCC-root check (`lowlink == index`) runs before children update
-      `lowlink`. The characterization test `tarjan_and_find_sccs_current_behavior` PINS the
-      current (buggy) output — fix it and update that test together. Fixing likely means
-      pushing the sentinel FIRST (before neighbor frames) or restructuring the frame protocol.
-      Verify against a 3-cycle (`a→b→c→a` should be one SCC) and the self-loop case.
+- [x] **BUG: `tarjan_sccs` returned all singletons for real cycles** (fixed 2026-07-02).
+      Root cause confirmed as reported: the iterative Tarjan pushed its `Frame::Resume(node, "")`
+      sentinel AFTER the neighbor frames; the call stack is LIFO, so the sentinel was popped
+      FIRST and the SCC-root check (`lowlink == index`) ran before any child `Enter` frame.
+      Fix: push the sentinel FIRST so it is popped LAST, after all children propagate lowlink.
+      Replaced the buggy characterization test with a full correct-output SCC suite (2-cycle,
+      3-cycle, self-loop, nested/multiple SCCs, pure DAG, disconnected cycles, determinism).
+      `find_bridges` was audited for the same class of bug and found CORRECT (it uses a
+      `last_mut()` + adjacency-cursor pattern with post-processing on pop) — added a
+      bridge-vs-cycle-edge correctness test proving so.
+- [ ] **Real circular dependency now surfaced by `view graph` (module graph):** a 28-module
+      SCC inside `crates/normalize/src/` — the service layer (`service/mod.rs`, `service/view.rs`,
+      `service/config.rs`, `service/context.rs`, `service/package.rs`, `service/sessions.rs`, …)
+      tangled with `output.rs`, `config.rs`, and `index.rs`. This was invisible while
+      `tarjan_sccs` was broken. Fold into the main-crate decomposition audit below when
+      untangling the service layer; the mutual `output.rs` ↔ command/service coupling is the
+      likely knot.
 
 ### Main-crate decomposition audit (not yet done)
 

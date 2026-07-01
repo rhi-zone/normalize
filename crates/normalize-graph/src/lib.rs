@@ -250,12 +250,24 @@ pub fn tarjan_sccs(imports: &HashMap<String, HashSet<String>>) -> Vec<Vec<String
                     stack.push(node.clone());
                     on_stack.insert(node.clone());
 
+                    // Push the root-check sentinel FIRST so it is popped LAST —
+                    // after every child subtree has been fully explored and has
+                    // propagated its lowlink back via its own `Resume` frame. The
+                    // call stack is LIFO (pop-based), so "pushed first" == "popped
+                    // last". (Pushing the sentinel last, as before, ran the root
+                    // check before any child `Enter` frame, collapsing every SCC
+                    // to a singleton.)
+                    call_stack.push(Frame::Resume(node.clone(), String::new()));
+
                     let neighbors: Vec<String> = imports
                         .get(&node)
                         .map(|s| s.iter().cloned().collect())
                         .unwrap_or_default();
 
-                    // Push neighbors in reverse so we process them in order
+                    // Push neighbors in reverse so we process them in order (LIFO).
+                    // Each unvisited neighbor gets an `Enter` (explore) followed by
+                    // a `Resume(node, neighbor)` that propagates the child's lowlink
+                    // back into `node` on the way up.
                     for neighbor in neighbors.into_iter().rev() {
                         if !indices.contains_key(&neighbor) {
                             call_stack.push(Frame::Resume(node.clone(), neighbor.clone()));
@@ -267,10 +279,6 @@ pub fn tarjan_sccs(imports: &HashMap<String, HashSet<String>>) -> Vec<Vec<String
                             lowlink.insert(node.clone(), nl.min(ni));
                         }
                     }
-
-                    // After processing all neighbors, check if this is a root
-                    // We need a sentinel to know when we're done with a node
-                    call_stack.push(Frame::Resume(node.clone(), String::new()));
                 }
                 Frame::Resume(node, neighbor) => {
                     if neighbor.is_empty() {
@@ -734,27 +742,165 @@ mod tests {
         assert_eq!(wcc[1], vec!["x", "y"]);
     }
 
+    /// Normalize `tarjan_sccs` output for order-independent comparison: sort
+    /// members within each SCC (already done inside the algorithm) and sort the
+    /// list of SCCs so assertions are stable despite HashMap iteration order.
+    fn sorted_sccs(graph: &HashMap<String, HashSet<String>>) -> Vec<Vec<String>> {
+        let mut sccs = tarjan_sccs(graph);
+        for scc in &mut sccs {
+            scc.sort();
+        }
+        sccs.sort();
+        sccs
+    }
+
+    /// Membership sets of the non-trivial SCCs found by `find_sccs`, sorted for
+    /// stable comparison.
+    fn sorted_scc_clusters(graph: &HashMap<String, HashSet<String>>) -> Vec<Vec<String>> {
+        let mut clusters: Vec<Vec<String>> = find_sccs(graph)
+            .into_iter()
+            .map(|s| {
+                let mut m = s.modules;
+                m.sort();
+                m
+            })
+            .collect();
+        clusters.sort();
+        clusters
+    }
+
     #[test]
-    fn tarjan_and_find_sccs_current_behavior() {
-        // KNOWN BUG being characterized (NOT endorsed): the iterative Tarjan
-        // pushes its `Frame::Resume(node, "")` sentinel AFTER the neighbor
-        // frames, so the SCC-root check runs before children update `lowlink`.
-        // Consequence: `tarjan_sccs` returns ALL singletons even for a real
-        // cycle, so `find_sccs` (circular-dependency detection) always returns
-        // empty. This test pins that current output so the presentation split
-        // is provably behavior-preserving; it does NOT assert correctness.
-        // See TODO.md "tarjan_sccs is broken" for the fix (a separate change).
-        let graph = g(&[("a", "b"), ("b", "c"), ("c", "a"), ("c", "d")]);
-        assert!(
-            find_sccs(&graph).is_empty(),
-            "current (buggy) behavior: no SCC detected"
+    fn tarjan_two_cycle_single_scc() {
+        // a -> b -> a : one SCC {a, b}.
+        let graph = g(&[("a", "b"), ("b", "a")]);
+        assert_eq!(
+            sorted_sccs(&graph),
+            vec![vec!["a".to_string(), "b".to_string()]]
         );
-        // Every node is reported as its own trivial SCC.
-        assert_eq!(tarjan_sccs(&graph).len(), 4);
-        // A correct Tarjan would instead group {a,b,c}; pin the singleton bug.
-        let two = g(&[("a", "b"), ("b", "a")]);
-        assert_eq!(tarjan_sccs(&two).len(), 2);
-        assert!(find_sccs(&two).is_empty());
+        assert_eq!(
+            sorted_scc_clusters(&graph),
+            vec![vec!["a".to_string(), "b".to_string()]]
+        );
+    }
+
+    #[test]
+    fn tarjan_three_cycle_single_scc() {
+        // a -> b -> c -> a : one SCC of size 3.
+        let graph = g(&[("a", "b"), ("b", "c"), ("c", "a")]);
+        assert_eq!(
+            sorted_sccs(&graph),
+            vec![vec!["a".to_string(), "b".to_string(), "c".to_string()]]
+        );
+    }
+
+    #[test]
+    fn tarjan_cycle_with_dangling_tail() {
+        // a -> b -> c -> a plus c -> d (a DAG tail off the cycle).
+        // SCCs: {a,b,c} and singleton {d}. find_sccs reports only {a,b,c}.
+        let graph = g(&[("a", "b"), ("b", "c"), ("c", "a"), ("c", "d")]);
+        assert_eq!(
+            sorted_sccs(&graph),
+            vec![
+                vec!["a".to_string(), "b".to_string(), "c".to_string()],
+                vec!["d".to_string()],
+            ]
+        );
+        assert_eq!(
+            sorted_scc_clusters(&graph),
+            vec![vec!["a".to_string(), "b".to_string(), "c".to_string()]]
+        );
+    }
+
+    #[test]
+    fn tarjan_self_loop_is_own_scc() {
+        // Tarjan treats a self-loop node as its own (size-1) SCC. `find_sccs`
+        // filters len <= 1, so a self-loop is NOT reported as a cluster.
+        let graph = g(&[("a", "a")]);
+        assert_eq!(sorted_sccs(&graph), vec![vec!["a".to_string()]]);
+        assert!(find_sccs(&graph).is_empty());
+    }
+
+    #[test]
+    fn tarjan_multiple_sccs_with_connecting_dag() {
+        // Two disjoint cycles {a,b} and {c,d} joined by a DAG edge b -> c, plus
+        // a lone DAG node e off the second cycle (d -> e).
+        // SCCs: {a,b}, {c,d}, {e}. find_sccs reports {a,b} and {c,d}.
+        let graph = g(&[
+            ("a", "b"),
+            ("b", "a"),
+            ("c", "d"),
+            ("d", "c"),
+            ("b", "c"),
+            ("d", "e"),
+        ]);
+        assert_eq!(
+            sorted_sccs(&graph),
+            vec![
+                vec!["a".to_string(), "b".to_string()],
+                vec!["c".to_string(), "d".to_string()],
+                vec!["e".to_string()],
+            ]
+        );
+        assert_eq!(
+            sorted_scc_clusters(&graph),
+            vec![
+                vec!["a".to_string(), "b".to_string()],
+                vec!["c".to_string(), "d".to_string()],
+            ]
+        );
+    }
+
+    #[test]
+    fn tarjan_pure_dag_no_nontrivial_sccs() {
+        // a -> b -> c, a -> c : acyclic, every SCC is a singleton.
+        let graph = g(&[("a", "b"), ("b", "c"), ("a", "c")]);
+        assert_eq!(
+            sorted_sccs(&graph),
+            vec![
+                vec!["a".to_string()],
+                vec!["b".to_string()],
+                vec!["c".to_string()],
+            ]
+        );
+        assert!(find_sccs(&graph).is_empty());
+    }
+
+    #[test]
+    fn tarjan_disconnected_components_each_with_cycle() {
+        // Two disconnected islands, each a 2-cycle: {a,b} and {x,y}.
+        let graph = g(&[("a", "b"), ("b", "a"), ("x", "y"), ("y", "x")]);
+        assert_eq!(
+            sorted_scc_clusters(&graph),
+            vec![
+                vec!["a".to_string(), "b".to_string()],
+                vec!["x".to_string(), "y".to_string()],
+            ]
+        );
+    }
+
+    #[test]
+    fn tarjan_deterministic_across_runs() {
+        // A 3-cycle feeding a nested 2-cycle. Repeated runs must be identical
+        // despite HashMap ordering.
+        let graph = g(&[
+            ("a", "b"),
+            ("b", "c"),
+            ("c", "a"),
+            ("c", "d"),
+            ("d", "e"),
+            ("e", "d"),
+        ]);
+        let first = sorted_sccs(&graph);
+        for _ in 0..20 {
+            assert_eq!(sorted_sccs(&graph), first);
+        }
+        assert_eq!(
+            first,
+            vec![
+                vec!["a".to_string(), "b".to_string(), "c".to_string()],
+                vec!["d".to_string(), "e".to_string()],
+            ]
+        );
     }
 
     #[test]
@@ -816,6 +962,20 @@ mod tests {
         assert!(find_bridges(&cycle).is_empty());
         let bidir = g(&[("a", "b"), ("b", "a")]);
         assert!(find_bridges(&bidir).is_empty());
+    }
+
+    #[test]
+    fn find_bridges_cycle_edge_not_a_bridge_tail_edge_is() {
+        // A 3-cycle {a,b,c} with a tail edge c -> d. Removing c->d disconnects
+        // d, so c->d IS a bridge. No edge inside the cycle is a bridge (each has
+        // an alternate path). Proves find_bridges distinguishes cut edges from
+        // cycle edges — the same frame-ordering class of bug that hit tarjan.
+        let graph = g(&[("a", "b"), ("b", "c"), ("c", "a"), ("c", "d")]);
+        let bridges: Vec<(String, String)> = find_bridges(&graph)
+            .into_iter()
+            .map(|b| (b.from, b.to))
+            .collect();
+        assert_eq!(bridges, vec![("c".to_string(), "d".to_string())]);
     }
 
     #[test]

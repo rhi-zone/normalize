@@ -23,6 +23,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Circular-dependency detection (`normalize view graph`) now works.** SCC computation
+  (`normalize-graph::tarjan_sccs`/`find_sccs`) silently returned no clusters even for real
+  cycles due to a frame-ordering bug in the iterative Tarjan: the root-check sentinel was
+  pushed onto the LIFO work stack after the child frames, so it ran before children
+  propagated their lowlinks and every SCC collapsed to a singleton. The sentinel is now
+  pushed first (popped last), so cycles are detected correctly. Added a full SCC test suite;
+  `find_bridges` was audited for the same defect and confirmed correct.
+
 - **Import-graph commands no longer silently succeed with an empty result when the import
   graph is empty.** `view graph`, `view dependents`, `view import-path`, `rank imports`,
   `rank depth-map`, `rank layering`, and `analyze architecture` now exit non-zero with an
