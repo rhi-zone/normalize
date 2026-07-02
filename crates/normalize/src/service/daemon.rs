@@ -1,6 +1,6 @@
 //! Daemon management service for server-less CLI.
 
-use crate::daemon::{self, DaemonClient, Event, global_socket_path};
+use crate::daemon::{DaemonClient, Event, global_socket_path};
 use crate::output::OutputFormatter;
 use server_less::cli;
 use std::path::PathBuf;
@@ -289,17 +289,27 @@ impl DaemonService {
     ///   normalize daemon run                 # run daemon in foreground with log output
     #[cli(display_with = "display_output")]
     pub async fn run(&self) -> Result<DaemonRunReport, String> {
-        match daemon::run_daemon().await {
-            Ok(code) => {
-                if code == 0 {
-                    Ok(DaemonRunReport {
-                        status: "Daemon exited".to_string(),
-                    })
-                } else {
-                    Err(format!("Daemon exited with code {}", code))
+        #[cfg(feature = "daemon")]
+        {
+            match crate::daemon::run_daemon().await {
+                Ok(code) => {
+                    if code == 0 {
+                        Ok(DaemonRunReport {
+                            status: "Daemon exited".to_string(),
+                        })
+                    } else {
+                        Err(format!("Daemon exited with code {}", code))
+                    }
                 }
+                Err(e) => Err(format!("Daemon error: {}", e)),
             }
-            Err(e) => Err(format!("Daemon error: {}", e)),
+        }
+
+        #[cfg(not(feature = "daemon"))]
+        {
+            Err("The daemon server requires the 'daemon' feature. \
+                 Rebuild with: cargo build --features daemon"
+                .to_string())
         }
     }
 

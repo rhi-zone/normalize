@@ -8,6 +8,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`daemon` feature flag** — the background daemon **server** (multi-root file watcher +
+  incremental index refresh, Unix-only) is now gated behind a `daemon` feature (`default = true`,
+  so the stock binary is unchanged). The feature pulls the `notify` filesystem watcher, now
+  `optional` — a build without `daemon` drops it from the dependency tree entirely. The daemon
+  **client** stays always-compiled (on Unix): edit/context service flows still push change
+  notifications, and with the server gated out they transparently fall back to the no-daemon
+  path (identical to the daemon simply not running). `normalize daemon run` built without the
+  feature prints a clear "requires the 'daemon' feature" message and exits non-zero. This
+  completes the capability-surface feature pass (serve transports + daemon).
+
 - **Serve transport feature flags** — the `normalize serve` transports are now individually
   gated capability surfaces: `lsp` (LSP/`tower-lsp`), `http` (HTTP REST + OpenAPI/`axum` +
   `utoipa`), and `mcp` (MCP/`rmcp`), with a `serve` umbrella that enables all three. All are

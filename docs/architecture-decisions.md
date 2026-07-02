@@ -583,3 +583,47 @@ MCP server — previously it was opt-in behind a non-default `mcp` feature. This
 the MCP server is a first-class LLM-integration surface and the marginal binary cost is
 accepted for out-of-the-box availability, consistent with the "embed, don't require external
 tools" posture elsewhere in this document.
+
+## Capability-Surface Feature Flags: Daemon Client vs Server
+
+**Decision**: The background daemon **server** (multi-root file watcher + incremental index
+refresh, Unix-only) is gated behind a `daemon` feature (`default = true`) that owns the
+`optional` `notify` dependency. The daemon **client** is *not* gated — it is always compiled
+on Unix.
+
+### Why the client stays in core but the server is gated
+
+The daemon has two halves with opposite coupling profiles:
+
+- The **server** is a leaf: nothing else in the crate depends on `DaemonServer`, `run_daemon`,
+  or the `notify` watcher. It is a self-contained capability with a heavy, distinctive
+  dependency (`notify` — inotify/kqueue/FSEvents backends). It fits the same
+  capability-surface test as the serve transports: "does a consumer want normalize without the
+  background watcher?" — yes (CI one-shot invocations, library embedders, minimal builds), so
+  it is gated, and `notify` leaves the dependency tree when it's off.
+
+- The **client** is cross-cutting: `DaemonClient` is called from `service/edit.rs` (push
+  file-change notifications after refactoring edits) and `service/context.rs` (query the
+  daemon's warm context index) on *every* relevant invocation, regardless of whether this
+  build can *start* a server. The client is also cheap — a Unix-socket connector plus the
+  shared `Request`/`Response`/`Event` protocol types, no heavy deps. Gating it would force
+  every call site to `#[cfg]`-branch and would change behavior, not just availability.
+
+Crucially, the client already degrades gracefully at runtime: when no daemon is listening it
+returns `Err`/`Ok(())` and callers fall through to their local (non-daemon) computation. A
+build with the server compiled out is therefore **behaviorally identical to the daemon simply
+not running** — the client finds no socket and the existing fallback path handles it. This is
+why gating only the server (and the `maybe_start_daemon` auto-start, which becomes a no-op)
+is sufficient and requires no changes at the client call sites.
+
+### Structure
+
+`daemon.rs` keeps the protocol types (`Event`, `Request`, `Response`, `DaemonConfig`) and the
+`DaemonClient` (plus shared socket/lock helpers: `global_socket_path`, `try_flock`,
+`spawn_lock_path`, `daemon_log_path`) always-compiled under `#[cfg(unix)]`. Everything
+server-side — `DaemonServer`, `run_daemon`, the `notify` watcher, `ContextIndex`, spin
+detection, and the server-side tests — carries `#[cfg(feature = "daemon")]`. `Response::ok`/
+`err` are gated too, since only the server constructs responses (the client deserializes them
+off the wire). The `normalize daemon run` service method keeps its signature (the server-less
+`#[cli]` macro generates dispatch before cfg-stripping) and `#[cfg]`-branches its **body** to a
+"requires the 'daemon' feature" runtime error, mirroring the serve-transport stub pattern.

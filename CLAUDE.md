@@ -45,6 +45,7 @@ Current feature flags on the main `normalize` crate:
 - `jq-cli` / `rg-cli` / `ast-grep-cli` — drop-in CLI replacements; `ast-grep-cli` also owns `dep:clap`. `cli-full` bundles all three.
 - `lsp` / `http` / `mcp` — **serve transports**, one capability surface per protocol over the shared service layer. Each pulls only its own transport stack (`tower-lsp`; `axum` + `utoipa`; `rmcp`). `serve` is the umbrella (all three). All are `default = true` via `serve`, so the stock binary ships LSP + HTTP + MCP; a transport compiled out degrades to a clear "requires the '<feature>' feature" error at runtime rather than a missing subcommand.
 - `sessions-web` — the sessions web UI; reuses the HTTP stack (`sessions-web = ["http"]`).
+- `daemon` — the background daemon **server** (multi-root file watcher + incremental index refresh, Unix-only; pulls `dep:notify`). `default = true`. The daemon **client** is always compiled (on Unix) because edit/context service flows push change notifications to a running daemon; gating `daemon` off removes only the server + auto-start, and the client transparently falls back to the no-daemon path. `normalize daemon run` compiled without the feature returns a clear "requires the 'daemon' feature" error.
 
 The `fix` feature exists on feature crates (e.g. `normalize-edit`), not on the main crate. Some workspace crates additionally gate library-vs-CLI surfaces behind their own `cli` feature.
 

@@ -16,7 +16,7 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [features]
-default = ["cli-full", "serve"]
+default = ["cli-full", "serve", "daemon"]
 
 # Core normalize CLI (server-less proc macro; clap re-exported from server-less)
 cli = []
@@ -39,6 +39,13 @@ serve = ["lsp", "http", "mcp"]
 
 # Build sessions web UI (requires bun/npm, enable in CI). Reuses the HTTP stack.
 sessions-web = ["http"]
+
+# Background daemon SERVER (multi-root file watcher + incremental index refresh,
+# Unix-only). Pulls the `notify` filesystem watcher. The daemon CLIENT is always
+# compiled (on Unix) so edit/context service flows can push changes to a running
+# daemon; disabling this feature only removes the server + auto-start, and the
+# client transparently falls back to the no-daemon path.
+daemon = ["cli", "dep:notify"]
 
 [dependencies]
 clap = { workspace = true, optional = true }
@@ -108,7 +115,7 @@ rayon.workspace = true
 tokio.workspace = true
 axum = { workspace = true, optional = true }
 utoipa = { version = "5", features = ["axum_extras"], optional = true }
-notify.workspace = true
+notify = { workspace = true, optional = true }
 ureq = { version = "2", features = ["json"] }
 flate2 = "1"
 sha2 = "0.10"

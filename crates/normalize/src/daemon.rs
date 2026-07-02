@@ -172,6 +172,9 @@ pub struct Response {
     pub error: Option<String>,
 }
 
+// `Response::ok`/`err` are only constructed by the daemon server; the client
+// deserializes responses off the wire and never builds them.
+#[cfg(feature = "daemon")]
 impl Response {
     fn ok(data: serde_json::Value) -> Self {
         Self {
@@ -196,15 +199,28 @@ impl Response {
 #[cfg(unix)]
 mod unix_impl {
     use super::*;
-    use crate::config::NormalizeConfig;
-    use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
-    use std::collections::{HashMap, HashSet};
     use std::os::unix::net::UnixStream;
+    use std::time::Duration;
+
+    // Server-only imports. The daemon SERVER (watcher + incremental refresh) is
+    // gated behind the `daemon` feature; the CLIENT below is always compiled.
+    #[cfg(feature = "daemon")]
+    use crate::config::NormalizeConfig;
+    #[cfg(feature = "daemon")]
+    use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+    #[cfg(feature = "daemon")]
+    use std::collections::{HashMap, HashSet};
+    #[cfg(feature = "daemon")]
     use std::sync::mpsc::{Sender, channel};
+    #[cfg(feature = "daemon")]
     use std::sync::{Arc, Condvar, Mutex};
-    use std::time::{Duration, Instant};
+    #[cfg(feature = "daemon")]
+    use std::time::Instant;
+    #[cfg(feature = "daemon")]
     use tokio::io::{AsyncBufReadExt, AsyncReadExt};
+    #[cfg(feature = "daemon")]
     use tokio::net::UnixListener;
+    #[cfg(feature = "daemon")]
     use tokio::sync::broadcast;
 
     /// Hash of the inputs that produced cached diagnostic blobs, used to
@@ -225,6 +241,7 @@ mod unix_impl {
     /// blake3 is used over SHA-2 because it's already a workspace dep
     /// (rkyv-related work pulled it in) and is faster on the small inputs we
     /// hash here.
+    #[cfg(feature = "daemon")]
     pub(super) fn compute_config_hash(root: &Path) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(env!("CARGO_PKG_VERSION").as_bytes());
@@ -256,6 +273,7 @@ mod unix_impl {
     /// custom rule files changed since the last prime, so their rule IDs can
     /// be routed through [`DaemonServer::surgical_rerun_rules`] (Tier 2)
     /// instead of falling back to a full reprime (Tier 3).
+    #[cfg(feature = "daemon")]
     fn hash_scm_files(root: &Path) -> HashMap<PathBuf, [u8; 32]> {
         let mut map = HashMap::new();
         let rules_dir = root.join(".normalize/rules");
@@ -284,6 +302,7 @@ mod unix_impl {
     /// We use the stem here because reading frontmatter from every changed
     /// file on every config reload would be wasteful; the stem convention
     /// covers the vast majority of custom rules.
+    #[cfg(feature = "daemon")]
     fn scm_path_to_rule_id(path: &Path) -> Option<String> {
         path.file_stem()
             .and_then(|s| s.to_str())
@@ -306,6 +325,7 @@ mod unix_impl {
 
     /// Get the daemon lock file path (~/.config/normalize/daemon.lock)
     /// Used by the daemon process to ensure only one instance runs.
+    #[cfg(feature = "daemon")]
     fn daemon_lock_path() -> PathBuf {
         daemon_config_dir().join("daemon.lock")
     }
@@ -379,6 +399,7 @@ mod unix_impl {
     }
 
     /// Acquire the daemon singleton lock. Only the daemon process should call this.
+    #[cfg(feature = "daemon")]
     fn acquire_daemon_lock() -> Result<std::fs::File, String> {
         let path = daemon_lock_path();
         let file = try_flock(&path).map_err(|_| "Another daemon is already running".to_string())?;
@@ -407,6 +428,7 @@ mod unix_impl {
     /// Errors on individual directories are logged at warn level and otherwise
     /// ignored — losing one watch is far better than aborting the whole prime
     /// because (e.g.) one subdir hit `EACCES`.
+    #[cfg(feature = "daemon")]
     pub(super) fn watch_tree_non_recursive(
         watcher: &mut RecommendedWatcher,
         root: &Path,
@@ -436,12 +458,14 @@ mod unix_impl {
     /// Holds pre-parsed blocks keyed by absolute file path. Rebuilt incrementally
     /// when `.normalize/context/` files change via the file watcher, so
     /// `QueryContext` requests return results without any filesystem I/O.
+    #[cfg(feature = "daemon")]
     struct ContextIndex {
         /// Blocks keyed by absolute file path. Each value is a vec of
         /// `(frontmatter_json, body)` pairs for the blocks in that file.
         entries: HashMap<PathBuf, Vec<(serde_json::Value, String)>>,
     }
 
+    #[cfg(feature = "daemon")]
     impl ContextIndex {
         fn new() -> Self {
             Self {
@@ -523,6 +547,7 @@ mod unix_impl {
     }
 
     /// Convert a `serde_json::Value` back to `serde_yaml::Value` for block_matches.
+    #[cfg(feature = "daemon")]
     fn context_json_to_yaml(v: &serde_json::Value) -> serde_yaml::Value {
         match v {
             serde_json::Value::Null => serde_yaml::Value::Null,
@@ -573,6 +598,7 @@ mod unix_impl {
     /// Roots are independent — each refresh writes only its own repo's
     /// `.normalize/index.sqlite`, with no cross-root ordering dependency — so the
     /// consumer may drain and process them in any order.
+    #[cfg(feature = "daemon")]
     struct DirtyRoots {
         /// `(set of dirty roots, shutdown flag)`. The shutdown flag lets a
         /// graceful stop wake a blocked consumer so its thread can exit.
@@ -580,6 +606,7 @@ mod unix_impl {
         signal: Condvar,
     }
 
+    #[cfg(feature = "daemon")]
     impl DirtyRoots {
         fn new() -> Self {
             Self {
@@ -633,6 +660,7 @@ mod unix_impl {
 
     /// A watched root. The shared watcher is owned by `DaemonServer`; this struct
     /// tracks per-root metadata only.
+    #[cfg(feature = "daemon")]
     struct WatchedRoot {
         last_refresh: Instant,
         /// Timestamps of recent `refresh_root` invocations, newest last. Used by
@@ -691,6 +719,7 @@ mod unix_impl {
     }
 
     /// Sliding window over which refresh density is measured for spin detection.
+    #[cfg(feature = "daemon")]
     const SPIN_WINDOW: Duration = Duration::from_secs(10);
     /// Minimum number of refreshes within [`SPIN_WINDOW`] before a self-write
     /// overlap is treated as a spin loop. 5-in-10s is well above any plausible
@@ -698,17 +727,21 @@ mod unix_impl {
     /// per 500ms here) but trips quickly once the daemon is re-indexing its own
     /// writes in a tight loop. The overlap check is the real signal; the density
     /// gate just avoids flagging a single coincidental self-write.
+    #[cfg(feature = "daemon")]
     const SPIN_DENSITY_THRESHOLD: usize = 5;
     /// How long to back off refreshes for a root after a spin is detected. Long
     /// enough to break the feedback loop and let any in-flight writes settle,
     /// short enough that legitimate work resumes promptly.
+    #[cfg(feature = "daemon")]
     const SPIN_COOLDOWN: Duration = Duration::from_secs(30);
     /// Cap on retained spin warnings; keeps `status()` bounded.
+    #[cfg(feature = "daemon")]
     const MAX_SPIN_WARNINGS: usize = 32;
 
     /// A recorded spin-loop detection, surfaced via `normalize daemon status`.
     /// This is the channel that actually reaches the user given the daemon's
     /// stdout/stderr are nulled on auto-start.
+    #[cfg(feature = "daemon")]
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub(super) struct SpinWarning {
         /// The watched root that was re-indexing its own state directory.
@@ -723,6 +756,7 @@ mod unix_impl {
     }
 
     /// Global daemon server managing multiple roots.
+    #[cfg(feature = "daemon")]
     struct DaemonServer {
         roots: Mutex<HashMap<PathBuf, WatchedRoot>>,
         /// Recent spin-loop detections, newest last, capped to the most recent
@@ -750,6 +784,7 @@ mod unix_impl {
     }
 
     /// Response type for binary rkyv IPC.
+    #[cfg(feature = "daemon")]
     enum RawResponse {
         /// Serialized rkyv payload.
         Frame(Vec<u8>),
@@ -757,6 +792,7 @@ mod unix_impl {
         Error(String),
     }
 
+    #[cfg(feature = "daemon")]
     impl DaemonServer {
         fn new(
             refresh_tx: Sender<PathBuf>,
@@ -2918,6 +2954,7 @@ mod unix_impl {
     }
 
     /// Run the global daemon server.
+    #[cfg(feature = "daemon")]
     pub async fn run_daemon() -> Result<i32, Box<dyn std::error::Error>> {
         let socket_path = global_socket_path();
 
@@ -3273,6 +3310,7 @@ mod unix_impl {
     }
 
     /// Handle one JSON request line in the legacy JSON IPC protocol.
+    #[cfg(feature = "daemon")]
     async fn handle_json_line(
         server: &Arc<DaemonServer>,
         line: &str,
@@ -3352,6 +3390,7 @@ mod unix_impl {
     /// Protocol: client sends `[0x01][json_request_bytes][\n]` (magic byte already
     /// consumed by the caller).  Daemon responds with `[type_byte][4-byte LE len][payload]`
     /// where `type_byte` is `0x01` (rkyv payload) or `0x00` (JSON error string).
+    #[cfg(feature = "daemon")]
     async fn handle_rkyv_connection(
         server: &Arc<DaemonServer>,
         reader: &mut tokio::io::BufReader<tokio::net::unix::OwnedReadHalf>,
@@ -3783,7 +3822,7 @@ mod unix_impl {
     // `DaemonServer` (with no real watchers/runtime) and exercise the
     // per-file storage + delta logic directly.
     // =========================================================================
-    #[cfg(test)]
+    #[cfg(all(test, feature = "daemon"))]
     mod config_hash_tests {
         use super::*;
 
@@ -3834,7 +3873,7 @@ mod unix_impl {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "daemon"))]
     mod per_file_tests {
         use super::*;
         use normalize_output::diagnostics::{Issue, Severity};
@@ -4270,7 +4309,7 @@ allow = ["a.rs"]
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "daemon"))]
     mod spin_tests {
         use super::*;
 
@@ -4536,9 +4575,10 @@ allow = ["a.rs"]
 }
 
 #[cfg(unix)]
-pub use unix_impl::{
-    DaemonClient, daemon_log_path, global_socket_path, open_daemon_log_writer, run_daemon,
-};
+pub use unix_impl::{DaemonClient, daemon_log_path, global_socket_path, open_daemon_log_writer};
+
+#[cfg(all(unix, feature = "daemon"))]
+pub use unix_impl::run_daemon;
 
 // ============================================================================
 // Auto-start helper
@@ -4546,7 +4586,7 @@ pub use unix_impl::{
 
 /// Ensure daemon is running and watching this root.
 pub fn maybe_start_daemon(root: &Path) {
-    #[cfg(unix)]
+    #[cfg(all(unix, feature = "daemon"))]
     {
         use crate::config::NormalizeConfig;
         let config = NormalizeConfig::load(root);
@@ -4570,8 +4610,11 @@ pub fn maybe_start_daemon(root: &Path) {
         }
     }
 
-    #[cfg(not(unix))]
-    let _ = root; // daemon not supported on non-Unix platforms
+    // No server to auto-start: non-Unix platform, or the `daemon` feature is
+    // disabled. The client still works if a daemon is running; it just won't be
+    // auto-started here.
+    #[cfg(not(all(unix, feature = "daemon")))]
+    let _ = root;
 }
 
 // ============================================================================

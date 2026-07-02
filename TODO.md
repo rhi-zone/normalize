@@ -32,8 +32,16 @@ B0 (guide-regression test, CLAUDE.md crate count) and B1 (`normalize-git` extrac
   fixed the latent `--features cli` clap-compile bug). MCP is now in the default build.
   `--no-default-features` drops axum 0.8/utoipa/tower-lsp/rmcp (verified via `cargo tree`; the
   residual axum 0.6 is an unrelated libsql→tonic transitive). CI `features` job added.
-- [ ] **Daemon half (remaining).** Apply the same capability-surface gating to the daemon
-  (append `daemon` to `default`, gate its deps). Separate pass — not done here.
+- [x] **Daemon half (2026-07-02).** Daemon **server** (watcher + incremental refresh) gated
+  behind `daemon` feature (`default = [cli-full, serve, daemon]`); `notify` made `optional` and
+  now leaves the dep tree when `daemon` is off (verified via `cargo tree -i notify`). The daemon
+  **client** (`DaemonClient` + `Request`/`Response`/`Event` protocol + socket/lock helpers) stays
+  always-compiled on Unix, so `service/edit.rs` and `service/context.rs` call sites are unchanged
+  and fall through to their existing no-daemon path when no server is running/built. `maybe_start_daemon`
+  is a no-op without the feature; `normalize daemon run` body `#[cfg]`-branches to a "requires the
+  'daemon' feature" error (mirrors serve stubs). `Response::ok`/`err` and server-side tests gated
+  too. CI `features` job gained a `cli,daemon` combo; the `cli`-only combo now also exercises the
+  daemon-off path. **Capability-surface pass complete (serve + daemon).**
 - [ ] **Pre-existing: bare `--no-default-features` lib does not compile.** Orthogonal to serve:
   `commands/grammars.rs` and `commands/init.rs` reference the cli-gated `crate::service::grammars::
   GrammarService` unconditionally, so building the lib without `cli` fails (E0433). Fence it

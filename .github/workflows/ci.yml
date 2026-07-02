@@ -53,11 +53,13 @@ jobs:
         with:
           workspaces: "crates -> target"
 
-      # Guards the capability-surface feature taxonomy so serve-transport combos
-      # don't bit-rot. The binary requires `cli` (required-features), so the
-      # minimal buildable core is `--features cli` — it must NOT pull the serve
-      # deps (axum/utoipa/tower-lsp/rmcp). Each serve leaf is checked in isolation
-      # so a transport can be dropped independently.
+      # Guards the capability-surface feature taxonomy so serve-transport and
+      # daemon combos don't bit-rot. The binary requires `cli` (required-features),
+      # so the minimal buildable core is `--features cli` — it must NOT pull the
+      # serve deps (axum/utoipa/tower-lsp/rmcp) or the daemon watcher (notify).
+      # Each surface leaf is checked in isolation so it can be dropped
+      # independently. The `cli`-only combo also exercises the daemon-off path
+      # (client always compiled, server gated out).
       #
       # NOTE: bare `--no-default-features` (lib without `cli`) currently fails to
       # compile due to a pre-existing cli/service boundary bug (commands/ referencing
@@ -71,6 +73,8 @@ jobs:
         run: cargo check -p normalize --no-default-features --features cli,http
       - name: MCP only
         run: cargo check -p normalize --no-default-features --features cli,mcp
+      - name: Daemon only
+        run: cargo check -p normalize --no-default-features --features cli,daemon
       - name: Default (cli-full + serve)
         run: cargo check -p normalize
       - name: All features
