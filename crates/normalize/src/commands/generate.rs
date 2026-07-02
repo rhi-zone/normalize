@@ -1,5 +1,6 @@
 //! Generate command - code generation from API specs and schemas.
 
+#[cfg(feature = "cli")]
 use std::path::PathBuf;
 
 #[derive(Clone, Copy, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
@@ -346,6 +347,7 @@ fn write_generate_result(
 }
 
 /// Read input content from file or stdin.
+#[cfg(feature = "cli")]
 fn read_input(input: &std::path::Path) -> Result<String, String> {
     if input.as_os_str() == "-" {
         use std::io::Read;
@@ -361,6 +363,7 @@ fn read_input(input: &std::path::Path) -> Result<String, String> {
 }
 
 /// Core CLI snapshot generation logic.
+#[cfg(feature = "cli")]
 fn generate_cli_snapshot_code(
     binary: &std::path::Path,
     name: Option<String>,

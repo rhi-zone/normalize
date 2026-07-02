@@ -2,8 +2,11 @@
 
 use crate::output::OutputFormatter;
 use serde::Serialize;
+#[cfg(feature = "cli")]
 use std::io::IsTerminal;
-use std::path::{Path, PathBuf};
+#[cfg(feature = "cli")]
+use std::path::Path;
+use std::path::PathBuf;
 
 /// A single grammar entry with its name and file path.
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -82,14 +85,17 @@ impl OutputFormatter for GrammarPathsReport {
 /// install. Its presence is the signal "we've checked; don't auto-install
 /// again on every command." Format: a single line containing the version (or
 /// `prebuilt` when the dir was already populated by `xtask build-grammars`).
+#[cfg(feature = "cli")]
 const INSTALLED_STAMP: &str = ".installed-version";
 
 /// Where grammars are auto-installed for the current user.
+#[cfg(feature = "cli")]
 fn user_grammars_dir() -> Option<PathBuf> {
     dirs::config_dir().map(|c| c.join("normalize/grammars"))
 }
 
 /// Returns true if the user grammars directory has at least one `.so`/`.dylib`/`.dll`.
+#[cfg(feature = "cli")]
 fn dir_has_grammars(dir: &Path) -> bool {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return false;
@@ -105,6 +111,7 @@ fn dir_has_grammars(dir: &Path) -> bool {
 /// Mark the user grammar install dir as "checked" so we don't re-attempt
 /// auto-install on every invocation. Best-effort; failures are silent because
 /// the worst case is "we re-check next time."
+#[cfg(feature = "cli")]
 fn write_installed_stamp(dir: &Path, marker: &str) {
     let _ = std::fs::create_dir_all(dir);
     let _ = std::fs::write(dir.join(INSTALLED_STAMP), marker);
@@ -112,6 +119,11 @@ fn write_installed_stamp(dir: &Path, marker: &str) {
 
 /// Outcome of a first-run grammar check, reported back to the caller so it
 /// can decide whether to proceed (e.g. `init` may want to print a notice).
+///
+/// Gated behind `cli`: the auto-install path drives `GrammarService`, which
+/// lives in the (cli-only) service layer. The core library never installs
+/// grammars.
+#[cfg(feature = "cli")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GrammarsFirstRun {
     /// Stamp file existed; nothing to do.
@@ -150,6 +162,7 @@ pub enum GrammarsFirstRun {
 /// This is meant to be called at most once per process, before any command
 /// that needs grammars runs. Calling it on `--help`, `--version`, etc. is
 /// harmless but pointless.
+#[cfg(feature = "cli")]
 pub fn ensure_grammars_first_use() -> GrammarsFirstRun {
     let Some(dir) = user_grammars_dir() else {
         return GrammarsFirstRun::NoConfigDir;

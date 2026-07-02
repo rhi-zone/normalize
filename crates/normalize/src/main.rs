@@ -167,6 +167,12 @@ async fn main() -> std::process::ExitCode {
     if let Some(first) = argv.first_mut() {
         *first = stem0.as_str().into();
     }
+    // Only read inside the drop-in-CLI dispatch blocks below; with none of those
+    // features enabled (bare `cli`) it is legitimately unused.
+    #[cfg_attr(
+        not(any(feature = "jq-cli", feature = "rg-cli", feature = "ast-grep-cli")),
+        allow(unused_variables)
+    )]
     let argv0: &str = &stem0;
 
     // argv[0] dispatch: symlink `jq -> normalize` runs jq directly.

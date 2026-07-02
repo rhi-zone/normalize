@@ -42,12 +42,19 @@ B0 (guide-regression test, CLAUDE.md crate count) and B1 (`normalize-git` extrac
   'daemon' feature" error (mirrors serve stubs). `Response::ok`/`err` and server-side tests gated
   too. CI `features` job gained a `cli,daemon` combo; the `cli`-only combo now also exercises the
   daemon-off path. **Capability-surface pass complete (serve + daemon).**
-- [ ] **Pre-existing: bare `--no-default-features` lib does not compile.** Orthogonal to serve:
-  `commands/grammars.rs` and `commands/init.rs` reference the cli-gated `crate::service::grammars::
-  GrammarService` unconditionally, so building the lib without `cli` fails (E0433). Fence it
-  behind `cli` or move `GrammarService` out of the cli-gated `service` module. Belongs with the
-  main-crate decomposition / cli-vs-service boundary work, not the serve pass. CI's `features`
-  job therefore uses `--features cli` as the minimal buildable core.
+- [x] **Bare `--no-default-features` lib now compiles (2026-07-02).** The only stray references
+  from non-cli-gated code into the cli-gated `crate::service` layer were the grammar auto-install
+  paths: `commands/grammars.rs::ensure_grammars_first_use` and `commands/init.rs::run_init` (the
+  latter now used only by its own tests — the live `init` command is served from `service/mod.rs`).
+  Fenced both — plus their now-core-dead helpers (`user_grammars_dir`/`dir_has_grammars`/
+  `write_installed_stamp`/`INSTALLED_STAMP`, `prompt_scratch_dirs`, `generate.rs`'s
+  `read_input`/`generate_cli_snapshot_code`) and imports — behind `#[cfg(feature = "cli")]`, and
+  gated `run_init`'s test module `#[cfg(all(test, feature = "cli"))]`. No logic moved; the default
+  and `cli` builds are byte-for-byte unchanged. The core lib now builds warning-free and stays slim
+  (no notify/tower-lsp/axum-0.8/utoipa/rmcp; residual axum 0.6 is the unrelated libsql→tonic
+  transitive). Also fixed the pre-existing `argv0` unused-variable warning under bare `cli` (only
+  read inside the drop-in-CLI cfg blocks). CI `features` job gained a bare `--no-default-features`
+  check so the core can't regress. **Capability-surface pass fully complete.**
 
 ## Follow-ups (2026-06-29 branch consolidation)
 

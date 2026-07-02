@@ -8,6 +8,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Buildable `--no-default-features` core** — `cargo build -p normalize --no-default-features`
+  (no `cli`/`serve`/`daemon`) now compiles: the bare library is the reusable surface with the
+  entire CLI service layer gated out. Previously this failed to compile because two grammar
+  auto-install code paths in `commands/` referenced the cli-gated `service` layer unconditionally;
+  they are now behind `cli`, where they belong. Library embedders can depend on the core without
+  pulling the CLI, serve-transport, or daemon stacks. Guarded in CI so it can't regress.
+
 - **`daemon` feature flag** — the background daemon **server** (multi-root file watcher +
   incremental index refresh, Unix-only) is now gated behind a `daemon` feature (`default = true`,
   so the stock binary is unchanged). The feature pulls the `notify` filesystem watcher, now

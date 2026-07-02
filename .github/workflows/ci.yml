@@ -54,17 +54,16 @@ jobs:
           workspaces: "crates -> target"
 
       # Guards the capability-surface feature taxonomy so serve-transport and
-      # daemon combos don't bit-rot. The binary requires `cli` (required-features),
-      # so the minimal buildable core is `--features cli` — it must NOT pull the
-      # serve deps (axum/utoipa/tower-lsp/rmcp) or the daemon watcher (notify).
-      # Each surface leaf is checked in isolation so it can be dropped
-      # independently. The `cli`-only combo also exercises the daemon-off path
-      # (client always compiled, server gated out).
-      #
-      # NOTE: bare `--no-default-features` (lib without `cli`) currently fails to
-      # compile due to a pre-existing cli/service boundary bug (commands/ referencing
-      # the cli-gated service layer) — tracked in TODO.md, out of scope for the serve
-      # feature pass.
+      # daemon combos don't bit-rot. The bare library (`--no-default-features`,
+      # no `cli`) is the irreducible core — it must build with the service layer
+      # gated out. Above that, `--features cli` is the minimal buildable binary
+      # (the bin has `required-features = ["cli"]`); it must NOT pull the serve
+      # deps (axum/utoipa/tower-lsp/rmcp) or the daemon watcher (notify). Each
+      # surface leaf is checked in isolation so it can be dropped independently.
+      # The `cli`-only combo also exercises the daemon-off path (client always
+      # compiled, server gated out).
+      - name: Irreducible core (lib, no cli)
+        run: cargo check -p normalize --no-default-features
       - name: Minimal core (no serve deps)
         run: cargo check -p normalize --no-default-features --features cli
       - name: LSP only

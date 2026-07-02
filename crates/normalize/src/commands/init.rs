@@ -1,6 +1,7 @@
 //! Initialize normalize in a project directory.
 
 use std::fs;
+#[cfg(feature = "cli")]
 use std::io::{self, BufRead, IsTerminal, Write};
 use std::path::Path;
 
@@ -31,6 +32,11 @@ const SCRATCH_DIRS: &[(&str, &str)] = &[(
     "Claude Code agent worktrees (ephemeral scratch — full repo copies)",
 )];
 
+/// Gated behind `cli`: the first-run grammar install drives `GrammarService`
+/// from the (cli-only) service layer. The `init` command itself is served from
+/// `service::mod`; this standalone entry point is used by the crate's own
+/// integration tests.
+#[cfg(feature = "cli")]
 pub async fn run_init(root: &Path, do_index: bool, setup: bool) -> i32 {
     let mut changes = Vec::new();
 
@@ -256,6 +262,9 @@ fn is_already_gitignored(root: &Path, dir: &str) -> bool {
 
 /// Interactive prompt: for each detected scratch dir, ask the user whether to
 /// add it to `[walk] exclude`. Default is "yes" (Enter accepts).
+///
+/// Only reachable from the cli-gated `run_init`.
+#[cfg(feature = "cli")]
 fn prompt_scratch_dirs(
     detected: &[(&'static str, &'static str)],
 ) -> Vec<&'static (&'static str, &'static str)> {
@@ -409,7 +418,8 @@ fn find_entry(lines: &[&str], pattern: &str) -> EntryStatus {
     EntryStatus::Missing
 }
 
-#[cfg(test)]
+// `run_init` (exercised throughout) is cli-gated, so the suite is too.
+#[cfg(all(test, feature = "cli"))]
 mod tests {
     use super::*;
     use std::fs;

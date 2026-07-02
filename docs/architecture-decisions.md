@@ -627,3 +627,25 @@ detection, and the server-side tests — carries `#[cfg(feature = "daemon")]`. `
 off the wire). The `normalize daemon run` service method keeps its signature (the server-less
 `#[cli]` macro generates dispatch before cfg-stripping) and `#[cfg]`-branches its **body** to a
 "requires the 'daemon' feature" runtime error, mirroring the serve-transport stub pattern.
+
+## The Irreducible Core: `--no-default-features`
+
+**Decision**: The bare library (`cargo build -p normalize --no-default-features`, i.e. none of
+`cli`/`serve`/`daemon`) is a first-class, CI-guarded build. It is the reusable library surface
+with the entire CLI service layer gated out.
+
+The `service` module — the server-less `#[cli]` service methods, report structs, and the
+`OutputFormatter` wiring — is `#[cfg(feature = "cli")]`. The binary itself has
+`required-features = ["cli"]`, so it only exists in `cli` builds. That leaves a clean split: the
+core is the library (extraction, index, rules, protocol types); `cli` adds the command/service/
+formatting layer; `serve`/`daemon`/drop-in features add capability surfaces on top.
+
+The one violation of this split that had to be fixed: two functions in the (otherwise core)
+`commands/` tree reached into the cli-gated `service` layer for grammar auto-install —
+`commands/grammars.rs::ensure_grammars_first_use` and `commands/init.rs::run_init` both
+constructed `crate::service::grammars::GrammarService`. Both are reachable only from cli contexts
+(the `cli`-required binary, or `run_init`'s own tests — the live `init` command is served from
+`service/mod.rs`), so both — with their now-core-dead private helpers and imports — carry
+`#[cfg(feature = "cli")]`. No logic moved and no crate was extracted; the default and `cli` builds
+are unchanged. The principle: **anything that needs the `service` layer belongs behind `cli`;
+the core lib never touches it.** The `features` CI job checks the bare core so this can't regress.
