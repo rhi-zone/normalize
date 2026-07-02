@@ -20,7 +20,10 @@
 //! parallel — there is no shared `NORMALIZE_DAEMON_CONFIG_DIR` env-var state
 //! between client constructions.
 
-#![cfg(unix)]
+// Gated on `daemon`: these spawn the daemon server, which only exists when the
+// `daemon` feature is enabled. Without the gate `cargo test --no-default-features
+// --features cli` would fail to compile this binary.
+#![cfg(all(unix, feature = "daemon"))]
 
 use assert_cmd::cargo::CommandCargoExt;
 use normalize::daemon::{DaemonClient, Event};
