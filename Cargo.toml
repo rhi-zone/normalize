@@ -75,7 +75,10 @@ tokio = { version = "1", features = ["full"] }
 axum = "0.8"
 
 # Database
-libsql = "0.9"
+# Local-only by default; the remote/replication stack (tonic, tonic-web,
+# libsql_replication + the transitive duplicate axum 0.6/hyper 0.14) is opt-in
+# via the `remote-sqld` feature on normalize-facts. See docs/architecture-decisions.md.
+libsql = { version = "0.9", default-features = false, features = ["core"] }
 
 # File system
 walkdir = "2"

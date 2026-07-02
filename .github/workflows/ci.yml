@@ -76,6 +76,11 @@ jobs:
         run: cargo check -p normalize --no-default-features --features cli,daemon
       - name: Default (cli-full + serve)
         run: cargo check -p normalize
+      # Opt-in remote/replicated libsql: default is local-only (libsql `core`),
+      # this restores the remote stack (tonic/tonic-web/libsql_replication + the
+      # transitive duplicate axum 0.6). Guards that the opt-in path can't rot.
+      - name: Remote sqld (opt-in)
+        run: cargo check -p normalize --features remote-sqld
       - name: All features
         run: cargo check -p normalize --all-features
 

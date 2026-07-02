@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The default build no longer bundles libsql's remote/replication stack.** normalize uses
+  only local libsql databases, so the stock build now pulls `libsql` with `core`-only features.
+  This drops `tonic`, `tonic-web`, `libsql_replication`, and the transitive duplicate
+  `axum 0.6`/`hyper 0.14`/`h2 0.3`/`tower-http 0.4` (~40 crates) from the default dependency
+  graph. Remote/replicated sqld is now opt-in via the new `remote-sqld` feature
+  (`cargo build --features remote-sqld`).
+
 ### Fixed
 
 - **Daemon no longer fires phantom config reloads on file reads.** The daemon's

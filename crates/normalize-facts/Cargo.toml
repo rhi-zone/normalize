@@ -15,6 +15,13 @@ required-features = ["cli"]
 default = []
 cli = ["dep:server-less", "dep:schemars", "dep:normalize-output", "dep:toml"]
 
+# Opt-in remote/replicated libsql. normalize uses only local databases
+# (Builder::new_local / :memory:), so the stock build ships libsql `core` only.
+# Enabling this restores libsql's default remote stack (tonic, tonic-web,
+# libsql_replication + the transitive duplicate axum 0.6/hyper 0.14). This is a
+# capability surface, default OFF: name is public API and adjustable.
+remote-sqld = ["libsql/replication", "libsql/remote", "libsql/sync", "libsql/tls"]
+
 [dependencies]
 server-less = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }

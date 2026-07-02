@@ -12,6 +12,8 @@ The `Extractor` (used by `normalize view`, `normalize rank`, single-file analysi
 
 `CallEntry.access` is populated from the call graph index with read/write distinction when the language supports it. `ChangedFiles` tracks which files changed between index refreshes for incremental fact-rule evaluation via the daemon.
 
+The workspace pulls `libsql` with `default-features = false, features = ["core"]` — normalize uses only local databases (`Builder::new_local` / `:memory:`), so the stock build omits libsql's remote/replication stack (`tonic`, `tonic-web`, `libsql_replication`, and the transitive duplicate `axum 0.6`/`hyper 0.14`). The default-OFF `remote-sqld` feature (`= ["libsql/replication", "libsql/remote", "libsql/sync", "libsql/tls"]`) restores it for consumers who want replicated/remote sqld; it is opt-in because nothing in normalize currently uses remote libsql (see `docs/architecture-decisions.md` § "Active surface vs. unused capability").
+
 The `cli` feature adds a standalone `FactsCliService` (`src/service.rs`) with `rebuild`, `stats`, and `files` subcommands. Output types (`RebuildReport`, `StructureStatsReport`, `StructureFilesReport`) implement `OutputFormatter`. Note: function parameters are not extracted as facts (no "parameter" `SymbolKind`); parameter-level analysis is handled by `normalize-scope` via `locals.scm` queries.
 
 Schema includes a `config_hash` column on diagnostic blob tables for cross-restart cache validity (hash covers binary version + `.normalize/config.toml` + rule files). Grammar load failure skips the file with a loud warning rather than silently returning empty results. Parallel fact-rule evaluation (~2× speedup via rayon) with CA cache poisoning fix.

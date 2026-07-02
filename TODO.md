@@ -55,6 +55,19 @@ B0 (guide-regression test, CLAUDE.md crate count) and B1 (`normalize-git` extrac
   cfg blocks). CI `features` job gained a bare `--no-default-features` check so the core can't
   regress. **Capability-surface pass fully complete.** (Note: `run_init` was later removed entirely
   — see the `[walk]`-seeding fix below.)
+- [x] **Duplicate `axum 0.6` / libsql remote stack resolved — now opt-in (2026-07-02).** The
+  residual `axum 0.6.20` (and `tonic`/`tonic-web`/`libsql_replication`/`hyper 0.14`/`h2 0.3`/
+  `tower-http 0.4`) reached the default build *only* via `libsql → tonic`. normalize uses only
+  local libsql (`Builder::new_local`/`:memory:`), so the workspace `libsql` dep is now
+  `default-features = false, features = ["core"]`, and the remote/replication stack is behind a
+  new default-OFF `remote-sqld` capability feature on `normalize-facts`
+  (`= ["libsql/replication", "libsql/remote", "libsql/sync", "libsql/tls"]`), re-exported as
+  `normalize/remote-sqld`. Default build drops ~40 transitive crates; `cargo tree -i axum@0.6.20`
+  and `-i tonic` now report "did not match any packages" on default features and return under
+  `--features remote-sqld`. No code needed gating (no remote API was used). CI `features` job
+  gained a `--features remote-sqld` check; asymmetry (active surfaces default-on vs. unused
+  capability default-off) documented in `docs/architecture-decisions.md`. **This clears the last
+  duplicate-dep finding from the audit.**
 - [x] **`normalize init` `[walk] exclude` regression fixed + `run_init` removed (2026-07-02).** The
   `[walk] exclude` scratch-dir seeding lived only in `commands/init.rs::run_init`, which had been
   dead-except-tests since `c6a4b505` (2026-03-07); the seeding was added to that already-dead

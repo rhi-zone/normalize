@@ -628,6 +628,38 @@ off the wire). The `normalize daemon run` service method keeps its signature (th
 `#[cli]` macro generates dispatch before cfg-stripping) and `#[cfg]`-branches its **body** to a
 "requires the 'daemon' feature" runtime error, mirroring the serve-transport stub pattern.
 
+## Active surface vs. unused capability: `remote-sqld` is default OFF
+
+**Decision**: `libsql` is pulled in with `default-features = false, features = ["core"]` at the
+workspace level, so the stock build gets only the **local** database engine (`Builder::new_local`
+/ `:memory:`). libsql's remote/replication stack — `replication`, `remote`, `sync`, `tls`, which
+transitively drag in `tonic`, `tonic-web`, `libsql_replication`, and the *duplicate* `axum 0.6.20`
+/ `hyper 0.14` / `h2 0.3` / `tower-http 0.4` — is restored only by the opt-in `remote-sqld` feature
+(`normalize-facts/remote-sqld = ["libsql/replication", "libsql/remote", "libsql/sync",
+"libsql/tls"]`, re-exported as `normalize/remote-sqld`). This prunes ~40 transitive crates from the
+default dependency graph and eliminates the last duplicate-`axum` finding from the dep audit
+(the residual `axum 0.6` previously came *only* via `libsql → tonic`).
+
+### Why this feature is `default = false` — the asymmetry with serve/daemon
+
+The serve transports (`lsp`/`http`/`mcp`) and the `daemon` server are gated features that are
+`default = true`. `remote-sqld` is gated too, but `default = false`. The difference is not
+arbitrary — it tracks **active surface vs. unused capability**:
+
+- **serve and daemon are active surfaces the stock binary actually exposes.** `normalize serve`
+  and `normalize daemon run` are real commands a default user runs; the features exist so a
+  *minimal* consumer can compile them out. They are default-on because the capability is in use.
+- **remote-sqld is a capability nothing in normalize currently uses.** Every database construction
+  in the codebase is local (`Builder::new_local` / `:memory:`); no call site touches
+  `new_remote`/`sync`/replication. Shipping the remote stack by default would bundle a large,
+  entirely-dormant dependency tree. So the polarity flips: default-off, opt-in for consumers of
+  the published `normalize-facts` crate who genuinely want replicated/remote sqld.
+
+The rule: a gated capability is `default = true` when the stock build *uses* it and the flag exists
+for slimming; it is `default = false` when the stock build does *not* use it and the flag exists for
+opting *in*. Same capability-surface principle, opposite default depending on whether the surface is
+live. (The feature name `remote-sqld` is public API and adjustable, but stable for now.)
+
 ## The Irreducible Core: `--no-default-features`
 
 **Decision**: The bare library (`cargo build -p normalize --no-default-features`, i.e. none of

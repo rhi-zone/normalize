@@ -47,6 +47,11 @@ sessions-web = ["http"]
 # client transparently falls back to the no-daemon path.
 daemon = ["cli", "dep:notify"]
 
+# Opt-in remote/replicated libsql (see normalize-facts). Default OFF: the stock
+# build is local-only and drops libsql's remote stack. Cargo unifies features, so
+# enabling it here restores tonic/tonic-web/libsql_replication across the graph.
+remote-sqld = ["normalize-facts/remote-sqld"]
+
 [dependencies]
 clap = { workspace = true, optional = true }
 serde.workspace = true
