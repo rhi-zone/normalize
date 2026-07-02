@@ -1,4 +1,4 @@
-// Adapted from jaq v3.0.0-beta (MIT License)
+// Adapted from jaq (MIT License), tracking the jaq-core 3.1.0 release API
 // https://github.com/01mf02/jaq
 //! Filter parsing, compilation, and execution.
 use jaq_core::compile::Compiler;
@@ -23,7 +23,9 @@ pub fn parse_compile(
 
     let vars: Vec<_> = vars.iter().map(|v| format!("${v}")).collect();
     let arena = Arena::default();
-    let defs = jaq_std::defs().chain(jaq_json::defs());
+    let defs = jaq_core::defs()
+        .chain(jaq_std::defs())
+        .chain(jaq_json::defs());
     let loader = Loader::new(defs).with_std_read(paths);
     let modules = loader
         .load(
@@ -48,7 +50,11 @@ pub fn parse_compile(
     .map_err(|errs| format_load_errors(&errs))?;
 
     let filter = Compiler::default()
-        .with_funs(jaq_std::funs::<JustLut<Val>>().chain(jaq_json::funs::<JustLut<Val>>()))
+        .with_funs(
+            jaq_core::funs::<JustLut<Val>>()
+                .chain(jaq_std::funs::<JustLut<Val>>())
+                .chain(jaq_json::funs::<JustLut<Val>>()),
+        )
         .with_global_vars(vars.iter().map(|v| v.as_str()))
         .compile(modules)
         .map_err(|errs| format_compile_errors(&errs))?;

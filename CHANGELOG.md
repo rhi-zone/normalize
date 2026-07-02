@@ -17,6 +17,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`normalize jq` is functional again.** Every filter previously failed with
+  `compile error: undefined Filter`. This was **not** a version-mismatch problem —
+  the jaq versions were already correct and coherent (jaq-core 3.1.0, jaq-std 3.0.1,
+  jaq-json 2.0.1, the same set the working `--jq` path uses). The real cause: the
+  vendored jq CLI was adapted from jaq 3.0.0-beta, and when jaq-core 3.1.0 moved the
+  core builtins into `jaq_core::defs()`/`jaq_core::funs()`, the vendored code kept
+  chaining only `jaq_std`/`jaq_json` and never registered the core builtins — so
+  every filter compiled as an undefined filter. Fixed by registering
+  `jaq_core::defs()`/`jaq_core::funs()` in the compiler (matching server-less-core's
+  working `--jq` path); the same fix was applied to the `sessions analyze --jq` path.
+  As a minor cleanup, the stale `*-beta` version pins were tidied to the release
+  triple (jaq-core 3.1.0, jaq-std 3.0.1, jaq-json 2.0.1), but that was cosmetic, not
+  the fix.
+
 - **Daemon no longer fires phantom config reloads on file reads.** The daemon's
   file-watch dispatch loop treated inotify `Access(Open)` events (pure reads) on
   `.normalize/config.toml` as config changes. Because the daemon reads config.toml

@@ -20,6 +20,19 @@ Three live threads from the 2026-06-29/07-01 session — verify state before act
 
 B0 (guide-regression test, CLAUDE.md crate count) and B1 (`normalize-git` extraction) have landed. The graph-crate blocker on B2/B3 is **resolved** (2026-07-02, refactor-in-place — see below); B2–B12 can now proceed. The `#[cli(alias)]` server-less prereq is a separate server-less task; it does not block batches that don't move verbs yet.
 
+## `normalize jq` fixed (2026-07-02)
+
+- [x] **`normalize jq` was non-functional — every filter failed with `compile error: undefined
+  Filter`.** Root cause was NOT a version skew (jaq-core 3.1.0 / jaq-std 3.0.1 / jaq-json 2.0.1 is
+  the coherent latest release triple, already resolved and shared with the published
+  server-less-core 0.6.0's `--jq` path). The vendored jq CLI (`crates/normalize/src/jq/filter.rs`,
+  adapted from jaq v3.0.0-beta) never chained `jaq_core::defs()`/`jaq_core::funs()` — in jaq-core
+  3.1.0 the core builtins were split out of std, so only std/json funcs were registered and every
+  core filter was undefined. Added the core defs/funs chains (matching server-less-core). Same fix
+  in `commands/sessions/analyze.rs::print_session_jq`. Bumped stale `*-beta` workspace reqs to the
+  release triple. Verified `jq '.a'`, `length`, `map(.+1)`, `--jq` output mode, and `sessions
+  analyze --jq` all work.
+
 ## Serve/daemon capability-surface feature pass
 
 - [x] **Serve half (2026-07-02).** `normalize serve` transports are now gated capability

@@ -80,7 +80,11 @@ pub fn print_session_jq(path: &Path, filter: &str) -> i32 {
     use jaq_core::{Compiler, Ctx, Vars, data::JustLut};
     use jaq_json::Val;
 
-    let loader = Loader::new(jaq_std::defs().chain(jaq_json::defs()));
+    let loader = Loader::new(
+        jaq_core::defs()
+            .chain(jaq_std::defs())
+            .chain(jaq_json::defs()),
+    );
     let arena = Arena::default();
 
     let modules = match loader.load(
@@ -100,7 +104,11 @@ pub fn print_session_jq(path: &Path, filter: &str) -> i32 {
     };
 
     let filter_compiled = match Compiler::default()
-        .with_funs(jaq_std::funs::<JustLut<Val>>().chain(jaq_json::funs::<JustLut<Val>>()))
+        .with_funs(
+            jaq_core::funs::<JustLut<Val>>()
+                .chain(jaq_std::funs::<JustLut<Val>>())
+                .chain(jaq_json::funs::<JustLut<Val>>()),
+        )
         .compile(modules)
     {
         Ok(f) => f,
