@@ -640,12 +640,15 @@ The `service` module — the server-less `#[cli]` service methods, report struct
 core is the library (extraction, index, rules, protocol types); `cli` adds the command/service/
 formatting layer; `serve`/`daemon`/drop-in features add capability surfaces on top.
 
-The one violation of this split that had to be fixed: two functions in the (otherwise core)
+The one violation of this split that had to be fixed: a function in the (otherwise core)
 `commands/` tree reached into the cli-gated `service` layer for grammar auto-install —
-`commands/grammars.rs::ensure_grammars_first_use` and `commands/init.rs::run_init` both
-constructed `crate::service::grammars::GrammarService`. Both are reachable only from cli contexts
-(the `cli`-required binary, or `run_init`'s own tests — the live `init` command is served from
-`service/mod.rs`), so both — with their now-core-dead private helpers and imports — carry
-`#[cfg(feature = "cli")]`. No logic moved and no crate was extracted; the default and `cli` builds
-are unchanged. The principle: **anything that needs the `service` layer belongs behind `cli`;
-the core lib never touches it.** The `features` CI job checks the bare core so this can't regress.
+`commands/grammars.rs::ensure_grammars_first_use` constructs
+`crate::service::grammars::GrammarService`. It is reachable only from cli contexts (the
+`cli`-required binary; the live `init` command is served from `service/mod.rs`), so it — with its
+now-core-dead private helpers and imports — carries `#[cfg(feature = "cli")]`. No logic moved and
+no crate was extracted; the default and `cli` builds are unchanged. (The former
+`commands/init.rs::run_init`, a second such consumer, was removed once the live `service::init`
+absorbed its config-seeding logic; its remaining helpers — `build_walk_section`,
+`detect_scratch_dirs`, `update_gitignore` — touch no `service` type and are ungated.) The
+principle: **anything that needs the `service` layer belongs behind `cli`; the core lib never
+touches it.** The `features` CI job checks the bare core so this can't regress.

@@ -11,7 +11,9 @@ normalize init [--index]
 ## What It Does
 
 1. Creates `.normalize/` directory
-2. Creates `.normalize/config.toml` with defaults
+2. Creates `.normalize/config.toml` with defaults, including a `[walk] exclude`
+   section seeded with the baseline (`.git/`, `.normalize/`) plus any
+   auto-detected scratch dirs present in the project (e.g. `.claude/worktrees/`)
 3. Detects TODO files (TODO.md, TASKS.md, etc.) and adds to aliases
 4. Updates `.gitignore` with normalize entries
 
@@ -41,6 +43,14 @@ normalize init [--index]
 # complexity = 0.5
 # security = 2.0
 # clones = 0.3
+
+[walk]
+# Project-wide path exclusions (gitignore-style; affects walker AND index).
+exclude = [
+    ".git/",
+    ".normalize/",
+    # ".claude/worktrees/",  # added automatically if present and not gitignored
+]
 
 [aliases]
 todo = ["TODO.md"]  # If TODO.md exists

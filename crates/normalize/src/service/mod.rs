@@ -433,6 +433,11 @@ impl NormalizeService {
                 format!("\n[aliases]\ntodo = [{}]\n", files_str)
             };
 
+            // Seed a discoverable `[walk] exclude` section: the daemon baseline
+            // (`.git/`, `.normalize/`) plus any auto-detected scratch dirs
+            // (e.g. `.claude/worktrees/`) present under the target root.
+            let walk = commands::init::build_walk_section(&root);
+
             let default_config = format!(
                 r#"# Normalize configuration
 # See: https://github.com/rhi-zone/normalize
@@ -449,14 +454,15 @@ impl NormalizeService {
 # complexity = 0.5
 # security = 2.0
 # clones = 0.3
-{}"#,
-                aliases_section
+{}{}"#,
+                walk.toml, aliases_section
             );
             if !dry_run {
                 fs::write(&config_path, default_config)
                     .map_err(|e| format!("Failed to create config.toml: {}", e))?;
             }
             changes.push("Created .normalize/config.toml".to_string());
+            changes.push(walk.summary);
             for f in &todo_files {
                 changes.push(format!("Detected TODO file: {}", f));
             }

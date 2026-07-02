@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`normalize init` now seeds a `[walk] exclude` section** in the generated
+  `.normalize/config.toml` — the baseline (`.git/`, `.normalize/`) plus any
+  auto-detected scratch dirs present in the project (e.g. `.claude/worktrees/`,
+  Claude Code agent worktrees). This restores behavior that had been stranded in
+  a dead-except-tests code path (`commands/init.rs::run_init`) since 2026-03-07
+  and so never shipped from the live command. The dead `run_init` is removed and
+  its config-seeding logic now lives in the served `init` command. `--dry-run`
+  previews the seeded excludes without writing.
+
 ### Added
 
 - **Buildable `--no-default-features` core** — `cargo build -p normalize --no-default-features`

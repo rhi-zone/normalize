@@ -1,8 +1,6 @@
 //! Initialize normalize in a project directory.
 
 use std::fs;
-#[cfg(feature = "cli")]
-use std::io::{self, BufRead, IsTerminal, Write};
 use std::path::Path;
 
 /// Common task-tracker file names to detect
@@ -32,189 +30,49 @@ const SCRATCH_DIRS: &[(&str, &str)] = &[(
     "Claude Code agent worktrees (ephemeral scratch — full repo copies)",
 )];
 
-/// Gated behind `cli`: the first-run grammar install drives `GrammarService`
-/// from the (cli-only) service layer. The `init` command itself is served from
-/// `service::mod`; this standalone entry point is used by the crate's own
-/// integration tests.
-#[cfg(feature = "cli")]
-pub async fn run_init(root: &Path, do_index: bool, setup: bool) -> i32 {
-    let mut changes = Vec::new();
+/// The generated `[walk]` section plus a human-readable summary of what it
+/// seeded. Returned by [`build_walk_section`].
+pub struct WalkSection {
+    /// The rendered `[walk]` TOML block to splice into `config.toml`.
+    pub toml: String,
+    /// One-line summary of the seeded excludes, for the `InitReport` change log
+    /// / dry-run preview.
+    pub summary: String,
+}
 
-    // 1. Create .normalize directory if needed
-    let moss_dir = root.join(".normalize");
-    if !moss_dir.exists() {
-        if let Err(e) = fs::create_dir_all(&moss_dir) {
-            eprintln!("Failed to create .normalize directory: {}", e);
-            return 1;
-        }
-        changes.push("Created .normalize/".to_string());
+/// Build the `[walk]` section for a freshly-created `config.toml`.
+///
+/// Always seeds the daemon baseline (`.git/`, `.normalize/`) so the section is
+/// discoverable and self-documenting, then appends any auto-detected scratch
+/// dirs (e.g. `.claude/worktrees/`) present under `root` and not already
+/// gitignored.
+///
+/// This is called from the live `init` command in `service::mod`, mirroring how
+/// that command already reuses `detect_todo_files` / `update_gitignore` from
+/// this module. The scratch-dir path table (`SCRATCH_DIRS`) lives here in the
+/// integration layer per `CLAUDE.md`, never in the rule-engine crates.
+pub fn build_walk_section(root: &Path) -> WalkSection {
+    let mut excludes: Vec<String> = vec![".git/".to_string(), ".normalize/".to_string()];
+    for (dir, _) in detect_scratch_dirs(root) {
+        excludes.push(dir.to_string());
     }
-
-    // 2. Detect task-tracking files for sigil config
-    let todo_files = detect_todo_files(root);
-
-    // 3. Create or update config.toml
-    let config_path = moss_dir.join("config.toml");
-    if !config_path.exists() {
-        // Start from the bootstrap (opinionated) config, then layer on
-        // project-specific detections.
-        let mut excludes: Vec<String> = vec![".git/".to_string()];
-
-        let detected = detect_scratch_dirs(root);
-        let interactive = io::stdin().is_terminal() && io::stdout().is_terminal();
-        let accepted: Vec<&(&str, &str)> = if interactive && !detected.is_empty() {
-            prompt_scratch_dirs(&detected)
-        } else {
-            // Non-interactive: include all detected entries by default.
-            detected.iter().collect()
-        };
-        for (dir, _) in &accepted {
-            excludes.push((*dir).to_string());
-            changes.push(format!("Detected scratch dir: {} → [walk] exclude", dir));
-        }
-
-        let aliases_section = if todo_files.is_empty() {
-            String::new()
-        } else {
-            let files_str = todo_files
-                .iter()
-                .map(|f| format!("\"{}\"", f))
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!("\n[aliases]\ntodo = [{}]\n", files_str)
-        };
-
-        let exclude_lines = excludes
-            .iter()
-            .map(|s| format!("    \"{}\",", s))
-            .collect::<Vec<_>>()
-            .join("\n");
-        let walk_section = format!(
-            r#"
+    let exclude_lines = excludes
+        .iter()
+        .map(|s| format!("    \"{}\",", s))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let toml = format!(
+        r#"
 [walk]
 # Project-wide path exclusions (gitignore-style; affects walker AND index).
 exclude = [
 {}
 ]
 "#,
-            exclude_lines
-        );
-
-        let default_config = format!(
-            r#"# Normalize configuration
-# See: https://github.com/rhi-zone/normalize
-
-[daemon]
-# enabled = true
-# auto_start = true
-
-[analyze]
-# clones = true
-
-# [analyze.weights]
-# health = 1.0
-# complexity = 0.5
-# security = 2.0
-# clones = 0.3
-{}{}"#,
-            walk_section, aliases_section
-        );
-        if let Err(e) = fs::write(&config_path, default_config) {
-            eprintln!("Failed to create config.toml: {}", e);
-            return 1;
-        }
-        changes.push("Created .normalize/config.toml".to_string());
-        for f in &todo_files {
-            changes.push(format!("Detected TODO file: {}", f));
-        }
-    }
-
-    // 3. Update .gitignore if needed
-    let gitignore_path = root.join(".gitignore");
-    let gitignore_changes = update_gitignore(&gitignore_path);
-    changes.extend(gitignore_changes);
-
-    // 3b. First-run grammar install. Always attempted from `init`; the
-    //     helper short-circuits if the stamp already exists or the user
-    //     already has grammars in place. In TTY mode where the helper would
-    //     normally defer, we treat `init` as the explicit prompt point and
-    //     trigger an install here too.
-    use crate::commands::grammars::{GrammarsFirstRun, ensure_grammars_first_use};
-    let mut outcome = ensure_grammars_first_use();
-    if matches!(outcome, GrammarsFirstRun::SkippedInteractive) {
-        eprintln!("Installing tree-sitter grammars (first-time setup)...");
-        let pretty = std::cell::Cell::new(false);
-        let service = crate::service::grammars::GrammarService::new(&pretty);
-        outcome = match service.install(None, false, false) {
-            Ok(report) => {
-                let dir = dirs::config_dir().map(|c| c.join("normalize/grammars"));
-                if let Some(dir) = dir {
-                    let _ = fs::create_dir_all(&dir);
-                    let _ = fs::write(
-                        dir.join(".installed-version"),
-                        format!(
-                            "{}\n",
-                            report.version.clone().unwrap_or_else(|| "unknown".into())
-                        ),
-                    );
-                }
-                GrammarsFirstRun::AutoInstalled {
-                    count: report.count,
-                }
-            }
-            Err(error) => GrammarsFirstRun::Failed { error },
-        };
-    }
-    match outcome {
-        GrammarsFirstRun::AutoInstalled { count } => {
-            changes.push(format!("Installed {count} tree-sitter grammars"));
-        }
-        GrammarsFirstRun::PreInstalled => {
-            changes.push("Detected existing tree-sitter grammars".to_string());
-        }
-        GrammarsFirstRun::Failed { error } => {
-            eprintln!("warning: grammar install failed: {error}");
-            eprintln!("    Run `normalize grammars install` manually to retry.");
-        }
-        _ => {}
-    }
-
-    // 4. Report changes
-    if changes.is_empty() {
-        println!("Already initialized.");
-    } else {
-        println!("Initialized normalize:");
-        for change in &changes {
-            println!("  {}", change);
-        }
-    }
-
-    // 5. Optionally index
-    if do_index {
-        println!("\nIndexing codebase...");
-        let mut idx = match crate::index::open(root).await {
-            Ok(idx) => idx,
-            Err(e) => {
-                eprintln!("Failed to open index: {}", e);
-                return 1;
-            }
-        };
-        match idx.refresh().await {
-            Ok(count) => println!("Indexed {} files.", count),
-            Err(e) => {
-                eprintln!("Failed to index: {}", e);
-                return 1;
-            }
-        }
-    }
-
-    // 6. Optionally run the interactive setup wizard
-    if setup {
-        println!();
-        return run_setup_wizard(root);
-    }
-
-    0
+        exclude_lines
+    );
+    let summary = format!("Seeded [walk] exclude: {}", excludes.join(", "));
+    WalkSection { toml, summary }
 }
 
 /// Interactive rule setup wizard.
@@ -258,37 +116,6 @@ fn is_already_gitignored(root: &Path, dir: &str) -> bool {
     };
     let rel = std::path::Path::new(dir.trim_end_matches('/'));
     gi.matched_path_or_any_parents(rel, true).is_ignore()
-}
-
-/// Interactive prompt: for each detected scratch dir, ask the user whether to
-/// add it to `[walk] exclude`. Default is "yes" (Enter accepts).
-///
-/// Only reachable from the cli-gated `run_init`.
-#[cfg(feature = "cli")]
-fn prompt_scratch_dirs(
-    detected: &[(&'static str, &'static str)],
-) -> Vec<&'static (&'static str, &'static str)> {
-    println!("Detected scratch directories that aren't gitignored:");
-    let stdin = io::stdin();
-    let mut accepted = Vec::new();
-    // Re-borrow against the original SCRATCH_DIRS table so we hand back
-    // 'static references (callers iterate without lifetime juggling).
-    for (dir, desc) in detected {
-        print!("  Exclude {} ({})? [Y/n] ", dir, desc);
-        io::stdout().flush().ok();
-        let mut line = String::new();
-        if stdin.lock().read_line(&mut line).is_err() {
-            break;
-        }
-        let answer = line.trim().to_lowercase();
-        if answer.is_empty() || answer == "y" || answer == "yes" {
-            // Find matching static entry in SCRATCH_DIRS.
-            if let Some(entry) = SCRATCH_DIRS.iter().find(|(d, _)| d == dir) {
-                accepted.push(entry);
-            }
-        }
-    }
-    accepted
 }
 
 /// Detect task-tracking files (TODO.md, TASKS.md, etc.) in the project root.
@@ -418,49 +245,36 @@ fn find_entry(lines: &[&str], pattern: &str) -> EntryStatus {
     EntryStatus::Missing
 }
 
-// `run_init` (exercised throughout) is cli-gated, so the suite is too.
-#[cfg(all(test, feature = "cli"))]
+// These exercise the library helpers reused by the live `init` command in
+// `service::mod` (`build_walk_section`, `detect_scratch_dirs`,
+// `update_gitignore`, `detect_todo_files`, `preview_gitignore_changes`). The
+// command itself resolves its root from `env::current_dir`, so it is covered by
+// an integration test in the scratch dir rather than here — testing the helpers
+// directly keeps coverage without cwd juggling.
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
     use tempfile::tempdir;
 
-    #[tokio::test]
-    async fn test_init_creates_moss_dir() {
-        let tmp = tempdir().unwrap();
-        let result = run_init(tmp.path(), false, false).await;
-        assert_eq!(result, 0);
-        assert!(tmp.path().join(".normalize").exists());
-        assert!(tmp.path().join(".normalize/config.toml").exists());
-    }
-
-    #[tokio::test]
-    async fn test_init_idempotent() {
-        let tmp = tempdir().unwrap();
-        let result1 = run_init(tmp.path(), false, false).await;
-        let result2 = run_init(tmp.path(), false, false).await;
-        assert_eq!(result1, 0);
-        assert_eq!(result2, 0);
-    }
-
-    #[tokio::test]
-    async fn test_init_updates_gitignore() {
+    #[test]
+    fn test_update_gitignore_adds_entries() {
         let tmp = tempdir().unwrap();
         fs::write(tmp.path().join(".gitignore"), "node_modules\n").unwrap();
 
-        run_init(tmp.path(), false, false).await;
+        update_gitignore(&tmp.path().join(".gitignore"));
 
         let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         assert!(content.contains(".normalize/*"));
         assert!(content.contains("!.normalize/config.toml"));
     }
 
-    #[tokio::test]
-    async fn test_init_skips_commented_entries() {
+    #[test]
+    fn test_update_gitignore_skips_commented_entries() {
         let tmp = tempdir().unwrap();
         fs::write(tmp.path().join(".gitignore"), "# .normalize\n").unwrap();
 
-        run_init(tmp.path(), false, false).await;
+        update_gitignore(&tmp.path().join(".gitignore"));
 
         let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         let lines: Vec<&str> = content.lines().collect();
@@ -473,8 +287,8 @@ mod tests {
         assert!(lines.iter().any(|l| l.trim() == "!.normalize/config.toml"));
     }
 
-    #[tokio::test]
-    async fn test_init_inserts_near_existing() {
+    #[test]
+    fn test_update_gitignore_inserts_near_existing() {
         let tmp = tempdir().unwrap();
         // Existing .gitignore already has .normalize/*
         fs::write(
@@ -483,7 +297,7 @@ mod tests {
         )
         .unwrap();
 
-        run_init(tmp.path(), false, false).await;
+        update_gitignore(&tmp.path().join(".gitignore"));
 
         let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
         let lines: Vec<&str> = content.lines().collect();
@@ -504,18 +318,32 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn test_init_detects_todo_files() {
+    #[test]
+    fn test_preview_gitignore_changes_reports_missing() {
+        let tmp = tempdir().unwrap();
+        fs::write(tmp.path().join(".gitignore"), "node_modules\n").unwrap();
+        let changes = preview_gitignore_changes(&tmp.path().join(".gitignore"));
+        assert!(changes.iter().any(|c| c.contains(".normalize/*")));
+        // Preview must not mutate the file.
+        let content = fs::read_to_string(tmp.path().join(".gitignore")).unwrap();
+        assert!(!content.contains(".normalize/*"));
+    }
+
+    #[test]
+    fn test_detect_todo_files() {
         let tmp = tempdir().unwrap();
         fs::write(tmp.path().join("TODO.md"), "# TODO\n").unwrap();
         fs::write(tmp.path().join("TASKS.md"), "# Tasks\n").unwrap();
 
-        run_init(tmp.path(), false, false).await;
+        let files = detect_todo_files(tmp.path());
+        assert!(files.contains(&"TODO.md".to_string()));
+        assert!(files.contains(&"TASKS.md".to_string()));
+    }
 
-        let config = fs::read_to_string(tmp.path().join(".normalize/config.toml")).unwrap();
-        assert!(config.contains("[aliases]"));
-        assert!(config.contains("TODO.md"));
-        assert!(config.contains("TASKS.md"));
+    #[test]
+    fn test_detect_todo_files_none() {
+        let tmp = tempdir().unwrap();
+        assert!(detect_todo_files(tmp.path()).is_empty());
     }
 
     #[test]
@@ -545,47 +373,37 @@ mod tests {
         assert!(detected.is_empty());
     }
 
-    #[tokio::test]
-    async fn test_init_non_interactive_adds_detected_scratch_dirs() {
+    #[test]
+    fn test_build_walk_section_baseline_when_no_scratch_dirs() {
         let tmp = tempdir().unwrap();
-        fs::create_dir_all(tmp.path().join(".claude/worktrees")).unwrap();
-
-        // Non-interactive (no TTY in test) → all detected scratch dirs added.
-        run_init(tmp.path(), false, false).await;
-
-        let config = fs::read_to_string(tmp.path().join(".normalize/config.toml")).unwrap();
-        assert!(
-            config.contains("[walk]"),
-            "missing [walk] section: {config}"
-        );
-        assert!(
-            config.contains(".claude/worktrees/"),
-            ".claude/worktrees/ should be excluded by default: {config}"
-        );
-        // Bootstrap opinion preserved.
-        assert!(config.contains(".git/"));
+        // No .claude/worktrees → only the daemon baseline in exclude.
+        let walk = build_walk_section(tmp.path());
+        assert!(walk.toml.contains("[walk]"));
+        assert!(walk.toml.contains(".git/"));
+        assert!(walk.toml.contains(".normalize/"));
+        assert!(!walk.toml.contains(".claude/worktrees"));
+        assert!(walk.summary.contains(".git/"));
+        assert!(walk.summary.contains(".normalize/"));
     }
 
     #[test]
-    fn test_init_writes_walk_exclude_with_git_when_no_scratch_dirs() {
+    fn test_build_walk_section_adds_detected_scratch_dirs() {
         let tmp = tempdir().unwrap();
-        // No .claude/worktrees → only bootstrap opinion in exclude.
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(run_init(tmp.path(), false, false));
-        let config = fs::read_to_string(tmp.path().join(".normalize/config.toml")).unwrap();
-        assert!(config.contains("[walk]"));
-        assert!(config.contains(".git/"));
-        assert!(!config.contains(".claude/worktrees"));
-    }
-
-    #[tokio::test]
-    async fn test_init_no_todo_files() {
-        let tmp = tempdir().unwrap();
-
-        run_init(tmp.path(), false, false).await;
-
-        let config = fs::read_to_string(tmp.path().join(".normalize/config.toml")).unwrap();
-        // Should not have aliases section if no todo-tracking files found
-        assert!(!config.contains("[aliases]"));
+        fs::create_dir_all(tmp.path().join(".claude/worktrees")).unwrap();
+        let walk = build_walk_section(tmp.path());
+        assert!(
+            walk.toml.contains("[walk]"),
+            "missing [walk] section: {}",
+            walk.toml
+        );
+        assert!(
+            walk.toml.contains(".claude/worktrees/"),
+            ".claude/worktrees/ should be excluded by default: {}",
+            walk.toml
+        );
+        // Baseline preserved alongside the detected scratch dir.
+        assert!(walk.toml.contains(".git/"));
+        assert!(walk.toml.contains(".normalize/"));
+        assert!(walk.summary.contains(".claude/worktrees/"));
     }
 }
