@@ -62,24 +62,26 @@ The marginal-cost argument justifies that the vendored CLIs are **cheap to keep*
 - **SRP / encapsulation concerns remain live.** The main crate being the home for ~21.6k
   lines of verbatim third-party tool front-ends is still a single-responsibility and
   encapsulation smell, independent of the marginal binary cost.
-- **Extraction into separate crates remains legitimately on the table** — but motivated by
-  SRP / encapsulation / modularity, **not** by cost reclamation. Extracting would *not*
-  meaningfully shrink binary or compile cost, since the engine dependencies stay regardless.
 
-Any such extraction is gated on **two hard conditions**:
+The remaining question — whether that smell warrants **extraction into separate crates** —
+was considered and **rejected** (2026-07-02). The vendored CLIs stay in the main crate. Two
+reasons decide it, both fatal:
 
-1. **Version lockstep.** Extracted vendored-CLI crates must be guaranteed not to drift in
-   engine/tool version from what the main crate uses for `--jq` / `grep` / ast-grep. If an
-   extracted `normalize jq` wrapper's jaq version skews from the main crate's `--jq` jaq
-   version, the two behave differently — unacceptable. Any extraction must enforce this
-   (e.g. shared `[workspace.dependencies]` pinning), and the guarantee must be explicit, not
-   incidental.
-2. **Publishing appropriateness is unresolved.** Publishing verbatim wrappers of vendored
-   third-party code (the ripgrep / jaq / ast-grep CLIs) to crates.io under `normalize-*`
-   names is of questionable appropriateness — licensing, namespace, and verbatim-copy
-   concerns all apply. At most such crates would be `publish = false`; possibly they should
-   not be separate published crates at all. This is an **open question**, not a settled
-   decision.
+- **A crate fails the crate-existence bar in every form.** CLAUDE.md requires a crate to
+  have multiple actual workspace dependents *or* genuine standalone value. A vendored copy of
+  ripgrep/jaq/ast-grep would have exactly one dependent (`normalize`) and zero standalone
+  value — it is a verbatim copy of an already-published upstream tool. `publish = false` does
+  not rescue this; a private crate earns its existence by the same bar.
+- **Naming is incoherent.** `normalize-rg` / `normalize-jq` / `normalize-ast-grep` would
+  misrepresent verbatim third-party copies as normalize-domain components; you cannot
+  republish ripgrep under a renamed crate, and no coherent name exists.
+
+This moots the two conditions previously listed as gating extraction (engine version
+lockstep, and the publishing-appropriateness question) — there is no extraction to gate. The
+SRP smell is mitigated in place instead: the code lives in isolated module subtrees
+(`src/rg/`, `src/ast_grep/`, `src/jq/`) behind capability feature gates
+(`cli-full` / `jq-cli` / `rg-cli` / `ast-grep-cli`). Full reasoning:
+`docs/audit-2026-07-02.md` ("Decision (2026-07-02): vendored-CLI extraction is REJECTED").
 
 ## Integration pattern
 

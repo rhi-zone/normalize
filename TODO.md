@@ -943,16 +943,15 @@ The marginal-cost rationale is now documented in `docs/cli-dropin-integrations.m
 ("Why the line count is not the cost") and the audit framing is corrected in
 `docs/audit-2026-07-02.md`.
 
-- [ ] **Possible follow-up: extract vendored CLIs into crates (SRP-motivated, NOT cost).**
-  ~21.6k lines of verbatim third-party tool front-ends in the main crate is a live SRP /
-  encapsulation smell. Extraction is legitimate on those grounds only — it reclaims no
-  binary/compile cost (engine deps stay regardless). **Gated on two hard conditions:**
-  (a) **version lockstep** — extracted wrappers must be guaranteed (e.g. shared
-  `[workspace.dependencies]` pinning) not to drift from the jaq/grep/ast-grep versions the
-  main crate uses for `--jq` / `grep` / ast-grep, else the surfaces behave differently; and
-  (b) **unresolved publishing question** — whether verbatim ripgrep/jaq/ast-grep CLI
-  wrappers can/should be published to crates.io under `normalize-*` names at all (licensing,
-  namespace, verbatim-copy concerns; at most `publish = false`). Both open, not decided.
+- [x] **REJECTED 2026-07-02 — do NOT extract vendored CLIs into crates. Keep in main.**
+  A vendored copy of ripgrep/jaq/ast-grep fails the crate-existence bar even as
+  `publish = false` (one dependent, zero standalone value — it is a verbatim copy of an
+  already-published upstream tool) and has no coherent `normalize-*` name. The SRP smell is
+  handled in place by module isolation (`src/rg/` / `src/ast_grep/` / `src/jq/`) + capability
+  feature gates (`cli-full` / `jq-cli` / `rg-cli` / `ast-grep-cli`); extraction reclaims no
+  cost (engines are sunk). The former version-lockstep / publishing-question gates are **moot**
+  (no extraction to gate). Full reasoning: `docs/audit-2026-07-02.md` ("Decision (2026-07-02):
+  vendored-CLI extraction is REJECTED") and `docs/cli-dropin-integrations.md`.
 
 **Execution items (plan of record — executed this session in subsequent commits):**
 
