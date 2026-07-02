@@ -866,6 +866,27 @@ re-litigated (keep both session crates; `normalize-cfg` stays; `health.rs` /
 legit wiring; latent: dual "parallelization savings" vocab, `module_health.rs` vs
 `health.rs` scorer overlap).
 
+**Correction (2026-07-02) — vendored CLIs are not a size lever.** The ~26% of the main
+crate that is vendored full-CLI front-ends (`src/rg/` ~13.9k, `src/ast_grep/` ~7.0k,
+`src/jq/` ~0.7k; ~21.6k lines) measures **line-count, not cost**. The engines
+(`jaq-*` / `grep`+`ignore` / `ast-grep-*`) are sunk cost — already linked for the
+first-class `--jq` / `normalize grep` / ast-grep features — so the marginal cost of the
+vendored front-ends is ~zero and extracting them would **not** shrink binary/compile cost.
+The marginal-cost rationale is now documented in `docs/cli-dropin-integrations.md`
+("Why the line count is not the cost") and the audit framing is corrected in
+`docs/audit-2026-07-02.md`.
+
+- [ ] **Possible follow-up: extract vendored CLIs into crates (SRP-motivated, NOT cost).**
+  ~21.6k lines of verbatim third-party tool front-ends in the main crate is a live SRP /
+  encapsulation smell. Extraction is legitimate on those grounds only — it reclaims no
+  binary/compile cost (engine deps stay regardless). **Gated on two hard conditions:**
+  (a) **version lockstep** — extracted wrappers must be guaranteed (e.g. shared
+  `[workspace.dependencies]` pinning) not to drift from the jaq/grep/ast-grep versions the
+  main crate uses for `--jq` / `grep` / ast-grep, else the surfaces behave differently; and
+  (b) **unresolved publishing question** — whether verbatim ripgrep/jaq/ast-grep CLI
+  wrappers can/should be published to crates.io under `normalize-*` names at all (licensing,
+  namespace, verbatim-copy concerns; at most `publish = false`). Both open, not decided.
+
 **Execution items (plan of record — executed this session in subsequent commits):**
 
 - [x] **D1 — liveness dataflow → `normalize-facts`** (`facts::cfg_dataflow`): ✅ DONE 2026-07-02.

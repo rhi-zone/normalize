@@ -24,6 +24,63 @@ Vendored CLIs bypass server-less entirely. Reasons:
 As a result, vendored CLI subcommands **do not appear in `normalize --help`**. They are
 undocumented from server-less's perspective, documented only here and in their own `--help`.
 
+## Why the line count is not the cost
+
+The vendored CLI front-ends are large by line count — roughly 21.6k lines in the main
+crate: `src/rg/` ~13.9k (of which `rg/flags/defs.rs` alone is ~7.8k of ripgrep flag
+definitions), `src/ast_grep/` ~7.0k, `src/jq/` ~0.7k. A naive reading treats that ~26% of
+the main crate as expensive weight worth reclaiming. It isn't — line count is a poor proxy
+for cost here.
+
+The real cost is the **engine libraries**, and they are already paid for:
+
+- **The engines are sunk cost.** `jaq-core`/`-std`/`-json`, `grep`/`grep-*`/`ignore`, and
+  `ast-grep-core`/`-config` are already linked into the binary because normalize's
+  *first-class* features require them — `--jq` compiles jaq via `jaq_core`, `normalize grep`
+  drives `grep`/`ignore` directly, and ast-grep functionality runs through
+  `normalize_syntax_rules`. That heavy dependency weight is present whether or not we vendor
+  the CLIs.
+- **The marginal cost of the front-ends is near-zero.** The vendored CLIs are a *parallel*
+  path: they have no callers outside their own directories except the handful of
+  argv[0]/subcommand dispatch lines in `main.rs`. The ~21.6k lines are mostly declarative
+  flag tables sitting on top of an engine that is already linked. They add negligible
+  binary, compile, and dependency weight beyond the engines themselves (see the size table
+  below — the jq feature measured ~835 KB, most of it monomorphization noise, not new deps).
+- **The marginal benefit is real.** On a system without `jq`/`rg`/`sg` — exactly the bare
+  NixOS/container/CI environments normalize targets — you get a genuine, full-interface tool
+  essentially for free, because the engine was going to be carried anyway.
+
+So: high benefit ÷ ~zero marginal cost. The economic case for vendoring the *full* CLI
+front-ends (not just embedding the engines) rests on this marginal-cost argument, which the
+raw line count hides.
+
+### What this argument does *not* settle
+
+The marginal-cost argument justifies that the vendored CLIs are **cheap to keep**. It does
+**not** dismiss the size question on other grounds:
+
+- **SRP / encapsulation concerns remain live.** The main crate being the home for ~21.6k
+  lines of verbatim third-party tool front-ends is still a single-responsibility and
+  encapsulation smell, independent of the marginal binary cost.
+- **Extraction into separate crates remains legitimately on the table** — but motivated by
+  SRP / encapsulation / modularity, **not** by cost reclamation. Extracting would *not*
+  meaningfully shrink binary or compile cost, since the engine dependencies stay regardless.
+
+Any such extraction is gated on **two hard conditions**:
+
+1. **Version lockstep.** Extracted vendored-CLI crates must be guaranteed not to drift in
+   engine/tool version from what the main crate uses for `--jq` / `grep` / ast-grep. If an
+   extracted `normalize jq` wrapper's jaq version skews from the main crate's `--jq` jaq
+   version, the two behave differently — unacceptable. Any extraction must enforce this
+   (e.g. shared `[workspace.dependencies]` pinning), and the guarantee must be explicit, not
+   incidental.
+2. **Publishing appropriateness is unresolved.** Publishing verbatim wrappers of vendored
+   third-party code (the ripgrep / jaq / ast-grep CLIs) to crates.io under `normalize-*`
+   names is of questionable appropriateness — licensing, namespace, and verbatim-copy
+   concerns all apply. At most such crates would be `publish = false`; possibly they should
+   not be separate published crates at all. This is an **open question**, not a settled
+   decision.
+
 ## Integration pattern
 
 ### 1. Feature gate
