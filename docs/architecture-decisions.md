@@ -536,3 +536,50 @@ errors cryptically) because `rg` or `git` isn't on PATH is unreliable.
 **The cost is binary size and compile time.** That's real, but it's the right tradeoff for a
 developer tool that needs to be reliable across environments. The alternative — a tool that
 works on the developer's machine but fails in CI — is worse than a large binary.
+
+## Capability-Surface Feature Flags: Serve Transports
+
+**Decision**: The `normalize serve` transports — LSP, HTTP, and MCP — are each a separate
+Cargo feature (`lsp`, `http`, `mcp`) gating an `optional` dependency, unified under a `serve`
+umbrella feature. All are `default = true` (via `serve` in the default set), so the stock
+binary ships all three.
+
+### Why per-transport features?
+
+The three serve transports are **peer capability surfaces over one service layer**: they expose
+the same code-intelligence data (`service/serve.rs` is the single live entry point), differing
+only in *protocol* (LSP JSON-RPC over stdio, HTTP REST + OpenAPI, MCP over stdio) and in
+*dependency weight*. That weight is the crux:
+
+- `lsp` → `tower-lsp` (pulls a transitive `axum` 0.6)
+- `http` → `axum` 0.8 + `utoipa`
+- `mcp` → `rmcp` (heavy: `schemars`, transport machinery)
+
+Before this split these dependencies were unconditional — `axum`, `utoipa`, and `tower-lsp`
+compiled into *every* build including `--no-default-features`. A consumer who wanted only the
+LSP surface still paid for the full HTTP + OpenAPI stack, and an embedder who wanted none of
+them couldn't shed any of it.
+
+Gating per transport lets a consumer take exactly the surface they need
+(`--no-default-features --features cli,lsp` yields an editor server with no HTTP/MCP deps)
+while the umbrella `serve` keeps the common build a one-word opt-in. This is the
+capability-surface principle from CLAUDE.md applied at the binary level: features declare
+*distinct consumer surfaces*, not micro-optimizations. The question was "does someone want the
+LSP surface but not the HTTP surface?" — yes (IDE integrations), so they are separate.
+
+### Graceful degradation over missing subcommands
+
+A transport compiled out does **not** disappear from `normalize serve --help`. The service
+method stays present; its body is `#[cfg]`-branched to a clear runtime error
+("HTTP server requires the 'http' feature. Rebuild with: cargo build --features http") on
+stderr with a non-zero exit. This follows CLAUDE.md's "non-interactive ≠ non-functional":
+a discoverable command that explains how to enable itself beats a silently-absent one. The MCP
+transport already used this stub pattern; HTTP and LSP now match it.
+
+### MCP is in the default build
+
+Folding `mcp` into `serve` (and `serve` into `default`) means the stock binary now ships the
+MCP server — previously it was opt-in behind a non-default `mcp` feature. This is intentional:
+the MCP server is a first-class LLM-integration surface and the marginal binary cost is
+accepted for out-of-the-box availability, consistent with the "embed, don't require external
+tools" posture elsewhere in this document.

@@ -41,26 +41,37 @@ impl ServeService {
             String,
         >,
     ) -> Result<serde_json::Value, String> {
-        let root_path = root
-            .as_deref()
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("."));
+        #[cfg(feature = "http")]
+        {
+            let root_path = root
+                .as_deref()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("."));
 
-        if openapi {
-            use crate::serve::http::ApiDoc;
-            use utoipa::OpenApi;
-            let spec = ApiDoc::openapi();
-            return Ok(serde_json::to_value(spec).unwrap_or(serde_json::Value::Null));
+            if openapi {
+                use crate::serve::http::ApiDoc;
+                use utoipa::OpenApi;
+                let spec = ApiDoc::openapi();
+                return Ok(serde_json::to_value(spec).unwrap_or(serde_json::Value::Null));
+            }
+
+            let config = crate::config::NormalizeConfig::load(&root_path);
+            let effective_port = port.unwrap_or_else(|| config.serve.http_port());
+
+            let exit = crate::serve::http::run_http_server(&root_path, effective_port).await;
+            if exit != 0 {
+                Err(format!("HTTP server exited with code {}", exit))
+            } else {
+                Ok(serde_json::Value::Null)
+            }
         }
 
-        let config = crate::config::NormalizeConfig::load(&root_path);
-        let effective_port = port.unwrap_or_else(|| config.serve.http_port());
-
-        let exit = crate::serve::http::run_http_server(&root_path, effective_port).await;
-        if exit != 0 {
-            Err(format!("HTTP server exited with code {}", exit))
-        } else {
-            Ok(serde_json::Value::Null)
+        #[cfg(not(feature = "http"))]
+        {
+            let _ = (port, openapi, root);
+            Err("HTTP server requires the 'http' feature. \
+                 Rebuild with: cargo build --features http"
+                .to_string())
         }
     }
 
@@ -74,12 +85,23 @@ impl ServeService {
             String,
         >,
     ) -> Result<(), String> {
-        let root_path = root.as_deref().map(PathBuf::from);
-        let exit = crate::serve::lsp::run_lsp_server(root_path.as_deref()).await;
-        if exit != 0 {
-            Err(format!("LSP server exited with code {}", exit))
-        } else {
-            Ok(())
+        #[cfg(feature = "lsp")]
+        {
+            let root_path = root.as_deref().map(PathBuf::from);
+            let exit = crate::serve::lsp::run_lsp_server(root_path.as_deref()).await;
+            if exit != 0 {
+                Err(format!("LSP server exited with code {}", exit))
+            } else {
+                Ok(())
+            }
+        }
+
+        #[cfg(not(feature = "lsp"))]
+        {
+            let _ = root;
+            Err("LSP server requires the 'lsp' feature. \
+                 Rebuild with: cargo build --features lsp"
+                .to_string())
         }
     }
 }

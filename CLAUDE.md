@@ -38,7 +38,15 @@ Practical consequences:
 
 The test for extraction: is this domain logic (algorithms, data models, extraction) or CLI wiring (formatting, dispatch, service layer)? Domain logic can be extracted when the above conditions are met. CLI wiring for a feature lives in the crate that owns that feature — a crate that owns a subcommand includes its own `#[cli]` service, report structs, and `OutputFormatter` impls. The main `normalize` crate just mounts them. Only cross-cutting wiring (command dispatch, global flags, output backend) lives in `normalize` itself. If it's purely "compute something and format it for this one command" with no standalone value, it stays in `commands/`.
 
-**Feature flags declare distinct capability surfaces,** not dependency optimizations. A crate that has a library API and a CLI API puts the CLI behind `cli`. A crate that has a rules engine and a fix engine puts fixes behind `fix`. The question is "does this crate serve consumers who want surface A but not surface B?" — if yes, gate B. Convention: capability features are `default = true` so the common case requires no opt-in; niche consumers pass `default-features = false`. Current feature flags: `cli` (CLI/server-less surface), `fix` (autofix/`PlannedEdit` surface).
+**Feature flags declare distinct capability surfaces,** not dependency optimizations. A crate that has a library API and a CLI API puts the CLI behind `cli`. A crate that has a rules engine and a fix engine puts fixes behind `fix`. The question is "does this crate serve consumers who want surface A but not surface B?" — if yes, gate B. Convention: capability features are `default = true` so the common case requires no opt-in; niche consumers pass `default-features = false`.
+
+Current feature flags on the main `normalize` crate:
+- `cli` — the core CLI/server-less surface (required by the binary).
+- `jq-cli` / `rg-cli` / `ast-grep-cli` — drop-in CLI replacements; `ast-grep-cli` also owns `dep:clap`. `cli-full` bundles all three.
+- `lsp` / `http` / `mcp` — **serve transports**, one capability surface per protocol over the shared service layer. Each pulls only its own transport stack (`tower-lsp`; `axum` + `utoipa`; `rmcp`). `serve` is the umbrella (all three). All are `default = true` via `serve`, so the stock binary ships LSP + HTTP + MCP; a transport compiled out degrades to a clear "requires the '<feature>' feature" error at runtime rather than a missing subcommand.
+- `sessions-web` — the sessions web UI; reuses the HTTP stack (`sessions-web = ["http"]`).
+
+The `fix` feature exists on feature crates (e.g. `normalize-edit`), not on the main crate. Some workspace crates additionally gate library-vs-CLI surfaces behind their own `cli` feature.
 
 
 ## Core Rule

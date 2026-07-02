@@ -39,6 +39,43 @@ jobs:
       - name: Run cargo check
         run: cargo check --workspace --all-features
 
+  features:
+    name: Feature Combos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "crates -> target"
+
+      # Guards the capability-surface feature taxonomy so serve-transport combos
+      # don't bit-rot. The binary requires `cli` (required-features), so the
+      # minimal buildable core is `--features cli` — it must NOT pull the serve
+      # deps (axum/utoipa/tower-lsp/rmcp). Each serve leaf is checked in isolation
+      # so a transport can be dropped independently.
+      #
+      # NOTE: bare `--no-default-features` (lib without `cli`) currently fails to
+      # compile due to a pre-existing cli/service boundary bug (commands/ referencing
+      # the cli-gated service layer) — tracked in TODO.md, out of scope for the serve
+      # feature pass.
+      - name: Minimal core (no serve deps)
+        run: cargo check -p normalize --no-default-features --features cli
+      - name: LSP only
+        run: cargo check -p normalize --no-default-features --features cli,lsp
+      - name: HTTP only
+        run: cargo check -p normalize --no-default-features --features cli,http
+      - name: MCP only
+        run: cargo check -p normalize --no-default-features --features cli,mcp
+      - name: Default (cli-full + serve)
+        run: cargo check -p normalize
+      - name: All features
+        run: cargo check -p normalize --all-features
+
   fmt:
     name: Format
     runs-on: ubuntu-latest

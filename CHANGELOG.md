@@ -8,6 +8,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Serve transport feature flags** — the `normalize serve` transports are now individually
+  gated capability surfaces: `lsp` (LSP/`tower-lsp`), `http` (HTTP REST + OpenAPI/`axum` +
+  `utoipa`), and `mcp` (MCP/`rmcp`), with a `serve` umbrella that enables all three. All are
+  `default = true` (via `serve` in the default feature set), so the stock binary ships LSP +
+  HTTP and — new in this release — the **MCP server** (previously opt-in behind `mcp`). Slim
+  builds can drop any transport (e.g. `--no-default-features --features cli,lsp`); the serve
+  dependencies (`axum` 0.8, `utoipa`, `tower-lsp`, `rmcp`) are now `optional` and only compile
+  when their transport is enabled. Invoking a transport that was compiled out prints a clear
+  "requires the '<feature>' feature" message to stderr and exits non-zero.
+
 - **`normalize-git` crate** — new standalone crate (`crates/normalize-git`) consolidating all
   pure-Rust gix read operations previously duplicated across `normalize-budget`,
   `normalize-ratchet`, `normalize-semantic`, and the main `normalize` crate. Public API:

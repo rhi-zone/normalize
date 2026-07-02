@@ -20,6 +20,27 @@ Three live threads from the 2026-06-29/07-01 session — verify state before act
 
 B0 (guide-regression test, CLAUDE.md crate count) and B1 (`normalize-git` extraction) have landed. The graph-crate blocker on B2/B3 is **resolved** (2026-07-02, refactor-in-place — see below); B2–B12 can now proceed. The `#[cli(alias)]` server-less prereq is a separate server-less task; it does not block batches that don't move verbs yet.
 
+## Serve/daemon capability-surface feature pass
+
+- [x] **Serve half (2026-07-02).** `normalize serve` transports are now gated capability
+  surfaces: features `lsp` (`tower-lsp`), `http` (`axum` + `utoipa`), `mcp` (`rmcp`), umbrella
+  `serve = [lsp, http, mcp]`, `default = [cli-full, serve]`. Made `axum`/`utoipa`/`tower-lsp`
+  `optional` (rmcp already was). `serve/{http,lsp}` modules gated by their features; `mcp` keeps
+  its always-present stub. `service/serve.rs` http/lsp bodies `#[cfg]`-branch to a clear runtime
+  error when compiled out (mcp already did). Deleted the vestigial clap `ServeArgs`/`ServeProtocol`/
+  `run` path in `serve/mod.rs` (unused — live dispatch is server-less `service/serve.rs`; this also
+  fixed the latent `--features cli` clap-compile bug). MCP is now in the default build.
+  `--no-default-features` drops axum 0.8/utoipa/tower-lsp/rmcp (verified via `cargo tree`; the
+  residual axum 0.6 is an unrelated libsql→tonic transitive). CI `features` job added.
+- [ ] **Daemon half (remaining).** Apply the same capability-surface gating to the daemon
+  (append `daemon` to `default`, gate its deps). Separate pass — not done here.
+- [ ] **Pre-existing: bare `--no-default-features` lib does not compile.** Orthogonal to serve:
+  `commands/grammars.rs` and `commands/init.rs` reference the cli-gated `crate::service::grammars::
+  GrammarService` unconditionally, so building the lib without `cli` fails (E0433). Fence it
+  behind `cli` or move `GrammarService` out of the cli-gated `service` module. Belongs with the
+  main-crate decomposition / cli-vs-service boundary work, not the serve pass. CI's `features`
+  job therefore uses `--features cli` as the minimal buildable core.
+
 ## Follow-ups (2026-06-29 branch consolidation)
 
 - [ ] **`missing-summary` commit count looks inflated.** When adding `tooling/claude-hooks/SUMMARY.md`

@@ -16,7 +16,7 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [features]
-default = ["cli-full"]
+default = ["cli-full", "serve"]
 
 # Core normalize CLI (server-less proc macro; clap re-exported from server-less)
 cli = []
@@ -29,11 +29,16 @@ ast-grep-cli = ["cli", "dep:clap"]
 # Full battery: normalize CLI + all drop-in replacements
 cli-full = ["cli", "jq-cli", "rg-cli", "ast-grep-cli"]
 
-# Optional MCP server support
-mcp = ["rmcp"]
+# Serve transports — capability surfaces over the service layer, one per protocol.
+# Each pulls only its own transport stack; `serve` is the umbrella (all three,
+# default=true so the stock binary ships LSP + HTTP + MCP).
+lsp = ["cli", "dep:tower-lsp"]
+http = ["cli", "dep:axum", "dep:utoipa"]
+mcp = ["cli", "dep:rmcp"]
+serve = ["lsp", "http", "mcp"]
 
-# Build sessions web UI (requires bun/npm, enable in CI)
-sessions-web = []
+# Build sessions web UI (requires bun/npm, enable in CI). Reuses the HTTP stack.
+sessions-web = ["http"]
 
 [dependencies]
 clap = { workspace = true, optional = true }
@@ -101,8 +106,8 @@ textwrap = { version = "0.16", default-features = false }
 log = "0.4"
 rayon.workspace = true
 tokio.workspace = true
-axum.workspace = true
-utoipa = { version = "5", features = ["axum_extras"] }
+axum = { workspace = true, optional = true }
+utoipa = { version = "5", features = ["axum_extras"], optional = true }
 notify.workspace = true
 ureq = { version = "2", features = ["json"] }
 flate2 = "1"
@@ -119,7 +124,7 @@ toml_edit = "0.22"
 jsonschema = { workspace = true }
 rmcp = { version = "0.12", features = ["server", "macros", "schemars", "transport-io"], optional = true }
 schemars = "1"
-tower-lsp = "0.20"
+tower-lsp = { version = "0.20", optional = true }
 git2 = { version = "0.19", default-features = false }
 gix = { workspace = true }
 glob = "0.3.3"

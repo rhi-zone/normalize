@@ -4,7 +4,9 @@
 
 use serde::Deserialize;
 
+#[cfg(feature = "http")]
 pub mod http;
+#[cfg(feature = "lsp")]
 pub mod lsp;
 pub mod mcp;
 
@@ -33,81 +35,5 @@ impl ServeConfig {
 
     pub fn fact_debounce_ms(&self) -> u64 {
         self.fact_debounce_ms.unwrap_or(1500)
-    }
-}
-
-/// Serve command arguments
-#[cfg(feature = "cli")]
-#[derive(clap::Args)]
-pub struct ServeArgs {
-    #[command(subcommand)]
-    pub protocol: ServeProtocol,
-
-    /// Root directory (defaults to current directory)
-    #[arg(short, long, global = true)]
-    pub root: Option<std::path::PathBuf>,
-}
-
-#[cfg(feature = "cli")]
-#[derive(clap::Subcommand)]
-pub enum ServeProtocol {
-    /// Start MCP server for LLM integration (stdio transport)
-    Mcp,
-
-    /// Start HTTP server (REST API)
-    Http {
-        /// Port to listen on
-        #[arg(short, long, default_value = "8080")]
-        port: u16,
-
-        /// Output OpenAPI spec and exit (don't start server)
-        #[arg(long)]
-        openapi: bool,
-    },
-
-    /// Start LSP server for IDE integration
-    Lsp,
-}
-
-/// Run the serve command
-#[cfg(feature = "cli")]
-pub fn run(args: ServeArgs) -> i32 {
-    use crate::config::NormalizeConfig;
-
-    let root = args
-        .root
-        .clone()
-        .unwrap_or_else(|| std::path::PathBuf::from("."));
-    let config = NormalizeConfig::load(&root);
-
-    match args.protocol {
-        ServeProtocol::Mcp => mcp::serve_mcp(args.root.as_deref()),
-        ServeProtocol::Http { port, openapi } => {
-            if openapi {
-                // Output OpenAPI spec and exit
-                use http::ApiDoc;
-                use utoipa::OpenApi;
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&ApiDoc::openapi()).unwrap()
-                );
-                0
-            } else {
-                // CLI port overrides config
-                let effective_port = if port != 8080 {
-                    port // Explicit CLI value
-                } else {
-                    config.serve.http_port()
-                };
-                // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
-                let rt = tokio::runtime::Runtime::new().unwrap();
-                rt.block_on(http::run_http_server(&root, effective_port))
-            }
-        }
-        ServeProtocol::Lsp => {
-            // normalize-syntax-allow: rust/unwrap-in-impl - Runtime::new() only fails on OS resource exhaustion
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(lsp::run_lsp_server(args.root.as_deref()))
-        }
     }
 }
