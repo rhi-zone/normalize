@@ -943,15 +943,21 @@ The marginal-cost rationale is now documented in `docs/cli-dropin-integrations.m
 ("Why the line count is not the cost") and the audit framing is corrected in
 `docs/audit-2026-07-02.md`.
 
-- [x] **REJECTED 2026-07-02 — do NOT extract vendored CLIs into crates. Keep in main.**
-  A vendored copy of ripgrep/jaq/ast-grep fails the crate-existence bar even as
-  `publish = false` (one dependent, zero standalone value — it is a verbatim copy of an
-  already-published upstream tool) and has no coherent `normalize-*` name. The SRP smell is
-  handled in place by module isolation (`src/rg/` / `src/ast_grep/` / `src/jq/`) + capability
-  feature gates (`cli-full` / `jq-cli` / `rg-cli` / `ast-grep-cli`); extraction reclaims no
-  cost (engines are sunk). The former version-lockstep / publishing-question gates are **moot**
-  (no extraction to gate). Full reasoning: `docs/audit-2026-07-02.md` ("Decision (2026-07-02):
-  vendored-CLI extraction is REJECTED") and `docs/cli-dropin-integrations.md`.
+- [x] **FORCED 2026-07-02 — vendored CLIs stay in main; extraction is IMPOSSIBLE, not just
+  rejected.** A genuine trilemma: you cannot have all of (1) purity (vendored CLI source out
+  of `normalize`), (2) publishable-with-drop-ins (`cargo install normalize` ships `rg`/`jq`/`sg`),
+  and (3) no junk crates (no verbatim third-party CLI copies on crates.io). The vendored code
+  is CLI *source* upstream publishes only as binaries (engines are libs, front-ends aren't), so
+  a published `normalize` carrying the drop-ins must hold that source in-crate (breaks 1) or in
+  a published dep (breaks 3). `publish = false` crates don't escape it — a published crate
+  cannot depend on one (path dep fails cargo's version check; versioned dep fails registry
+  validation; both verified this session); a `publish = false` multitool *binary* fixes the dep
+  but breaks (2). The project chose (2)+(3), which forecloses (1) → keeping them in main is
+  forced. Secondary (weaker): also fails the crate bar (one dependent, zero standalone value,
+  no coherent `normalize-*` name). Marginal cost is ~zero (engines sunk). Former
+  version-lockstep / publishing gates are **moot**. Full reasoning: `docs/audit-2026-07-02.md`
+  ("Decision (2026-07-02): keeping the vendored CLIs in main is FORCED by a publish trilemma")
+  and `docs/cli-dropin-integrations.md`.
 
 **Execution items (plan of record — executed this session in subsequent commits):**
 
