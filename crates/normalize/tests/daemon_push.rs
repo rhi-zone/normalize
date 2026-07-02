@@ -233,23 +233,54 @@ fn config_edit_triggers_reload_event() {
         });
     });
 
-    // Allow the subscriber + initial add_root refresh to settle. The startup
-    // refresh emits its own IndexRefreshed (with files > 0), which we must
-    // discard before triggering the config edit so we don't false-positive
-    // on it.
-    std::thread::sleep(Duration::from_millis(1500));
+    // Allow the subscriber to connect and drain any events emitted before we
+    // start triggering config edits.
+    std::thread::sleep(Duration::from_millis(500));
     while rx.try_recv().is_ok() {}
 
-    // Edit the config to trigger a reload.
-    std::fs::write(
-        project.path().join(".normalize/config.toml"),
-        "# trigger reload\n",
-    )
-    .unwrap();
+    // Two independent nondeterminism sources make a single fixed-sleep-then-
+    // edit-once approach flaky under parallel load; both are handled here.
+    //
+    // 1. Broadcast-attach race: the server subscribes to its
+    //    `tokio::sync::broadcast` channel only *after* it has accepted the
+    //    connection and processed the `Subscribe` request. A broadcast
+    //    receiver never sees messages sent before it subscribed, so a config
+    //    edit whose reload event fires before the subscriber has attached is
+    //    broadcast to zero receivers and lost. We therefore re-edit the config
+    //    (toggling the comment so notify fires each time and the no-op-diff
+    //    reload path re-emits `IndexRefreshed { files: 0 }`) on an interval
+    //    longer than the 500ms config debounce, polling for the event between
+    //    edits. Once the subscriber has attached — however long that takes —
+    //    the next edit's reload event is caught. Deterministic: it depends
+    //    only on attach *eventually* happening, not on a fixed timing window.
+    //
+    // 2. (Fixed at the source, in the daemon.) The daemon used to fire a
+    //    config reload on inotify `Access(Open)` events, so its own reads of
+    //    config.toml during startup emitted a phantom `IndexRefreshed
+    //    { files: 0 }` that this subscriber would consume and stop on before
+    //    the real edit. The dispatch loop now ignores read (`Access`) events.
+    let overall_deadline = Instant::now() + Duration::from_secs(30);
+    let mut toggle = 0u32;
+    let event = loop {
+        toggle += 1;
+        std::fs::write(
+            project.path().join(".normalize/config.toml"),
+            format!("# trigger reload {toggle}\n"),
+        )
+        .unwrap();
 
-    let event = wait_for_event(&rx, Duration::from_secs(15), |ev| {
-        matches!(ev, Event::IndexRefreshed { files: 0, .. })
-    });
+        // Poll for the reload event for a bit longer than the config debounce
+        // before re-editing, so a successful reload is observed rather than
+        // debounced away.
+        if let Some(ev) = wait_for_event(&rx, Duration::from_millis(800), |ev| {
+            matches!(ev, Event::IndexRefreshed { files: 0, .. })
+        }) {
+            break Some(ev);
+        }
+        if Instant::now() >= overall_deadline {
+            break None;
+        }
+    };
     assert!(
         event.is_some(),
         "no config-reload IndexRefreshed event after `.normalize/config.toml` edit"

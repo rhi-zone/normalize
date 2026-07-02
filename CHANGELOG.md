@@ -8,6 +8,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Daemon no longer fires phantom config reloads on file reads.** The daemon's
+  file-watch dispatch loop treated inotify `Access(Open)` events (pure reads) on
+  `.normalize/config.toml` as config changes. Because the daemon reads config.toml
+  constantly while indexing and priming, its own reads triggered spurious config
+  reloads (each emitting an `IndexRefreshed { files: 0 }` event and needless
+  reprime churn). The dispatch loop now ignores read (`Access`) events entirely;
+  real edits still arrive as `Create`/`Modify`/`Remove`.
+
 - **`normalize init` now seeds a `[walk] exclude` section** in the generated
   `.normalize/config.toml` — the baseline (`.git/`, `.normalize/`) plus any
   auto-detected scratch dirs present in the project (e.g. `.claude/worktrees/`,

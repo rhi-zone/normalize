@@ -3024,6 +3024,21 @@ mod unix_impl {
                     }
                 };
 
+                // Reads are not changes. The daemon opens `.normalize/config.toml`,
+                // source files, and the SQLite index constantly while indexing and
+                // priming; on Linux, inotify surfaces every open as
+                // `Access(Open(_))` (and reads/read-closes as other `Access(_)`
+                // kinds). Classifying those as changes fires a phantom config
+                // reload for each of the daemon's *own* reads of config.toml —
+                // emitting spurious `IndexRefreshed { files: 0 }` events and
+                // needless reprimes. Real mutations arrive as `Create`, `Modify`,
+                // or `Remove`; a write's post-close (`Access(Close(Write))`) is
+                // redundant with the `Modify` we already act on. So ignore the
+                // whole `Access(_)` family for change detection.
+                if matches!(event.kind, notify::EventKind::Access(_)) {
+                    continue;
+                }
+
                 // Collect dispatch targets under a brief lock, then release before sending
                 let mut to_event: Vec<(PathBuf, PathBuf)> = Vec::new(); // (path, root)
                 let mut to_refresh: Vec<PathBuf> = Vec::new();

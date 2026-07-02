@@ -246,14 +246,19 @@ second look — none are blocking, none are strictly committed:
   the in-shell toolchain and `rust-toolchain.toml` channel will diverge. Keep them in sync manually when
   bumping the toolchain.
 
-- **Daemon flake `config_edit_triggers_reload_event`** — failed once in
-  a workspace test run, passed in isolation and on subsequent runs. The
-  agent who chased it called it transient (possibly inotify saturation
-  under parallel test load). Watch for recurrences. (Reproduced again during
-  the 2026-05-29 native-refresh-coalescing work: fails only when interleaved
-  with the full `-p normalize` test run, passes in isolation and on repeated
-  full `daemon_push` runs. Confirmed test-interaction/timing, not a product
-  bug — multiple test daemons sharing the socket dir + inotify under load.)
+- [x] **Daemon flake `config_edit_triggers_reload_event` — RESOLVED (2026-07-02).**
+  Root cause was a **real daemon bug**, not test timing (the earlier
+  "test-interaction/inotify-saturation" diagnosis was wrong): the notify
+  dispatch loop classified *any* event on `.normalize/config.toml` as a config
+  change, including inotify `Access(Open)` **reads**. The daemon reads config.toml
+  constantly during startup indexing/prime (`NormalizeConfig::load`), so its own
+  reads fired a phantom config reload that emitted a spurious `IndexRefreshed
+  { files: 0 }`; the test's subscriber consumed that as the config-edit signal
+  and stopped before the real edit. Fix: dispatch loop now ignores `Access(_)`
+  (read) events — real mutations arrive as `Create`/`Modify`/`Remove`. The test
+  was also hardened against the broadcast-attach race (re-edits config until the
+  subscriber, which attaches asynchronously, observes the reload). Proven: 40/40
+  single-test + 25/25 full `daemon_push` suite green (was ~2/15 flaky).
 
 - [x] **Daemon native-refresh backlog: unbounded channel → per-root coalescing**
   (2026-05-29). The daemon watched each repo's `.git/index` and pushed the root
