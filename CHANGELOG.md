@@ -6,6 +6,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`docs/crates.md` — a canonical crate registry.** A single scannable reference listing
+  every workspace crate with its purpose, category, and CLI-namespace ownership. It
+  replaces the removed per-directory `SUMMARY.md` convention at the crate level; each
+  crate's `Cargo.toml` `description` remains the maintainable source of truth.
+
 ### Removed
 
 - **The `SUMMARY.md` per-directory convention and its enforcing native rules

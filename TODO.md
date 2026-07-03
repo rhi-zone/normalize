@@ -106,6 +106,16 @@ B0 (guide-regression test, CLAUDE.md crate count) and B1 (`normalize-git` extrac
   replacement for crate-level context; the `normalize view <dir>` SUMMARY.md-preamble
   feature is now inert (no files) and can be repurposed or removed separately.
 
+- [x] **`docs/crates.md` crate registry landed (2026-07-03).** The intended crate-level
+  replacement for SUMMARY.md now exists: every workspace crate with purpose, category, and
+  CLI-namespace ownership (current vs planned-inversion), cross-checked against the
+  inversion plan and the 2026-07-03 decomposition audit. Each crate's `Cargo.toml`
+  `description` is the maintainable source of truth.
+  - [ ] **Follow-up (future option, don't build now):** an `xtask` / `normalize` command
+    that regenerates `docs/crates.md` from the workspace `Cargo.toml` `description` fields
+    + the `service/mod.rs` mount table, so the registry can't drift. Manual for now.
+  - [x] Fixed `normalize-grammars` `Cargo.toml` description (was placeholder "Normalize").
+
 ---
 
 ## CFG (Control Flow Graph) — Phase 1 ✓ + Phase 2 ✓ + Phase 3 ✓ + Phase 4 ✓

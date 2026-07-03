@@ -21,6 +21,12 @@ Practical consequences:
 
 ## Architecture
 
+**Crate-level context lives in `docs/crates.md`** — the canonical registry of every
+workspace crate (purpose, category, namespace ownership). It replaces the removed
+per-directory `SUMMARY.md` convention at the crate level. The maintainable source of truth
+for each crate's purpose is its `Cargo.toml` `description` field; keep that accurate and
+the registry stays cheap to regenerate. Consult it before asking "which crate owns X?".
+
 **Index-first:** Core data extraction (symbols, imports, calls) goes in the Rust index. When adding language support: first add extraction to the indexer, then expose via commands. Single-file commands (view, complexity, parsing) work without the index; cross-file features (import resolution, call graphs, dead code) require it and prompt the user to run `normalize structure rebuild`.
 
 **CLI is generated from the service layer.** Subcommands come from `#[cli(...)]` proc-macro attributes on service methods, not `args.rs`. When adding a new subcommand:

@@ -3,7 +3,7 @@ name = "normalize-grammars"
 version = "0.3.2"
 edition = "2024"
 publish = false
-description = "Normalize"
+description = "Marker crate aggregating all tree-sitter grammar dependencies for normalize"
 
 # This crate exists solely to download arborium grammars.
 # Run `cargo fetch -p normalize-grammars` to populate ~/.cargo/registry.
