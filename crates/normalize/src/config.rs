@@ -83,20 +83,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-/// Index configuration.
-#[derive(Debug, Clone, Deserialize, Serialize, Default, JsonSchema, server_less::Config)]
-#[serde(default)]
-pub struct IndexConfig {
-    /// Whether to create and use the file index. Default: true
-    pub enabled: Option<bool>,
-}
-
-impl IndexConfig {
-    pub fn enabled(&self) -> bool {
-        self.enabled.unwrap_or(true)
-    }
-}
-
 /// User-defined rule tag groups.
 ///
 /// Tags can reference rule IDs or other tag names (including built-in tags).
@@ -119,8 +105,8 @@ pub struct RuleTagsConfig(pub std::collections::HashMap<String, Vec<String>>);
 pub struct NormalizeConfig {
     #[param(nested)]
     pub daemon: DaemonConfig,
-    #[param(nested)]
-    pub index: IndexConfig,
+    #[param(nested, serde)]
+    pub index: normalize_index::IndexConfig,
     #[param(nested, serde)]
     pub shadow: ShadowConfig,
     #[param(nested, serde)]

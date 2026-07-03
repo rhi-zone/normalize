@@ -7,7 +7,7 @@ repository.workspace = true
 description = "Architectural metrics: coupling, cycles, layering, hubs"
 
 [dependencies]
-normalize-facts = { path = "../normalize-facts", version = "0.3.2" }
+normalize-index = { path = "../normalize-index", version = "0.3.2" }
 normalize-graph = { path = "../normalize-graph", version = "0.3.2" }
 normalize-languages = { path = "../normalize-languages", version = "0.3.2" }
 libsql.workspace = true

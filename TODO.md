@@ -1082,10 +1082,14 @@ reports + `OutputFormatter` with zero back-refs to main.
   into the in-main `crate::commands` module (171 refs). Service extraction is *downstream* of
   `commands/` extraction: move the `commands/<feature>/` impl into the crate first, then the
   thin `#[cli]` service method follows.
-- **Two enablers** unblock the analyze family: (1) the daemon-aware `crate::index` wrapper
-  (~144 LOC over `normalize_facts::FileIndex`) — use `FileIndex` directly (as ratchet/budget
-  do) or hoist `index.rs` into a small shared crate; (2) `crate::config::NormalizeConfig`
-  per-subcommand excludes — pass each crate its config slice.
+- **Two enablers** unblock the analyze family: (1) ✅ **DONE 2026-07-03** — index acquisition
+  hoisted into the new `normalize-index` leaf crate (`open`/`ensure_ready`/`require_import_graph`,
+  `IndexConfig`, `build_import_graph`/`ImportGraph`). Acquisition takes config **slices**
+  (`&IndexConfig`+`&WalkConfig`), NOT `NormalizeConfig`, so feature crates depend on the leaf.
+  Also broke the `graph ↔ architecture` cycle (build_import_graph now in the shared leaf) and
+  fixed the standalone-`structure` `NORMALIZE_INDEX_DIR` bug. Main `crate::index`/`crate::paths`
+  are thin wrappers/re-exports (main src −180 LOC); (2) `crate::config::NormalizeConfig`
+  per-subcommand excludes — pass each crate its config slice (still pending).
 
 **Migration map** (target → ~LOC → owner → notes):
 
@@ -1114,8 +1118,10 @@ reports + `OutputFormatter` with zero back-refs to main.
   `NormalizeConfig`). `sessions-web`/`axum` carried across as a crate feature. Main src 83,243
   → 75,157 LOC (−8,086); main mounts `normalize_sessions::service::SessionsService` in one line.
   Proves the full surface migration (commands subtree + `service/*.rs` method) end to end.
-- [ ] **2. Build the two enablers** — shareable index acquisition (direct `FileIndex` or hoist
-  `index.rs`); config excludes-slice.
+- [ ] **2. Build the two enablers** — (a) ✅ **DONE 2026-07-03**: shareable index acquisition
+  hoisted into new `normalize-index` crate (slice-based config API, no `NormalizeConfig` dep;
+  `build_import_graph` relocated, breaking `graph ↔ architecture`); (b) config excludes-slice
+  still pending. Unblocks B2 (`graph`/`view` carve) and B3 (`architecture`).
 - [ ] **3. Analyze families → existing owners** (~7.75k): code-similarity (B4), architecture
   (B3), graph (B2, out of `view`), dataflow trio (cfg *or* facts/structure — open fork B5),
   chat-sessions/session-analysis. `search` (B7): drop `search`→`grep` alias atomically with

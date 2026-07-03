@@ -5211,6 +5211,7 @@ dependencies = [
  "normalize-filter",
  "normalize-git",
  "normalize-graph",
+ "normalize-index",
  "normalize-knowledge-graph",
  "normalize-languages",
  "normalize-local-deps",
@@ -5270,8 +5271,8 @@ name = "normalize-architecture"
 version = "0.3.2"
 dependencies = [
  "libsql",
- "normalize-facts",
  "normalize-graph",
+ "normalize-index",
  "normalize-languages",
  "schemars",
  "serde",
@@ -5630,6 +5631,18 @@ dependencies = [
 name = "normalize-graph"
 version = "0.3.2"
 dependencies = [
+ "schemars",
+ "serde",
+]
+
+[[package]]
+name = "normalize-index"
+version = "0.3.2"
+dependencies = [
+ "libsql",
+ "normalize-core",
+ "normalize-facts",
+ "normalize-rules-config",
  "schemars",
  "serde",
 ]

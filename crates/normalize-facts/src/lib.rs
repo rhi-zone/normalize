@@ -13,6 +13,7 @@ pub mod extract;
 pub mod extraction_fixtures;
 mod index;
 mod parsers;
+pub mod paths;
 mod symbols;
 
 #[cfg(feature = "cli")]
@@ -26,6 +27,7 @@ pub use parsers::{
     MissingGrammar, available_external_grammars, grammar_loader, parse_with_grammar, parser_for,
     peek_missing_grammars, report_missing_grammar, take_missing_grammars, try_get_grammar,
 };
+pub use paths::get_normalize_dir;
 pub use symbols::SymbolParser;
 
 // Re-export core types for convenience

@@ -74,7 +74,9 @@ impl OutputFormatter for StructureFilesReport {
 // =============================================================================
 
 fn open_index_path(root: &Path) -> PathBuf {
-    root.join(".normalize").join("index.sqlite")
+    // Honor NORMALIZE_INDEX_DIR / XDG resolution so `structure` and the main
+    // binary's `view graph` agree on where the index lives.
+    crate::paths::get_normalize_dir(root).join("index.sqlite")
 }
 
 /// Best-effort: parse `[walk]` from `.normalize/config.toml`.

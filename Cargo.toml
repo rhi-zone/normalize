@@ -38,6 +38,7 @@ members = [
     "crates/normalize-graph",
     "crates/normalize-code-similarity",
     "crates/normalize-rank",
+    "crates/normalize-index",
     "crates/normalize-architecture",
     "crates/normalize-metrics",
     "crates/normalize-budget",

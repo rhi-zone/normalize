@@ -8,6 +8,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`normalize-index` — foundational index-enabler crate.** Extracts index acquisition
+  (`open`/`open_if_enabled`/`ensure_ready`/`require_import_graph`/`ensure_ready_or_warn`)
+  and import-graph construction (`build_import_graph`/`ImportGraph`) out of the main crate
+  and `normalize-architecture` into one leaf crate. Acquisition now takes config **slices**
+  (`&IndexConfig` + `&WalkConfig`) instead of the monolithic `NormalizeConfig`, so feature
+  crates can acquire the index without depending on the main crate. `IndexConfig` moved here
+  (composed by `NormalizeConfig` via `#[param(nested, serde)]`). Moving `build_import_graph`
+  into this shared leaf breaks the `graph ↔ architecture` dependency cycle;
+  `normalize-architecture` re-exports it so its consumers are unchanged. No user-facing CLI
+  change. (Unblocks the CLI taxonomy inversion B-series.)
+
 - **`docs/crates.md` — a canonical crate registry.** A single scannable reference listing
   every workspace crate with its purpose, category, and CLI-namespace ownership. It
   replaces the removed per-directory `SUMMARY.md` convention at the crate level; each
@@ -43,6 +54,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`cargo build --features remote-sqld`).
 
 ### Fixed
+
+- **Standalone `normalize-facts structure` now honors `NORMALIZE_INDEX_DIR`.** Its
+  `FactsCliService` previously hardcoded `<root>/.normalize/index.sqlite`, so with
+  `NORMALIZE_INDEX_DIR` set it read/wrote a different index than `normalize view graph`
+  and the main `normalize structure`. It now resolves the index path via the shared
+  `normalize_facts::get_normalize_dir`, so all index consumers agree on one location.
 
 - **`normalize jq` is functional again.** Every filter previously failed with
   `compile error: undefined Filter`. This was **not** a version-mismatch problem —
