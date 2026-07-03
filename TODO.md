@@ -13,7 +13,7 @@ Three live threads from the 2026-06-29/07-01 session — verify state before act
 - **CLI taxonomy inversion (B2–B12)**: B1 landed; B0's guide-regression + CLAUDE.md-crate-count parts landed, but **B0's server-less `#[cli(alias = "...")]` prerequisite is still PENDING** (blocks any verb-move batch's transitional aliases). The graph-crate blocker on B2/B3 is resolved (see below). Note: command-surface decomposition is the SAME move — see below. See [CLI command-taxonomy FULL INVERSION](#cli-command-taxonomy-full-inversion--seam-corrected-final-scope-high-priority) below.
 - **Graph-crate split**: ✅ RESOLVED 2026-07-02 — refactored `normalize-graph` in place (pure algorithms split from presentation; deps `normalize-output`/`nu-ansi-term` dropped; characterization tests added). No standalone crate, no node-type genericization. Decision record (superseded resolution at top): `docs/artifacts/cli-taxonomy-2026-06-29/DECISION-graph-crate.md`. This unblocks B2 and B3. See [Graph crate refactor](#graph-crate-refactor-resolved-2026-07-02) below.
 - **Main-crate decomposition audit**: ✅ DONE 2026-07-02 — full audit run; findings recorded in `docs/audit-2026-07-02.md`. Headline: the main crate is NOT a reservoir of extractable domain logic (reusable algorithms already in feature crates). Six small execution items + one rename remain (D1–D6 below), to be executed this session. See [Main-crate decomposition audit](#main-crate-decomposition-audit-done-2026-07-02) below.
-- **Command-surface decomposition ≡ the B0–B12 CLI taxonomy inversion**: 🔄 IN PROGRESS 2026-07-03 — a second lens (CLAUDE.md's "crate owns its subcommand, main just mounts") reached the *same* move as the CLI taxonomy inversion, from the size-reduction direction. Main can shrink ~84k → ~30–34k (~21k forced-to-stay vendored CLIs → own core ≈ 9–13k). **The authoritative target taxonomy is already designed:** `docs/artifacts/cli-taxonomy-2026-06-29/00-inversion-plan.md` (FINAL SCOPE, B0–B12). Audit (reconciled + open forks): `docs/audit-2026-07-03-command-surface-decomposition.md`. Sessions ✅ DONE 2026-07-03 (proof case, main src −8,086 LOC). Execution blocked on the open forks below (metrics A1/A2, dataflow home, `search` collision). See [Command-surface decomposition roadmap](#command-surface-decomposition-roadmap-in-progress-2026-07-03) below.
+- **Command-surface decomposition ≡ the B0–B12 CLI taxonomy inversion**: 🔄 IN PROGRESS 2026-07-03 — a second lens (CLAUDE.md's "crate owns its subcommand, main just mounts") reached the *same* move as the CLI taxonomy inversion, from the size-reduction direction. Main can shrink ~84k → ~30–34k (~21k forced-to-stay vendored CLIs → own core ≈ 9–13k). **The authoritative target taxonomy is already designed:** `docs/artifacts/cli-taxonomy-2026-06-29/00-inversion-plan.md` (FINAL SCOPE, B0–B12). Audit (reconciled + open forks): `docs/audit-2026-07-03-command-surface-decomposition.md`. Sessions ✅ DONE 2026-07-03 (proof case, main src −8,086 LOC). Execution blocked on the open forks below (metrics A1/A2, dataflow home; `search` collision RESOLVED 2026-07-03 — drop `search`→`grep` alias at B7). See [Command-surface decomposition roadmap](#command-surface-decomposition-roadmap-in-progress-2026-07-03) below.
 
 ---
 
@@ -869,7 +869,10 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   activate `features=["cli"]`.
 - [ ] **B6 — `filter`:** mount `FilterCliService` (rename `name`→`filter`); retire main-crate
   `aliases` leaf; add hidden top-level `aliases` transitional alias.
-- [ ] **B7 — `search`:** add `#[cli(name="search")]` to normalize-semantic; mount.
+- [ ] **B7 — `search`:** add `#[cli(name="search")]` to normalize-semantic; mount. **Remove
+  the `search`→`grep` alias from `main.rs` `rewrite_aliases` (and the `docs/cli-design.md`
+  aliases table row) atomically with mounting this verb** — `search` becomes the semantic
+  verb (resolved 2026-07-03). `find`→`grep` alias stays.
 - [ ] **B8 — `normalize-git-history` extraction:** define typed data API (`ChurnStats`,
   `CoupledPair`, `OwnershipEntry`, `HotspotEntry`, etc.); disentangle compute from
   `OutputFormatter` in each command file; move compute fns into new crate; OutputFormatter
@@ -1044,8 +1047,10 @@ section above for the batch plan. Reconciled/full audit with corrections:
   call).
 - **Dataflow trio home** (`liveness`/`effects`/`exceptions`): inversion-plan B5 → `structure`
   (normalize-facts) vs this roadmap → `normalize-cfg`. **UNRESOLVED** — pick before B5.
-- **`search` verb collision**: inversion-plan B7 wires normalize-semantic as `search`, which
-  clashes with the existing `search`→`grep` alias. **UNRESOLVED** — resolve before B7.
+- **`search` verb collision** (RESOLVED 2026-07-03): inversion-plan B7 wires normalize-semantic
+  as `search`, which clashes with the existing `search`→`grep` alias. **Decision:** drop the
+  `search`→`grep` alias; `search` becomes the semantic verb. Alias removal executed at B7,
+  atomically with mounting the verb (not now — nothing replaces it until B7). `find`→`grep` stays.
 - **`analyze security`**: no compute crate in either map — genuinely unassigned (future
   security crate, or stays main). OPEN, non-blocking.
 - **`coupling-clusters` → history** (RESOLVED): it is git-temporal (`co_change_edges`),
@@ -1101,7 +1106,8 @@ reports + `OutputFormatter` with zero back-refs to main.
   `index.rs`); config excludes-slice.
 - [ ] **3. Analyze families → existing owners** (~7.75k): code-similarity (B4), architecture
   (B3), graph (B2, out of `view`), dataflow trio (cfg *or* facts/structure — open fork B5),
-  chat-sessions/session-analysis. `search` (B7) blocked on the alias collision.
+  chat-sessions/session-analysis. `search` (B7): drop `search`→`grep` alias atomically with
+  mounting the semantic verb (collision resolved 2026-07-03).
 - [ ] **4. DECISION on the ~5.7k rank-metrics** — designate `normalize-metrics` as owner vs.
   leave in main. The one genuinely open architectural call here.
 - [ ] **5. Small wrappers** (~2k) — generate/context/package/find_references, budget template.

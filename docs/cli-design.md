@@ -238,7 +238,7 @@ Users from other tools often try familiar names. These aliases are rewritten tra
 
 | Alias | Canonical Command | Rationale |
 |-------|-------------------|-----------|
-| `search` | `grep` | Most tools call it "search" |
+| `search` | `grep` | Most tools call it "search" — **slated for removal at taxonomy-inversion B7** in favor of the semantic `search` verb (normalize-semantic); still active until then |
 | `find` | `grep` | Common alternative for text search |
 | `lint` | `rules run` | Standard linter invocation |
 | `check` | `ci` | Common CI/check command name |
@@ -247,6 +247,8 @@ Users from other tools often try familiar names. These aliases are rewritten tra
 
 Aliases are invisible — they don't appear in `--help` output. The canonical name is always what's shown.
 
-> **Open collision (taxonomy inversion B7):** the planned semantic-search verb `search`
-> (normalize-semantic) clashes with this `search`→`grep` alias. Unresolved — see the open
-> forks in `docs/audit-2026-07-03-command-surface-decomposition.md`.
+> **Resolved collision (taxonomy inversion B7, 2026-07-03):** the planned semantic-search verb
+> `search` (normalize-semantic) clashed with this `search`→`grep` alias. **Decision:** drop the
+> `search`→`grep` alias and let `search` become the semantic verb. The alias removal is executed
+> at **B7, atomically with mounting the verb** — so the row above stays active until then. See
+> the open forks in `docs/audit-2026-07-03-command-surface-decomposition.md`.

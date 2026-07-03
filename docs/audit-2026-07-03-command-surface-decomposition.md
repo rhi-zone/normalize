@@ -209,11 +209,15 @@ SCOPE.
    honest owners. **Status: UNRESOLVED** — pick one before B5. (Cross-ref: inversion plan
    §Flagged soft spots notes they "read as analysis not index introspection.")
 
-3. **`search` verb collision.** Inversion-plan **B7** wires `normalize-semantic` as a new
-   top-level **`search`** verb (semantic code search). But `search` already exists as a
-   user-facing **alias for `grep`**. The planned semantic `search` clashes with that alias.
-   **Status: UNRESOLVED** — resolve before B7 (options: rename the semantic verb, e.g.
-   `semantic`; repurpose `search`→semantic and drop/rename the grep alias; or namespace one).
+3. **`search` verb collision (RESOLVED, 2026-07-03).** Inversion-plan **B7** wires
+   `normalize-semantic` as a new top-level **`search`** verb (semantic code search). `search`
+   currently exists as a user-facing **alias for `grep`**. **Decision (user-approved):** drop
+   the `search`→`grep` alias and let `search` become the semantic verb. The alias removal is
+   **executed at B7, atomically with mounting the `search` verb** (removing it earlier would
+   delete a convenience with nothing replacing it until B7). The `find`→`grep` alias is
+   unaffected and remains the grep-oriented shortcut. Until B7 the alias still stands in
+   `main.rs`/`rewrite_aliases` and the `docs/cli-design.md` aliases table (row annotated as
+   slated for removal at B7).
 
 4. **`analyze security` home — genuinely unassigned.** No compute crate in either map.
    Candidate: a future security crate, or stays main. **Status: OPEN** (not blocking; parks
