@@ -43,7 +43,7 @@ Normalize provides a unified CLI for code intelligence. Three core primitives: *
 | [grammars](grammars.md) | Manage tree-sitter grammars |
 | [sessions](sessions.md) | Analyze agent session logs |
 | [update](update.md) | Self-update normalize |
-| [aliases](aliases.md) | Manage filter aliases |
+| [filter](filter.md) | Filter files by glob patterns; manage `--exclude`/`--only` aliases |
 | [serve](serve.md) | Start MCP/HTTP/LSP server |
 | context | Show directory context (.context.md files) |
 

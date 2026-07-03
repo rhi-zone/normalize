@@ -8,6 +8,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **`filter` verb mounted from `normalize-filter` (CLI taxonomy inversion B6).**
+  The filter surface now lives under a top-level `filter` verb owned by `normalize-filter`
+  (behind its `cli` feature): `normalize filter aliases` (list built-in/config `@aliases`)
+  and `normalize filter matches <path> --only/--exclude` (check a path against filters).
+  Both load the `[aliases]` config slice from `.normalize/config.toml` and detect project
+  languages so language-aware built-ins like `@tests` resolve correctly — no dependency on
+  the main crate's `NormalizeConfig`. The old top-level `normalize aliases` still works as a
+  **hidden transitional alias** for one release; migrate to `normalize filter aliases`.
+  Also fixed a stale docs example: the alias config table is `[aliases]`, not
+  `[filter.aliases]`.
+
 - **Canonical `structure` service + dataflow trio absorbed (CLI taxonomy inversion B5).**
   The `structure` verb is now backed by the real `FactsCliService` in `normalize-facts`
   (behind its `cli` feature) instead of a stale, drifted copy in the main crate — which was

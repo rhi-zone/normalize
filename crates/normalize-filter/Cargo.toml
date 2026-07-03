@@ -16,7 +16,14 @@ default = []
 # Enable Merge + JsonSchema derives for config integration
 config = ["dep:normalize-core", "dep:schemars"]
 # Standalone CLI binary (server-less; clap re-exported from server-less)
-cli = ["dep:server-less", "dep:schemars", "dep:serde_json", "dep:tokio"]
+cli = [
+    "dep:server-less",
+    "dep:schemars",
+    "dep:serde_json",
+    "dep:tokio",
+    "dep:toml",
+    "dep:normalize-languages",
+]
 
 [dependencies]
 ignore = "0.4"
@@ -31,3 +38,6 @@ schemars = { version = "1", optional = true }
 server-less = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
+# CLI-only: config-slice loading + project language detection for @-alias resolution
+toml = { workspace = true, optional = true }
+normalize-languages = { path = "../normalize-languages", version = "0.3.2", optional = true }

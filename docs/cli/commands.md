@@ -31,7 +31,7 @@
 ### Utilities
 | Command | Description |
 |---------|-------------|
-| `aliases` | List filter aliases |
+| `filter` | Filter files by glob patterns; inspect `--exclude`/`--only` aliases (`filter aliases`, `filter matches`) |
 | `docs` | Fetch upstream symbol documentation (Rust/Go/Python) into LLM context |
 | `context` | Show directory context (.context.md files) |
 | `translate` | Translate code between programming languages |
@@ -54,7 +54,8 @@
 ## Design Principles
 
 ### One namespace per concept
-- `aliases` not `filter aliases` (filter does nothing else)
+- `grep` not `grep search` (grep does nothing but search)
+- A namespace earns its place once it holds >1 command: `filter` groups `filter aliases` and `filter matches`.
 
 ### Group by domain, not by verb
 - `sessions`, `grammars list`, `package list`

@@ -928,8 +928,26 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   done here):** the cyclomatic-complexity wrapper fold into `normalize-facts::extract`, and the
   parked `cfg liveness` naming alternative (move `normalize-cfg`'s render `CfgService` into
   facts) — neither blocks; revisit if `structure liveness` naming grates.
-- [ ] **B6 — `filter`:** mount `FilterCliService` (rename `name`→`filter`); retire main-crate
-  `aliases` leaf; add hidden top-level `aliases` transitional alias.
+- [x] **B6 — `filter`:** ✅ DONE 2026-07-03. Mounted `normalize-filter`'s `FilterCliService`
+  as the top-level `filter` verb (`#[cli(name)]` renamed `normalize-filter`→`filter`; main-crate
+  filter dep gained the `cli` feature). Retired the main-crate `aliases` leaf → now a
+  `#[cli(hidden)]` transitional shim (unchanged behavior/format, hidden from `--help`, still
+  callable) for one release. **Reconciliation vs plan:** the crate service used
+  `AliasConfig::default()` (no config, no language detection) — mounting as-is would have
+  regressed custom `@aliases` and language-aware `@tests`. Fixed by giving the service its own
+  config-slice loading (`load_alias_config` reads the `[aliases]` table from
+  `.normalize/config.toml`) + `detect_project_languages` (via a cli-gated `normalize-languages`
+  dep), no `NormalizeConfig` dependency — mirroring the B4/B5 pattern. Both leaves gained a
+  `--root`; `filter matches` now resolves aliases too. `AliasesReport` gained a
+  `detected_languages` footer. Verified: `filter aliases`/`filter matches` (incl. `--json`/`--jq`)
+  work and pick up this repo's `@todo` custom alias + detected languages; old `aliases` works +
+  hidden; `search`/`find`→`grep` aliases untouched. Build matrix (default / `cli` /
+  all-features / no-default-features) green, no cycle (normalize-languages doesn't depend on
+  filter). clippy + `cargo test -q` green (2 CLI help snapshots updated: `aliases`→hidden,
+  `filter` added). Also fixed a stale docs example (`[filter.aliases]`→`[aliases]`). **Main-crate
+  `src` LOC: 66839 → 66850 (+11: mount wiring; the `aliases` display logic + `detect_project_languages`
+  stay in `commands/aliases.rs` because the shim uses them and `build_filter` shares the
+  detector — both retire at B12).**
 - [ ] **B7 — `search`:** add `#[cli(name="search")]` to normalize-semantic; mount. **Remove
   the `search`→`grep` alias from `main.rs` `rewrite_aliases` (and the `docs/cli-design.md`
   aliases table row) atomically with mounting this verb** — `search` becomes the semantic

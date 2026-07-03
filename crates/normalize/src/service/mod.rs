@@ -62,6 +62,7 @@ pub struct NormalizeService {
     daemon: daemon::DaemonService,
     edit: edit::EditService,
     structure: normalize_facts::service::FactsCliService,
+    filter: normalize_filter::service::FilterCliService,
     grammars: grammars::GrammarService,
     guide: guide::GuideService,
     generate: generate::GenerateService,
@@ -123,6 +124,7 @@ impl NormalizeService {
                 history: history::HistoryService,
             },
             structure: normalize_facts::service::FactsCliService::new(),
+            filter: normalize_filter::service::FilterCliService::new(),
             grammars: grammars::GrammarService::new(&pretty),
             guide: guide::GuideService,
             generate: generate::GenerateService,
@@ -335,12 +337,11 @@ impl NormalizeService {
         }
     }
 
-    /// List filter aliases. Use to see available shorthand names for --exclude/--only globs.
+    /// Transitional hidden alias — `aliases` now lives at `filter aliases`.
     ///
-    /// Examples:
-    ///   normalize aliases                      # list all filter aliases
+    /// Kept for one release so existing scripts keep working; removed at 1.0.
     #[server(group = "utilities")]
-    #[cli(display_with = "display_output")]
+    #[cli(hidden, display_with = "display_output")]
     pub fn aliases(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -788,6 +789,16 @@ impl NormalizeService {
     #[server(group = "core")]
     pub fn structure(&self) -> &normalize_facts::service::FactsCliService {
         &self.structure
+    }
+
+    /// Filter files by glob patterns and inspect --exclude/--only aliases.
+    ///
+    /// Examples:
+    ///   normalize filter aliases                       # list all filter aliases
+    ///   normalize filter matches src/main.rs --only "*.rs"
+    #[server(group = "utilities")]
+    pub fn filter(&self) -> &normalize_filter::service::FilterCliService {
+        &self.filter
     }
 
     /// Inspect parsed syntax trees and test queries. Use to debug grammars or develop tree-sitter patterns.

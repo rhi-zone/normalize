@@ -5531,6 +5531,7 @@ dependencies = [
  "ignore",
  "normalize-core",
  "normalize-language-meta",
+ "normalize-languages",
  "normalize-output",
  "schemars",
  "serde",
@@ -5538,6 +5539,7 @@ dependencies = [
  "server-less",
  "thiserror 2.0.18",
  "tokio",
+ "toml",
 ]
 
 [[package]]

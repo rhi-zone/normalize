@@ -277,7 +277,7 @@ Create `.normalize/config.toml`:
 depth = 1
 line_numbers = false
 
-[filter.aliases]
+[aliases]
 tests = ["**/test_*.py", "**/*_test.go"]
 
 [walk]

@@ -35,7 +35,7 @@ Assessment, metrics, and quality gates:
 
 ### Utilities
 Specialized tools and integrations:
-- `aliases` - List filter aliases (used by --exclude/--only)
+- `filter` - Filter files by glob patterns and inspect --exclude/--only aliases (`filter aliases`, `filter matches`; owned by `normalize-filter`, B6). Old top-level `aliases` kept as a hidden alias for one release.
 - `context` - Show directory context (.context.md files)
 - `translate` - Translate code between languages
 - `guide` - Workflow guides with examples
@@ -56,8 +56,10 @@ Setup, configuration, and plumbing:
 ## Design Principles
 
 ### 1. One namespace per concept
-Bad: `filter aliases` (filter does nothing else)
-Good: `aliases` (direct access to the one thing)
+Bad: `grep search`, `grep find` (grep does nothing but search)
+Good: `grep` (direct access to the one thing)
+(A namespace earns its place once it holds >1 command: `filter` groups `filter aliases`
+and `filter matches`, so it is a real namespace, not ceremony.)
 
 ### 2. Group by domain, not by verb
 Bad: `list-sessions`, `list-grammars`, `list-packages`
@@ -216,7 +218,7 @@ rules validate
 All filters on `list` and `run` compose (see principle #8). `enable`/`disable` accept either a rule ID or a tag name — when given a tag, they apply to all rules matching that tag.
 
 Commands with no subcommands (positional/flag-based):
-- `view`, `grep`, `aliases`, `context`, `init`, `update`, `docs`
+- `view`, `grep`, `context`, `init`, `update`, `docs`
 
 ### `docs` — ecosystem-dispatched, not language-flagged
 

@@ -88,7 +88,7 @@ normalize-shadow = { path = "../normalize-shadow", version = "0.3.2" }
 normalize-edit = { path = "../normalize-edit", version = "0.3.2" }
 normalize-refactor = { path = "../normalize-refactor", version = "0.3.2" }
 normalize-deps = { path = "../normalize-deps", version = "0.3.2" }
-normalize-filter = { path = "../normalize-filter", version = "0.3.2", features = ["config"] }
+normalize-filter = { path = "../normalize-filter", version = "0.3.2", features = ["config", "cli"] }
 normalize-scope = { path = "../normalize-scope", version = "0.3.2" }
 normalize-graph = { path = "../normalize-graph", version = "0.3.2", features = ["cli"] }
 normalize-code-similarity = { path = "../normalize-code-similarity", version = "0.3.2", features = ["cli"] }
