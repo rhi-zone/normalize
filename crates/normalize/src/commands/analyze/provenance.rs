@@ -288,7 +288,7 @@ async fn build_import_edges(root: &Path, files: &HashSet<String>) -> Vec<Provena
             None => return Vec::new(),
         };
 
-        let graph = match super::architecture::build_import_graph(&idx).await {
+        let graph = match normalize_architecture::build_import_graph(&idx).await {
             Ok(g) => g,
             Err(_) => return Vec::new(),
         };

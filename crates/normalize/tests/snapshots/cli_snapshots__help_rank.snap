@@ -34,8 +34,6 @@ Module structure:
   density          Rank modules by information density: compression ratio combined with token uniqueness.
   imports          Rank modules by import fan-in: how many other modules import each module.
   surface          Rank modules by API surface area: public symbol count, public ratio, and constraint score.
-  depth-map        Rank modules by dependency depth and ripple risk in the import graph.
-  layering         Rank modules by import layering compliance: do imports flow in one direction?
   module-health    Score each module on a composite health metric: test ratio × uniqueness × density.
 
 Repository:

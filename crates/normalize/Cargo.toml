@@ -95,7 +95,7 @@ normalize-code-similarity = { path = "../normalize-code-similarity", version = "
 normalize-tools = { path = "../normalize-tools", version = "0.3.2" }
 normalize-rank = { path = "../normalize-rank", version = "0.3.2" }
 normalize-index = { path = "../normalize-index", version = "0.3.2" }
-normalize-architecture = { path = "../normalize-architecture", version = "0.3.2" }
+normalize-architecture = { path = "../normalize-architecture", version = "0.3.2", features = ["cli"] }
 normalize-native-rules = { path = "../normalize-native-rules", version = "0.3.2" }
 normalize-budget = { path = "../normalize-budget", version = "0.3.2", features = ["cli"] }
 normalize-ratchet = { path = "../normalize-ratchet", version = "0.3.2", features = ["cli"] }

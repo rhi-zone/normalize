@@ -19,6 +19,7 @@
 | Command | Description |
 |---------|-------------|
 | `analyze` | Codebase analysis (~45 subcommands) |
+| `architecture` | Architectural structure: coupling, cycles, hub modules, layering, depth (`architecture`, `architecture layering`, `architecture depth-map`) |
 | `graph` | Dependency-graph analysis: cycles, blast radius, import paths (`graph`, `graph dependents`, `graph import-path`) |
 | `rank` | Rank files/functions by metrics |
 | `trend` | Track metrics over git history |

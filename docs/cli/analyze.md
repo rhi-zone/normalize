@@ -26,10 +26,9 @@ old `view` paths remain as hidden aliases for one release).
 | `repo-coupling` | Analyze cross-repo coupling |
 | `cross-repo-health` | Rank repos by tech debt (churn + complexity + coupling) |
 
-### Dependencies & Structure
-| Subcommand | Description |
-|------------|-------------|
-| `architecture` | Codebase architecture: coupling, cycles, hub modules |
+Architecture analysis (`architecture`, `layering`, `depth-map`) has moved to the top-level
+[`normalize architecture`](../cli-design.md) verb (was `analyze architecture`/`rank layering`/
+`rank depth-map`; the old paths remain as hidden aliases for one release).
 
 ### Documentation
 | Subcommand | Description |
@@ -51,8 +50,10 @@ normalize analyze
 # Security scan
 normalize analyze security
 
-# Architecture analysis
-normalize analyze architecture
+# Architecture analysis is under normalize architecture:
+normalize architecture                    # coupling, hubs, layer flows
+normalize architecture layering           # import-direction compliance
+normalize architecture depth-map          # dependency depth + ripple risk
 
 # Ranked lists are now under normalize rank:
 normalize rank complexity                 # cyclomatic complexity per function

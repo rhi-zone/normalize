@@ -38,9 +38,6 @@ channel send/receive) for functions in a source file.
 Repository:
   docs               Measure documentation coverage: which public symbols lack doc comments.
 
-Graph analysis:
-  architecture       Analyze architectural structure: coupling, dependency cycles, and hub modules.
-
 Git history:
   coupling-clusters  Find clusters of files that change together in git history (connected components).
   activity           Show commit activity across multiple repositories over time windows.

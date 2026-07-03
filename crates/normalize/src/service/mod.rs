@@ -57,6 +57,7 @@ pub struct NormalizeService {
     pretty_raw: Cell<bool>,
     compact_raw: Cell<bool>,
     analyze: analyze::AnalyzeService,
+    architecture: normalize_architecture::ArchitectureService,
     config: config::ConfigService,
     context: context::ContextService,
     daemon: daemon::DaemonService,
@@ -114,6 +115,7 @@ impl NormalizeService {
         let pretty = Cell::new(false);
         Self {
             analyze: analyze::AnalyzeService::new(&pretty),
+            architecture: normalize_architecture::ArchitectureService::new(&pretty),
             config: config::ConfigService::new(&pretty),
             context: context::ContextService::new(&pretty),
             daemon: daemon::DaemonService,
@@ -1124,6 +1126,17 @@ impl NormalizeService {
     #[server(group = "analysis")]
     pub fn budget(&self) -> &normalize_budget::service::BudgetService {
         &self.budget
+    }
+
+    /// Analyze architectural structure: coupling, cycles, hub modules, layering, and depth.
+    ///
+    /// Examples:
+    ///   normalize architecture                   # coupling, hubs, layer flows
+    ///   normalize architecture layering          # import-direction compliance
+    ///   normalize architecture depth-map         # dependency depth + ripple risk
+    #[server(group = "analysis")]
+    pub fn architecture(&self) -> &normalize_architecture::ArchitectureService {
+        &self.architecture
     }
 
     /// Analyze the dependency graph: cycles, blast radius, import paths. Requires the facts index.

@@ -82,7 +82,6 @@ mod tests {
         use crate::analyze::test_gaps::TestGapsReport;
         use crate::commands::aliases::AliasesReport;
         use crate::commands::analyze::activity::ActivityReport;
-        use crate::commands::analyze::architecture::ArchitectureReport;
         use crate::commands::analyze::budget::LineBudgetReport;
         use crate::commands::analyze::call_complexity::CallComplexityReport;
         use crate::commands::analyze::ceremony::CeremonyReport;
@@ -91,7 +90,6 @@ mod tests {
         use crate::commands::analyze::coupling_clusters::CouplingClustersReport;
         use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
         use crate::commands::analyze::density::DensityReport;
-        use crate::commands::analyze::depth_map::DepthMapReport;
         use crate::commands::analyze::docs::DocCoverageReport;
         use crate::commands::analyze::duplicates::DuplicateTypesReport;
         use crate::commands::analyze::duplicates_views::DuplicatesReport;
@@ -101,7 +99,6 @@ mod tests {
         use crate::commands::analyze::fragments::FragmentsReport;
         use crate::commands::analyze::hotspots::HotspotsReport;
         use crate::commands::analyze::imports::ImportCentralityReport;
-        use crate::commands::analyze::layering::LayeringReport;
         use crate::commands::analyze::liveness::LivenessReport;
         use crate::commands::analyze::module_health::ModuleHealthReport;
         use crate::commands::analyze::ownership::OwnershipReport;
@@ -126,6 +123,7 @@ mod tests {
         use crate::commands::tools::lint::LintListReport;
         use crate::commands::view::report::{ViewHistoryReport, ViewListReport, ViewReport};
         use crate::text_search::GrepReport;
+        use normalize_architecture::{ArchitectureReport, DepthMapReport, LayeringReport};
         use normalize_graph::{DependentsReport, GraphReport, ImportPathReport};
         use normalize_output::diagnostics::DiagnosticsReport;
         use normalize_session_analysis::SessionAnalysisReport;

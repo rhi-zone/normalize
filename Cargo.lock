@@ -5270,12 +5270,22 @@ dependencies = [
 name = "normalize-architecture"
 version = "0.3.2"
 dependencies = [
+ "dirs 5.0.1",
+ "indicatif 0.17.11",
  "libsql",
+ "normalize-git",
  "normalize-graph",
  "normalize-index",
  "normalize-languages",
+ "normalize-output",
+ "normalize-rank",
+ "normalize-rules-config",
+ "nu-ansi-term",
  "schemars",
  "serde",
+ "server-less",
+ "tokio",
+ "toml",
 ]
 
 [[package]]

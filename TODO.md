@@ -19,7 +19,7 @@ Three live threads from the 2026-06-29/07-01 session — verify state before act
 
 ## CLI Taxonomy Migration
 
-B0 (guide-regression test, CLAUDE.md crate count), B1 (`normalize-git` extraction), and B2 (`graph` verb) have landed. The graph-crate blocker on B2/B3 is **resolved** (2026-07-02, refactor-in-place — see below); B3–B12 can now proceed. The `#[cli(alias)]` server-less prereq is a separate server-less task; it does not block batches that don't move verbs yet.
+B0 (guide-regression test, CLAUDE.md crate count), B1 (`normalize-git` extraction), B2 (`graph` verb), and B3 (`architecture` verb) have landed. The graph-crate blocker on B2/B3 is **resolved** (2026-07-02, refactor-in-place — see below); B4–B12 can now proceed. The `#[cli(alias)]` server-less prereq is a separate server-less task; it does not block batches that don't move verbs yet.
 
 ## `normalize jq` fixed (2026-07-02)
 
@@ -866,10 +866,24 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   delegating to `normalize_graph::*` for one release. Build matrix (default / `cli` /
   all-features / no-default-features) green, no dep cycle (graph→index→facts, acyclic).
   clippy + tests green (CLI help snapshots updated). **Main-crate `src` LOC: −1156.**
-- [ ] **B3 — `architecture`:** move 3 reports into crate; `cli` feature + service; mount
-  (`architecture`, `depth-map`, `layering`). **UNBLOCKED (2026-07-02).** The
-  `find_longest_chains` duplication was already killed and the graph boundary is resolved;
-  `ImportGraph`/`build_import_graph` placement is the remaining B3-local decision.
+- [x] **B3 — `architecture`:** ✅ DONE 2026-07-03. Added `cli` feature to
+  `normalize-architecture` (gates `architecture`/`layering`/`depth_map`/`output`/`service`
+  modules; pure algorithms build with `default-features = false`). Moved the 3 report structs
+  + compute (`ArchitectureReport`/`analyze_architecture`, `LayeringReport`/`analyze_layering`,
+  `DepthMapReport`/`analyze_depth_map`) + `OutputFormatter` impls out of
+  `crates/normalize/src/commands/analyze/{architecture,layering,depth_map}.rs` (deleted) into
+  the crate; recreated a `crate::output` re-export (adds a local `pretty_ranked_table`) to keep
+  the moved code unchanged. Added `ArchitectureService` (`service.rs`): owns config access
+  (loads `[index]`/`[walk]`/`[pretty]` slices standalone, acquires via
+  `normalize_index::{require_import_graph, ensure_ready}`; `--diff` baseline via `normalize-git`
+  `resolve_ref`/`run_in_worktree` + `normalize_rank::compute_ranked_diff`). Mounted as top-level
+  **`architecture`** verb (default = coupling/hubs; `architecture layering`;
+  `architecture depth-map`). Two-parent transitional shims: `analyze architecture` (on
+  `AnalyzeService`) + `rank layering`/`rank depth-map` (on `RankService`) kept as
+  `#[cli(hidden)]` delegating to `normalize_architecture::*` for one release; hidden from
+  `analyze --help`/`rank --help`, both old+new paths verified working. Build matrix (default /
+  `cli` / all-features / no-default-features) green, no dep cycle. clippy + tests green (CLI
+  help snapshots updated). **Main-crate `src` LOC: 73704 → 72823 (−881).**
 - [ ] **B4 — `similarity`:** move duplicates/duplicate-types/fragments reports; service; mount.
 - [ ] **B5 — `structure` fix + dataflow:** mount real `FactsCliService` (rename→`structure`);
   delete main-crate `service/facts.rs` dup; absorb `liveness`/`effects`/`exceptions`;

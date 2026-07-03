@@ -6,6 +6,25 @@ license.workspace = true
 repository.workspace = true
 description = "Architectural metrics: coupling, cycles, layering, hubs"
 
+[features]
+default = []
+# CLI surface: the `architecture` verb (coupling/cycles/hubs, layering,
+# depth-map) — report structs, `OutputFormatter` impls, index acquisition, and
+# the server-less `ArchitectureService`. Library consumers who only want the
+# pure architecture algorithms build with `default-features = false`.
+cli = [
+    "dep:server-less",
+    "dep:normalize-rank",
+    "dep:normalize-output",
+    "dep:normalize-rules-config",
+    "dep:normalize-git",
+    "dep:nu-ansi-term",
+    "dep:indicatif",
+    "dep:tokio",
+    "dep:toml",
+    "dep:dirs",
+]
+
 [dependencies]
 normalize-index = { path = "../normalize-index", version = "0.3.2" }
 normalize-graph = { path = "../normalize-graph", version = "0.3.2" }
@@ -13,3 +32,15 @@ normalize-languages = { path = "../normalize-languages", version = "0.3.2" }
 libsql.workspace = true
 serde.workspace = true
 schemars = "1"
+
+# cli-only dependencies
+normalize-rank = { path = "../normalize-rank", version = "0.3.2", optional = true }
+normalize-output = { path = "../normalize-output", version = "0.3.2", optional = true }
+normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.2", optional = true }
+normalize-git = { workspace = true, optional = true }
+nu-ansi-term = { version = "0.50", optional = true }
+indicatif = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+toml = { workspace = true, optional = true }
+dirs = { workspace = true, optional = true }
+server-less = { workspace = true, optional = true }

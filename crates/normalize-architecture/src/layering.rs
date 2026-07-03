@@ -3,11 +3,9 @@
 //! Uses dependency depth as the layer proxy — no hardcoded ordering.
 //! Compliance = downward / (downward + upward), where 1.0 = perfect layering.
 
-use crate::index::FileIndex;
 use crate::output::OutputFormatter;
-use normalize_architecture::{
-    build_import_graph, compute_depth, compute_layering_compliance, extract_layer,
-};
+use crate::{build_import_graph, compute_depth, compute_layering_compliance, extract_layer};
+use normalize_index::FileIndex;
 use normalize_rank::ranked::{
     Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
 };

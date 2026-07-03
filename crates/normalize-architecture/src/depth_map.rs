@@ -3,9 +3,9 @@
 //! Depth 0 = entry point (nothing imports it). High depth = deeply embedded.
 //! Ripple score = fan_out × depth × downstream — composite blast radius metric.
 
-use crate::index::FileIndex;
 use crate::output::OutputFormatter;
-use normalize_architecture::{build_import_graph, compute_depth, compute_downstream};
+use crate::{build_import_graph, compute_depth, compute_downstream};
+use normalize_index::FileIndex;
 use normalize_rank::ranked::{
     Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
 };

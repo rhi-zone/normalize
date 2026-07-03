@@ -8,6 +8,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **New top-level `architecture` verb (CLI taxonomy inversion B3).** The architecture
+  command family moved out of the `analyze`/`rank` grab-bags into a dedicated
+  `architecture` verb owned by `normalize-architecture`: `normalize architecture`
+  (coupling/cross-imports/hub modules, was `analyze architecture`),
+  `normalize architecture layering` (import-direction compliance, was `rank layering`),
+  and `normalize architecture depth-map` (dependency depth + ripple risk, was
+  `rank depth-map`). The old `analyze architecture` / `rank layering` / `rank depth-map`
+  paths still work as **hidden transitional aliases** for one release; migrate to the
+  `architecture` verb. `normalize-architecture` gained a `cli` feature gating the report
+  structs, `OutputFormatter` impls, and `ArchitectureService` (library consumers of the
+  pure architecture algorithms build with `default-features = false`).
+
 - **New top-level `graph` verb (CLI taxonomy inversion B2).** The dependency-graph
   commands moved out of `view` into a dedicated `graph` verb owned by `normalize-graph`:
   `normalize graph` (module/symbol/type graph analysis, was `view graph`),

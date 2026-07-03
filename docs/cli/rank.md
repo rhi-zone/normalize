@@ -25,9 +25,11 @@ commands were previously under `normalize analyze`.
 | `density` | Compression ratio + token uniqueness per module |
 | `module-health` | Score each module across test ratio, uniqueness, and density (worst first) |
 | `imports` | Rank modules by import fan-in (requires facts index) |
-| `depth-map` | Per-module dependency depth + ripple risk |
 | `surface` | Per-module public symbol count, public ratio, and constraint score |
-| `layering` | Per-module import layering compliance |
+
+`depth-map` and `layering` moved to the top-level [`normalize architecture`](../cli-design.md)
+verb (`architecture depth-map` / `architecture layering`; old `rank` paths remain as hidden
+aliases for one release).
 
 ### Repository
 | Subcommand | Description |
@@ -72,8 +74,10 @@ normalize rank duplicates --scope blocks --mode similar  # similar blocks (MinHa
 # Module structure
 normalize rank imports            # most-imported modules (requires index)
 normalize rank surface            # public API surface per module
-normalize rank depth-map          # dependency depth + ripple risk
-normalize rank layering           # import layering compliance
+
+# Dependency depth + layering moved to normalize architecture:
+normalize architecture depth-map  # dependency depth + ripple risk
+normalize architecture layering   # import layering compliance
 
 # Test coverage
 normalize rank test-ratio         # test/impl ratio per module

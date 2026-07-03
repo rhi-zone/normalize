@@ -1,19 +1,16 @@
-//! Architecture analysis: coupling and structural insights
+//! Architecture analysis: coupling and structural insights.
 //!
 //! Provides insights by default - no configuration needed.
-//! Cycle detection lives in `graph.rs` (Tarjan SCC) — use `analyze graph`.
+//! Cycle detection lives in `normalize-graph` (Tarjan SCC) — use `normalize graph`.
 
-use crate::index::FileIndex;
 use crate::output::OutputFormatter;
+use crate::{
+    CrossImport, HubModule, LayerFlow, ModuleCoupling, OrphanModule, SymbolMetrics,
+    build_import_graph, compute_coupling_and_hubs, compute_layer_flows, detect_cross_imports,
+    find_orphan_modules, find_symbol_hotspots,
+};
 use indicatif::{ProgressBar, ProgressStyle};
-pub use normalize_architecture::{
-    CrossImport, Cycle, HubModule, ImportChain, ImportGraph, LayerFlow, ModuleCoupling,
-    OrphanModule, SymbolMetrics, build_import_graph,
-};
-use normalize_architecture::{
-    compute_coupling_and_hubs, compute_layer_flows, detect_cross_imports, find_orphan_modules,
-    find_symbol_hotspots,
-};
+use normalize_index::FileIndex;
 use normalize_languages::is_programming_language;
 use normalize_rank::truncate_path;
 use serde::Serialize;

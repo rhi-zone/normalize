@@ -11,7 +11,6 @@ use crate::commands::analyze::ceremony::CeremonyReport;
 use crate::commands::analyze::contributors::ContributorsReport;
 use crate::commands::analyze::coupling::CouplingReport;
 use crate::commands::analyze::density::DensityReport;
-use crate::commands::analyze::depth_map::DepthMapReport;
 use crate::commands::analyze::duplicates::{
     DuplicateBlocksConfig, DuplicateFunctionsConfig, DuplicateTypesReport, SimilarBlocksConfig,
     SimilarFunctionsConfig,
@@ -21,7 +20,6 @@ use crate::commands::analyze::files::FileLengthReport;
 use crate::commands::analyze::fragments::{FragmentScope, FragmentsReport};
 use crate::commands::analyze::hotspots::HotspotsReport;
 use crate::commands::analyze::imports::ImportCentralityReport;
-use crate::commands::analyze::layering::LayeringReport;
 use crate::commands::analyze::module_health::ModuleHealthReport;
 use crate::commands::analyze::ownership::{OwnershipRepoEntry, OwnershipReport};
 use crate::commands::analyze::size::SizeReport;
@@ -29,6 +27,7 @@ use crate::commands::analyze::surface::SurfaceReport;
 use crate::commands::analyze::test_ratio::TestRatioReport;
 use crate::commands::analyze::uniqueness::UniquenessReport;
 use crate::output::OutputFormatter;
+use normalize_architecture::{DepthMapReport, LayeringReport};
 use server_less::cli;
 use std::cell::Cell;
 use std::path::PathBuf;
@@ -1118,8 +1117,11 @@ impl RankService {
     ///
     /// Requires the facts index (`normalize structure rebuild`). Returns a `DepthMapReport`
     /// sorted by ripple score (highest first).
+    ///
+    /// Transitional shim: moved to `architecture depth-map` (owned by
+    /// `normalize-architecture`). Hidden from help; kept for one release.
     #[server(group = "modules")]
-    #[cli(display_with = "display_depth_map")]
+    #[cli(hidden, display_with = "display_depth_map")]
     pub async fn depth_map(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -1138,10 +1140,9 @@ impl RankService {
             n => n,
         };
         let idx = crate::index::require_import_graph(&root_path).await?;
-        let mut report =
-            crate::commands::analyze::depth_map::analyze_depth_map(&idx, effective_limit)
-                .await
-                .map_err(|e| format!("Depth map analysis failed: {}", e))?;
+        let mut report = normalize_architecture::analyze_depth_map(&idx, effective_limit)
+            .await
+            .map_err(|e| format!("Depth map analysis failed: {}", e))?;
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
             use normalize_rank::ranked::compute_ranked_diff;
@@ -1151,7 +1152,7 @@ impl RankService {
                 tokio::task::block_in_place(|| {
                     handle.block_on(async {
                         let wt_idx = crate::index::ensure_ready(wt).await?;
-                        crate::commands::analyze::depth_map::analyze_depth_map(&wt_idx, usize::MAX)
+                        normalize_architecture::analyze_depth_map(&wt_idx, usize::MAX)
                             .await
                             .map_err(|e| format!("Baseline depth map failed: {}", e))
                     })
@@ -1180,8 +1181,11 @@ impl RankService {
     ///
     /// Requires the facts index (`normalize structure rebuild`). Returns a `LayeringReport`
     /// with per-module violation counts and a per-layer summary.
+    ///
+    /// Transitional shim: moved to `architecture layering` (owned by
+    /// `normalize-architecture`). Hidden from help; kept for one release.
     #[server(group = "modules")]
-    #[cli(display_with = "display_layering")]
+    #[cli(hidden, display_with = "display_layering")]
     pub async fn layering(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -1200,10 +1204,9 @@ impl RankService {
             n => n,
         };
         let idx = crate::index::require_import_graph(&root_path).await?;
-        let mut report =
-            crate::commands::analyze::layering::analyze_layering(&idx, effective_limit)
-                .await
-                .map_err(|e| format!("Layering analysis failed: {}", e))?;
+        let mut report = normalize_architecture::analyze_layering(&idx, effective_limit)
+            .await
+            .map_err(|e| format!("Layering analysis failed: {}", e))?;
         if let Some(ref diff_ref) = diff {
             use crate::commands::analyze::git_history::{resolve_ref, run_in_worktree};
             use normalize_rank::ranked::compute_ranked_diff;
@@ -1213,7 +1216,7 @@ impl RankService {
                 tokio::task::block_in_place(|| {
                     handle.block_on(async {
                         let wt_idx = crate::index::ensure_ready(wt).await?;
-                        crate::commands::analyze::layering::analyze_layering(&wt_idx, usize::MAX)
+                        normalize_architecture::analyze_layering(&wt_idx, usize::MAX)
                             .await
                             .map_err(|e| format!("Baseline layering failed: {}", e))
                     })

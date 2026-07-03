@@ -1,7 +1,30 @@
 //! Architectural metrics: coupling, cycles, layering, hubs.
 //!
-//! Extracted pure algorithms and supporting types for architecture analysis.
-//! Report structs and OutputFormatter impls live in the `normalize` crate.
+//! Pure algorithms and supporting types for architecture analysis, plus (behind
+//! the `cli` feature) the `architecture` CLI verb: report structs,
+//! `OutputFormatter` impls, and the server-less `ArchitectureService`.
+
+// The `architecture` CLI verb. Gated behind `cli` so library consumers of the
+// pure algorithms don't pull in the index/config/output stack.
+#[cfg(feature = "cli")]
+pub mod architecture;
+#[cfg(feature = "cli")]
+pub mod depth_map;
+#[cfg(feature = "cli")]
+pub mod layering;
+#[cfg(feature = "cli")]
+pub mod output;
+#[cfg(feature = "cli")]
+pub mod service;
+
+#[cfg(feature = "cli")]
+pub use architecture::{ArchitectureReport, analyze_architecture};
+#[cfg(feature = "cli")]
+pub use depth_map::{DepthMapReport, analyze_depth_map};
+#[cfg(feature = "cli")]
+pub use layering::{LayeringReport, analyze_layering};
+#[cfg(feature = "cli")]
+pub use service::ArchitectureService;
 
 // `ImportGraph` + `build_import_graph` moved to `normalize-index` (the leaf both
 // `normalize-graph` and `normalize-architecture` depend on) to break the historical

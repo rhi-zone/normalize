@@ -105,7 +105,7 @@ pub async fn analyze_surface(
     idx: &FileIndex,
     limit: usize,
 ) -> Result<SurfaceReport, libsql::Error> {
-    use super::architecture::build_import_graph;
+    use normalize_architecture::build_import_graph;
 
     // 1. Load all symbols and group by file
     let symbols = idx.all_symbols_with_details().await?;

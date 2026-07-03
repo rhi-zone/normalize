@@ -1,7 +1,6 @@
 //! Analyze command - run analysis on target.
 
 pub mod activity;
-pub mod architecture;
 pub mod ast;
 pub mod budget;
 pub mod call_complexity;
@@ -14,7 +13,6 @@ pub mod coupling;
 pub mod coupling_clusters;
 pub mod cross_repo_health;
 pub mod density;
-pub mod depth_map;
 pub mod docs;
 pub mod duplicates;
 pub mod duplicates_views;
@@ -26,7 +24,6 @@ pub mod git_history;
 pub mod git_utils;
 pub mod hotspots;
 pub mod imports;
-pub mod layering;
 pub mod length;
 pub mod liveness;
 pub mod module_health;

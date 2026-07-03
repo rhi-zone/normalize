@@ -1,7 +1,6 @@
 //! Analyze sub-service for server-less CLI.
 
 use crate::commands::analyze::activity::ActivityReport;
-use crate::commands::analyze::architecture::ArchitectureReport;
 use crate::commands::analyze::coupling_clusters::CouplingClustersReport;
 use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
 use crate::commands::analyze::docs::DocCoverageReport;
@@ -13,6 +12,7 @@ use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
 use crate::commands::analyze::skeleton_diff::SkeletonDiffReport;
 use crate::commands::analyze::summary::SummaryReport;
 use crate::output::OutputFormatter;
+use normalize_architecture::ArchitectureReport;
 use server_less::cli;
 use std::cell::Cell;
 use std::path::PathBuf;
@@ -149,8 +149,11 @@ impl AnalyzeService {
     ///
     /// Requires the facts index (`normalize structure rebuild`). Returns an `ArchitectureReport`
     /// with coupling pairs, cycle lists, and hub modules ranked by fan-in/fan-out.
+    ///
+    /// Transitional shim: moved to the top-level `architecture` verb (owned by
+    /// `normalize-architecture`). Hidden from help; kept for one release.
     #[server(group = "graph")]
-    #[cli(display_with = "display_output")]
+    #[cli(hidden, display_with = "display_output")]
     pub async fn architecture(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -165,7 +168,7 @@ impl AnalyzeService {
         let root_path = Self::root_path(root)?;
         self.resolve_format(&root_path);
         let idx = crate::index::require_import_graph(&root_path).await?;
-        let mut report = crate::commands::analyze::architecture::analyze_architecture(&idx)
+        let mut report = normalize_architecture::analyze_architecture(&idx)
             .await
             .map_err(|e| AnalyzeError::Message(format!("Architecture analysis failed: {}", e)))?;
         // Cap cross_imports to avoid bloated JSON output for agents.
