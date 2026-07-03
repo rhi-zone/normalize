@@ -10,10 +10,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 Three live threads from the 2026-06-29/07-01 session — verify state before acting:
 
-- **CLI taxonomy inversion (B2–B12)**: B0+B1 landed; the graph-crate blocker on B2/B3 is now resolved (see below). See [CLI command-taxonomy FULL INVERSION](#cli-command-taxonomy-full-inversion--seam-corrected-final-scope-high-priority) below.
+- **CLI taxonomy inversion (B2–B12)**: B1 landed; B0's guide-regression + CLAUDE.md-crate-count parts landed, but **B0's server-less `#[cli(alias = "...")]` prerequisite is still PENDING** (blocks any verb-move batch's transitional aliases). The graph-crate blocker on B2/B3 is resolved (see below). Note: command-surface decomposition is the SAME move — see below. See [CLI command-taxonomy FULL INVERSION](#cli-command-taxonomy-full-inversion--seam-corrected-final-scope-high-priority) below.
 - **Graph-crate split**: ✅ RESOLVED 2026-07-02 — refactored `normalize-graph` in place (pure algorithms split from presentation; deps `normalize-output`/`nu-ansi-term` dropped; characterization tests added). No standalone crate, no node-type genericization. Decision record (superseded resolution at top): `docs/artifacts/cli-taxonomy-2026-06-29/DECISION-graph-crate.md`. This unblocks B2 and B3. See [Graph crate refactor](#graph-crate-refactor-resolved-2026-07-02) below.
 - **Main-crate decomposition audit**: ✅ DONE 2026-07-02 — full audit run; findings recorded in `docs/audit-2026-07-02.md`. Headline: the main crate is NOT a reservoir of extractable domain logic (reusable algorithms already in feature crates). Six small execution items + one rename remain (D1–D6 below), to be executed this session. See [Main-crate decomposition audit](#main-crate-decomposition-audit-done-2026-07-02) below.
-- **Command-surface decomposition (SUPERSEDES the "62k legit stays" framing)**: 🔄 IN PROGRESS 2026-07-03 — a second lens (CLAUDE.md's "crate owns its subcommand, main just mounts") shows the command *surface* is substantially migratable: main can shrink ~84k → ~30–34k (of which ~21k is forced-to-stay vendored CLIs → own irreducible core ≈ 9–13k). Audit: `docs/audit-2026-07-03-command-surface-decomposition.md`. Sessions migration (~8k → new `normalize-sessions`) ✅ DONE 2026-07-03 as the proof case (main src −8,086 LOC). See [Command-surface decomposition roadmap](#command-surface-decomposition-roadmap-in-progress-2026-07-03) below.
+- **Command-surface decomposition ≡ the B0–B12 CLI taxonomy inversion**: 🔄 IN PROGRESS 2026-07-03 — a second lens (CLAUDE.md's "crate owns its subcommand, main just mounts") reached the *same* move as the CLI taxonomy inversion, from the size-reduction direction. Main can shrink ~84k → ~30–34k (~21k forced-to-stay vendored CLIs → own core ≈ 9–13k). **The authoritative target taxonomy is already designed:** `docs/artifacts/cli-taxonomy-2026-06-29/00-inversion-plan.md` (FINAL SCOPE, B0–B12). Audit (reconciled + open forks): `docs/audit-2026-07-03-command-surface-decomposition.md`. Sessions ✅ DONE 2026-07-03 (proof case, main src −8,086 LOC). Execution blocked on the open forks below (metrics A1/A2, dataflow home, `search` collision). See [Command-surface decomposition roadmap](#command-surface-decomposition-roadmap-in-progress-2026-07-03) below.
 
 ---
 
@@ -1020,7 +1020,26 @@ true) but missed CLAUDE.md's second rule: *"a crate that owns a subcommand inclu
 `#[cli]` service, report structs, and `OutputFormatter` impls; the main crate just mounts
 them."* Under that lens the command **surface** is substantially migratable.
 
-Full audit: **`docs/audit-2026-07-03-command-surface-decomposition.md`.**
+**This IS the CLI taxonomy inversion, reached from the size direction.** Do not redesign —
+the authoritative target (verb names + per-command owner + B0–B12 batch order) is
+`docs/artifacts/cli-taxonomy-2026-06-29/00-inversion-plan.md` (FINAL SCOPE). This roadmap
+reconciles with it; see the [CLI command-taxonomy FULL INVERSION](#cli-command-taxonomy-full-inversion--seam-corrected-final-scope-high-priority)
+section above for the batch plan. Reconciled/full audit with corrections:
+**`docs/audit-2026-07-03-command-surface-decomposition.md`.**
+
+**Open forks blocking execution (resolve before the batch that touches each):**
+- **Metrics bucket A1 vs A2** (~19 subcommands, most of `rank` + `analyze docs`): A1 = keep
+  `rank`/`trend` permanently main-resident (inversion-plan seam-eval *recommends A1*); A2 =
+  extract a `normalize-metrics`-family crate + `metrics` verb. **UNRESOLVED** (the load-bearing
+  call).
+- **Dataflow trio home** (`liveness`/`effects`/`exceptions`): inversion-plan B5 → `structure`
+  (normalize-facts) vs this roadmap → `normalize-cfg`. **UNRESOLVED** — pick before B5.
+- **`search` verb collision**: inversion-plan B7 wires normalize-semantic as `search`, which
+  clashes with the existing `search`→`grep` alias. **UNRESOLVED** — resolve before B7.
+- **`analyze security`**: no compute crate in either map — genuinely unassigned (future
+  security crate, or stays main). OPEN, non-blocking.
+- **`coupling-clusters` → history** (RESOLVED): it is git-temporal (`co_change_edges`),
+  belongs with `normalize-git-history` (B8/B9), NOT code-similarity. Corrected in the map below.
 
 **Headline:** main is ~84k; ~21k is forced-to-stay vendored CLIs (publish trilemma); of the
 ~62k own code ~50k is migratable in principle. Realistic floor ≈ **30–34k** total → own
@@ -1046,10 +1065,11 @@ reports + `OutputFormatter` with zero back-refs to main.
 | Target | ~LOC | Owner | Notes |
 |---|---|---|---|
 | Sessions (`commands/sessions/` + `service/sessions.rs`) | ~8k | NEW `normalize-sessions` | ✅ **DONE 2026-07-03** — extracted; main src 83,243 → 75,157 LOC (−8,086) |
-| duplicates/fragments/clusters/coupling_clusters | ~4k | `normalize-code-similarity` | gated on enablers |
-| architecture/layering/depth_map | ~0.9k | `normalize-architecture` | gated on enablers |
-| graph/call_graph | ~1.2k | `normalize-graph` | gated on enablers |
-| liveness/effects/exceptions | ~0.9k | `normalize-cfg` (mounted) | gated on enablers |
+| duplicates/duplicate-types/fragments | ~3k | `normalize-code-similarity` | `similarity` verb (B4). **Corrected:** clusters/coupling_clusters removed (git-temporal). |
+| architecture/layering/depth_map | ~0.9k | `normalize-architecture` | `architecture` verb (B3). |
+| graph/dependents/import-path | ~1.2k | `normalize-graph` | **Corrected:** these are `view` subcommands today (carve out of `view`, not analyze/rank). `graph` verb (B2). |
+| clusters/coupling_clusters (git co-change) | ~0.5k | `normalize-git-history` (B8/B9) | **Corrected:** git-temporal (`co_change_edges`), NOT code-similarity. |
+| liveness/effects/exceptions (dataflow) | ~0.9k | **UNRECONCILED** — `normalize-cfg` vs `normalize-facts`/`structure` (B5) | Open fork; pick before B5. |
 | provenance | ~0.75k | chat-sessions / session-analysis | — |
 | small wrappers (generate/context/package/find_references) | ~2k | typegen/-context/-ecosystems/-scope | budget template |
 | rank-metrics (hotspots, contributors, ownership, density, ceremony, test_ratio, call_complexity, size, docs, coupling, imports, uniqueness, module_health, surface, complexity/length/test_gaps, budget-metric) | ~5.7k | **NO owner — DECISION NEEDED** (`normalize-metrics` vs stay) | not blocked by OutputFormatter; blocked by absence of a home |
@@ -1069,8 +1089,9 @@ reports + `OutputFormatter` with zero back-refs to main.
   Proves the full surface migration (commands subtree + `service/*.rs` method) end to end.
 - [ ] **2. Build the two enablers** — shareable index acquisition (direct `FileIndex` or hoist
   `index.rs`); config excludes-slice.
-- [ ] **3. Analyze families → existing owners** (~7.75k): code-similarity, architecture, graph,
-  cfg, chat-sessions/session-analysis.
+- [ ] **3. Analyze families → existing owners** (~7.75k): code-similarity (B4), architecture
+  (B3), graph (B2, out of `view`), dataflow trio (cfg *or* facts/structure — open fork B5),
+  chat-sessions/session-analysis. `search` (B7) blocked on the alias collision.
 - [ ] **4. DECISION on the ~5.7k rank-metrics** — designate `normalize-metrics` as owner vs.
   leave in main. The one genuinely open architectural call here.
 - [ ] **5. Small wrappers** (~2k) — generate/context/package/find_references, budget template.

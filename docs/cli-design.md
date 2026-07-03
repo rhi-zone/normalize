@@ -1,5 +1,14 @@
 # CLI Design
 
+> **Active restructuring: CLI taxonomy inversion (B0–B12).** The command tree below is being
+> reorganized so each top-level verb *is* the crate that owns its `#[cli]` service (per
+> CLAUDE.md's crate-owns-its-CLI rule). This is the **same operation** as the command-surface
+> decomposition (reached from the size-reduction direction) — they are merged. Authoritative
+> target taxonomy: `docs/artifacts/cli-taxonomy-2026-06-29/00-inversion-plan.md` (FINAL SCOPE);
+> reconciled roadmap + open forks: `docs/audit-2026-07-03-command-surface-decomposition.md`;
+> batch tracking in `TODO.md`. Grab-bag `analyze`/`rank` shrink as crate-owned families
+> (`graph`, `architecture`, `similarity`, `structure`, `history`, …) move out.
+
 ## Command Structure
 
 `normalize --help` organizes commands into four tiered groups using `#[server(groups(...))]`. Core commands appear first; everything else is grouped by domain.
@@ -237,3 +246,7 @@ Users from other tools often try familiar names. These aliases are rewritten tra
 | `refactor` | `edit` | Refactoring tools use this name |
 
 Aliases are invisible — they don't appear in `--help` output. The canonical name is always what's shown.
+
+> **Open collision (taxonomy inversion B7):** the planned semantic-search verb `search`
+> (normalize-semantic) clashes with this `search`→`grep` alias. Unresolved — see the open
+> forks in `docs/audit-2026-07-03-command-surface-decomposition.md`.
