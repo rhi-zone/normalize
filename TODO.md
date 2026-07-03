@@ -13,6 +13,7 @@ Three live threads from the 2026-06-29/07-01 session — verify state before act
 - **CLI taxonomy inversion (B2–B12)**: B0+B1 landed; the graph-crate blocker on B2/B3 is now resolved (see below). See [CLI command-taxonomy FULL INVERSION](#cli-command-taxonomy-full-inversion--seam-corrected-final-scope-high-priority) below.
 - **Graph-crate split**: ✅ RESOLVED 2026-07-02 — refactored `normalize-graph` in place (pure algorithms split from presentation; deps `normalize-output`/`nu-ansi-term` dropped; characterization tests added). No standalone crate, no node-type genericization. Decision record (superseded resolution at top): `docs/artifacts/cli-taxonomy-2026-06-29/DECISION-graph-crate.md`. This unblocks B2 and B3. See [Graph crate refactor](#graph-crate-refactor-resolved-2026-07-02) below.
 - **Main-crate decomposition audit**: ✅ DONE 2026-07-02 — full audit run; findings recorded in `docs/audit-2026-07-02.md`. Headline: the main crate is NOT a reservoir of extractable domain logic (reusable algorithms already in feature crates). Six small execution items + one rename remain (D1–D6 below), to be executed this session. See [Main-crate decomposition audit](#main-crate-decomposition-audit-done-2026-07-02) below.
+- **Command-surface decomposition (SUPERSEDES the "62k legit stays" framing)**: 🔄 IN PROGRESS 2026-07-03 — a second lens (CLAUDE.md's "crate owns its subcommand, main just mounts") shows the command *surface* is substantially migratable: main can shrink ~84k → ~30–34k (of which ~21k is forced-to-stay vendored CLIs → own irreducible core ≈ 9–13k). Audit: `docs/audit-2026-07-03-command-surface-decomposition.md`. Sessions migration (~8k → new `normalize-sessions`) is being started this session as the proof case. See [Command-surface decomposition roadmap](#command-surface-decomposition-roadmap-in-progress-2026-07-03) below.
 
 ---
 
@@ -1010,6 +1011,64 @@ The marginal-cost rationale is now documented in `docs/cli-dropin-integrations.m
   `normalize_analyze::` Rust paths, SUMMARYs and living docs (cli-design,
   architecture-decisions, analyze-consolidation, POLISH) renamed in one commit. No
   `package =` aliasing existed. Crate count unchanged (44). User-facing → CHANGELOG.
+
+### Command-surface decomposition roadmap (IN PROGRESS 2026-07-03)
+
+**Supersedes the 2026-07-02 audit's "~62k of own code mostly legitimately stays" framing.**
+That audit answered the *algorithm-extraction* question (algorithms already in crates —
+true) but missed CLAUDE.md's second rule: *"a crate that owns a subcommand includes its own
+`#[cli]` service, report structs, and `OutputFormatter` impls; the main crate just mounts
+them."* Under that lens the command **surface** is substantially migratable.
+
+Full audit: **`docs/audit-2026-07-03-command-surface-decomposition.md`.**
+
+**Headline:** main is ~84k; ~21k is forced-to-stay vendored CLIs (publish trilemma); of the
+~62k own code ~50k is migratable in principle. Realistic floor ≈ **30–34k** total → own
+irreducible core ≈ **9–13k**. The mount pattern is already in production for 5 sub-services
+(`normalize-budget`/`-cfg`/`-ratchet`/`-rules`/`-knowledge-graph`), each a `#[cli]` service +
+reports + `OutputFormatter` with zero back-refs to main.
+
+**Key facts:**
+- **`OutputFormatter` is NOT a blocker** — it lives in `normalize-output`
+  (`crates/normalize-output/src/lib.rs:94`); `crates/normalize/src/output.rs` is just
+  `pub use normalize_output::*`. Feature crates impl it standalone today.
+- **The real blocker is ORDERING** — the movable per-feature `service/*.rs` methods delegate
+  into the in-main `crate::commands` module (171 refs). Service extraction is *downstream* of
+  `commands/` extraction: move the `commands/<feature>/` impl into the crate first, then the
+  thin `#[cli]` service method follows.
+- **Two enablers** unblock the analyze family: (1) the daemon-aware `crate::index` wrapper
+  (~144 LOC over `normalize_facts::FileIndex`) — use `FileIndex` directly (as ratchet/budget
+  do) or hoist `index.rs` into a small shared crate; (2) `crate::config::NormalizeConfig`
+  per-subcommand excludes — pass each crate its config slice.
+
+**Migration map** (target → ~LOC → owner → notes):
+
+| Target | ~LOC | Owner | Notes |
+|---|---|---|---|
+| Sessions (`commands/sessions/` + `service/sessions.rs`) | ~8k | NEW `normalize-sessions` | cleanest; DO FIRST — **being started this session** |
+| duplicates/fragments/clusters/coupling_clusters | ~4k | `normalize-code-similarity` | gated on enablers |
+| architecture/layering/depth_map | ~0.9k | `normalize-architecture` | gated on enablers |
+| graph/call_graph | ~1.2k | `normalize-graph` | gated on enablers |
+| liveness/effects/exceptions | ~0.9k | `normalize-cfg` (mounted) | gated on enablers |
+| provenance | ~0.75k | chat-sessions / session-analysis | — |
+| small wrappers (generate/context/package/find_references) | ~2k | typegen/-context/-ecosystems/-scope | budget template |
+| rank-metrics (hotspots, contributors, ownership, density, ceremony, test_ratio, call_complexity, size, docs, coupling, imports, uniqueness, module_health, surface, complexity/length/test_gaps, budget-metric) | ~5.7k | **NO owner — DECISION NEEDED** (`normalize-metrics` vs stay) | not blocked by OutputFormatter; blocked by absence of a home |
+| view (`commands/view/` + tree/skeleton/parsers) | ~3.5k | none — intrinsically main | STAYS unless tree/skeleton/parsers extracted first |
+| `service/edit.rs`, `service/facts.rs` | large | edit/facts crates | coupled to `crate::index`/shadow; later |
+| aggregators, multi-repo, trend, init/update/sync, daemon, service composition | ~irreducible | — | genuinely stays |
+
+**Ordered plan:**
+- [ ] **1. Sessions first** (~8k, no blockers) → new `normalize-sessions` (deps
+  `normalize-chat-sessions` + `normalize-session-analysis`). Only coupling: `crate::output`
+  re-export + `super::` internals + `resolve_pretty` rewire. **Started this session** — proves
+  the full surface migration end to end.
+- [ ] **2. Build the two enablers** — shareable index acquisition (direct `FileIndex` or hoist
+  `index.rs`); config excludes-slice.
+- [ ] **3. Analyze families → existing owners** (~7.75k): code-similarity, architecture, graph,
+  cfg, chat-sessions/session-analysis.
+- [ ] **4. DECISION on the ~5.7k rank-metrics** — designate `normalize-metrics` as owner vs.
+  leave in main. The one genuinely open architectural call here.
+- [ ] **5. Small wrappers** (~2k) — generate/context/package/find_references, budget template.
 
 ### Language trait: remaining .scm migration
 
