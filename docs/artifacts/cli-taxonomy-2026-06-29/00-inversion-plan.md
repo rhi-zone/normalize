@@ -442,6 +442,13 @@ worse than one composer. Keep `trend` as the single time-series composer.
   `liveness`/`effects`/`exceptions` methods (they already query the facts index).
 - **Activate** `normalize-facts` with `features = ["cli"]` in the main crate (today it is
   mounted with no features).
+- **Dataflow home SETTLED (2026-07-03):** `normalize-facts` is FORCED (the trio reads the
+  `cfg_*` tables via `idx.connection()`; `normalize-cfg` is impossible — `facts → cfg` already
+  exists, so `cfg → facts` would be a compile cycle). Verb = `structure`, as above. **Alternative
+  to weigh at execution if `structure liveness` naming grates:** also move `normalize-cfg`'s
+  render `CfgService` into facts and host a `cfg` verb there (→ `cfg liveness`), leaving
+  `normalize-cfg` a pure library. See `docs/audit-2026-07-03-command-surface-decomposition.md`
+  Open forks #2.
 
 ### 3.5 normalize-semantic → `search`
 

@@ -169,7 +169,7 @@ architecture / graph / cfg family.
 | architecture / layering / depth_map | ~0.9k | `normalize-architecture` | Gated on index/config enablers. → inversion-plan `architecture` verb (B3). |
 | graph / dependents / import-path | ~1.2k | `normalize-graph` | **Correction:** these are `view` subcommands today (`view graph` / `view dependents` / `view import-path`), NOT `analyze`/`rank` — the `normalize-graph` verb carves out of **`view`**, not analyze/rank. (`view references`/`referenced-by`/`trace`/`blame` are separate view leaves that stay main.) → inversion-plan `graph` verb (B2). Gated on enablers. |
 | clusters / coupling_clusters (git co-change) | ~0.5k | `normalize-git-history` (B8/B9 `history` verb) | **Correction (de-double-claim):** git-temporal — "files that change together in git history", via daemon-aware `crate::index` + `co_change_edges`. Was claimed by code-similarity above; it belongs with the git-history family, not clone detection. |
-| liveness / effects / exceptions (dataflow trio) | ~0.9k | **UNRECONCILED** — `normalize-cfg` (this roadmap) vs `normalize-facts`→`structure` (inversion-plan B5) | See Open forks #2. Both are defensible (CFG builds them; facts index answers them). Gated on enablers. |
+| liveness / effects / exceptions (dataflow trio) | ~0.9k | **RESOLVED → `normalize-facts`, `structure` verb (B5)** | Code home FORCED to facts (they read `cfg_*` tables via `idx.connection()`; `normalize-cfg` would create a `facts ⇄ cfg` compile cycle). Verb = `structure`. See Open forks #2. Gated on enablers. |
 | provenance | ~0.75k | `normalize-chat-sessions` / `normalize-session-analysis` | `view provenance` leaf. — |
 | small wrappers (generate / context / package / find_references service + report surfaces) | ~2k | `normalize-typegen` / `-context` / `-ecosystems` / `-scope` | Follows the budget template. |
 | rank-style metrics (hotspots, contributors, ownership, density, ceremony, test_ratio, call_complexity, size, docs, coupling, imports, uniqueness, module_health, surface, complexity/length/test_gaps, budget-metric) | ~5.7k | **NO owner today — DECISION NEEDED:** designate `normalize-metrics` as home, or they stay | **Not** blocked by `OutputFormatter`; blocked by the **absence of a home**. |
@@ -203,11 +203,31 @@ SCOPE.
      because it is the load-bearing architectural call and the human has not re-ratified it in
      the decomposition framing.
 
-2. **Dataflow trio (`liveness`/`effects`/`exceptions`) home — unreconciled.** Inversion-plan
-   **B5 routes them to `structure` (normalize-facts)** — they query the facts index. This
-   07-03 roadmap routed them to **`normalize-cfg`** — the CFG builder produces them. Both are
-   honest owners. **Status: UNRESOLVED** — pick one before B5. (Cross-ref: inversion plan
-   §Flagged soft spots notes they "read as analysis not index introspection.")
+2. **Dataflow trio (`liveness`/`effects`/`exceptions`) home — RESOLVED (2026-07-03).**
+   - **Physical code home: `normalize-facts` — FORCED (not a preference).** The three commands
+     are index/table readers: they open `idx.connection()` and run libsql SELECTs against the
+     `cfg_*` tables that `normalize-facts` owns (schema `index.rs:628`, writers `index.rs:3134+`,
+     and the `cfg_dataflow` solver already living there since `b8e5da99`). Homing them in
+     `normalize-cfg` (this roadmap's earlier suggestion) is architecturally **impossible**: it
+     would force `cfg → facts + libsql`, but `facts → cfg` already exists
+     (`normalize-facts/Cargo.toml:37`, used at `index.rs:4339`), creating a `facts ⇄ cfg`
+     **compile cycle** — and it would contaminate the deliberately pure in-memory `normalize-cfg`
+     and undo `b8e5da99`. The 07-03 roadmap's `normalize-cfg` suggestion is therefore superseded
+     by the dependency-cycle finding.
+   - **Verb label: `structure` (inversion-plan B5).** Commands become
+     `normalize structure liveness/effects/exceptions`. Chosen for least machinery — code and
+     verb both land in facts, zero new Cargo edges, matches the plan of record.
+   - **Recorded ALTERNATIVE for B5-execution.** The conceded downside is that `structure liveness`
+     reads grab-baggy (these are CFG analyses, not index introspection — the inversion plan's
+     §Flagged soft spots concedes exactly this: they "read as analysis not index introspection").
+     The clean alternative that yields the semantically-correct `cfg liveness` name is: have
+     `normalize-facts` host a `cfg` verb by **also** moving the render command (currently
+     `normalize-cfg`'s `CfgService`) into facts, making `normalize-cfg` a pure library
+     (model + builder + mermaid, no CLI). This is permitted by the dep graph (`facts → cfg`, no
+     cycle) but costs a render-move plus un-mounting cfg's service. **Reconsider this at
+     B5-execution time if the `structure` naming grates — do not decide it now.**
+   - **Status: RESOLVED** (code→facts forced; verb=`structure`; cfg-consolidation alternative
+     parked for B5-execution).
 
 3. **`search` verb collision (RESOLVED, 2026-07-03).** Inversion-plan **B7** wires
    `normalize-semantic` as a new top-level **`search`** verb (semantic code search). `search`
