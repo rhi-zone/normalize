@@ -18,7 +18,7 @@ streaming-iterator = "0.1"
 serde = { workspace = true }
 schemars = "1"
 thiserror = "2"
-server-less = { version = "0.6", default-features = false, features = ["cli", "jsonschema", "config"], optional = true }
+server-less = { version = "0.7", default-features = false, features = ["cli", "jsonschema", "config"], optional = true }
 
 [dev-dependencies]
 insta = "1"

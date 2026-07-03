@@ -28,5 +28,5 @@ anyhow = "1"
 thiserror = "2"
 tree-sitter = "0.26"
 streaming-iterator = "0.1"
-server-less = { version = "0.6", default-features = false, features = ["cli", "jsonschema", "config"], optional = true }
+server-less = { version = "0.7", default-features = false, features = ["cli", "jsonschema", "config"], optional = true }
 schemars = "1"
