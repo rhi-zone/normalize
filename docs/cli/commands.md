@@ -19,6 +19,7 @@
 | Command | Description |
 |---------|-------------|
 | `analyze` | Codebase analysis (~45 subcommands) |
+| `graph` | Dependency-graph analysis: cycles, blast radius, import paths (`graph`, `graph dependents`, `graph import-path`) |
 | `rank` | Rank files/functions by metrics |
 | `trend` | Track metrics over git history |
 | `ci` | Run all quality checks in one pass |

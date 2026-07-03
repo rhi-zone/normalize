@@ -19,7 +19,7 @@ Three live threads from the 2026-06-29/07-01 session — verify state before act
 
 ## CLI Taxonomy Migration
 
-B0 (guide-regression test, CLAUDE.md crate count) and B1 (`normalize-git` extraction) have landed. The graph-crate blocker on B2/B3 is **resolved** (2026-07-02, refactor-in-place — see below); B2–B12 can now proceed. The `#[cli(alias)]` server-less prereq is a separate server-less task; it does not block batches that don't move verbs yet.
+B0 (guide-regression test, CLAUDE.md crate count), B1 (`normalize-git` extraction), and B2 (`graph` verb) have landed. The graph-crate blocker on B2/B3 is **resolved** (2026-07-02, refactor-in-place — see below); B3–B12 can now proceed. The `#[cli(alias)]` server-less prereq is a separate server-less task; it does not block batches that don't move verbs yet.
 
 ## `normalize jq` fixed (2026-07-02)
 
@@ -853,12 +853,19 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
 - [x] **B1 — `normalize-git`:** extract `git_utils.rs` as new crate; migrate ALL dependents
   (budget, ratchet, semantic, main crate); budget/ratchet git_ops.rs → thin re-export wrappers;
   semantic git_staleness.rs uses normalize_git::open_repo; main git_utils.rs → pub use normalize_git::*.
-- [ ] **B2 — `graph`:** gate `OutputFormatter` behind `cli` feature; add `GraphService`;
-  mount; move `view graph`/`dependents`/`import-path`. **UNBLOCKED (2026-07-02).** The graph
-  refactor settled the boundary: `normalize-graph` is pure algorithms + plain result types;
-  the report structs, `GraphTarget`, and `OutputFormatter` impls now live in
-  `crates/normalize/src/commands/analyze/graph.rs`. B2 relocates that presentation into a
-  `graph` verb/service.
+- [x] **B2 — `graph`:** ✅ DONE 2026-07-03. Added `cli` feature to `normalize-graph`
+  (gates `report`+`service` modules; pure algorithms build with `default-features = false`).
+  Moved report structs (`GraphReport`/`DependentsReport`/`GraphStats`/`GraphTarget`/
+  `ImportPathReport`), `assemble_graph_report`, graph construction, and `OutputFormatter`
+  impls out of `crates/normalize/src/commands/analyze/{graph,import_path}.rs` (deleted) into
+  `normalize-graph/src/report.rs`. Added `GraphService` (`service.rs`): owns config access
+  (loads `[index]`/`[walk]`/`[pretty]` slices standalone, acquires via
+  `normalize_index::require_import_graph`). Mounted as top-level **`graph`** verb (default =
+  module graph; `graph dependents`; `graph import-path`). Old `view graph`/`dependents`/
+  `import-path` kept as **hidden** transitional shims on `ViewService` (`#[cli(hidden)]`)
+  delegating to `normalize_graph::*` for one release. Build matrix (default / `cli` /
+  all-features / no-default-features) green, no dep cycle (graph→index→facts, acyclic).
+  clippy + tests green (CLI help snapshots updated). **Main-crate `src` LOC: −1156.**
 - [ ] **B3 — `architecture`:** move 3 reports into crate; `cli` feature + service; mount
   (`architecture`, `depth-map`, `layering`). **UNBLOCKED (2026-07-02).** The
   `find_longest_chains` duplication was already killed and the graph boundary is resolved;

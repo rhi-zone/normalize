@@ -10,6 +10,22 @@
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 
+// The `graph` CLI verb: report structs, index-graph construction, output
+// formatting, and the server-less `GraphService`. Gated behind `cli` so
+// library consumers of the pure algorithms don't pull in the index/config stack.
+#[cfg(feature = "cli")]
+pub mod report;
+#[cfg(feature = "cli")]
+pub mod service;
+
+#[cfg(feature = "cli")]
+pub use report::{
+    DependentsReport, GraphReport, GraphStats, GraphTarget, ImportPathReport, analyze_dependents,
+    analyze_graph, find_import_path_command,
+};
+#[cfg(feature = "cli")]
+pub use service::GraphService;
+
 /// Minimum chain length (in nodes) to include in the longest-chains report.
 ///
 /// A chain of 4 nodes has depth 3 (3 edges). Depth 2 chains are common in any

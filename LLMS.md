@@ -100,7 +100,9 @@ normalize analyze health           # Health metrics
 normalize analyze security         # Security scan
 normalize view referenced-by symbol  # What calls this?
 normalize view references symbol      # What does this call?
-normalize view graph               # Dependency graph analysis
+normalize graph                    # Dependency graph analysis (cycles, blast radius)
+normalize graph dependents src/lib.rs  # What depends on this file?
+normalize graph import-path a.rs b.rs  # Shortest import chain
 ```
 
 ### rank - Ranked Metrics

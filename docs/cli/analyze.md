@@ -4,7 +4,10 @@ Analyze codebase quality: health, security, docs, and architectural structure.
 
 Commands that produce ranked lists have moved to [`normalize rank`](rank.md).
 Time-series trend commands have moved to [`normalize trend`](trend.md).
-Graph navigation (`call-graph`, `trace`, `dependents`, `graph`) has moved to [`normalize view`](../cli-design.md).
+Call-graph navigation (`call-graph`, `trace`) lives under [`normalize view`](../cli-design.md).
+Dependency-graph analysis (`graph`, `dependents`, `import-path`) has moved to the top-level
+[`normalize graph`](../cli-design.md) verb (was `view graph`/`dependents`/`import-path`; the
+old `view` paths remain as hidden aliases for one release).
 
 ## Subcommands
 
@@ -64,10 +67,14 @@ normalize trend complexity                # complexity trend over git history
 normalize trend length                    # function length trend
 normalize trend test-ratio                # test ratio trend
 
-# Graph navigation is now under normalize view:
+# Call-graph navigation is under normalize view:
 normalize view referenced-by MyFunction   # callers of a symbol
 normalize view references MyFunction      # callees of a symbol
-normalize view graph src/lib.rs           # dependency graph
+
+# Dependency-graph analysis is under normalize graph:
+normalize graph                           # module dependency graph
+normalize graph dependents src/lib.rs     # what depends on this file
+normalize graph import-path a.rs b.rs     # shortest import chain
 ```
 
 ## Options

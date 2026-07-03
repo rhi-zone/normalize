@@ -1,4 +1,4 @@
-//! Graph-theoretic metrics on the dependency graph.
+//! Graph-theoretic metrics on the dependency graph — the `graph` CLI verb.
 //!
 //! Operates on either the module graph (file→file via imports) or the symbol
 //! graph (function→function via calls). Use `--on modules` (default) or
@@ -8,23 +8,23 @@
 //! diamond dependencies, bridge edges, transitive (redundant) edges,
 //! deep chains, and overall graph density.
 //!
-//! Pure graph algorithms live in `normalize-graph`. This module handles graph
-//! construction from the index, report assembly, and output formatting — the
-//! normalize-flavored presentation layer over the crate's generic primitives.
+//! Pure graph algorithms live in the crate root (`crate::`). This module handles
+//! graph construction from the index, report assembly, and output formatting —
+//! the normalize-flavored presentation layer over the crate's generic primitives.
 
-use crate::index::FileIndex;
-use normalize_graph::{
+use crate::{
     BlastRadius, BridgeEdge, DependentEntry, Diamond, ImportChain, Scc, TransitiveEdge, all_nodes,
     count_transitive_edges, edge_count, find_bridges, find_dead_nodes, find_dependents,
     find_diamonds, find_longest_chains, find_sccs, find_transitive_edges, tarjan_sccs,
     weakly_connected_components,
 };
+use normalize_index::{FileIndex, build_import_graph};
 use normalize_languages::is_test_path;
 use normalize_output::OutputFormatter;
 use nu_ansi_term::Color;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 // ---------------------------------------------------------------------------
 // Graph construction
@@ -113,7 +113,6 @@ pub async fn analyze_graph(
 ) -> Result<GraphReport, libsql::Error> {
     let adj = match target {
         GraphTarget::Modules => {
-            use super::architecture::build_import_graph;
             let graph = build_import_graph(idx).await?;
             graph.imports_by_file
         }
@@ -170,8 +169,6 @@ async fn analyze_module_dependents(
     idx: &FileIndex,
     file: &str,
 ) -> Result<DependentsReport, libsql::Error> {
-    use super::architecture::build_import_graph;
-
     let graph = build_import_graph(idx).await?;
 
     // Compute fan-in per file
@@ -292,7 +289,7 @@ fn build_untested_paths(
 }
 
 // ---------------------------------------------------------------------------
-// Report types (normalize-flavored presentation over normalize-graph)
+// Report types (normalize-flavored presentation over the pure algorithms)
 // ---------------------------------------------------------------------------
 
 /// What the graph nodes represent.
@@ -402,8 +399,22 @@ pub struct DependentsReport {
     pub dependents: Vec<String>,
 }
 
+/// Report for `normalize graph import-path`.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct ImportPathReport {
+    /// The source file (root-relative).
+    pub from: String,
+    /// The target file (root-relative).
+    pub to: String,
+    /// Found import paths.  Empty when no path exists.
+    /// Each inner vec is one path: [from, hop1, ..., to].
+    pub paths: Vec<Vec<String>>,
+    /// True when `--all` was requested (multiple paths may be present).
+    pub all_paths: bool,
+}
+
 // ---------------------------------------------------------------------------
-// Report assembly (calls the pure algorithms from normalize-graph)
+// Report assembly (calls the pure algorithms from the crate root)
 // ---------------------------------------------------------------------------
 
 /// Assemble the full graph analysis report from an abstract dependency graph.
@@ -511,6 +522,65 @@ fn assemble_graph_report(
         transitive_edges,
         dead_nodes,
     }
+}
+
+// ---------------------------------------------------------------------------
+// import-path query
+// ---------------------------------------------------------------------------
+
+/// Resolve a user-supplied path to a root-relative string for DB lookup.
+///
+/// Accepts either an absolute path or a path relative to `root`.
+/// Strips the root prefix and normalizes separators.
+fn resolve_db_path(input: &str, root: &Path) -> String {
+    let p = PathBuf::from(input);
+    let abs = if p.is_absolute() { p } else { root.join(p) };
+    // Strip root prefix to get root-relative string
+    abs.strip_prefix(root)
+        .map(|r| r.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| input.to_string())
+}
+
+/// Find import path(s) between `from_file` and `to_file`.
+pub async fn find_import_path_command(
+    idx: &FileIndex,
+    root: &Path,
+    from_file: &str,
+    to_file: &str,
+    all_paths: bool,
+    path_limit: usize,
+    reverse: bool,
+) -> Result<ImportPathReport, libsql::Error> {
+    const MAX_DEPTH: usize = 10;
+
+    let (from_raw, to_raw) = if reverse {
+        (
+            resolve_db_path(to_file, root),
+            resolve_db_path(from_file, root),
+        )
+    } else {
+        (
+            resolve_db_path(from_file, root),
+            resolve_db_path(to_file, root),
+        )
+    };
+
+    let paths = idx
+        .find_import_path(&from_raw, &to_raw, all_paths, path_limit, MAX_DEPTH)
+        .await?;
+
+    let (report_from, report_to) = if reverse {
+        (to_raw, from_raw)
+    } else {
+        (from_raw, to_raw)
+    };
+
+    Ok(ImportPathReport {
+        from: report_from,
+        to: report_to,
+        paths,
+        all_paths,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -1057,5 +1127,26 @@ impl DependentsReport {
             }
         }
         out.join("\n")
+    }
+}
+
+impl OutputFormatter for ImportPathReport {
+    fn format_text(&self) -> String {
+        if self.from == self.to {
+            return "Same file".to_string();
+        }
+        if self.paths.is_empty() {
+            return format!("No import path found between {} and {}", self.from, self.to);
+        }
+        let mut lines = Vec::new();
+        for (i, path) in self.paths.iter().enumerate() {
+            if self.all_paths && self.paths.len() > 1 {
+                lines.push(format!("Path {}:", i + 1));
+                lines.push(format!("  {}", path.join(" → ")));
+            } else {
+                lines.push(path.join(" → "));
+            }
+        }
+        lines.join("\n")
     }
 }

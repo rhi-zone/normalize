@@ -5631,8 +5631,17 @@ dependencies = [
 name = "normalize-graph"
 version = "0.3.2"
 dependencies = [
+ "dirs 5.0.1",
+ "libsql",
+ "normalize-index",
+ "normalize-languages",
+ "normalize-output",
+ "normalize-rules-config",
+ "nu-ansi-term",
  "schemars",
  "serde",
+ "server-less",
+ "toml",
 ]
 
 [[package]]

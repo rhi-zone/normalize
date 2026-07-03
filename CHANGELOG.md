@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **New top-level `graph` verb (CLI taxonomy inversion B2).** The dependency-graph
+  commands moved out of `view` into a dedicated `graph` verb owned by `normalize-graph`:
+  `normalize graph` (module/symbol/type graph analysis, was `view graph`),
+  `normalize graph dependents` (was `view dependents`), and
+  `normalize graph import-path` (was `view import-path`). The old `view graph` /
+  `view dependents` / `view import-path` paths still work as **hidden transitional
+  aliases** for one release; migrate to the `graph` verb. `normalize-graph` gained a
+  `cli` feature gating the report structs, `OutputFormatter` impls, and `GraphService`
+  (library consumers of the pure graph algorithms build with `default-features = false`).
+
 ### Added
 
 - **`normalize-index` — foundational index-enabler crate.** Extracts index acquisition

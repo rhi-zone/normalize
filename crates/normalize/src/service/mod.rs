@@ -65,6 +65,7 @@ pub struct NormalizeService {
     grammars: grammars::GrammarService,
     guide: guide::GuideService,
     generate: generate::GenerateService,
+    graph: normalize_graph::GraphService,
     package: package::PackageService,
     rank: rank::RankService,
     budget: normalize_budget::service::BudgetService,
@@ -123,6 +124,7 @@ impl NormalizeService {
             grammars: grammars::GrammarService::new(&pretty),
             guide: guide::GuideService,
             generate: generate::GenerateService,
+            graph: normalize_graph::GraphService::new(&pretty),
             package: package::PackageService::new(),
             rank: rank::RankService::new(&pretty),
             budget: normalize_budget::service::BudgetService::new(),
@@ -1122,6 +1124,18 @@ impl NormalizeService {
     #[server(group = "analysis")]
     pub fn budget(&self) -> &normalize_budget::service::BudgetService {
         &self.budget
+    }
+
+    /// Analyze the dependency graph: cycles, blast radius, import paths. Requires the facts index.
+    ///
+    /// Examples:
+    ///   normalize graph                          # module dependency graph
+    ///   normalize graph --on symbols             # symbol-level graph
+    ///   normalize graph dependents src/lib.rs    # what depends on this file
+    ///   normalize graph import-path src/a.rs src/b.rs  # shortest import chain
+    #[server(group = "analysis")]
+    pub fn graph(&self) -> &normalize_graph::GraphService {
+        &self.graph
     }
 
     /// Build and render the control flow graph for a function. Use to visualize execution paths, branches, and loops.

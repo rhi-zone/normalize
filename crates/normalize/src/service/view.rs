@@ -4,12 +4,11 @@
 //! navigation subcommands: referenced-by, references, history, dependents, trace, graph, blame.
 
 use crate::commands::analyze::call_graph::CallEntry;
-use crate::commands::analyze::graph::{DependentsReport, GraphReport, GraphTarget};
-use crate::commands::analyze::import_path::ImportPathReport;
 use crate::commands::analyze::provenance::ProvenanceReport;
 use crate::commands::view::chunked::ChunkedViewReport;
 use crate::commands::view::report::{ViewHistoryReport, ViewListReport, ViewReport};
 use crate::output::OutputFormatter;
+use normalize_graph::{DependentsReport, GraphReport, GraphTarget, ImportPathReport};
 use server_less::cli;
 use std::cell::Cell;
 use std::path::PathBuf;
@@ -530,15 +529,12 @@ impl ViewService {
         )
     }
 
-    /// Reverse-dependency closure: who imports this file or module? (requires facts index)
+    /// [moved to `graph dependents`] Reverse-dependency closure. (requires facts index)
     ///
-    /// Also known as: blast radius, impact analysis, reverse imports, dependents, upstream callers
-    /// at the module level. Use this before deleting or changing a module's public API.
-    ///
-    /// Examples:
-    ///   normalize view dependents src/lib.rs           # modules that import lib.rs
-    ///   normalize view dependents src/lib.rs --on symbols  # symbol-level dependents
-    #[cli(display_with = "display_dependents")]
+    /// Transitional hidden alias — `view dependents` now lives at `graph dependents`.
+    /// Kept for one release so existing scripts keep working; delegates to the
+    /// `normalize-graph` implementation. Will be removed in a future release.
+    #[cli(hidden, display_with = "display_dependents")]
     pub async fn dependents(
         &self,
         #[param(positional, help = "File or module to find dependents for")] target: String,
@@ -553,7 +549,7 @@ impl ViewService {
         self.resolve_format(&root_path);
         let graph_target = on.unwrap_or(GraphTarget::Modules);
         let idx = crate::index::require_import_graph(&root_path).await?;
-        crate::commands::analyze::graph::analyze_dependents(&idx, &target, graph_target)
+        normalize_graph::analyze_dependents(&idx, &target, graph_target)
             .await
             .map_err(|e| format!("Dependents query failed: {}", e))
     }
@@ -588,15 +584,12 @@ impl ViewService {
         Ok(TraceReport { trace })
     }
 
-    /// Graph-theoretic properties of the dependency graph (requires facts index)
+    /// [moved to `graph`] Graph-theoretic properties of the dependency graph. (requires facts index)
     ///
-    /// Reports dependency cycles (circular imports), hub modules (high fan-in/fan-out),
-    /// and graph centrality. Also known as: circular dependency detection, import cycle finder.
-    ///
-    /// Examples:
-    ///   normalize view graph                     # module dependency graph
-    ///   normalize view graph --on symbols        # symbol-level graph
-    #[cli(display_with = "display_graph")]
+    /// Transitional hidden alias — `view graph` now lives at the top-level `graph`
+    /// verb. Kept for one release so existing scripts keep working; delegates to
+    /// the `normalize-graph` implementation. Will be removed in a future release.
+    #[cli(hidden, display_with = "display_graph")]
     pub async fn graph(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
@@ -613,21 +606,17 @@ impl ViewService {
         };
         let target = on.unwrap_or(GraphTarget::Modules);
         let idx = crate::index::require_import_graph(&root_path).await?;
-        crate::commands::analyze::graph::analyze_graph(&idx, effective_limit, target)
+        normalize_graph::analyze_graph(&idx, effective_limit, target)
             .await
             .map_err(|e| format!("Graph analysis failed: {}", e))
     }
 
-    /// Find the shortest import chain between two files (requires facts index)
+    /// [moved to `graph import-path`] Find the shortest import chain between two files. (requires facts index)
     ///
-    /// Uses BFS over the resolved import graph to find the path from `<from>` to `<to>`.
-    /// Also known as: dependency path, import chain, module reachability.
-    ///
-    /// Examples:
-    ///   normalize view import-path src/a.rs src/b.rs           # shortest path
-    ///   normalize view import-path src/a.rs src/b.rs --all     # all simple paths (up to 5)
-    ///   normalize view import-path src/a.rs src/b.rs --reverse # path from b to a
-    #[cli(display_with = "display_import_path")]
+    /// Transitional hidden alias — `view import-path` now lives at `graph import-path`.
+    /// Kept for one release so existing scripts keep working; delegates to the
+    /// `normalize-graph` implementation. Will be removed in a future release.
+    #[cli(hidden, display_with = "display_import_path")]
     pub async fn import_path(
         &self,
         #[param(positional, help = "Source file (root-relative or absolute path)")] from: String,
@@ -647,7 +636,7 @@ impl ViewService {
         let root_path = Self::root_path(root)?;
         let path_limit = limit.unwrap_or(5);
         let idx = crate::index::require_import_graph(&root_path).await?;
-        crate::commands::analyze::import_path::find_import_path_command(
+        normalize_graph::find_import_path_command(
             &idx, &root_path, &from, &to, all, path_limit, reverse,
         )
         .await

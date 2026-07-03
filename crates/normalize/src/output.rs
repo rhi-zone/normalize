@@ -99,7 +99,6 @@ mod tests {
         use crate::commands::analyze::exceptions::ExceptionsReport;
         use crate::commands::analyze::files::FileLengthReport;
         use crate::commands::analyze::fragments::FragmentsReport;
-        use crate::commands::analyze::graph::{DependentsReport, GraphReport};
         use crate::commands::analyze::hotspots::HotspotsReport;
         use crate::commands::analyze::imports::ImportCentralityReport;
         use crate::commands::analyze::layering::LayeringReport;
@@ -127,6 +126,7 @@ mod tests {
         use crate::commands::tools::lint::LintListReport;
         use crate::commands::view::report::{ViewHistoryReport, ViewListReport, ViewReport};
         use crate::text_search::GrepReport;
+        use normalize_graph::{DependentsReport, GraphReport, ImportPathReport};
         use normalize_output::diagnostics::DiagnosticsReport;
         use normalize_session_analysis::SessionAnalysisReport;
         use normalize_sessions::SessionShowReport;
@@ -310,7 +310,6 @@ mod tests {
         assert_output_formatter::<DaemonRootReport>();
         assert_output_formatter::<DaemonRootsReport>();
 
-        use crate::commands::analyze::import_path::ImportPathReport;
         assert_output_formatter::<ImportPathReport>();
 
         use crate::service::view::TraceReport;

@@ -13,10 +13,7 @@ Commands:
   list           List code entities matching filters in a scope
   references     Show what this symbol references (callees in the call graph; requires facts index)
   history        Show git history for a symbol or file
-  dependents     Reverse-dependency closure: who imports this file or module? (requires facts index)
   trace          Trace value provenance for a symbol
-  graph          Graph-theoretic properties of the dependency graph (requires facts index)
-  import-path    Find the shortest import chain between two files (requires facts index)
   blame          Git blame with session attribution and code relations
   help           Print this message or the help of the given subcommand(s)
 
