@@ -21,6 +21,7 @@ members = [
     "crates/normalize-package-index",
     "crates/normalize-syntax-rules",
     "crates/normalize-chat-sessions",
+    "crates/normalize-sessions",
     "crates/normalize-tools",
     "crates/normalize-local-deps",
     "crates/normalize-output",

@@ -1,0 +1,38 @@
+[package]
+name = "normalize-sessions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "normalize `sessions` command surface: inspect and analyze AI agent session logs"
+
+[features]
+default = []
+# Build the sessions web UI server (reuses the HTTP/axum stack). Requires the
+# prebuilt SPA assets under `web/sessions/dist/` (generated via bun/npm).
+sessions-web = ["dep:axum", "dep:tokio"]
+
+[dependencies]
+normalize-chat-sessions = { path = "../normalize-chat-sessions", version = "0.3.2", features = ["schema"] }
+normalize-session-analysis = { path = "../normalize-session-analysis", version = "0.3.2" }
+normalize-output = { path = "../normalize-output", version = "0.3.2" }
+server-less = { workspace = true }
+serde.workspace = true
+serde_json.workspace = true
+schemars = "1"
+regex = "1"
+glob = "0.3.3"
+nucleo-matcher.workspace = true
+nu-ansi-term = "0.50"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+jaq-core.workspace = true
+jaq-std.workspace = true
+jaq-json.workspace = true
+tracing = "0.1"
+toml = "0.8"
+dirs = "5"
+axum = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = "3"

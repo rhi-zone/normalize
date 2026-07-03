@@ -5225,6 +5225,7 @@ dependencies = [
  "normalize-rules-config",
  "normalize-scope",
  "normalize-session-analysis",
+ "normalize-sessions",
  "normalize-shadow",
  "normalize-surface-syntax",
  "normalize-syntax-rules",
@@ -5921,6 +5922,33 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "normalize-sessions"
+version = "0.3.2"
+dependencies = [
+ "axum 0.8.9",
+ "chrono",
+ "dirs 5.0.1",
+ "glob",
+ "jaq-core",
+ "jaq-json",
+ "jaq-std",
+ "normalize-chat-sessions",
+ "normalize-output",
+ "normalize-session-analysis",
+ "nu-ansi-term",
+ "nucleo-matcher",
+ "regex",
+ "schemars",
+ "serde",
+ "serde_json",
+ "server-less",
+ "tempfile",
+ "tokio",
+ "toml",
+ "tracing",
 ]
 
 [[package]]

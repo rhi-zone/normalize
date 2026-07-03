@@ -41,7 +41,6 @@ pub mod grammars;
 pub mod history;
 pub mod init;
 pub mod package;
-pub mod sessions;
 pub mod sync;
 pub mod syntax;
 pub mod text_search;

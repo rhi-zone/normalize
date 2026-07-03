@@ -124,16 +124,16 @@ mod tests {
             HistoryDiffReport, HistoryListReport, HistoryPruneReport, HistoryStatusReport,
             HistoryTreeReport,
         };
-        use crate::commands::sessions::SessionShowReport;
-        use crate::commands::sessions::SubagentsReport;
-        use crate::commands::sessions::list::SessionListReport;
-        use crate::commands::sessions::messages::MessagesReport;
-        use crate::commands::sessions::plans::PlansListReport;
         use crate::commands::tools::lint::LintListReport;
         use crate::commands::view::report::{ViewHistoryReport, ViewListReport, ViewReport};
-        use crate::sessions::SessionAnalysisReport;
         use crate::text_search::GrepReport;
         use normalize_output::diagnostics::DiagnosticsReport;
+        use normalize_session_analysis::SessionAnalysisReport;
+        use normalize_sessions::SessionShowReport;
+        use normalize_sessions::SubagentsReport;
+        use normalize_sessions::list::SessionListReport;
+        use normalize_sessions::messages::MessagesReport;
+        use normalize_sessions::plans::PlansListReport;
 
         // Compile-time checks via trait bounds
         assert_output_formatter::<CiReport>();
@@ -188,11 +188,11 @@ mod tests {
         assert_output_formatter::<SessionListReport>();
         assert_output_formatter::<SessionShowReport>();
         assert_output_formatter::<SubagentsReport>();
-        use crate::commands::sessions::ngrams::NgramsReport;
+        use normalize_sessions::ngrams::NgramsReport;
         assert_output_formatter::<NgramsReport>();
-        use crate::commands::sessions::patterns::PatternsReport;
+        use normalize_sessions::patterns::PatternsReport;
         assert_output_formatter::<PatternsReport>();
-        use crate::commands::sessions::stats::RepoStatsReport;
+        use normalize_sessions::stats::RepoStatsReport;
         assert_output_formatter::<RepoStatsReport>();
         use crate::commands::sync::SyncReport;
         assert_output_formatter::<SyncReport>();
@@ -354,10 +354,10 @@ mod tests {
         assert_output_formatter::<KgWriteReport>();
         assert_output_formatter::<KgWalkReport>();
 
-        use crate::service::sessions::PlansReport;
+        use normalize_sessions::service::PlansReport;
         assert_output_formatter::<PlansReport>();
 
-        use crate::commands::sessions::mark::MarkReport;
+        use normalize_sessions::mark::MarkReport;
         assert_output_formatter::<MarkReport>();
 
         use crate::service::package::{

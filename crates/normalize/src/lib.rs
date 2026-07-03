@@ -43,7 +43,6 @@ pub mod rules;
 pub mod serve;
 #[cfg(feature = "cli")]
 pub mod service;
-pub mod sessions;
 pub mod shadow;
 pub mod skeleton;
 pub mod symbols;

@@ -8,6 +8,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Internal: the `sessions` command surface moved into a new `normalize-sessions`
+  crate.** The `#[cli] SessionsService`, all session report structs, and their
+  `OutputFormatter` impls now live in `normalize-sessions`; the main `normalize`
+  crate mounts it in one line (the "crate owns its subcommand" pattern used by
+  `normalize-budget`/`normalize-cfg`). This is a pure restructure — `normalize
+  sessions` behaviour, flags, and output are unchanged. The optional sessions web
+  UI is still gated behind the `sessions-web` feature (now
+  `normalize/sessions-web` → `normalize-sessions/sessions-web`).
+
 - **The default build no longer bundles libsql's remote/replication stack.** normalize uses
   only local libsql databases, so the stock build now pulls `libsql` with `core`-only features.
   This drops `tonic`, `tonic-web`, `libsql_replication`, and the transitive duplicate

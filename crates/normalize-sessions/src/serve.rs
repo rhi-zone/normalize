@@ -17,9 +17,9 @@ struct SessionsState {
 }
 
 // Embedded SPA assets (gzipped for smaller binary)
-const SPA_HTML_GZ: &[u8] = include_bytes!("../../../../../web/sessions/dist/index.html.gz");
-const SPA_JS_GZ: &[u8] = include_bytes!("../../../../../web/sessions/dist/app.js.gz");
-const SPA_CSS_GZ: &[u8] = include_bytes!("../../../../../web/sessions/dist/index.css.gz");
+const SPA_HTML_GZ: &[u8] = include_bytes!("../../../web/sessions/dist/index.html.gz");
+const SPA_JS_GZ: &[u8] = include_bytes!("../../../web/sessions/dist/app.js.gz");
+const SPA_CSS_GZ: &[u8] = include_bytes!("../../../web/sessions/dist/index.css.gz");
 
 /// Start the sessions web server.
 pub async fn serve_sessions(project: Option<&Path>, port: u16) -> i32 {

@@ -13,7 +13,7 @@ Three live threads from the 2026-06-29/07-01 session — verify state before act
 - **CLI taxonomy inversion (B2–B12)**: B0+B1 landed; the graph-crate blocker on B2/B3 is now resolved (see below). See [CLI command-taxonomy FULL INVERSION](#cli-command-taxonomy-full-inversion--seam-corrected-final-scope-high-priority) below.
 - **Graph-crate split**: ✅ RESOLVED 2026-07-02 — refactored `normalize-graph` in place (pure algorithms split from presentation; deps `normalize-output`/`nu-ansi-term` dropped; characterization tests added). No standalone crate, no node-type genericization. Decision record (superseded resolution at top): `docs/artifacts/cli-taxonomy-2026-06-29/DECISION-graph-crate.md`. This unblocks B2 and B3. See [Graph crate refactor](#graph-crate-refactor-resolved-2026-07-02) below.
 - **Main-crate decomposition audit**: ✅ DONE 2026-07-02 — full audit run; findings recorded in `docs/audit-2026-07-02.md`. Headline: the main crate is NOT a reservoir of extractable domain logic (reusable algorithms already in feature crates). Six small execution items + one rename remain (D1–D6 below), to be executed this session. See [Main-crate decomposition audit](#main-crate-decomposition-audit-done-2026-07-02) below.
-- **Command-surface decomposition (SUPERSEDES the "62k legit stays" framing)**: 🔄 IN PROGRESS 2026-07-03 — a second lens (CLAUDE.md's "crate owns its subcommand, main just mounts") shows the command *surface* is substantially migratable: main can shrink ~84k → ~30–34k (of which ~21k is forced-to-stay vendored CLIs → own irreducible core ≈ 9–13k). Audit: `docs/audit-2026-07-03-command-surface-decomposition.md`. Sessions migration (~8k → new `normalize-sessions`) is being started this session as the proof case. See [Command-surface decomposition roadmap](#command-surface-decomposition-roadmap-in-progress-2026-07-03) below.
+- **Command-surface decomposition (SUPERSEDES the "62k legit stays" framing)**: 🔄 IN PROGRESS 2026-07-03 — a second lens (CLAUDE.md's "crate owns its subcommand, main just mounts") shows the command *surface* is substantially migratable: main can shrink ~84k → ~30–34k (of which ~21k is forced-to-stay vendored CLIs → own irreducible core ≈ 9–13k). Audit: `docs/audit-2026-07-03-command-surface-decomposition.md`. Sessions migration (~8k → new `normalize-sessions`) ✅ DONE 2026-07-03 as the proof case (main src −8,086 LOC). See [Command-surface decomposition roadmap](#command-surface-decomposition-roadmap-in-progress-2026-07-03) below.
 
 ---
 
@@ -1045,7 +1045,7 @@ reports + `OutputFormatter` with zero back-refs to main.
 
 | Target | ~LOC | Owner | Notes |
 |---|---|---|---|
-| Sessions (`commands/sessions/` + `service/sessions.rs`) | ~8k | NEW `normalize-sessions` | cleanest; DO FIRST — **being started this session** |
+| Sessions (`commands/sessions/` + `service/sessions.rs`) | ~8k | NEW `normalize-sessions` | ✅ **DONE 2026-07-03** — extracted; main src 83,243 → 75,157 LOC (−8,086) |
 | duplicates/fragments/clusters/coupling_clusters | ~4k | `normalize-code-similarity` | gated on enablers |
 | architecture/layering/depth_map | ~0.9k | `normalize-architecture` | gated on enablers |
 | graph/call_graph | ~1.2k | `normalize-graph` | gated on enablers |
@@ -1058,10 +1058,15 @@ reports + `OutputFormatter` with zero back-refs to main.
 | aggregators, multi-repo, trend, init/update/sync, daemon, service composition | ~irreducible | — | genuinely stays |
 
 **Ordered plan:**
-- [ ] **1. Sessions first** (~8k, no blockers) → new `normalize-sessions` (deps
-  `normalize-chat-sessions` + `normalize-session-analysis`). Only coupling: `crate::output`
-  re-export + `super::` internals + `resolve_pretty` rewire. **Started this session** — proves
-  the full surface migration end to end.
+- [x] **1. Sessions first** (~8k, no blockers) → new `normalize-sessions` (deps
+  `normalize-chat-sessions` + `normalize-session-analysis`). ✅ **DONE 2026-07-03.** Coupling
+  matched the audit exactly: only `crate::output` re-export, `super::` internals, `crate::sessions`
+  re-export, and `resolve_pretty`. Handled by re-creating `crate::output`/`crate::sessions`
+  re-export modules inside the new crate (so submodule files needed zero edits) and a local
+  `resolve_pretty` that reads only the `[pretty]` config section (no dependency on main's
+  `NormalizeConfig`). `sessions-web`/`axum` carried across as a crate feature. Main src 83,243
+  → 75,157 LOC (−8,086); main mounts `normalize_sessions::service::SessionsService` in one line.
+  Proves the full surface migration (commands subtree + `service/*.rs` method) end to end.
 - [ ] **2. Build the two enablers** — shareable index acquisition (direct `FileIndex` or hoist
   `index.rs`); config excludes-slice.
 - [ ] **3. Analyze families → existing owners** (~7.75k): code-similarity, architecture, graph,

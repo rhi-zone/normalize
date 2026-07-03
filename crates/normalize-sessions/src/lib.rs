@@ -1,4 +1,9 @@
-//! Sessions command - analyze Claude Code and other agent session logs.
+//! `normalize sessions` command surface — analyze Claude Code and other agent
+//! session logs.
+//!
+//! This crate owns the `sessions` subcommand: its `#[cli]` [`service::SessionsService`],
+//! all report structs, and their `OutputFormatter` impls. The main `normalize` crate
+//! mounts [`service::SessionsService`] and does nothing else.
 
 pub mod analyze;
 pub mod cost;
@@ -12,9 +17,64 @@ pub mod patterns;
 pub mod plans;
 #[cfg(feature = "sessions-web")]
 mod serve;
+pub mod service;
 pub mod show;
 pub mod sort;
 pub mod stats;
+
+/// Re-export of [`normalize_output`] under the `output` name so report modules can
+/// refer to `crate::output::OutputFormatter` (the trait lives in `normalize-output`).
+pub mod output {
+    pub use normalize_output::*;
+}
+
+/// Session parsing/analysis types, re-exported under `crate::sessions` from the two
+/// feature crates that own them (`normalize-chat-sessions` for parsing,
+/// `normalize-session-analysis` for analysis).
+pub mod sessions {
+    pub use normalize_chat_sessions::{
+        ClaudeCodeFormat, ContentBlock, FormatRegistry, LogFormat, Message, Role, Session,
+        SessionFile, SessionMetadata, TokenUsage, Turn, detect_format, get_format, list_formats,
+        list_jsonl_sessions, list_subagent_sessions, parse_session, parse_session_with_format,
+        project_metadata_roots,
+    };
+    pub use normalize_session_analysis::*;
+}
+
+/// Resolve pretty mode from CLI flags plus the project's `[pretty]` config.
+///
+/// Mirrors the main crate's `resolve_pretty` but reads only the `[pretty]` section
+/// (global `~/.config/normalize/config.toml` then project `.normalize/config.toml`),
+/// so this crate does not depend on the main crate's full `NormalizeConfig`.
+pub(crate) fn resolve_pretty(root: &std::path::Path, pretty: bool, compact: bool) -> bool {
+    !compact && (pretty || load_pretty_config(root).enabled())
+}
+
+fn load_pretty_config(root: &std::path::Path) -> normalize_output::PrettyConfig {
+    #[derive(serde::Deserialize, Default)]
+    struct Wrapper {
+        #[serde(default)]
+        pretty: normalize_output::PrettyConfig,
+    }
+    let mut cfg = normalize_output::PrettyConfig::default();
+    let global = std::env::var("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .ok()
+        .or_else(|| dirs::home_dir().map(|h| h.join(".config")))
+        .map(|c| c.join("normalize").join("config.toml"));
+    // Global config first, then project overrides.
+    for path in [global, Some(root.join(".normalize").join("config.toml"))]
+        .into_iter()
+        .flatten()
+    {
+        if let Ok(content) = std::fs::read_to_string(&path)
+            && let Ok(w) = toml::from_str::<Wrapper>(&content)
+        {
+            cfg = w.pretty;
+        }
+    }
+    cfg
+}
 
 pub use cost::{CostReport, build_cost_report, build_cost_report_for_session};
 pub use heatmap::{HeatmapReport, build_heatmap_report, build_heatmap_report_for_session};

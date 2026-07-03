@@ -34,7 +34,6 @@ pub mod ratchet;
 pub mod rename;
 // rules module moved to normalize-rules crate; re-exported for internal use
 pub mod serve;
-pub mod sessions;
 pub mod syntax;
 pub mod tools;
 pub mod trend;
@@ -75,7 +74,7 @@ pub struct NormalizeService {
     rules: normalize_rules::RulesService,
     serve: serve::ServeService,
     syntax: syntax::SyntaxService,
-    sessions: sessions::SessionsService,
+    sessions: normalize_sessions::service::SessionsService,
     tools: tools::ToolsService,
     trend: trend::TrendService,
     view: view::ViewService,
@@ -133,7 +132,7 @@ impl NormalizeService {
             rules: normalize_rules::RulesService::new(&pretty),
             serve: serve::ServeService,
             syntax: syntax::SyntaxService::new(),
-            sessions: sessions::SessionsService::new(&pretty),
+            sessions: normalize_sessions::service::SessionsService::new(&pretty),
             tools: tools::ToolsService::new(),
             trend: trend::TrendService::new(&pretty),
             view: view::ViewService::new(&pretty),
@@ -848,7 +847,7 @@ impl NormalizeService {
 
     /// Review AI agent session logs. Use to check cost, duration, and tool usage across coding sessions.
     #[server(group = "utilities")]
-    pub fn sessions(&self) -> &sessions::SessionsService {
+    pub fn sessions(&self) -> &normalize_sessions::service::SessionsService {
         &self.sessions
     }
 

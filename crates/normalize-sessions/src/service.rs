@@ -1,12 +1,12 @@
 //! Sessions management service for server-less CLI.
 
-use crate::commands::sessions::{
+use crate::output::OutputFormatter;
+use crate::sessions::SessionAnalysisReport;
+use crate::{
     CostReport, HeatmapReport, MarkReport, MessagesReport, NgramRole, NgramsReport,
     ParallelizationReport, PatternsReport, PlanContent, PlansListReport, SessionListReport,
     SessionMode, SessionShowReport, SubagentsReport,
 };
-use crate::output::OutputFormatter;
-use crate::sessions::SessionAnalysisReport;
 use server_less::cli;
 use std::cell::Cell;
 
@@ -140,7 +140,7 @@ impl SessionsService {
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
         self.resolve_format(resolved_root);
         let mode = mode.unwrap_or_default();
-        let mut report = crate::commands::sessions::build_session_list(
+        let mut report = crate::build_session_list(
             root_path,
             limit,
             format.as_deref(),
@@ -156,7 +156,7 @@ impl SessionsService {
         )?;
         // Apply reviewed/unreviewed filter after building the list.
         if reviewed || unreviewed {
-            let ids = crate::commands::sessions::load_reviewed(root_path);
+            let ids = crate::load_reviewed(root_path);
             report.filter_by_ids(&ids, reviewed);
         }
         Ok(report)
@@ -188,13 +188,7 @@ impl SessionsService {
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
         self.resolve_format(resolved_root);
         let effective_project = project_path.or(root_path);
-        crate::commands::sessions::build_show_report(
-            &session,
-            effective_project,
-            format.as_deref(),
-            full,
-            exact,
-        )
+        crate::build_show_report(&session, effective_project, format.as_deref(), full, exact)
     }
 
     /// Run deep behavioral analysis on a session (tool stats, errors, token costs, corrections)
@@ -230,12 +224,7 @@ impl SessionsService {
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
         self.resolve_format(resolved_root);
         let effective_project = project_path.or(root_path);
-        crate::commands::sessions::build_analyze_report(
-            &session,
-            effective_project,
-            format.as_deref(),
-            exact,
-        )
+        crate::build_analyze_report(&session, effective_project, format.as_deref(), exact)
     }
 
     /// Show aggregate statistics across sessions
@@ -293,7 +282,7 @@ impl SessionsService {
 
         // --by-repo: delegate to the repo stats path which exits directly after printing.
         if by_repo {
-            let report = crate::commands::sessions::build_repo_stats(
+            let report = crate::build_repo_stats(
                 root_path,
                 limit,
                 format.as_deref(),
@@ -319,7 +308,7 @@ impl SessionsService {
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect();
-            let exit_code = crate::commands::sessions::show_stats_grouped(
+            let exit_code = crate::show_stats_grouped(
                 root_path,
                 limit,
                 format.as_deref(),
@@ -336,7 +325,7 @@ impl SessionsService {
             std::process::exit(exit_code);
         }
 
-        crate::commands::sessions::build_stats_data(
+        crate::build_stats_data(
             root_path,
             limit,
             format.as_deref(),
@@ -406,7 +395,7 @@ impl SessionsService {
         let top_k = top.unwrap_or(20);
         let role_filter = role.unwrap_or_default();
 
-        crate::commands::sessions::build_ngrams_report(
+        crate::build_ngrams_report(
             root_path,
             limit,
             format.as_deref(),
@@ -446,7 +435,7 @@ impl SessionsService {
     pub fn messages(
         &self,
         #[param(help = "Filter by role: user (default), assistant, tool, system, all")]
-        role: Option<crate::commands::sessions::messages::RoleFilter>,
+        role: Option<crate::messages::RoleFilter>,
         #[param(help = "Filter messages by content pattern")] grep: Option<String>,
         #[param(help = "Filter sessions from the last N days")] days: Option<u32>,
         #[param(help = "Filter sessions since date (YYYY-MM-DD)")] since: Option<String>,
@@ -542,7 +531,7 @@ impl SessionsService {
                 }
             })
             .transpose()?;
-        crate::commands::sessions::build_messages_report(
+        crate::build_messages_report(
             root_path,
             limit,
             format.as_deref(),
@@ -592,11 +581,7 @@ impl SessionsService {
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
         self.resolve_format(resolved_root);
         let effective_project = project_path.or(root_path);
-        crate::commands::sessions::subagents::build_subagents_report(
-            &session,
-            effective_project,
-            format.as_deref(),
-        )
+        crate::subagents::build_subagents_report(&session, effective_project, format.as_deref())
     }
 
     /// Analyze tool call sequence patterns across sessions using Markov chain transition matrices
@@ -645,7 +630,7 @@ impl SessionsService {
         let resolved_root = root_path.unwrap_or(std::path::Path::new("."));
         self.resolve_format(resolved_root);
         let mode = mode.unwrap_or_default();
-        crate::commands::sessions::build_patterns_report(
+        crate::build_patterns_report(
             root_path,
             limit,
             format.as_deref(),
@@ -711,7 +696,7 @@ impl SessionsService {
         let mode = mode.unwrap_or_default();
         let effective_project = project_path.or(root_path);
         if let Some(ref session_id) = session {
-            crate::commands::sessions::build_parallelization_report_for_session(
+            crate::build_parallelization_report_for_session(
                 session_id,
                 effective_project,
                 format.as_deref(),
@@ -719,7 +704,7 @@ impl SessionsService {
                 threshold,
             )
         } else {
-            crate::commands::sessions::build_parallelization_report(
+            crate::build_parallelization_report(
                 root_path,
                 limit,
                 format.as_deref(),
@@ -786,7 +771,7 @@ impl SessionsService {
         let mode = mode.unwrap_or_default();
         let effective_project = project_path.or(root_path);
         if let Some(ref session_id) = session {
-            crate::commands::sessions::build_heatmap_report_for_session(
+            crate::build_heatmap_report_for_session(
                 session_id,
                 effective_project,
                 format.as_deref(),
@@ -794,7 +779,7 @@ impl SessionsService {
                 top,
             )
         } else {
-            crate::commands::sessions::build_heatmap_report(
+            crate::build_heatmap_report(
                 root_path,
                 limit,
                 format.as_deref(),
@@ -859,14 +844,14 @@ impl SessionsService {
         let mode = mode.unwrap_or_default();
         let effective_project = project_path.or(root_path);
         if let Some(ref session_id) = session {
-            crate::commands::sessions::build_cost_report_for_session(
+            crate::build_cost_report_for_session(
                 session_id,
                 effective_project,
                 format.as_deref(),
                 exact,
             )
         } else {
-            crate::commands::sessions::build_cost_report(
+            crate::build_cost_report(
                 root_path,
                 limit,
                 format.as_deref(),
@@ -896,11 +881,11 @@ impl SessionsService {
         let limit = limit.unwrap_or(20);
         match name {
             Some(ref n) => {
-                let content = crate::commands::sessions::build_plan_content(n)?;
+                let content = crate::build_plan_content(n)?;
                 Ok(PlansReport::Content(content))
             }
             None => {
-                let list = crate::commands::sessions::build_plans_list(limit)?;
+                let list = crate::build_plans_list(limit)?;
                 Ok(PlansReport::List(list))
             }
         }
@@ -921,7 +906,7 @@ impl SessionsService {
         #[param(help = "Dry run - show what would change")] dry_run: bool,
     ) -> Result<MarkReport, String> {
         let root_path = root.as_deref().map(std::path::Path::new);
-        crate::commands::sessions::mark_session(&session, root_path, dry_run)
+        crate::mark_session(&session, root_path, dry_run)
     }
 
     /// Remove a session from the reviewed list
@@ -939,6 +924,6 @@ impl SessionsService {
         #[param(help = "Dry run - show what would change")] dry_run: bool,
     ) -> Result<MarkReport, String> {
         let root_path = root.as_deref().map(std::path::Path::new);
-        crate::commands::sessions::unmark_session(&session, root_path, dry_run)
+        crate::unmark_session(&session, root_path, dry_run)
     }
 }
