@@ -51,7 +51,7 @@ pub enum RuleKind {
     All,
     Syntax,
     Fact,
-    /// Native checks: stale-summary, missing-summary, check-refs, stale-docs, check-examples.
+    /// Native checks: check-refs, stale-docs, check-examples, ratchet, budget.
     Native,
     /// Run external tools that emit SARIF 2.1.0 output (configured via `[[rules.sarif-tools]]`).
     Sarif,
@@ -1233,7 +1233,7 @@ pub fn show_rule_structured(
         // Native rules are static descriptors (not loaded from .scm/.fact files),
         // so they're searched separately. `build_list_report` enumerates them the
         // same way, so `rules show` must resolve against the same set — otherwise
-        // an id that appears in `rules list` (e.g. `stale-summary`) is reported as
+        // an id that appears in `rules list` (e.g. `stale-doc`) is reported as
         // "Rule not found".
         _ => match native_rule_info(id, config) {
             Some(report) => Ok(report),
@@ -1484,7 +1484,7 @@ pub async fn collect_fact_diagnostics_incremental(
 }
 
 /// Apply `RulesConfig` severity/enabled overrides to issues in a `DiagnosticsReport`.
-/// This lets native checks (stale-summary, missing-summary, check-refs, etc.) be
+/// This lets native checks (check-refs, stale-docs, check-examples, etc.) be
 /// configured via `[rules.rule."rule-id"]` in normalize.toml, just like syntax rules.
 pub fn apply_native_rules_config(
     report: &mut normalize_output::diagnostics::DiagnosticsReport,

@@ -64,14 +64,13 @@ Keeping documentation in sync with code: preventing stale docs, broken examples.
 
 ### Automated Checks
 ```bash
-# Run all documentation checks (broken refs, stale docs, missing examples, SUMMARY.md)
+# Run all documentation checks (broken refs, stale docs, missing examples)
 normalize rules run --type native
 
 # Filter to specific rule IDs:
 normalize rules run --rule check-refs       # broken doc references
 normalize rules run --rule stale-docs       # stale docs (code newer than docs)
 normalize rules run --rule check-examples   # missing example markers
-normalize rules run --rule stale-summary    # missing/stale SUMMARY.md files
 ```
 
 ### Manual Checks

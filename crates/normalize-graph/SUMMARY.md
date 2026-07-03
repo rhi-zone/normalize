@@ -1,7 +1,0 @@
-# normalize-graph
-
-Pure graph algorithms for dependency analysis, operating on abstract adjacency lists (`&HashMap<String, HashSet<String>>`) with no filesystem, CLI, or normalize-specific types. Presentation (report assembly, `OutputFormatter`, `GraphTarget`) lives in the consumer — `crates/normalize/src/commands/analyze/graph.rs`.
-
-Plain result/data types (serde + schemars derives only): `Scc`, `Diamond`, `BridgeEdge`, `ImportChain`, `TransitiveEdge`, `DependentEntry`, `BlastRadius`. Functions: `tarjan_sccs`, `find_sccs`, `find_diamonds`, `find_bridges`, `find_longest_chains` (+ `longest_path_from`), `find_transitive_edges`, `count_transitive_edges`, `weakly_connected_components`, `find_dead_nodes`, `find_dependents`, `reverse_graph`, `all_nodes`, `edge_count`. Single-module crate (all logic in `lib.rs`) with a `#[cfg(test)]` suite (characterization tests for the presentation split plus correct-output tests for `tarjan_sccs`/`find_sccs`/`find_bridges`). Published as a standalone crate on crates.io; usable independently of normalize.
-
-The iterative `tarjan_sccs` uses an explicit call stack (`Frame::Enter`/`Frame::Resume`) to avoid recursion depth limits on large graphs. The root-check sentinel (`Frame::Resume(node, "")`) is pushed FIRST so — the stack being LIFO — it is popped LAST, after every child subtree has propagated its lowlink. (A prior bug pushed it last, collapsing every SCC to a singleton; fixed 2026-07-02, see `CHANGELOG.md`.)

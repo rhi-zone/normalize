@@ -32,7 +32,7 @@ if [ -x "./target/debug/normalize" ] || [ -x "./target/release/normalize" ]; the
     [ -x "$NORMALIZE" ] || NORMALIZE="./target/release/normalize"
 
     if [ -x "$NORMALIZE" ]; then
-        # All rule engines: syntax, native (SUMMARY.md, broken refs, etc.), fact.
+        # All rule engines: syntax, native (broken refs, ratchet, budget, etc.), fact.
         # severity=error issues block commits; warnings are informational.
         # Use `normalize rules run --limit 0` to see full list.
         echo "Running normalize rules..."

@@ -569,7 +569,7 @@ pub fn git_summary_has_uncommitted_changes(root: &Path, summary_path: &str) -> b
     is_unstaged(&repo, summary_path)
 }
 
-// ── Commit count helpers (for stale-summary cache) ──────────────────────────
+// ── Commit count helpers (git history queries) ──────────────────────────────
 
 /// Return the commit hash of the last commit touching `rel_path`, or `None`.
 ///

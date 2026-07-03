@@ -98,13 +98,13 @@ B0 (guide-regression test, CLAUDE.md crate count) and B1 (`normalize-git` extrac
 
 ## Follow-ups (2026-06-29 branch consolidation)
 
-- [ ] **`missing-summary` commit count looks inflated.** When adding `tooling/claude-hooks/SUMMARY.md`
-  (it was genuinely missing — the rule fired `error [missing-summary]`), the rule reported
-  "16 commits touch this directory" while `git log --oneline -- tooling/claude-hooks` shows only 6.
-  A stale `.normalize/findings-cache.sqlite` had also been *masking* the violation across merge
-  commits (deleting the cache surfaced it). Investigate whether `missing-summary`/`stale-summary`
-  over-count (gix commit-walk vs `git log`) and whether the incremental cache can hide a
-  newly-crossed threshold. Low priority; the SUMMARY.md fix stands regardless.
+- [x] **SUMMARY.md convention removed (2026-07-03).** The per-directory `SUMMARY.md`
+  requirement, the `missing-summary`/`stale-summary` native rules, their config, and the
+  CLAUDE.md section were removed — the convention was high-friction, chronically stale, and
+  repeatedly blocked commits. This also retires the open `missing-summary` commit-count
+  investigation (the rule no longer exists). Follow-up: `docs/crates.md` is the intended
+  replacement for crate-level context; the `normalize view <dir>` SUMMARY.md-preamble
+  feature is now inert (no files) and can be repurposed or removed separately.
 
 ---
 

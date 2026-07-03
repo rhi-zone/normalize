@@ -135,7 +135,7 @@ normalize grep "TODO" --only "*.rs"
 ```bash
 normalize ci                       # run all engines, exit 1 on errors
 normalize ci --strict              # warnings also fail
-normalize ci --no-native           # skip ratchet/budget/stale-summary
+normalize ci --no-native           # skip ratchet/budget
 normalize ci --sarif               # SARIF output for GitHub Actions
 ```
 

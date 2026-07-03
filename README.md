@@ -258,7 +258,7 @@ Run all configured checks in a single command:
 ```bash
 normalize ci                    # run all engines, exit 1 on errors
 normalize ci --strict           # treat warnings as errors
-normalize ci --no-native        # skip native checks (ratchet, budget, stale-summary)
+normalize ci --no-native        # skip native checks (ratchet, budget)
 normalize ci --sarif            # SARIF output for GitHub Actions annotations
 ```
 

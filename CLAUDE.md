@@ -82,23 +82,6 @@ Write a small example file in the target language, parse it, and see what node t
 2. Implement the Language trait methods that the grammar supports
 3. Don't leave gaps for "later" — if the grammar supports it, implement it now
 
-## SUMMARY.md
-
-Every directory with files should have a `SUMMARY.md` describing its purpose and contents. The pre-commit hook enforces this at `severity=error` via `normalize rules run --type native` (stale-summary rule).
-
-**When making changes:**
-- Keep `SUMMARY.md` up to date as a concise summary document — it describes what's there now, not what changed.
-- Update it in the current directory if you add, remove, or significantly change files there.
-- Update ancestor `SUMMARY.md` files if the change affects a parent directory's description (e.g., adding a new crate, removing a module, changing a major interface).
-- Rule of thumb: if a reader of the parent SUMMARY.md would be surprised by your change, update it.
-
-**For context before making changes:**
-- Read `SUMMARY.md` in the current working directory to understand the directory's purpose.
-- Read ancestor `SUMMARY.md` files when working across multiple subdirectories or when you need broader architectural context.
-- Example: before editing files in `crates/normalize-facts/src/`, read `crates/normalize-facts/src/SUMMARY.md` and `crates/normalize-facts/SUMMARY.md`.
-
-**The pre-commit hook will block commits** if SUMMARY.md is stale (too many commits since last update) or missing and there are commits touching that directory. It also detects uncommitted content changes — if you staged file edits without updating SUMMARY.md, the check will catch it.
-
 ## Dogfooding
 
 **Use normalize, not builtin tools.** Avoid Read/Grep/Glob - they waste tokens.

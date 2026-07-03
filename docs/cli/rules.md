@@ -1,6 +1,6 @@
 # normalize rules
 
-Manage and run analysis rules (syntax + fact + native). This is the unified entry point for all rule engines — tree-sitter syntax rules (`.scm`), Datalog fact rules (`.dl`), and native checks (stale-summary, check-refs, ratchet, budget).
+Manage and run analysis rules (syntax + fact + native). This is the unified entry point for all rule engines — tree-sitter syntax rules (`.scm`), Datalog fact rules (`.dl`), and native checks (check-refs, ratchet, budget).
 
 **Command path:** `normalize rules <subcommand>`
 
@@ -42,7 +42,7 @@ Run rules against the codebase:
 normalize rules run                              # Run all rules
 normalize rules run --type syntax                # Syntax rules only
 normalize rules run --type fact                  # Fact rules only
-normalize rules run --type native                # Native checks only (stale-summary, ratchet, budget)
+normalize rules run --type native                # Native checks only (check-refs, ratchet, budget)
 normalize rules run --rule rust/unwrap-in-impl   # Specific rule
 normalize rules run --fix                        # Apply auto-fixes (syntax only)
 normalize rules run --fix --dry-run              # Preview fixes without writing

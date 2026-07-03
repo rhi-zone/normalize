@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Native rule checks for normalize (stale-summary, check-refs, stale-docs, check-examples)"
+description = "Native rule checks for normalize (check-refs, stale-docs, check-examples, ratchet, budget)"
 
 [dependencies]
 normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.2" }

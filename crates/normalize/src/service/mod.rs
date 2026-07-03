@@ -1170,7 +1170,7 @@ impl NormalizeService {
 
     /// Run all quality checks in one pass. Use in CI pipelines or before committing to catch violations.
     ///
-    /// Runs the syntax rules engine (tree-sitter queries), native rules engine (stale-summary,
+    /// Runs the syntax rules engine (tree-sitter queries), native rules engine (check-refs,
     /// ratchet, budget), and fact rules engine in sequence. Returns a `CiReport` with grouped
     /// findings. Use `--strict` to treat warnings as errors; `--sarif` for GitHub Actions output.
     ///
@@ -1180,7 +1180,7 @@ impl NormalizeService {
     /// Examples:
     ///   normalize ci                           # run all engines, exit 1 on errors
     ///   normalize ci --path src/               # scope run to a subdirectory
-    ///   normalize ci --no-native               # skip native checks (stale-summary, ratchet, budget)
+    ///   normalize ci --no-native               # skip native checks (check-refs, ratchet, budget)
     ///   normalize ci --strict                  # treat warnings as errors
     ///   normalize ci --sarif                   # SARIF output for GitHub Actions annotations
     ///   normalize ci --json                    # structured JSON output
@@ -1191,7 +1191,7 @@ impl NormalizeService {
         &self,
         #[param(help = "Skip syntax rules engine")] no_syntax: bool,
         #[param(
-            help = "Skip native rules engine (stale-summary, stale-docs, check-examples, check-refs, ratchet, budget)"
+            help = "Skip native rules engine (stale-docs, check-examples, check-refs, ratchet, budget)"
         )]
         no_native: bool,
         #[param(help = "Skip fact rules engine")] no_fact: bool,
@@ -1257,34 +1257,10 @@ impl NormalizeService {
             engines_run.push("syntax".into());
         }
 
-        // Native engine (stale-summary, check-refs, check-examples, ratchet, budget)
+        // Native engine (check-refs, check-examples, ratchet, budget)
         if !no_native {
             let native_root = effective_root.clone();
             let native_config = load_rules_config(&native_root);
-            let threshold = 10;
-
-            #[derive(serde::Deserialize, Default)]
-            struct SummaryRuleConfig {
-                #[serde(
-                    default,
-                    deserialize_with = "normalize_rules_config::deserialize_one_or_many"
-                )]
-                filenames: Vec<String>,
-                #[serde(
-                    default,
-                    deserialize_with = "normalize_rules_config::deserialize_one_or_many"
-                )]
-                paths: Vec<String>,
-            }
-
-            let stale_summary_cfg: SummaryRuleConfig = native_config
-                .rules
-                .rules
-                .get("stale-summary")
-                .map(|r| r.rule_config())
-                .unwrap_or_default();
-            let stale_summary_filenames = stale_summary_cfg.filenames;
-            let stale_summary_paths = stale_summary_cfg.paths;
 
             let boundary_cfg: normalize_native_rules::BoundaryViolationsConfig = native_config
                 .rules
@@ -1298,28 +1274,7 @@ impl NormalizeService {
                 .filter_map(|s| normalize_native_rules::parse_boundary(s))
                 .collect();
 
-            let (
-                summary_res,
-                stale_res,
-                examples_res,
-                refs_res,
-                ratchet_res,
-                budget_res,
-                boundary_res,
-            ) = tokio::join!(
-                tokio::task::spawn_blocking({
-                    let root = native_root.clone();
-                    let wc = native_config.walk.clone();
-                    move || {
-                        normalize_native_rules::build_stale_summary_report(
-                            &root,
-                            threshold,
-                            &stale_summary_filenames,
-                            &stale_summary_paths,
-                            &wc,
-                        )
-                    }
-                }),
+            let (stale_res, examples_res, refs_res, ratchet_res, budget_res, boundary_res) = tokio::join!(
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
                     let wc = native_config.walk.clone();
@@ -1342,9 +1297,6 @@ impl NormalizeService {
                 normalize_native_rules::build_boundary_violations_report(&native_root, &boundaries),
             );
             let mut native_report = DiagnosticsReport::new();
-            if let Ok(r) = summary_res {
-                native_report.merge(r.into());
-            }
             if let Ok(r) = stale_res {
                 native_report.merge(r.into());
             }

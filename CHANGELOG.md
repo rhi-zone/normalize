@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- **The `SUMMARY.md` per-directory convention and its enforcing native rules
+  (`missing-summary`, `stale-summary`) were removed.** The convention was
+  high-friction and chronically stale, so the pre-commit hook no longer requires a
+  `SUMMARY.md` in every directory, and `normalize rules run --type native` /
+  `normalize ci` no longer emit `missing-summary` or `stale-summary` findings. All
+  in-repo `SUMMARY.md` files were deleted. Any `[rules.rule."stale-summary"]` /
+  `[rules.rule."missing-summary"]` entries in a project's `.normalize/config.toml`
+  are now inert and can be removed.
+
 ### Changed
 
 - **Internal: the `sessions` command surface moved into a new `normalize-sessions`

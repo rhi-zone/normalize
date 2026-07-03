@@ -15,22 +15,6 @@ use crate::runner::{
     remove_rule, run_rules_report, show_rule_structured, update_rules,
 };
 
-/// Typed config for summary rules (stale-summary, missing-summary).
-/// Deserialized from `extra` fields on the `RuleOverride` via `rule_config()`.
-#[derive(serde::Deserialize, Default)]
-struct SummaryRuleConfig {
-    #[serde(
-        default,
-        deserialize_with = "normalize_rules_config::deserialize_one_or_many"
-    )]
-    filenames: Vec<String>,
-    #[serde(
-        default,
-        deserialize_with = "normalize_rules_config::deserialize_one_or_many"
-    )]
-    paths: Vec<String>,
-}
-
 /// Typed config for threshold-based rules (long-file, high-complexity, long-function).
 /// Deserialized from `extra` fields on the `RuleOverride` via `rule_config()`.
 #[derive(serde::Deserialize, Default)]
@@ -682,7 +666,7 @@ impl RulesService {
         .await
         .map_err(|e| format!("Task error: {e}"))?;
 
-        // Native engine (missing-summary, stale-summary, check-refs, stale-docs, check-examples,
+        // Native engine (check-refs, stale-docs, check-examples,
         // ratchet, budget, long-file, high-complexity, long-function)
         // runs in async context; included in All and Native engine types.
         // All checks are independent — run them in parallel.
@@ -691,23 +675,6 @@ impl RulesService {
             let native_timings_start = std::time::Instant::now();
             let native_root = effective_root.clone();
             let native_config = load_rules_config(&native_root);
-            let threshold = 10;
-            let missing_summary_cfg: SummaryRuleConfig = native_config
-                .rules
-                .rules
-                .get("missing-summary")
-                .map(|r| r.rule_config())
-                .unwrap_or_default();
-            let missing_summary_filenames = missing_summary_cfg.filenames;
-            let missing_summary_paths = missing_summary_cfg.paths;
-            let stale_summary_cfg: SummaryRuleConfig = native_config
-                .rules
-                .rules
-                .get("stale-summary")
-                .map(|r| r.rule_config())
-                .unwrap_or_default();
-            let stale_summary_filenames = stale_summary_cfg.filenames;
-            let stale_summary_paths = stale_summary_cfg.paths;
 
             // Helper: check if a native rule is enabled given config overrides and
             // the descriptor's default_enabled. A `--rule <id>` filter implicitly
@@ -835,48 +802,7 @@ impl RulesService {
                 })
             };
 
-            let (
-                missing_res,
-                summary_res,
-                stale_res,
-                examples_res,
-                refs_res,
-                ratchet_res,
-                budget_res,
-                effective_files_res,
-            ) = tokio::join!(
-                tokio::task::spawn_blocking({
-                    let root = native_root.clone();
-                    let wc = native_config.walk.clone();
-                    move || {
-                        let t = std::time::Instant::now();
-                        let r = normalize_native_rules::build_missing_summary_report(
-                            &root,
-                            threshold,
-                            &missing_summary_filenames,
-                            &missing_summary_paths,
-                            &wc,
-                        );
-                        eprintln!("[timings] missing-summary: {:.1?}", t.elapsed());
-                        r
-                    }
-                }),
-                tokio::task::spawn_blocking({
-                    let root = native_root.clone();
-                    let wc = native_config.walk.clone();
-                    move || {
-                        let t = std::time::Instant::now();
-                        let r = normalize_native_rules::build_stale_summary_report(
-                            &root,
-                            threshold,
-                            &stale_summary_filenames,
-                            &stale_summary_paths,
-                            &wc,
-                        );
-                        eprintln!("[timings] stale-summary: {:.1?}", t.elapsed());
-                        r
-                    }
-                }),
+            let (stale_res, examples_res, refs_res, ratchet_res, budget_res, effective_files_res) = tokio::join!(
                 tokio::task::spawn_blocking({
                     let root = native_root.clone();
                     let wc = native_config.walk.clone();
@@ -938,12 +864,6 @@ impl RulesService {
             // global_allow filtering only touches the newly added native issues.
             let native_start = report.issues.len();
 
-            if let Ok(r) = missing_res {
-                report.merge(r.into());
-            }
-            if let Ok(r) = summary_res {
-                report.merge(r.into());
-            }
             if let Ok(r) = stale_res {
                 report.merge(r.into());
             }

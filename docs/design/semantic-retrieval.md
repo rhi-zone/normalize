@@ -27,7 +27,7 @@ Embedding sources, in rough priority order:
 |--------|-------------|--------|
 | Symbols + doc comments | Per symbol | Highest — colocated, author-written, versioned |
 | Co-change clusters | Per cluster | Behavioral coupling, not just structural |
-| Markdown docs (SUMMARY.md, CLAUDE.md, ADRs) | Per section | Intent and design rationale |
+| Markdown docs (CLAUDE.md, ADRs) | Per section | Intent and design rationale |
 | Commit messages | Per commit | Change narrative |
 
 What gets embedded is **configurable per repo** — different codebases have different
@@ -62,11 +62,11 @@ which. High-churn items get higher retrieval weight.
 **Staleness** — documentation that hasn't been updated since the code it describes last
 changed is suspect. Two staleness signals compound:
 
-1. *Temporal staleness*: commits since last doc update (already tracked by stale-summary
-   and stale-doc rules)
+1. *Temporal staleness*: commits since last doc update (already tracked by the
+   stale-doc rule)
 2. *Colocation staleness*: a comment in the function body is more trustworthy than a
-   SUMMARY.md two directories up that hasn't moved in 50 commits. Proximity to the code
-   matters.
+   module-level doc two directories up that hasn't moved in 50 commits. Proximity to the
+   code matters.
 
 Both signals come from git history — no new data source needed.
 

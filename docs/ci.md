@@ -39,7 +39,6 @@ normalize rules list --type syntax    # see which syntax rules are enabled
 
 Built-in Rust checks that don't fit the `.scm` model:
 
-- **stale-summary**: `SUMMARY.md` files that haven't been updated since recent changes
 - **stale-docs**: documentation files referencing removed symbols
 - **check-examples**: code examples in docs that no longer parse
 - **check-refs**: cross-file references that point to missing targets
@@ -143,9 +142,6 @@ Override rule severity in `.normalize/config.toml`:
 ```toml
 [rules.rule."rust/unwrap-in-impl"]
 severity = "warning"   # downgrade from error
-
-[rules.rule."stale-summary"]
-severity = "error"     # upgrade to error (default is warning)
 
 [rules.rule."python/bare-except"]
 enabled = false        # disable entirely

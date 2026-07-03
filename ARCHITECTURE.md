@@ -40,7 +40,7 @@ crates/
 
   normalize-rules/                rule orchestration (run/list/show/enable...)
   normalize-syntax-rules/         tree-sitter query rule engine
-  normalize-native-rules/         native checks (stale-summary, ratchet, ...)
+  normalize-native-rules/         native checks (check-refs, ratchet, ...)
   normalize-rules-config/         shared config types for rule engines
 
   normalize-knowledge-graph/      .normalize/kg/ unit store + 3-primitive CLI
@@ -132,8 +132,8 @@ crate that already owns the surrounding feature.
 
 - The capability has a coherent public surface (trait + types + entrypoints)
   another workspace crate would consume.
-- You can write a 1-paragraph SUMMARY.md that does not contain the word
-  "miscellaneous".
+- You can write a 1-paragraph description of it that does not contain the
+  word "miscellaneous".
 - It is publishable to crates.io as-is (no path deps — see Hard Constraints
   in CLAUDE.md).
 
@@ -310,7 +310,7 @@ normalize-facts-rules-api       Relations (Datalog inputs) + Diagnostic
 normalize-facts-rules-interpret ascent-interpreter Datalog engine
 
 normalize-syntax-rules          tree-sitter-query rule engine (.scm)
-normalize-native-rules          pure-Rust checks (stale-summary, ratchet, ...)
+normalize-native-rules          pure-Rust checks (check-refs, ratchet, ...)
 normalize-rules                 orchestration (run/list/show/enable/disable)
 normalize-rules-config          shared TOML schema for all engines
 ```
@@ -345,7 +345,7 @@ covers the "lint a single file by pattern" case (no cross-file info,
 no Datalog).
 
 **`normalize-native-rules`** is a flat catalog of pure-Rust checks that
-don't fit either of the above: `stale-summary`, `stale-doc`,
+don't fit either of the above: `stale-doc`,
 `check-examples`, `check-refs`, `ratchet`, `budget`,
 `boundary-violations`, `high-complexity`, `high-fan-out`,
 `high-fan-in`, `long-file`, `long-function`, `dead-parameter`. Each has
@@ -612,11 +612,9 @@ not replicate.
   `ViewReport`, `DocsReport`, `RulesListReport`, `CiReport`.
 
 ### File layout per crate
-- `Cargo.toml`, `SUMMARY.md` (required; pre-commit hook enforces),
-  `src/lib.rs`, optional `src/main.rs`, optional `src/service.rs` /
-  `src/service/` behind `cli` feature, optional `src/bin/`.
-- Per-directory `SUMMARY.md` required for every directory with files —
-  enforced by the `stale-summary` native rule at `severity = error`.
+- `Cargo.toml`, `src/lib.rs`, optional `src/main.rs`, optional
+  `src/service.rs` / `src/service/` behind `cli` feature, optional
+  `src/bin/`.
 
 ### Error type conventions
 - Per-crate `Error` enum derived `Debug` + `Display` + `std::error::Error`

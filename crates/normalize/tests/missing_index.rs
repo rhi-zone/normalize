@@ -76,24 +76,24 @@ fn rank_imports_exits_nonzero_with_rebuild_hint_on_empty_import_graph() {
 
 #[test]
 fn rules_show_resolves_native_rule() {
-    // `stale-summary` is a native rule: it appears in `rules list` and must be
+    // `stale-doc` is a native rule: it appears in `rules list` and must be
     // resolvable by `rules show` (previously reported "Rule not found").
     let daemon_dir = TempDir::new().unwrap();
     let out = normalize()
         .env("NORMALIZE_DAEMON_CONFIG_DIR", daemon_dir.path())
-        .args(["rules", "show", "stale-summary"])
+        .args(["rules", "show", "stale-doc"])
         .output()
-        .expect("run rules show stale-summary");
+        .expect("run rules show stale-doc");
 
     assert!(
         out.status.success(),
-        "rules show stale-summary must succeed; stderr={}",
+        "rules show stale-doc must succeed; stderr={}",
         String::from_utf8_lossy(&out.stderr)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
-        stdout.contains("stale-summary") && stdout.contains("native"),
-        "expected native rule detail for stale-summary, got: {stdout}"
+        stdout.contains("stale-doc") && stdout.contains("native"),
+        "expected native rule detail for stale-doc, got: {stdout}"
     );
 }
 
@@ -102,9 +102,9 @@ fn rules_show_json_native_rule_has_type_native() {
     let daemon_dir = TempDir::new().unwrap();
     let out = normalize()
         .env("NORMALIZE_DAEMON_CONFIG_DIR", daemon_dir.path())
-        .args(["rules", "show", "stale-summary", "--json"])
+        .args(["rules", "show", "stale-doc", "--json"])
         .output()
-        .expect("run rules show stale-summary --json");
+        .expect("run rules show stale-doc --json");
 
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);

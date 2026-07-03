@@ -236,14 +236,6 @@ severity = "error"
 enabled = true
 allow = ["crates/normalize/src/rg/**", "**/tests/fixtures/**"]
 
-# SUMMARY.md freshness: currently at info severity (TODO: re-escalate to "error" once all
-# SUMMARY.md enforcement — severity=error blocks commits when SUMMARY.md is stale/missing.
-[rules.rule."stale-summary"]
-severity = "error"
-
-[rules.rule."missing-summary"]
-severity = "error"
-
 # Error-severity: genuine bugs / serious antipatterns — clean in current codebase.
 [rules.rule."python/mutable-default-arg"]
 severity = "error"

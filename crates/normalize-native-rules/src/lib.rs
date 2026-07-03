@@ -1,6 +1,6 @@
 //! Native rule checks for normalize.
 //!
-//! Implements stale-summary, check-refs, stale-docs, check-examples, ratchet, budget,
+//! Implements check-refs, stale-docs, check-examples, ratchet, budget,
 //! long-file, high-complexity, long-function, high-fan-out, and high-fan-in as pure
 //! Rust checks. These are the "native engine" checks invoked by
 //! `normalize rules run --engine native`.
@@ -19,7 +19,6 @@ pub mod long_function;
 pub mod ratchet;
 pub mod stale_doc;
 pub mod stale_docs;
-pub mod stale_summary;
 pub mod walk;
 
 pub use cache::{
@@ -41,7 +40,6 @@ pub use long_function::build_long_function_report;
 pub use ratchet::{RatchetRulesReport, build_ratchet_report};
 pub use stale_doc::{StaleDocConfig, build_stale_doc_report};
 pub use stale_docs::build_stale_docs_report;
-pub use stale_summary::{build_missing_summary_report, build_stale_summary_report};
 
 /// Static descriptor for a native rule's default metadata.
 ///
@@ -50,7 +48,7 @@ pub use stale_summary::{build_missing_summary_report, build_stale_summary_report
 /// `[rules.rule."rule-id"]` overrides from the project's `normalize.toml` via
 /// `normalize_rules::apply_native_rules_config` before presenting findings to the user.
 pub struct NativeRuleDescriptor {
-    /// Unique rule identifier (e.g. `"stale-summary"`).
+    /// Unique rule identifier (e.g. `"stale-doc"`).
     pub id: &'static str,
     /// Default severity before any project-level override (`"error"`, `"warning"`, or `"info"`).
     pub default_severity: &'static str,
@@ -77,20 +75,6 @@ pub const NATIVE_RULES: &[NativeRuleDescriptor] = &[
         default_severity: "warning",
         message: "Backtick reference in docs/comments doesn't resolve to a known symbol or file",
         tags: &["correctness", "documentation"],
-        default_enabled: true,
-    },
-    NativeRuleDescriptor {
-        id: "missing-summary",
-        default_severity: "error",
-        message: "Directory is missing a required doc file (default: SUMMARY.md; configurable via filenames and paths)",
-        tags: &["documentation"],
-        default_enabled: true,
-    },
-    NativeRuleDescriptor {
-        id: "stale-summary",
-        default_severity: "error",
-        message: "Doc file hasn't been updated since files in the directory changed (default: SUMMARY.md; configurable via filenames and paths)",
-        tags: &["documentation"],
         default_enabled: true,
     },
     NativeRuleDescriptor {

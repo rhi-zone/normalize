@@ -1954,34 +1954,6 @@ mod unix_impl {
         ) -> Vec<normalize_output::diagnostics::Issue> {
             use normalize_output::diagnostics::DiagnosticsReport;
 
-            /// Typed config for summary rules (mirrors normalize-rules service.rs).
-            #[derive(serde::Deserialize, Default)]
-            struct SummaryRuleConfig {
-                #[serde(
-                    default,
-                    deserialize_with = "normalize_rules_config::deserialize_one_or_many"
-                )]
-                filenames: Vec<String>,
-                #[serde(
-                    default,
-                    deserialize_with = "normalize_rules_config::deserialize_one_or_many"
-                )]
-                paths: Vec<String>,
-            }
-
-            // Read config for summary rules.
-            let missing_summary_cfg: SummaryRuleConfig = rules_config
-                .rules
-                .get("missing-summary")
-                .map(|r| r.rule_config())
-                .unwrap_or_default();
-            let stale_summary_cfg: SummaryRuleConfig = rules_config
-                .rules
-                .get("stale-summary")
-                .map(|r| r.rule_config())
-                .unwrap_or_default();
-            let threshold = 10;
-
             let root_owned = root.to_path_buf();
 
             // Read config for boundary-violations rule.
@@ -1996,38 +1968,7 @@ mod unix_impl {
                 .filter_map(|s| normalize_native_rules::parse_boundary(s))
                 .collect();
 
-            let (
-                missing_res,
-                summary_res,
-                stale_res,
-                examples_res,
-                refs_res,
-                ratchet_res,
-                budget_res,
-                boundary_res,
-            ) = tokio::join!(
-                tokio::task::spawn_blocking({
-                    let r = root_owned.clone();
-                    let fnames = missing_summary_cfg.filenames.clone();
-                    let paths = missing_summary_cfg.paths.clone();
-                    let wc = walk_config.clone();
-                    move || {
-                        normalize_native_rules::build_missing_summary_report(
-                            &r, threshold, &fnames, &paths, &wc,
-                        )
-                    }
-                }),
-                tokio::task::spawn_blocking({
-                    let r = root_owned.clone();
-                    let fnames = stale_summary_cfg.filenames.clone();
-                    let paths = stale_summary_cfg.paths.clone();
-                    let wc = walk_config.clone();
-                    move || {
-                        normalize_native_rules::build_stale_summary_report(
-                            &r, threshold, &fnames, &paths, &wc,
-                        )
-                    }
-                }),
+            let (stale_res, examples_res, refs_res, ratchet_res, budget_res, boundary_res) = tokio::join!(
                 tokio::task::spawn_blocking({
                     let r = root_owned.clone();
                     let wc = walk_config.clone();
@@ -2051,12 +1992,6 @@ mod unix_impl {
             );
 
             let mut report = DiagnosticsReport::new();
-            if let Ok(r) = missing_res {
-                report.merge(r.into());
-            }
-            if let Ok(r) = summary_res {
-                report.merge(r.into());
-            }
             if let Ok(r) = stale_res {
                 report.merge(r.into());
             }
@@ -2513,7 +2448,7 @@ mod unix_impl {
 
         /// Re-run only native rules for a root and persist the results to SQLite.
         /// Called when `.git/index` changes (e.g. after `git add`) so that rules
-        /// that read staged state (stale-summary, etc.) see fresh results without
+        /// that read staged state (ratchet, check-refs, etc.) see fresh results without
         /// triggering a full index rebuild.
         fn refresh_native_rules(&self, root: &Path) {
             let config = NormalizeConfig::load(root);

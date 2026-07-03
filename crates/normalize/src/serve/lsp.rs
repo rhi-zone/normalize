@@ -233,7 +233,7 @@ impl NormalizeBackend {
     }
 
     /// Schedule debounced native diagnostics (workspace-wide).
-    /// Native rules (missing-summary, stale-summary, check-refs, etc.) are workspace-level checks.
+    /// Native rules (check-refs, stale-docs, check-examples, etc.) are workspace-level checks.
     async fn schedule_native_diagnostics(&self) {
         let generation = self
             .native_diagnostics_generation
@@ -354,7 +354,7 @@ impl LanguageServer for NormalizeBackend {
 
     async fn did_change_watched_files(&self, params: DidChangeWatchedFilesParams) {
         // Re-run native rules when .git/index changes (i.e. after `git add`).
-        // Native rules like stale-summary check git-tracked state, so staging
+        // Native rules like check-refs check git-tracked state, so staging
         // changes affects their results.
         let is_git_index = params.changes.iter().any(|change| {
             change
