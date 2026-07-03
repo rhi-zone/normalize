@@ -23,7 +23,6 @@ pub mod context;
 pub mod daemon;
 pub mod docs;
 pub mod edit;
-pub mod facts;
 pub mod generate;
 pub mod grammars;
 pub mod guide;
@@ -62,7 +61,7 @@ pub struct NormalizeService {
     context: context::ContextService,
     daemon: daemon::DaemonService,
     edit: edit::EditService,
-    structure: facts::FactsService,
+    structure: normalize_facts::service::FactsCliService,
     grammars: grammars::GrammarService,
     guide: guide::GuideService,
     generate: generate::GenerateService,
@@ -123,7 +122,7 @@ impl NormalizeService {
             edit: edit::EditService {
                 history: history::HistoryService,
             },
-            structure: facts::FactsService::new(&pretty),
+            structure: normalize_facts::service::FactsCliService::new(),
             grammars: grammars::GrammarService::new(&pretty),
             guide: guide::GuideService,
             generate: generate::GenerateService,
@@ -787,7 +786,7 @@ impl NormalizeService {
 
     /// Build and query the code index. Run `structure rebuild` after cloning or when cross-file commands return stale results.
     #[server(group = "core")]
-    pub fn structure(&self) -> &facts::FactsService {
+    pub fn structure(&self) -> &normalize_facts::service::FactsCliService {
         &self.structure
     }
 

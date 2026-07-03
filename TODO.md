@@ -906,13 +906,28 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   Build matrix (default / `cli` / all-features / no-default-features) green, no dep cycle.
   clippy + tests green (CLI help snapshots updated). **Main-crate `src` LOC: 72823 → 69087
   (−3736).**
-- [ ] **B5 — `structure` fix + dataflow:** mount real `FactsCliService` (rename→`structure`);
-  delete main-crate `service/facts.rs` dup; absorb `liveness`/`effects`/`exceptions`;
-  activate `features=["cli"]`. **Dataflow home RESOLVED 2026-07-03:** code lands in
-  `normalize-facts` (FORCED — reads `cfg_*` tables; `normalize-cfg` ruled out by `facts ⇄ cfg`
-  cycle); verb = `structure`. **B5-execution alternative to weigh then (not now):** if
-  `structure liveness` naming grates, also move `normalize-cfg`'s render `CfgService` into facts
-  and host a `cfg` verb (→ `cfg liveness`), making `normalize-cfg` a pure library.
+- [x] **B5 — `structure` fix + dataflow:** ✅ DONE 2026-07-03. **Two-service divergence found
+  and reconciled:** the main-crate `service/facts.rs` was the *complete* one (rich rebuild with
+  include/only/exclude/full/strict/dry-run, stats+storage, files, packages, query,
+  test-fixtures ≈ 1331 LOC); the `normalize-facts` `FactsCliService` was a 3-method *stub*
+  (simple rebuild/stats/files). Deleting main and mounting the stub would have LOST packages /
+  query / test-fixtures / the rich rebuild+stats. So the full service was **ported into the
+  crate** (adapted off `NormalizeConfig`: tolerant `[walk]`/`[aliases]` slice loaders +
+  `detect_project_languages` + local `build_filter`, mirroring the B4 code-similarity pattern;
+  `crate::index::open`→`open_index`, `SkeletonExtractor`→`crate::extract::Extractor`,
+  `crate::index::ensure_ready` replicated on `FileIndex` without the `[index] enabled` gate).
+  Dead `CommandReport` dropped. Dataflow trio (report structs + `OutputFormatter` + `analyze_*`
+  fns) moved into `normalize-facts::service::{liveness,effects,exceptions}`; added
+  `structure liveness`/`effects`/`exceptions`; old `analyze` paths kept as `#[cli(hidden)]`
+  shims delegating to `FactsCliService` (verified hidden from `analyze --help`, still callable).
+  `normalize-facts` `cli` feature activated in main + gained `normalize-filter` dep. Build
+  matrix (default / `cli` / all-features / no-default-features) green, **no `facts ⇄ *` cycle**
+  (facts stays a leaf). clippy + `cargo test -q` green (CLI help snapshots updated: trio added
+  to `structure`, removed from `analyze`). **Main-crate `src` LOC: 69087 → 66839 (−2248 net;
+  −2264 deletions).** Dataflow home realized as `structure`. **Deferred to B5-followup (not
+  done here):** the cyclomatic-complexity wrapper fold into `normalize-facts::extract`, and the
+  parked `cfg liveness` naming alternative (move `normalize-cfg`'s render `CfgService` into
+  facts) — neither blocks; revisit if `structure liveness` naming grates.
 - [ ] **B6 — `filter`:** mount `FilterCliService` (rename `name`→`filter`); retire main-crate
   `aliases` leaf; add hidden top-level `aliases` transitional alias.
 - [ ] **B7 — `search`:** add `#[cli(name="search")]` to normalize-semantic; mount. **Remove

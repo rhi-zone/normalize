@@ -4,15 +4,13 @@ use crate::commands::analyze::activity::ActivityReport;
 use crate::commands::analyze::coupling_clusters::CouplingClustersReport;
 use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
 use crate::commands::analyze::docs::DocCoverageReport;
-use crate::commands::analyze::effects::EffectsReport;
-use crate::commands::analyze::exceptions::ExceptionsReport;
-use crate::commands::analyze::liveness::LivenessReport;
 use crate::commands::analyze::repo_coupling::RepoCouplingReport;
 use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
 use crate::commands::analyze::skeleton_diff::SkeletonDiffReport;
 use crate::commands::analyze::summary::SummaryReport;
 use crate::output::OutputFormatter;
 use normalize_architecture::ArchitectureReport;
+use normalize_facts::service::{EffectsReport, ExceptionsReport, LivenessReport};
 use server_less::cli;
 use std::cell::Cell;
 use std::path::PathBuf;
@@ -467,7 +465,10 @@ impl AnalyzeService {
     /// to run standard backward-dataflow liveness analysis. Requires the facts index.
     ///
     /// Also known as: variable liveness, live variable analysis, dead variable detection.
-    #[cli(display_with = "display_output")]
+    ///
+    /// Transitional shim: moved to `structure liveness` (owned by `normalize-facts`).
+    /// Hidden from help; kept for one release.
+    #[cli(hidden, display_with = "display_output")]
     pub async fn liveness(
         &self,
         #[param(positional, help = "Source file path")] file: String,
@@ -476,19 +477,8 @@ impl AnalyzeService {
             String,
         >,
     ) -> Result<LivenessReport, AnalyzeError> {
-        let root_path = Self::root_path(root)?;
-        let idx = crate::index::ensure_ready(&root_path).await?;
-        // Resolve file to a root-relative path for the index query.
-        let abs_file = std::path::Path::new(&file);
-        let rel_file = if abs_file.is_absolute() {
-            abs_file
-                .strip_prefix(&root_path)
-                .map(|p| p.to_string_lossy().into_owned())
-                .unwrap_or(file.clone())
-        } else {
-            file.clone()
-        };
-        crate::commands::analyze::liveness::analyze_liveness(&idx, &rel_file, &function)
+        normalize_facts::service::FactsCliService::new()
+            .liveness(file, function, root)
             .await
             .map_err(AnalyzeError::from)
     }
@@ -499,7 +489,10 @@ impl AnalyzeService {
     /// Uses the CFG data stored in the index (populated by `normalize structure rebuild`)
     /// to report suspension points, deferred calls, generator yields, and resource operations.
     /// Requires the facts index.
-    #[cli(display_with = "display_output")]
+    ///
+    /// Transitional shim: moved to `structure effects` (owned by `normalize-facts`).
+    /// Hidden from help; kept for one release.
+    #[cli(hidden, display_with = "display_output")]
     pub async fn effects(
         &self,
         #[param(positional, help = "Source file path")] file: String,
@@ -512,19 +505,8 @@ impl AnalyzeService {
             String,
         >,
     ) -> Result<EffectsReport, AnalyzeError> {
-        let root_path = Self::root_path(root)?;
-        let idx = crate::index::ensure_ready(&root_path).await?;
-        // Resolve file to a root-relative path for the index query.
-        let abs_file = std::path::Path::new(&file);
-        let rel_file = if abs_file.is_absolute() {
-            abs_file
-                .strip_prefix(&root_path)
-                .map(|p| p.to_string_lossy().into_owned())
-                .unwrap_or(file.clone())
-        } else {
-            file.clone()
-        };
-        crate::commands::analyze::effects::analyze_effects(&idx, &rel_file, function.as_deref())
+        normalize_facts::service::FactsCliService::new()
+            .effects(file, function, root)
             .await
             .map_err(AnalyzeError::from)
     }
@@ -536,7 +518,10 @@ impl AnalyzeService {
     /// unhandled throws that escape the function. Requires the facts index.
     ///
     /// Also known as: exception analysis, throw-catch mapping, unhandled exception detection.
-    #[cli(display_with = "display_output")]
+    ///
+    /// Transitional shim: moved to `structure exceptions` (owned by `normalize-facts`).
+    /// Hidden from help; kept for one release.
+    #[cli(hidden, display_with = "display_output")]
     pub async fn exceptions(
         &self,
         #[param(positional, help = "Source file path")] file: String,
@@ -549,25 +534,10 @@ impl AnalyzeService {
             String,
         >,
     ) -> Result<ExceptionsReport, AnalyzeError> {
-        let root_path = Self::root_path(root)?;
-        let idx = crate::index::ensure_ready(&root_path).await?;
-        // Resolve file to a root-relative path for the index query.
-        let abs_file = std::path::Path::new(&file);
-        let rel_file = if abs_file.is_absolute() {
-            abs_file
-                .strip_prefix(&root_path)
-                .map(|p| p.to_string_lossy().into_owned())
-                .unwrap_or(file.clone())
-        } else {
-            file.clone()
-        };
-        crate::commands::analyze::exceptions::analyze_exceptions(
-            &idx,
-            &rel_file,
-            function.as_deref(),
-        )
-        .await
-        .map_err(AnalyzeError::from)
+        normalize_facts::service::FactsCliService::new()
+            .exceptions(file, function, root)
+            .await
+            .map_err(AnalyzeError::from)
     }
 
     /// Show structural (skeleton) changes between a base ref and HEAD.

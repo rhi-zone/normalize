@@ -8,6 +8,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Canonical `structure` service + dataflow trio absorbed (CLI taxonomy inversion B5).**
+  The `structure` verb is now backed by the real `FactsCliService` in `normalize-facts`
+  (behind its `cli` feature) instead of a stale, drifted copy in the main crate — which was
+  deleted. All existing subcommands still work: `structure rebuild` / `stats` / `files` /
+  `packages` / `query` / `test-fixtures`. The CFG dataflow commands moved next to the compute
+  that powers them (`cfg_dataflow`): `normalize structure liveness` / `structure effects` /
+  `structure exceptions` (were `analyze liveness` / `analyze effects` / `analyze exceptions`).
+  The old `analyze` paths still work as **hidden transitional aliases** for one release;
+  migrate to the `structure` verb. Net effect: the main crate shed ~2.2k LOC of vendored
+  index/service code, and the standalone `normalize-facts` binary now exposes the full
+  `structure` surface.
+
 - **New top-level `similarity` verb (CLI taxonomy inversion B4).** The code-similarity
   command family moved out of the `rank` grab-bag into a dedicated `similarity` verb owned
   by `normalize-code-similarity`: `normalize similarity` (duplicate/near-duplicate code —

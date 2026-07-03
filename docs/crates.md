@@ -34,7 +34,7 @@ lives in main.
 |---|---|---|---|
 | `normalize` | Fast code intelligence CLI and library | (host binary) | Main crate: command dispatch, global flags, output backend, service composition, vendored CLIs (`rg`/`ast_grep`/`jq`), `view`/`edit`/`analyze`/`rank`/`trend`/`init`/`update`/`sync` residual. ~84k L; ~21k vendored (forced to stay). |
 | `normalize-budget` | Diff-based budget system: track how much a codebase is allowed to change | `budget` | Reference "crate owns its subcommand" shape. |
-| `normalize-cfg` | Control flow graph builder | `cfg` | Owns `cfg` verb; candidate home for the dataflow trio (liveness/effects/exceptions) — unresolved fork vs `normalize-facts`. |
+| `normalize-cfg` | Control flow graph builder | `cfg` | Owns `cfg` verb. (The dataflow trio — liveness/effects/exceptions — landed in `normalize-facts` under `structure`, B5.) |
 | `normalize-knowledge-graph` | Persistent, addressable, queryable knowledge graph adjacent to code — unit CRUD, edge management, BFS traversal | `kg` | |
 | `normalize-ratchet` | Metric regression-tracking (ratchet) system | `ratchet` | Uses `normalize-facts::FileIndex` directly (migration precedent). |
 | `normalize-rules` | Rule orchestration and CLI service (syntax + fact + native + SARIF engines) | `rules` | Mounts the syntax/fact/native rule engines behind one verb. |
@@ -81,7 +81,7 @@ lives in main.
 
 | crate | purpose | namespace (current / planned) | key notes |
 |---|---|---|---|
-| `normalize-facts` | Code fact extraction and storage library | planned (inversion) `structure` | Owns the index + cyclomatic core. `structure` is main-backed today (stale copy); plan mounts the real `FactsCliService` and absorbs the dataflow trio (B5). |
+| `normalize-facts` | Code fact extraction and storage library | `structure` (`cli` feature) | Owns the index + cyclomatic core. Canonical `FactsCliService` backs the `structure` verb (rebuild/stats/files/packages/query/test-fixtures) and the absorbed dataflow trio (`structure liveness`/`effects`/`exceptions`); the stale main-crate copy was deleted (B5). |
 | `normalize-facts-core` | Core data types for normalize facts (symbols, imports, exports) | — | |
 | `normalize-git` | Pure-Rust read-only git operations: repo open, blob read, tree walk, diff, blame, churn, history | — | Extracted 2026 (B1) to dedup gix helpers across budget/ratchet/semantic/native-rules/main. Future `normalize-git-history` (planned `history` verb, B8/B9) will depend on it. |
 | `normalize-shadow` | Shadow git history tracking for edit operations | — | |
@@ -115,5 +115,6 @@ lives in main.
 - **Planned (inversion) rows are targets, not current state.** They mount as their own verb
   only after the corresponding batch (B2–B12) lands. `normalize-git-history` (planned
   `history` verb) does not exist yet.
-- **Open forks** (dataflow-trio home cfg-vs-facts, metrics A1/A2, `search` collision) are
-  tracked in `docs/audit-2026-07-03-command-surface-decomposition.md`, not here.
+- **Open forks** (metrics A1/A2) are tracked in
+  `docs/audit-2026-07-03-command-surface-decomposition.md`, not here. (dataflow-trio home
+  resolved → `normalize-facts`/`structure`, B5; `search` collision resolved, B7.)

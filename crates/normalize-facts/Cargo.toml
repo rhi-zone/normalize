@@ -13,7 +13,7 @@ required-features = ["cli"]
 
 [features]
 default = []
-cli = ["dep:server-less", "dep:schemars", "dep:normalize-output", "dep:toml"]
+cli = ["dep:server-less", "dep:schemars", "dep:normalize-output", "dep:normalize-filter", "dep:toml"]
 
 # Opt-in remote/replicated libsql. normalize uses only local databases
 # (Builder::new_local / :memory:), so the stock build ships libsql `core` only.
@@ -29,6 +29,7 @@ tokio = { workspace = true }
 serde_json = { workspace = true }
 schemars = { version = "1", optional = true }
 normalize-output = { path = "../normalize-output", version = "0.3.2", optional = true }
+normalize-filter = { path = "../normalize-filter", version = "0.3.2", optional = true }
 # Core types
 normalize-facts-core = { path = "../normalize-facts-core", version = "0.3.2" }
 normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.2" }

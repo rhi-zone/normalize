@@ -68,7 +68,7 @@ dirs = "5"
 normalize-git = { workspace = true }
 normalize-core = { path = "../normalize-core", version = "0.3.2" }
 normalize-output = { path = "../normalize-output", version = "0.3.2" }
-normalize-facts = { path = "../normalize-facts", version = "0.3.2" }
+normalize-facts = { path = "../normalize-facts", version = "0.3.2", features = ["cli"] }
 normalize-facts-core = { path = "../normalize-facts-core", version = "0.3.2" }
 normalize-facts-rules-api = { path = "../normalize-facts-rules-api", version = "0.3.2" }
 normalize-facts-rules-interpret = { path = "../normalize-facts-rules-interpret", version = "0.3.2" }

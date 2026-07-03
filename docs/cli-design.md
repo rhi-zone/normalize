@@ -19,7 +19,7 @@ The essential daily-driver commands:
 - `grep` - Fast ripgrep-based text search
 - `edit` - Structural code modifications (delete, replace, swap, insert, undo, redo, goto, batch, history)
 - `rules` - Manage and run analysis rules (syntax + fact)
-- `structure` - Manage the structural index (symbols, imports, calls)
+- `structure` - Build and query the structural index (rebuild, stats, files, packages, query, test-fixtures) plus CFG dataflow (liveness, effects, exceptions); owned by `normalize-facts`
 - `init` - Initialize normalize in a directory
 
 ### Analysis

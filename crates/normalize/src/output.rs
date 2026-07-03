@@ -91,12 +91,9 @@ mod tests {
         use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
         use crate::commands::analyze::density::DensityReport;
         use crate::commands::analyze::docs::DocCoverageReport;
-        use crate::commands::analyze::effects::EffectsReport;
-        use crate::commands::analyze::exceptions::ExceptionsReport;
         use crate::commands::analyze::files::FileLengthReport;
         use crate::commands::analyze::hotspots::HotspotsReport;
         use crate::commands::analyze::imports::ImportCentralityReport;
-        use crate::commands::analyze::liveness::LivenessReport;
         use crate::commands::analyze::module_health::ModuleHealthReport;
         use crate::commands::analyze::ownership::OwnershipReport;
         use crate::commands::analyze::provenance::ProvenanceReport;
@@ -122,6 +119,7 @@ mod tests {
         use crate::text_search::GrepReport;
         use normalize_architecture::{ArchitectureReport, DepthMapReport, LayeringReport};
         use normalize_code_similarity::{DuplicateTypesReport, DuplicatesReport, FragmentsReport};
+        use normalize_facts::service::{EffectsReport, ExceptionsReport, LivenessReport};
         use normalize_graph::{DependentsReport, GraphReport, ImportPathReport};
         use normalize_output::diagnostics::DiagnosticsReport;
         use normalize_session_analysis::SessionAnalysisReport;
@@ -266,16 +264,15 @@ mod tests {
         assert_output_formatter::<StaleDocsReport>();
 
         // Service report types now implementing OutputFormatter
-        use crate::service::facts::{
-            CommandReport, ExtractionFixtureTestReport, FactsStats, FactsStatsReport,
-            FileListReport, PackagesReport, QueryReport, RebuildReport, StorageReport,
+        use normalize_facts::service::{
+            ExtractionFixtureTestReport, FactsStats, FactsStatsReport, FileListReport,
+            PackagesReport, QueryReport, RebuildReport, StorageReport,
         };
         assert_output_formatter::<RebuildReport>();
         assert_output_formatter::<FactsStats>();
         assert_output_formatter::<StorageReport>();
         assert_output_formatter::<FileListReport>();
         assert_output_formatter::<PackagesReport>();
-        assert_output_formatter::<CommandReport>();
         assert_output_formatter::<FactsStatsReport>();
         assert_output_formatter::<QueryReport>();
         assert_output_formatter::<ExtractionFixtureTestReport>();

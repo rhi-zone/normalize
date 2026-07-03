@@ -4,9 +4,9 @@
 //! runs the standard backward-dataflow liveness fixed-point, and returns a
 //! report with per-block live-in and live-out sets.
 
-use crate::output::OutputFormatter;
-use normalize_facts::FileIndex;
-use normalize_facts::cfg_dataflow;
+use crate::FileIndex;
+use crate::cfg_dataflow;
+use normalize_output::OutputFormatter;
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------

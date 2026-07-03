@@ -1,39 +1,255 @@
-//! Facts management service for server-less CLI.
+//! Standalone CLI service for normalize-facts — the canonical `structure` verb.
+//!
+//! Exposes `structure` subcommands: rebuild, stats, files, packages, query,
+//! test-fixtures, and the CFG dataflow trio (liveness, effects, exceptions).
+//!
+//! The service owns its config access: it loads the `[walk]` and `[aliases]`
+//! sections directly from the global and project `config.toml` files (the
+//! "sessions technique"), so this crate does not depend on the main crate's
+//! monolithic `NormalizeConfig`. It reads and writes the SQLite index directly
+//! via [`FileIndex`] (this crate *is* the index crate).
 
-use crate::commands::facts::FactsContent;
+pub mod effects;
+pub mod exceptions;
+pub mod liveness;
+
+pub use effects::{EffectEntry, EffectsReport, FunctionEffects, analyze_effects};
+pub use exceptions::{
+    CatchEntry, ExceptionsReport, FunctionExceptions, ThrowEntry, analyze_exceptions,
+};
+pub use liveness::{BlockLiveness, LivenessReport, analyze_liveness};
+
+use crate::FileIndex;
+use crate::paths::get_normalize_dir;
+use normalize_filter::{AliasConfig, Filter};
+use normalize_languages::external_packages;
+use normalize_output::OutputFormatter;
+use normalize_rules_config::WalkConfig;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use server_less::cli;
+use std::path::{Path, PathBuf};
 
 fn is_false(b: &bool) -> bool {
     !b
 }
-use crate::index;
-use crate::output::OutputFormatter;
-use crate::paths::get_normalize_dir;
-use crate::skeleton;
-use normalize_languages::external_packages;
-use server_less::cli;
-use std::cell::Cell;
-use std::path::{Path, PathBuf};
 
-/// Facts management sub-service.
-pub struct FactsService {
-    _pretty: Cell<bool>,
+// =============================================================================
+// Content selector (local copy — the main crate has its own for other uses)
+// =============================================================================
+
+/// What to extract during indexing (files are always indexed).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FactsContent {
+    /// Skip content extraction (files only)
+    None,
+    /// Function and type definitions
+    Symbols,
+    /// Function call relationships
+    Calls,
+    /// Import statements
+    Imports,
 }
 
-impl FactsService {
-    pub fn new(pretty: &Cell<bool>) -> Self {
-        Self {
-            _pretty: Cell::new(pretty.get()),
+impl std::str::FromStr for FactsContent {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "none" => Ok(Self::None),
+            "symbols" => Ok(Self::Symbols),
+            "calls" => Ok(Self::Calls),
+            "imports" => Ok(Self::Imports),
+            _ => Err(format!("unknown facts content: {s}")),
         }
     }
+}
 
-    /// Generic display bridge that routes to `OutputFormatter::format_text()`.
-    fn display_output<T: crate::output::OutputFormatter>(&self, value: &T) -> String {
-        value.format_text()
+// =============================================================================
+// Config / index acquisition helpers (tolerant slice loaders — no NormalizeConfig)
+// =============================================================================
+
+fn open_index_path(root: &Path) -> PathBuf {
+    // Honor NORMALIZE_INDEX_DIR / XDG resolution so `structure` and the main
+    // binary's cross-file commands agree on where the index lives.
+    get_normalize_dir(root).join("index.sqlite")
+}
+
+/// Best-effort: parse `[walk]` from `.normalize/config.toml`.
+///
+/// Always applies the daemon baseline (`.git/`, `.normalize/`) so the index
+/// walkers never descend into `.normalize/` even when the project config exists
+/// but omits `[walk]`.
+fn load_walk_config(root: &Path) -> WalkConfig {
+    #[derive(serde::Deserialize, Default)]
+    struct MinimalConfig {
+        #[serde(default)]
+        walk: WalkConfig,
+    }
+    let config_path = root.join(".normalize").join("config.toml");
+    if let Ok(contents) = std::fs::read_to_string(&config_path)
+        && let Ok(cfg) = toml::from_str::<MinimalConfig>(&contents)
+    {
+        return cfg.walk.with_daemon_baseline();
+    }
+    WalkConfig {
+        exclude: Some(vec![".git/".to_string(), ".normalize/".to_string()]),
+        ..Default::default()
     }
 }
 
+async fn open_index(root: &Path) -> Result<FileIndex, String> {
+    let db_path = open_index_path(root);
+    let mut idx = FileIndex::open(&db_path, root)
+        .await
+        .map_err(|e| format!("Failed to open index: {}", e))?;
+    idx.set_walk_config(load_walk_config(root));
+    Ok(idx)
+}
+
+/// Open the index and ensure it has call-graph (and CFG) data, building it if
+/// absent and incrementally refreshing it when stale. Mirrors the main crate's
+/// `index::ensure_ready` but without the `[index] enabled` gate (a main-crate
+/// config concept).
+async fn ensure_ready(root: &Path) -> Result<FileIndex, String> {
+    let mut idx = open_index(root).await?;
+    let stats = idx
+        .call_graph_stats()
+        .await
+        .map_err(|e| format!("Failed to read index stats: {}", e))?;
+    if stats.symbols == 0 {
+        eprintln!("Building facts index...");
+        idx.refresh()
+            .await
+            .map_err(|e| format!("Failed to build file index: {}", e))?;
+        let built = idx
+            .refresh_call_graph()
+            .await
+            .map_err(|e| format!("Failed to build call graph: {}", e))?;
+        eprintln!(
+            "Indexed {} symbols, {} calls, {} imports",
+            built.symbols, built.calls, built.imports
+        );
+    } else {
+        let file_changes = idx
+            .incremental_refresh()
+            .await
+            .map_err(|e| format!("Incremental refresh failed: {}", e))?;
+        if !file_changes.is_empty() {
+            eprintln!("Refreshing index ({} files changed)...", file_changes.len());
+            let updated = idx
+                .incremental_call_graph_refresh()
+                .await
+                .map_err(|e| format!("Call graph refresh failed: {}", e))?;
+            eprintln!(
+                "Updated {} symbols, {} calls, {} imports",
+                updated.symbols, updated.calls, updated.imports
+            );
+        }
+    }
+    Ok(idx)
+}
+
+fn resolve_root(root: Option<String>) -> Result<PathBuf, String> {
+    root.map(PathBuf::from)
+        .map(Ok)
+        .unwrap_or_else(std::env::current_dir)
+        .map_err(|e| format!("Failed to get current directory: {}", e))
+}
+
+/// Resolve a caller-supplied file path to a root-relative path for index queries.
+fn rel_to_root(root: &Path, file: &str) -> String {
+    let abs_file = Path::new(file);
+    if abs_file.is_absolute() {
+        abs_file
+            .strip_prefix(root)
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|_| file.to_string())
+    } else {
+        file.to_string()
+    }
+}
+
+// =============================================================================
+// Filter (aliases loaded standalone from config.toml — no NormalizeConfig)
+// =============================================================================
+
+fn config_paths(root: &Path) -> impl Iterator<Item = PathBuf> {
+    let global = std::env::var("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .ok()
+        .or_else(|| dirs::home_dir().map(|h| h.join(".config")))
+        .map(|c| c.join("normalize").join("config.toml"));
+    [global, Some(root.join(".normalize").join("config.toml"))]
+        .into_iter()
+        .flatten()
+}
+
+/// Load just the `[aliases]` slice from the global then project `config.toml`.
+fn load_aliases(root: &Path) -> AliasConfig {
+    #[derive(Deserialize, Default)]
+    #[serde(default)]
+    struct AliasSlice {
+        aliases: AliasConfig,
+    }
+    let mut cfg = AliasConfig::default();
+    for path in config_paths(root) {
+        if let Ok(content) = std::fs::read_to_string(&path)
+            && let Ok(parsed) = toml::from_str::<AliasSlice>(&content)
+        {
+            cfg = parsed.aliases;
+        }
+    }
+    cfg
+}
+
+/// Detect programming languages present under `root` (bounded-depth walk).
+/// Used to resolve language-scoped filter aliases (`@tests`, …).
+fn detect_project_languages(root: &Path) -> Vec<String> {
+    let mut languages = std::collections::HashSet::new();
+    let walker = ignore::WalkBuilder::new(root)
+        .max_depth(Some(5))
+        .hidden(false)
+        .git_ignore(true)
+        .build();
+    for entry in walker.flatten() {
+        if let Some(lang) = normalize_languages::support_for_path(entry.path()) {
+            languages.insert(lang.name().to_string());
+        }
+    }
+    let mut result: Vec<_> = languages.into_iter().collect();
+    result.sort();
+    result
+}
+
+/// Build a `Filter` from `--exclude` / `--only` patterns, printing any warnings.
+/// Returns `None` when both slices are empty (no filtering needed).
+fn build_filter(root: &Path, exclude: &[String], only: &[String]) -> Option<Filter> {
+    if exclude.is_empty() && only.is_empty() {
+        return None;
+    }
+    let aliases = load_aliases(root);
+    let languages = detect_project_languages(root);
+    let lang_refs: Vec<&str> = languages.iter().map(|s| s.as_str()).collect();
+    match Filter::new(exclude, only, &aliases, &lang_refs) {
+        Ok(f) => {
+            for warning in f.warnings() {
+                eprintln!("warning: {}", warning);
+            }
+            Some(f)
+        }
+        Err(e) => {
+            eprintln!("error: {}", e);
+            None
+        }
+    }
+}
+
+// =============================================================================
+// Output types
+// =============================================================================
+
 /// One missing-grammar entry on a `RebuildReport`.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Serialize, JsonSchema)]
 pub struct MissingGrammarEntry {
     /// Grammar name (e.g. `"go"`, `"kotlin"`).
     pub grammar: String,
@@ -47,7 +263,7 @@ pub struct MissingGrammarEntry {
 ///
 /// `files` is always populated. `symbols`, `calls`, and `imports` are only set when the
 /// corresponding content type was included in the rebuild (controlled by `--include`).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Serialize, JsonSchema)]
 pub struct RebuildReport {
     pub files: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -138,7 +354,7 @@ impl OutputFormatter for RebuildReport {
 ///
 /// Includes database size, codebase size, ratio, entity counts (files, symbols, calls,
 /// imports), and a ranked list of file extensions present in the index.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Serialize, JsonSchema)]
 pub struct FactsStats {
     pub db_size_bytes: u64,
     pub codebase_size_bytes: u64,
@@ -152,7 +368,7 @@ pub struct FactsStats {
 }
 
 /// Count of indexed files with a given file extension.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Serialize, JsonSchema)]
 pub struct ExtensionCount {
     pub ext: String,
     pub count: usize,
@@ -203,7 +419,7 @@ impl std::fmt::Display for FactsStats {
 /// Storage usage report returned by `normalize structure stats --storage`.
 ///
 /// Breaks down disk usage into the project index, language package cache, and global cache.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Serialize, JsonSchema)]
 pub struct StorageReport {
     pub index: StorageEntry,
     pub package_cache: StorageEntry,
@@ -213,7 +429,7 @@ pub struct StorageReport {
 }
 
 /// A single storage location's disk usage, with optional path and human-readable size.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Serialize, JsonSchema)]
 pub struct StorageEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
@@ -254,7 +470,7 @@ impl OutputFormatter for StorageReport {
 ///
 /// Each entry is a path relative to the project root. The list can be filtered by prefix
 /// and capped via `--limit`.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Serialize, JsonSchema)]
 pub struct FileListReport {
     pub files: Vec<String>,
 }
@@ -266,13 +482,13 @@ impl OutputFormatter for FileListReport {
 }
 
 /// Report for `normalize structure packages`: indexed package counts per ecosystem.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Serialize, JsonSchema)]
 pub struct PackagesReport {
     pub ecosystems: Vec<EcosystemCounts>,
 }
 
 /// Package and symbol counts for a single package ecosystem (e.g. "rust", "python").
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Serialize, JsonSchema)]
 pub struct EcosystemCounts {
     pub name: String,
     pub packages: usize,
@@ -303,27 +519,123 @@ Add dependencies (e.g. a Cargo.toml or requirements.txt) or pass --only <ecosyst
     }
 }
 
-/// Generic command result for operations that produce a status message and optional data.
-///
-/// Used for commands that don't have a more specific report type. `data` carries
-/// arbitrary structured output when present. Errors are signalled via `Err(...)` in the
-/// `Result` return type — this struct only carries successful outcomes.
-#[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct CommandReport {
-    /// Human-readable description of the outcome.
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<serde_json::Value>,
+/// Report for stats command (either regular stats or storage report).
+#[derive(Serialize, JsonSchema)]
+#[serde(tag = "kind")]
+pub enum FactsStatsReport {
+    Stats(FactsStats),
+    Storage(StorageReport),
 }
 
-impl OutputFormatter for CommandReport {
+impl OutputFormatter for FactsStatsReport {
     fn format_text(&self) -> String {
-        self.message.clone()
+        match self {
+            Self::Stats(s) => s.format_text(),
+            Self::Storage(s) => s.format_text(),
+        }
     }
 }
 
+/// Report for a raw SQL query against the structural index.
+#[derive(Serialize, JsonSchema)]
+pub struct QueryReport {
+    pub rows: Vec<serde_json::Map<String, serde_json::Value>>,
+}
+
+impl OutputFormatter for QueryReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        if self.rows.is_empty() {
+            return "(no rows)".to_string();
+        }
+        let mut out = String::new();
+        let cols: Vec<&str> = self.rows[0].keys().map(|k| k.as_str()).collect();
+        let mut widths: Vec<usize> = cols.iter().map(|c| c.len()).collect();
+        for row in &self.rows {
+            for (i, col) in cols.iter().enumerate() {
+                let val = row.get(*col).map(value_to_str).unwrap_or_default();
+                if val.len() > widths[i] {
+                    widths[i] = val.len();
+                }
+            }
+        }
+        let header: Vec<String> = cols
+            .iter()
+            .zip(&widths)
+            .map(|(c, w)| format!("{:width$}", c, width = w))
+            .collect();
+        let _ = writeln!(out, "{}", header.join("  "));
+        let sep: Vec<String> = widths.iter().map(|w| "-".repeat(*w)).collect();
+        let _ = writeln!(out, "{}", sep.join("  "));
+        for row in &self.rows {
+            let cells: Vec<String> = cols
+                .iter()
+                .zip(&widths)
+                .map(|(col, w)| {
+                    let val = row.get(*col).map(value_to_str).unwrap_or_default();
+                    format!("{:width$}", val, width = w)
+                })
+                .collect();
+            let _ = writeln!(out, "{}", cells.join("  "));
+        }
+        let _ = write!(out, "\n{} row(s)", self.rows.len());
+        out
+    }
+}
+
+fn value_to_str(v: &serde_json::Value) -> String {
+    match v {
+        serde_json::Value::Null => "NULL".to_string(),
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::String(s) => s.clone(),
+        other => other.to_string(),
+    }
+}
+
+/// Report returned by `normalize structure test-fixtures`.
+#[derive(Serialize, JsonSchema)]
+pub struct ExtractionFixtureTestReport {
+    pub fixture_dir: String,
+    pub cases: Vec<ExtractionFixtureCaseResult>,
+    pub passed: usize,
+    pub failed: usize,
+    pub updated: bool,
+}
+
+impl OutputFormatter for ExtractionFixtureTestReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        for case in &self.cases {
+            if case.passed {
+                let _ = writeln!(out, "PASS  {}", case.case);
+            } else {
+                let _ = writeln!(out, "FAIL  {}", case.case);
+                for line in &case.diff {
+                    let _ = writeln!(out, "      {line}");
+                }
+            }
+        }
+        if self.updated {
+            let _ = write!(out, "\nUpdated {} fixture case(s).", self.cases.len());
+        } else {
+            let _ = write!(out, "\n{} passed, {} failed", self.passed, self.failed);
+        }
+        out
+    }
+}
+
+/// Result for a single extraction fixture case.
+#[derive(Serialize, JsonSchema)]
+pub struct ExtractionFixtureCaseResult {
+    pub case: String,
+    pub passed: bool,
+    pub diff: Vec<String>,
+}
+
 // =============================================================================
-// Helper functions (inlined from commands/facts.rs service helpers)
+// Package-indexing helpers (inlined from the main crate's facts service)
 // =============================================================================
 
 fn get_cache_dir() -> Option<PathBuf> {
@@ -423,7 +735,7 @@ struct IndexedCounts {
 async fn count_and_insert_symbols(
     pkg_index: &external_packages::PackageIndex,
     pkg_id: i64,
-    symbols: &[normalize_languages::Symbol],
+    symbols: &[crate::Symbol],
 ) -> usize {
     let mut count = 0;
     for sym in symbols {
@@ -445,7 +757,7 @@ async fn count_and_insert_symbols(
 async fn index_package_symbols(
     deps: &dyn normalize_local_deps::LocalDeps,
     pkg_index: &external_packages::PackageIndex,
-    extractor: &mut skeleton::SkeletonExtractor,
+    extractor: &crate::extract::Extractor,
     pkg_id: i64,
     path: &Path,
 ) -> usize {
@@ -486,7 +798,7 @@ async fn index_language_packages(
     }
 
     let min_version = version.unwrap_or(external_packages::Version { major: 0, minor: 0 });
-    let mut extractor = skeleton::SkeletonExtractor::new();
+    let extractor = crate::extract::Extractor::new();
     let mut total_packages = 0;
     let mut total_symbols = 0;
 
@@ -519,7 +831,7 @@ async fn index_language_packages(
 
             total_packages += 1;
             total_symbols +=
-                index_package_symbols(deps, pkg_index, &mut extractor, pkg_id, &pkg_path).await;
+                index_package_symbols(deps, pkg_index, &extractor, pkg_id, &pkg_path).await;
         }
     }
 
@@ -545,14 +857,14 @@ async fn rebuild_data(
 ) -> Result<RebuildReport, String> {
     // Reset the missing-grammar tracker so this rebuild starts fresh — any
     // missing grammars surfaced below belong to *this* rebuild only.
-    let _ = normalize_facts::take_missing_grammars();
+    let _ = crate::take_missing_grammars();
     let root = root
         .map(|p| p.to_path_buf())
         .map(Ok)
         .unwrap_or_else(std::env::current_dir)
         .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
-    let filter = crate::commands::build_filter(&root, exclude, only);
+    let filter = build_filter(&root, exclude, only);
 
     if dry_run {
         let mode = if full {
@@ -601,9 +913,7 @@ async fn rebuild_data(
         });
     }
 
-    let mut idx = index::open(&root)
-        .await
-        .map_err(|e| format!("Error opening index: {}", e))?;
+    let mut idx = open_index(&root).await?;
 
     idx.set_progress(true);
 
@@ -628,7 +938,7 @@ async fn rebuild_data(
             .map_err(|e| format!("Error listing indexed files: {}", e))?
             .into_iter()
             .filter(|entry| {
-                let path = std::path::Path::new(&entry.path);
+                let path = Path::new(&entry.path);
                 !f.matches(path)
             })
             .map(|entry| entry.path)
@@ -708,7 +1018,7 @@ async fn rebuild_data(
 
     // Drain missing-grammar tracker into the report so users see (and can
     // act on) which languages were silently skipped.
-    let mut missing: Vec<MissingGrammarEntry> = normalize_facts::take_missing_grammars()
+    let mut missing: Vec<MissingGrammarEntry> = crate::take_missing_grammars()
         .into_iter()
         .map(|m| MissingGrammarEntry {
             grammar: m.name,
@@ -752,9 +1062,7 @@ async fn stats_data(root: Option<&Path>) -> Result<FactsStats, String> {
     let db_path = moss_dir.join("index.sqlite");
     let db_size = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
 
-    let idx = index::open(&root)
-        .await
-        .map_err(|e| format!("Failed to open index: {}", e))?;
+    let idx = open_index(&root).await?;
 
     let files = idx
         .all_files()
@@ -769,7 +1077,7 @@ async fn stats_data(root: Option<&Path>) -> Result<FactsStats, String> {
         if f.is_dir {
             continue;
         }
-        let path = std::path::Path::new(&f.path);
+        let path = Path::new(&f.path);
         let ext = match path.extension().and_then(|e| e.to_str()) {
             Some(e) => e.to_string(),
             None => {
@@ -831,9 +1139,7 @@ async fn list_files_data(
         .unwrap_or_else(std::env::current_dir)
         .map_err(|e| format!("Failed to get current directory: {e}"))?;
 
-    let idx = index::open(&root)
-        .await
-        .map_err(|e| format!("Failed to open index: {}", e))?;
+    let idx = open_index(&root).await?;
 
     let files = idx
         .all_files()
@@ -926,14 +1232,37 @@ async fn packages_data(
 }
 
 // =============================================================================
-// Service impl
+// Service
 // =============================================================================
+
+/// Canonical CLI service backing the `structure` verb.
+pub struct FactsCliService;
+
+impl FactsCliService {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for FactsCliService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FactsCliService {
+    /// Generic display bridge that routes to `OutputFormatter::format_text()`.
+    fn display_output<T: OutputFormatter>(&self, value: &T) -> String {
+        value.format_text()
+    }
+}
 
 #[cli(
     name = "structure",
+    version = "0.3.2",
     description = "Build and query the code index. Run `structure rebuild` after cloning or when cross-file commands return stale results."
 )]
-impl FactsService {
+impl FactsCliService {
     /// Rebuild the structural index (symbols, calls, imports, and file tree)
     ///
     /// Walks the project directory, parses source files, and populates the SQLite index
@@ -1006,12 +1335,7 @@ impl FactsService {
         >,
     ) -> Result<FactsStatsReport, String> {
         if storage {
-            let effective_root = root
-                .as_deref()
-                .map(PathBuf::from)
-                .map(Ok)
-                .unwrap_or_else(std::env::current_dir)
-                .map_err(|e| format!("Failed to get current directory: {e}"))?;
+            let effective_root = resolve_root(root)?;
             return Ok(FactsStatsReport::Storage(build_storage_report(
                 &effective_root,
             )));
@@ -1083,21 +1407,12 @@ impl FactsService {
             String,
         >,
     ) -> Result<QueryReport, String> {
-        let root = root
-            .map(PathBuf::from)
-            .map(Ok)
-            .unwrap_or_else(std::env::current_dir)
-            .map_err(|e| format!("Failed to get current directory: {e}"))?;
-
-        let idx = index::open(&root)
-            .await
-            .map_err(|e| format!("Failed to open index: {}", e))?;
-
+        let root = resolve_root(root)?;
+        let idx = open_index(&root).await?;
         let rows = idx
             .raw_query(&sql)
             .await
             .map_err(|e| format!("Query error: {}", e))?;
-
         Ok(QueryReport { rows })
     }
 
@@ -1128,16 +1443,11 @@ impl FactsService {
             String,
         >,
     ) -> Result<ExtractionFixtureTestReport, String> {
-        let effective_root = root
-            .as_deref()
-            .map(std::path::PathBuf::from)
-            .map(Ok)
-            .unwrap_or_else(std::env::current_dir)
-            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+        let effective_root = resolve_root(root)?;
 
         let fixture_root = match fixture_dir {
             Some(ref d) => {
-                let p = std::path::Path::new(d);
+                let p = Path::new(d);
                 if p.is_absolute() {
                     p.to_path_buf()
                 } else {
@@ -1166,9 +1476,8 @@ impl FactsService {
             ));
         }
 
-        let cases =
-            normalize_facts::extraction_fixtures::discover_cases(&fixture_root, lang.as_deref())
-                .map_err(|e| format!("Failed to discover fixtures: {e}"))?;
+        let cases = crate::extraction_fixtures::discover_cases(&fixture_root, lang.as_deref())
+            .map_err(|e| format!("Failed to discover fixtures: {e}"))?;
 
         if cases.is_empty() {
             return Err(format!(
@@ -1181,7 +1490,7 @@ impl FactsService {
         let case_results: Vec<ExtractionFixtureCaseResult> = cases
             .iter()
             .map(|case| {
-                let r = normalize_facts::extraction_fixtures::run_case(case, update);
+                let r = crate::extraction_fixtures::run_case(case, update);
                 ExtractionFixtureCaseResult {
                     case: r.case,
                     passed: r.passed,
@@ -1208,123 +1517,76 @@ impl FactsService {
             Ok(report)
         }
     }
-}
 
-/// Report returned by `normalize structure test-fixtures`.
-#[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct ExtractionFixtureTestReport {
-    pub fixture_dir: String,
-    pub cases: Vec<ExtractionFixtureCaseResult>,
-    pub passed: usize,
-    pub failed: usize,
-    pub updated: bool,
-}
-
-impl crate::output::OutputFormatter for ExtractionFixtureTestReport {
-    fn format_text(&self) -> String {
-        use std::fmt::Write as _;
-        let mut out = String::new();
-        for case in &self.cases {
-            if case.passed {
-                let _ = writeln!(out, "PASS  {}", case.case);
-            } else {
-                let _ = writeln!(out, "FAIL  {}", case.case);
-                for line in &case.diff {
-                    let _ = writeln!(out, "      {line}");
-                }
-            }
-        }
-        if self.updated {
-            let _ = write!(out, "\nUpdated {} fixture case(s).", self.cases.len());
-        } else {
-            let _ = write!(out, "\n{} passed, {} failed", self.passed, self.failed);
-        }
-        out
+    /// Compute live-in and live-out variable sets for each basic block in a function.
+    ///
+    /// Uses the CFG data stored in the index (populated by `normalize structure rebuild`)
+    /// to run standard backward-dataflow liveness analysis. Requires the facts index.
+    ///
+    /// Also known as: variable liveness, live variable analysis, dead variable detection.
+    #[cli(display_with = "display_output")]
+    pub async fn liveness(
+        &self,
+        #[param(positional, help = "Source file path")] file: String,
+        #[param(short = 'f', help = "Function name to analyse (required)")] function: String,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+    ) -> Result<LivenessReport, String> {
+        let root_path = resolve_root(root)?;
+        let idx = ensure_ready(&root_path).await?;
+        let rel_file = rel_to_root(&root_path, &file);
+        analyze_liveness(&idx, &rel_file, &function).await
     }
-}
 
-/// Result for a single extraction fixture case.
-#[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct ExtractionFixtureCaseResult {
-    pub case: String,
-    pub passed: bool,
-    pub diff: Vec<String>,
-}
-
-/// Report for stats command (either regular stats or storage report).
-#[derive(serde::Serialize, schemars::JsonSchema)]
-#[serde(tag = "kind")]
-pub enum FactsStatsReport {
-    Stats(FactsStats),
-    Storage(StorageReport),
-}
-
-impl OutputFormatter for FactsStatsReport {
-    fn format_text(&self) -> String {
-        match self {
-            Self::Stats(s) => s.format_text(),
-            Self::Storage(s) => s.format_text(),
-        }
+    /// Show all side-effecting constructs (await, defer, yield, resource acquire/release,
+    /// channel send/receive) for functions in a source file.
+    ///
+    /// Uses the CFG data stored in the index (populated by `normalize structure rebuild`)
+    /// to report suspension points, deferred calls, generator yields, and resource operations.
+    /// Requires the facts index.
+    #[cli(display_with = "display_output")]
+    pub async fn effects(
+        &self,
+        #[param(positional, help = "Source file path")] file: String,
+        #[param(
+            short = 'f',
+            help = "Function name to analyse (defaults to all functions)"
+        )]
+        function: Option<String>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+    ) -> Result<EffectsReport, String> {
+        let root_path = resolve_root(root)?;
+        let idx = ensure_ready(&root_path).await?;
+        let rel_file = rel_to_root(&root_path, &file);
+        analyze_effects(&idx, &rel_file, function.as_deref()).await
     }
-}
 
-/// Report for a raw SQL query against the structural index.
-#[derive(serde::Serialize, schemars::JsonSchema)]
-pub struct QueryReport {
-    pub rows: Vec<serde_json::Map<String, serde_json::Value>>,
-}
-
-impl OutputFormatter for QueryReport {
-    fn format_text(&self) -> String {
-        use std::fmt::Write as _;
-        if self.rows.is_empty() {
-            return "(no rows)".to_string();
-        }
-        let mut out = String::new();
-        // Collect column names from the first row
-        let cols: Vec<&str> = self.rows[0].keys().map(|k| k.as_str()).collect();
-        // Compute column widths
-        let mut widths: Vec<usize> = cols.iter().map(|c| c.len()).collect();
-        for row in &self.rows {
-            for (i, col) in cols.iter().enumerate() {
-                let val = row.get(*col).map(value_to_str).unwrap_or_default();
-                if val.len() > widths[i] {
-                    widths[i] = val.len();
-                }
-            }
-        }
-        // Header
-        let header: Vec<String> = cols
-            .iter()
-            .zip(&widths)
-            .map(|(c, w)| format!("{:width$}", c, width = w))
-            .collect();
-        let _ = writeln!(out, "{}", header.join("  "));
-        let sep: Vec<String> = widths.iter().map(|w| "-".repeat(*w)).collect();
-        let _ = writeln!(out, "{}", sep.join("  "));
-        // Rows
-        for row in &self.rows {
-            let cells: Vec<String> = cols
-                .iter()
-                .zip(&widths)
-                .map(|(col, w)| {
-                    let val = row.get(*col).map(value_to_str).unwrap_or_default();
-                    format!("{:width$}", val, width = w)
-                })
-                .collect();
-            let _ = writeln!(out, "{}", cells.join("  "));
-        }
-        let _ = write!(out, "\n{} row(s)", self.rows.len());
-        out
-    }
-}
-
-fn value_to_str(v: &serde_json::Value) -> String {
-    match v {
-        serde_json::Value::Null => "NULL".to_string(),
-        serde_json::Value::Bool(b) => b.to_string(),
-        serde_json::Value::Number(n) => n.to_string(),
-        serde_json::Value::String(s) => s.clone(),
-        other => other.to_string(),
+    /// Show type-refined exception flow for functions in a source file.
+    ///
+    /// Uses the CFG data stored in the index (populated by `normalize structure rebuild`)
+    /// to report throw sites, the catch clauses they route to (by exception type), and any
+    /// unhandled throws that escape the function. Requires the facts index.
+    ///
+    /// Also known as: exception analysis, throw-catch mapping, unhandled exception detection.
+    #[cli(display_with = "display_output")]
+    pub async fn exceptions(
+        &self,
+        #[param(positional, help = "Source file path")] file: String,
+        #[param(
+            short = 'f',
+            help = "Function name to analyse (defaults to all functions)"
+        )]
+        function: Option<String>,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+    ) -> Result<ExceptionsReport, String> {
+        let root_path = resolve_root(root)?;
+        let idx = ensure_ready(&root_path).await?;
+        let rel_file = rel_to_root(&root_path, &file);
+        analyze_exceptions(&idx, &rel_file, function.as_deref()).await
     }
 }

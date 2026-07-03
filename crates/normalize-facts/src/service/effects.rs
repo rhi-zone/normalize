@@ -4,8 +4,8 @@
 //! suspension points, deferred calls, generator yields, and resource
 //! acquisitions/releases within each function.
 
-use crate::output::OutputFormatter;
-use normalize_facts::FileIndex;
+use crate::FileIndex;
+use normalize_output::OutputFormatter;
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------

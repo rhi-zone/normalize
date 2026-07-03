@@ -4,8 +4,8 @@
 //! per-function summary of thrown exceptions, their catch clauses, and any
 //! unhandled throws that escape the function.
 
-use crate::output::OutputFormatter;
-use normalize_facts::FileIndex;
+use crate::FileIndex;
+use normalize_output::OutputFormatter;
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------

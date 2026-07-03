@@ -5470,6 +5470,7 @@ dependencies = [
  "libsql",
  "normalize-cfg",
  "normalize-facts-core",
+ "normalize-filter",
  "normalize-languages",
  "normalize-local-deps",
  "normalize-manifest",

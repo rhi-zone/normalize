@@ -1,6 +1,5 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-assertion_line: 82
 expression: "snapshot_help(&[\"find-references\"])"
 ---
 
