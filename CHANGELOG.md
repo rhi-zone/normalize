@@ -8,6 +8,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **New top-level `similarity` verb (CLI taxonomy inversion B4).** The code-similarity
+  command family moved out of the `rank` grab-bag into a dedicated `similarity` verb owned
+  by `normalize-code-similarity`: `normalize similarity` (duplicate/near-duplicate code —
+  functions, blocks, and `--mode clusters`; was `rank duplicates`),
+  `normalize similarity duplicate-types` (was `rank duplicate-types`), and
+  `normalize similarity fragments` (repeated AST fragments; was `rank fragments`). The old
+  `rank duplicates` / `rank duplicate-types` / `rank fragments` paths still work as
+  **hidden transitional aliases** for one release; migrate to the `similarity` verb.
+  `normalize-code-similarity` gained a `cli` feature gating the report structs,
+  `OutputFormatter` impls, the filesystem-walking compute passes, and the new
+  `SimilarityService` (library consumers of the pure MinHash/LSH/AST-hashing algorithms
+  build with `default-features = false`). These commands walk the filesystem directly — no
+  facts index required.
+
 - **New top-level `architecture` verb (CLI taxonomy inversion B3).** The architecture
   command family moved out of the `analyze`/`rank` grab-bags into a dedicated
   `architecture` verb owned by `normalize-architecture`: `normalize architecture`

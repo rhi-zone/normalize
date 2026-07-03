@@ -69,6 +69,7 @@ pub struct NormalizeService {
     graph: normalize_graph::GraphService,
     package: package::PackageService,
     rank: rank::RankService,
+    similarity: normalize_code_similarity::SimilarityService,
     budget: normalize_budget::service::BudgetService,
     cfg: normalize_cfg::service::CfgService,
     kg: normalize_knowledge_graph::service::KgCliService,
@@ -129,6 +130,7 @@ impl NormalizeService {
             graph: normalize_graph::GraphService::new(&pretty),
             package: package::PackageService::new(),
             rank: rank::RankService::new(&pretty),
+            similarity: normalize_code_similarity::SimilarityService::new(&pretty),
             budget: normalize_budget::service::BudgetService::new(),
             cfg: normalize_cfg::service::CfgService::new(),
             kg: normalize_knowledge_graph::service::KgCliService::new(),
@@ -1149,6 +1151,19 @@ impl NormalizeService {
     #[server(group = "analysis")]
     pub fn graph(&self) -> &normalize_graph::GraphService {
         &self.graph
+    }
+
+    /// Detect duplicate and near-duplicate code: clones, duplicate types, and repeated AST fragments.
+    ///
+    /// Examples:
+    ///   normalize similarity                       # exact duplicate functions
+    ///   normalize similarity --mode similar        # fuzzy near-duplicates (MinHash)
+    ///   normalize similarity --mode clusters       # connected-component clusters
+    ///   normalize similarity duplicate-types       # duplicate struct/enum/class definitions
+    ///   normalize similarity fragments             # repeated AST sub-patterns
+    #[server(group = "analysis")]
+    pub fn similarity(&self) -> &normalize_code_similarity::SimilarityService {
+        &self.similarity
     }
 
     /// Build and render the control flow graph for a function. Use to visualize execution paths, branches, and loops.

@@ -1,0 +1,50 @@
+---
+source: crates/normalize/tests/cli_snapshots.rs
+expression: "snapshot_help(&[\"similarity\"])"
+---
+Detect duplicate and near-duplicate code: clones, duplicate types, and repeated AST fragments.
+
+Usage: normalize similarity [OPTIONS] [COMMAND]
+
+Commands:
+  duplicates       Detect duplicate or similar code blocks and functions across the codebase.
+  duplicate-types  Detect duplicate type definitions (structs, enums, classes) across the codebase.
+  fragments        Find repeated AST fragments (sub-expressions, statement patterns) across the codebase.
+  help             Print this message or the help of the given subcommand(s)
+
+Options:
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
+      --jsonl                      Output one JSON object per line (for arrays)
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --manual                     Emit the reference manual for the command subtree rooted here and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+      --scope <scope>              Scope: functions (default) or blocks [possible values: functions, blocks]
+      --mode <mode>                Detection mode: exact (default), similar (fuzzy), or clusters [possible values: exact, similar, clusters]
+      --elide-identifiers          Elide identifier names when comparing
+      --elide-literals             Elide literal values when comparing (default: true for blocks scope)
+      --no-elide-literals          Keep literal values distinct when comparing (blocks scope: opt out of default elision)
+      --show-source                Show source code for matches
+      --min-lines <min-lines>      Minimum lines to be considered
+      --include-trait-impls        Include groups where all items share the same name
+  -r, --root <root>                Root directory (defaults to current directory)
+      --exclude <exclude>          Exclude paths matching pattern
+      --only <only>                Include only paths matching pattern
+      --similarity <similarity>    Minimum similarity threshold (0.0-1.0, similar/clusters mode)
+      --skeleton                   Match on control-flow structure (similar/clusters mode)
+      --repos-dir <repos-dir>      Scan across all git repos under DIR (functions scope only)
+      --repos-depth <repos-depth>  Max depth to search for repos (default: 1)
+      --skip-functions             Skip function/method nodes (blocks scope only)
+  -l, --limit <limit>              Maximum number of results to show (0=no limit, clusters mode)
+  -h, --help                       Print help
+  -V, --version                    Print version
+
+Examples:
+normalize similarity                       # exact duplicate functions
+normalize similarity --mode similar        # fuzzy near-duplicates (MinHash)
+normalize similarity --mode clusters       # connected-component clusters
+normalize similarity duplicate-types       # duplicate struct/enum/class definitions
+normalize similarity fragments             # repeated AST sub-patterns

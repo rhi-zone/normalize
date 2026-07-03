@@ -80,8 +80,8 @@ normalize rank complexity            # Cyclomatic complexity report
 normalize rank length                # Function length analysis
 normalize analyze security           # Security vulnerability scan
 normalize rank hotspots              # Git history analysis (churn + complexity)
-normalize rank duplicates            # Detect code clones
-normalize rank duplicate-types       # Detect duplicate type definitions
+normalize similarity                 # Detect code clones (was rank duplicates)
+normalize similarity duplicate-types # Detect duplicate type definitions
 normalize graph                      # Dependency graph analysis (cycles, blast radius)
 normalize analyze docs               # Documentation coverage
 ```

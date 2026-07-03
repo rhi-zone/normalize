@@ -58,7 +58,7 @@ normalize architecture depth-map          # dependency depth + ripple risk
 # Ranked lists are now under normalize rank:
 normalize rank complexity                 # cyclomatic complexity per function
 normalize rank hotspots                   # churn × complexity hotspots
-normalize rank duplicates                 # code duplicates
+normalize similarity                      # code duplicates (was rank duplicates)
 normalize rank coupling                   # temporal coupling
 normalize rank length                     # longest functions
 normalize rank test-gaps                  # untested public functions

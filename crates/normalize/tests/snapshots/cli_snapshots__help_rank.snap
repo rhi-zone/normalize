@@ -25,9 +25,6 @@ Code quality:
   length           Find the longest functions in the codebase, ranked by line count.
   uniqueness       Rank modules by code uniqueness: fraction of functions with no structural near-twin.
   call-complexity  Rank functions by effective complexity: cyclomatic complexity summed over the full call graph.
-  duplicates       Detect duplicate or similar code blocks and functions across the codebase.
-  duplicate-types  Detect duplicate type definitions (structs, enums, classes) across the codebase.
-  fragments        Find repeated AST fragments (sub-expressions, statement patterns) across the codebase.
 
 Module structure:
   size             Show hierarchical lines-of-code breakdown (ncdu-style tree view).

@@ -11,13 +11,7 @@ use crate::commands::analyze::ceremony::CeremonyReport;
 use crate::commands::analyze::contributors::ContributorsReport;
 use crate::commands::analyze::coupling::CouplingReport;
 use crate::commands::analyze::density::DensityReport;
-use crate::commands::analyze::duplicates::{
-    DuplicateBlocksConfig, DuplicateFunctionsConfig, DuplicateTypesReport, SimilarBlocksConfig,
-    SimilarFunctionsConfig,
-};
-use crate::commands::analyze::duplicates_views::{DuplicateMode, DuplicateScope, DuplicatesReport};
 use crate::commands::analyze::files::FileLengthReport;
-use crate::commands::analyze::fragments::{FragmentScope, FragmentsReport};
 use crate::commands::analyze::hotspots::HotspotsReport;
 use crate::commands::analyze::imports::ImportCentralityReport;
 use crate::commands::analyze::module_health::ModuleHealthReport;
@@ -28,6 +22,11 @@ use crate::commands::analyze::test_ratio::TestRatioReport;
 use crate::commands::analyze::uniqueness::UniquenessReport;
 use crate::output::OutputFormatter;
 use normalize_architecture::{DepthMapReport, LayeringReport};
+use normalize_code_similarity::{
+    DuplicateBlocksConfig, DuplicateFunctionsConfig, DuplicateMode, DuplicateScope,
+    DuplicateTypesReport, DuplicatesReport, FragmentScope, FragmentsReport, SimilarBlocksConfig,
+    SimilarFunctionsConfig,
+};
 use server_less::cli;
 use std::cell::Cell;
 use std::path::PathBuf;
@@ -1315,8 +1314,11 @@ impl RankService {
     /// Groups where all items share the same name (likely trait implementations), parallel
     /// implementations across sibling directories, and same-body-pattern clusters are
     /// suppressed by default. Use `--include-trait-impls` to include them in output.
+    ///
+    /// Transitional shim: moved to `similarity` (owned by `normalize-code-similarity`).
+    /// Hidden from help; kept for one release.
     #[server(group = "code")]
-    #[cli(display_with = "display_duplicates")]
+    #[cli(hidden, display_with = "display_duplicates")]
     #[allow(clippy::too_many_arguments)]
     pub fn duplicates(
         &self,
@@ -1380,36 +1382,32 @@ impl RankService {
                 } else {
                     vec![root_path.clone()]
                 };
-                Ok(
-                    crate::commands::analyze::duplicates::build_duplicate_functions_report(
-                        DuplicateFunctionsConfig {
-                            roots: &roots,
-                            elide_identifiers,
-                            elide_literals,
-                            show_source,
-                            min_lines: min_lines.or(config_min_lines).unwrap_or(1),
-                            include_trait_impls,
-                            filter: filter.as_ref(),
-                            config_allow: config.analyze.allows_for("duplicate-functions"),
-                        },
-                    ),
-                )
-            }
-            (DuplicateMode::Exact, DuplicateScope::Blocks) => Ok(
-                crate::commands::analyze::duplicates::build_duplicate_blocks_report(
-                    DuplicateBlocksConfig {
-                        root: &root_path,
-                        min_lines: min_lines.or(config_min_lines).unwrap_or(5),
+                Ok(normalize_code_similarity::build_duplicate_functions_report(
+                    DuplicateFunctionsConfig {
+                        roots: &roots,
                         elide_identifiers,
                         elide_literals,
-                        skip_functions,
                         show_source,
-                        allow: None,
-                        reason: None,
+                        min_lines: min_lines.or(config_min_lines).unwrap_or(1),
+                        include_trait_impls,
                         filter: filter.as_ref(),
-                        config_allow: config.analyze.allows_for("duplicate-blocks"),
+                        config_allow: config.analyze.allows_for("duplicate-functions"),
                     },
-                ),
+                ))
+            }
+            (DuplicateMode::Exact, DuplicateScope::Blocks) => Ok(
+                normalize_code_similarity::build_duplicate_blocks_report(DuplicateBlocksConfig {
+                    root: &root_path,
+                    min_lines: min_lines.or(config_min_lines).unwrap_or(5),
+                    elide_identifiers,
+                    elide_literals,
+                    skip_functions,
+                    show_source,
+                    allow: None,
+                    reason: None,
+                    filter: filter.as_ref(),
+                    config_allow: config.analyze.allows_for("duplicate-blocks"),
+                }),
             ),
             (DuplicateMode::Similar, DuplicateScope::Functions) => {
                 let roots: Vec<PathBuf> = if let Some(repos_dir) = repos_dir {
@@ -1417,30 +1415,10 @@ impl RankService {
                 } else {
                     vec![root_path.clone()]
                 };
-                Ok(
-                    crate::commands::analyze::duplicates::build_similar_functions_report(
-                        SimilarFunctionsConfig {
-                            roots: &roots,
-                            min_lines: min_lines.or(config_min_lines).unwrap_or(10),
-                            similarity: similarity.unwrap_or(0.85),
-                            elide_identifiers,
-                            elide_literals,
-                            skeleton,
-                            show_source,
-                            include_trait_impls,
-                            allow: None,
-                            reason: None,
-                            filter: filter.as_ref(),
-                            config_allow: config.analyze.allows_for("similar-functions"),
-                        },
-                    ),
-                )
-            }
-            (DuplicateMode::Similar, DuplicateScope::Blocks) => Ok(
-                crate::commands::analyze::duplicates::build_similar_blocks_report(
-                    SimilarBlocksConfig {
-                        root: &root_path,
-                        min_lines: min_lines.or(config_min_lines).unwrap_or(15),
+                Ok(normalize_code_similarity::build_similar_functions_report(
+                    SimilarFunctionsConfig {
+                        roots: &roots,
+                        min_lines: min_lines.or(config_min_lines).unwrap_or(10),
                         similarity: similarity.unwrap_or(0.85),
                         elide_identifiers,
                         elide_literals,
@@ -1450,9 +1428,25 @@ impl RankService {
                         allow: None,
                         reason: None,
                         filter: filter.as_ref(),
-                        config_allow: config.analyze.allows_for("similar-blocks"),
+                        config_allow: config.analyze.allows_for("similar-functions"),
                     },
-                ),
+                ))
+            }
+            (DuplicateMode::Similar, DuplicateScope::Blocks) => Ok(
+                normalize_code_similarity::build_similar_blocks_report(SimilarBlocksConfig {
+                    root: &root_path,
+                    min_lines: min_lines.or(config_min_lines).unwrap_or(15),
+                    similarity: similarity.unwrap_or(0.85),
+                    elide_identifiers,
+                    elide_literals,
+                    skeleton,
+                    show_source,
+                    include_trait_impls,
+                    allow: None,
+                    reason: None,
+                    filter: filter.as_ref(),
+                    config_allow: config.analyze.allows_for("similar-blocks"),
+                }),
             ),
             (DuplicateMode::Clusters, _) => {
                 let roots: Vec<PathBuf> = if let Some(repos_dir) = repos_dir {
@@ -1460,18 +1454,16 @@ impl RankService {
                 } else {
                     vec![root_path.clone()]
                 };
-                Ok(
-                    crate::commands::analyze::clusters::build_clusters_report_multi(
-                        &roots,
-                        min_lines.or(config_min_lines).unwrap_or(10),
-                        similarity.unwrap_or(0.85),
-                        elide_identifiers,
-                        skeleton,
-                        include_trait_impls,
-                        limit.unwrap_or(20),
-                        filter.as_ref(),
-                    ),
-                )
+                Ok(normalize_code_similarity::build_clusters_report_multi(
+                    &roots,
+                    min_lines.or(config_min_lines).unwrap_or(10),
+                    similarity.unwrap_or(0.85),
+                    elide_identifiers,
+                    skeleton,
+                    include_trait_impls,
+                    limit.unwrap_or(20),
+                    filter.as_ref(),
+                ))
             }
         }
     }
@@ -1480,8 +1472,11 @@ impl RankService {
     ///
     /// Finds types with identical or near-identical field layouts that have been defined
     /// more than once. Returns a `DuplicateTypesReport` with grouped matches.
+    ///
+    /// Transitional shim: moved to `similarity duplicate-types` (owned by
+    /// `normalize-code-similarity`). Hidden from help; kept for one release.
     #[server(group = "code")]
-    #[cli(display_with = "display_dup_types")]
+    #[cli(hidden, display_with = "display_dup_types")]
     pub fn duplicate_types(
         &self,
         #[param(positional, help = "Target directory to scan")] target: Option<String>,
@@ -1496,14 +1491,12 @@ impl RankService {
             .map(PathBuf::from)
             .unwrap_or_else(|| root_path.clone());
         let config_allow = config.analyze.allows_for("duplicate-types");
-        Ok(
-            crate::commands::analyze::duplicates::build_duplicate_types_report(
-                &scan_root,
-                &root_path,
-                min_overlap.unwrap_or(70),
-                &config_allow,
-            ),
-        )
+        Ok(normalize_code_similarity::build_duplicate_types_report(
+            &scan_root,
+            &root_path,
+            min_overlap.unwrap_or(70),
+            &config_allow,
+        ))
     }
 
     /// Find repeated AST fragments (sub-expressions, statement patterns) across the codebase.
@@ -1511,8 +1504,11 @@ impl RankService {
     /// Operates at a finer granularity than `duplicates`: finds repeated structural patterns
     /// within function bodies rather than entire functions. The `scope` parameter controls
     /// whether to search within functions or across blocks. Returns a `FragmentsReport`.
+    ///
+    /// Transitional shim: moved to `similarity fragments` (owned by
+    /// `normalize-code-similarity`). Hidden from help; kept for one release.
     #[server(group = "code")]
-    #[cli(display_with = "display_fragments")]
+    #[cli(hidden, display_with = "display_fragments")]
     #[allow(clippy::too_many_arguments)]
     pub fn fragments(
         &self,
@@ -1553,7 +1549,7 @@ impl RankService {
         let config = crate::config::NormalizeConfig::load(&root_path);
         let mut merged_exclude = config.analyze.excludes_for("fragments");
         merged_exclude.extend(exclude);
-        crate::commands::analyze::fragments::analyze_fragments(
+        normalize_code_similarity::analyze_fragments(
             &root_path,
             min_nodes.unwrap_or(10),
             scope_val,

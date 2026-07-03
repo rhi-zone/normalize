@@ -26,6 +26,7 @@ The essential daily-driver commands:
 Assessment, metrics, and quality gates:
 - `analyze` - Codebase analysis (45 subcommands)
 - `graph` - Dependency-graph analysis: cycles/blast-radius/import-paths (`graph`, `graph dependents`, `graph import-path`; owned by `normalize-graph`, B2). Was `view graph`/`dependents`/`import-path` — old paths kept as hidden aliases for one release.
+- `similarity` - Duplicate/near-duplicate code detection: clones, duplicate types, AST fragments (`similarity` incl. `--mode clusters`, `similarity duplicate-types`, `similarity fragments`; owned by `normalize-code-similarity`, B4). Index-free (walks the filesystem). Was `rank duplicates`/`duplicate-types`/`fragments` — old paths kept as hidden aliases for one release.
 - `rank` - Rank files/functions by metrics
 - `trend` - Track metrics over git history
 - `ci` - Run all quality checks in one pass

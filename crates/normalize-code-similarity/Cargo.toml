@@ -6,8 +6,47 @@ license.workspace = true
 repository.workspace = true
 description = "Code similarity algorithms: MinHash LSH, normalized AST hashing, structural tokenization"
 
+[features]
+default = []
+# CLI surface: the `similarity` verb (duplicates/duplicate-types/fragments) —
+# report structs, `OutputFormatter` impls, the filesystem-walking compute passes,
+# and the server-less `SimilarityService`. Library consumers who only want the
+# pure MinHash/LSH/AST-hashing algorithms build with `default-features = false`.
+cli = [
+    "dep:server-less",
+    "dep:normalize-facts",
+    "dep:normalize-output",
+    "dep:normalize-rank",
+    "dep:normalize-filter",
+    "dep:serde",
+    "dep:schemars",
+    "dep:indicatif",
+    "dep:nu-ansi-term",
+    "dep:ignore",
+    "dep:toml",
+    "dep:dirs",
+    "dep:regex",
+    "dep:glob",
+]
+
 [dependencies]
 tree-sitter = "0.26"
 streaming-iterator = "0.1"
 rayon.workspace = true
 normalize-languages = { path = "../normalize-languages", version = "0.3.2" }
+
+# cli-only dependencies
+normalize-facts = { path = "../normalize-facts", version = "0.3.2", optional = true }
+normalize-output = { path = "../normalize-output", version = "0.3.2", optional = true }
+normalize-rank = { path = "../normalize-rank", version = "0.3.2", optional = true }
+normalize-filter = { path = "../normalize-filter", version = "0.3.2", optional = true }
+serde = { workspace = true, optional = true }
+schemars = { version = "1", optional = true }
+indicatif = { workspace = true, optional = true }
+nu-ansi-term = { version = "0.50", optional = true }
+ignore = { workspace = true, optional = true }
+toml = { workspace = true, optional = true }
+dirs = { workspace = true, optional = true }
+regex = { version = "1", optional = true }
+glob = { version = "0.3.3", optional = true }
+server-less = { workspace = true, optional = true }

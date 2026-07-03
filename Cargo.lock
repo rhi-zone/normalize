@@ -5364,9 +5364,23 @@ dependencies = [
 name = "normalize-code-similarity"
 version = "0.3.2"
 dependencies = [
+ "dirs 5.0.1",
+ "glob",
+ "ignore",
+ "indicatif 0.17.11",
+ "normalize-facts",
+ "normalize-filter",
  "normalize-languages",
+ "normalize-output",
+ "normalize-rank",
+ "nu-ansi-term",
  "rayon",
+ "regex",
+ "schemars",
+ "serde",
+ "server-less",
  "streaming-iterator",
+ "toml",
  "tree-sitter",
 ]
 

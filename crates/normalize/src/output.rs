@@ -91,12 +91,9 @@ mod tests {
         use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
         use crate::commands::analyze::density::DensityReport;
         use crate::commands::analyze::docs::DocCoverageReport;
-        use crate::commands::analyze::duplicates::DuplicateTypesReport;
-        use crate::commands::analyze::duplicates_views::DuplicatesReport;
         use crate::commands::analyze::effects::EffectsReport;
         use crate::commands::analyze::exceptions::ExceptionsReport;
         use crate::commands::analyze::files::FileLengthReport;
-        use crate::commands::analyze::fragments::FragmentsReport;
         use crate::commands::analyze::hotspots::HotspotsReport;
         use crate::commands::analyze::imports::ImportCentralityReport;
         use crate::commands::analyze::liveness::LivenessReport;
@@ -124,6 +121,7 @@ mod tests {
         use crate::commands::view::report::{ViewHistoryReport, ViewListReport, ViewReport};
         use crate::text_search::GrepReport;
         use normalize_architecture::{ArchitectureReport, DepthMapReport, LayeringReport};
+        use normalize_code_similarity::{DuplicateTypesReport, DuplicatesReport, FragmentsReport};
         use normalize_graph::{DependentsReport, GraphReport, ImportPathReport};
         use normalize_output::diagnostics::DiagnosticsReport;
         use normalize_session_analysis::SessionAnalysisReport;

@@ -4,10 +4,10 @@
 //! form a "family" — functions that are mutually similar, possibly across many files.
 //! Ranked by total line count (largest families first).
 
-use crate::commands::analyze::duplicates::find_similar_function_pairs;
-use crate::commands::analyze::duplicates_views::DuplicatesReport;
-use crate::filter::Filter;
-use normalize_code_similarity::UnionFind;
+use crate::UnionFind;
+use crate::duplicates::find_similar_function_pairs;
+use crate::duplicates_views::DuplicatesReport;
+use normalize_filter::Filter;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -64,7 +64,7 @@ pub fn build_clusters_report(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn build_clusters_report_multi(
+pub fn build_clusters_report_multi(
     roots: &[PathBuf],
     min_lines: usize,
     similarity: f64,
@@ -74,9 +74,7 @@ pub(crate) fn build_clusters_report_multi(
     limit: usize,
     filter: Option<&Filter>,
 ) -> DuplicatesReport {
-    use crate::commands::analyze::duplicates_views::{
-        CodeLocation, DuplicateGroup, DuplicateMode, DuplicateScope,
-    };
+    use crate::duplicates_views::{CodeLocation, DuplicateGroup, DuplicateMode, DuplicateScope};
 
     let result = find_similar_function_pairs(
         roots,

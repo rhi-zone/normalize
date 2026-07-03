@@ -12,12 +12,10 @@ use std::path::Path;
 use crate::commands::analyze::ceremony::analyze_ceremony;
 use crate::commands::analyze::complexity::analyze_codebase_complexity;
 use crate::commands::analyze::density::analyze_density;
-use crate::commands::analyze::duplicates::{
-    DuplicateFunctionsConfig, build_duplicate_functions_report,
-};
 use crate::commands::analyze::test_ratio::analyze_test_ratio;
 use crate::commands::analyze::uniqueness::analyze_uniqueness;
 use crate::index::FileIndex;
+use normalize_code_similarity::{DuplicateFunctionsConfig, build_duplicate_functions_report};
 
 /// Large file info for reporting
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]

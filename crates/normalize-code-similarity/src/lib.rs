@@ -1,9 +1,139 @@
 //! Code similarity algorithms: MinHash + LSH, normalized AST hashing, and structural tokenization.
 //!
-//! Shared between `normalize analyze duplicates` and `normalize analyze fragments`.
+//! Pure algorithms (MinHash/LSH, AST hashing, union-find) plus — behind the `cli`
+//! feature — the `similarity` CLI verb: the duplicate/fragment/duplicate-type
+//! report structs, their `OutputFormatter` impls, the compute passes that walk the
+//! filesystem, and the server-less `SimilarityService`. Library consumers who only
+//! want the pure algorithms build with `default-features = false`.
 
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
+#[cfg(feature = "cli")]
+use std::path::Path;
+
+// The `similarity` CLI verb. Gated behind `cli` so library consumers of the pure
+// algorithms don't pull in the facts/output/filter/rank stack.
+#[cfg(feature = "cli")]
+pub mod clusters;
+#[cfg(feature = "cli")]
+pub mod duplicates;
+#[cfg(feature = "cli")]
+pub mod duplicates_views;
+#[cfg(feature = "cli")]
+pub mod fragments;
+#[cfg(feature = "cli")]
+pub mod service;
+
+#[cfg(feature = "cli")]
+pub use clusters::build_clusters_report_multi;
+#[cfg(feature = "cli")]
+pub use duplicates::{
+    DuplicateBlocksConfig, DuplicateFunctionsConfig, DuplicateTypesReport, SimilarBlocksConfig,
+    SimilarFunctionPair, SimilarFunctionPairsResult, SimilarFunctionsConfig,
+    build_duplicate_blocks_report, build_duplicate_functions_report, build_duplicate_types_report,
+    build_similar_blocks_report, build_similar_functions_report, find_similar_function_pairs,
+};
+#[cfg(feature = "cli")]
+pub use duplicates_views::{DuplicateMode, DuplicateScope, DuplicatesReport};
+#[cfg(feature = "cli")]
+pub use fragments::{FragmentScope, FragmentsReport, analyze_fragments};
+#[cfg(feature = "cli")]
+pub use service::SimilarityService;
+
+/// Check if a path is a source file worth analyzing for similarity.
+///
+/// True when the path maps to a supported language and is not a known
+/// generated/lock file. Moved here (from the main crate's `commands/analyze`)
+/// so the filesystem-walking compute passes stay self-contained.
+#[cfg(feature = "cli")]
+pub fn is_source_file(path: &Path) -> bool {
+    !is_generated_file(path) && normalize_languages::support_for_path(path).is_some()
+}
+
+/// Known generated/lock files that are not useful to analyze for code quality.
+#[cfg(feature = "cli")]
+fn is_generated_file(path: &Path) -> bool {
+    let file_name = match path.file_name().and_then(|n| n.to_str()) {
+        Some(n) => n,
+        None => return false,
+    };
+    matches!(
+        file_name,
+        "package-lock.json"
+            | "yarn.lock"
+            | "pnpm-lock.yaml"
+            | "bun.lockb"
+            | "Cargo.lock"
+            | "composer.lock"
+            | "Gemfile.lock"
+            | "poetry.lock"
+            | "Pipfile.lock"
+            | "packages.lock.json"
+    ) || file_name.ends_with(".lock")
+}
+
+/// Detect programming languages present under `root` (bounded-depth walk).
+///
+/// Used to resolve language-scoped filter aliases (`@rust`, `@python`, …).
+#[cfg(feature = "cli")]
+pub fn detect_project_languages(root: &Path) -> Vec<String> {
+    let mut languages = HashSet::new();
+    let walker = ignore::WalkBuilder::new(root)
+        .max_depth(Some(5))
+        .hidden(false)
+        .git_ignore(true)
+        .build();
+    for entry in walker.flatten() {
+        if let Some(lang) = normalize_languages::support_for_path(entry.path()) {
+            languages.insert(lang.name().to_string());
+        }
+    }
+    let mut result: Vec<_> = languages.into_iter().collect();
+    result.sort();
+    result
+}
+
+/// Build a `Filter` from `--exclude` / `--only` patterns, printing any warnings.
+///
+/// Returns `None` when both slices are empty (no filtering needed). Aliases are
+/// resolved against the project's `[aliases]` config, loaded standalone from
+/// `config.toml` (global then project).
+#[cfg(feature = "cli")]
+pub fn build_filter(
+    root: &Path,
+    exclude: &[String],
+    only: &[String],
+) -> Option<normalize_filter::Filter> {
+    let aliases = service::load_aliases(root);
+    build_filter_with_aliases(root, &aliases, exclude, only)
+}
+
+/// Like [`build_filter`] but with an explicit `[aliases]` config slice.
+#[cfg(feature = "cli")]
+pub fn build_filter_with_aliases(
+    root: &Path,
+    aliases: &normalize_filter::AliasConfig,
+    exclude: &[String],
+    only: &[String],
+) -> Option<normalize_filter::Filter> {
+    if exclude.is_empty() && only.is_empty() {
+        return None;
+    }
+    let languages = detect_project_languages(root);
+    let lang_refs: Vec<&str> = languages.iter().map(|s| s.as_str()).collect();
+    match normalize_filter::Filter::new(exclude, only, aliases, &lang_refs) {
+        Ok(f) => {
+            for warning in f.warnings() {
+                eprintln!("warning: {}", warning);
+            }
+            Some(f)
+        }
+        Err(e) => {
+            eprintln!("error: {}", e);
+            None
+        }
+    }
+}
 
 // ── MinHash + LSH constants ───────────────────────────────────────────────────
 

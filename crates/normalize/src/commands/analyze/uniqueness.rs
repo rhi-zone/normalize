@@ -2,9 +2,9 @@ use serde::Serialize;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 
-use crate::commands::analyze::duplicates::find_similar_function_pairs;
 use crate::commands::analyze::test_ratio::{discover_module_dirs, module_key};
 use crate::output::OutputFormatter;
+use normalize_code_similarity::find_similar_function_pairs;
 use normalize_rank::ranked::{
     Column, DiffableRankEntry, RankEntry, format_delta, format_ranked_table,
 };

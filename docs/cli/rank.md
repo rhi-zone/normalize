@@ -13,10 +13,12 @@ commands were previously under `normalize analyze`.
 | `complexity` | Cyclomatic complexity per function |
 | `call-complexity` | Effective (reachable) cyclomatic complexity via call-graph BFS |
 | `ceremony` | Fraction of callables that are trait/interface boilerplate |
-| `duplicates` | Detect duplicate/similar code (`--scope functions\|blocks`, `--mode exact\|similar\|clusters`) |
-| `duplicate-types` | Detect similar type definitions |
 | `uniqueness` | Fraction of functions with no structural near-twin per module |
-| `fragments` | Find repeated AST fragments |
+
+`duplicates`, `duplicate-types`, and `fragments` moved to the top-level
+[`normalize similarity`](../cli-design.md) verb (`similarity` incl. `--mode clusters`,
+`similarity duplicate-types`, `similarity fragments`; owned by `normalize-code-similarity`,
+index-free). Old `rank` paths remain as hidden aliases for one release.
 
 ### Module structure
 | Subcommand | Description |
@@ -65,11 +67,13 @@ normalize rank coupling
 # Information density
 normalize rank density
 
-# Find code duplicates
-normalize rank duplicates                                # exact function duplicates
-normalize rank duplicates --mode similar                 # similar functions (MinHash)
-normalize rank duplicates --scope blocks                 # exact block duplicates
-normalize rank duplicates --scope blocks --mode similar  # similar blocks (MinHash)
+# Find code duplicates moved to normalize similarity:
+normalize similarity                                # exact function duplicates
+normalize similarity --mode similar                 # similar functions (MinHash)
+normalize similarity --scope blocks                 # exact block duplicates
+normalize similarity --mode clusters                # near-duplicate clusters
+normalize similarity duplicate-types                # duplicate type definitions
+normalize similarity fragments                      # repeated AST fragments
 
 # Module structure
 normalize rank imports            # most-imported modules (requires index)
@@ -109,18 +113,8 @@ normalize rank module-health
 **complexity:**
 - `-t, --threshold <N>` - Only show functions above threshold
 
-**duplicates:**
-- `--scope functions|blocks` - Detection scope (default: functions)
-- `--mode exact|similar|clusters` - Detection mode (default: exact)
-- `--elide-identifiers` - Ignore identifier names when comparing
-- `--elide-literals` - Ignore literal values when comparing
-- `--show-source` - Show source code for matches
-- `--min-lines <N>` - Minimum lines to consider
-- `--include-trait-impls` - Include same-name groups (likely trait impls)
-- `--similarity <F>` - MinHash similarity threshold (similar mode only)
-- `--skeleton` - Match on control-flow structure (similar mode only)
-- `--repos-dir <DIR>` - Scan across repos under DIR (functions scope only)
-- `--skip-functions` - Skip function nodes (blocks scope only)
+(`duplicates` flags moved with the command to `normalize similarity` — run
+`normalize similarity --help`.)
 
 **hotspots / coupling / ownership:**
 - `--repos-dir <DIR>` - Run across all repos under DIR

@@ -7,13 +7,13 @@
 //! Exact mode (`similarity == 1.0`) groups by hash; fuzzy mode uses MinHash + LSH +
 //! union-find clustering.
 
-use crate::extract::Extractor;
-use crate::output::OutputFormatter;
-use normalize_code_similarity::{
+use crate::{
     MINHASH_N, UnionFind, compute_minhash, find_function_node, flatten_symbols, jaccard_estimate,
     lsh_candidate_pairs, serialize_subtree_tokens,
 };
+use normalize_facts::Extractor;
 use normalize_languages::{parsers, support_for_path};
+use normalize_output::OutputFormatter;
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -126,7 +126,7 @@ pub fn analyze_fragments(
     }
 
     let extractor = Extractor::new();
-    let filter = crate::commands::build_filter(root, exclude, only);
+    let filter = crate::build_filter(root, exclude, only);
 
     // Inline depth > 0 requires async index — scaffolded but not yet wired.
     if inline_depth > 0 {
@@ -142,7 +142,7 @@ pub fn analyze_fragments(
         .filter_map(|e| e.ok())
         .filter(|e| {
             let path = e.path();
-            path.is_file() && super::is_source_file(path)
+            path.is_file() && crate::is_source_file(path)
         })
         .filter(|e| {
             if let Some(ref f) = filter {

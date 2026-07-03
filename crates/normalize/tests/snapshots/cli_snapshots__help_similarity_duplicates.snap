@@ -1,10 +1,10 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-expression: "snapshot_help(&[\"rank\", \"duplicates\"])"
+expression: "snapshot_help(&[\"similarity\", \"duplicates\"])"
 ---
 Detect duplicate or similar code blocks and functions across the codebase.
 
-Usage: normalize rank duplicates [OPTIONS]
+Usage: normalize similarity duplicates [OPTIONS]
 
 Options:
       --pretty                     Human-friendly output with colors and formatting
@@ -45,3 +45,8 @@ matching; `clusters` groups near-duplicates into connected components. Returns a
 Groups where all items share the same name (likely trait implementations), parallel
 implementations across sibling directories, and same-body-pattern clusters are
 suppressed by default. Use `--include-trait-impls` to include them in output.
+
+Examples:
+normalize similarity                       # exact duplicate functions
+normalize similarity --mode similar        # fuzzy near-duplicates
+normalize similarity --mode clusters       # connected-component clusters

@@ -91,7 +91,7 @@ normalize-deps = { path = "../normalize-deps", version = "0.3.2" }
 normalize-filter = { path = "../normalize-filter", version = "0.3.2", features = ["config"] }
 normalize-scope = { path = "../normalize-scope", version = "0.3.2" }
 normalize-graph = { path = "../normalize-graph", version = "0.3.2", features = ["cli"] }
-normalize-code-similarity = { path = "../normalize-code-similarity", version = "0.3.2" }
+normalize-code-similarity = { path = "../normalize-code-similarity", version = "0.3.2", features = ["cli"] }
 normalize-tools = { path = "../normalize-tools", version = "0.3.2" }
 normalize-rank = { path = "../normalize-rank", version = "0.3.2" }
 normalize-index = { path = "../normalize-index", version = "0.3.2" }

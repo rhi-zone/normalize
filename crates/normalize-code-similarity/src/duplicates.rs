@@ -1,16 +1,16 @@
 //! Duplicate function and type detection.
 
-use super::duplicates_views::{DuplicateGroup, DuplicatesReport};
-use crate::extract::Extractor;
-use crate::filter::Filter;
-use crate::output::OutputFormatter;
-use crate::parsers;
-use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
-use normalize_code_similarity::{
+use crate::duplicates_views::{DuplicateGroup, DuplicatesReport};
+use crate::{
     MINHASH_N, SHINGLE_K, UnionFind, compute_function_hash, compute_minhash, find_function_node,
     flatten_symbols, jaccard_estimate, lsh_candidate_pairs, serialize_subtree_tokens,
 };
+use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
+use normalize_facts::Extractor;
+use normalize_filter::Filter;
+use normalize_languages::parsers;
 use normalize_languages::support_for_path;
+use normalize_output::OutputFormatter;
 use rayon::prelude::*;
 use serde::Serialize;
 
@@ -461,11 +461,11 @@ fn group_dir_pair_key(group: &DuplicateGroup) -> Option<(String, String)> {
 
 struct DirectorySuppressionResult {
     kept: Vec<DuplicateGroup>,
-    suppressed: Vec<crate::commands::analyze::duplicates_views::SuppressedDirectoryPair>,
+    suppressed: Vec<crate::duplicates_views::SuppressedDirectoryPair>,
 }
 
 fn suppress_parallel_directory_groups(groups: Vec<DuplicateGroup>) -> DirectorySuppressionResult {
-    use crate::commands::analyze::duplicates_views::SuppressedDirectoryPair;
+    use crate::duplicates_views::SuppressedDirectoryPair;
 
     // Count groups per ordered directory pair.
     let mut dir_pair_counts: HashMap<(String, String), usize> = HashMap::new();
@@ -520,7 +520,7 @@ fn suppress_parallel_directory_groups(groups: Vec<DuplicateGroup>) -> DirectoryS
 
 struct BodyPatternSuppressionResult {
     kept: Vec<SimilarFunctionPair>,
-    suppressed: Vec<crate::commands::analyze::duplicates_views::SuppressedBodyPatternGroup>,
+    suppressed: Vec<crate::duplicates_views::SuppressedBodyPatternGroup>,
 }
 
 /// Suppress pairs where the same body pattern appears across many files (different method names).
@@ -535,7 +535,7 @@ struct BodyPatternSuppressionResult {
 fn suppress_widespread_body_patterns(
     pairs: Vec<SimilarFunctionPair>,
 ) -> BodyPatternSuppressionResult {
-    use crate::commands::analyze::duplicates_views::SuppressedBodyPatternGroup;
+    use crate::duplicates_views::SuppressedBodyPatternGroup;
 
     if pairs.is_empty() {
         return BodyPatternSuppressionResult {
@@ -761,7 +761,7 @@ pub struct SimilarFunctionsConfig<'a> {
 
 /// Core pair detection: extract MinHash signatures and find similar function pairs via LSH.
 /// Result of similar-function detection including per-file function counts.
-pub(crate) struct SimilarFunctionPairsResult {
+pub struct SimilarFunctionPairsResult {
     pub files_scanned: usize,
     pub functions_analyzed: usize,
     pub pairs: Vec<SimilarFunctionPair>,
@@ -775,7 +775,7 @@ pub(crate) struct SimilarFunctionPairsResult {
 /// Returns similar function pairs plus per-file function counts. Pairs are sorted by
 /// similarity descending. Used by both `cmd_similar_functions` and the clustering analysis.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn find_similar_function_pairs(
+pub fn find_similar_function_pairs(
     roots: &[PathBuf],
     min_lines: usize,
     similarity: f64,
@@ -783,7 +783,7 @@ pub(crate) fn find_similar_function_pairs(
     elide_literals: bool,
     skeleton: bool,
     include_trait_impls: bool,
-    filter: Option<&crate::filter::Filter>,
+    filter: Option<&Filter>,
 ) -> SimilarFunctionPairsResult {
     let extractor = Extractor::new();
     let multi_repo = roots.len() > 1;
@@ -806,7 +806,7 @@ pub(crate) fn find_similar_function_pairs(
             .filter_map(|e| e.ok())
             .filter(|e| {
                 let path = e.path();
-                path.is_file() && super::is_source_file(path)
+                path.is_file() && crate::is_source_file(path)
             })
             .filter(|e| {
                 if let Some(f) = filter {
@@ -834,7 +834,7 @@ pub(crate) fn find_similar_function_pairs(
             .filter_map(|path| {
                 let content = std::fs::read_to_string(path).ok()?;
                 let support = support_for_path(path)?;
-                let tree = crate::parsers::parse_with_grammar(support.grammar_name(), &content)?;
+                let tree = parsers::parse_with_grammar(support.grammar_name(), &content)?;
                 let root_rel = path.strip_prefix(root).unwrap_or(path);
                 let rel_path = if multi_repo {
                     format!("{}/{}", repo_name, root_rel.display())
@@ -987,7 +987,7 @@ pub(crate) fn find_similar_function_pairs(
 
 /// Build duplicate functions report without printing (for service layer).
 pub fn build_duplicate_functions_report(cfg: DuplicateFunctionsConfig<'_>) -> DuplicatesReport {
-    use crate::commands::analyze::duplicates_views::{CodeLocation, DuplicateMode, DuplicateScope};
+    use crate::duplicates_views::{CodeLocation, DuplicateMode, DuplicateScope};
 
     let DuplicateFunctionsConfig {
         roots,
@@ -1022,7 +1022,7 @@ pub fn build_duplicate_functions_report(cfg: DuplicateFunctionsConfig<'_>) -> Du
             .filter_map(|e| e.ok())
             .filter(|e| {
                 let path = e.path();
-                path.is_file() && super::is_source_file(path)
+                path.is_file() && crate::is_source_file(path)
             })
             .filter(|e| {
                 if let Some(f) = filter {
@@ -1191,7 +1191,7 @@ pub fn build_duplicate_functions_report(cfg: DuplicateFunctionsConfig<'_>) -> Du
 
 /// Build duplicate blocks report without printing (for service layer).
 pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> DuplicatesReport {
-    use crate::commands::analyze::duplicates_views::{CodeLocation, DuplicateMode, DuplicateScope};
+    use crate::duplicates_views::{CodeLocation, DuplicateMode, DuplicateScope};
 
     let DuplicateBlocksConfig {
         root,
@@ -1221,7 +1221,7 @@ pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> Duplicat
         .filter_map(|e| e.ok())
         .filter(|e| {
             let path = e.path();
-            path.is_file() && super::is_source_file(path)
+            path.is_file() && crate::is_source_file(path)
         })
         .filter(|e| {
             if let Some(f) = filter {
@@ -1252,7 +1252,7 @@ pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> Duplicat
             }
         };
 
-        let tree = match crate::parsers::parse_with_grammar(support.grammar_name(), &content) {
+        let tree = match parsers::parse_with_grammar(support.grammar_name(), &content) {
             Some(t) => t,
             None => {
                 pb.inc(1);
@@ -1363,7 +1363,7 @@ pub fn build_duplicate_blocks_report(cfg: DuplicateBlocksConfig<'_>) -> Duplicat
 
 /// Build similar functions report without printing (for service layer).
 pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> DuplicatesReport {
-    use crate::commands::analyze::duplicates_views::{CodeLocation, DuplicateMode, DuplicateScope};
+    use crate::duplicates_views::{CodeLocation, DuplicateMode, DuplicateScope};
 
     let SimilarFunctionsConfig {
         roots,
@@ -1489,7 +1489,7 @@ pub fn build_similar_functions_report(cfg: SimilarFunctionsConfig<'_>) -> Duplic
 
 /// Build similar blocks report without printing (for service layer).
 pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> DuplicatesReport {
-    use crate::commands::analyze::duplicates_views::{CodeLocation, DuplicateMode, DuplicateScope};
+    use crate::duplicates_views::{CodeLocation, DuplicateMode, DuplicateScope};
 
     let SimilarBlocksConfig {
         root,
@@ -1520,7 +1520,7 @@ pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> DuplicatesRe
         .filter_map(|e| e.ok())
         .filter(|e| {
             let path = e.path();
-            path.is_file() && super::is_source_file(path)
+            path.is_file() && crate::is_source_file(path)
         })
         .filter(|e| {
             if let Some(f) = filter {
@@ -1551,7 +1551,7 @@ pub fn build_similar_blocks_report(cfg: SimilarBlocksConfig<'_>) -> DuplicatesRe
             }
         };
 
-        let tree = match crate::parsers::parse_with_grammar(support.grammar_name(), &content) {
+        let tree = match parsers::parse_with_grammar(support.grammar_name(), &content) {
             Some(t) => t,
             None => {
                 pb.inc(1);
@@ -1787,7 +1787,7 @@ pub fn build_duplicate_types_report(
             .filter_map(|e| e.ok())
             .filter(|e| {
                 let path = e.path();
-                path.is_file() && super::is_source_file(path)
+                path.is_file() && crate::is_source_file(path)
             })
             .map(|e| e.path().to_path_buf())
             .collect()

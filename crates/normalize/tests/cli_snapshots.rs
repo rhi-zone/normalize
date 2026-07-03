@@ -242,9 +242,15 @@ fn test_help_rank_hotspots() {
     insta::assert_snapshot!(snapshot_help(&["rank", "hotspots"]));
 }
 
+// similarity subcommands (duplicates/duplicate-types/fragments moved here from `rank`)
 #[test]
-fn test_help_rank_duplicates() {
-    insta::assert_snapshot!(snapshot_help(&["rank", "duplicates"]));
+fn test_help_similarity() {
+    insta::assert_snapshot!(snapshot_help(&["similarity"]));
+}
+
+#[test]
+fn test_help_similarity_duplicates() {
+    insta::assert_snapshot!(snapshot_help(&["similarity", "duplicates"]));
 }
 
 // analyze subcommands

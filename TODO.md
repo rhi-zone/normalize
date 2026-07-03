@@ -884,7 +884,28 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   `analyze --help`/`rank --help`, both old+new paths verified working. Build matrix (default /
   `cli` / all-features / no-default-features) green, no dep cycle. clippy + tests green (CLI
   help snapshots updated). **Main-crate `src` LOC: 73704 → 72823 (−881).**
-- [ ] **B4 — `similarity`:** move duplicates/duplicate-types/fragments reports; service; mount.
+- [x] **B4 — `similarity`:** ✅ DONE 2026-07-03. Added `cli` feature to
+  `normalize-code-similarity` (gates `duplicates`/`duplicates_views`/`fragments`/`clusters`/
+  `service` modules + report structs, `OutputFormatter` impls, and the filesystem-walking
+  compute passes; pure MinHash/LSH/AST-hashing algorithms build with
+  `default-features = false`). Moved the 4 command files (`duplicates.rs`,
+  `duplicates_views.rs`, `fragments.rs`, `clusters.rs`) out of
+  `crates/normalize/src/commands/analyze/` into the crate; rewired `crate::extract` →
+  `normalize_facts`, `crate::filter` → `normalize_filter`, `crate::output` →
+  `normalize_output`, `crate::parsers` → `normalize_languages::parsers`, and copied
+  `is_source_file`/`detect_project_languages`/`build_filter` into the crate. Added
+  `SimilarityService` (`service.rs`): owns config access, loading `[analyze]`/`[aliases]`/
+  `[pretty]` slices standalone (tolerant `AnalyzeSlice` via `toml::Value` flatten — no
+  `NormalizeConfig` dep). **Index-free** — all compute walks the filesystem directly
+  (`ignore::WalkBuilder` + `parse_with_grammar` + `Extractor`), no daemon/import-graph.
+  Mounted as top-level **`similarity`** verb (default = duplicates, with `--mode clusters`;
+  `similarity duplicate-types`; `similarity fragments`). Transitional shims: `rank duplicates`/
+  `rank duplicate-types`/`rank fragments` (on `RankService`) kept as `#[cli(hidden)]`
+  delegating to `normalize_code_similarity::*` for one release; hidden from `rank --help`,
+  both old+new paths verified working. `health.rs` + `uniqueness.rs` repointed to the crate.
+  Build matrix (default / `cli` / all-features / no-default-features) green, no dep cycle.
+  clippy + tests green (CLI help snapshots updated). **Main-crate `src` LOC: 72823 → 69087
+  (−3736).**
 - [ ] **B5 — `structure` fix + dataflow:** mount real `FactsCliService` (rename→`structure`);
   delete main-crate `service/facts.rs` dup; absorb `liveness`/`effects`/`exceptions`;
   activate `features=["cli"]`. **Dataflow home RESOLVED 2026-07-03:** code lands in
