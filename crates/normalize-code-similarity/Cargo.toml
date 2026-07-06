@@ -18,13 +18,13 @@ cli = [
     "dep:normalize-output",
     "dep:normalize-rank",
     "dep:normalize-filter",
+    "dep:normalize-config-paths",
     "dep:serde",
     "dep:schemars",
     "dep:indicatif",
     "dep:nu-ansi-term",
     "dep:ignore",
     "dep:toml",
-    "dep:dirs",
     "dep:regex",
     "dep:glob",
 ]
@@ -40,13 +40,13 @@ normalize-facts = { path = "../normalize-facts", version = "0.3.2", optional = t
 normalize-output = { path = "../normalize-output", version = "0.3.2", optional = true }
 normalize-rank = { path = "../normalize-rank", version = "0.3.2", optional = true }
 normalize-filter = { path = "../normalize-filter", version = "0.3.2", optional = true }
+normalize-config-paths = { path = "../normalize-config-paths", version = "0.3.2", optional = true }
 serde = { workspace = true, optional = true }
 schemars = { version = "1", optional = true }
 indicatif = { workspace = true, optional = true }
 nu-ansi-term = { version = "0.50", optional = true }
 ignore = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
-dirs = { workspace = true, optional = true }
 regex = { version = "1", optional = true }
 glob = { version = "0.3.3", optional = true }
 server-less = { workspace = true, optional = true }

@@ -704,17 +704,11 @@ fn resolve_root(root: Option<String>) -> Result<PathBuf, String> {
     }
 }
 
+/// Load the `[ratchet]` slice from the global then project `config.toml` via the
+/// shared [`normalize_config_paths::ConfigSlices`] loader (per-section last-wins,
+/// project overrides global).
 fn load_ratchet_config(root: &Path) -> RatchetConfig {
-    // Try to load from .normalize/config.toml
-    let config_path = root.join(".normalize").join("config.toml");
-    if let Ok(content) = std::fs::read_to_string(&config_path)
-        && let Ok(toml_val) = toml::from_str::<toml::Value>(&content)
-        && let Some(ratchet_section) = toml_val.get("ratchet")
-        && let Ok(cfg) = toml::from_str::<RatchetConfig>(&ratchet_section.to_string())
-    {
-        return cfg;
-    }
-    RatchetConfig::default()
+    normalize_config_paths::ConfigSlices::load(root).slice("ratchet")
 }
 
 /// True if `addr` matches path prefix `prefix`, respecting path boundaries.

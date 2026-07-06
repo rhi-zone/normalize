@@ -5272,9 +5272,9 @@ dependencies = [
 name = "normalize-architecture"
 version = "0.3.2"
 dependencies = [
- "dirs 5.0.1",
  "indicatif 0.17.11",
  "libsql",
+ "normalize-config-paths",
  "normalize-git",
  "normalize-graph",
  "normalize-index",
@@ -5287,7 +5287,6 @@ dependencies = [
  "serde",
  "server-less",
  "tokio",
- "toml",
 ]
 
 [[package]]
@@ -5307,6 +5306,7 @@ version = "0.3.2"
 dependencies = [
  "anyhow",
  "gix",
+ "normalize-config-paths",
  "normalize-facts",
  "normalize-git",
  "normalize-languages",
@@ -5320,7 +5320,6 @@ dependencies = [
  "server-less",
  "streaming-iterator",
  "thiserror 2.0.18",
- "toml",
  "tracing",
  "tree-sitter",
 ]
@@ -5366,10 +5365,10 @@ dependencies = [
 name = "normalize-code-similarity"
 version = "0.3.2"
 dependencies = [
- "dirs 5.0.1",
  "glob",
  "ignore",
  "indicatif 0.17.11",
+ "normalize-config-paths",
  "normalize-facts",
  "normalize-filter",
  "normalize-languages",
@@ -5384,6 +5383,17 @@ dependencies = [
  "streaming-iterator",
  "toml",
  "tree-sitter",
+]
+
+[[package]]
+name = "normalize-config-paths"
+version = "0.3.2"
+dependencies = [
+ "dirs 5.0.1",
+ "normalize-rules-config",
+ "serde",
+ "tempfile",
+ "toml",
 ]
 
 [[package]]
@@ -5471,6 +5481,7 @@ dependencies = [
  "indicatif 0.17.11",
  "libsql",
  "normalize-cfg",
+ "normalize-config-paths",
  "normalize-facts-core",
  "normalize-filter",
  "normalize-languages",
@@ -5486,7 +5497,6 @@ dependencies = [
  "streaming-iterator",
  "tempfile",
  "tokio",
- "toml",
  "tracing",
  "tree-sitter",
 ]
@@ -5531,6 +5541,7 @@ name = "normalize-filter"
 version = "0.3.2"
 dependencies = [
  "ignore",
+ "normalize-config-paths",
  "normalize-core",
  "normalize-language-meta",
  "normalize-languages",
@@ -5541,7 +5552,6 @@ dependencies = [
  "server-less",
  "thiserror 2.0.18",
  "tokio",
- "toml",
 ]
 
 [[package]]
@@ -5556,10 +5566,10 @@ dependencies = [
 name = "normalize-git-history"
 version = "0.3.2"
 dependencies = [
- "dirs 5.0.1",
  "gix",
  "glob",
  "normalize-code-similarity",
+ "normalize-config-paths",
  "normalize-ecosystems",
  "normalize-facts",
  "normalize-git",
@@ -5688,8 +5698,8 @@ dependencies = [
 name = "normalize-graph"
 version = "0.3.2"
 dependencies = [
- "dirs 5.0.1",
  "libsql",
+ "normalize-config-paths",
  "normalize-index",
  "normalize-languages",
  "normalize-output",
@@ -5698,7 +5708,6 @@ dependencies = [
  "schemars",
  "serde",
  "server-less",
- "toml",
 ]
 
 [[package]]
@@ -5885,6 +5894,7 @@ version = "0.3.2"
 dependencies = [
  "anyhow",
  "gix",
+ "normalize-config-paths",
  "normalize-facts",
  "normalize-git",
  "normalize-languages",
@@ -5899,7 +5909,6 @@ dependencies = [
  "streaming-iterator",
  "tempfile",
  "thiserror 2.0.18",
- "toml",
  "tracing",
  "tree-sitter",
 ]
@@ -5927,6 +5936,7 @@ dependencies = [
  "glob",
  "ignore",
  "libsql",
+ "normalize-config-paths",
  "normalize-core",
  "normalize-facts",
  "normalize-facts-rules-api",

@@ -18,10 +18,9 @@ cli = [
     "dep:normalize-rules-config",
     "dep:normalize-languages",
     "dep:normalize-output",
+    "dep:normalize-config-paths",
     "dep:libsql",
     "dep:nu-ansi-term",
-    "dep:toml",
-    "dep:dirs",
 ]
 
 [dependencies]
@@ -33,8 +32,7 @@ normalize-index = { path = "../normalize-index", version = "0.3.2", optional = t
 normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.2", optional = true }
 normalize-languages = { path = "../normalize-languages", version = "0.3.2", optional = true }
 normalize-output = { path = "../normalize-output", version = "0.3.2", optional = true }
+normalize-config-paths = { path = "../normalize-config-paths", version = "0.3.2", optional = true }
 libsql = { workspace = true, optional = true }
 nu-ansi-term = { version = "0.50", optional = true }
-toml = { workspace = true, optional = true }
-dirs = { workspace = true, optional = true }
 server-less = { workspace = true, optional = true }

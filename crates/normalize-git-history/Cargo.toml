@@ -20,9 +20,9 @@ cli = [
     "dep:server-less",
     "dep:normalize-index",
     "dep:normalize-rules-config",
+    "dep:normalize-config-paths",
     "dep:tokio",
     "dep:toml",
-    "dep:dirs",
 ]
 
 [dependencies]
@@ -48,6 +48,6 @@ streaming-iterator = "0.1"
 server-less = { workspace = true, optional = true }
 normalize-index = { path = "../normalize-index", version = "0.3.2", optional = true }
 normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.2", optional = true }
+normalize-config-paths = { path = "../normalize-config-paths", version = "0.3.2", optional = true }
 tokio = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
-dirs = { workspace = true, optional = true }

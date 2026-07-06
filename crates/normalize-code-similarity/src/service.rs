@@ -76,39 +76,26 @@ impl AnalyzeSlice {
 }
 
 /// The `[analyze]` + `[aliases]` + `[pretty]` config sections this service reads.
-#[derive(Deserialize, Default)]
-#[serde(default)]
+#[derive(Default)]
 struct SimilarityConfig {
     analyze: AnalyzeSlice,
     aliases: AliasConfig,
     pretty: PrettyConfig,
 }
 
-fn config_paths(root: &Path) -> impl Iterator<Item = PathBuf> {
-    let global = std::env::var("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .ok()
-        .or_else(|| dirs::home_dir().map(|h| h.join(".config")))
-        .map(|c| c.join("normalize").join("config.toml"));
-    [global, Some(root.join(".normalize").join("config.toml"))]
-        .into_iter()
-        .flatten()
-}
-
 /// Load the relevant config sections from the global then project `config.toml`.
 ///
-/// Later files override earlier ones (project overrides global), matching the
-/// precedence the main crate's `NormalizeConfig::load` uses.
+/// Delegates to the shared [`normalize_config_paths::ConfigSlices`] loader, which
+/// applies per-section last-wins precedence (project overrides global; a project
+/// config that omits a section keeps the global one) — matching the main crate's
+/// `NormalizeConfig::load` exactly.
 fn load_config(root: &Path) -> SimilarityConfig {
-    let mut cfg = SimilarityConfig::default();
-    for path in config_paths(root) {
-        if let Ok(content) = std::fs::read_to_string(&path)
-            && let Ok(parsed) = toml::from_str::<SimilarityConfig>(&content)
-        {
-            cfg = parsed;
-        }
+    let slices = normalize_config_paths::ConfigSlices::load(root);
+    SimilarityConfig {
+        analyze: slices.slice("analyze"),
+        aliases: slices.slice("aliases"),
+        pretty: slices.slice("pretty"),
     }
-    cfg
 }
 
 /// Load just the `[aliases]` slice (used by the standalone `build_filter` helper).

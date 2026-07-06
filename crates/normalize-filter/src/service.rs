@@ -99,30 +99,13 @@ fn resolve_root(root: Option<String>) -> Result<PathBuf, String> {
         .map_err(|e| format!("failed to determine root directory: {e}"))
 }
 
-/// Load the `[aliases]` slice from `<root>/.normalize/config.toml`.
+/// Load the `[aliases]` slice from the global then project `config.toml` via the
+/// shared [`normalize_config_paths::ConfigSlices`] loader.
 ///
-/// Returns an empty (default) config if the file is absent or unparseable — the
-/// built-in aliases still apply.
+/// Returns an empty (default) config if no file declares `[aliases]` (or it is
+/// unparseable) — the built-in aliases still apply.
 fn load_alias_config(root: &Path) -> AliasConfig {
-    let path = root.join(".normalize").join("config.toml");
-    let Ok(content) = std::fs::read_to_string(&path) else {
-        return AliasConfig::default();
-    };
-    #[derive(serde::Deserialize, Default)]
-    struct Wrapper {
-        #[serde(default)]
-        aliases: AliasConfig,
-    }
-    match toml::from_str::<Wrapper>(&content) {
-        Ok(w) => w.aliases,
-        Err(e) => {
-            eprintln!(
-                "warning: failed to parse [aliases] from {}: {e}",
-                path.display()
-            );
-            AliasConfig::default()
-        }
-    }
+    normalize_config_paths::ConfigSlices::load(root).slice("aliases")
 }
 
 /// Detect programming languages present under `root` (bounded depth walk).

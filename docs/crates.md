@@ -76,6 +76,7 @@ lives in main.
 | `normalize-facts-rules-api` | Data types for fact rules (Relations input, Diagnostic output) | — | |
 | `normalize-facts-rules-interpret` | Interpreted Datalog rule evaluation for code facts | — | |
 | `normalize-rules-config` | Shared rule configuration types (`RulesConfig`, `RuleOverride`) | — | |
+| `normalize-config-paths` | Shared config-slice loader for verb services: locates global + project `config.toml`, reads typed `[section]` slices with **per-section last-wins** precedence (matching main's `NormalizeConfig::load`) — without depending on main | — | Leaf; deps `serde`/`toml`/`dirs`/`normalize-rules-config` (for `WalkConfig` + `with_daemon_baseline` in `walk()`). Dedups the loaders `graph`/`architecture`/`similarity`/`git-history`/`facts`/`rules`/`filter`/`budget`/`ratchet` each hand-rolled. `slice::<T>(section)` is generic, so each caller keeps its own slice/`AnalyzeSlice` types (no main `AnalyzeConfig` dep, cycle-free). |
 
 ## infra — facts/index/git/languages/grammars substrate
 

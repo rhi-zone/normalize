@@ -34,11 +34,11 @@ use std::path::{Path, PathBuf};
 
 /// Config slices this service reads.
 ///
-/// `[index]`, `[walk]`, and `[pretty]` deserialize cleanly via serde (unknown
-/// top-level sections are ignored). The `[analyze]` excludes are extracted
-/// manually because `[analyze]` mixes scalar keys (`threshold`, `compact`, …)
-/// with `[analyze.<subcommand>]` tables — a serde `flatten` would choke on the
-/// scalars.
+/// `[index]`, `[walk]`, and `[pretty]` are read via the shared
+/// [`normalize_config_paths::ConfigSlices`] loader. The `[analyze]` excludes come
+/// from an [`AnalyzeSlice`] whose `#[serde(flatten)]` `toml::Value` map tolerates
+/// `[analyze]` mixing scalar keys (`threshold`, `compact`, …) with
+/// `[analyze.<subcommand>]` tables.
 #[derive(Default)]
 struct HistoryConfig {
     index: IndexConfig,
@@ -63,76 +63,53 @@ impl HistoryConfig {
     }
 }
 
-/// `[index]` + `[walk]` + `[pretty]` deserialized via serde.
+/// The `[analyze]` slice this service reads for exclude patterns.
+///
+/// Named fields consume the scalar `[analyze]` keys we care about; the flattened
+/// `subs` map captures `[analyze.<subcommand>]` tables (and tolerates any other
+/// scalar/table keys, so parsing never fails regardless of what else lives under
+/// `[analyze]`).
 #[derive(serde::Deserialize, Default)]
-struct SliceConfig {
-    #[serde(default)]
-    index: IndexConfig,
-    #[serde(default)]
-    walk: WalkConfig,
-    #[serde(default)]
-    pretty: PrettyConfig,
-}
-
-fn string_array(value: Option<&toml::Value>) -> Vec<String> {
-    match value {
-        Some(toml::Value::Array(arr)) => arr
-            .iter()
-            .filter_map(|v| v.as_str().map(str::to_string))
-            .collect(),
-        _ => Vec::new(),
-    }
+#[serde(default)]
+struct AnalyzeSlice {
+    /// `[analyze] exclude` — applied to every subcommand.
+    exclude: Vec<String>,
+    /// `[analyze] hotspots_exclude` — additional excludes for hotspots.
+    hotspots_exclude: Vec<String>,
+    #[serde(flatten)]
+    subs: HashMap<String, toml::Value>,
 }
 
 /// Load the relevant config sections from the global then project `config.toml`.
 ///
-/// Later files override earlier ones (project overrides global) on a per-field
-/// basis, matching the precedence the main crate's `NormalizeConfig::load` uses.
+/// Delegates to the shared [`normalize_config_paths::ConfigSlices`] loader, which
+/// applies per-section last-wins precedence (project overrides global; a project
+/// config that omits a section keeps the global one) — matching the main crate's
+/// `NormalizeConfig::load` exactly.
 fn load_config(root: &Path) -> HistoryConfig {
-    let global = std::env::var("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .ok()
-        .or_else(|| dirs::home_dir().map(|h| h.join(".config")))
-        .map(|c| c.join("normalize").join("config.toml"));
-
-    let mut cfg = HistoryConfig::default();
-    for path in [global, Some(root.join(".normalize").join("config.toml"))]
-        .into_iter()
-        .flatten()
-    {
-        let Ok(content) = std::fs::read_to_string(&path) else {
-            continue;
-        };
-        let Ok(table) = toml::from_str::<toml::Table>(&content) else {
-            continue;
-        };
-
-        // Clean serde slices for [index]/[walk]/[pretty].
-        if let Ok(slice) = toml::Value::Table(table.clone()).try_into::<SliceConfig>() {
-            cfg.index = slice.index;
-            cfg.walk = slice.walk;
-            cfg.pretty_enabled = slice.pretty.enabled();
-        }
-
-        // Manual extraction of [analyze] excludes.
-        if let Some(toml::Value::Table(analyze)) = table.get("analyze") {
-            if analyze.contains_key("exclude") {
-                cfg.global_exclude = string_array(analyze.get("exclude"));
-            }
-            if analyze.contains_key("hotspots_exclude") {
-                cfg.hotspots_exclude = string_array(analyze.get("hotspots_exclude"));
-            }
-            for (key, value) in analyze {
-                if let toml::Value::Table(sub) = value
-                    && sub.contains_key("exclude")
-                {
-                    cfg.sub_exclude
-                        .insert(key.clone(), string_array(sub.get("exclude")));
-                }
-            }
-        }
+    let slices = normalize_config_paths::ConfigSlices::load(root);
+    let analyze: AnalyzeSlice = slices.slice("analyze");
+    let sub_exclude = analyze
+        .subs
+        .iter()
+        .filter_map(|(key, value)| {
+            let arr = value.as_table()?.get("exclude")?.as_array()?;
+            Some((
+                key.clone(),
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(str::to_string))
+                    .collect(),
+            ))
+        })
+        .collect();
+    HistoryConfig {
+        index: slices.slice("index"),
+        walk: slices.slice("walk"),
+        pretty_enabled: slices.slice::<PrettyConfig>("pretty").enabled(),
+        global_exclude: analyze.exclude,
+        hotspots_exclude: analyze.hotspots_exclude,
+        sub_exclude,
     }
-    cfg
 }
 
 /// Discover git repositories up to `max_depth` levels deep under `dir`.

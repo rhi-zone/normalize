@@ -1,0 +1,16 @@
+[package]
+name = "normalize-config-paths"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Shared config-slice loader for normalize: locates global + project config.toml and reads typed [section] slices with per-section last-wins precedence"
+
+[dependencies]
+serde = { workspace = true }
+toml = { workspace = true }
+dirs = { workspace = true }
+normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.2" }
+
+[dev-dependencies]
+tempfile = "3"

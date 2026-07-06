@@ -22,39 +22,26 @@ use std::cell::Cell;
 use std::path::Path;
 
 /// The `[index]` + `[walk]` + `[pretty]` config sections this service reads.
-#[derive(serde::Deserialize, Default)]
+#[derive(Default)]
 struct ArchConfig {
-    #[serde(default)]
     index: IndexConfig,
-    #[serde(default)]
     walk: WalkConfig,
-    #[serde(default)]
     pretty: PrettyConfig,
 }
 
 /// Load the relevant config sections from the global then project `config.toml`.
 ///
-/// Later files override earlier ones (project overrides global), matching the
-/// precedence the main crate's `NormalizeConfig::load` uses.
+/// Delegates to the shared [`normalize_config_paths::ConfigSlices`] loader, which
+/// applies per-section last-wins precedence (project overrides global; a project
+/// config that omits a section keeps the global one) — matching the main crate's
+/// `NormalizeConfig::load` exactly.
 fn load_config(root: &Path) -> ArchConfig {
-    let global = std::env::var("XDG_CONFIG_HOME")
-        .map(std::path::PathBuf::from)
-        .ok()
-        .or_else(|| dirs::home_dir().map(|h| h.join(".config")))
-        .map(|c| c.join("normalize").join("config.toml"));
-
-    let mut cfg = ArchConfig::default();
-    for path in [global, Some(root.join(".normalize").join("config.toml"))]
-        .into_iter()
-        .flatten()
-    {
-        if let Ok(content) = std::fs::read_to_string(&path)
-            && let Ok(parsed) = toml::from_str::<ArchConfig>(&content)
-        {
-            cfg = parsed;
-        }
+    let slices = normalize_config_paths::ConfigSlices::load(root);
+    ArchConfig {
+        index: slices.slice("index"),
+        walk: slices.slice("walk"),
+        pretty: slices.slice("pretty"),
     }
-    cfg
 }
 
 /// CLI service implementing `normalize architecture` subcommands.

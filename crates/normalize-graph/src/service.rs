@@ -19,41 +19,26 @@ use std::cell::Cell;
 use std::path::Path;
 
 /// The `[index]` + `[walk]` + `[pretty]` config sections this service reads.
-#[derive(serde::Deserialize, Default)]
+#[derive(Default)]
 struct GraphConfig {
-    #[serde(default)]
     index: IndexConfig,
-    #[serde(default)]
     walk: WalkConfig,
-    #[serde(default)]
     pretty: PrettyConfig,
 }
 
 /// Load the relevant config sections from the global then project `config.toml`.
 ///
-/// Later files override earlier ones (project overrides global), matching the
-/// precedence the main crate's `NormalizeConfig::load` uses. This crate loads
-/// only the sections it needs so it can acquire the index and resolve pretty
-/// mode without depending on `NormalizeConfig`.
+/// Delegates to the shared [`normalize_config_paths::ConfigSlices`] loader, which
+/// applies per-section last-wins precedence (project overrides global; a project
+/// config that omits a section keeps the global one) — matching the main crate's
+/// `NormalizeConfig::load` exactly.
 fn load_config(root: &Path) -> GraphConfig {
-    let global = std::env::var("XDG_CONFIG_HOME")
-        .map(std::path::PathBuf::from)
-        .ok()
-        .or_else(|| dirs::home_dir().map(|h| h.join(".config")))
-        .map(|c| c.join("normalize").join("config.toml"));
-
-    let mut cfg = GraphConfig::default();
-    for path in [global, Some(root.join(".normalize").join("config.toml"))]
-        .into_iter()
-        .flatten()
-    {
-        if let Ok(content) = std::fs::read_to_string(&path)
-            && let Ok(parsed) = toml::from_str::<GraphConfig>(&content)
-        {
-            cfg = parsed;
-        }
+    let slices = normalize_config_paths::ConfigSlices::load(root);
+    GraphConfig {
+        index: slices.slice("index"),
+        walk: slices.slice("walk"),
+        pretty: slices.slice("pretty"),
     }
-    cfg
 }
 
 /// CLI service implementing `normalize graph` subcommands.

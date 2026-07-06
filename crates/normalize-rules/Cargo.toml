@@ -19,6 +19,7 @@ tokio = { workspace = true }
 server-less = { workspace = true, optional = true }
 normalize-core = { path = "../normalize-core", version = "0.3.2" }
 normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.2" }
+normalize-config-paths = { path = "../normalize-config-paths", version = "0.3.2" }
 normalize-output = { path = "../normalize-output", version = "0.3.2" }
 normalize-syntax-rules = { path = "../normalize-syntax-rules", version = "0.3.2" }
 normalize-facts-rules-interpret = { path = "../normalize-facts-rules-interpret", version = "0.3.2" }

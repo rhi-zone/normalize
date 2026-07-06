@@ -222,6 +222,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Verb services no longer reset unrelated global config sections, and now all honor
+  global config.** The taxonomy-inversion verb services each hand-rolled their own
+  `config.toml` loader. Three of them (`graph`, `architecture`, `similarity`) did a
+  whole-**struct** replace: a project `.normalize/config.toml` that omitted a section
+  (e.g. `[index]`) silently reset the corresponding global setting back to its default.
+  Others (`filter aliases`, `budget`, `ratchet`, and the `structure`/`rules` walk config)
+  ignored the global `config.toml` entirely. All now route through the new shared
+  `normalize-config-paths` loader, which applies **per-section last-wins** precedence —
+  the whole `[section]` from the project overrides the global one when present, and the
+  global one is kept when the project omits it — exactly matching the main crate's
+  `NormalizeConfig::load`. Internal refactor with a behavior fix; no CLI surface change.
+
 - **Standalone `normalize-facts structure` now honors `NORMALIZE_INDEX_DIR`.** Its
   `FactsCliService` previously hardcoded `<root>/.normalize/index.sqlite`, so with
   `NORMALIZE_INDEX_DIR` set it read/wrote a different index than `normalize view graph`

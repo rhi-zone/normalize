@@ -26,7 +26,7 @@ use normalize_languages::external_packages;
 use normalize_output::OutputFormatter;
 use normalize_rules_config::WalkConfig;
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use server_less::cli;
 use std::path::{Path, PathBuf};
 
@@ -74,27 +74,12 @@ fn open_index_path(root: &Path) -> PathBuf {
     get_normalize_dir(root).join("index.sqlite")
 }
 
-/// Best-effort: parse `[walk]` from `.normalize/config.toml`.
-///
-/// Always applies the daemon baseline (`.git/`, `.normalize/`) so the index
-/// walkers never descend into `.normalize/` even when the project config exists
-/// but omits `[walk]`.
+/// Parse `[walk]` from the global then project `config.toml`, always applying the
+/// daemon baseline (`.git/`, `.normalize/`) so the index walkers never descend
+/// into `.normalize/` even when no `[walk]` section is present. Delegates to the
+/// shared [`normalize_config_paths::ConfigSlices::walk`] loader.
 fn load_walk_config(root: &Path) -> WalkConfig {
-    #[derive(serde::Deserialize, Default)]
-    struct MinimalConfig {
-        #[serde(default)]
-        walk: WalkConfig,
-    }
-    let config_path = root.join(".normalize").join("config.toml");
-    if let Ok(contents) = std::fs::read_to_string(&config_path)
-        && let Ok(cfg) = toml::from_str::<MinimalConfig>(&contents)
-    {
-        return cfg.walk.with_daemon_baseline();
-    }
-    WalkConfig {
-        exclude: Some(vec![".git/".to_string(), ".normalize/".to_string()]),
-        ..Default::default()
-    }
+    normalize_config_paths::ConfigSlices::load(root).walk()
 }
 
 async fn open_index(root: &Path) -> Result<FileIndex, String> {
@@ -173,33 +158,10 @@ fn rel_to_root(root: &Path, file: &str) -> String {
 // Filter (aliases loaded standalone from config.toml — no NormalizeConfig)
 // =============================================================================
 
-fn config_paths(root: &Path) -> impl Iterator<Item = PathBuf> {
-    let global = std::env::var("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .ok()
-        .or_else(|| dirs::home_dir().map(|h| h.join(".config")))
-        .map(|c| c.join("normalize").join("config.toml"));
-    [global, Some(root.join(".normalize").join("config.toml"))]
-        .into_iter()
-        .flatten()
-}
-
-/// Load just the `[aliases]` slice from the global then project `config.toml`.
+/// Load just the `[aliases]` slice from the global then project `config.toml` via
+/// the shared [`normalize_config_paths::ConfigSlices`] loader.
 fn load_aliases(root: &Path) -> AliasConfig {
-    #[derive(Deserialize, Default)]
-    #[serde(default)]
-    struct AliasSlice {
-        aliases: AliasConfig,
-    }
-    let mut cfg = AliasConfig::default();
-    for path in config_paths(root) {
-        if let Ok(content) = std::fs::read_to_string(&path)
-            && let Ok(parsed) = toml::from_str::<AliasSlice>(&content)
-        {
-            cfg = parsed.aliases;
-        }
-    }
-    cfg
+    normalize_config_paths::ConfigSlices::load(root).slice("aliases")
 }
 
 /// Detect programming languages present under `root` (bounded-depth walk).

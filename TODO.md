@@ -98,6 +98,24 @@ B0 (guide-regression test, CLAUDE.md crate count), B1 (`normalize-git` extractio
 
 ## Follow-ups (2026-06-29 branch consolidation)
 
+- [x] **Config-slice-loader dedup — shared `normalize-config-paths` crate (2026-07-07).**
+  The B4–B11 verb services each hand-rolled a `config.toml` slice loader (XDG global +
+  project resolution + tolerant `[section]` parsing) — six divergent copies across
+  `graph`/`architecture`/`code-similarity`/`git-history`/`facts`/`rules`/`filter`/`budget`/
+  `ratchet`. Investigation found they weren't just duplicated, they were **inconsistent**:
+  `graph`/`architecture`/`similarity` did whole-**struct** replace (a project config omitting
+  a section reset the global setting — a bug), while `filter`/`budget`/`ratchet`/`facts`-walk/
+  `rules`-walk ignored global config entirely. Extracted a leaf `normalize-config-paths`
+  (`config_paths`, `ConfigSlices::load/slice::<T>/walk`) with **per-section last-wins**
+  precedence matching the main crate's `NormalizeConfig::load` exactly (verified against the
+  server-less `#[param(nested, serde)]` derive — main is per-section, NOT field-level, so the
+  helper is too; a field-level deep-merge would have overshot main). `[analyze]` stays with
+  each caller via the generic `slice::<AnalyzeSlice>("analyze")` (flatten tolerates mixed
+  scalar/table keys — verified — so no `AnalyzeConfig`/main dep; cycle-free). All nine verb
+  loaders repointed; per-crate `toml`/`dirs` deps dropped where now unused. Registry row added
+  to `docs/crates.md`; `### Fixed` CHANGELOG entry. This also subsumes the pending
+  "(2) per-subcommand config-slice" enabler noted in the decomposition roadmap.
+
 - [x] **SUMMARY.md convention removed (2026-07-03).** The per-directory `SUMMARY.md`
   requirement, the `missing-summary`/`stale-summary` native rules, their config, and the
   CLAUDE.md section were removed — the convention was high-friction, chronically stale, and

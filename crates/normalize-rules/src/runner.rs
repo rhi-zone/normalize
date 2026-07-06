@@ -2085,28 +2085,14 @@ fn get_normalize_dir(root: &Path) -> std::path::PathBuf {
     root.join(".normalize")
 }
 
-/// Load `[walk]` config from the project's `.normalize/config.toml`.
+/// Load `[walk]` config from the global then project `config.toml`.
 ///
 /// Always applies the daemon baseline (`.git/`, `.normalize/`) via
-/// [`WalkConfig::with_daemon_baseline`] so the index walkers never descend
-/// into `.normalize/` even when the project config exists but omits `[walk]`.
+/// [`WalkConfig::with_daemon_baseline`] so the index walkers never descend into
+/// `.normalize/` even when no `[walk]` section is present. Delegates to the
+/// shared [`normalize_config_paths::ConfigSlices::walk`] loader.
 fn load_walk_config(root: &Path) -> normalize_rules_config::WalkConfig {
-    #[derive(serde::Deserialize, Default)]
-    struct MinimalConfig {
-        #[serde(default)]
-        walk: normalize_rules_config::WalkConfig,
-    }
-    let config_path = root.join(".normalize").join("config.toml");
-    if let Ok(contents) = std::fs::read_to_string(&config_path)
-        && let Ok(cfg) = toml::from_str::<MinimalConfig>(&contents)
-    {
-        return cfg.walk.with_daemon_baseline();
-    }
-    // File absent or malformed — bootstrap default already has the baseline.
-    normalize_rules_config::WalkConfig {
-        exclude: Some(vec![".git/".to_string(), ".normalize/".to_string()]),
-        ..Default::default()
-    }
+    normalize_config_paths::ConfigSlices::load(root).walk()
 }
 
 /// Build Relations from the file index.

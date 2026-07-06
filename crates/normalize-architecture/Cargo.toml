@@ -17,12 +17,11 @@ cli = [
     "dep:normalize-rank",
     "dep:normalize-output",
     "dep:normalize-rules-config",
+    "dep:normalize-config-paths",
     "dep:normalize-git",
     "dep:nu-ansi-term",
     "dep:indicatif",
     "dep:tokio",
-    "dep:toml",
-    "dep:dirs",
 ]
 
 [dependencies]
@@ -37,10 +36,9 @@ schemars = "1"
 normalize-rank = { path = "../normalize-rank", version = "0.3.2", optional = true }
 normalize-output = { path = "../normalize-output", version = "0.3.2", optional = true }
 normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.2", optional = true }
+normalize-config-paths = { path = "../normalize-config-paths", version = "0.3.2", optional = true }
 normalize-git = { workspace = true, optional = true }
 nu-ansi-term = { version = "0.50", optional = true }
 indicatif = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
-toml = { workspace = true, optional = true }
-dirs = { workspace = true, optional = true }
 server-less = { workspace = true, optional = true }

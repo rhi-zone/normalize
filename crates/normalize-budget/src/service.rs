@@ -625,30 +625,11 @@ fn resolve_root(root: Option<String>) -> Result<PathBuf, String> {
     }
 }
 
+/// Load the `[budget]` slice from the global then project `config.toml` via the
+/// shared [`normalize_config_paths::ConfigSlices`] loader (per-section last-wins,
+/// project overrides global).
 fn load_budget_config(root: &Path) -> BudgetConfig {
-    let path = root.join(".normalize").join("config.toml");
-    if !path.exists() {
-        return BudgetConfig::default();
-    }
-    let content = match std::fs::read_to_string(&path) {
-        Ok(c) => c,
-        Err(e) => {
-            tracing::debug!("budget config not found, using defaults: {e}");
-            return BudgetConfig::default();
-        }
-    };
-    #[derive(serde::Deserialize, Default)]
-    struct Wrapper {
-        #[serde(default)]
-        budget: BudgetConfig,
-    }
-    match toml::from_str::<Wrapper>(&content) {
-        Ok(w) => w.budget,
-        Err(e) => {
-            tracing::warn!("failed to parse budget config: {e}");
-            BudgetConfig::default()
-        }
-    }
+    normalize_config_paths::ConfigSlices::load(root).slice("budget")
 }
 
 /// Measure current diff stats for a path prefix and metric, filtered and aggregated.
