@@ -25,12 +25,12 @@ The essential daily-driver commands:
 ### Analysis
 Assessment, metrics, and quality gates:
 - `analyze` - Codebase analysis (per-metric + security/docs/skeleton-diff residual). Shrunk by inversion; the aggregate dashboards moved to `overview` (B11).
-- `overview` - Codebase dashboards: `overview` (health), `overview --full` (all passes), `overview summary`, `overview cross-repo-health` (thin main-crate composition verb, B11). Was `analyze health`/`all`/`summary`/`cross-repo-health` — old paths kept as hidden aliases for one release. `cross-repo-health` lands here (main-resident composer, no cycle) rather than `history`.
-- `graph` - Dependency-graph analysis: cycles/blast-radius/import-paths (`graph`, `graph dependents`, `graph import-path`; owned by `normalize-graph`, B2). Was `view graph`/`dependents`/`import-path` — old paths kept as hidden aliases for one release.
-- `similarity` - Duplicate/near-duplicate code detection: clones, duplicate types, AST fragments (`similarity` incl. `--mode clusters`, `similarity duplicate-types`, `similarity fragments`; owned by `normalize-code-similarity`, B4). Index-free (walks the filesystem). Was `rank duplicates`/`duplicate-types`/`fragments` — old paths kept as hidden aliases for one release.
-- `history` - Statistical code-health signals from git history: `hotspots`, `coupling`, `ownership`, `contributors`, `activity`, `repo-coupling`, `coupling-clusters` (owned by `normalize-git-history`, B9). Repo-wide cross-file analysis — distinct from `view history` (single-file git log). Was `rank hotspots`/`coupling`/`ownership`/`contributors` and `analyze activity`/`repo-coupling`/`coupling-clusters` — old paths kept as hidden aliases for one release. `cross-repo-health` went to `overview` instead (B11).
+- `overview` - Codebase dashboards: `overview` (health), `overview --full` (all passes), `overview summary`, `overview cross-repo-health` (thin main-crate composition verb, B11). Was `analyze health`/`all`/`summary`/`cross-repo-health` — old paths removed in B12 (no back-compat; 0.x breaking is acceptable). `cross-repo-health` lands here (main-resident composer, no cycle) rather than `history`.
+- `graph` - Dependency-graph analysis: cycles/blast-radius/import-paths (`graph`, `graph dependents`, `graph import-path`; owned by `normalize-graph`, B2). Was `view graph`/`dependents`/`import-path` — old paths removed in B12 (no back-compat; 0.x breaking is acceptable).
+- `similarity` - Duplicate/near-duplicate code detection: clones, duplicate types, AST fragments (`similarity` incl. `--mode clusters`, `similarity duplicate-types`, `similarity fragments`; owned by `normalize-code-similarity`, B4). Index-free (walks the filesystem). Was `rank duplicates`/`duplicate-types`/`fragments` — old paths removed in B12 (no back-compat; 0.x breaking is acceptable).
+- `history` - Statistical code-health signals from git history: `hotspots`, `coupling`, `ownership`, `contributors`, `activity`, `repo-coupling`, `coupling-clusters` (owned by `normalize-git-history`, B9). Repo-wide cross-file analysis — distinct from `view history` (single-file git log). Was `rank hotspots`/`coupling`/`ownership`/`contributors` and `analyze activity`/`repo-coupling`/`coupling-clusters` — old paths removed in B12 (no back-compat; 0.x breaking is acceptable). `cross-repo-health` went to `overview` instead (B11).
 - `cfg` - Control-flow-graph render for a function (`normalize cfg <file>`; owned by `normalize-cfg`). The former redundant `cfg cfg` nesting was collapsed to a single leaf (B11).
-- `rank` - Rank files/functions by metrics (permanent main-crate verb; A1). Includes `rank purposes` (line-purpose breakdown — was `rank budget`, renamed B11 to free `budget` for `normalize-budget`; hidden alias for one release).
+- `rank` - Rank files/functions by metrics (permanent main-crate verb; A1). Includes `rank purposes` (line-purpose breakdown — was `rank budget`, renamed B11 to free `budget` for `normalize-budget`; removed in B12 (no back-compat)).
 - `trend` - Track metrics over git history (permanent main-crate verb; A1)
 - `ci` - Run all quality checks in one pass
 - `budget` - Enforce diff budgets on PRs
@@ -38,7 +38,7 @@ Assessment, metrics, and quality gates:
 
 ### Utilities
 Specialized tools and integrations:
-- `filter` - Filter files by glob patterns and inspect --exclude/--only aliases (`filter aliases`, `filter matches`; owned by `normalize-filter`, B6). Old top-level `aliases` kept as a hidden alias for one release.
+- `filter` - Filter files by glob patterns and inspect --exclude/--only aliases (`filter aliases`, `filter matches`; owned by `normalize-filter`, B6). Old top-level `aliases` removed in B12 (no back-compat).
 - `context` - Show directory context (.context.md files)
 - `translate` - Translate code between languages
 - `guide` - Workflow guides with examples

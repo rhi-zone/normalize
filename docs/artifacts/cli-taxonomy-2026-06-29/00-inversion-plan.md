@@ -138,7 +138,8 @@ task-oriented than `overview`), `evolution`/`churn` (alts for `history`).
 - `edit history`→`edit log`: resolves the `view history` collision (audit M-3).
 - `rank budget`→`rank purposes`: frees the `budget` word for `normalize-budget` (audit H-2);
   stays main-crate.
-- Transitional one-release hidden aliases on every moved/renamed path, removed at 1.0.
+- Transitional hidden aliases on every moved/renamed path during B2–B11, **removed
+  immediately in B12** (no backward-compat — 0.x breaking changes between minors are fine).
   **Server-less prerequisite (B0):** add `#[cli(alias = "...")]` to server-less before any
   verb move; server-less has `#[server(hidden)]` and `#[cli(name=…)]` but no alias attr.
 - Guide/help regression test (B0): parse each `guide` body for `normalize …` lines; resolve
@@ -165,7 +166,7 @@ Each batch: changes land in one commit, `cargo clippy --all-targets --all-featur
 | **B9** | `history` verb | Add `#[cli(name="history")]` service to `normalize-git-history`; mount; move `rank hotspots`/`rank coupling`/`rank ownership`/`rank contributors`/`analyze activity`/`analyze repo-coupling`/`analyze cross-repo-health` | Crates touched: 2; commands moved: 7 |
 | **B10** | syntax-rules consolidation | Confirm `rules run --type syntax` routes syntax rules; if confirmed, delete standalone `SyntaxRulesService` CLI scaffolding from normalize-syntax-rules (do NOT add a second verb) | Crates touched: up to 3; commands removed: ≤2 (dedup) |
 | **B11** | Small fixes + overview + CI lint | `cfg cfg`→`cfg`; `edit history`→`edit log`; `rank budget`→`rank purposes`; dashboards `health`/`summary`/`all`→`overview` (thin main-crate composition verb); add RankEntry-based CI lint (xtask/native rule) to hold metric-verb drift | Crates touched: ~3; commands renamed: ~5; new lint: 1 |
-| **B12** | Alias sunset | Remove all hidden transitional aliases/shims at 1.0 | All touched crates |
+| **B12** | Shim removal | Remove all hidden transitional aliases/shims **immediately** (no back-compat; 0.x breaking is acceptable). DONE. | All touched crates |
 
 ### Total blast radius (A1 + git extractions)
 
@@ -516,7 +517,8 @@ main-crate residual. It stays under `rank`; **rename to `rank purposes`** to fre
 `budget` word for the `normalize-budget` crate verb (audit H-2). Owner: main crate.
 
 ### 4.9 Transitional aliases
-Every moved command path keeps a hidden one-release alias; removed at 1.0. **server-less
+Every moved command path kept a hidden alias during B2–B11; **all removed in B12**
+(executed immediately — no backward-compat, 0.x breaking between minors is fine). **server-less
 prerequisite:** add `#[cli(alias = "...")]` (hidden clap alias) to server-less — it has
 `#[server(hidden)]` and `#[cli(name=…)]` but no `alias` attr. For **cross-verb moves**
 (`analyze architecture`→`architecture architecture`, `view graph`→`graph`), keep the old
@@ -553,7 +555,7 @@ batch. Lowest blast first.
 | **B6 `filter` + syntax-rules** | mount `FilterCliService` (rename→`filter`); retire `aliases` leaf; consolidate/delete syntax-rules dup into `rules` | 2 (+verify) | 0 | normalize-filter, normalize-syntax-rules, normalize-rules, normalize |
 | **B7 `search`** | add `#[cli]` to `normalize-semantic`; mount as `search` | (new surface) | 0 | normalize-semantic, normalize |
 | **B8 small fixes** | `cfg cfg`→`cfg`; `edit history`→`edit log`; `rank budget`→`rank purposes`; dashboards→`overview` (composition verb) | ~4 renames + 3 dashboards | 0 | normalize-cfg, normalize |
-| **B9 alias sunset** | (at 1.0) remove all hidden aliases/shims | 0 | 0 | all touched |
+| **B9 shim removal** | (B12, immediate) remove all hidden aliases/shims | 0 | 0 | all touched |
 
 ### Blast radius (total, option A1)
 

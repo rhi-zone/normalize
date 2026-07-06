@@ -7,7 +7,7 @@ Time-series trend commands have moved to [`normalize trend`](trend.md).
 Call-graph navigation (`call-graph`, `trace`) lives under [`normalize view`](../cli-design.md).
 Dependency-graph analysis (`graph`, `dependents`, `import-path`) has moved to the top-level
 [`normalize graph`](../cli-design.md) verb (was `view graph`/`dependents`/`import-path`; the
-old `view` paths remain as hidden aliases for one release).
+old `view` paths were removed in B12 (no back-compat)).
 
 ## Subcommands
 
@@ -15,17 +15,17 @@ old `view` paths remain as hidden aliases for one release).
 
 The aggregate dashboards moved to the top-level [`normalize overview`](../cli-design.md) verb
 (B11): `analyze health`→`overview`, `analyze all`→`overview --full`, `analyze summary`→`overview
-summary`, `analyze cross-repo-health`→`overview cross-repo-health`. Old `analyze` paths remain as
-hidden aliases for one release, and a bare `normalize analyze <target>` still routes to the health
-dashboard.
+summary`, `analyze cross-repo-health`→`overview cross-repo-health`. The old `analyze` paths were
+removed in B12 (no back-compat); `analyze` no longer has a default, so use `overview` for the
+health dashboard.
 
 Git-history analysis (`coupling-clusters`, `activity`, `repo-coupling`) moved to the top-level
 [`normalize history`](../cli-design.md) verb (owned by `normalize-git-history`, B9); old paths
-remain as hidden aliases for one release.
+were removed in B12 (no back-compat).
 
 Architecture analysis (`architecture`, `layering`, `depth-map`) has moved to the top-level
 [`normalize architecture`](../cli-design.md) verb (was `analyze architecture`/`rank layering`/
-`rank depth-map`; the old paths remain as hidden aliases for one release).
+`rank depth-map`; the old paths were removed in B12 (no back-compat)).
 
 ### Documentation
 | Subcommand | Description |
@@ -55,9 +55,9 @@ normalize architecture depth-map          # dependency depth + ripple risk
 
 # Ranked lists are now under normalize rank:
 normalize rank complexity                 # cyclomatic complexity per function
-normalize rank hotspots                   # churn × complexity hotspots
+normalize history hotspots                # churn × complexity hotspots
 normalize similarity                      # code duplicates (was rank duplicates)
-normalize rank coupling                   # temporal coupling
+normalize history coupling                # temporal coupling
 normalize rank length                     # longest functions
 normalize rank test-gaps                  # untested public functions
 

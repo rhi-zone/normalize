@@ -18,7 +18,7 @@ commands were previously under `normalize analyze`.
 `duplicates`, `duplicate-types`, and `fragments` moved to the top-level
 [`normalize similarity`](../cli-design.md) verb (`similarity` incl. `--mode clusters`,
 `similarity duplicate-types`, `similarity fragments`; owned by `normalize-code-similarity`,
-index-free). Old `rank` paths remain as hidden aliases for one release.
+index-free). Old `rank` paths were removed in B12 (no back-compat).
 
 ### Module structure
 | Subcommand | Description |
@@ -30,8 +30,7 @@ index-free). Old `rank` paths remain as hidden aliases for one release.
 | `surface` | Per-module public symbol count, public ratio, and constraint score |
 
 `depth-map` and `layering` moved to the top-level [`normalize architecture`](../cli-design.md)
-verb (`architecture depth-map` / `architecture layering`; old `rank` paths remain as hidden
-aliases for one release).
+verb (`architecture depth-map` / `architecture layering`; old `rank` paths were removed in B12 (no back-compat)).
 
 ### Repository
 | Subcommand | Description |
@@ -42,7 +41,7 @@ aliases for one release).
 
 Git-history analysis (`hotspots`, `coupling`, `ownership`, `contributors`) has moved to the
 top-level [`normalize history`](../cli-design.md) verb (owned by `normalize-git-history`, B9).
-Old paths (`rank hotspots` etc.) are kept as hidden aliases for one release — run
+Old paths (`rank hotspots` etc.) are removed in B12 (no back-compat) — run
 `normalize history --help`.
 
 ### Testing

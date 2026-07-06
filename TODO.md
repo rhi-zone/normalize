@@ -1045,8 +1045,26 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
     `help_cfg_cfg` test removed, `help_overview` test added). **Main-crate `src` LOC: 64471 →
     64744 (+273: `overview.rs` composer + mount wiring; A1 adds no extraction reduction, and
     shim removal at B12 recovers the shim doc-notes).**
-- [ ] **B12 — alias sunset:** remove all hidden transitional aliases/shims at 1.0.
-- [ ] **Doc sync (every batch):** `docs/cli/`, `README.md`, `LLMS.md`, `docs/cli-design.md`,
+- [x] **B12 — shim removal (done 2026-07-06):** removed ALL hidden transitional aliases/shims
+  **immediately** — no backward-compat (0.x breaking between minors is acceptable; user
+  decision). The new taxonomy verbs are now the ONLY paths. Removed: `view graph`/`dependents`/
+  `import-path` (→`graph`); `analyze architecture` (→`architecture`), `analyze liveness`/`effects`/
+  `exceptions` (→`structure`), `analyze activity`/`repo-coupling`/`coupling-clusters` (→`history`),
+  `analyze health`/`all`/`summary`/`cross-repo-health` (→`overview`); `rank hotspots`/`coupling`/
+  `ownership`/`contributors` (→`history`), `rank duplicates`/`duplicate-types`/`fragments`
+  (→`similarity`), `rank layering`/`depth-map` (→`architecture`), `rank budget` alias (→`rank
+  purposes`); `edit history` alias (→`edit log`); top-level `aliases` (→`filter aliases`). Also
+  deleted shim-only retained code: `commands/analyze/{activity,repo_coupling,coupling_clusters,
+  ownership,contributors}.rs` re-export wrappers (now zero non-test callers — `history` verb owns
+  its compute in `normalize-git-history`), the `AliasesReport` struct/`OutputFormatter` in
+  `commands/aliases.rs` (kept only `detect_project_languages`, still used by `build_filter`), and
+  the corresponding `output.rs` assertions + shim `display_*` helpers. `hotspots`/`coupling`/
+  `cross_repo_health`/`summary` retained (still used by the `overview` verb). analyze residual =
+  {docs, security, skeleton-diff}. Build matrix (default / `cli` / all-features / no-default-features)
+  green; clippy `-D warnings` + `cargo test -q` green (7 stale snapshot tests removed, `help_analyze`
+  updated, guide bodies + guide_links fixtures updated to new paths). **Main-crate `src` LOC: 64746 →
+  63351 (−1395 net).** **CLI taxonomy inversion COMPLETE.**
+- [x] **Doc sync (every batch):** `docs/cli/`, `README.md`, `LLMS.md`, `docs/cli-design.md`,
   all guide bodies, `CHANGELOG.md`, touched `SUMMARY.md`s, regenerate `cli-snapshot`.
 
 **Prior-decision history (superseded by the retree above):**

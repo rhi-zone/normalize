@@ -8,7 +8,6 @@ use crate::commands::analyze::provenance::ProvenanceReport;
 use crate::commands::view::chunked::ChunkedViewReport;
 use crate::commands::view::report::{ViewHistoryReport, ViewListReport, ViewReport};
 use crate::output::OutputFormatter;
-use normalize_graph::{DependentsReport, GraphReport, GraphTarget, ImportPathReport};
 use server_less::cli;
 use std::cell::Cell;
 use std::path::PathBuf;
@@ -109,23 +108,11 @@ impl ViewService {
         self.display_output(r)
     }
 
-    fn display_dependents(&self, r: &DependentsReport) -> String {
-        self.display_output(r)
-    }
-
     fn display_trace(&self, r: &TraceReport) -> String {
         r.trace.clone()
     }
 
-    fn display_graph(&self, r: &GraphReport) -> String {
-        self.display_output(r)
-    }
-
     fn display_provenance(&self, r: &ProvenanceReport) -> String {
-        self.display_output(r)
-    }
-
-    fn display_import_path(&self, r: &ImportPathReport) -> String {
         self.display_output(r)
     }
 }
@@ -529,31 +516,6 @@ impl ViewService {
         )
     }
 
-    /// [moved to `graph dependents`] Reverse-dependency closure. (requires facts index)
-    ///
-    /// Transitional hidden alias — `view dependents` now lives at `graph dependents`.
-    /// Kept for one release so existing scripts keep working; delegates to the
-    /// `normalize-graph` implementation. Will be removed in a future release.
-    #[cli(hidden, display_with = "display_dependents")]
-    pub async fn dependents(
-        &self,
-        #[param(positional, help = "File or module to find dependents for")] target: String,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(help = "Graph nodes: modules (default), symbols, or types")] on: Option<
-            GraphTarget,
-        >,
-    ) -> Result<DependentsReport, String> {
-        let root_path = Self::root_path(root)?;
-        self.resolve_format(&root_path);
-        let graph_target = on.unwrap_or(GraphTarget::Modules);
-        let idx = crate::index::require_import_graph(&root_path).await?;
-        normalize_graph::analyze_dependents(&idx, &target, graph_target)
-            .await
-            .map_err(|e| format!("Dependents query failed: {}", e))
-    }
-
     /// Trace value provenance for a symbol
     ///
     /// Examples:
@@ -582,65 +544,6 @@ impl ViewService {
         )
         .await?;
         Ok(TraceReport { trace })
-    }
-
-    /// [moved to `graph`] Graph-theoretic properties of the dependency graph. (requires facts index)
-    ///
-    /// Transitional hidden alias — `view graph` now lives at the top-level `graph`
-    /// verb. Kept for one release so existing scripts keep working; delegates to
-    /// the `normalize-graph` implementation. Will be removed in a future release.
-    #[cli(hidden, display_with = "display_graph")]
-    pub async fn graph(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(short = 'l', help = "Max examples per section (0=no limit)")] limit: Option<usize>,
-        #[param(help = "Graph nodes: modules (default) or symbols")] on: Option<GraphTarget>,
-    ) -> Result<GraphReport, String> {
-        let root_path = Self::root_path(root)?;
-        self.resolve_format(&root_path);
-        let effective_limit = match limit.unwrap_or(10) {
-            0 => usize::MAX,
-            n => n,
-        };
-        let target = on.unwrap_or(GraphTarget::Modules);
-        let idx = crate::index::require_import_graph(&root_path).await?;
-        normalize_graph::analyze_graph(&idx, effective_limit, target)
-            .await
-            .map_err(|e| format!("Graph analysis failed: {}", e))
-    }
-
-    /// [moved to `graph import-path`] Find the shortest import chain between two files. (requires facts index)
-    ///
-    /// Transitional hidden alias — `view import-path` now lives at `graph import-path`.
-    /// Kept for one release so existing scripts keep working; delegates to the
-    /// `normalize-graph` implementation. Will be removed in a future release.
-    #[cli(hidden, display_with = "display_import_path")]
-    pub async fn import_path(
-        &self,
-        #[param(positional, help = "Source file (root-relative or absolute path)")] from: String,
-        #[param(positional, help = "Target file (root-relative or absolute path)")] to: String,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-        #[param(help = "Show all simple paths instead of just the shortest (up to --limit)")]
-        all: bool,
-        #[param(
-            short = 'l',
-            help = "Maximum number of paths to return with --all (default: 5)"
-        )]
-        limit: Option<usize>,
-        #[param(help = "Find paths from <to> to <from> instead")] reverse: bool,
-    ) -> Result<ImportPathReport, String> {
-        let root_path = Self::root_path(root)?;
-        let path_limit = limit.unwrap_or(5);
-        let idx = crate::index::require_import_graph(&root_path).await?;
-        normalize_graph::find_import_path_command(
-            &idx, &root_path, &from, &to, all, path_limit, reverse,
-        )
-        .await
-        .map_err(|e| format!("Import path query failed: {}", e))
     }
 
     /// Git blame with session attribution and code relations

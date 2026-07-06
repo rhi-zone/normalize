@@ -1,15 +1,12 @@
 //! Analyze command - run analysis on target.
 
-pub mod activity;
 pub mod ast;
 pub mod budget;
 pub mod call_complexity;
 pub mod call_graph;
 pub mod ceremony;
 pub mod complexity;
-pub mod contributors;
 pub mod coupling;
-pub mod coupling_clusters;
 pub mod cross_repo_health;
 pub mod density;
 pub mod docs;
@@ -20,10 +17,8 @@ pub mod hotspots;
 pub mod imports;
 pub mod length;
 pub mod module_health;
-pub mod ownership;
 pub mod provenance;
 pub mod query;
-pub mod repo_coupling;
 pub mod report;
 pub mod security;
 pub mod size;

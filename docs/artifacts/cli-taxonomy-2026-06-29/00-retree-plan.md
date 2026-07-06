@@ -28,8 +28,9 @@ concrete, implementable mapping. It does not relitigate the axis choice.
 4. **NO enum-wrapping** (CLAUDE.md ban). Unlike shapes stay separate commands. The only
    sanctioned merge is `analyze architecture` → `view graph` as a genuine single-report
    struct-union (same whole-import-graph domain).
-5. **Transitional one-release aliases are allowed** (migration scaffolding, not permanent
-   cruft) — removed at 1.0.
+5. **Transitional aliases are allowed during the migration** (scaffolding, not permanent
+   cruft) — **all removed in B12, executed immediately** (no backward-compat; 0.x breaking
+   between minors is fine).
 6. **D's input-scope axis is rejected** (not lint-enforceable — prereqs are buried/
    silently-degrading; `index` grab-bag).
 
@@ -280,17 +281,15 @@ surfaced.
    don't work around it here). Covers **same-parent renames**: `rank budget`→
    `rank purposes`, `edit history`→`edit log`, `cfg cfg`→`view cfg` (same leaf word
    moving parents needs #2).
-2. **Cross-verb moves keep the OLD parent mounted as a hidden shim for one release.**
+2. **Cross-verb moves keep the OLD parent mounted as a hidden shim during the migration.**
    clap aliases are scoped to one parent, so `normalize analyze complexity` cannot be a
-   hidden alias of `normalize rank complexity` from under `rank`. For the transitional
-   release, keep a `#[server(hidden)]` `analyze`/`ci`/`budget check`/`ratchet check`/
-   `rules run` mount whose body delegates to the new home (or prints a one-line "moved
-   to `X`; this alias is removed at 1.0" to stderr and runs it). These hidden shims are
-   migration scaffolding.
-3. **Policy:** every renamed/moved command keeps its hidden old path for **exactly one
-   release**. At 1.0 the alias attrs and the hidden shim services are **deleted**. This
-   satisfies "retire, don't deprecate" (the ban is on *permanent* compat cruft; the repo
-   already endorses one-release hidden aliases — see T2-3's `--base-ref` verdict).
+   hidden alias of `normalize rank complexity` from under `rank`. During B2–B11, keep a
+   `#[server(hidden)]` `analyze`/`ci`/`budget check`/`ratchet check`/`rules run` mount
+   whose body delegates to the new home. These hidden shims are migration scaffolding.
+3. **Policy:** renamed/moved commands kept a hidden old path during B2–B11. **B12 deletes
+   the alias attrs and the hidden shim services immediately** — no backward-compat, since
+   0.x breaking changes between minors are acceptable. This satisfies "retire, don't
+   deprecate" (the ban is on *permanent* compat cruft).
 
 **`ci`:** `check` (bare) becomes the canonical "run all gates"; `ci` is retained as a
 transitional alias for one release (CI ergonomics), removed at 1.0. (If the human wants

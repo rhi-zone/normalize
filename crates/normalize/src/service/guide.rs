@@ -175,8 +175,8 @@ const GUIDE_EXPLORE: &str = r#"# Exploring a Codebase
 ## Import/dependency graph
 
   normalize rank imports                # modules ranked by import fan-in
-  normalize view graph     # dependency graph properties
-  normalize view dependents path # who depends on this?
+  normalize graph          # dependency graph properties
+  normalize graph dependents path # who depends on this?
 "#;
 
 const GUIDE_SETUP: &str = r#"# Setting Up Normalize
@@ -237,8 +237,8 @@ const GUIDE_ANALYZE: &str = r#"# Running Analysis
 
   normalize rank complexity             # cyclomatic complexity ranking
   normalize rank length                 # long functions
-  normalize rank duplicates             # copy-paste detection
-  normalize rank duplicates --scope blocks  # block-level duplicates
+  normalize similarity                  # copy-paste detection
+  normalize similarity --scope blocks   # block-level duplicates
   normalize rank ceremony             # boilerplate ratio
 
 ## Module structure
@@ -247,21 +247,21 @@ const GUIDE_ANALYZE: &str = r#"# Running Analysis
   normalize rank density                # information density per module
   normalize rank module-health          # composite score (tests + uniqueness + density)
   normalize rank surface                # public API surface per module
-  normalize rank layering               # are imports flowing downward?
+  normalize architecture layering       # are imports flowing downward?
 
 ## Dependencies and graphs
 
-  normalize analyze architecture           # coupling + cycles + hubs
-  normalize view graph     # graph-theoretic properties
-  normalize view dependents path # reverse dependency closure
+  normalize architecture                   # coupling + cycles + hubs
+  normalize graph          # graph-theoretic properties
+  normalize graph dependents path # reverse dependency closure
   normalize view references symbol      # callers and callees
-  normalize rank depth-map              # dependency depth + ripple risk
+  normalize architecture depth-map      # dependency depth + ripple risk
 
 ## Git history
 
-  normalize rank hotspots               # churn x complexity
-  normalize rank coupling               # files that change together
-  normalize rank ownership              # per-file ownership concentration
+  normalize history hotspots            # churn x complexity
+  normalize history coupling            # files that change together
+  normalize history ownership           # per-file ownership concentration
   normalize trend complexity       # complexity over git history
 
 ## Security

@@ -78,11 +78,6 @@ fn test_help_overview() {
 }
 
 #[test]
-fn test_help_aliases() {
-    insta::assert_snapshot!(snapshot_help(&["aliases"]));
-}
-
-#[test]
 fn test_help_find_references() {
     insta::assert_snapshot!(snapshot_help(&["find-references"]));
 }
@@ -242,11 +237,6 @@ fn test_help_rank_files() {
     insta::assert_snapshot!(snapshot_help(&["rank", "files"]));
 }
 
-#[test]
-fn test_help_rank_hotspots() {
-    insta::assert_snapshot!(snapshot_help(&["rank", "hotspots"]));
-}
-
 // similarity subcommands (duplicates/duplicate-types/fragments moved here from `rank`)
 #[test]
 fn test_help_similarity() {
@@ -260,23 +250,6 @@ fn test_help_similarity_duplicates() {
 
 // analyze subcommands
 #[test]
-fn test_help_analyze_health() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "health"]));
-}
-
-// complexity moved to rank
-
-#[test]
-fn test_help_analyze_length() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "length"]));
-}
-
-#[test]
-fn test_help_analyze_trend_metric() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "trend-metric"]));
-}
-
-#[test]
 fn test_help_analyze_security() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "security"]));
 }
@@ -285,22 +258,6 @@ fn test_help_analyze_security() {
 fn test_help_analyze_docs() {
     insta::assert_snapshot!(snapshot_help(&["analyze", "docs"]));
 }
-
-// files moved to rank
-
-#[test]
-fn test_help_analyze_trace() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "trace"]));
-}
-
-// ownership moved to rank
-
-#[test]
-fn test_help_analyze_repo_coupling() {
-    insta::assert_snapshot!(snapshot_help(&["analyze", "repo-coupling"]));
-}
-
-// duplicate-types moved to rank
 
 // sessions subcommands
 #[test]

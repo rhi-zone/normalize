@@ -4,10 +4,7 @@ expression: "snapshot_help(&[\"analyze\"])"
 ---
 Assess codebase quality. Use for health checks, finding duplicates, security scanning, and architecture analysis.
 
-Usage: normalize analyze [OPTIONS] [target]
-
-Arguments:
-  [target]  Target file or directory
+Usage: normalize analyze [OPTIONS]
 
 Options:
       --pretty                     Human-friendly output with colors and formatting
@@ -19,10 +16,6 @@ Options:
       --output-schema              Print JSON Schema of the subcommand's return type and exit
       --manual                     Emit the reference manual for the command subtree rooted here and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
-  -r, --root <root>                Root directory (defaults to current directory)
-      --exclude <exclude>          Exclude paths matching pattern
-      --only <only>                Include only paths matching pattern
-  -l, --limit <limit>              Maximum number of large files to include in output (0 = no limit, default 10)
   -h, --help                       Print help
   -V, --version                    Print version
 

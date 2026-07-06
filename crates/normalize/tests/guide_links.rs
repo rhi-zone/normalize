@@ -160,10 +160,10 @@ fn detect_stale_guide_reference() {
     );
 
     // Known-good two-level path: must pass.
-    let good2 = vec!["analyze".to_string(), "architecture".to_string()];
+    let good2 = vec!["analyze".to_string(), "security".to_string()];
     assert!(
         resolve_path(&root_cmd, &good2).is_ok(),
-        "`normalize analyze architecture` should resolve fine"
+        "`normalize analyze security` should resolve fine"
     );
 
     // Bogus second-level subcommand on a non-leaf parent: must be an error.
@@ -175,12 +175,12 @@ fn detect_stale_guide_reference() {
 
     // Valid command followed by a positional arg (leaf command): must pass.
     let leaf_with_arg = vec![
-        "view".to_string(),
+        "graph".to_string(),
         "dependents".to_string(),
         "path".to_string(),
     ];
     assert!(
         resolve_path(&root_cmd, &leaf_with_arg).is_ok(),
-        "`normalize view dependents path` — `path` is a positional arg on a leaf command, must pass"
+        "`normalize graph dependents path` — `path` is a positional arg on a leaf command, must pass"
     );
 }

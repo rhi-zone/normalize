@@ -40,7 +40,6 @@ pub mod trend;
 pub mod view;
 
 use crate::commands;
-use crate::commands::aliases::{AliasesReport, detect_project_languages};
 use crate::config::NormalizeConfig;
 use crate::output::OutputFormatter;
 use crate::text_search::{self, GrepReport};
@@ -342,29 +341,6 @@ impl NormalizeService {
             }
             Err(e) => Err(format!("Error: {}", e)),
         }
-    }
-
-    /// Transitional hidden alias — `aliases` now lives at `filter aliases`.
-    ///
-    /// Kept for one release so existing scripts keep working; removed at 1.0.
-    #[server(group = "utilities")]
-    #[cli(hidden, display_with = "display_output")]
-    pub fn aliases(
-        &self,
-        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
-            String,
-        >,
-    ) -> Result<AliasesReport, String> {
-        let root_path = root
-            .map(PathBuf::from)
-            .map(Ok)
-            .unwrap_or_else(std::env::current_dir)
-            .map_err(|e| format!("Failed to get current directory: {e}"))?;
-
-        let config = NormalizeConfig::load(&root_path);
-        let languages = detect_project_languages(&root_path);
-
-        Ok(AliasesReport::build(&config, &languages))
     }
 
     /// Inject project context into LLM prompts. Use to provide per-project instructions to agents.

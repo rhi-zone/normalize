@@ -25,14 +25,10 @@ mod tests {
         use crate::analyze::complexity::ComplexityReport;
         use crate::analyze::function_length::LengthReport;
         use crate::analyze::test_gaps::TestGapsReport;
-        use crate::commands::aliases::AliasesReport;
-        use crate::commands::analyze::activity::ActivityReport;
         use crate::commands::analyze::budget::LineBudgetReport;
         use crate::commands::analyze::call_complexity::CallComplexityReport;
         use crate::commands::analyze::ceremony::CeremonyReport;
-        use crate::commands::analyze::contributors::ContributorsReport;
         use crate::commands::analyze::coupling::CouplingReport;
-        use crate::commands::analyze::coupling_clusters::CouplingClustersReport;
         use crate::commands::analyze::cross_repo_health::CrossRepoHealthReport;
         use crate::commands::analyze::density::DensityReport;
         use crate::commands::analyze::docs::DocCoverageReport;
@@ -40,9 +36,7 @@ mod tests {
         use crate::commands::analyze::hotspots::HotspotsReport;
         use crate::commands::analyze::imports::ImportCentralityReport;
         use crate::commands::analyze::module_health::ModuleHealthReport;
-        use crate::commands::analyze::ownership::OwnershipReport;
         use crate::commands::analyze::provenance::ProvenanceReport;
-        use crate::commands::analyze::repo_coupling::RepoCouplingReport;
         use crate::commands::analyze::report::{AnalyzeReport, SecurityReport};
         use crate::commands::analyze::size::SizeReport;
         use crate::commands::analyze::skeleton_diff::SkeletonDiffReport;
@@ -77,22 +71,18 @@ mod tests {
 
         // Compile-time checks via trait bounds
         assert_output_formatter::<CiReport>();
-        assert_output_formatter::<ActivityReport>();
         assert_output_formatter::<CallComplexityReport>();
         assert_output_formatter::<DensityReport>();
         assert_output_formatter::<DepthMapReport>();
         assert_output_formatter::<UniquenessReport>();
         assert_output_formatter::<AnalyzeReport>();
-        assert_output_formatter::<AliasesReport>();
         assert_output_formatter::<ArchitectureReport>();
         assert_output_formatter::<LineBudgetReport>();
         assert_output_formatter::<CeremonyReport>();
         assert_output_formatter::<DiagnosticsReport>();
         assert_output_formatter::<ComplexityReport>();
-        assert_output_formatter::<ContributorsReport>();
         assert_output_formatter::<ContextListReport>();
         assert_output_formatter::<ContextReport>();
-        assert_output_formatter::<CouplingClustersReport>();
         assert_output_formatter::<CouplingReport>();
         assert_output_formatter::<CrossRepoHealthReport>();
         assert_output_formatter::<DocCoverageReport>();
@@ -119,10 +109,8 @@ mod tests {
         assert_output_formatter::<LengthReport>();
         assert_output_formatter::<ModuleHealthReport>();
         assert_output_formatter::<LintListReport>();
-        assert_output_formatter::<OwnershipReport>();
         assert_output_formatter::<ProvenanceReport>();
         assert_output_formatter::<PlansListReport>();
-        assert_output_formatter::<RepoCouplingReport>();
         assert_output_formatter::<SecurityReport>();
         assert_output_formatter::<MessagesReport>();
         assert_output_formatter::<SessionAnalysisReport>();

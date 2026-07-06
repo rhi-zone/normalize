@@ -1612,12 +1612,12 @@ impl EditService {
     /// View shadow git edit log
     ///
     /// Renamed from `edit history` to `edit log` to resolve the `view history`
-    /// collision. `history` is kept as a hidden alias for one release.
+    /// collision.
     ///
     /// Examples:
     ///   normalize edit log list                  # show recent edit log
     ///   normalize edit log diff abc1234          # show diff for a shadow commit
-    #[cli(name = "log", alias = "history")]
+    #[cli(name = "log")]
     pub fn history(&self) -> &HistoryService {
         &self.history
     }

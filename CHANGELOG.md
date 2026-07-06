@@ -6,6 +6,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- **BREAKING — transitional command aliases removed (CLI taxonomy inversion B12).** The
+  old command paths that were kept as hidden aliases during B2–B11 are **gone** — no
+  backward-compat (this is a 0.x tool; breaking changes between minors are acceptable). The
+  new taxonomy verbs are now the only paths. Migrate as follows:
+  - `view graph` → `graph`; `view dependents <t>` → `graph dependents <t>`;
+    `view import-path <a> <b>` → `graph import-path <a> <b>`
+  - `analyze architecture` → `architecture`
+  - `analyze liveness` → `structure liveness`; `analyze effects` → `structure effects`;
+    `analyze exceptions` → `structure exceptions`
+  - `analyze activity` → `history activity`; `analyze repo-coupling` → `history repo-coupling`;
+    `analyze coupling-clusters` → `history coupling-clusters`
+  - `analyze health` (and bare `analyze <target>`) → `overview`; `analyze all` → `overview --full`;
+    `analyze summary` → `overview summary`; `analyze cross-repo-health` → `overview cross-repo-health`
+  - `rank hotspots` → `history hotspots`; `rank coupling` → `history coupling`;
+    `rank ownership` → `history ownership`; `rank contributors` → `history contributors`
+  - `rank duplicates` → `similarity`; `rank duplicate-types` → `similarity duplicate-types`;
+    `rank fragments` → `similarity fragments`
+  - `rank layering` → `architecture layering`; `rank depth-map` → `architecture depth-map`
+  - `rank budget` → `rank purposes`
+  - `edit history` → `edit log`
+  - `aliases` → `filter aliases`
+
+  `analyze` now owns only its residual: `analyze docs`, `analyze security`, `analyze skeleton-diff`.
+
 ### Added
 
 - **`overview` verb: codebase dashboards in one place (CLI taxonomy inversion B11).**

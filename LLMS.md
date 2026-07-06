@@ -111,7 +111,7 @@ normalize graph import-path a.rs b.rs  # Shortest import chain
 normalize rank complexity          # Cyclomatic complexity
 normalize history hotspots         # High-churn files (was rank hotspots)
 normalize similarity               # Code clones (was rank duplicates)
-normalize rank coupling            # Temporal coupling
+normalize history coupling         # Temporal coupling
 normalize rank test-ratio          # Test/impl ratio per module
 normalize rank module-health       # Worst modules by combined score
 ```
