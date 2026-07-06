@@ -1135,13 +1135,16 @@ Follow-up discovered during the refactor:
       `find_bridges` was audited for the same class of bug and found CORRECT (it uses a
       `last_mut()` + adjacency-cursor pattern with post-processing on pop) — added a
       bridge-vs-cycle-edge correctness test proving so.
-- [ ] **Real circular dependency now surfaced by `view graph` (module graph):** a 28-module
+- [x] **Real circular dependency now surfaced by `view graph` (module graph):** a 28-module
       SCC inside `crates/normalize/src/` — the service layer (`service/mod.rs`, `service/view.rs`,
       `service/config.rs`, `service/context.rs`, `service/package.rs`, `service/sessions.rs`, …)
       tangled with `output.rs`, `config.rs`, and `index.rs`. This was invisible while
-      `tarjan_sccs` was broken. Fold into the main-crate decomposition audit below when
-      untangling the service layer; the mutual `output.rs` ↔ command/service coupling is the
-      likely knot.
+      `tarjan_sccs` was broken. **RESOLVED (2026-07-07):** the SCC was TEST-ONLY — the
+      `output.rs` production code is a bare `pub use normalize_output::*`. The back-edges
+      were the `#[cfg(test)]` aggregator in `output.rs` that imported every report type.
+      Moved the aggregator to `crates/normalize/tests/output_formatter_impls.rs` (integration
+      test, separate compilation unit). All 74+ `assert_output_formatter::<T>()` assertions
+      preserved; SCC dissolved.
 
 ### Main-crate decomposition audit (DONE 2026-07-02)
 
