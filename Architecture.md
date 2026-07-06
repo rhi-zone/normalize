@@ -102,7 +102,7 @@ crates/
 | `package` | Package management (info, tree, audit) |
 | `tools` | External tools (lint, test) |
 | `serve` | Server protocols (MCP, HTTP, LSP) |
-| `generate` | Code generation (client, types, cli-snapshot) |
+| `generate` | Code generation (client, types) |
 | `aliases` | List filter aliases |
 | `context` | Show directory context (.context.md files) |
 | `translate` | Translate code between languages |

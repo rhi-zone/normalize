@@ -146,27 +146,4 @@ impl GenerateService {
             split,
         )
     }
-
-    /// Generate CLI snapshot tests for a binary
-    ///
-    /// Examples:
-    ///   normalize generate cli-snapshot ./target/debug/myapp              # generate snapshot tests
-    ///   normalize generate cli-snapshot ./target/debug/myapp -o tests/cli.rs  # write to file
-    #[cli(name = "cli-snapshot", display_with = "display_output")]
-    pub fn cli_snapshot(
-        &self,
-        #[param(positional, help = "Path to the CLI binary")] binary: String,
-        #[param(
-            short = 'o',
-            help = "Output file for the test (stdout if not specified)"
-        )]
-        output: Option<String>,
-        #[param(help = "Binary name to use in test (defaults to file stem)")] name: Option<String>,
-    ) -> Result<GenerateReport, String> {
-        crate::commands::generate::run_cli_snapshot_service(
-            PathBuf::from(&binary),
-            output.map(PathBuf::from),
-            name,
-        )
-    }
 }

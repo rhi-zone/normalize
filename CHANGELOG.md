@@ -8,6 +8,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 
+- **`generate cli-snapshot` removed.** The subcommand generated CLI snapshot test scaffolding
+  by walking `--help` output at runtime. Use `normalize --manual` instead, which provides a
+  static, complete command tree without requiring a built binary as input.
+
 - **BREAKING — transitional command aliases removed (CLI taxonomy inversion B12).** The
   old command paths that were kept as hidden aliases during B2–B11 are **gone** — no
   backward-compat (this is a 0.x tool; breaking changes between minors are acceptable). The

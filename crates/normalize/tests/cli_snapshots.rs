@@ -370,11 +370,6 @@ fn test_help_generate_types() {
 }
 
 #[test]
-fn test_help_generate_cli_snapshot() {
-    insta::assert_snapshot!(snapshot_help(&["generate", "cli-snapshot"]));
-}
-
-#[test]
 fn test_help_generate_typegen() {
     insta::assert_snapshot!(snapshot_help(&["generate", "typegen"]));
 }

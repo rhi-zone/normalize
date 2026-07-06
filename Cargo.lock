@@ -5197,7 +5197,6 @@ dependencies = [
  "normalize-budget",
  "normalize-cfg",
  "normalize-chat-sessions",
- "normalize-cli-parser",
  "normalize-code-similarity",
  "normalize-context",
  "normalize-core",

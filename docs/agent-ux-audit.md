@@ -166,11 +166,9 @@ Each command was run with `--compact` and `--json`. Evaluation criteria:
 
 ---
 
-### `generate client` / `generate types` / `generate cli-snapshot`
+### `generate client` / `generate types`
 
-Not evaluated (require an OpenAPI spec or running binary as input). Schema-driven generation commands — output is source code, not a report. `--json` is available but would wrap generated code in a string field, which is not useful for agents that want to write the output to a file anyway.
-
-**Recommendation:** Confirm `generate cli-snapshot --json` returns `{code: string, path: string|null}` so agents can capture generated code programmatically. Not evaluated due to input requirements.
+Not evaluated (require an OpenAPI spec as input). Schema-driven generation commands — output is source code, not a report. `--json` is available but would wrap generated code in a string field, which is not useful for agents that want to write the output to a file anyway.
 
 ---
 
