@@ -824,8 +824,16 @@ T1-6 guide-regression.
   standalone tool category (code-maat/git-of-theseus). Passes standalone-useful criterion.
   Extract typed data API; OutputFormatter stays in main crate. Depends on normalize-git.
   Becomes the `history` verb (B8 extraction, B9 mount).
-- Fold cyclomatic-complexity tags-walking from main `analyze/complexity.rs` into
+- [x] Fold cyclomatic-complexity tags-walking from main `analyze/complexity.rs` into
   `normalize-facts::extract` (dedup of the `compute_complexity` wrapper; not a new crate; B5).
+  ✅ DONE 2026-07-07. Removed `ComplexityAnalyzer::count_complexity_with_query` and its
+  pre-loading of the complexity query; replaced `if complexity_query { self.count... } else
+  { compute_complexity }` with a single `compute_complexity(...)` call. No behavior change —
+  `compute_complexity` in facts already handles the query path (via cached `get_compiled_query`)
+  and falls back to 1. Dropped unused `GrammarLoader` + top-level `StreamingIterator` imports.
+  Main-crate `analyze/complexity.rs`: −51 net lines. No dep cycle (facts stays leaf).
+  clippy + `cargo test -q` green; build matrix (default / `cli` / `all-features` /
+  `no-default-features`) all clean.
 
 **Metric core stays A1 — SETTLED 2026-07-06 (executed at B11; A2 rejected, no metrics crate):**
 Complexity, length, ceremony, density, imports, surface, size, files, test-ratio, test-gaps
@@ -930,7 +938,7 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   (facts stays a leaf). clippy + `cargo test -q` green (CLI help snapshots updated: trio added
   to `structure`, removed from `analyze`). **Main-crate `src` LOC: 69087 → 66839 (−2248 net;
   −2264 deletions).** Dataflow home realized as `structure`. **Deferred to B5-followup (not
-  done here):** the cyclomatic-complexity wrapper fold into `normalize-facts::extract`, and the
+  done here):** ~~the cyclomatic-complexity wrapper fold into `normalize-facts::extract`~~ (done 2026-07-07), and the
   parked `cfg liveness` naming alternative (move `normalize-cfg`'s render `CfgService` into
   facts) — neither blocks; revisit if `structure liveness` naming grates.
 - [x] **B6 — `filter`:** ✅ DONE 2026-07-03. Mounted `normalize-filter`'s `FilterCliService`

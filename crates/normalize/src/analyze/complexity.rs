@@ -6,11 +6,10 @@
 use crate::output::{OutputFormatter, tier_color};
 use crate::parsers;
 use normalize_facts::extract::compute_complexity;
-use normalize_languages::{GrammarLoader, Language, support_for_path};
+use normalize_languages::{Language, support_for_path};
 use normalize_rank::ranked::{Column, RankEntry, RiskTier, format_ranked_table};
 use serde::Serialize;
 use std::path::Path;
-use streaming_iterator::StreamingIterator;
 use tree_sitter;
 
 /// Risk classification based on McCabe cyclomatic complexity.
@@ -304,14 +303,7 @@ impl ComplexityAnalyzer {
             .zip(loader.get(grammar_name).ok())
             .and_then(|(tags_scm, ts_lang)| tree_sitter::Query::new(&ts_lang, &tags_scm).ok())
             .map(|tags_query| {
-                self.collect_functions_from_tags(
-                    &tree,
-                    &tags_query,
-                    content,
-                    support,
-                    loader.as_ref(),
-                    grammar_name,
-                )
+                self.collect_functions_from_tags(&tree, &tags_query, content, support)
             })
             .unwrap_or_default()
     }
@@ -319,25 +311,19 @@ impl ComplexityAnalyzer {
     /// Collect function complexity data using a tags query.
     ///
     /// Runs the tags query to find `@definition.function` and `@definition.method`
-    /// nodes, computes complexity for each using the complexity query (if any),
-    /// and reconstructs parent names via line-range containment.
+    /// nodes, computes complexity for each via `normalize_facts::extract::compute_complexity`
+    /// (which handles the `.complexity.scm` query internally), and reconstructs parent
+    /// names via line-range containment.
     fn collect_functions_from_tags(
         &self,
         tree: &tree_sitter::Tree,
         tags_query: &tree_sitter::Query,
         content: &str,
         support: &dyn Language,
-        loader: &GrammarLoader,
-        grammar_name: &str,
     ) -> Vec<FunctionComplexity> {
         use streaming_iterator::StreamingIterator;
 
         let capture_names = tags_query.capture_names();
-
-        let complexity_query = loader.get_complexity(grammar_name).and_then(|scm| {
-            let grammar = loader.get(grammar_name).ok()?;
-            tree_sitter::Query::new(&grammar, &scm).ok()
-        });
 
         let root = tree.root_node();
         let mut qcursor = tree_sitter::QueryCursor::new();
@@ -427,11 +413,7 @@ impl ComplexityAnalyzer {
                 None => continue,
             };
 
-            let complexity = if let Some(ref cq) = complexity_query {
-                self.count_complexity_with_query(&tn.node, cq, content)
-            } else {
-                compute_complexity(&tn.node, support, content.as_bytes())
-            };
+            let complexity = compute_complexity(&tn.node, support, content.as_bytes());
 
             functions.push(FunctionComplexity {
                 name,
@@ -445,39 +427,6 @@ impl ComplexityAnalyzer {
         }
 
         functions
-    }
-
-    /// Count complexity using a tree-sitter query with `@complexity` captures.
-    /// Returns base complexity (1) + number of `@complexity` matches within the node.
-    fn count_complexity_with_query(
-        &self,
-        node: &tree_sitter::Node,
-        query: &tree_sitter::Query,
-        content: &str,
-    ) -> usize {
-        let complexity_idx = query
-            .capture_names()
-            .iter()
-            .position(|n| *n == "complexity");
-
-        let Some(complexity_idx) = complexity_idx else {
-            return 1; // No @complexity capture in query
-        };
-
-        let mut qcursor = tree_sitter::QueryCursor::new();
-        // Restrict to this function's byte range
-        qcursor.set_byte_range(node.byte_range());
-
-        let mut complexity = 1usize; // Base complexity
-        let mut matches = qcursor.matches(query, *node, content.as_bytes());
-        while let Some(m) = matches.next() {
-            for capture in m.captures {
-                if capture.index as usize == complexity_idx {
-                    complexity += 1;
-                }
-            }
-        }
-        complexity
     }
 }
 

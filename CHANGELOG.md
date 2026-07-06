@@ -45,6 +45,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Internal:** `rank complexity` now delegates complexity counting entirely to
+  `normalize_facts::extract::compute_complexity` (no behavior change). The duplicate
+  `count_complexity_with_query` method and its pre-loading logic have been removed from
+  `ComplexityAnalyzer` — `compute_complexity` already handles the `.complexity.scm` query
+  path internally via `GrammarLoader`'s compiled-query cache.
+
 - **Command renames (CLI taxonomy inversion B11); old paths kept as hidden aliases for one release:**
   - `cfg cfg <file>` → `normalize cfg <file>` — the redundant double-name nesting is collapsed
     into a single leaf command (owner unchanged: `normalize-cfg`).
