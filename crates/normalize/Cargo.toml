@@ -98,6 +98,7 @@ normalize-index = { path = "../normalize-index", version = "0.3.2" }
 normalize-architecture = { path = "../normalize-architecture", version = "0.3.2", features = ["cli"] }
 normalize-native-rules = { path = "../normalize-native-rules", version = "0.3.2" }
 normalize-budget = { path = "../normalize-budget", version = "0.3.2", features = ["cli"] }
+normalize-semantic = { path = "../normalize-semantic", version = "0.3.2", features = ["cli"] }
 normalize-ratchet = { path = "../normalize-ratchet", version = "0.3.2", features = ["cli"] }
 normalize-cfg = { path = "../normalize-cfg", version = "0.3.2", features = ["cli"] }
 normalize-rules = { path = "../normalize-rules", version = "0.3.2", features = ["cli"] }

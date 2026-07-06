@@ -25,6 +25,7 @@ Core:
   view          Browse code structure and symbol relationships. Use to read files, explore types, or trace dependencies.
   structure     Build and query the code index. Run `structure rebuild` after cloning or when cross-file commands return stale results.
   edit          Edit code by symbol name. Use for batch renames, signature changes, or pattern-based rewrites.
+  search        Semantic (vector) search over the code index. Ranks by meaning, not by name.
   rules         Configure and run lint rules. Use to enable/disable checks or see what rules are available.
   kg            Persistent knowledge graph adjacent to code. Use to create units, link concepts, and query relationships.
 

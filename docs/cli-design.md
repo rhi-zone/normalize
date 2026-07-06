@@ -242,7 +242,6 @@ Users from other tools often try familiar names. These aliases are rewritten tra
 
 | Alias | Canonical Command | Rationale |
 |-------|-------------------|-----------|
-| `search` | `grep` | Most tools call it "search" — **slated for removal at taxonomy-inversion B7** in favor of the semantic `search` verb (normalize-semantic); still active until then |
 | `find` | `grep` | Common alternative for text search |
 | `lint` | `rules run` | Standard linter invocation |
 | `check` | `ci` | Common CI/check command name |
@@ -251,8 +250,13 @@ Users from other tools often try familiar names. These aliases are rewritten tra
 
 Aliases are invisible — they don't appear in `--help` output. The canonical name is always what's shown.
 
-> **Resolved collision (taxonomy inversion B7, 2026-07-03):** the planned semantic-search verb
-> `search` (normalize-semantic) clashed with this `search`→`grep` alias. **Decision:** drop the
-> `search`→`grep` alias and let `search` become the semantic verb. The alias removal is executed
-> at **B7, atomically with mounting the verb** — so the row above stays active until then. See
-> the open forks in `docs/audit-2026-07-03-command-surface-decomposition.md`.
+`search` is **not** an alias: it is the top-level semantic-search verb
+(`normalize search <query>`, served by `normalize-semantic`), ranking symbols,
+docs, and commits by meaning. For text/regex search use `grep` (or its `find`
+alias).
+
+> **Resolved collision (taxonomy inversion B7, 2026-07-03, EXECUTED):** the semantic-search verb
+> `search` (normalize-semantic) clashed with the former `search`→`grep` alias. **Decision:** drop the
+> `search`→`grep` alias and let `search` become the semantic verb. Executed at **B7**, atomically
+> with mounting the verb — `search` now routes to semantic search, not grep. This is a user-facing
+> behavior change. See `docs/audit-2026-07-03-command-surface-decomposition.md`.

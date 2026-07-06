@@ -1,9 +1,9 @@
-//! Report types and search logic for `normalize structure search`.
+//! Report types, CLI service, and search logic for the `normalize search` verb.
 //!
-//! The CLI method itself lives in `crates/normalize/src/service/facts.rs` so it
-//! can be added to `FactsService` under the `structure` subcommand group.
-//! This module exports the report struct and the `run_search` function that the
-//! method delegates to.
+//! `SemanticCliService` provides the top-level `search` verb (mounted by the
+//! main crate under the `cli` feature). It delegates to `run_search`, which
+//! embeds the query and ranks stored chunk embeddings. `run_context_search`
+//! backs `normalize context --semantic`.
 
 use crate::config::EmbeddingsConfig;
 use crate::search::SearchHit;
@@ -11,11 +11,13 @@ use crate::store;
 use crate::vec_ext::VecConnection;
 use normalize_output::OutputFormatter;
 use serde::{Deserialize, Serialize};
+use server_less::cli;
+use std::path::PathBuf;
 
 #[cfg(feature = "cli")]
 use schemars::JsonSchema;
 
-/// One result entry returned by `normalize structure search`.
+/// One result entry returned by `normalize search`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "cli", derive(JsonSchema))]
 pub struct SearchResultEntry {
@@ -49,7 +51,7 @@ impl From<SearchHit> for SearchResultEntry {
     }
 }
 
-/// Report returned by `normalize structure search`.
+/// Report returned by `normalize search`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "cli", derive(JsonSchema))]
 pub struct SearchReport {
@@ -105,7 +107,7 @@ impl OutputFormatter for SearchReport {
     }
 }
 
-/// Core search logic, called from `FactsService::search` in the main crate.
+/// Core search logic, called from `SemanticCliService::search` (the `search` verb).
 ///
 /// `root` is the project root directory; `query` is the natural-language query.
 /// `top_k` is the max number of results to return.
@@ -366,4 +368,71 @@ pub fn load_embeddings_config(root: &std::path::Path) -> EmbeddingsConfig {
     toml::from_str::<PartialConfig>(&contents)
         .map(|c| c.embeddings)
         .unwrap_or_default()
+}
+
+// ---------------------------------------------------------------------------
+// CLI service — `normalize search`
+// ---------------------------------------------------------------------------
+
+/// CLI service implementing the top-level `normalize search` verb (semantic /
+/// vector search over the structural index).
+pub struct SemanticCliService;
+
+impl SemanticCliService {
+    /// Create a new semantic search service.
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Generic display bridge that routes to `OutputFormatter::format_text()`.
+    fn display_output<T: OutputFormatter>(&self, value: &T) -> String {
+        value.format_text()
+    }
+}
+
+impl Default for SemanticCliService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cli(
+    name = "search",
+    version = "0.3.2",
+    description = "Semantic (vector) search over the code index. Ranks symbols, docs, and commits by meaning rather than by name. Requires embeddings — enable `[embeddings]` in .normalize/config.toml and run `structure rebuild`."
+)]
+impl SemanticCliService {
+    /// Search the semantic index for chunks matching a natural-language query.
+    ///
+    /// Embeds the query and ranks stored chunk embeddings by cosine similarity,
+    /// re-ranked by git staleness. Uses the ANN index when available, falling
+    /// back to a brute-force scan otherwise.
+    ///
+    /// Requires the embeddings index: set `[embeddings] enabled = true` in
+    /// `.normalize/config.toml`, then run `normalize structure rebuild`.
+    ///
+    /// Examples:
+    ///   normalize search "retry logic with backoff"
+    ///   normalize search "parse config file" --limit 5
+    #[cli(default, display_with = "display_output")]
+    pub async fn search(
+        &self,
+        #[param(positional, help = "Natural-language query")] query: String,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(
+            short = 'n',
+            name = "limit",
+            help = "Maximum number of results to return (default 10)"
+        )]
+        limit: Option<usize>,
+    ) -> Result<SearchReport, String> {
+        let root = match root {
+            Some(r) => PathBuf::from(r),
+            None => std::env::current_dir().map_err(|e| e.to_string())?,
+        };
+        let top_k = limit.unwrap_or(10);
+        run_search(&root, query, top_k).await
+    }
 }

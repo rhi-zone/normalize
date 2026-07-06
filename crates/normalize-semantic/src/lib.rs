@@ -14,7 +14,7 @@
 //! - **[`store`]** -- read/write embeddings to/from SQLite
 //! - **[`search`]** -- ANN search + staleness re-ranking
 //! - **[`populate`]** -- walk the structural index and embed symbols, docs, and commits
-//! - **[`service`]** -- CLI service (`normalize structure search`) -- `cli` feature
+//! - **[`service`]** -- CLI service (`normalize search` verb) -- `cli` feature
 //!
 //! ## Usage
 //!

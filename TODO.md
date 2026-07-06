@@ -948,10 +948,22 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   `src` LOC: 66839 → 66850 (+11: mount wiring; the `aliases` display logic + `detect_project_languages`
   stay in `commands/aliases.rs` because the shim uses them and `build_filter` shares the
   detector — both retire at B12).**
-- [ ] **B7 — `search`:** add `#[cli(name="search")]` to normalize-semantic; mount. **Remove
-  the `search`→`grep` alias from `main.rs` `rewrite_aliases` (and the `docs/cli-design.md`
-  aliases table row) atomically with mounting this verb** — `search` becomes the semantic
-  verb (resolved 2026-07-03). `find`→`grep` alias stays.
+- [x] **B7 — `search`:** ✅ DONE 2026-07-03. Added `SemanticCliService` (`#[cli(name="search")]`,
+  `cli` feature) to `normalize-semantic` and mounted it as the top-level `search` verb; the
+  single `search` method is `#[cli(default, ...)]` so `normalize search <query>` is a leaf, not
+  `search search`. The compute was already present but ORPHANED (`run_search` + `SearchReport`
+  with `OutputFormatter` in `service.rs`, no `#[cli]` wrapper, no mount) — the plan's "orphan
+  `#[cli]` service" was slightly off (no `#[cli]` existed; only the compute did), so B7 wrote the
+  thin wrapper rather than inventing a service. Config wiring is budget-style: `run_search` loads
+  the `[embeddings]` slice from `.normalize/config.toml` itself (no `NormalizeConfig` dep); when
+  disabled/unpopulated it prints an actionable stderr message + non-zero exit (verified
+  non-interactive). **Removed the `search`→`grep` alias** from `main.rs` `rewrite_aliases` + the
+  `docs/cli-design.md` aliases table row — `search` now routes to semantic search, not grep
+  (proven: `normalize search "…"` hits the semantic "not enabled" path, not a text match);
+  `find`→`grep` still works. Also fixed stale `structure search` doc refs in `normalize-semantic`.
+  Build matrix (default / `cli` / all-features / no-default-features) green; clippy + `cargo test -q`
+  green (1 snapshot updated: `help_root` gains `search`; added `assert_output_formatter::<SearchReport>()`).
+  **Main-crate `src` LOC: 66850 → 66863 (+13: mount wiring + output.rs test line).**
 - [ ] **B8 — `normalize-git-history` extraction:** define typed data API (`ChurnStats`,
   `CoupledPair`, `OwnershipEntry`, `HotspotEntry`, etc.); disentangle compute from
   `OutputFormatter` in each command file; move compute fns into new crate; OutputFormatter
