@@ -2105,7 +2105,7 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
   `std::fs::copy` (note: `fast_rsync` is a delta algorithm library, not a file copier).
   Copies project dir + session metadata via `project_metadata_roots`, rewrites index paths
   post-copy via libsql. `--dry-run`, `--verbose`, `--all`, `--active N`, `--repo`/`--exclude` done.
-  - [ ] Follow-up: incremental sync (skip unchanged files via mtime/checksum)
+  - [x] Follow-up: incremental sync (skip unchanged files via mtime/checksum) — done. Default: mtime+size check against dest. `--checksum` for SHA-256 content comparison. `--force` bypasses. Report shows `files_copied`/`files_unchanged`. Manifest approach removed.
   - [ ] Follow-up: multi-format session discovery (currently Claude Code only)
 - Agent habit analysis: study session logs to identify builtin vs learned behaviors
   - Example: "git status before commit" - is this hardcoded or from CLAUDE.md guidance?

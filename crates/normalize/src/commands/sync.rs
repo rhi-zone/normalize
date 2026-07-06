@@ -1,8 +1,7 @@
 //! Sync command — copy a project (and its session metadata) to a destination.
 
 use crate::output::OutputFormatter;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use serde::Serialize;
 use std::path::{Path, PathBuf};
 
 // ── Report types ─────────────────────────────────────────────────────────────
@@ -17,6 +16,9 @@ pub struct SyncFileItem {
     /// Whether the file was skipped due to an exclude rule.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub excluded: bool,
+    /// Whether the file was skipped because it was unchanged (incremental check).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub unchanged: bool,
 }
 
 /// Report returned by `normalize sync`.
@@ -30,7 +32,7 @@ pub struct SyncReport {
     pub files_copied: usize,
     /// Number of session metadata files copied.
     pub sessions_copied: usize,
-    /// Number of files skipped because their content hash matched the manifest.
+    /// Number of files skipped because they were unchanged (mtime+size or checksum match).
     pub files_unchanged: usize,
     /// Whether path rewriting was performed on the index DB.
     pub index_paths_rewritten: bool,
@@ -63,7 +65,11 @@ impl OutputFormatter for SyncReport {
         if !self.files.is_empty() {
             let _ = writeln!(out);
             for f in &self.files {
-                let _ = writeln!(out, "  {} → {}", f.src, f.dest);
+                if f.unchanged {
+                    let _ = writeln!(out, "  [skip] {}", f.src);
+                } else {
+                    let _ = writeln!(out, "  {} → {}", f.src, f.dest);
+                }
             }
         }
         for w in &self.warnings {
@@ -101,106 +107,55 @@ fn is_excluded(path: &Path, root: &Path) -> bool {
     false
 }
 
-// ── Copy helpers ──────────────────────────────────────────────────────────────
+// ── Incremental check helpers ─────────────────────────────────────────────────
 
-/// Walk `src_root` and copy all non-excluded files to `dest_root`.
-/// Returns (files_copied, file_items).
-pub fn copy_tree(
-    src_root: &Path,
-    dest_root: &Path,
-    dry_run: bool,
-    verbose: bool,
-    warnings: &mut Vec<String>,
-    // normalize-syntax-allow: rust/tuple-return
-) -> (usize, Vec<SyncFileItem>) {
-    let mut count = 0usize;
-    let mut items = Vec::new();
-
-    for entry in walkdir::WalkDir::new(src_root)
-        .follow_links(false)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        let src_path = entry.path();
-        if src_path.is_dir() {
-            continue;
-        }
-        if is_excluded(src_path, src_root) {
-            continue;
-        }
-
-        let Ok(rel) = src_path.strip_prefix(src_root) else {
-            continue;
-        };
-        let dest_path = dest_root.join(rel);
-
-        if verbose {
-            items.push(SyncFileItem {
-                src: src_path.to_string_lossy().into_owned(),
-                dest: dest_path.to_string_lossy().into_owned(),
-                excluded: false,
-            });
-        }
-
-        if !dry_run {
-            if let Some(parent) = dest_path.parent()
-                && let Err(e) = std::fs::create_dir_all(parent)
-            {
-                warnings.push(format!("mkdir {}: {}", parent.display(), e));
-                continue;
-            }
-            if let Err(e) = std::fs::copy(src_path, &dest_path) {
-                warnings.push(format!("copy {}: {}", src_path.display(), e));
-                continue;
-            }
-        }
-        count += 1;
+/// Returns true if `dest` exists, has the same size as `src`, and its mtime >= src mtime.
+/// Fast O(1) metadata-only check — no file reads required.
+fn is_unchanged_mtime_size(src: &Path, dest: &Path) -> bool {
+    let Ok(src_meta) = std::fs::metadata(src) else {
+        return false;
+    };
+    let Ok(dest_meta) = std::fs::metadata(dest) else {
+        return false;
+    };
+    if src_meta.len() != dest_meta.len() {
+        return false;
     }
-
-    (count, items)
+    let Ok(src_mtime) = src_meta.modified() else {
+        return false;
+    };
+    let Ok(dest_mtime) = dest_meta.modified() else {
+        return false;
+    };
+    dest_mtime >= src_mtime
 }
 
-// ── Sync manifest (incremental sync) ─────────────────────────────────────────
-
-/// Manifest recording content hashes for all files copied in a previous sync.
-/// Stored as `.normalize/sync-manifest.json` in the *destination* project root.
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct SyncManifest {
-    /// Map from relative path (slash-separated) to hex-encoded blake3 hash of source content.
-    pub files: HashMap<String, String>,
-}
-
-impl SyncManifest {
-    /// Load manifest from `<dest_root>/.normalize/sync-manifest.json`, or return empty.
-    pub fn load(dest_root: &Path) -> Self {
-        let path = dest_root.join(".normalize/sync-manifest.json");
-        if let Ok(data) = std::fs::read_to_string(&path) {
-            serde_json::from_str(&data).unwrap_or_default()
-        } else {
-            Self::default()
-        }
-    }
-
-    /// Save manifest to `<dest_root>/.normalize/sync-manifest.json`.
-    pub fn save(&self, dest_root: &Path) -> Result<(), String> {
-        let dir = dest_root.join(".normalize");
-        std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir {}: {}", dir.display(), e))?;
-        let path = dir.join("sync-manifest.json");
-        let json =
-            serde_json::to_string_pretty(self).map_err(|e| format!("serialize manifest: {}", e))?;
-        std::fs::write(&path, json).map_err(|e| format!("write manifest {}: {}", path.display(), e))
-    }
-}
-
-/// Hash a file's contents with blake3. Returns hex-encoded digest.
-fn hash_file(path: &Path) -> Option<String> {
+/// Compute SHA-256 digest of a file's contents. Returns raw bytes.
+fn sha256_file(path: &Path) -> Option<Vec<u8>> {
+    use sha2::Digest as _;
     let data = std::fs::read(path).ok()?;
-    Some(blake3::hash(&data).to_hex().to_string())
+    let mut h = sha2::Sha256::new();
+    h.update(&data);
+    Some(h.finalize().to_vec())
 }
 
+/// Returns true if both files exist and their SHA-256 digests match.
+fn is_unchanged_checksum(src: &Path, dest: &Path) -> bool {
+    match (sha256_file(src), sha256_file(dest)) {
+        (Some(s), Some(d)) => s == d,
+        _ => false,
+    }
+}
+
+// ── Copy helper ───────────────────────────────────────────────────────────────
+
 /// Walk `src_root` and copy all non-excluded files to `dest_root`.
-/// If `manifest` is Some, skips files whose content hash matches.
-/// Returns (files_copied, files_unchanged, file_items, updated_manifest_entries).
+///
+/// Incremental behaviour (skipped when `force` is true or during a dry-run preview):
+/// - Default: skip a file if dest exists, `dest_mtime >= src_mtime`, and sizes match.
+/// - With `checksum = true`: skip a file if dest exists and SHA-256 digests match.
+///
+/// Returns `(files_copied, files_unchanged, file_items)`.
 #[allow(clippy::too_many_arguments)]
 pub fn copy_tree_incremental(
     src_root: &Path,
@@ -208,14 +163,13 @@ pub fn copy_tree_incremental(
     dry_run: bool,
     verbose: bool,
     force: bool,
-    manifest: &SyncManifest,
+    checksum: bool,
     warnings: &mut Vec<String>,
     // normalize-syntax-allow: rust/tuple-return
-) -> (usize, usize, Vec<SyncFileItem>, HashMap<String, String>) {
+) -> (usize, usize, Vec<SyncFileItem>) {
     let mut copied = 0usize;
     let mut unchanged = 0usize;
     let mut items = Vec::new();
-    let mut new_entries: HashMap<String, String> = HashMap::new();
 
     for entry in walkdir::WalkDir::new(src_root)
         .follow_links(false)
@@ -233,27 +187,29 @@ pub fn copy_tree_incremental(
         let Ok(rel) = src_path.strip_prefix(src_root) else {
             continue;
         };
-        let rel_key = rel.to_string_lossy().replace('\\', "/");
         let dest_path = dest_root.join(rel);
 
-        // Incremental: check hash unless --force
-        if !force
-            && !dry_run
-            && let Some(src_hash) = hash_file(src_path)
-        {
-            if manifest
-                .files
-                .get(&rel_key)
-                .map(|h| h == &src_hash)
-                .unwrap_or(false)
-            {
-                unchanged += 1;
-                // Keep existing manifest entry
-                new_entries.insert(rel_key, src_hash);
-                continue;
+        // Incremental: skip unchanged files unless --force or --dry-run.
+        // Dry-run still runs the check so it can report what *would* be skipped.
+        let skip = !force && {
+            if checksum {
+                is_unchanged_checksum(src_path, &dest_path)
+            } else {
+                is_unchanged_mtime_size(src_path, &dest_path)
             }
-            // Will copy — record hash
-            new_entries.insert(rel_key.clone(), src_hash);
+        };
+
+        if skip {
+            unchanged += 1;
+            if verbose {
+                items.push(SyncFileItem {
+                    src: src_path.to_string_lossy().into_owned(),
+                    dest: dest_path.to_string_lossy().into_owned(),
+                    excluded: false,
+                    unchanged: true,
+                });
+            }
+            continue;
         }
 
         if verbose {
@@ -261,6 +217,7 @@ pub fn copy_tree_incremental(
                 src: src_path.to_string_lossy().into_owned(),
                 dest: dest_path.to_string_lossy().into_owned(),
                 excluded: false,
+                unchanged: false,
             });
         }
 
@@ -279,7 +236,7 @@ pub fn copy_tree_incremental(
         copied += 1;
     }
 
-    (copied, unchanged, items, new_entries)
+    (copied, unchanged, items)
 }
 
 /// Discover session metadata roots for a project across all registered AI agent formats.

@@ -857,18 +857,24 @@ impl NormalizeService {
     /// session metadata to `<dest>`. After copying, rewrites absolute paths in the index DB
     /// so the copy works from its new location.
     ///
-    /// On subsequent syncs, skips files whose content hash matches the manifest stored at
-    /// `<dest>/.normalize/sync-manifest.json`. Use `--force` to bypass the manifest.
+    /// **Incremental by default:** on subsequent syncs, skips files where the destination
+    /// already exists, `dest_mtime >= src_mtime`, and sizes match. Pass `--checksum` to use
+    /// SHA-256 content comparison instead (slower but mtime-independent). Pass `--force` to
+    /// copy all files unconditionally.
+    ///
+    /// The index DB in the destination is always rewritten after sync — even when all project
+    /// files were skipped — so path references stay correct if the destination was moved.
     ///
     /// Session metadata is discovered across all registered AI agent formats (Claude Code,
     /// OpenAI Codex, Gemini CLI, Normalize Agent) via the `normalize_chat_sessions` format
-    /// registry.
+    /// registry. Session files are always copied in full (no incremental check).
     ///
     /// Examples:
     ///   normalize sync /backup/myproject               # copy project to new location
     ///   normalize sync /backup/myproject --dry-run     # preview what would be copied
     ///   normalize sync /backup/myproject --verbose     # show each file as it's copied
-    ///   normalize sync /backup/myproject --force       # force full re-sync (ignore manifest)
+    ///   normalize sync /backup/myproject --checksum    # use SHA-256 instead of mtime+size
+    ///   normalize sync /backup/myproject --force       # copy all files (skip no-change check)
     ///   normalize sync /backup --all                   # copy all known projects
     ///   normalize sync /backup --all --active 30       # only projects active in last 30 days
     ///   normalize sync /backup --all --repo "*/rhizone/*"  # filter by path glob
@@ -887,7 +893,9 @@ impl NormalizeService {
         #[param(help = "Dry run — show what would be copied without writing anything")]
         dry_run: bool,
         #[param(short = 'v', help = "Print each file as it is copied")] verbose: bool,
-        #[param(help = "Force full re-sync, ignoring the incremental manifest")] force: bool,
+        #[param(help = "Force full re-sync, skipping no-change checks")] force: bool,
+        #[param(help = "Use SHA-256 content comparison instead of mtime+size for unchanged check")]
+        checksum: bool,
         #[param(
             help = "Only sync projects with activity in the last N days (--all only, default 30)"
         )]
@@ -898,7 +906,7 @@ impl NormalizeService {
         exclude: Option<String>,
     ) -> Result<commands::sync::SyncReport, String> {
         use commands::sync::{
-            SyncFileItem, SyncManifest, SyncReport, common_prefix, copy_tree_incremental,
+            SyncFileItem, SyncReport, common_prefix, copy_tree_incremental,
             list_all_known_project_roots, rewrite_index_paths,
         };
         use normalize_chat_sessions::project_metadata_roots;
@@ -992,43 +1000,21 @@ impl NormalizeService {
                 dest_root.clone()
             };
 
-            // 1. Load incremental manifest from destination.
-            let manifest = if force || dry_run {
-                SyncManifest::default()
-            } else {
-                SyncManifest::load(&proj_dest)
-            };
-
-            // 2. Copy project tree (incremental).
-            let (n, unchanged, items, new_entries) = copy_tree_incremental(
+            // 1. Copy project tree (incremental by default).
+            let (n, unchanged, items) = copy_tree_incremental(
                 proj_root,
                 &proj_dest,
                 dry_run,
                 verbose,
                 force,
-                &manifest,
+                checksum,
                 &mut all_warnings,
             );
             total_files += n;
             total_unchanged += unchanged;
             all_file_items.extend(items);
 
-            // 3. Save updated manifest.
-            if !dry_run {
-                let mut updated = SyncManifest::default();
-                // Preserve unchanged entries + add newly computed entries
-                for (k, v) in &manifest.files {
-                    updated.files.insert(k.clone(), v.clone());
-                }
-                for (k, v) in new_entries {
-                    updated.files.insert(k, v);
-                }
-                if let Err(e) = updated.save(&proj_dest) {
-                    all_warnings.push(format!("manifest save: {}", e));
-                }
-            }
-
-            // 4. Copy session metadata for all registered formats.
+            // 2. Copy session metadata for all registered formats (always full copy).
             for meta_root in project_metadata_roots(proj_root) {
                 let format_name = meta_root
                     .parent()
@@ -1039,21 +1025,23 @@ impl NormalizeService {
                     .join(".sessions")
                     .join(format_name)
                     .join(meta_root.file_name().unwrap_or_default());
-                // Session metadata is not incremental (always copy; manifests track project files)
-                let (sn, _unchanged, sitems, _) = copy_tree_incremental(
+                // Session metadata: always copy in full (force=true, checksum ignored).
+                let (sn, _unchanged, sitems) = copy_tree_incremental(
                     &meta_root,
                     &sessions_dest,
                     dry_run,
                     verbose,
                     true,
-                    &SyncManifest::default(),
+                    false,
                     &mut all_warnings,
                 );
                 total_sessions += sn;
                 all_file_items.extend(sitems);
             }
 
-            // 5. Rewrite index paths.
+            // 3. Rewrite index paths in the destination DB.
+            // Runs regardless of how many files were skipped — paths must be correct
+            // even when every project file was already up to date.
             if !dry_run {
                 let dest_db = proj_dest.join(".normalize").join("index.sqlite");
                 if dest_db.exists() {

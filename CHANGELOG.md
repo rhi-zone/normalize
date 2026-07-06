@@ -38,6 +38,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`normalize sync` is now incremental by default.** Skips copying a file when the
+  destination already exists, `dest_mtime >= src_mtime`, and sizes match — no separate
+  manifest file required. Pass `--checksum` to use SHA-256 content comparison instead
+  (slower, but mtime-independent). Pass `--force` to copy all files unconditionally.
+  The report now shows `files_copied` vs `files_unchanged` counts; `--verbose` marks
+  skipped files as `[skip]`. The index DB path rewrite runs unconditionally after sync —
+  even when every file was skipped — so paths stay correct regardless.
+
 - **`overview` verb: codebase dashboards in one place (CLI taxonomy inversion B11).**
   `normalize overview` renders the health dashboard (formerly `analyze health`), `overview
   --full` runs every analysis pass (formerly `analyze all`), `overview summary` is the
