@@ -7,7 +7,7 @@ Edit code by symbol name. Use for batch renames, signature changes, or pattern-b
 Usage: normalize edit [OPTIONS] [COMMAND]
 
 Commands:
-  history             View shadow git edit history
+  log                 View shadow git edit log
   delete              Delete a symbol.
   replace             Replace a symbol with new content.
   swap                Swap two symbols

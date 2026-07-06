@@ -9,6 +9,7 @@ fn main() {
     match args.get(1).map(|s| s.as_str()) {
         Some("build-grammars") => build_grammars(&args[2..]),
         Some("bump-version") => bump_version(&args[2..]),
+        Some("lint-rank-verbs") => lint_rank_verbs(),
         Some("help") | None => print_help(),
         Some(cmd) => {
             eprintln!("Unknown command: {cmd}");
@@ -38,7 +39,127 @@ fn print_help() {
     eprintln!("      Update version strings for all normalize-* crates");
     eprintln!("      <new-version>  New semver version (e.g. 0.3.0)");
     eprintln!("      --dry-run      Show what would change without writing");
+    eprintln!("  lint-rank-verbs");
+    eprintln!("      Fail if a rank-metric report (its entry `impl RankEntry`) is surfaced by");
+    eprintln!("      a main-crate verb other than `rank`/`trend`. Guards metric-command drift.");
     eprintln!("  help             Show this message");
+}
+
+// ─── lint-rank-verbs ─────────────────────────────────────────────────────────
+
+/// Ownership lint (inversion plan §metric-core, B11): metric commands are
+/// identified by their entry types implementing the `RankEntry` trait. Those
+/// commands must stay under the main-crate `rank`/`trend` verbs (the A1
+/// decision — rank/trend are permanently main-resident). This guards against
+/// the H-4/H-5 drift where metric commands silently migrated between `analyze`
+/// and `rank`.
+///
+/// Mechanism: a module under `crates/normalize/src/{commands/analyze,analyze}/`
+/// that contains `impl RankEntry for` (or `DiffableRankEntry`) is a rank-metric
+/// module; its `pub struct *Report` types are rank-metric reports. Any
+/// main-crate `service/*.rs` OTHER than `rank.rs`/`trend.rs` that returns such a
+/// report is flagged — unless the report is on the documented allow-list.
+///
+/// Allow-listed verbs: `rank`, `trend` (checked by filename).
+/// Allow-listed reports: `DocCoverageReport` — a documentation-coverage report
+/// that legitimately lives under `analyze` and merely reuses the ranked-table
+/// renderer; it is not a drifting metric.
+fn lint_rank_verbs() {
+    let root = find_workspace_root();
+    let src = root.join("crates/normalize/src");
+
+    // 1. Collect rank-metric report struct names from metric modules.
+    let mut metric_reports: Vec<String> = Vec::new();
+    for sub in ["commands/analyze", "analyze"] {
+        let dir = src.join(sub);
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                continue;
+            }
+            let Ok(content) = fs::read_to_string(&path) else {
+                continue;
+            };
+            if !(content.contains("impl RankEntry for")
+                || content.contains("impl DiffableRankEntry for"))
+            {
+                continue;
+            }
+            for line in content.lines() {
+                if let Some(name) = line.trim().strip_prefix("pub struct ") {
+                    let name = name
+                        .split(|c: char| c == ' ' || c == '{' || c == '(' || c == '<')
+                        .next()
+                        .unwrap_or("");
+                    if name.ends_with("Report") {
+                        metric_reports.push(name.to_string());
+                    }
+                }
+            }
+        }
+    }
+    metric_reports.sort();
+    metric_reports.dedup();
+
+    // Reports allowed to live outside rank/trend despite ranked rendering.
+    let allowed_reports = ["DocCoverageReport"];
+
+    // 2. Scan main-crate service files (except rank/trend) for rank-metric returns.
+    let service_dir = src.join("service");
+    let mut violations: Vec<String> = Vec::new();
+    let Ok(entries) = fs::read_dir(&service_dir) else {
+        eprintln!("lint-rank-verbs: cannot read {}", service_dir.display());
+        std::process::exit(1);
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+            continue;
+        }
+        let file = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        // Allow-listed main-crate verbs.
+        if file == "rank.rs" || file == "trend.rs" {
+            continue;
+        }
+        let Ok(content) = fs::read_to_string(&path) else {
+            continue;
+        };
+        for report in &metric_reports {
+            if allowed_reports.contains(&report.as_str()) {
+                continue;
+            }
+            // Return-type signal: `-> Result<XxxReport` or `-> XxxReport`.
+            let needle_a = format!("Result<{report}");
+            let needle_b = format!("-> {report}");
+            if content.contains(&needle_a) || content.contains(&needle_b) {
+                violations.push(format!(
+                    "  {report} (rank-metric) is surfaced by verb `{}`",
+                    file.trim_end_matches(".rs")
+                ));
+            }
+        }
+    }
+
+    if violations.is_empty() {
+        println!(
+            "lint-rank-verbs: OK — {} rank-metric report(s) stay under rank/trend",
+            metric_reports.len()
+        );
+    } else {
+        eprintln!(
+            "lint-rank-verbs: FAIL — metric commands must live under the `rank` or `trend` verbs\n\
+             (A1 decision: rank/trend are permanently main-resident). Move the command's\n\
+             `#[cli]` method into service/rank.rs (or trend.rs), or if it is genuinely not a\n\
+             ranked metric, add its report to the allow-list in xtask lint-rank-verbs.\n"
+        );
+        for v in &violations {
+            eprintln!("{v}");
+        }
+        std::process::exit(1);
+    }
 }
 
 fn build_grammars(args: &[String]) {

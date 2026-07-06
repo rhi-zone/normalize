@@ -39,6 +39,12 @@ jobs:
       - name: Run cargo check
         run: cargo check --workspace --all-features
 
+      # Guards metric-command drift (inversion plan B11): rank-metric commands
+      # (entry types implementing `RankEntry`) must stay under the main-crate
+      # `rank`/`trend` verbs, not accrete into `analyze`/`overview`/etc.
+      - name: Lint rank-metric verb ownership
+        run: cargo xtask lint-rank-verbs
+
   features:
     name: Feature Combos
     runs-on: ubuntu-latest

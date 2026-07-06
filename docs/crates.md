@@ -32,9 +32,9 @@ lives in main.
 
 | crate | purpose | namespace (current / planned) | key notes |
 |---|---|---|---|
-| `normalize` | Fast code intelligence CLI and library | (host binary) | Main crate: command dispatch, global flags, output backend, service composition, vendored CLIs (`rg`/`ast_grep`/`jq`), `view`/`edit`/`analyze`/`rank`/`trend`/`init`/`update`/`sync` residual. ~84k L; ~21k vendored (forced to stay). |
+| `normalize` | Fast code intelligence CLI and library | (host binary) | Main crate: command dispatch, global flags, output backend, service composition, vendored CLIs (`rg`/`ast_grep`/`jq`), `view`/`edit`/`analyze`/`overview`/`rank`/`trend`/`init`/`update`/`sync` residual. `overview` (B11) is a thin composition verb over the analysis surface; `rank`/`trend` are permanent main-crate verbs (metrics A1 — no metrics crate). ~84k L; ~21k vendored (forced to stay). |
 | `normalize-budget` | Diff-based budget system: track how much a codebase is allowed to change | `budget` | Reference "crate owns its subcommand" shape. |
-| `normalize-cfg` | Control flow graph builder | `cfg` | Owns `cfg` verb. (The dataflow trio — liveness/effects/exceptions — landed in `normalize-facts` under `structure`, B5.) |
+| `normalize-cfg` | Control flow graph builder | `cfg` | Owns `cfg` compute; mounted as the `normalize cfg <file>` leaf (the redundant `cfg cfg` nesting was collapsed in B11). (The dataflow trio — liveness/effects/exceptions — landed in `normalize-facts` under `structure`, B5.) |
 | `normalize-knowledge-graph` | Persistent, addressable, queryable knowledge graph adjacent to code — unit CRUD, edge management, BFS traversal | `kg` | |
 | `normalize-ratchet` | Metric regression-tracking (ratchet) system | `ratchet` | Uses `normalize-facts::FileIndex` directly (migration precedent). |
 | `normalize-rules` | Rule orchestration and CLI service (syntax + fact + native + SARIF engines) | `rules` | Mounts the syntax/fact/native rule engines behind one verb. |

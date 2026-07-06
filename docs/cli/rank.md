@@ -49,7 +49,7 @@ Old paths (`rank hotspots` etc.) are kept as hidden aliases for one release — 
 | Subcommand | Description |
 |------------|-------------|
 | `test-ratio` | Test/impl line ratio per module |
-| `budget` | Line budget breakdown by purpose (logic, tests, docs, config) |
+| `purposes` | Line-purpose breakdown (logic, tests, docs, config) — was `budget` (hidden alias for one release) |
 
 ## Examples
 
@@ -84,7 +84,7 @@ normalize architecture layering   # import layering compliance
 
 # Test coverage
 normalize rank test-ratio         # test/impl ratio per module
-normalize rank budget             # line budget breakdown
+normalize rank purposes           # line-purpose breakdown (was rank budget)
 
 # Show worst modules overall
 normalize rank module-health

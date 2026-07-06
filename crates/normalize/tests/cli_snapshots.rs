@@ -73,6 +73,11 @@ fn test_help_analyze() {
 }
 
 #[test]
+fn test_help_overview() {
+    insta::assert_snapshot!(snapshot_help(&["overview"]));
+}
+
+#[test]
 fn test_help_aliases() {
     insta::assert_snapshot!(snapshot_help(&["aliases"]));
 }
@@ -485,13 +490,8 @@ fn test_help_trend_test_ratio() {
     insta::assert_snapshot!(snapshot_help(&["trend", "test-ratio"]));
 }
 
-// cfg command
+// cfg command (leaf — the former redundant `cfg cfg` nesting was collapsed in B11)
 #[test]
 fn test_help_cfg() {
     insta::assert_snapshot!(snapshot_help(&["cfg"]));
-}
-
-#[test]
-fn test_help_cfg_cfg() {
-    insta::assert_snapshot!(snapshot_help(&["cfg", "cfg"]));
 }

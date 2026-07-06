@@ -8,6 +8,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`overview` verb: codebase dashboards in one place (CLI taxonomy inversion B11).**
+  `normalize overview` renders the health dashboard (formerly `analyze health`), `overview
+  --full` runs every analysis pass (formerly `analyze all`), `overview summary` is the
+  single-page codebase overview (formerly `analyze summary`), and `overview cross-repo-health`
+  ranks repositories by composite tech-debt (formerly `analyze cross-repo-health`). A thin
+  main-crate composition verb over the analysis surface — the aggregate reports no longer hide
+  among `analyze`'s per-metric subcommands. The old `analyze` paths keep working as hidden
+  aliases for one release (`analyze` also still routes a bare target to the health dashboard).
+
+### Changed
+
+- **Command renames (CLI taxonomy inversion B11); old paths kept as hidden aliases for one release:**
+  - `cfg cfg <file>` → `normalize cfg <file>` — the redundant double-name nesting is collapsed
+    into a single leaf command (owner unchanged: `normalize-cfg`).
+  - `edit history` → `edit log` — resolves the collision with `view history` (single-file git log).
+  - `rank budget` → `rank purposes` — frees the `budget` word for the `normalize-budget` verb.
+
 - **Top-level `history` verb: git-history code-health signals (CLI taxonomy inversion B9).**
   `normalize history` groups the repo-wide, cross-file statistical analyses derived from git
   history — `hotspots` (churn × complexity), `coupling` (temporal file coupling), `ownership`

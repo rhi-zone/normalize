@@ -24,3 +24,7 @@ Options:
       --manual                     Emit the reference manual for the command subtree rooted here and exit
       --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
   -h, --help                       Print help
+
+Transitional shim: moved to the top-level `overview` verb. Hidden from help;
+kept for one release. Remains the `analyze` default so `normalize analyze <target>`
+still routes here.

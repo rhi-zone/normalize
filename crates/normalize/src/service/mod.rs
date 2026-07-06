@@ -27,6 +27,7 @@ pub mod generate;
 pub mod grammars;
 pub mod guide;
 pub mod history;
+pub mod overview;
 pub mod package;
 pub mod rank;
 pub mod ratchet;
@@ -68,6 +69,7 @@ pub struct NormalizeService {
     generate: generate::GenerateService,
     graph: normalize_graph::GraphService,
     history: normalize_git_history::service::HistoryService,
+    overview: overview::OverviewService,
     package: package::PackageService,
     rank: rank::RankService,
     similarity: normalize_code_similarity::SimilarityService,
@@ -132,6 +134,7 @@ impl NormalizeService {
             generate: generate::GenerateService,
             graph: normalize_graph::GraphService::new(&pretty),
             history: normalize_git_history::service::HistoryService::new(),
+            overview: overview::OverviewService::new(&pretty),
             package: package::PackageService::new(),
             rank: rank::RankService::new(&pretty),
             similarity: normalize_code_similarity::SimilarityService::new(&pretty),
@@ -1126,6 +1129,20 @@ impl NormalizeService {
         &self.analyze
     }
 
+    /// Codebase dashboards: health, full analysis, single-page summary, cross-repo health.
+    ///
+    /// Thin composition over the analysis surface — one place for the aggregate reports.
+    ///
+    /// Examples:
+    ///   normalize overview                       # health dashboard
+    ///   normalize overview --full                # run all analysis passes
+    ///   normalize overview summary               # single-page codebase overview
+    ///   normalize overview cross-repo-health ~/src  # rank repos by tech-debt
+    #[server(group = "analysis")]
+    pub fn overview(&self) -> &overview::OverviewService {
+        &self.overview
+    }
+
     /// Rank files and functions by metrics. Use to find the most complex, longest, or most coupled code.
     #[server(group = "analysis")]
     pub fn rank(&self) -> &rank::RankService {
@@ -1202,9 +1219,26 @@ impl NormalizeService {
     }
 
     /// Build and render the control flow graph for a function. Use to visualize execution paths, branches, and loops.
+    ///
+    /// Also known as: control-flow graph, flow chart, code flow. Leaf command
+    /// (formerly the redundant `cfg cfg`); the compute is owned by `normalize-cfg`.
+    ///
+    /// Examples:
+    ///   normalize cfg src/lib.rs                 # CFG of the first function
+    ///   normalize cfg src/lib.rs -f my_function  # CFG of a specific function
     #[server(group = "analysis")]
-    pub fn cfg(&self) -> &normalize_cfg::service::CfgService {
-        &self.cfg
+    #[cli(display_with = "display_output")]
+    pub fn cfg(
+        &self,
+        #[param(positional, help = "Source file path")] path: String,
+        #[param(
+            short = 'f',
+            help = "Function name filter (defaults to first function found)"
+        )]
+        function: Option<String>,
+        #[param(help = "Output format: mermaid (default)")] format: Option<String>,
+    ) -> Result<normalize_cfg::service::CfgReport, String> {
+        self.cfg.cfg(path, function, format)
     }
 
     /// Prevent metric regressions. Records a baseline and fails CI if metrics get worse.

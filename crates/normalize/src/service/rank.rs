@@ -824,8 +824,11 @@ impl RankService {
     /// Classifies every line in the codebase into a budget category and ranks files by the
     /// categories you care about most. Returns a `LineBudgetReport` with per-file breakdowns
     /// and totals across the whole project.
+    ///
+    /// Renamed from `rank budget` to `rank purposes` to free the `budget` word for the
+    /// `normalize-budget` crate verb. `budget` is kept as a hidden alias for one release.
     #[server(group = "test")]
-    #[cli(display_with = "display_budget")]
+    #[cli(name = "purposes", alias = "budget", display_with = "display_budget")]
     pub fn budget(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<

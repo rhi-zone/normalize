@@ -6,7 +6,7 @@ Quick reference for working with codebases using Normalize.
 
 ```bash
 # Get project overview
-normalize analyze health
+normalize overview
 
 # View codebase structure
 normalize view
@@ -19,7 +19,7 @@ normalize view src/main.rs
 
 | Command | Purpose | When to Use |
 |---------|---------|-------------|
-| `normalize analyze health` | Codebase metrics and health score | First thing when entering a codebase |
+| `normalize overview` | Codebase metrics and health score | First thing when entering a codebase |
 | `normalize view src/` | Code structure (symbols, hierarchy) | Understanding architecture |
 | `normalize view --deps FILE` | Import/export analysis | Before modifying a file |
 | `normalize rank complexity` | Cyclomatic complexity report | Checking code quality |
@@ -40,7 +40,7 @@ JSON is useful for parsing but more verbose. Plain text is token-efficient.
 
 **Starting work on a codebase:**
 ```bash
-normalize analyze health      # Quick health check
+normalize overview            # Quick health check
 normalize view                # See structure
 normalize view src/            # Drill into source
 ```
@@ -63,7 +63,7 @@ normalize view references FILE/symbol              # What does it call?
 **After making changes:**
 ```bash
 normalize tools lint           # Run linters
-normalize analyze health       # Health check
+normalize overview             # Health check
 ```
 
 **Checking dependencies:**
@@ -96,7 +96,7 @@ normalize view -d 2                # Depth 2 (nested symbols)
 ### analyze - Analysis
 
 ```bash
-normalize analyze health           # Health metrics
+normalize overview                 # Health metrics
 normalize analyze security         # Security scan
 normalize view referenced-by symbol  # What calls this?
 normalize view references symbol      # What does this call?

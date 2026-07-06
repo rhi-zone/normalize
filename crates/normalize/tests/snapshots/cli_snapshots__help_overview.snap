@@ -1,10 +1,16 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
-expression: "snapshot_help(&[\"analyze\", \"trace\"])"
+expression: "snapshot_help(&[\"overview\"])"
 ---
-Assess codebase quality. Use for health checks, finding duplicates, security scanning, and architecture analysis.
+Codebase dashboards: health, full analysis, single-page summary, cross-repo health.
 
-Usage: normalize analyze [OPTIONS] [target]
+Usage: normalize overview [OPTIONS] [target] [COMMAND]
+
+Commands:
+  health             Codebase health dashboard: file counts, complexity stats, large-file warnings.
+  summary            Auto-generated single-page codebase overview.
+  cross-repo-health  Rank repositories by composite tech-debt score (churn × complexity × coupling).
+  help               Print this message or the help of the given subcommand(s)
 
 Arguments:
   [target]  Target file or directory
@@ -23,14 +29,14 @@ Options:
       --exclude <exclude>          Exclude paths matching pattern
       --only <only>                Include only paths matching pattern
   -l, --limit <limit>              Maximum number of large files to include in output (0 = no limit, default 10)
+      --full                       Run all analysis passes (health + complexity + length + security)
   -h, --help                       Print help
   -V, --version                    Print version
 
-Repository:
-  docs           Measure documentation coverage: which public symbols lack doc comments.
+Thin composition over the analysis surface — one place for the aggregate reports.
 
-Security:
-  security       Scan the codebase for security issues (hardcoded secrets, unsafe patterns).
-
-Diff:
-  skeleton-diff  Show structural (skeleton) changes between a base ref and HEAD.
+Examples:
+normalize overview                       # health dashboard
+normalize overview --full                # run all analysis passes
+normalize overview summary               # single-page codebase overview
+normalize overview cross-repo-health ~/src  # rank repos by tech-debt

@@ -44,7 +44,7 @@ normalize view src/main.rs
 normalize view src/main.rs/main
 
 # Analyze codebase health
-normalize analyze health
+normalize overview
 
 # Search for text patterns
 normalize grep "TODO"
@@ -75,7 +75,7 @@ normalize view --focus src/foo.rs    # Resolve and show imported symbols
 Unified analysis with subcommands:
 
 ```bash
-normalize analyze health             # Codebase metrics and health score
+normalize overview                   # Codebase metrics and health score
 normalize rank complexity            # Cyclomatic complexity report
 normalize rank length                # Function length analysis
 normalize analyze security           # Security vulnerability scan
@@ -168,12 +168,12 @@ normalize edit undo                             # Undo last edit
 normalize edit delete --dry-run src/main.rs/Foo # Preview without applying
 ```
 
-### edit history - Shadow Git Edit History
+### edit log - Shadow Git Edit Log
 
-View the history of structural edits:
+View the log of structural edits:
 
 ```bash
-normalize edit history               # Recent edit history
+normalize edit log                   # Recent edit log
 normalize edit undo                  # Undo last edit
 normalize edit redo                  # Redo last undone edit
 normalize edit redo --dry-run        # Preview a redo without applying
@@ -304,7 +304,7 @@ Most commands support `--json` for structured output:
 
 ```bash
 normalize view src/main.rs --json
-normalize analyze health --json
+normalize overview --json
 normalize tools lint --json
 ```
 

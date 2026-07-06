@@ -39,4 +39,4 @@ Repository:
 Testing:
   test-ratio       Rank modules by test-to-implementation line ratio.
   test-gaps        Identify public functions that lack test coverage, ranked by risk score.
-  budget           Break down line counts by purpose: business logic, tests, docs, config, and generated code.
+  purposes         Break down line counts by purpose: business logic, tests, docs, config, and generated code.

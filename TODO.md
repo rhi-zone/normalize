@@ -827,13 +827,18 @@ T1-6 guide-regression.
 - Fold cyclomatic-complexity tags-walking from main `analyze/complexity.rs` into
   `normalize-facts::extract` (dedup of the `compute_complexity` wrapper; not a new crate; B5).
 
-**Metric core stays A1 — confirmed by seam evaluation (no metrics crate):**
+**Metric core stays A1 — SETTLED 2026-07-06 (executed at B11; A2 rejected, no metrics crate):**
 Complexity, length, ceremony, density, imports, surface, size, files, test-ratio, test-gaps
 have no coherent compute crate. Two disjoint dependency groups: AST-group (no SQLite) and
 index-group (entangled with `crate::index::FileIndex`). A `normalize-metrics`-AST crate
 would collide with the existing ratchet `normalize-metrics`, have one dependent, duplicate
-`compute_complexity`, and exist solely to back a verb. **`rank` and `trend` stay main-crate
-verbs.** CI lint (RankEntry-based, B11) holds against future drift.
+`compute_complexity`, and exist solely to back a verb — it fails the crate-existence bar.
+**Decision is final: `rank` and `trend` are PERMANENT main-crate verbs**; the ~19 rank-metric
+commands (complexity/ceremony/length/uniqueness/size/density/imports/surface/module-health/
+files/test-ratio/test-gaps/call-complexity/purposes/…) stay under `rank`; `cross-repo-health`
+stays main-resident (→ `overview`, B9-followup). **No `metrics` verb, no complexity-core
+extraction.** The `cargo xtask lint-rank-verbs` CI lint (B11, RankEntry-based) holds the line
+against future drift, with `rank`/`trend` allow-listed as main-crate-owned.
 
 **Reachable crate-owned verbs:** `graph` (normalize-graph), `architecture`
 (normalize-architecture), `similarity` (normalize-code-similarity), `structure`
@@ -1002,10 +1007,12 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   dropped from `rank`/`analyze` help + `help_root` gains `history`). **Main-crate `src` LOC:
   64433 → 64471 (+38: shim doc-notes + mount wiring; the real reduction lands at B12 when the
   shims are removed).**
-- [ ] **B9-followup — move `cross-repo-health` to `history`:** blocked on extracting the
-  complexity core out of the main crate into `normalize-facts` (so the crate's composer can
-  reach it without cycling). Do together with the complexity-core extraction + metrics A1/A2
-  decision (B11).
+- [x] **B9-followup — `cross-repo-health` rehomed (done, B11):** RESOLVED by routing it to
+  **`overview cross-repo-health`** (main-resident composer), NOT the `history` crate. The
+  cycle that blocked the `history` move (crate composer → main-crate complexity core) does
+  not arise here: `overview` lives in the main crate, so it calls `crate::commands::analyze::
+  cross_repo_health::analyze_cross_repo_health` directly. No complexity-core extraction
+  needed. Old `analyze cross-repo-health` kept as a hidden shim for one release.
 - [x] **B10 — syntax-rules consolidation (done):** confirmed `rules run --type syntax` and
   `rules list --type syntax` fully cover the standalone `SyntaxRulesService` (both call the same
   `normalize_syntax_rules::{load_all_rules, run_rules}` core; the `rules` engine is a superset).
@@ -1016,10 +1023,28 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   unchanged (0 delta — deletion is in `normalize-syntax-rules`, not `crates/normalize`);
   −300 L in `normalize-syntax-rules`.** `SyntaxService` (ast/query/node-types inspection) is a
   different service and stays untouched.
-- [ ] **B11 — small fixes + overview + CI lint:** `cfg cfg`→`cfg`; `edit history`→`edit log`;
-  `rank budget`→`rank purposes`; dashboards `health`/`summary`/`all`→`overview` (thin
-  main-crate composition verb); add RankEntry-based CI lint (flags metric commands drifting
-  to wrong verb; rank/trend explicitly allow-listed).
+- [x] **B11 — small fixes + overview + CI lint (done 2026-07-06):**
+  - **`overview` verb** (thin main-crate composer, `service/overview.rs`): `overview` (=health,
+    default), `overview --full` (=`analyze all`), `overview summary`, `overview cross-repo-health`.
+    Old `analyze health`/`all`/`summary`/`cross-repo-health` kept as `#[cli(hidden)]` shims
+    (health stays the `analyze` default so `normalize analyze <target>` still routes there).
+  - **`cfg cfg`→`cfg`**: collapsed the redundant nesting into a delegating leaf on
+    `NormalizeService` (calls `normalize_cfg::CfgService::cfg`; owner unchanged). No hidden
+    `cfg cfg` shim — the double-name was an accidental nesting, not an intended path, and a
+    single name can't be both a leaf and a group.
+  - **`edit history`→`edit log`** (hidden `alias = "history"`); **`rank budget`→`rank purposes`**
+    (hidden `alias = "budget"`).
+  - **CI lint** `cargo xtask lint-rank-verbs` (wired into `.github/workflows/ci.yml` check job):
+    flags any rank-metric report (its entry `impl RankEntry`) surfaced by a main-crate verb
+    other than `rank`/`trend`. `rank`/`trend` allow-listed by filename; `DocCoverageReport`
+    allow-listed by name (docs command legitimately under `analyze`, reuses ranked rendering).
+  - **Metrics A1 recorded settled** (see below); B9-followup resolved (`cross-repo-health`→
+    `overview`, above). Build matrix (default / `cli` / all-features / no-default-features)
+    green; clippy `-D warnings` + `cargo test -q` green (snapshots updated: `help_root` gains
+    `overview`, `analyze` sheds the 4 moved commands, `cfg`/`edit`/`rank` help updated,
+    `help_cfg_cfg` test removed, `help_overview` test added). **Main-crate `src` LOC: 64471 →
+    64744 (+273: `overview.rs` composer + mount wiring; A1 adds no extraction reduction, and
+    shim removal at B12 recovers the shim doc-notes).**
 - [ ] **B12 — alias sunset:** remove all hidden transitional aliases/shims at 1.0.
 - [ ] **Doc sync (every batch):** `docs/cli/`, `README.md`, `LLMS.md`, `docs/cli-design.md`,
   all guide bodies, `CHANGELOG.md`, touched `SUMMARY.md`s, regenerate `cli-snapshot`.

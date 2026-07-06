@@ -9,7 +9,7 @@
 |---------|-------------|
 | `view` | View directory/file/symbol structure |
 | `grep` | Fast ripgrep-based text search |
-| `edit` | Structural code modifications (delete, replace, swap, insert, undo, redo, history) |
+| `edit` | Structural code modifications (delete, replace, swap, insert, undo, redo, log) |
 | `rules` | Manage and run analysis rules (syntax + fact) |
 | `structure` | Manage structural index (symbols, imports, calls) |
 | `kg` | Knowledge graph — three primitives: read (selector → units), write (jq transform → mutate/delete), walk (graph traversal) |
@@ -18,7 +18,8 @@
 ### Analysis
 | Command | Description |
 |---------|-------------|
-| `analyze` | Codebase analysis (~45 subcommands) |
+| `analyze` | Codebase analysis: security, docs, skeleton-diff + per-metric residual |
+| `overview` | Codebase dashboards: `overview` (health), `overview --full`, `overview summary`, `overview cross-repo-health` (was `analyze health`/`all`/`summary`/`cross-repo-health`) |
 | `architecture` | Architectural structure: coupling, cycles, hub modules, layering, depth (`architecture`, `architecture layering`, `architecture depth-map`) |
 | `graph` | Dependency-graph analysis: cycles, blast radius, import paths (`graph`, `graph dependents`, `graph import-path`) |
 | `similarity` | Duplicate/near-duplicate code detection: clones, duplicate types, AST fragments (`similarity` incl. `--mode clusters`, `similarity duplicate-types`, `similarity fragments`; index-free) |

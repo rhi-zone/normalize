@@ -20,7 +20,7 @@ cargo build --release
 normalize view src/main.rs
 
 # Analyze codebase health
-normalize analyze health
+normalize overview
 
 # Search for a symbol by name
 normalize view MyClass
@@ -31,7 +31,8 @@ normalize view MyClass
 | Command | Purpose | Example |
 |---------|---------|---------|
 | `view` | Navigate structure | `normalize view src/` or `normalize view MyClass` |
-| `analyze` | Quality metrics | `normalize analyze health` or `normalize analyze complexity` |
+| `overview` | Codebase dashboards | `normalize overview` or `normalize overview summary` |
+| `analyze` | Quality metrics | `normalize rank complexity` or `normalize analyze security` |
 | `tools` | Run linters | `normalize tools lint` or `normalize tools test` |
 
 ## What It Does

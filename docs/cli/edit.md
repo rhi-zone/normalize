@@ -25,7 +25,7 @@ Same as `normalize view`:
 | `redo` | Redo the last undone edit |
 | `goto` | Jump to a specific shadow commit |
 | `batch` | Apply batch edits from JSON file |
-| `history` | View shadow git edit history |
+| `log` | View shadow git edit log (was `history`; hidden alias for one release) |
 
 Position (`--at` for insert): `before`, `after`, `prepend`, `append`
 
@@ -56,8 +56,8 @@ normalize edit redo
 # Preview a redo without applying it
 normalize edit redo --dry-run
 
-# View edit history
-normalize edit history
+# View edit log
+normalize edit log
 
 # Apply batch edits from JSON
 normalize edit batch edits.json
@@ -124,7 +124,7 @@ These are subcommands, not flags:
 - `normalize edit undo [<N>]` - Undo the last N edits (default: 1)
 - `normalize edit redo` - Redo the last undone edit
 - `normalize edit goto <REF>` - Jump to a specific shadow commit
-- `normalize edit history` - View shadow git edit history
+- `normalize edit log` - View shadow git edit log (was `edit history`)
 
 Undo options:
 - `--file <PATH>` - Undo changes only for specific file(s)

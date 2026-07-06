@@ -12,22 +12,16 @@ old `view` paths remain as hidden aliases for one release).
 ## Subcommands
 
 ### Health & Overview
-| Subcommand | Description |
-|------------|-------------|
-| `health` | File counts, complexity stats, large file warnings (default when no subcommand) |
-| `summary` | Auto-generated single-page codebase overview |
-| `all` | Run all analysis passes |
 
-### Churn & Coupling
-| Subcommand | Description |
-|------------|-------------|
-| `cross-repo-health` | Rank repos by tech debt (churn + complexity + coupling) |
+The aggregate dashboards moved to the top-level [`normalize overview`](../cli-design.md) verb
+(B11): `analyze health`→`overview`, `analyze all`→`overview --full`, `analyze summary`→`overview
+summary`, `analyze cross-repo-health`→`overview cross-repo-health`. Old `analyze` paths remain as
+hidden aliases for one release, and a bare `normalize analyze <target>` still routes to the health
+dashboard.
 
-Git-history analysis (`coupling-clusters`, `activity`, `repo-coupling`) has moved to the
-top-level [`normalize history`](../cli-design.md) verb (owned by `normalize-git-history`, B9);
-old paths remain as hidden aliases for one release. `cross-repo-health` stays under `analyze`
-for now — it depends on the not-yet-extracted complexity core (moving it would cycle); it
-follows once that core lands (B11).
+Git-history analysis (`coupling-clusters`, `activity`, `repo-coupling`) moved to the top-level
+[`normalize history`](../cli-design.md) verb (owned by `normalize-git-history`, B9); old paths
+remain as hidden aliases for one release.
 
 Architecture analysis (`architecture`, `layering`, `depth-map`) has moved to the top-level
 [`normalize architecture`](../cli-design.md) verb (was `analyze architecture`/`rank layering`/
@@ -47,8 +41,9 @@ Architecture analysis (`architecture`, `layering`, `depth-map`) has moved to the
 ## Examples
 
 ```bash
-# Quick health check
-normalize analyze
+# Quick health check (dashboards are under normalize overview):
+normalize overview
+normalize overview --full                 # run all analysis passes
 
 # Security scan
 normalize analyze security

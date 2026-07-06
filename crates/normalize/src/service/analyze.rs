@@ -180,7 +180,11 @@ impl AnalyzeService {
     }
 
     /// Run health analysis (file counts, complexity stats, large file warnings)
-    #[cli(default, display_with = "display_output")]
+    ///
+    /// Transitional shim: moved to the top-level `overview` verb. Hidden from help;
+    /// kept for one release. Remains the `analyze` default so `normalize analyze <target>`
+    /// still routes here.
+    #[cli(hidden, default, display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn health(
         &self,
@@ -232,7 +236,9 @@ impl AnalyzeService {
     }
 
     /// Run all analysis passes
-    #[cli(display_with = "display_output")]
+    ///
+    /// Transitional shim: moved to `overview --full`. Hidden from help; kept for one release.
+    #[cli(hidden, display_with = "display_output")]
     pub fn all(
         &self,
         #[param(positional, help = "Target file or directory")] target: Option<String>,
@@ -434,8 +440,12 @@ impl AnalyzeService {
     /// Discovers git repos under `repos_dir` and computes a health score for each by
     /// combining churn rate, average cyclomatic complexity, and temporal coupling density.
     /// Returns a `CrossRepoHealthReport` with repos ranked worst-first.
+    ///
+    /// Transitional shim: moved to the top-level `overview` verb
+    /// (`overview cross-repo-health`) — it is a multi-repo composite dashboard.
+    /// Hidden from help; kept for one release.
     #[server(group = "git")]
-    #[cli(display_with = "display_output")]
+    #[cli(hidden, display_with = "display_output")]
     pub fn cross_repo_health(
         &self,
         #[param(help = "Directory containing git repos")] repos_dir: String,
@@ -447,7 +457,9 @@ impl AnalyzeService {
     }
 
     /// Auto-generated single-page codebase overview
-    #[cli(display_with = "display_output")]
+    ///
+    /// Transitional shim: moved to `overview summary`. Hidden from help; kept for one release.
+    #[cli(hidden, display_with = "display_output")]
     pub async fn summary(
         &self,
         #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<

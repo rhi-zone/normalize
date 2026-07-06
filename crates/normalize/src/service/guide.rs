@@ -168,9 +168,9 @@ const GUIDE_EXPLORE: &str = r#"# Exploring a Codebase
 
 ## Structural overview
 
-  normalize analyze summary               # auto-generated codebase overview
+  normalize overview summary              # auto-generated codebase overview
   normalize rank size                   # hierarchical LOC (ncdu-style)
-  normalize analyze architecture           # coupling, cycles, hubs
+  normalize architecture                   # coupling, cycles, hubs
 
 ## Import/dependency graph
 
@@ -229,9 +229,9 @@ const GUIDE_ANALYZE: &str = r#"# Running Analysis
 
 ## Start broad, then drill down
 
-  normalize analyze all                   # everything at once
-  normalize analyze health                # quick health check
-  normalize analyze summary               # generated overview
+  normalize overview --full               # everything at once
+  normalize overview                      # quick health check
+  normalize overview summary              # generated overview
 
 ## Code quality
 
