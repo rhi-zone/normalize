@@ -83,7 +83,8 @@ lives in main.
 |---|---|---|---|
 | `normalize-facts` | Code fact extraction and storage library | `structure` (`cli` feature) | Owns the index + cyclomatic core. Canonical `FactsCliService` backs the `structure` verb (rebuild/stats/files/packages/query/test-fixtures) and the absorbed dataflow trio (`structure liveness`/`effects`/`exceptions`); the stale main-crate copy was deleted (B5). |
 | `normalize-facts-core` | Core data types for normalize facts (symbols, imports, exports) | — | |
-| `normalize-git` | Pure-Rust read-only git operations: repo open, blob read, tree walk, diff, blame, churn, history | — | Extracted 2026 (B1) to dedup gix helpers across budget/ratchet/semantic/native-rules/main. Future `normalize-git-history` (planned `history` verb, B8/B9) will depend on it. |
+| `normalize-git` | Pure-Rust read-only git operations: repo open, blob read, tree walk, diff, blame, churn, history | — | Extracted 2026 (B1) to dedup gix helpers across budget/ratchet/semantic/native-rules/main. `normalize-git-history` depends on it. |
+| `normalize-git-history` | Typed code-health analysis derived from git history: churn hotspots, temporal coupling, blame ownership, contributors, activity, cross-repo coupling, change-coupling clusters | planned `history` (B9) | **Extracted 2026 (B8).** Presentation-free compute API (report structs + `analyze_*`/`cluster_from_edges`) backing `rank hotspots`/`coupling`/`ownership`/`contributors` and `analyze activity`/`repo-coupling`/`coupling-clusters`. `OutputFormatter` impls gated behind `cli` feature (orphan rules force them here, not main); pure consumers use `default-features = false`. `#[cli]` service methods still live in main; those command files are re-export shims. B9 will mount the `history` verb. |
 | `normalize-shadow` | Shadow git history tracking for edit operations | — | |
 | `normalize-languages` | Tree-sitter language support and dynamic grammar loading | — | `GrammarLoader`; loads `*.scm` query files. |
 | `normalize-language-meta` | Language metadata and capabilities | — | |
@@ -113,8 +114,8 @@ lives in main.
   `crates/normalize/src/{rg,ast_grep,jq}/` (~21k L), forced to stay in main by the publish
   trilemma (`docs/audit-2026-07-02.md`). There is no `vendored` crate category.
 - **Planned (inversion) rows are targets, not current state.** They mount as their own verb
-  only after the corresponding batch (B2–B12) lands. `normalize-git-history` (planned
-  `history` verb) does not exist yet.
+  only after the corresponding batch (B2–B12) lands. `normalize-git-history` now exists
+  (crate extracted, B8) but its `history` verb is not yet mounted (B9).
 - **Open forks** (metrics A1/A2) are tracked in
   `docs/audit-2026-07-03-command-surface-decomposition.md`, not here. (dataflow-trio home
   resolved → `normalize-facts`/`structure`, B5; `search` collision resolved, B7.)

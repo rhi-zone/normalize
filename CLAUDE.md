@@ -6,7 +6,7 @@ Behavioral rules for Claude Code in this repository.
 
 ## Publishing
 
-**Published on [crates.io](https://crates.io/crates/normalize)** as 44 crates (+ 3 `publish = false`: `normalize-grammars`, `xtask`, `benches`). All at v0.3.2 (early, in active development).
+**Published on [crates.io](https://crates.io/crates/normalize)** as 45 crates (+ 3 `publish = false`: `normalize-grammars`, `xtask`, `benches`). All at v0.3.2 (early, in active development).
 
 **Installer URL:** `curl -fsSL https://rhi.zone/normalize/install.sh | sh` — canonical copy lives at `https://github.com/rhi-zone/rhi.zone/blob/master/normalize/install.sh`; the in-repo `install.sh` is a synced copy.
 

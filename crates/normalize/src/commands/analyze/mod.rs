@@ -228,28 +228,8 @@ pub(super) fn collect_code_files<'a>(
 }
 
 /// Check if a path is a source file we can analyze.
-pub(crate) fn is_source_file(path: &Path) -> bool {
-    !is_generated_file(path) && normalize_languages::support_for_path(path).is_some()
-}
-
-/// Known generated/lockfiles that are not useful to analyze for code quality.
-fn is_generated_file(path: &Path) -> bool {
-    let file_name = match path.file_name().and_then(|n| n.to_str()) {
-        Some(n) => n,
-        None => return false,
-    };
-    // Common lock files by exact name
-    matches!(
-        file_name,
-        "package-lock.json"
-            | "yarn.lock"
-            | "pnpm-lock.yaml"
-            | "bun.lockb"
-            | "Cargo.lock"
-            | "composer.lock"
-            | "Gemfile.lock"
-            | "poetry.lock"
-            | "Pipfile.lock"
-            | "packages.lock.json"
-    ) || file_name.ends_with(".lock")
-}
+///
+/// Re-exported from `normalize_git_history` (single source of truth for the
+/// generated/lockfile exclusion list) so existing `super::is_source_file` call
+/// sites keep resolving.
+pub(crate) use normalize_git_history::is_source_file;

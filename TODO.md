@@ -964,10 +964,23 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   Build matrix (default / `cli` / all-features / no-default-features) green; clippy + `cargo test -q`
   green (1 snapshot updated: `help_root` gains `search`; added `assert_output_formatter::<SearchReport>()`).
   **Main-crate `src` LOC: 66850 → 66863 (+13: mount wiring + output.rs test line).**
-- [ ] **B8 — `normalize-git-history` extraction:** define typed data API (`ChurnStats`,
-  `CoupledPair`, `OwnershipEntry`, `HotspotEntry`, etc.); disentangle compute from
-  `OutputFormatter` in each command file; move compute fns into new crate; OutputFormatter
-  stays in main crate.
+- [x] **B8 — `normalize-git-history` extraction (done):** new crate holds the typed compute
+  API + report structs (`FileHotspot`/`HotspotsReport`, `CoupledPair`/`CouplingReport`,
+  `FileOwnership`/`OwnershipReport`, `ContributorInfo`/`ContributorsReport`,
+  `RepoActivity`/`ActivityReport`, `RepoCouplingReport`, `FileCluster`/`CouplingClustersReport`)
+  plus `analyze_*`/`cluster_from_edges` compute fns for `rank hotspots`/`coupling`/`ownership`/
+  `contributors` and `analyze activity`/`repo-coupling`/`coupling-clusters`. **Deviation from
+  original plan:** OutputFormatter could NOT stay in main — orphan rules forbid `impl
+  normalize_output::OutputFormatter for <git-history struct>` in the main crate (both trait and
+  type foreign). Resolved per CLAUDE.md feature convention: the `OutputFormatter` impls + render
+  helpers live in the crate behind a `cli` feature (`default = ["cli"]`; non-CLI consumers use
+  `default-features = false` for the pure compute API). `tier_color`/`pretty_ranked_table` moved
+  from main's `output.rs` into `normalize-output` so the crate can render pretty tables. The
+  `#[cli]` service methods (`RankService`/`AnalyzeService`) stay in main; main's
+  `commands/analyze/{hotspots,coupling,coupling_clusters,contributors,activity,repo_coupling,ownership}.rs`
+  are now re-export shims (coupling_clusters keeps its tokio index-orchestration fn). Behavior
+  unchanged (B9 mounts the `history` verb). **Main-crate `src` LOC: 66863 → 64431 (−2432);
+  new crate 2551 LOC.** Build matrix (default / no-default-features) + clippy + `cargo test -q` green.
 - [ ] **B9 — `history` verb:** add `#[cli(name="history")]` to normalize-git-history; mount;
   move `rank hotspots`/`rank coupling`/`rank ownership`/`rank contributors`/`analyze
   activity`/`analyze repo-coupling`/`analyze cross-repo-health`.

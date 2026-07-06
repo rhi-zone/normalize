@@ -8,6 +8,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **New published crate `normalize-git-history` (CLI taxonomy inversion B8).** The typed
+  code-health compute derived from git history — churn hotspots, temporal coupling, blame
+  ownership, contributors, activity-over-time, cross-repo coupling, and change-coupling
+  clusters — now lives in a standalone, publishable crate with a presentation-free API
+  (report structs + `analyze_*`/`cluster_from_edges`). Library consumers can depend on it with
+  `default-features = false` for the pure compute surface; the `OutputFormatter` rendering is
+  gated behind its `cli` feature. No CLI behavior change: `rank hotspots`/`coupling`/`ownership`/
+  `contributors` and `analyze activity`/`repo-coupling`/`coupling-clusters` produce identical
+  output. (B9 will mount a dedicated `history` verb.)
+
 - **Top-level `search` verb: semantic (vector) search (CLI taxonomy inversion B7).**
   `normalize search <query>` embeds the query and ranks the code index (symbols, docs,
   commits) by meaning rather than by name, re-ranked by git staleness, using the ANN index

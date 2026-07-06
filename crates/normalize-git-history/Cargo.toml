@@ -1,0 +1,32 @@
+[package]
+name = "normalize-git-history"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Typed code-health analysis derived from git history: churn hotspots, temporal coupling, blame ownership, contributors, activity, and cross-repo coupling"
+
+[features]
+# Presentation surface: OutputFormatter impls + text/pretty rendering. Gated so
+# non-CLI consumers can use the typed compute API (analyze_* + data structs)
+# without pulling the rendering stack. default so the common case needs no opt-in.
+default = ["cli"]
+cli = ["dep:normalize-output", "dep:nu-ansi-term"]
+
+[dependencies]
+normalize-git = { workspace = true }
+normalize-output = { path = "../normalize-output", version = "0.3.2", optional = true }
+nu-ansi-term = { version = "0.50", optional = true }
+normalize-rank = { path = "../normalize-rank", version = "0.3.2" }
+normalize-code-similarity = { path = "../normalize-code-similarity", version = "0.3.2" }
+normalize-ecosystems = { path = "../normalize-ecosystems", version = "0.3.2" }
+normalize-facts = { path = "../normalize-facts", version = "0.3.2" }
+normalize-languages = { path = "../normalize-languages", version = "0.3.2" }
+glob = "0.3.3"
+rayon.workspace = true
+serde.workspace = true
+schemars = "1"
+gix = { workspace = true }
+tracing = "0.1"
+tree-sitter = "0.26"
+streaming-iterator = "0.1"

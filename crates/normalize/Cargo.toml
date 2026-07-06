@@ -66,6 +66,7 @@ tree-sitter = "0.26"
 streaming-iterator = "0.1"
 dirs = "5"
 normalize-git = { workspace = true }
+normalize-git-history = { workspace = true, features = ["cli"] }
 normalize-core = { path = "../normalize-core", version = "0.3.2" }
 normalize-output = { path = "../normalize-output", version = "0.3.2" }
 normalize-facts = { path = "../normalize-facts", version = "0.3.2", features = ["cli"] }

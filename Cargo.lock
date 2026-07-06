@@ -5210,6 +5210,7 @@ dependencies = [
  "normalize-facts-rules-interpret",
  "normalize-filter",
  "normalize-git",
+ "normalize-git-history",
  "normalize-graph",
  "normalize-index",
  "normalize-knowledge-graph",
@@ -5552,6 +5553,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "normalize-git-history"
+version = "0.3.2"
+dependencies = [
+ "gix",
+ "glob",
+ "normalize-code-similarity",
+ "normalize-ecosystems",
+ "normalize-facts",
+ "normalize-git",
+ "normalize-languages",
+ "normalize-output",
+ "normalize-rank",
+ "nu-ansi-term",
+ "rayon",
+ "schemars",
+ "serde",
+ "streaming-iterator",
+ "tracing",
+ "tree-sitter",
+]
+
+[[package]]
 name = "normalize-grammars"
 version = "0.3.2"
 dependencies = [
@@ -5805,6 +5828,7 @@ name = "normalize-output"
 version = "0.3.2"
 dependencies = [
  "normalize-core",
+ "normalize-rank",
  "nu-ansi-term",
  "rkyv",
  "schemars",
