@@ -7,11 +7,23 @@ repository.workspace = true
 description = "Typed code-health analysis derived from git history: churn hotspots, temporal coupling, blame ownership, contributors, activity, and cross-repo coupling"
 
 [features]
-# Presentation surface: OutputFormatter impls + text/pretty rendering. Gated so
-# non-CLI consumers can use the typed compute API (analyze_* + data structs)
-# without pulling the rendering stack. default so the common case needs no opt-in.
+# CLI surface: the `history` verb (churn hotspots, temporal coupling, blame
+# ownership, contributors, activity, repo-coupling, coupling-clusters) — the
+# server-less `HistoryService`, `OutputFormatter` impls, text/pretty rendering,
+# and index-backed co-change loading. Gated so non-CLI consumers can use the
+# typed compute API (analyze_* + data structs) without pulling the rendering or
+# CLI stack. default so the common case needs no opt-in.
 default = ["cli"]
-cli = ["dep:normalize-output", "dep:nu-ansi-term"]
+cli = [
+    "dep:normalize-output",
+    "dep:nu-ansi-term",
+    "dep:server-less",
+    "dep:normalize-index",
+    "dep:normalize-rules-config",
+    "dep:tokio",
+    "dep:toml",
+    "dep:dirs",
+]
 
 [dependencies]
 normalize-git = { workspace = true }
@@ -30,3 +42,12 @@ gix = { workspace = true }
 tracing = "0.1"
 tree-sitter = "0.26"
 streaming-iterator = "0.1"
+
+# cli-only dependencies (the `history` verb: server-less service, index-backed
+# co-change loading, config-slice parsing).
+server-less = { workspace = true, optional = true }
+normalize-index = { path = "../normalize-index", version = "0.3.2", optional = true }
+normalize-rules-config = { path = "../normalize-rules-config", version = "0.3.2", optional = true }
+tokio = { workspace = true, optional = true }
+toml = { workspace = true, optional = true }
+dirs = { workspace = true, optional = true }

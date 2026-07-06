@@ -981,9 +981,31 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   are now re-export shims (coupling_clusters keeps its tokio index-orchestration fn). Behavior
   unchanged (B9 mounts the `history` verb). **Main-crate `src` LOC: 66863 → 64431 (−2432);
   new crate 2551 LOC.** Build matrix (default / no-default-features) + clippy + `cargo test -q` green.
-- [ ] **B9 — `history` verb:** add `#[cli(name="history")]` to normalize-git-history; mount;
-  move `rank hotspots`/`rank coupling`/`rank ownership`/`rank contributors`/`analyze
-  activity`/`analyze repo-coupling`/`analyze cross-repo-health`.
+- [x] **B9 — `history` verb (done):** added `#[cli(name="history")] HistoryService` to
+  `normalize-git-history` (behind `cli`), mounted as the top-level `history` verb (group
+  `analysis`). The service owns config-slice loading (`[analyze]` excludes + `[index]`/`[walk]`/
+  `[pretty]`, no `NormalizeConfig` dep) and, for `coupling-clusters`, loads co-change edges from
+  the structural index via `normalize_index::ensure_ready_or_warn` (new optional dep) with a
+  git-walk fallback — cycle-free (neither `normalize-index` nor `normalize-facts` depends on
+  `normalize-git-history`). **Shipped 7 of the plan's 8:** `history hotspots`/`coupling`/
+  `ownership`/`contributors` (from `rank`) + `history activity`/`repo-coupling`/`coupling-clusters`
+  (from `analyze`). Old paths kept as `#[cli(hidden)]` shims (bodies retained; compute already
+  in the crate post-B8) for one release. `view history` untouched (verified). **Deviation from
+  the plan's B9 row (which listed `cross-repo-health`, omitted `coupling-clusters`):** the row is
+  superseded by dependency-driven composition — `analyze cross-repo-health` does NOT move
+  (its composer calls the un-extracted main-crate complexity core `crate::analyze::complexity::
+  ComplexityAnalyzer`; moving would cycle), so it stays under `analyze` and follows with the
+  complexity-core extraction + metrics A1/A2 decision (B11). `coupling-clusters` moved instead
+  (rehomed from the B4 deferral — it is git-temporal, `co_change_edges`). Build matrix (default /
+  `cli` / all-features / no-default-features) green, no cycle; clippy `-D warnings` + `cargo test
+  -q` green (9 CLI-help snapshots updated: new `history` verb + hidden git-history commands
+  dropped from `rank`/`analyze` help + `help_root` gains `history`). **Main-crate `src` LOC:
+  64433 → 64471 (+38: shim doc-notes + mount wiring; the real reduction lands at B12 when the
+  shims are removed).**
+- [ ] **B9-followup — move `cross-repo-health` to `history`:** blocked on extracting the
+  complexity core out of the main crate into `normalize-facts` (so the crate's composer can
+  reach it without cycling). Do together with the complexity-core extraction + metrics A1/A2
+  decision (B11).
 - [ ] **B10 — syntax-rules consolidation:** confirm `rules run --type syntax` routes syntax
   rules; if confirmed, delete standalone `SyntaxRulesService` CLI from normalize-syntax-rules
   (do NOT add a second verb).

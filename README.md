@@ -79,7 +79,7 @@ normalize analyze health             # Codebase metrics and health score
 normalize rank complexity            # Cyclomatic complexity report
 normalize rank length                # Function length analysis
 normalize analyze security           # Security vulnerability scan
-normalize rank hotspots              # Git history analysis (churn + complexity)
+normalize history hotspots           # Git history analysis (churn + complexity; was rank hotspots)
 normalize similarity                 # Detect code clones (was rank duplicates)
 normalize similarity duplicate-types # Detect duplicate type definitions
 normalize graph                      # Dependency graph analysis (cycles, blast radius)

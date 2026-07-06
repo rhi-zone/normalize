@@ -39,12 +39,11 @@ aliases for one release).
 | `files` | Longest files in codebase |
 
 ### Git history
-| Subcommand | Description |
-|------------|-------------|
-| `hotspots` | Churn × complexity hotspots |
-| `coupling` | Temporal coupling: file pairs that change together |
-| `ownership` | Per-file ownership concentration from git blame |
-| `contributors` | Analyze contributors across repos |
+
+Git-history analysis (`hotspots`, `coupling`, `ownership`, `contributors`) has moved to the
+top-level [`normalize history`](../cli-design.md) verb (owned by `normalize-git-history`, B9).
+Old paths (`rank hotspots` etc.) are kept as hidden aliases for one release — run
+`normalize history --help`.
 
 ### Testing
 | Subcommand | Description |
@@ -58,11 +57,11 @@ aliases for one release).
 # Find complex functions
 normalize rank complexity --threshold 15
 
-# Find hotspot files
-normalize rank hotspots
+# Find hotspot files (moved to `normalize history`)
+normalize history hotspots
 
-# Temporal coupling analysis
-normalize rank coupling
+# Temporal coupling analysis (moved to `normalize history`)
+normalize history coupling
 
 # Information density
 normalize rank density
@@ -116,11 +115,5 @@ normalize rank module-health
 (`duplicates` flags moved with the command to `normalize similarity` — run
 `normalize similarity --help`.)
 
-**hotspots / coupling / ownership:**
-- `--repos-dir <DIR>` - Run across all repos under DIR
-
-**hotspots:**
-- `--recency` - Weight recent changes higher (exponential decay)
-
-**coupling:**
-- `--min-commits <N>` - Minimum shared commits for edges
+(`hotspots` / `coupling` / `ownership` / `contributors` flags moved with the commands to
+`normalize history` — run `normalize history --help`.)

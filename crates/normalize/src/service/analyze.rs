@@ -330,8 +330,11 @@ impl AnalyzeService {
     /// Groups files into clusters using temporal coupling edges weighted by shared commit
     /// count. `min_commits` controls the edge threshold (auto-scaled by repo size if
     /// omitted). Returns a `CouplingClustersReport` with cluster membership and sizes.
+    ///
+    /// Transitional shim: moved to the top-level `history` verb (`history coupling-clusters`,
+    /// owned by `normalize-git-history`). Hidden from help; kept for one release.
     #[server(group = "git")]
-    #[cli(display_with = "display_output")]
+    #[cli(hidden, display_with = "display_output")]
     #[allow(clippy::too_many_arguments)]
     pub fn coupling_clusters(
         &self,
@@ -375,8 +378,11 @@ impl AnalyzeService {
     /// Discovers git repos under `repos_dir`, groups commits by `window` (month or week),
     /// and returns an `ActivityReport` with per-repo commit counts across `windows` periods.
     /// Useful for identifying which repos are most actively developed.
+    ///
+    /// Transitional shim: moved to the top-level `history` verb (`history activity`,
+    /// owned by `normalize-git-history`). Hidden from help; kept for one release.
     #[server(group = "git")]
-    #[cli(display_with = "display_output")]
+    #[cli(hidden, display_with = "display_output")]
     pub fn activity(
         &self,
         #[param(help = "Directory containing git repos")] repos_dir: String,
@@ -400,8 +406,11 @@ impl AnalyzeService {
     /// Groups commits within `window` hours as "co-changes" and reports repo pairs that
     /// appear together in at least `min_windows` co-change windows. Returns a
     /// `RepoCouplingReport` with ranked repo pairs and their co-change counts.
+    ///
+    /// Transitional shim: moved to the top-level `history` verb (`history repo-coupling`,
+    /// owned by `normalize-git-history`). Hidden from help; kept for one release.
     #[server(group = "git")]
-    #[cli(display_with = "display_output")]
+    #[cli(hidden, display_with = "display_output")]
     pub fn repo_coupling(
         &self,
         #[param(help = "Directory containing git repos")] repos_dir: String,

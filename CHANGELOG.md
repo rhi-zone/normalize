@@ -8,6 +8,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Top-level `history` verb: git-history code-health signals (CLI taxonomy inversion B9).**
+  `normalize history` groups the repo-wide, cross-file statistical analyses derived from git
+  history — `hotspots` (churn × complexity), `coupling` (temporal file coupling), `ownership`
+  (blame / bus factor), `contributors`, `activity`, `repo-coupling`, and `coupling-clusters`.
+  Owned by `normalize-git-history` (`HistoryService`, behind its `cli` feature) — it loads its
+  own `[analyze]`/`[index]`/`[walk]`/`[pretty]` config slices (no dependency on the main
+  crate's monolithic config) and loads co-change edges from the structural index (with a
+  git-walk fallback) for `coupling-clusters`. This is distinct from `view history` (a single
+  file's git log); both coexist. The old paths — `rank hotspots`/`coupling`/`ownership`/
+  `contributors` and `analyze activity`/`repo-coupling`/`coupling-clusters` — keep working as
+  hidden aliases for one release, then are removed at 1.0. **Deviation from the inversion
+  plan's B9 row:** `analyze cross-repo-health` did **not** move — its composer depends on the
+  not-yet-extracted main-crate complexity core (moving it into the crate would create a
+  dependency cycle), so it stays under `analyze` and follows once that core is extracted
+  (B11). `coupling-clusters` moved here instead (rehomed from the B4 deferral).
+
 - **New published crate `normalize-git-history` (CLI taxonomy inversion B8).** The typed
   code-health compute derived from git history — churn hotspots, temporal coupling, blame
   ownership, contributors, activity-over-time, cross-repo coupling, and change-coupling

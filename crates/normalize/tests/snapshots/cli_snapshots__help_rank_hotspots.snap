@@ -33,3 +33,6 @@ High scores indicate complex, bug-prone files that change often.
 **Score formula (with `--recency`):** `Σ(e^(-λ·age) × √churn_i) × log₂(1 + max_complexity)`,
 where λ = ln(2)/180 (half-life of 180 days). Recent changes are weighted higher.
 The `Churn` column is the total lines added + deleted across all commits.
+
+Transitional shim: moved to the top-level `history` verb (`history hotspots`,
+owned by `normalize-git-history`). Hidden from help; kept for one release.

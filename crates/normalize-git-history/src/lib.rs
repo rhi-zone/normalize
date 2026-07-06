@@ -20,6 +20,11 @@ pub mod hotspots;
 pub mod ownership;
 pub mod repo_coupling;
 
+/// The server-less `HistoryService` (`history` verb). Behind `cli` because it
+/// pulls the CLI/rendering/index stack; the compute API needs none of it.
+#[cfg(feature = "cli")]
+pub mod service;
+
 pub use complexity::max_function_complexity;
 
 use std::path::Path;

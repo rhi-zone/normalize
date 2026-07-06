@@ -37,6 +37,7 @@ Analysis:
   budget        Enforce diff budgets on PRs. Use to cap how much complexity or size can grow per change.
   architecture  Analyze architectural structure: coupling, cycles, hub modules, layering, and depth.
   graph         Analyze the dependency graph: cycles, blast radius, import paths. Requires the facts index.
+  history       Statistical code-health signals from git history: hotspots, coupling, ownership, activity.
   similarity    Detect duplicate and near-duplicate code: clones, duplicate types, and repeated AST fragments.
   cfg           Build and render the control flow graph for a function. Use to visualize execution paths, branches, and loops.
   ratchet       Prevent metric regressions. Records a baseline and fails CI if metrics get worse.

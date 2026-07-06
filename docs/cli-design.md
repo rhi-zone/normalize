@@ -27,6 +27,7 @@ Assessment, metrics, and quality gates:
 - `analyze` - Codebase analysis (45 subcommands)
 - `graph` - Dependency-graph analysis: cycles/blast-radius/import-paths (`graph`, `graph dependents`, `graph import-path`; owned by `normalize-graph`, B2). Was `view graph`/`dependents`/`import-path` — old paths kept as hidden aliases for one release.
 - `similarity` - Duplicate/near-duplicate code detection: clones, duplicate types, AST fragments (`similarity` incl. `--mode clusters`, `similarity duplicate-types`, `similarity fragments`; owned by `normalize-code-similarity`, B4). Index-free (walks the filesystem). Was `rank duplicates`/`duplicate-types`/`fragments` — old paths kept as hidden aliases for one release.
+- `history` - Statistical code-health signals from git history: `hotspots`, `coupling`, `ownership`, `contributors`, `activity`, `repo-coupling`, `coupling-clusters` (owned by `normalize-git-history`, B9). Repo-wide cross-file analysis — distinct from `view history` (single-file git log). Was `rank hotspots`/`coupling`/`ownership`/`contributors` and `analyze activity`/`repo-coupling`/`coupling-clusters` — old paths kept as hidden aliases for one release. `analyze cross-repo-health` stays put pending the complexity-core extraction (would cycle; see B11).
 - `rank` - Rank files/functions by metrics
 - `trend` - Track metrics over git history
 - `ci` - Run all quality checks in one pass
@@ -189,7 +190,8 @@ Critical (>20): 213                        6  Moderate  compute_ranked_diff
 Total: ~110 entry points (21 top-level + subcommands)
 
 Commands with most subcommands:
-- `analyze`: ~20 (health, summary, architecture, docs, security, skeleton-diff, coupling-clusters, activity, repo-coupling, cross-repo-health, and others — see `normalize analyze --help` for current list; many commands have been migrated to `rank`, `trend`, `syntax`, and `view`)
+- `analyze`: ~16 (health, summary, docs, security, skeleton-diff, cross-repo-health, and others — see `normalize analyze --help` for current list; many commands have been migrated to `rank`, `trend`, `syntax`, `view`, `architecture`, and `history` — the git-history cluster `hotspots`/`coupling`/`ownership`/`contributors`/`activity`/`repo-coupling`/`coupling-clusters` now lives under `history`)
+- `history`: 7 (hotspots, coupling, ownership, contributors, activity, repo-coupling, coupling-clusters; owned by `normalize-git-history`)
 - `syntax`: 3 (ast, query, node-types)
 - `rules`: 10 (list, run, enable, disable, show, tags, add, update, remove, validate)
 - `edit`: 10 (delete, replace, swap, insert, undo, redo, goto, batch, history)

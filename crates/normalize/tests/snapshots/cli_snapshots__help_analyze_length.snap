@@ -35,9 +35,6 @@ Repository:
   docs               Measure documentation coverage: which public symbols lack doc comments.
 
 Git history:
-  coupling-clusters  Find clusters of files that change together in git history (connected components).
-  activity           Show commit activity across multiple repositories over time windows.
-  repo-coupling      Detect temporal coupling between repositories: pairs that receive commits together.
   cross-repo-health  Rank repositories by composite tech-debt score (churn × complexity × coupling).
 
 Security:

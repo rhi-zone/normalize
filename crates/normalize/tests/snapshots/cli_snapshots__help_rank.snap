@@ -36,12 +36,6 @@ Module structure:
 Repository:
   files            Rank source files by line count, longest first.
 
-Git history:
-  hotspots         Rank files by churn × complexity: the highest-risk files for introducing bugs.
-  coupling         Rank file pairs by temporal coupling: pairs that appear in the same git commits.
-  ownership        Rank files by ownership concentration: how many authors contribute to each file.
-  contributors     Rank contributors by commit activity across one or more repositories.
-
 Testing:
   test-ratio       Rank modules by test-to-implementation line ratio.
   test-gaps        Identify public functions that lack test coverage, ranked by risk score.

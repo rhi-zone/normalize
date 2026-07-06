@@ -22,6 +22,7 @@
 | `architecture` | Architectural structure: coupling, cycles, hub modules, layering, depth (`architecture`, `architecture layering`, `architecture depth-map`) |
 | `graph` | Dependency-graph analysis: cycles, blast radius, import paths (`graph`, `graph dependents`, `graph import-path`) |
 | `similarity` | Duplicate/near-duplicate code detection: clones, duplicate types, AST fragments (`similarity` incl. `--mode clusters`, `similarity duplicate-types`, `similarity fragments`; index-free) |
+| `history` | Statistical code-health from git history: `hotspots`, `coupling`, `ownership`, `contributors`, `activity`, `repo-coupling`, `coupling-clusters` (owned by `normalize-git-history`; repo-wide — distinct from `view history`) |
 | `rank` | Rank files/functions by metrics |
 | `trend` | Track metrics over git history |
 | `ci` | Run all quality checks in one pass |

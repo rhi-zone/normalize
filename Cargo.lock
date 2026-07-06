@@ -5556,20 +5556,26 @@ dependencies = [
 name = "normalize-git-history"
 version = "0.3.2"
 dependencies = [
+ "dirs 5.0.1",
  "gix",
  "glob",
  "normalize-code-similarity",
  "normalize-ecosystems",
  "normalize-facts",
  "normalize-git",
+ "normalize-index",
  "normalize-languages",
  "normalize-output",
  "normalize-rank",
+ "normalize-rules-config",
  "nu-ansi-term",
  "rayon",
  "schemars",
  "serde",
+ "server-less",
  "streaming-iterator",
+ "tokio",
+ "toml",
  "tracing",
  "tree-sitter",
 ]

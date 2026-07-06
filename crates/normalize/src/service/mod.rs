@@ -67,6 +67,7 @@ pub struct NormalizeService {
     guide: guide::GuideService,
     generate: generate::GenerateService,
     graph: normalize_graph::GraphService,
+    history: normalize_git_history::service::HistoryService,
     package: package::PackageService,
     rank: rank::RankService,
     similarity: normalize_code_similarity::SimilarityService,
@@ -130,6 +131,7 @@ impl NormalizeService {
             guide: guide::GuideService,
             generate: generate::GenerateService,
             graph: normalize_graph::GraphService::new(&pretty),
+            history: normalize_git_history::service::HistoryService::new(),
             package: package::PackageService::new(),
             rank: rank::RankService::new(&pretty),
             similarity: normalize_code_similarity::SimilarityService::new(&pretty),
@@ -1169,6 +1171,21 @@ impl NormalizeService {
     #[server(group = "analysis")]
     pub fn graph(&self) -> &normalize_graph::GraphService {
         &self.graph
+    }
+
+    /// Statistical code-health signals from git history: hotspots, coupling, ownership, activity.
+    ///
+    /// Repo-wide, cross-file analysis — distinct from `view history` (a single file's git log).
+    ///
+    /// Examples:
+    ///   normalize history hotspots               # files ranked by churn × complexity
+    ///   normalize history coupling               # file pairs that change together
+    ///   normalize history ownership              # bus-factor / ownership concentration
+    ///   normalize history coupling-clusters      # connected components of co-changing files
+    ///   normalize history activity ~/src         # commit activity across repos over time
+    #[server(group = "analysis")]
+    pub fn history(&self) -> &normalize_git_history::service::HistoryService {
+        &self.history
     }
 
     /// Detect duplicate and near-duplicate code: clones, duplicate types, and repeated AST fragments.

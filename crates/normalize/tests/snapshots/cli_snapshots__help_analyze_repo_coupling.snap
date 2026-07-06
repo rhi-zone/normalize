@@ -25,3 +25,6 @@ Options:
 Groups commits within `window` hours as "co-changes" and reports repo pairs that
 appear together in at least `min_windows` co-change windows. Returns a
 `RepoCouplingReport` with ranked repo pairs and their co-change counts.
+
+Transitional shim: moved to the top-level `history` verb (`history repo-coupling`,
+owned by `normalize-git-history`). Hidden from help; kept for one release.

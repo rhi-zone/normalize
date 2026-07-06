@@ -2,4 +2,38 @@
 source: crates/normalize/tests/cli_snapshots.rs
 expression: "snapshot_help(&[\"history\"])"
 ---
+Statistical code-health signals from git history: hotspots, coupling, ownership, activity.
 
+Usage: normalize history [OPTIONS] [COMMAND]
+
+Commands:
+  hotspots           Rank files by churn × complexity: the highest-risk files for introducing bugs.
+  coupling           Rank file pairs by temporal coupling: pairs that appear in the same git commits.
+  ownership          Rank files by ownership concentration: how many authors contribute to each file.
+  contributors       Rank contributors across multiple repositories by commit share and overlap.
+  activity           Show commit activity across multiple repositories over time windows.
+  repo-coupling      Detect temporal coupling between repositories: pairs that receive commits together.
+  coupling-clusters  Find clusters of files that change together in git history (connected components).
+  help               Print this message or the help of the given subcommand(s)
+
+Options:
+      --pretty                     Human-friendly output with colors and formatting
+      --compact                    Compact output without colors (overrides TTY detection)
+      --jsonl                      Output one JSON object per line (for arrays)
+      --json                       Output machine-readable JSON
+      --jq <jq>                    Filter output through jq expression
+      --input-schema               Print JSON Schema of the subcommand's input parameters and exit
+      --output-schema              Print JSON Schema of the subcommand's return type and exit
+      --manual                     Emit the reference manual for the command subtree rooted here and exit
+      --params-json <params-json>  Provide all parameters as a JSON object instead of individual flags
+  -h, --help                       Print help
+  -V, --version                    Print version
+
+Repo-wide, cross-file analysis — distinct from `view history` (a single file's git log).
+
+Examples:
+normalize history hotspots               # files ranked by churn × complexity
+normalize history coupling               # file pairs that change together
+normalize history ownership              # bus-factor / ownership concentration
+normalize history coupling-clusters      # connected components of co-changing files
+normalize history activity ~/src         # commit activity across repos over time

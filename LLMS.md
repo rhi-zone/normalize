@@ -109,7 +109,7 @@ normalize graph import-path a.rs b.rs  # Shortest import chain
 
 ```bash
 normalize rank complexity          # Cyclomatic complexity
-normalize rank hotspots            # High-churn files
+normalize history hotspots         # High-churn files (was rank hotspots)
 normalize similarity               # Code clones (was rank duplicates)
 normalize rank coupling            # Temporal coupling
 normalize rank test-ratio          # Test/impl ratio per module
@@ -172,7 +172,7 @@ Familiar names work: `search`/`find` → `grep`, `lint` → `rules run`, `check`
 ## Key Insights
 
 - `normalize view` is the primary navigation command - works on dirs, files, and symbols
-- `normalize analyze` handles health, security, call graphs, docs, and trends; `normalize rank` handles ranked-list metrics (complexity, hotspots, coupling, etc.); `normalize similarity` handles duplicate/near-duplicate code (clones, duplicate types, AST fragments)
+- `normalize analyze` handles health, security, call graphs, docs, and trends; `normalize rank` handles ranked-list code metrics (complexity, length, density, etc.); `normalize history` handles git-history signals (hotspots, coupling, ownership, contributors, activity, repo-coupling, coupling-clusters — repo-wide, distinct from `view history`); `normalize similarity` handles duplicate/near-duplicate code (clones, duplicate types, AST fragments)
 - `normalize grep` for text search, `normalize view` for structural navigation
 - Use `--json` when you need to parse output programmatically
 - The structure DB (`.normalize/index.sqlite`) caches symbols for fast lookups

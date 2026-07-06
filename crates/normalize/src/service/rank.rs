@@ -437,8 +437,11 @@ impl RankService {
     /// **Score formula (with `--recency`):** `Σ(e^(-λ·age) × √churn_i) × log₂(1 + max_complexity)`,
     /// where λ = ln(2)/180 (half-life of 180 days). Recent changes are weighted higher.
     /// The `Churn` column is the total lines added + deleted across all commits.
+    ///
+    /// Transitional shim: moved to the top-level `history` verb (`history hotspots`,
+    /// owned by `normalize-git-history`). Hidden from help; kept for one release.
     #[server(group = "git")]
-    #[cli(display_with = "display_hotspots")]
+    #[cli(hidden, display_with = "display_hotspots")]
     pub fn hotspots(
         &self,
         #[param(help = "Weight recent changes higher (exponential decay)")] recency: bool,
@@ -504,8 +507,11 @@ impl RankService {
     /// The `Confidence` column is `shared commits / max(commits_a, commits_b)`. High coupling
     /// may indicate hidden dependencies or shotgun surgery (one logical change spread across
     /// many files).
+    ///
+    /// Transitional shim: moved to the top-level `history` verb (`history coupling`,
+    /// owned by `normalize-git-history`). Hidden from help; kept for one release.
     #[server(group = "git")]
-    #[cli(display_with = "display_coupling")]
+    #[cli(hidden, display_with = "display_coupling")]
     #[allow(clippy::too_many_arguments)]
     pub fn coupling(
         &self,
@@ -560,8 +566,11 @@ impl RankService {
     /// The `Bus Factor` column is the number of authors needed to cover >50% of a file's
     /// lines. A bus factor of 1 means the file has a single effective owner — a knowledge
     /// concentration risk.
+    ///
+    /// Transitional shim: moved to the top-level `history` verb (`history ownership`,
+    /// owned by `normalize-git-history`). Hidden from help; kept for one release.
     #[server(group = "git")]
-    #[cli(display_with = "display_ownership")]
+    #[cli(hidden, display_with = "display_ownership")]
     pub fn ownership(
         &self,
         #[param(short = 'l', help = "Maximum number of files to show (0=no limit)")] limit: Option<
@@ -1574,8 +1583,11 @@ impl RankService {
     /// commit history covers more than 50% of a repo's total commits. A bus factor of 1
     /// means a single author accounts for the majority of contributions — a knowledge
     /// concentration risk. Repos are ranked lowest bus factor first (highest risk first).
+    ///
+    /// Transitional shim: moved to the top-level `history` verb (`history contributors`,
+    /// owned by `normalize-git-history`). Hidden from help; kept for one release.
     #[server(group = "git")]
-    #[cli(display_with = "display_contributors")]
+    #[cli(hidden, display_with = "display_contributors")]
     pub fn contributors(
         &self,
         #[param(help = "Directory containing git repos")] repos_dir: String,
