@@ -44,6 +44,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `normalize structure rebuild`; when disabled or unpopulated the command prints a clear,
   actionable message to stderr and exits non-zero (works without a TTY).
 
+### Removed
+
+- **BREAKING: the standalone `normalize-syntax-rules` binary is removed (CLI taxonomy
+  inversion B10).** Syntax rules are run through the unified rules engine —
+  `normalize rules run --type syntax` and `normalize rules list --type syntax` — which
+  cover everything the standalone binary did (both call the same
+  `normalize_syntax_rules::{load_all_rules, run_rules}` core; `rules` is a superset that
+  also handles native/fact rules, fixes, and filtering). The `normalize-syntax-rules` crate
+  is now library-only (consumed by `normalize-rules`); its `cli` feature, `[[bin]]` target,
+  and CLI service scaffolding are gone. No second top-level syntax-rules verb was added.
+  Unaffected: `normalize syntax ast`/`query`/`node-types` (grammar inspection) is a separate
+  service and is unchanged.
+
 ### Changed
 
 - **BREAKING: `search` is no longer an alias for `grep`.** The `search`→`grep` transitional

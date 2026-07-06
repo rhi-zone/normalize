@@ -1006,9 +1006,16 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   complexity core out of the main crate into `normalize-facts` (so the crate's composer can
   reach it without cycling). Do together with the complexity-core extraction + metrics A1/A2
   decision (B11).
-- [ ] **B10 — syntax-rules consolidation:** confirm `rules run --type syntax` routes syntax
-  rules; if confirmed, delete standalone `SyntaxRulesService` CLI from normalize-syntax-rules
-  (do NOT add a second verb).
+- [x] **B10 — syntax-rules consolidation (done):** confirmed `rules run --type syntax` and
+  `rules list --type syntax` fully cover the standalone `SyntaxRulesService` (both call the same
+  `normalize_syntax_rules::{load_all_rules, run_rules}` core; the `rules` engine is a superset).
+  Deleted the standalone CLI scaffolding from `normalize-syntax-rules`: `src/service.rs` (289 L),
+  `src/main.rs` (11 L, the `normalize-syntax-rules` binary), the `[[bin]]` target, the `cli`
+  feature, and the optional `server-less` dep. The crate is now library-only, consumed by
+  `normalize-rules` (default features unchanged). No second verb added. **Main-crate `src` LOC:
+  unchanged (0 delta — deletion is in `normalize-syntax-rules`, not `crates/normalize`);
+  −300 L in `normalize-syntax-rules`.** `SyntaxService` (ast/query/node-types inspection) is a
+  different service and stays untouched.
 - [ ] **B11 — small fixes + overview + CI lint:** `cfg cfg`→`cfg`; `edit history`→`edit log`;
   `rank budget`→`rank purposes`; dashboards `health`/`summary`/`all`→`overview` (thin
   main-crate composition verb); add RankEntry-based CI lint (flags metric commands drifting

@@ -6072,7 +6072,6 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "server-less",
  "streaming-iterator",
  "tempfile",
  "tokio",
