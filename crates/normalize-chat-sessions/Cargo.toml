@@ -10,13 +10,15 @@ description = "Session log parsing for AI coding agents"
 default = ["formats-all"]
 
 # All formats
-formats-all = ["format-claude", "format-codex", "format-gemini", "format-normalize"]
+formats-all = ["format-claude", "format-cline", "format-codex", "format-gemini", "format-normalize", "format-roo"]
 
 # Individual formats
-format-claude = []  # Claude Code sessions
-format-codex = []   # OpenAI Codex CLI sessions
-format-gemini = []  # Gemini CLI sessions
-format-normalize = []    # normalize agent sessions
+format-claude = []    # Claude Code sessions
+format-cline = []     # Cline (saoudrizwan.claude-dev) sessions
+format-codex = []     # OpenAI Codex CLI sessions
+format-gemini = []    # Gemini CLI sessions
+format-normalize = [] # normalize agent sessions
+format-roo = []       # Roo-Code (rooveterinaryinc.roo-cline) sessions
 
 # JSON Schema support (schemars derives on session types)
 schema = ["dep:schemars"]

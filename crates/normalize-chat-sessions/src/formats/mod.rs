@@ -25,23 +25,33 @@
 //! register(&MyAgentSource);
 //! ```
 
+#[cfg(any(feature = "format-cline", feature = "format-roo"))]
+mod anthropic_history;
 #[cfg(feature = "format-claude")]
 mod claude_code;
+#[cfg(feature = "format-cline")]
+mod cline;
 #[cfg(feature = "format-codex")]
 mod codex;
 #[cfg(feature = "format-gemini")]
 mod gemini_cli;
 #[cfg(feature = "format-normalize")]
 mod normalize_agent;
+#[cfg(feature = "format-roo")]
+mod roo_code;
 
 #[cfg(feature = "format-claude")]
 pub use claude_code::ClaudeCodeFormat;
+#[cfg(feature = "format-cline")]
+pub use cline::ClineFormat;
 #[cfg(feature = "format-codex")]
 pub use codex::CodexFormat;
 #[cfg(feature = "format-gemini")]
 pub use gemini_cli::GeminiCliFormat;
 #[cfg(feature = "format-normalize")]
 pub use normalize_agent::NormalizeAgentFormat;
+#[cfg(feature = "format-roo")]
+pub use roo_code::RooCodeFormat;
 
 use crate::Session;
 use std::fs::File;
@@ -224,12 +234,16 @@ fn init_builtin() {
         let mut sources = SOURCES.write().unwrap();
         #[cfg(feature = "format-claude")]
         sources.push(&ClaudeCodeFormat);
+        #[cfg(feature = "format-cline")]
+        sources.push(&ClineFormat);
         #[cfg(feature = "format-codex")]
         sources.push(&CodexFormat);
         #[cfg(feature = "format-gemini")]
         sources.push(&GeminiCliFormat);
         #[cfg(feature = "format-normalize")]
         sources.push(&NormalizeAgentFormat);
+        #[cfg(feature = "format-roo")]
+        sources.push(&RooCodeFormat);
     });
 }
 
@@ -400,12 +414,16 @@ impl FormatRegistry {
         let mut sources: Vec<Box<dyn SessionSource>> = Vec::new();
         #[cfg(feature = "format-claude")]
         sources.push(Box::new(ClaudeCodeFormat));
+        #[cfg(feature = "format-cline")]
+        sources.push(Box::new(ClineFormat));
         #[cfg(feature = "format-codex")]
         sources.push(Box::new(CodexFormat));
         #[cfg(feature = "format-gemini")]
         sources.push(Box::new(GeminiCliFormat));
         #[cfg(feature = "format-normalize")]
         sources.push(Box::new(NormalizeAgentFormat));
+        #[cfg(feature = "format-roo")]
+        sources.push(Box::new(RooCodeFormat));
         Self { sources }
     }
 

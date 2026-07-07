@@ -1,0 +1,79 @@
+[
+  {
+    "role": "user",
+    "ts": 1705319400000,
+    "content": [
+      {
+        "type": "text",
+        "text": "Implement a binary search function in Python."
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "ts": 1705319410000,
+    "content": [
+      {
+        "type": "text",
+        "text": "I'll implement binary search."
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_roo_01",
+        "name": "write_to_file",
+        "input": {
+          "path": "search.py",
+          "content": "def binary_search(arr, target):\n    lo, hi = 0, len(arr) - 1\n    while lo <= hi:\n        mid = (lo + hi) // 2\n        if arr[mid] == target:\n            return mid\n        elif arr[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return -1\n"
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "ts": 1705319420000,
+    "content": [
+      {
+        "type": "tool_result",
+        "tool_use_id": "toolu_roo_01",
+        "content": "File written: search.py"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "ts": 1705319430000,
+    "content": [
+      {
+        "type": "text",
+        "text": "Done. Binary search implemented in search.py."
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "ts": 1705319440000,
+    "isSummary": true,
+    "content": "This is a condensed summary of the conversation so far."
+  },
+  {
+    "role": "user",
+    "ts": 1705319450000,
+    "content": [
+      {
+        "type": "text",
+        "text": "What is the time complexity?"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "ts": 1705319460000,
+    "reasoning_content": "The user is asking about time complexity of binary search.",
+    "content": [
+      {
+        "type": "text",
+        "text": "Binary search has O(log n) time complexity because it halves the search space on each step."
+      }
+    ]
+  }
+]

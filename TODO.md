@@ -1334,9 +1334,14 @@ reports + `OutputFormatter` with zero back-refs to main.
     `SessionLocation`/`DiscoverError`/`ParseError::Database`; `type SessionFile = SessionRef`
     alias; backward-compatible. Phase 2 (cline, roo, codex-rewrite, gemini-rewrite, opencode
     SQLite) can now build on the new trait.
+  - [x] **Phase 2a — Cline + Roo-Code parsers** (2026-07-07): `ClineFormat` + `RooCodeFormat`
+    added to `normalize-chat-sessions` under `format-cline` / `format-roo` feature flags.
+    Both use `SessionLocation::Directory`; shared `anthropic_history::load_from_task_dir`
+    parser handles the common `api_conversation_history.json` format; Roo-Code's extra fields
+    (`ts`, `isSummary`, `reasoning_content`, `isTruncationMarker`, etc.) handled gracefully.
+    `formats-all` now includes both. Integration tests in `tests/cline_roo_tests.rs`.
 
-  **Phase 2 follow-ups (when adding new sources):**
-  - Cline / Roo source (JSONL in `~/.cline/` / `~/.roo/`)
+  **Phase 2 remaining (when prioritised):**
   - Codex current format (rewrite `codex.rs` — marked TODO)
   - Gemini current format (rewrite `gemini_cli.rs` — marked TODO)
   - opencode SQLite source (use `SessionLocation::Database`, `block_on` in `load()`)

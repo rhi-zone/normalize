@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added (internal)
+
+- **Cline and Roo-Code session parsers (Phase 2a).** `normalize-chat-sessions` now ships
+  `ClineFormat` (`format-cline` feature) and `RooCodeFormat` (`format-roo` feature).
+  Both use `SessionLocation::Directory` — one task directory per session — and share a common
+  Anthropic `api_conversation_history.json` parser in `formats::anthropic_history`.
+  Extra roo-code fields (`ts`, `isSummary`, `reasoning_content`, `isTruncationMarker`) are
+  handled gracefully. The `formats-all` convenience feature now includes both.
+
 ### Changed (internal)
 
 - **`SessionSource` trait replaces `LogFormat` (Phase 1).** `normalize-chat-sessions` formats now

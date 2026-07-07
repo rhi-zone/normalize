@@ -1,0 +1,94 @@
+[
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Write a hello world function in Rust."
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "I'll create a simple hello world function."
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_01ABC",
+        "name": "write_to_file",
+        "input": {
+          "path": "src/main.rs",
+          "content": "fn hello() -> &'static str {\n    \"Hello, world!\"\n}\n\nfn main() {\n    println!(\"{}\", hello());\n}\n"
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "tool_result",
+        "tool_use_id": "toulu_01ABC",
+        "content": "File written successfully."
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "I've created src/main.rs with a hello world function and a main function that calls it."
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Can you add a test for it?"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "Sure! Let me add a test module."
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_02DEF",
+        "name": "write_to_file",
+        "input": {
+          "path": "src/main.rs",
+          "content": "fn hello() -> &'static str {\n    \"Hello, world!\"\n}\n\nfn main() {\n    println!(\"{}\", hello());\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n    #[test]\n    fn test_hello() {\n        assert_eq!(hello(), \"Hello, world!\");\n    }\n}\n"
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "tool_result",
+        "tool_use_id": "toolu_02DEF",
+        "content": "File written successfully."
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "Done! I've added a test module with a test_hello function."
+      }
+    ]
+  }
+]
