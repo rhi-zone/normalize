@@ -1,0 +1,5 @@
+{"sessionId":"session-abcdef12-0000-0000-0000-000000000001","projectHash":"abc123hash","startTime":"2025-05-07T17:24:00.000Z","lastUpdated":"2025-05-07T17:25:00.000Z","kind":"main"}
+{"id":"msg-u-001","timestamp":"2025-05-07T17:24:05.000Z","content":[{"text":"What is 2+2?"}],"type":"user"}
+{"id":"msg-g-001","timestamp":"2025-05-07T17:24:06.000Z","content":[{"text":"2+2 equals 4."}],"type":"gemini","model":"gemini-2.0-flash","tokens":{"input":10,"output":8,"cached":0,"total":18}}
+{"id":"msg-u-002","timestamp":"2025-05-07T17:24:10.000Z","content":"Can you read a file for me?","type":"user"}
+{"id":"msg-g-002","timestamp":"2025-05-07T17:24:11.000Z","content":[{"text":"Sure, let me read that file."}],"type":"gemini","thoughts":[{"subject":"Planning","description":"The user wants me to read a file. I'll use the read_file tool.","timestamp":"2025-05-07T17:24:10.500Z"}],"toolCalls":[{"id":"tc-001","name":"read_file","args":{"path":"/home/user/notes.txt"},"result":[{"text":"Hello from notes!"}],"status":"success","timestamp":"2025-05-07T17:24:11.000Z"}],"model":"gemini-2.0-flash","tokens":{"input":20,"output":15,"cached":0,"total":35}}

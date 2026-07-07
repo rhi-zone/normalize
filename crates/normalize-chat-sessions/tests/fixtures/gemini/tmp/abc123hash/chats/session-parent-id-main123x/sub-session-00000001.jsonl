@@ -1,0 +1,3 @@
+{"sessionId":"sub-session-00000001","projectHash":"abc123hash","startTime":"2025-05-07T17:25:00.000Z","kind":"subagent"}
+{"id":"msg-sub-u-001","timestamp":"2025-05-07T17:25:01.000Z","content":[{"text":"Summarize this document."}],"type":"user"}
+{"id":"msg-sub-g-001","timestamp":"2025-05-07T17:25:02.000Z","content":[{"text":"The document covers Python basics."}],"type":"gemini","model":"gemini-2.0-flash"}
