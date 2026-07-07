@@ -1,7 +1,8 @@
 //! Claude Code JSONL format parser.
 
 use super::{
-    LogFormat, ParseError, SessionFile, list_jsonl_sessions, list_subagent_sessions, peek_lines,
+    DiscoverError, ParseError, SessionLocation, SessionRef, SessionSource, list_jsonl_sessions,
+    list_subagent_sessions, peek_lines,
 };
 use crate::{ContentBlock, Message, Role, Session, TokenUsage, Turn};
 use serde_json::Value;
@@ -26,7 +27,7 @@ fn claude_projects_root() -> PathBuf {
     }
 }
 
-impl LogFormat for ClaudeCodeFormat {
+impl SessionSource for ClaudeCodeFormat {
     fn name(&self) -> &'static str {
         "claude"
     }
@@ -35,7 +36,7 @@ impl LogFormat for ClaudeCodeFormat {
         Some(claude_projects_root())
     }
 
-    fn sessions_dir(&self, project: Option<&Path>) -> PathBuf {
+    fn sessions_root(&self, project: Option<&Path>) -> PathBuf {
         let claude_dir = claude_projects_root();
 
         // Claude encodes project paths - check which encoding variant exists
@@ -75,14 +76,6 @@ impl LogFormat for ClaudeCodeFormat {
         claude_dir
     }
 
-    fn list_sessions(&self, project: Option<&Path>) -> Vec<SessionFile> {
-        list_jsonl_sessions(&self.sessions_dir(project))
-    }
-
-    fn list_subagent_sessions(&self, project: Option<&Path>) -> Vec<SessionFile> {
-        list_subagent_sessions(&self.sessions_dir(project))
-    }
-
     fn detect(&self, path: &Path) -> f64 {
         // Check extension
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
@@ -107,7 +100,30 @@ impl LogFormat for ClaudeCodeFormat {
         0.0
     }
 
-    fn parse(&self, path: &Path) -> Result<Session, ParseError> {
+    fn discover(&self, root: &Path) -> Result<Vec<SessionRef>, DiscoverError> {
+        let mut refs = list_jsonl_sessions(root);
+        for r in &mut refs {
+            r.format = self.name();
+        }
+        let mut subagents = list_subagent_sessions(root);
+        for r in &mut subagents {
+            r.format = self.name();
+        }
+        refs.extend(subagents);
+        Ok(refs)
+    }
+
+    fn load(&self, r: &SessionRef) -> Result<Session, ParseError> {
+        let path = match &r.location {
+            SessionLocation::File(p) => p.as_path(),
+            _ => &r.path,
+        };
+        self.parse_path(path)
+    }
+}
+
+impl ClaudeCodeFormat {
+    fn parse_path(&self, path: &Path) -> Result<Session, ParseError> {
         let file = File::open(path).map_err(|e| ParseError::Io {
             path: path.to_path_buf(),
             source: e,
@@ -279,7 +295,7 @@ impl LogFormat for ClaudeCodeFormat {
         // Set provider
         session.metadata.provider = Some("anthropic".to_string());
 
-        // Detect subagent metadata from the file path and first entry's fields.
+        // Detect subagent metadata from the file path.
         // Subagent files live at <session-uuid>/subagents/agent-<id>.jsonl
         if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
             && stem.starts_with("agent-")
@@ -312,13 +328,7 @@ impl LogFormat for ClaudeCodeFormat {
     }
 }
 
-/// Parse a JSONL entry into a Message.
 /// Sum token usage across all API calls in a turn.
-///
-/// A single user-prompt turn may involve multiple API calls (e.g. tool-call
-/// rounds before the final answer). Each call has its own `requestId` and its
-/// own `usage` entry. We sum them so `Turn::token_usage` reflects the full cost
-/// of the turn, not just the last API call.
 fn sum_turn_tokens(
     ids: &[String],
     request_tokens: &mut HashMap<String, TokenUsage>,
@@ -338,7 +348,6 @@ fn sum_turn_tokens(
             if let Some(cc) = u.cache_create {
                 *total.cache_create.get_or_insert(0) += cc;
             }
-            // Use the model from the last API call (most likely the final answer)
             if u.model.is_some() {
                 total.model = u.model;
             }
@@ -351,8 +360,6 @@ fn sum_turn_tokens(
 fn parse_message(entry: &Value, role: Role) -> Message {
     let mut content_blocks = Vec::new();
 
-    // Content can be a bare string (human-typed prompts) or an array of content blocks
-    // (tool results, assistant text blocks, etc.)
     let content_value = entry.get("message").and_then(|m| m.get("content"));
 
     if let Some(text) = content_value.and_then(|c| c.as_str()) {

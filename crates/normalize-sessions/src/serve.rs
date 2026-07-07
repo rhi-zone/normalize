@@ -1,7 +1,7 @@
 //! Web server for session viewing.
 
 use super::{format_age, resolve_session_paths};
-use crate::sessions::{ClaudeCodeFormat, LogFormat};
+use crate::sessions::{ClaudeCodeFormat, SessionSource};
 use axum::{
     Router,
     extract::{Path as AxumPath, State},
@@ -88,7 +88,7 @@ async fn spa_css() -> impl IntoResponse {
 
 /// API: list all sessions as JSON.
 async fn api_sessions(State(state): State<Arc<SessionsState>>) -> axum::response::Response {
-    let sessions_dir = ClaudeCodeFormat.sessions_dir(state.project.as_deref());
+    let sessions_dir = ClaudeCodeFormat.sessions_root(state.project.as_deref());
 
     let mut sessions: Vec<serde_json::Value> = Vec::new();
 

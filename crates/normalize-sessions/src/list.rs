@@ -3,7 +3,9 @@
 use super::format_age;
 use super::sort::{DefaultDir, SortDir, SortSpec};
 use crate::output::OutputFormatter;
-use crate::sessions::{ContentBlock, FormatRegistry, LogFormat, Role, SessionFile};
+use crate::sessions::{
+    ContentBlock, FormatRegistry, Role, SessionFile, SessionSource, parse_session,
+};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -245,8 +247,8 @@ struct SessionStats {
 }
 
 /// Extract rich stats from a session file.
-fn extract_session_stats(format: &dyn LogFormat, path: &Path) -> SessionStats {
-    let Ok(session) = format.parse(path) else {
+fn extract_session_stats(path: &Path) -> SessionStats {
+    let Ok(session) = parse_session(path) else {
         return SessionStats {
             name: None,
             message_count: 0,
@@ -326,7 +328,7 @@ pub fn build_session_list(
     use std::time::{Duration, SystemTime};
 
     let registry = FormatRegistry::new();
-    let format: &dyn LogFormat = match format_name {
+    let source: &dyn SessionSource = match format_name {
         Some(name) => registry
             .get(name)
             .ok_or_else(|| format!("Unknown format: {}", name))?,
@@ -340,10 +342,10 @@ pub fn build_session_list(
         .transpose()?;
 
     let mut sessions: Vec<SessionFile> = if all_projects {
-        list_all_project_sessions_by_mode(format, mode)
+        list_all_project_sessions_by_mode(source, mode)
     } else {
         let proj = project_filter.or(project);
-        super::list_sessions_by_mode(format, proj, mode)
+        super::list_sessions_by_mode(source, proj, mode)
     };
 
     // Date filtering
@@ -388,7 +390,7 @@ pub fn build_session_list(
         None => SortSpec::default(),
     };
 
-    let has_subagents = sessions.iter().any(|s| s.parent_id.is_some());
+    let has_subagents = sessions.iter().any(|s| s.parent_session_id.is_some());
 
     let mut items: Vec<SessionListItem> = sessions
         .iter()
@@ -401,7 +403,7 @@ pub fn build_session_list(
                 .to_string();
             let age_seconds = s.mtime.elapsed().map(|d| d.as_secs()).unwrap_or(0);
             let project = project_from_path(&s.path);
-            let stats = extract_session_stats(format, &s.path);
+            let stats = extract_session_stats(&s.path);
             SessionListItem {
                 id,
                 path: s.path.clone(),
@@ -411,7 +413,7 @@ pub fn build_session_list(
                 user_messages: stats.message_count,
                 tool_calls: stats.tool_use_count,
                 duration_seconds: stats.first_timestamp,
-                parent_id: s.parent_id.clone(),
+                parent_id: s.parent_session_id.clone(),
                 agent_id: s.agent_id.clone(),
                 subagent_type: s.subagent_type.clone(),
             }

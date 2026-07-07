@@ -1,7 +1,7 @@
 //! Subagent listing and summary for a parent session.
 
 use crate::output::OutputFormatter;
-use crate::sessions::{FormatRegistry, LogFormat, Session, list_subagent_sessions};
+use crate::sessions::{FormatRegistry, Session, SessionSource, parse_session};
 use serde::Serialize;
 use std::fmt::Write as _;
 use std::path::Path;
@@ -102,7 +102,7 @@ pub fn build_subagents_report(
     format_name: Option<&str>,
 ) -> Result<SubagentsReport, String> {
     let registry = FormatRegistry::new();
-    let format: &dyn LogFormat = match format_name {
+    let source: &dyn SessionSource = match format_name {
         Some(name) => registry
             .get(name)
             .ok_or_else(|| format!("Unknown format: {}", name))?,
@@ -112,7 +112,7 @@ pub fn build_subagents_report(
     };
 
     // Find the sessions dir and look for subagents under this session
-    let sessions_dir = format.sessions_dir(project);
+    let sessions_dir = source.sessions_root(project);
 
     // Try to find the session directory (exact or prefix match)
     let session_dir = find_session_dir(&sessions_dir, session_id)
@@ -124,17 +124,17 @@ pub fn build_subagents_report(
         .unwrap_or(session_id)
         .to_string();
 
-    let subagent_files = list_subagent_sessions(&sessions_dir);
-    let subagent_files: Vec<_> = subagent_files
+    let subagent_files: Vec<_> = source
+        .discover(&sessions_dir)
+        .unwrap_or_default()
         .into_iter()
-        .filter(|s| s.parent_id.as_deref() == Some(&parent_id))
+        .filter(|s| s.parent_session_id.as_deref() == Some(&parent_id))
         .collect();
 
     let mut items = Vec::new();
     for sf in &subagent_files {
-        let session = format
-            .parse(&sf.path)
-            .unwrap_or_else(|_| Session::new(sf.path.clone(), format.name()));
+        let session = parse_session(&sf.path)
+            .unwrap_or_else(|_| Session::new(sf.path.clone(), source.name()));
         let tokens = session.total_tokens();
         let tool_calls = session.tool_uses().count();
 

@@ -1,6 +1,9 @@
 //! Normalize @agent JSONL format parser.
 
-use super::{LogFormat, ParseError, SessionFile, list_jsonl_sessions, peek_lines};
+use super::{
+    DiscoverError, ParseError, SessionLocation, SessionRef, SessionSource, list_jsonl_sessions,
+    peek_lines,
+};
 use crate::{ContentBlock, Message, Role, Session, Turn};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -153,21 +156,16 @@ impl NormalizeAgentSession {
     }
 }
 
-impl LogFormat for NormalizeAgentFormat {
+impl SessionSource for NormalizeAgentFormat {
     fn name(&self) -> &'static str {
         "normalize"
     }
 
-    fn sessions_dir(&self, project: Option<&Path>) -> PathBuf {
+    fn sessions_root(&self, project: Option<&Path>) -> PathBuf {
         let project_root = project
             .map(|p| p.to_path_buf())
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
         project_root.join(".normalize/agent/logs")
-    }
-
-    fn list_sessions(&self, project: Option<&Path>) -> Vec<SessionFile> {
-        let dir = self.sessions_dir(project);
-        list_jsonl_sessions(&dir)
     }
 
     fn detect(&self, path: &Path) -> f64 {
@@ -176,27 +174,39 @@ impl LogFormat for NormalizeAgentFormat {
             return 0.0;
         }
 
-        // Peek at first few lines for normalize agent events
         for line in peek_lines(path, 3) {
-            if let Ok(entry) = serde_json::from_str::<Value>(&line) {
-                // Normalize agent logs have "event" field
-                if let Some(event) = entry.get("event").and_then(|v| v.as_str())
-                    && matches!(event, "session_start" | "task" | "turn_start")
-                {
-                    // Check for normalize-specific fields
-                    if entry.get("moss_root").is_some()
-                        || entry.get("user_prompt").is_some()
-                        || entry.get("working_memory_count").is_some()
-                    {
-                        return 1.0;
-                    }
-                }
+            if let Ok(entry) = serde_json::from_str::<Value>(&line)
+                && let Some(event) = entry.get("event").and_then(|v| v.as_str())
+                && matches!(event, "session_start" | "task" | "turn_start")
+                && (entry.get("moss_root").is_some()
+                    || entry.get("user_prompt").is_some()
+                    || entry.get("working_memory_count").is_some())
+            {
+                return 1.0;
             }
         }
         0.0
     }
 
-    fn parse(&self, path: &Path) -> Result<Session, ParseError> {
+    fn discover(&self, root: &Path) -> Result<Vec<SessionRef>, DiscoverError> {
+        let mut refs = list_jsonl_sessions(root);
+        for r in &mut refs {
+            r.format = self.name();
+        }
+        Ok(refs)
+    }
+
+    fn load(&self, r: &SessionRef) -> Result<Session, ParseError> {
+        let path = match &r.location {
+            SessionLocation::File(p) => p.as_path(),
+            _ => &r.path,
+        };
+        self.parse_path(path)
+    }
+}
+
+impl NormalizeAgentFormat {
+    fn parse_path(&self, path: &Path) -> Result<Session, ParseError> {
         let file = File::open(path).map_err(|e| ParseError::Io {
             path: path.to_path_buf(),
             source: e,
@@ -239,7 +249,6 @@ impl LogFormat for NormalizeAgentFormat {
                     session.metadata.provider = provider;
                     session.metadata.model = model;
 
-                    // Add user message for the task
                     current_turn.messages.push(Message {
                         role: Role::User,
                         content: vec![ContentBlock::Text { text: user_prompt }],
@@ -247,7 +256,6 @@ impl LogFormat for NormalizeAgentFormat {
                     });
                 }
                 AgentEvent::TurnStart { turn, .. } => {
-                    // Flush previous turn when starting a new one
                     if turn > current_turn_num && !current_turn.messages.is_empty() {
                         session.turns.push(std::mem::take(&mut current_turn));
                     }
@@ -261,10 +269,7 @@ impl LogFormat for NormalizeAgentFormat {
                     });
                 }
                 AgentEvent::Command { cmd, success, .. } => {
-                    // Extract command name for tool use
                     let cmd_name = cmd.split_whitespace().next().unwrap_or("shell").to_string();
-
-                    // Add tool use
                     let tool_id = format!("cmd-{}", current_turn_num);
                     current_turn.messages.push(Message {
                         role: Role::Assistant,
@@ -275,8 +280,6 @@ impl LogFormat for NormalizeAgentFormat {
                         }],
                         timestamp: None,
                     });
-
-                    // Add tool result
                     current_turn.messages.push(Message {
                         role: Role::Tool,
                         content: vec![ContentBlock::ToolResult {
@@ -295,7 +298,6 @@ impl LogFormat for NormalizeAgentFormat {
             }
         }
 
-        // Flush final turn
         if !current_turn.messages.is_empty() {
             session.turns.push(current_turn);
         }

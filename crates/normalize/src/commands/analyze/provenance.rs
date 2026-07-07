@@ -5,7 +5,9 @@
 
 use super::git_utils;
 use crate::output::OutputFormatter;
-use normalize_chat_sessions::{ClaudeCodeFormat, ContentBlock, LogFormat, Session};
+use normalize_chat_sessions::{
+    ClaudeCodeFormat, ContentBlock, Session, SessionSource, parse_session,
+};
 use rayon::prelude::*;
 use regex::Regex;
 use serde::Serialize;
@@ -94,12 +96,18 @@ struct CommitSessionMap {
 /// Build commit→session map by scanning session tool-use blocks.
 fn build_commit_session_map(root: &Path, sessions_path: Option<&Path>) -> CommitSessionMap {
     let mut warnings = Vec::new();
-    let format = ClaudeCodeFormat;
+    let source = ClaudeCodeFormat;
 
     let session_files = if let Some(dir) = sessions_path {
         normalize_chat_sessions::list_jsonl_sessions(dir)
     } else {
-        format.list_sessions(Some(root))
+        let sessions_root = source.sessions_root(Some(root));
+        source
+            .discover(&sessions_root)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|r| r.parent_session_id.is_none())
+            .collect()
     };
 
     if session_files.is_empty() {
@@ -117,11 +125,7 @@ fn build_commit_session_map(root: &Path, sessions_path: Option<&Path>) -> Commit
     let mut short_to_session: HashMap<String, CommitSession> = HashMap::new();
 
     for sf in &session_files {
-        let session: Session = match if sessions_path.is_some() {
-            normalize_chat_sessions::parse_session(&sf.path)
-        } else {
-            format.parse(&sf.path)
-        } {
+        let session: Session = match parse_session(&sf.path) {
             Ok(s) => s,
             Err(_) => continue,
         };

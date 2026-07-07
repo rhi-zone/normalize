@@ -734,28 +734,10 @@ pub fn print_session_show(
 
     // If --filter or --grep or --ngrams with message analysis
     if filter.is_some() || grep_pattern.is_some() || errors_only || ngrams.is_some() {
-        use normalize_chat_sessions::{FormatRegistry, LogFormat};
-
-        let registry = FormatRegistry::new();
-        let log_format: &dyn LogFormat = match format {
-            Some(name) => match registry.get(name) {
-                Some(f) => f,
-                None => {
-                    eprintln!("Unknown format: {}", name);
-                    return 1;
-                }
-            },
-            None => match registry.get("claude") {
-                Some(f) => f,
-                None => {
-                    eprintln!("Claude format not available (compile with feature = format-claude)");
-                    return 1;
-                }
-            },
-        };
+        use normalize_chat_sessions::parse_session;
 
         let path = &paths[0];
-        let session = match log_format.parse(path) {
+        let session = match parse_session(path) {
             Ok(s) => s,
             Err(e) => {
                 eprintln!("Failed to parse session: {}", e);
@@ -787,19 +769,26 @@ pub fn print_session_show(
 
 /// Parse a session file for the show command.
 fn parse_session_for_show(path: &Path, format: Option<&str>) -> Result<Session, String> {
-    use normalize_chat_sessions::{FormatRegistry, LogFormat};
+    use normalize_chat_sessions::{FormatRegistry, SessionSource, parse_session};
 
-    let registry = FormatRegistry::new();
-    let log_format: &dyn LogFormat = match format {
-        Some(name) => registry
+    if let Some(name) = format {
+        let registry = FormatRegistry::new();
+        let source: &dyn SessionSource = registry
             .get(name)
-            .ok_or_else(|| format!("Unknown format: {}", name))?,
-        None => registry.get("claude").ok_or_else(|| {
-            "Claude format not available (compile with feature = format-claude)".to_string()
-        })?,
-    };
-
-    log_format.parse(path).map_err(|e| e.to_string())
+            .ok_or_else(|| format!("Unknown format: {}", name))?;
+        let r = normalize_chat_sessions::SessionRef {
+            format: source.name(),
+            location: normalize_chat_sessions::SessionLocation::File(path.to_path_buf()),
+            path: path.to_path_buf(),
+            mtime: std::time::SystemTime::UNIX_EPOCH,
+            parent_session_id: None,
+            agent_id: None,
+            subagent_type: None,
+        };
+        source.load(&r).map_err(|e| e.to_string())
+    } else {
+        parse_session(path).map_err(|e| e.to_string())
+    }
 }
 
 /// Filter and display messages from a session.

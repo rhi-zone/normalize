@@ -1,49 +1,69 @@
 //! OpenAI Codex CLI JSONL format parser.
+//!
+//! TODO(phase2): rewrite for current Codex CLI format (session layout may have changed).
 
-use super::{LogFormat, ParseError, SessionFile, peek_lines};
+use super::{DiscoverError, ParseError, SessionLocation, SessionRef, SessionSource, peek_lines};
 use crate::{ContentBlock, Message, Role, Session, TokenUsage, Turn};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 /// OpenAI Codex CLI session log format (JSONL).
 pub struct CodexFormat;
 
-impl LogFormat for CodexFormat {
+impl SessionSource for CodexFormat {
     fn name(&self) -> &'static str {
         "codex"
     }
 
-    fn sessions_dir(&self, _project: Option<&Path>) -> PathBuf {
+    fn sessions_root(&self, _project: Option<&Path>) -> PathBuf {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
         PathBuf::from(home).join(".codex/sessions")
     }
 
-    fn list_sessions(&self, project: Option<&Path>) -> Vec<SessionFile> {
-        let dir = self.sessions_dir(project);
+    fn detect(&self, path: &Path) -> f64 {
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "jsonl" {
+            return 0.0;
+        }
+
+        for line in peek_lines(path, 5) {
+            if let Ok(entry) = serde_json::from_str::<Value>(&line)
+                && let Some(t) = entry.get("type").and_then(|v| v.as_str())
+                && t == "session_meta"
+                && let Some(originator) = entry
+                    .get("payload")
+                    .and_then(|p| p.get("originator"))
+                    .and_then(|v| v.as_str())
+                && originator.contains("codex")
+            {
+                return 1.0;
+            }
+        }
+        0.0
+    }
+
+    fn discover(&self, root: &Path) -> Result<Vec<SessionRef>, DiscoverError> {
         // Codex stores sessions in ~/.codex/sessions/YYYY/MM/DD/*.jsonl
-        let mut sessions = Vec::new();
-        // Walk year directories
-        if let Ok(years) = std::fs::read_dir(&dir) {
+        let mut refs = Vec::new();
+        if let Ok(years) = std::fs::read_dir(root) {
             for year in years.filter_map(|e| e.ok()) {
                 if !year.path().is_dir() {
                     continue;
                 }
-                // Walk month directories
                 if let Ok(months) = std::fs::read_dir(year.path()) {
                     for month in months.filter_map(|e| e.ok()) {
                         if !month.path().is_dir() {
                             continue;
                         }
-                        // Walk day directories
                         if let Ok(days) = std::fs::read_dir(month.path()) {
                             for day in days.filter_map(|e| e.ok()) {
                                 if !day.path().is_dir() {
                                     continue;
                                 }
-                                // Find .jsonl files
                                 if let Ok(files) = std::fs::read_dir(day.path()) {
                                     for file in files.filter_map(|e| e.ok()) {
                                         let path = file.path();
@@ -52,10 +72,14 @@ impl LogFormat for CodexFormat {
                                             && let Ok(meta) = path.metadata()
                                             && let Ok(mtime) = meta.modified()
                                         {
-                                            sessions.push(SessionFile {
+                                            refs.push(SessionRef {
+                                                format: self.name(),
+                                                location: super::SessionLocation::File(
+                                                    path.clone(),
+                                                ),
                                                 path,
                                                 mtime,
-                                                parent_id: None,
+                                                parent_session_id: None,
                                                 agent_id: None,
                                                 subagent_type: Some("interactive".into()),
                                             });
@@ -68,39 +92,20 @@ impl LogFormat for CodexFormat {
                 }
             }
         }
-        sessions
+        Ok(refs)
     }
 
-    fn detect(&self, path: &Path) -> f64 {
-        // Check extension
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        if ext != "jsonl" {
-            return 0.0;
-        }
-
-        // Peek at first few lines
-        for line in peek_lines(path, 5) {
-            if let Ok(entry) = serde_json::from_str::<Value>(&line) {
-                // Codex has type field with session_meta, response_item, event_msg
-                if let Some(t) = entry.get("type").and_then(|v| v.as_str())
-                    && t == "session_meta"
-                {
-                    // Check for codex-specific originator
-                    if let Some(originator) = entry
-                        .get("payload")
-                        .and_then(|p| p.get("originator"))
-                        .and_then(|v| v.as_str())
-                        && originator.contains("codex")
-                    {
-                        return 1.0;
-                    }
-                }
-            }
-        }
-        0.0
+    fn load(&self, r: &SessionRef) -> Result<Session, ParseError> {
+        let path = match &r.location {
+            SessionLocation::File(p) => p.as_path(),
+            _ => &r.path,
+        };
+        self.parse_path(path)
     }
+}
 
-    fn parse(&self, path: &Path) -> Result<Session, ParseError> {
+impl CodexFormat {
+    fn parse_path(&self, path: &Path) -> Result<Session, ParseError> {
         let file = File::open(path).map_err(|e| ParseError::Io {
             path: path.to_path_buf(),
             source: e,
@@ -127,7 +132,6 @@ impl LogFormat for CodexFormat {
 
             let entry_type = entry.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
-            // Extract metadata from session_meta
             if entry_type == "session_meta"
                 && let Some(payload) = entry.get("payload")
             {
@@ -153,7 +157,6 @@ impl LogFormat for CodexFormat {
 
             match payload_type {
                 "user_message" => {
-                    // Flush previous turn
                     if !current_turn.messages.is_empty() {
                         session.turns.push(std::mem::take(&mut current_turn));
                     }
@@ -174,7 +177,6 @@ impl LogFormat for CodexFormat {
                     });
                 }
                 "message" => {
-                    // Assistant text response
                     let text = payload
                         .get("content")
                         .and_then(|v| v.as_str())
@@ -210,7 +212,6 @@ impl LogFormat for CodexFormat {
                     let input: Value =
                         serde_json::from_str(args_str).unwrap_or(Value::Object(Default::default()));
 
-                    // Store for later pairing with result
                     pending_tool_calls.insert(call_id.clone(), (name.clone(), input.clone()));
 
                     current_turn.messages.push(Message {
@@ -255,7 +256,6 @@ impl LogFormat for CodexFormat {
                     });
                 }
                 "token_count" => {
-                    // Extract final token usage
                     if let Some(info) = payload.get("info")
                         && let Some(total) = info.get("total_token_usage")
                     {
@@ -282,14 +282,20 @@ impl LogFormat for CodexFormat {
             }
         }
 
-        // Flush final turn
+        // Suppress unused warning for pending_tool_calls (kept for future pairing logic)
+        let _ = pending_tool_calls;
+
         if !current_turn.messages.is_empty() {
             session.turns.push(current_turn);
         }
 
-        // Set provider
         session.metadata.provider = Some("openai".to_string());
 
         Ok(session)
     }
 }
+
+// Keep SystemTime in scope for SessionRef construction in discover()
+const _: () = {
+    let _ = SystemTime::UNIX_EPOCH;
+};

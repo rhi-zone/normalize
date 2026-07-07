@@ -33,8 +33,8 @@ pub mod output {
 /// `normalize-session-analysis` for analysis).
 pub mod sessions {
     pub use normalize_chat_sessions::{
-        ClaudeCodeFormat, ContentBlock, FormatRegistry, LogFormat, Message, Role, Session,
-        SessionFile, SessionMetadata, TokenUsage, Turn, detect_format, get_format, list_formats,
+        ClaudeCodeFormat, ContentBlock, FormatRegistry, Message, Role, Session, SessionFile,
+        SessionMetadata, SessionSource, TokenUsage, Turn, detect_format, get_format, list_formats,
         list_jsonl_sessions, list_subagent_sessions, parse_session, parse_session_with_format,
         project_metadata_roots,
     };
@@ -98,7 +98,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
-use crate::sessions::{FormatRegistry, LogFormat, SessionFile};
+use crate::sessions::{FormatRegistry, SessionFile, SessionSource};
 use nucleo_matcher::pattern::{CaseMatching, Normalization, Pattern};
 use nucleo_matcher::{Config, Matcher};
 
@@ -205,18 +205,22 @@ impl std::fmt::Display for SessionMode {
 
 /// List sessions filtered by mode.
 pub(crate) fn list_sessions_by_mode(
-    format: &dyn LogFormat,
+    source: &dyn SessionSource,
     project: Option<&Path>,
     mode: &SessionMode,
 ) -> Vec<SessionFile> {
+    let root = source.sessions_root(project);
+    let all = source.discover(&root).unwrap_or_default();
     match mode {
-        SessionMode::Interactive => format.list_sessions(project),
-        SessionMode::Subagent => format.list_subagent_sessions(project),
-        SessionMode::All => {
-            let mut all = format.list_sessions(project);
-            all.extend(format.list_subagent_sessions(project));
-            all
-        }
+        SessionMode::Interactive => all
+            .into_iter()
+            .filter(|r| r.parent_session_id.is_none())
+            .collect(),
+        SessionMode::Subagent => all
+            .into_iter()
+            .filter(|r| r.parent_session_id.is_some())
+            .collect(),
+        SessionMode::All => all,
     }
 }
 
@@ -268,12 +272,18 @@ fn resolve_subagent_path(
     format_name: Option<&str>,
 ) -> Option<PathBuf> {
     let registry = FormatRegistry::new();
-    let format: &dyn LogFormat = match format_name {
+    let source: &dyn SessionSource = match format_name {
         Some(name) => registry.get(name)?,
         None => registry.get("claude")?,
     };
 
-    let subagent_sessions = format.list_subagent_sessions(project);
+    let root = source.sessions_root(project);
+    let subagent_sessions: Vec<_> = source
+        .discover(&root)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|r| r.parent_session_id.is_some())
+        .collect();
     for s in &subagent_sessions {
         if let Some(stem) = s.path.file_stem().and_then(|os| os.to_str())
             && (stem == agent_id || stem.starts_with(agent_id))
@@ -319,7 +329,7 @@ pub(crate) fn resolve_session_paths_literal(
 
     // Otherwise, try to find it as a session ID in the format's directory
     let registry = FormatRegistry::new();
-    let format: &dyn LogFormat = match format_name {
+    let source: &dyn SessionSource = match format_name {
         Some(name) => match registry.get(name) {
             Some(f) => f,
             None => return Vec::new(),
@@ -330,7 +340,13 @@ pub(crate) fn resolve_session_paths_literal(
         },
     };
 
-    let sessions = format.list_sessions(project);
+    let root = source.sessions_root(project);
+    let sessions: Vec<_> = source
+        .discover(&root)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|r| r.parent_session_id.is_none())
+        .collect();
 
     // Match by session ID prefix (file stem)
     for s in &sessions {
@@ -353,12 +369,18 @@ fn resolve_session_fuzzy(
     format_name: Option<&str>,
 ) -> Option<(PathBuf, String)> {
     let registry = FormatRegistry::new();
-    let format: &dyn LogFormat = match format_name {
+    let source: &dyn SessionSource = match format_name {
         Some(name) => registry.get(name)?,
         None => registry.get("claude")?,
     };
 
-    let sessions = format.list_sessions(project);
+    let root = source.sessions_root(project);
+    let sessions: Vec<_> = source
+        .discover(&root)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|r| r.parent_session_id.is_none())
+        .collect();
     let mut matcher = Matcher::new(Config::DEFAULT);
     let pattern = Pattern::parse(session_id, CaseMatching::Ignore, Normalization::Smart);
 

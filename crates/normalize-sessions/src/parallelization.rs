@@ -2,7 +2,7 @@
 
 use crate::output::OutputFormatter;
 use crate::sessions::{
-    ContentBlock, FormatRegistry, LogFormat, Role, SessionFile, parse_session,
+    ContentBlock, FormatRegistry, Role, SessionFile, SessionSource, parse_session,
     parse_session_with_format,
 };
 use serde::{Deserialize, Serialize};
@@ -277,7 +277,7 @@ pub fn build_parallelization_report(
     threshold: usize,
 ) -> Result<ParallelizationReport, String> {
     let registry = FormatRegistry::new();
-    let format: &dyn LogFormat = match format_name {
+    let source: &dyn SessionSource = match format_name {
         Some(name) => registry
             .get(name)
             .ok_or_else(|| format!("Unknown format: {}", name))?,
@@ -291,10 +291,10 @@ pub fn build_parallelization_report(
         .transpose()?;
 
     let mut sessions: Vec<SessionFile> = if all_projects {
-        list_all_project_sessions_by_mode(format, mode)
+        list_all_project_sessions_by_mode(source, mode)
     } else {
         let project = project_filter.or(root);
-        list_sessions_by_mode(format, project, mode)
+        list_sessions_by_mode(source, project, mode)
     };
 
     let now = std::time::SystemTime::now();

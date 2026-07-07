@@ -4,7 +4,9 @@ use super::list::project_from_path;
 use super::sort::DefaultDir;
 use super::stats::parse_date;
 use crate::output::OutputFormatter;
-use crate::sessions::{ContentBlock, FormatRegistry, LogFormat, SessionFile, TokenUsage, Turn};
+use crate::sessions::{
+    ContentBlock, FormatRegistry, SessionFile, SessionSource, TokenUsage, Turn, parse_session,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -811,7 +813,7 @@ pub fn build_messages_report(
     };
 
     let registry = FormatRegistry::new();
-    let format: &dyn LogFormat = match format_name {
+    let source: &dyn SessionSource = match format_name {
         Some(name) => registry
             .get(name)
             .ok_or_else(|| format!("Unknown format: {}", name))?,
@@ -825,10 +827,10 @@ pub fn build_messages_report(
         .transpose()?;
 
     let mut sessions: Vec<SessionFile> = if all_projects {
-        list_all_project_sessions_by_mode(format, mode)
+        list_all_project_sessions_by_mode(source, mode)
     } else {
         let proj = project_filter.or(root);
-        super::list_sessions_by_mode(format, proj, mode)
+        super::list_sessions_by_mode(source, proj, mode)
     };
 
     // Session ID filtering
@@ -895,7 +897,7 @@ pub fn build_messages_report(
     let mut session_count = 0;
 
     for sf in &sessions {
-        let Ok(session) = format.parse(&sf.path) else {
+        let Ok(session) = parse_session(&sf.path) else {
             continue;
         };
         session_count += 1;

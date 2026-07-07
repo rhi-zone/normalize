@@ -6,6 +6,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed (internal)
+
+- **`SessionSource` trait replaces `LogFormat` (Phase 1).** `normalize-chat-sessions` formats now
+  implement `SessionSource` (with `sessions_root`, `discover`, `load`) instead of the former
+  `LogFormat` (with `sessions_dir`, `list_sessions`, `list_subagent_sessions`, `parse`).
+  `SessionRef` replaces `SessionFile` as the discovery result type (with `type SessionFile =
+  SessionRef` alias for backward compat). New types: `SessionLocation` (File/Directory/Database),
+  `DiscoverError`, `ParseError::Database`. No user-facing behavior change; Claude Code session
+  discovery and parsing work identically.
+
 ### Removed
 
 - **`generate cli-snapshot` removed.** The subcommand generated CLI snapshot test scaffolding

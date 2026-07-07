@@ -1,7 +1,7 @@
 //! N-gram frequency analysis of session message text.
 
 use crate::output::OutputFormatter;
-use crate::sessions::{ContentBlock, FormatRegistry, LogFormat, SessionFile};
+use crate::sessions::{ContentBlock, FormatRegistry, SessionFile, SessionSource, parse_session};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Write as _;
@@ -140,7 +140,7 @@ pub fn build_ngrams_report(
     agent_type: Option<&str>,
 ) -> Result<NgramsReport, String> {
     let registry = FormatRegistry::new();
-    let format: &dyn LogFormat = match format_name {
+    let source: &dyn SessionSource = match format_name {
         Some(name) => registry
             .get(name)
             .ok_or_else(|| format!("Unknown format: {}", name))?,
@@ -154,10 +154,10 @@ pub fn build_ngrams_report(
         .transpose()?;
 
     let mut sessions: Vec<SessionFile> = if all_projects {
-        list_all_project_sessions_by_mode(format, mode)
+        list_all_project_sessions_by_mode(source, mode)
     } else {
         let proj = project_filter.or(root);
-        list_sessions_by_mode(format, proj, mode)
+        list_sessions_by_mode(source, proj, mode)
     };
 
     // Session ID filter
@@ -218,7 +218,7 @@ pub fn build_ngrams_report(
     let mut messages_processed = 0usize;
 
     for sf in &sessions {
-        let Ok(session) = format.parse(&sf.path) else {
+        let Ok(session) = parse_session(&sf.path) else {
             continue;
         };
 

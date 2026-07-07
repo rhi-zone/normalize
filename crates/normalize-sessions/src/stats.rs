@@ -6,7 +6,7 @@ use super::{
     sort::{DefaultDir, SortDir, SortSpec},
 };
 use crate::output::OutputFormatter;
-use crate::sessions::{FormatRegistry, LogFormat, SessionFile};
+use crate::sessions::{FormatRegistry, SessionFile, SessionSource};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -206,7 +206,7 @@ pub fn show_stats_grouped(
     let registry = FormatRegistry::new();
 
     // Get format (default to claude for backwards compatibility)
-    let format: &dyn LogFormat = match format_name {
+    let source: &dyn SessionSource = match format_name {
         Some(name) => match registry.get(name) {
             Some(f) => f,
             None => {
@@ -244,14 +244,14 @@ pub fn show_stats_grouped(
 
     // Get sessions from format
     let mut sessions: Vec<SessionFile> = if all_projects {
-        list_all_project_sessions_by_mode(format, mode)
+        list_all_project_sessions_by_mode(source, mode)
     } else {
         let project = if let Some(p) = project_filter {
             Some(p)
         } else {
             root
         };
-        super::list_sessions_by_mode(format, project, mode)
+        super::list_sessions_by_mode(source, project, mode)
     };
 
     // Calculate date filters
@@ -383,7 +383,7 @@ pub fn build_stats_data(
     sort: Option<&str>,
 ) -> Result<crate::sessions::SessionAnalysisReport, String> {
     let registry = FormatRegistry::new();
-    let format: &dyn LogFormat = match format_name {
+    let source: &dyn SessionSource = match format_name {
         Some(name) => registry
             .get(name)
             .ok_or_else(|| format!("Unknown format: {}", name))?,
@@ -397,10 +397,10 @@ pub fn build_stats_data(
         .transpose()?;
 
     let mut sessions: Vec<SessionFile> = if all_projects {
-        list_all_project_sessions_by_mode(format, mode)
+        list_all_project_sessions_by_mode(source, mode)
     } else {
         let project = project_filter.or(root);
-        super::list_sessions_by_mode(format, project, mode)
+        super::list_sessions_by_mode(source, project, mode)
     };
 
     let now = SystemTime::now();
@@ -471,8 +471,8 @@ pub fn build_stats_data(
 ///
 /// Returns an empty vector for formats that do not organize sessions one-directory-per-project
 /// (those formats' `list_sessions(None)` already returns everything).
-pub(crate) fn list_all_project_dirs(format: &dyn LogFormat) -> Vec<PathBuf> {
-    let Some(projects_dir) = format.projects_root() else {
+pub(crate) fn list_all_project_dirs(source: &dyn SessionSource) -> Vec<PathBuf> {
+    let Some(projects_dir) = source.projects_root() else {
         return Vec::new();
     };
     if !projects_dir.exists() {
@@ -492,26 +492,21 @@ pub(crate) fn list_all_project_dirs(format: &dyn LogFormat) -> Vec<PathBuf> {
 
 /// List all project sessions (interactive + subagent) filtered by mode.
 pub(crate) fn list_all_project_sessions_by_mode(
-    format: &dyn LogFormat,
+    source: &dyn SessionSource,
     mode: &super::SessionMode,
 ) -> Vec<SessionFile> {
-    use normalize_chat_sessions::{list_jsonl_sessions, list_subagent_sessions};
     let mut all = Vec::new();
-    for dir in list_all_project_dirs(format) {
+    for dir in list_all_project_dirs(source) {
+        let refs = source.discover(&dir).unwrap_or_default();
         match mode {
             super::SessionMode::Interactive => {
-                let mut sessions = list_jsonl_sessions(&dir);
-                sessions.retain(|s| format.detect(&s.path) > 0.5);
-                all.extend(sessions);
+                all.extend(refs.into_iter().filter(|r| r.parent_session_id.is_none()));
             }
             super::SessionMode::Subagent => {
-                all.extend(list_subagent_sessions(&dir));
+                all.extend(refs.into_iter().filter(|r| r.parent_session_id.is_some()));
             }
             super::SessionMode::All => {
-                let mut sessions = list_jsonl_sessions(&dir);
-                sessions.retain(|s| format.detect(&s.path) > 0.5);
-                all.extend(sessions);
-                all.extend(list_subagent_sessions(&dir));
+                all.extend(refs);
             }
         }
     }
@@ -774,7 +769,7 @@ pub fn build_repo_stats(
     agent_type: Option<&str>,
 ) -> Result<RepoStatsReport, String> {
     let registry = FormatRegistry::new();
-    let format: &dyn LogFormat = match format_name {
+    let source: &dyn SessionSource = match format_name {
         Some(name) => registry
             .get(name)
             .ok_or_else(|| format!("Unknown format: {}", name))?,
@@ -789,10 +784,10 @@ pub fn build_repo_stats(
 
     // Collect all sessions (always cross-project for --by-repo to be useful)
     let mut sessions: Vec<SessionFile> = if all_projects || project_filter.is_none() {
-        list_all_project_sessions_by_mode(format, mode)
+        list_all_project_sessions_by_mode(source, mode)
     } else {
         let project = project_filter.or(root);
-        super::list_sessions_by_mode(format, project, mode)
+        super::list_sessions_by_mode(source, project, mode)
     };
 
     // Date filters

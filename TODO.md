@@ -1329,6 +1329,17 @@ reports + `OutputFormatter` with zero back-refs to main.
   (B3), graph (B2, out of `view`), dataflow trio (cfg *or* facts/structure — open fork B5),
   chat-sessions/session-analysis. `search` (B7): drop `search`→`grep` alias atomically with
   mounting the semantic verb (collision resolved 2026-07-03).
+  - [x] **SessionSource Phase 1** (2026-07-07): `LogFormat` → `SessionSource` in
+    `normalize-chat-sessions`; all formats + all consumers migrated; `SessionRef` with
+    `SessionLocation`/`DiscoverError`/`ParseError::Database`; `type SessionFile = SessionRef`
+    alias; backward-compatible. Phase 2 (cline, roo, codex-rewrite, gemini-rewrite, opencode
+    SQLite) can now build on the new trait.
+
+  **Phase 2 follow-ups (when adding new sources):**
+  - Cline / Roo source (JSONL in `~/.cline/` / `~/.roo/`)
+  - Codex current format (rewrite `codex.rs` — marked TODO)
+  - Gemini current format (rewrite `gemini_cli.rs` — marked TODO)
+  - opencode SQLite source (use `SessionLocation::Database`, `block_on` in `load()`)
 - [ ] **4. DECISION on the ~5.7k rank-metrics** — designate `normalize-metrics` as owner vs.
   leave in main. The one genuinely open architectural call here.
 - [ ] **5. Small wrappers** (~2k) — generate/context/package/find_references, budget template.
