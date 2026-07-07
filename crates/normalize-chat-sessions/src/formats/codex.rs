@@ -1,17 +1,26 @@
-//! OpenAI Codex CLI JSONL format parser.
+//! OpenAI Codex CLI JSONL rollout format parser.
 //!
-//! TODO(phase2): rewrite for current Codex CLI format (session layout may have changed).
+//! Codex records sessions as JSONL "rollout" files under:
+//!   `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-{date}-{thread_id}.jsonl`
+//! (default `CODEX_HOME` = `~/.codex`).
+//!
+//! Each line is a `RolloutLine`:
+//!   `{"timestamp": "...", "type": "<item_type>", "payload": {...}}`
+//!
+//! The first line is always `type=session_meta`. Subsequent lines are typically
+//! `type=response_item` containing a Responses-API `ResponseItem`.
+//!
+//! Reference: `codex-rs/protocol/src/protocol.rs` + `codex-rs/rollout/src/recorder.rs`.
 
 use super::{DiscoverError, ParseError, SessionLocation, SessionRef, SessionSource, peek_lines};
-use crate::{ContentBlock, Message, Role, Session, TokenUsage, Turn};
+use crate::{ContentBlock, Message, Role, Session, Turn};
 use serde_json::Value;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-/// OpenAI Codex CLI session log format (JSONL).
+/// Codex CLI session format (rollout JSONL).
 pub struct CodexFormat;
 
 impl SessionSource for CodexFormat {
@@ -20,25 +29,26 @@ impl SessionSource for CodexFormat {
     }
 
     fn sessions_root(&self, _project: Option<&Path>) -> PathBuf {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-        PathBuf::from(home).join(".codex/sessions")
+        let home = std::env::var("CODEX_HOME").unwrap_or_else(|_| {
+            let h = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+            format!("{h}/.codex")
+        });
+        PathBuf::from(home).join("sessions")
     }
 
+    /// Returns 1.0 if the first line of `path` is a `session_meta` RolloutLine.
     fn detect(&self, path: &Path) -> f64 {
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         if ext != "jsonl" {
             return 0.0;
         }
-
-        for line in peek_lines(path, 5) {
+        for line in peek_lines(path, 1) {
             if let Ok(entry) = serde_json::from_str::<Value>(&line)
-                && let Some(t) = entry.get("type").and_then(|v| v.as_str())
-                && t == "session_meta"
-                && let Some(originator) = entry
+                && entry.get("type").and_then(|v| v.as_str()) == Some("session_meta")
+                && entry
                     .get("payload")
-                    .and_then(|p| p.get("originator"))
-                    .and_then(|v| v.as_str())
-                && originator.contains("codex")
+                    .and_then(|p| p.get("session_id"))
+                    .is_some()
             {
                 return 1.0;
             }
@@ -46,48 +56,56 @@ impl SessionSource for CodexFormat {
         0.0
     }
 
+    /// Walk `root/YYYY/MM/DD/rollout-*.jsonl`, reading the first line of each
+    /// to extract `session_id` and `parent_thread_id`.
     fn discover(&self, root: &Path) -> Result<Vec<SessionRef>, DiscoverError> {
-        // Codex stores sessions in ~/.codex/sessions/YYYY/MM/DD/*.jsonl
         let mut refs = Vec::new();
-        if let Ok(years) = std::fs::read_dir(root) {
-            for year in years.filter_map(|e| e.ok()) {
-                if !year.path().is_dir() {
+        let Ok(years) = std::fs::read_dir(root) else {
+            return Ok(refs);
+        };
+        for year in years.filter_map(|e| e.ok()) {
+            if !year.path().is_dir() {
+                continue;
+            }
+            let Ok(months) = std::fs::read_dir(year.path()) else {
+                continue;
+            };
+            for month in months.filter_map(|e| e.ok()) {
+                if !month.path().is_dir() {
                     continue;
                 }
-                if let Ok(months) = std::fs::read_dir(year.path()) {
-                    for month in months.filter_map(|e| e.ok()) {
-                        if !month.path().is_dir() {
+                let Ok(days) = std::fs::read_dir(month.path()) else {
+                    continue;
+                };
+                for day in days.filter_map(|e| e.ok()) {
+                    if !day.path().is_dir() {
+                        continue;
+                    }
+                    let Ok(files) = std::fs::read_dir(day.path()) else {
+                        continue;
+                    };
+                    for file in files.filter_map(|e| e.ok()) {
+                        let path = file.path();
+                        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                        if ext != "jsonl" {
                             continue;
                         }
-                        if let Ok(days) = std::fs::read_dir(month.path()) {
-                            for day in days.filter_map(|e| e.ok()) {
-                                if !day.path().is_dir() {
-                                    continue;
-                                }
-                                if let Ok(files) = std::fs::read_dir(day.path()) {
-                                    for file in files.filter_map(|e| e.ok()) {
-                                        let path = file.path();
-                                        if path.extension().and_then(|e| e.to_str())
-                                            == Some("jsonl")
-                                            && let Ok(meta) = path.metadata()
-                                            && let Ok(mtime) = meta.modified()
-                                        {
-                                            refs.push(SessionRef {
-                                                format: self.name(),
-                                                location: super::SessionLocation::File(
-                                                    path.clone(),
-                                                ),
-                                                path,
-                                                mtime,
-                                                parent_session_id: None,
-                                                agent_id: None,
-                                                subagent_type: Some("interactive".into()),
-                                            });
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        let Ok(meta) = path.metadata() else {
+                            continue;
+                        };
+                        let Ok(mtime) = meta.modified() else {
+                            continue;
+                        };
+                        let meta = read_session_meta_from_rollout(&path);
+                        refs.push(SessionRef {
+                            format: self.name(),
+                            location: SessionLocation::File(path.clone()),
+                            path,
+                            mtime,
+                            parent_session_id: meta.parent_thread_id,
+                            agent_id: meta.session_id,
+                            subagent_type: Some("interactive".into()),
+                        });
                     }
                 }
             }
@@ -100,199 +118,280 @@ impl SessionSource for CodexFormat {
             SessionLocation::File(p) => p.as_path(),
             _ => &r.path,
         };
-        self.parse_path(path)
+        parse_rollout(path)
     }
 }
 
-impl CodexFormat {
-    fn parse_path(&self, path: &Path) -> Result<Session, ParseError> {
-        let file = File::open(path).map_err(|e| ParseError::Io {
+/// Metadata extracted from the first line of a rollout JSONL file.
+struct RolloutMeta {
+    session_id: Option<String>,
+    parent_thread_id: Option<String>,
+}
+
+/// Read the first line of a rollout file and return its session metadata.
+fn read_session_meta_from_rollout(path: &Path) -> RolloutMeta {
+    for line in peek_lines(path, 1) {
+        if let Ok(entry) = serde_json::from_str::<Value>(&line)
+            && entry.get("type").and_then(|v| v.as_str()) == Some("session_meta")
+        {
+            let payload = entry.get("payload");
+            return RolloutMeta {
+                session_id: payload
+                    .and_then(|p| p.get("session_id"))
+                    .and_then(|v| v.as_str())
+                    .map(String::from),
+                parent_thread_id: payload
+                    .and_then(|p| p.get("parent_thread_id"))
+                    .and_then(|v| v.as_str())
+                    .map(String::from),
+            };
+        }
+    }
+    RolloutMeta {
+        session_id: None,
+        parent_thread_id: None,
+    }
+}
+
+/// Parse a `rollout-*.jsonl` file into a `Session`.
+///
+/// Line structure:
+/// ```json
+/// {"timestamp":"...","type":"session_meta","payload":{...SessionMeta...}}
+/// {"timestamp":"...","type":"response_item","payload":{...ResponseItem...}}
+/// ```
+///
+/// ResponseItem variants we map:
+/// - `message` (role=user) → new Turn, User Message
+/// - `message` (role=assistant) → Assistant Message, Text blocks from `content`
+/// - `reasoning` → Thinking block from `summary[].text`
+/// - `function_call` → ToolUse (name, call_id, arguments as JSON)
+/// - `function_call_output` → ToolResult (call_id, output string or items)
+fn parse_rollout(path: &Path) -> Result<Session, ParseError> {
+    let file = File::open(path).map_err(|e| ParseError::Io {
+        path: path.to_path_buf(),
+        source: e,
+    })?;
+    let reader = BufReader::new(file);
+
+    let mut session = Session::new(path.to_path_buf(), "codex");
+    let mut current_turn = Turn::default();
+
+    for raw in reader.lines() {
+        let raw = raw.map_err(|e| ParseError::Io {
             path: path.to_path_buf(),
             source: e,
         })?;
-        let reader = BufReader::new(file);
+        if raw.trim().is_empty() {
+            continue;
+        }
+        let Ok(entry) = serde_json::from_str::<Value>(&raw) else {
+            continue;
+        };
 
-        let mut session = Session::new(path.to_path_buf(), self.name());
-        session.subagent_type = Some("interactive".into());
-        let mut current_turn = Turn::default();
-        let mut pending_tool_calls: HashMap<String, (String, Value)> = HashMap::new();
+        let entry_type = entry.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        let timestamp = entry
+            .get("timestamp")
+            .and_then(|v| v.as_str())
+            .map(String::from);
 
-        for line in reader.lines() {
-            let line = line.map_err(|e| ParseError::Io {
-                path: path.to_path_buf(),
-                source: e,
-            })?;
-            if line.trim().is_empty() {
-                continue;
-            }
-
-            let Ok(entry) = serde_json::from_str::<Value>(&line) else {
-                continue;
-            };
-
-            let entry_type = entry.get("type").and_then(|v| v.as_str()).unwrap_or("");
-
-            if entry_type == "session_meta"
-                && let Some(payload) = entry.get("payload")
-            {
+        match entry_type {
+            "session_meta" => {
+                let payload = entry.get("payload");
                 if session.metadata.session_id.is_none() {
                     session.metadata.session_id = payload
-                        .get("session_id")
+                        .and_then(|p| p.get("session_id"))
                         .and_then(|v| v.as_str())
                         .map(String::from);
                 }
-                if session.metadata.model.is_none() {
-                    session.metadata.model = payload
-                        .get("model")
+                if session.metadata.timestamp.is_none() {
+                    session.metadata.timestamp = timestamp.clone().or_else(|| {
+                        payload
+                            .and_then(|p| p.get("timestamp"))
+                            .and_then(|v| v.as_str())
+                            .map(String::from)
+                    });
+                }
+                // model_provider is on SessionMeta; model name is not stored per-session
+                if session.metadata.provider.is_none() {
+                    session.metadata.provider = payload
+                        .and_then(|p| p.get("model_provider"))
+                        .and_then(|v| v.as_str())
+                        .map(String::from)
+                        .or_else(|| Some("openai".to_string()));
+                }
+                // parent_thread_id → parent_id (subagent link)
+                if session.parent_id.is_none() {
+                    session.parent_id = payload
+                        .and_then(|p| p.get("parent_thread_id"))
                         .and_then(|v| v.as_str())
                         .map(String::from);
                 }
             }
 
-            let Some(payload) = entry.get("payload") else {
-                continue;
-            };
+            "response_item" => {
+                let Some(payload) = entry.get("payload") else {
+                    continue;
+                };
+                let item_type = payload.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
-            let payload_type = payload.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                match item_type {
+                    "message" => {
+                        let role = payload
+                            .get("role")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("assistant");
+                        let content_blocks = extract_content_items(payload);
 
-            match payload_type {
-                "user_message" => {
-                    if !current_turn.messages.is_empty() {
-                        session.turns.push(std::mem::take(&mut current_turn));
+                        if role == "user" {
+                            // User message → flush previous turn and start new one.
+                            if !current_turn.messages.is_empty() {
+                                session.turns.push(std::mem::take(&mut current_turn));
+                            }
+                            current_turn.messages.push(Message {
+                                role: Role::User,
+                                content: content_blocks,
+                                timestamp,
+                            });
+                        } else {
+                            // assistant (or system) message
+                            current_turn.messages.push(Message {
+                                role: Role::Assistant,
+                                content: content_blocks,
+                                timestamp,
+                            });
+                        }
                     }
 
-                    let text = payload
-                        .get("content")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
+                    "reasoning" => {
+                        // Collect reasoning summary text as a Thinking block.
+                        let text = payload
+                            .get("summary")
+                            .and_then(|s| s.as_array())
+                            .map(|items| {
+                                items
+                                    .iter()
+                                    .filter_map(|item| item.get("text").and_then(|t| t.as_str()))
+                                    .collect::<Vec<_>>()
+                                    .join("\n")
+                            })
+                            .unwrap_or_default();
 
-                    current_turn.messages.push(Message {
-                        role: Role::User,
-                        content: vec![ContentBlock::Text { text }],
-                        timestamp: entry
-                            .get("timestamp")
+                        if !text.is_empty() {
+                            current_turn.messages.push(Message {
+                                role: Role::Assistant,
+                                content: vec![ContentBlock::Thinking { text }],
+                                timestamp,
+                            });
+                        }
+                    }
+
+                    "function_call" => {
+                        let call_id = payload
+                            .get("call_id")
                             .and_then(|v| v.as_str())
-                            .map(String::from),
-                    });
-                }
-                "message" => {
-                    let text = payload
-                        .get("content")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
+                            .unwrap_or("")
+                            .to_string();
+                        let name = payload
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        // `arguments` is a JSON string on the wire; parse it.
+                        let input = payload
+                            .get("arguments")
+                            .and_then(|v| v.as_str())
+                            .and_then(|s| serde_json::from_str::<Value>(s).ok())
+                            .unwrap_or(Value::Object(Default::default()));
 
-                    if !text.is_empty() {
                         current_turn.messages.push(Message {
                             role: Role::Assistant,
-                            content: vec![ContentBlock::Text { text }],
-                            timestamp: entry
-                                .get("timestamp")
-                                .and_then(|v| v.as_str())
-                                .map(String::from),
+                            content: vec![ContentBlock::ToolUse {
+                                id: call_id,
+                                name,
+                                input,
+                            }],
+                            timestamp,
                         });
                     }
-                }
-                "function_call" => {
-                    let call_id = payload
-                        .get("call_id")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    let name = payload
-                        .get("name")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    let args_str = payload
-                        .get("arguments")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("{}");
-                    let input: Value =
-                        serde_json::from_str(args_str).unwrap_or(Value::Object(Default::default()));
 
-                    pending_tool_calls.insert(call_id.clone(), (name.clone(), input.clone()));
-
-                    current_turn.messages.push(Message {
-                        role: Role::Assistant,
-                        content: vec![ContentBlock::ToolUse {
-                            id: call_id,
-                            name,
-                            input,
-                        }],
-                        timestamp: entry
-                            .get("timestamp")
+                    "function_call_output" => {
+                        let call_id = payload
+                            .get("call_id")
                             .and_then(|v| v.as_str())
-                            .map(String::from),
-                    });
-                }
-                "function_call_output" => {
-                    let call_id = payload
-                        .get("call_id")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    let output = payload
-                        .get("output")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    let is_error = output.contains("Exit code: 1")
-                        || output.starts_with("Error:")
-                        || output.contains("\nError:");
+                            .unwrap_or("")
+                            .to_string();
+                        // `output` serializes as either a plain string or an array of
+                        // content items (FunctionCallOutputPayload custom serde).
+                        let output_val = payload.get("output");
+                        let output_text = match output_val {
+                            Some(Value::String(s)) => s.clone(),
+                            Some(Value::Array(items)) => items
+                                .iter()
+                                .filter_map(|item| item.get("text").and_then(|t| t.as_str()))
+                                .collect::<Vec<_>>()
+                                .join("\n"),
+                            _ => String::new(),
+                        };
+                        let is_error = payload
+                            .get("success")
+                            .and_then(|v| v.as_bool())
+                            .map(|ok| !ok)
+                            .unwrap_or(false);
 
-                    current_turn.messages.push(Message {
-                        role: Role::User,
-                        content: vec![ContentBlock::ToolResult {
-                            tool_use_id: call_id,
-                            content: output,
-                            is_error,
-                        }],
-                        timestamp: entry
-                            .get("timestamp")
-                            .and_then(|v| v.as_str())
-                            .map(String::from),
-                    });
-                }
-                "token_count" => {
-                    if let Some(info) = payload.get("info")
-                        && let Some(total) = info.get("total_token_usage")
-                    {
-                        current_turn.token_usage = Some(TokenUsage {
-                            input: total
-                                .get("input_tokens")
-                                .and_then(|v| v.as_u64())
-                                .unwrap_or(0),
-                            output: total
-                                .get("output_tokens")
-                                .and_then(|v| v.as_u64())
-                                .unwrap_or(0)
-                                + total
-                                    .get("reasoning_output_tokens")
-                                    .and_then(|v| v.as_u64())
-                                    .unwrap_or(0),
-                            cache_read: total.get("cached_input_tokens").and_then(|v| v.as_u64()),
-                            cache_create: None,
-                            model: session.metadata.model.clone(),
+                        current_turn.messages.push(Message {
+                            role: Role::User,
+                            content: vec![ContentBlock::ToolResult {
+                                tool_use_id: call_id,
+                                content: output_text,
+                                is_error,
+                            }],
+                            timestamp,
                         });
                     }
+
+                    _ => {
+                        // local_shell_call, compacted, agent_message, etc. — skip.
+                    }
                 }
-                _ => {}
             }
+
+            // session_meta, compacted, turn_context, world_state, event_msg — skip
+            _ => {}
         }
-
-        // Suppress unused warning for pending_tool_calls (kept for future pairing logic)
-        let _ = pending_tool_calls;
-
-        if !current_turn.messages.is_empty() {
-            session.turns.push(current_turn);
-        }
-
-        session.metadata.provider = Some("openai".to_string());
-
-        Ok(session)
     }
+
+    if !current_turn.messages.is_empty() {
+        session.turns.push(current_turn);
+    }
+
+    Ok(session)
+}
+
+/// Extract text `ContentBlock`s from a `ResponseItem::Message` payload's `content` array.
+///
+/// ContentItem wire format: `{"type": "input_text"|"output_text", "text": "..."}`.
+fn extract_content_items(payload: &Value) -> Vec<ContentBlock> {
+    let Some(arr) = payload.get("content").and_then(|c| c.as_array()) else {
+        return Vec::new();
+    };
+    let mut blocks = Vec::new();
+    for item in arr {
+        let item_type = item.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        match item_type {
+            "input_text" | "output_text" => {
+                if let Some(text) = item.get("text").and_then(|v| v.as_str())
+                    && !text.is_empty()
+                {
+                    blocks.push(ContentBlock::Text {
+                        text: text.to_string(),
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+    blocks
 }
 
 // Keep SystemTime in scope for SessionRef construction in discover()

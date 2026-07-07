@@ -17,5 +17,5 @@ Each format implements the `SessionSource` trait (Phase 1 redesign, replacing th
 - `cline.rs` — Cline (`saoudrizwan.claude-dev`) directory-per-task format; uses `anthropic_history` (gated: `format-cline`)
 - `normalize_agent.rs` — Normalize @agent JSONL format (gated: `format-normalize`)
 - `roo_code.rs` — Roo-Code (`rooveterinaryinc.roo-cline`) directory-per-task format with extended `ApiMessage` fields (`ts`, `isSummary`, `reasoning_content`); uses `anthropic_history` (gated: `format-roo`)
-- `codex.rs` — OpenAI Codex CLI JSONL format (gated: `format-codex`; TODO phase2: rewrite for current format)
-- `gemini_cli.rs` — Gemini CLI JSON format (gated: `format-gemini`; TODO phase2: rewrite for current format)
+- `codex.rs` — OpenAI Codex CLI rollout JSONL format; parses `sessions/YYYY/MM/DD/rollout-*.jsonl`, maps `response_item` lines (message/reasoning/function_call/function_call_output), `parent_thread_id` → subagent linking (gated: `format-codex`)
+- `gemini_cli.rs` — Gemini CLI JSONL format; parses `~/.gemini/tmp/<hash>/chats/session-*.jsonl` (main) and `chats/<parent-id>/*.jsonl` (subagents); maps MessageRecord user/gemini types with thoughts→Thinking, toolCalls→ToolUse+ToolResult (gated: `format-gemini`)

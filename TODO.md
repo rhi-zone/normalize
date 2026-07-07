@@ -1341,9 +1341,16 @@ reports + `OutputFormatter` with zero back-refs to main.
     (`ts`, `isSummary`, `reasoning_content`, `isTruncationMarker`, etc.) handled gracefully.
     `formats-all` now includes both. Integration tests in `tests/cline_roo_tests.rs`.
 
+  - [x] **Phase 2b — Codex + Gemini parsers rewritten** (2026-07-07): Both parsers now target
+    the current upstream formats. Codex: `rollout-*.jsonl` in `sessions/YYYY/MM/DD/`, maps
+    `response_item` lines (`message`/`reasoning`/`function_call`/`function_call_output`),
+    extracts `parent_thread_id` → `parent_id` for subagents. Gemini: JSONL per-session files
+    at `~/.gemini/tmp/<hash>/chats/`, discovers main + subagent sessions, maps
+    `MessageRecord` types with thoughts (→ Thinking), toolCalls (→ ToolUse+ToolResult), tokens
+    (→ TokenUsage). 15 new integration tests in `tests/codex_gemini_tests.rs` with
+    synthetic-faithful fixtures.
+
   **Phase 2 remaining (when prioritised):**
-  - Codex current format (rewrite `codex.rs` — marked TODO)
-  - Gemini current format (rewrite `gemini_cli.rs` — marked TODO)
   - opencode SQLite source (use `SessionLocation::Database`, `block_on` in `load()`)
 - [ ] **4. DECISION on the ~5.7k rank-metrics** — designate `normalize-metrics` as owner vs.
   leave in main. The one genuinely open architectural call here.

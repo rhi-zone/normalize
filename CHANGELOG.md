@@ -6,6 +6,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed (internal)
+
+- **Codex session parser rewritten for current rollout protocol (Phase 2b).** The prior
+  `format-codex` parser targeted a stale format. It now correctly parses
+  `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl` rollout files: reads line 1
+  (`session_meta`) for `session_id`, `parent_thread_id`, and `model_provider`; maps
+  `response_item` lines — `message` (user/assistant, `Vec<ContentItem>`), `reasoning`
+  (→ `Thinking`), `function_call` (→ `ToolUse`, JSON-string arguments parsed to `Value`),
+  `function_call_output` (→ `ToolResult`, string or content-item array). Subagent sessions
+  (those with a `parent_thread_id`) propagate `parent_id` to the `Session`.
+
+- **Gemini CLI session parser rewritten for current chat-recording format (Phase 2b).** The
+  prior `format-gemini` parser read a stale single-JSON `logs.json` format. It now parses
+  JSONL files at `~/.gemini/tmp/<project-hash>/chats/session-*.jsonl` (main) and
+  `chats/<parent-id>/<session-id>.jsonl` (subagents). Line 1 is a metadata record
+  (`sessionId`, `projectHash`, `startTime`); subsequent lines are `MessageRecord`
+  (`type: "user"|"gemini"`), `MetadataUpdateRecord` (`$set`), or `RewindRecord` (`$rewindTo`).
+  `gemini` messages map `thoughts` → `Thinking` blocks, `toolCalls` → `ToolUse`+`ToolResult`
+  pairs, `tokens` → `TokenUsage`. Discovery walks `chats/` for flat main sessions and nested
+  subdirectories for subagents, setting `parent_session_id` from the subdirectory name.
+
 ### Added (internal)
 
 - **Cline and Roo-Code session parsers (Phase 2a).** `normalize-chat-sessions` now ships
