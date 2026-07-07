@@ -36,6 +36,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
   `analyze` now owns only its residual: `analyze docs`, `analyze security`, `analyze skeleton-diff`.
 
+- **Retired the `--schema` pre-clap hack.** `normalize --schema` (a raw-argv intercept that
+  printed a Nursery/moss integration envelope before clap parsed the command line) is removed.
+  The Nursery consumer is defunct. Use `normalize config schema` for the JSON Schema of
+  `NormalizeConfig`.
+
 ### Added
 
 - **`normalize sync` is now incremental by default.** Skips copying a file when the

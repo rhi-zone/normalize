@@ -9,13 +9,7 @@ fn should_skip_grammar_check(argv: &[std::ffi::OsString]) -> bool {
     argv.iter().skip(1).filter_map(|s| s.to_str()).any(|s| {
         matches!(
             s,
-            "--help"
-                | "-h"
-                | "--version"
-                | "-V"
-                | "--input-schema"
-                | "--output-schema"
-                | "--schema"
+            "--help" | "-h" | "--version" | "-V" | "--input-schema" | "--output-schema"
         )
     })
 }
@@ -34,13 +28,7 @@ fn should_skip_daemon_autostart(argv: &[std::ffi::OsString]) -> bool {
     argv.iter().skip(1).filter_map(|s| s.to_str()).any(|s| {
         matches!(
             s,
-            "--help"
-                | "-h"
-                | "--version"
-                | "-V"
-                | "--input-schema"
-                | "--output-schema"
-                | "--schema"
+            "--help" | "-h" | "--version" | "-V" | "--input-schema" | "--output-schema"
         )
     })
 }
@@ -80,27 +68,6 @@ fn rewrite_aliases(mut argv: Vec<std::ffi::OsString>) -> Vec<std::ffi::OsString>
         _ => {}
     }
     argv
-}
-
-/// Help output styling is now handled by server-less.
-/// Schema flag support for Nursery integration.
-fn handle_schema_flag() -> bool {
-    let args: Vec<String> = std::env::args().collect();
-    if args.get(1).map(|s| s.as_str()) == Some("--schema") {
-        let response = serde_json::json!({
-            "config_path": ".normalize/config.toml",
-            "format": "toml",
-            "schema": schemars::schema_for!(normalize::config::NormalizeConfig)
-        });
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&response)
-                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e))
-        );
-        true
-    } else {
-        false
-    }
 }
 
 /// Reset SIGPIPE to default behavior so piping to `head` etc. doesn't panic.
@@ -216,11 +183,6 @@ async fn main() -> std::process::ExitCode {
         .is_some_and(|sub| sub == "ast-grep" || sub == "sg")
     {
         return normalize::ast_grep::run_ast_grep(argv[2..].iter().cloned());
-    }
-
-    // Handle --schema for Nursery integration (before clap parsing)
-    if handle_schema_flag() {
-        return std::process::ExitCode::SUCCESS;
     }
 
     // Auto-start daemon in background before running any command (if configured).

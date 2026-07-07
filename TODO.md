@@ -455,8 +455,10 @@ motivated by normalize's ~150-command nested CLI. Adoption tasks:
 - [x] **Retire `generate cli-snapshot` (2026-07-07).** Subcommand that walked `--help` recursively
   to generate insta test scaffolding. Removed subcommand + `run_cli_snapshot_service` +
   `generate_cli_snapshot_code` + `normalize-cli-parser` dep. Use `normalize --manual` for the
-  full command tree. `--schema` pre-clap-hack retirement is a separate open item (Nursery
-  envelope caveat; see "Retire `--schema` hack" section below).
+  full command tree.
+- [x] **Retire `--schema` pre-clap hack (2026-07-07).** `handle_schema_flag` + call site removed;
+  `--schema` removed from the skip lists. Nursery/moss consumer confirmed defunct. Use
+  `normalize config schema`.
 - [ ] **Verify the reserved-flag collision guard after the bump (low risk).** 0.5.0 turns a
   `#[param]` name colliding with an injected global flag (`manual`, `json`, `jq`, `*-schema`, etc.)
   into a compile error. A grep found no colliding param names in normalize today, so a clean build
@@ -1449,34 +1451,12 @@ Candidates: `[workflow]` (directory, auto-run)
 - Propose `#[config]` proc macro to server-less (stretch goal — superseded by `#[derive(Config)]`;
   filed nested struct support + merge semantics requests in server-less TODO.md 2026-03-10)
 
-### Retire `--schema` hack in `main.rs`
+### ~~Retire `--schema` hack in `main.rs`~~ (done 2026-07-07)
 
-`handle_schema_flag()` in `crates/normalize/src/main.rs` reads raw `std::env::args()` before
-clap and prints `schemars::schema_for!(NormalizeConfig)`. It is stranded legacy from before the
-server-less `#[cli]` migration.
-
-The sanctioned replacement exists: `NormalizeConfig` already derives `server_less::Config`, and
-server-less `#[program(config = T)]` generates a `config schema` subcommand automatically.
-
-**Status (2026-07-07):**
-- Step 1 (wire `config = NormalizeConfig`) is already done — `normalize config schema` works and
-  emits raw JSON Schema.
-- Step 2 (delete `handle_schema_flag()`) is BLOCKED on Nursery envelope verification. Nursery/moss
-  repo is not locally available to confirm which fields `{ config_path, format, schema }` it
-  consumes. `handle_schema_flag()` kept until Nursery is accessible. To unblock: check moss/Nursery
-  for `normalize --schema` invocation, confirm envelope fields needed, then either delete
-  `handle_schema_flag()` (if Nursery only needs raw schema) or add `normalize config schema
-  --envelope` flag wrapping the output.
-
-**Caveat before deleting:** The current `--schema` output is an envelope
-`{ config_path, format, schema }` consumed by Nursery integration (introduced in moss commit
-d19654c9, "Nursery integration"). The server-less `config schema` subcommand emits raw JSON
-Schema. Reconcile the envelope shape with the Nursery consumer before removing the hack — don't
-break Nursery silently.
-
-**Why this matters:** The hack squats the root `--schema` name and blurs two distinct concepts
-(config-file schema vs CLI-tree schema), blocking the naming space needed for the
-server-less whole-tree "manual" surface.
+`handle_schema_flag()` deleted; call site removed; `--schema` removed from the
+`should_skip_grammar_check` / `should_skip_daemon_autostart` skip lists. Nursery/moss
+consumer confirmed defunct. Use `normalize config schema` for the JSON Schema of
+`NormalizeConfig`.
 
 ### ~~Complexity Hotspots~~ (resolved - max now 22)
 
