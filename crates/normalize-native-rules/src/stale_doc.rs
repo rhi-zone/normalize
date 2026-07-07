@@ -26,18 +26,8 @@ pub struct StaleDocConfig {
 /// Default glob patterns for doc files.
 const DEFAULT_DOC_PATTERNS: &[&str] = &["**/*.md", "**/*.rst", "docs/**/*"];
 
-/// Patterns that are explicitly excluded (handled by other rules).
-const EXCLUDED_FILENAMES: &[&str] = &["SUMMARY.md"];
-
-/// Returns true if the given relative path matches the doc patterns and is not excluded.
+/// Returns true if the given relative path matches the doc patterns.
 fn is_doc_file(rel_path: &str, patterns: &[glob::Pattern]) -> bool {
-    let file_name = std::path::Path::new(rel_path)
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    if EXCLUDED_FILENAMES.contains(&file_name.as_str()) {
-        return false;
-    }
     patterns.iter().any(|p| p.matches(rel_path))
 }
 

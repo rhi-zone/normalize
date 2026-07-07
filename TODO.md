@@ -124,6 +124,17 @@ B0 (guide-regression test, CLAUDE.md crate count), B1 (`normalize-git` extractio
   replacement for crate-level context; the `normalize view <dir>` SUMMARY.md-preamble
   feature is now inert (no files) and can be repurposed or removed separately.
 
+- [x] **SUMMARY.md re-removal (2026-07-07).** A concurrent session commit `7a08e3e0`
+  (2026-03-06) bootstrapped 265+ SUMMARY.md files and added an incremental cache for
+  `check --summary`; `c20e238e` already removed the bulk of them. Follow-up cleanup
+  (2026-07-07): removed the surviving `tooling/claude-hooks/SUMMARY.md` (re-added by
+  harness sync `2b7eb5ac`), removed the stale SUMMARY.md exclusion from `stale_doc.rs`,
+  and updated the CHANGELOG stale-doc entry.
+  **Coordination risk:** `tooling/claude-hooks/SUMMARY.md` is propagated FROM the central
+  github-io harness source. Next `chore(harness): sync` will re-add it unless the central
+  source is also updated. The central `rhi.zone/github-io` harness must have its
+  `tooling/claude-hooks/SUMMARY.md` removed to prevent re-propagation.
+
 - [x] **`docs/crates.md` crate registry landed (2026-07-03).** The intended crate-level
   replacement for SUMMARY.md now exists: every workspace crate with purpose, category, and
   CLI-namespace ownership (current vs planned-inversion), cross-checked against the

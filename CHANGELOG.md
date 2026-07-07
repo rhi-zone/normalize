@@ -61,7 +61,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `DiscoverError`, `ParseError::Database`. No user-facing behavior change; Claude Code session
   discovery and parsing work identically.
 
+### Changed
+
+- **`stale-doc` SUMMARY.md exclusion removed.** The `stale-doc` native rule no longer
+  explicitly excludes `SUMMARY.md` files (the `stale-summary` rule that previously covered
+  them was removed in v0.3.2; no SUMMARY.md files are tracked in the repo). The rule now
+  processes all files matching `doc_patterns` without exception.
+
 ### Removed
+
+- **Re-removed the SUMMARY.md convention (concurrent-revival cleanup).** A harness sync
+  re-added `tooling/claude-hooks/SUMMARY.md` after the wholesale SUMMARY.md removal;
+  it (the last tracked SUMMARY.md) plus the residual `stale-doc` exclusion constant are
+  gone again. `docs/crates.md` remains the replacement for crate-level context.
 
 - **`generate cli-snapshot` removed.** The subcommand generated CLI snapshot test scaffolding
   by walking `--help` output at runtime. Use `normalize --manual` instead, which provides a
@@ -894,7 +906,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **No `git` binary required.** All git operations now use `gix` (pure-Rust gitoxide): `git blame` (ownership, provenance, `view history`), `git status --porcelain`, path-filtered commit counts, `git rev-list --count`, budget metrics diff, ratchet ref-based check/measure. A `git` binary in `$PATH` is no longer a runtime dependency.
 - **Configurable walker exclusions** — new `[walk]` section in `.normalize/config.toml` controls directory walking. `ignore_files` configures which gitignore-format files are respected (default: `[".gitignore"]`; `[]` to disable). `exclude` accepts gitignore-style globs (default: `[".git", ".claude/worktrees/"]`). Threaded through native rules, syntax rules, the unified rules runner, the daemon, and the LSP server.
 - **Co-change edge index** — `normalize structure rebuild` populates a `co_change_edges` table in the SQLite index with file pairs that frequently change together (co-change count ≥ 2, commits touching >50 files skipped as noise, per-file fanout capped at top 20 partners). Incremental: only new commits since the last rebuild are processed. `normalize analyze coupling-clusters` queries this table instead of re-walking git history; falls back transparently to the git walk when the table is empty. Rebuild output now includes a `co_change_edges` count.
-- **`stale-doc` native rule** — flags documentation files that are likely stale because strongly co-changed code files have been updated more recently. Queries the `co_change_edges` index for each doc file (`**/*.md`, `**/*.rst`, `docs/**/*`), finds code files it historically changes with, and flags the doc if any partner was committed more recently. `SUMMARY.md` is excluded (covered by `stale-summary`). Configurable via `[rules.rule."stale-doc"]` with `min_co_changes` (default 3), `min_lag_days` (default 0), and `doc_patterns`. Default disabled; requires `normalize structure rebuild`.
+- **`stale-doc` native rule** — flags documentation files that are likely stale because strongly co-changed code files have been updated more recently. Queries the `co_change_edges` index for each doc file (`**/*.md`, `**/*.rst`, `docs/**/*`), finds code files it historically changes with, and flags the doc if any partner was committed more recently. Configurable via `[rules.rule."stale-doc"]` with `min_co_changes` (default 3), `min_lag_days` (default 0), and `doc_patterns`. Default disabled; requires `normalize structure rebuild`.
 - **`missing-test` fact rule** — flags public functions that are never called from a test function (a function with a test attribute such as `#[test]`, `@test`, `@Test`, or `@pytest.mark`). Default disabled. Entry-point and module-boundary files excluded via the default allow list.
 - **`stale-mock` fact rule** — flags mock/stub functions (identified by attributes such as `@Mock`, `@patch`, `@stub`, `mock`, `stub`, `fake`) that call a callee which no longer exists as a symbol in the index. Catches mocks that were not updated after a rename or deletion. Default disabled.
 - **`normalize edit move`** — moves a symbol's definition to another file and rewrites import statements in every file that imported it from the old location. Per-language module-path derivation is best-effort: Python, Go, and JavaScript/TypeScript imports are rewritten when a new path can be derived; Rust and unsupported cases emit warnings and skip the import site rather than fabricating wrong paths. `--reexport` (Python only) leaves a re-export stub at the source location. Supports `--dry-run` and shadow-history `--message`. Leading decorations (doc comments, attributes, decorators, annotations, pragmas) preceding the symbol are included in the move, classified by tree-sitter `node.kind()` rather than text patterns.
