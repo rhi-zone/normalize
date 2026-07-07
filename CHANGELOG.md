@@ -6,6 +6,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added (internal)
+
+- **OpenCode session source via libsql (Phase 2c).** `normalize-chat-sessions` now ships
+  `OpenCodeFormat` under the opt-in `format-opencode` feature flag (NOT included in
+  `formats-all` or `default`, because it pulls libsql + tokio). Reads
+  `$XDG_DATA_HOME/opencode/opencode.db` (override: `OPENCODE_DB` env var). Detection
+  checks SQLite magic bytes and both `session` + `session_message` tables. Discovery
+  returns one `SessionRef` per `session` row using `SessionLocation::Database { db_path,
+  session_id }` — no message loading at discovery time. Loading queries `session_message`
+  ordered by `seq`, reconstructing `Session → Turn → Message → ContentBlock`: user
+  messages start new turns, assistant messages map `content[]` items (text → `Text`,
+  reasoning → `Thinking`, tool → `ToolUse` + optional `ToolResult`), token usage
+  accumulated per turn. Sync-over-async bridge reuses the `block_on` / `spawn_scoped`
+  pattern from `normalize-facts/src/ca_cache.rs`.
+
 ### Fixed (internal)
 
 - **Codex session parser rewritten for current rollout protocol (Phase 2b).** The prior

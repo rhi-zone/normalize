@@ -1350,8 +1350,15 @@ reports + `OutputFormatter` with zero back-refs to main.
     (→ TokenUsage). 15 new integration tests in `tests/codex_gemini_tests.rs` with
     synthetic-faithful fixtures.
 
-  **Phase 2 remaining (when prioritised):**
-  - opencode SQLite source (use `SessionLocation::Database`, `block_on` in `load()`)
+  - [x] **Phase 2c — OpenCode session parser** (2026-07-07): `OpenCodeFormat` added to
+    `normalize-chat-sessions` under opt-in `format-opencode` feature (excluded from
+    `formats-all`/`default` to avoid pulling libsql+tokio). Reads
+    `$XDG_DATA_HOME/opencode/opencode.db`; detection checks SQLite magic +
+    `session`/`session_message` tables; discovery uses `SessionLocation::Database`;
+    load reconstructs Session/Turn from `session_message` JSON ordered by `seq`. Async
+    bridge reuses `block_on`/`spawn_scoped` from `normalize-facts/ca_cache.rs`.
+
+  **SessionSource redesign — Phase 2 COMPLETE.**
 - [ ] **4. DECISION on the ~5.7k rank-metrics** — designate `normalize-metrics` as owner vs.
   leave in main. The one genuinely open architectural call here.
 - [ ] **5. Small wrappers** (~2k) — generate/context/package/find_references, budget template.

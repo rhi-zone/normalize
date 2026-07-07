@@ -9,7 +9,7 @@ description = "Session log parsing for AI coding agents"
 [features]
 default = ["formats-all"]
 
-# All formats
+# All formats (excludes format-opencode: that pulls libsql/tokio and is opt-in)
 formats-all = ["format-claude", "format-cline", "format-codex", "format-gemini", "format-normalize", "format-roo"]
 
 # Individual formats
@@ -19,6 +19,10 @@ format-codex = []     # OpenAI Codex CLI sessions
 format-gemini = []    # Gemini CLI sessions
 format-normalize = [] # normalize agent sessions
 format-roo = []       # Roo-Code (rooveterinaryinc.roo-cline) sessions
+
+# OpenCode SQLite source — opt-in because it pulls libsql + tokio.
+# NOT included in formats-all or default.
+format-opencode = ["dep:libsql", "dep:tokio"]
 
 # JSON Schema support (schemars derives on session types)
 schema = ["dep:schemars"]
@@ -30,3 +34,11 @@ serde_json = "1"
 regex = "1"
 thiserror = "2"
 schemars = { version = "1", optional = true }
+
+# opencode SQLite backend — pulled only by format-opencode
+libsql = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { workspace = true, features = ["macros", "rt"] }

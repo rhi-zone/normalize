@@ -64,7 +64,7 @@ lives in main.
 | `normalize-manifest` | Manifest file parsing for programming language ecosystems | — | |
 | `normalize-local-deps` | Local dependency discovery for programming language ecosystems | — | |
 | `normalize-package-index` | Package index ingestion from distro and language registries | — | Backs `package`. |
-| `normalize-chat-sessions` | Session log parsing for AI coding agents | — | Substrate for `normalize-sessions`; also `provenance`. |
+| `normalize-chat-sessions` | Session log parsing for AI coding agents | — | Substrate for `normalize-sessions`; also `provenance`. Formats: claude, cline, codex, gemini, normalize, roo (all default), opencode (opt-in `format-opencode` — pulls libsql+tokio). |
 | `normalize-session-analysis` | Session analysis metrics for AI coding agent logs | — | Substrate for `normalize-sessions`. |
 
 ## rules — rule engines / rule data types

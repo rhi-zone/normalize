@@ -5343,11 +5343,14 @@ name = "normalize-chat-sessions"
 version = "0.3.2"
 dependencies = [
  "gix",
+ "libsql",
  "regex",
  "schemars",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]

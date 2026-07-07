@@ -37,6 +37,8 @@ mod codex;
 mod gemini_cli;
 #[cfg(feature = "format-normalize")]
 mod normalize_agent;
+#[cfg(feature = "format-opencode")]
+mod opencode;
 #[cfg(feature = "format-roo")]
 mod roo_code;
 
@@ -50,6 +52,8 @@ pub use codex::CodexFormat;
 pub use gemini_cli::GeminiCliFormat;
 #[cfg(feature = "format-normalize")]
 pub use normalize_agent::NormalizeAgentFormat;
+#[cfg(feature = "format-opencode")]
+pub use opencode::OpenCodeFormat;
 #[cfg(feature = "format-roo")]
 pub use roo_code::RooCodeFormat;
 
@@ -242,6 +246,8 @@ fn init_builtin() {
         sources.push(&GeminiCliFormat);
         #[cfg(feature = "format-normalize")]
         sources.push(&NormalizeAgentFormat);
+        #[cfg(feature = "format-opencode")]
+        sources.push(&OpenCodeFormat);
         #[cfg(feature = "format-roo")]
         sources.push(&RooCodeFormat);
     });
@@ -422,6 +428,8 @@ impl FormatRegistry {
         sources.push(Box::new(GeminiCliFormat));
         #[cfg(feature = "format-normalize")]
         sources.push(Box::new(NormalizeAgentFormat));
+        #[cfg(feature = "format-opencode")]
+        sources.push(Box::new(OpenCodeFormat));
         #[cfg(feature = "format-roo")]
         sources.push(Box::new(RooCodeFormat));
         Self { sources }
