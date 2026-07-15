@@ -324,7 +324,7 @@ Users from other tools often try familiar names. These aliases are rewritten tra
 
 | Alias | Canonical Command | Rationale |
 |-------|-------------------|-----------|
-| `find` | `grep` | Common alternative for text search |
+| `search`, `find` | `grep` | Common alternatives for text search |
 | `lint` | `rules run` | Standard linter invocation |
 | `check` | `ci` | Common CI/check command name |
 | `index` | `structure rebuild` | Indexing is the primary use of `structure` |
@@ -332,13 +332,10 @@ Users from other tools often try familiar names. These aliases are rewritten tra
 
 Aliases are invisible — they don't appear in `--help` output. The canonical name is always what's shown.
 
-`search` is **not** an alias: it is the top-level semantic-search verb
-(`normalize search <query>`, served by `normalize-semantic`), ranking symbols,
-docs, and commits by meaning. For text/regex search use `grep` (or its `find`
-alias).
-
-> **Resolved collision (taxonomy inversion B7, 2026-07-03, EXECUTED):** the semantic-search verb
-> `search` (normalize-semantic) clashed with the former `search`→`grep` alias. **Decision:** drop the
-> `search`→`grep` alias and let `search` become the semantic verb. Executed at **B7**, atomically
-> with mounting the verb — `search` now routes to semantic search, not grep. This is a user-facing
-> behavior change. See `docs/audit-2026-07-03-command-surface-decomposition.md`.
+`normalize-semantic` is not mounted on the main crate — it stays published standalone.
+`dd249b48` (2026-05-07) dropped it deliberately ("design pivots to tag-based search");
+a later taxonomy-inversion pass (B7, 2026-07-03) re-mounted it as a top-level `search`
+verb and dropped the `search`→`grep` alias to make room, without that decision being
+revisited. That mount was reverted 2026-07-16 (see `TODO.md` B7 entry) and the
+`search`→`grep` alias restored. Symbol search is being redesigned around discrete tags
+instead — see "Structured-metadata symbol search (0.4 design)" in `TODO.md`.

@@ -1030,6 +1030,16 @@ Implementation order (each batch: build + `cargo test -q` green; docs synced sam
   Build matrix (default / `cli` / all-features / no-default-features) green; clippy + `cargo test -q`
   green (1 snapshot updated: `help_root` gains `search`; added `assert_output_formatter::<SearchReport>()`).
   **Main-crate `src` LOC: 66850 → 66863 (+13: mount wiring + output.rs test line).**
+  **REVERTED 2026-07-16:** this mount was never asked for — `dd249b48` (2026-05-07) deliberately
+  dropped `normalize-semantic` from the main crate ("design pivots to tag-based search"; symbol
+  search is being redesigned around discrete tags, see "Structured-metadata symbol search (0.4
+  design)" below), and B7 re-added it three months later without that decision being revisited.
+  Removed `normalize-semantic` from `crates/normalize/Cargo.toml` again, unmounted
+  `SemanticCliService`/`search()` from `NormalizeService`, restored the `search`→`grep` alias in
+  `rewrite_aliases` (text search, not semantic), and reverted the `help_root` snapshot +
+  `assert_output_formatter::<SearchReport>()` test line. `normalize-semantic` itself stays
+  published standalone; only its main-crate consumer is gone, same as after `dd249b48`. Any
+  future re-mount of semantic search needs an explicit ask, not a taxonomy-inversion side effect.
 - [x] **B8 — `normalize-git-history` extraction (done):** new crate holds the typed compute
   API + report structs (`FileHotspot`/`HotspotsReport`, `CoupledPair`/`CouplingReport`,
   `FileOwnership`/`OwnershipReport`, `ContributorInfo`/`ContributorsReport`,

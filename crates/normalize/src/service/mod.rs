@@ -75,7 +75,6 @@ pub struct NormalizeService {
     rank: rank::RankService,
     similarity: normalize_code_similarity::SimilarityService,
     budget: normalize_budget::service::BudgetService,
-    search: normalize_semantic::service::SemanticCliService,
     cfg: normalize_cfg::service::CfgService,
     kg: normalize_knowledge_graph::service::KgCliService,
     ratchet: normalize_ratchet::service::RatchetService,
@@ -141,7 +140,6 @@ impl NormalizeService {
             rank: rank::RankService::new(&pretty),
             similarity: normalize_code_similarity::SimilarityService::new(&pretty),
             budget: normalize_budget::service::BudgetService::new(),
-            search: normalize_semantic::service::SemanticCliService::new(),
             cfg: normalize_cfg::service::CfgService::new(),
             kg: normalize_knowledge_graph::service::KgCliService::new(),
             ratchet: normalize_ratchet::service::RatchetService::new(),
@@ -1237,12 +1235,6 @@ impl NormalizeService {
     #[server(group = "analysis")]
     pub fn budget(&self) -> &normalize_budget::service::BudgetService {
         &self.budget
-    }
-
-    /// Semantic (vector) search over the code index. Ranks by meaning, not by name.
-    #[server(group = "core")]
-    pub fn search(&self) -> &normalize_semantic::service::SemanticCliService {
-        &self.search
     }
 
     /// Analyze architectural structure: coupling, cycles, hub modules, layering, and depth.

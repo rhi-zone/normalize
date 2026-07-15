@@ -35,21 +35,18 @@ fn should_skip_daemon_autostart(argv: &[std::ffi::OsString]) -> bool {
 
 /// Rewrite well-known command aliases to their canonical forms.
 ///
-/// Users from other tools often try `normalize find`, `normalize lint`, etc.
+/// Users from other tools often try `normalize search`, `normalize lint`, etc.
 /// This rewrites argv so the expected names work transparently:
-/// - `find` → `grep`
+/// - `search`, `find` → `grep`
 /// - `lint` → `rules run`
 /// - `check` → `ci`
 /// - `index` → `structure rebuild`
 /// - `refactor` → `edit`
-///
-/// Note: `search` is NOT an alias — it is the top-level semantic-search verb
-/// (`normalize search <query>`), served by `normalize-semantic`.
 fn rewrite_aliases(mut argv: Vec<std::ffi::OsString>) -> Vec<std::ffi::OsString> {
     let subcmd = argv.get(1).and_then(|s| s.to_str()).map(str::to_owned);
     match subcmd.as_deref() {
         // Simple 1:1 aliases — replace argv[1] in place.
-        Some("find") => {
+        Some("search" | "find") => {
             argv[1] = "grep".into();
         }
         Some("check") => {

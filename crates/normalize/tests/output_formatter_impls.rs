@@ -52,7 +52,6 @@ fn test_output_formatter_implementations() {
     use normalize_facts::service::{EffectsReport, ExceptionsReport, LivenessReport};
     use normalize_graph::{DependentsReport, GraphReport, ImportPathReport};
     use normalize_output::diagnostics::DiagnosticsReport;
-    use normalize_semantic::service::SearchReport;
     use normalize_session_analysis::SessionAnalysisReport;
     use normalize_sessions::SessionShowReport;
     use normalize_sessions::SubagentsReport;
@@ -88,7 +87,6 @@ fn test_output_formatter_implementations() {
     assert_output_formatter::<GrammarPathsReport>();
     assert_output_formatter::<DependentsReport>();
     assert_output_formatter::<GraphReport>();
-    assert_output_formatter::<SearchReport>();
     assert_output_formatter::<GrepReport>();
     assert_output_formatter::<HistoryDiffReport>();
     assert_output_formatter::<HistoryListReport>();

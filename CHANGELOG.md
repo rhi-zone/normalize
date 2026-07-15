@@ -219,16 +219,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `contributors` and `analyze activity`/`repo-coupling`/`coupling-clusters` produce identical
   output. (B9 will mount a dedicated `history` verb.)
 
-- **Top-level `search` verb: semantic (vector) search (CLI taxonomy inversion B7).**
-  `normalize search <query>` embeds the query and ranks the code index (symbols, docs,
-  commits) by meaning rather than by name, re-ranked by git staleness, using the ANN index
-  when available (brute-force fallback otherwise). Owned by `normalize-semantic`
-  (`SemanticCliService`, behind its `cli` feature) — it loads the `[embeddings]` config slice
-  from `.normalize/config.toml` itself, with no dependency on the main crate's
-  `NormalizeConfig`. Requires embeddings: set `[embeddings] enabled = true` and run
-  `normalize structure rebuild`; when disabled or unpopulated the command prints a clear,
-  actionable message to stderr and exits non-zero (works without a TTY).
-
 ### Removed
 
 - **BREAKING: the standalone `normalize-syntax-rules` binary is removed (CLI taxonomy
@@ -243,12 +233,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   service and is unchanged.
 
 ### Changed
-
-- **BREAKING: `search` is no longer an alias for `grep`.** The `search`→`grep` transitional
-  alias has been removed. `normalize search <query>` now runs semantic search (see Added),
-  not text/regex search. For text/regex search use `normalize grep <pattern>` or its `find`
-  alias (`find`→`grep` is unchanged). Landed atomically with mounting the semantic `search`
-  verb at CLI taxonomy inversion B7.
 
 - **`filter` verb mounted from `normalize-filter` (CLI taxonomy inversion B6).**
   The filter surface now lives under a top-level `filter` verb owned by `normalize-filter`
