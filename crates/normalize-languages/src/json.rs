@@ -73,7 +73,11 @@ impl Language for Json {
                     _ => {
                         let val_text = &content[value.byte_range()];
                         if val_text.len() > 40 {
-                            format!("{}: {}…", key, &val_text[..37])
+                            let mut end = 37;
+                            while end > 0 && !val_text.is_char_boundary(end) {
+                                end -= 1;
+                            }
+                            format!("{}: {}…", key, &val_text[..end])
                         } else {
                             format!("{}: {}", key, val_text)
                         }
