@@ -61,6 +61,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `DiscoverError`, `ParseError::Database`. No user-facing behavior change; Claude Code session
   discovery and parsing work identically.
 
+### Added
+
+- **`normalize rank density` gains three entropy metrics.** Alongside the existing
+  `compression_ratio` and `token_uniqueness`, per-file and per-module results now report
+  `structural_entropy` (Shannon entropy over AST node-kind distribution, normalized to
+  `[0, 1]`; 0.0 when the file has no grammar support), `vocabulary_entropy` (Shannon
+  entropy over identifier word fragments split on camelCase/snake_case/SCREAMING_SNAKE
+  boundaries, normalized to `[0, 1]`), and `cross_file_entropy` (KL divergence of a
+  file's vocabulary from the project-wide vocabulary, with additive smoothing). The
+  combined `density_score` is now the average of all five metrics.
+
 ### Changed
 
 - **`stale-doc` SUMMARY.md exclusion removed.** The `stale-doc` native rule no longer

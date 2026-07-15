@@ -591,7 +591,7 @@ impl RankService {
         Ok(report)
     }
 
-    /// Rank modules by information density: compression ratio combined with token uniqueness.
+    /// Rank modules by information density across five complementary entropy metrics.
     ///
     /// Modules with high density pack more distinct concepts per line. Low-density modules
     /// may have excessive boilerplate or copy-paste.
@@ -601,8 +601,17 @@ impl RankService {
     ///   repetitive structure (boilerplate, templated code).
     /// - **Token uniqueness**: `unique_tokens / total_tokens` — lower = more repeated
     ///   vocabulary (copy-paste, uniform naming patterns).
-    /// - **Density score**: `(compression_ratio + token_uniqueness) / 2` — combined score;
-    ///   lower = more repetitive overall. Modules are ranked lowest-first.
+    /// - **Structural entropy**: Shannon entropy over AST node-type kinds, normalized to
+    ///   `[0, 1]` — lower = more structurally repetitive (e.g. long runs of similar
+    ///   statements). 0.0 when the file has no grammar support.
+    /// - **Vocabulary entropy**: Shannon entropy over identifier word fragments (split on
+    ///   camelCase/snake_case/SCREAMING_SNAKE boundaries), normalized to `[0, 1]` — lower =
+    ///   narrower vocabulary (a handful of words reused everywhere).
+    /// - **Cross-file entropy**: KL divergence of a file's word distribution from the
+    ///   project-wide word distribution — low = "just another instance of the pattern",
+    ///   high = vocabulary that diverges from the rest of the project.
+    /// - **Density score**: average of all five metrics above; lower = more repetitive
+    ///   overall. Modules are ranked lowest-first.
     ///
     /// Returns a `DensityReport` with per-module scores and the worst individual files.
     #[server(group = "modules")]

@@ -24,7 +24,7 @@ index-free). Old `rank` paths were removed in B12 (no back-compat).
 | Subcommand | Description |
 |------------|-------------|
 | `size` | Hierarchical LOC breakdown (ncdu-style) |
-| `density` | Compression ratio + token uniqueness per module |
+| `density` | Compression ratio, token uniqueness, structural/vocabulary/cross-file entropy per module |
 | `module-health` | Score each module across test ratio, uniqueness, and density (worst first) |
 | `imports` | Rank modules by import fan-in (requires facts index) |
 | `surface` | Per-module public symbol count, public ratio, and constraint score |

@@ -28,7 +28,7 @@ Code quality:
 
 Module structure:
   size             Show hierarchical lines-of-code breakdown (ncdu-style tree view).
-  density          Rank modules by information density: compression ratio combined with token uniqueness.
+  density          Rank modules by information density across five complementary entropy metrics.
   imports          Rank modules by import fan-in: how many other modules import each module.
   surface          Rank modules by API surface area: public symbol count, public ratio, and constraint score.
   module-health    Score each module on a composite health metric: test ratio × uniqueness × density.
