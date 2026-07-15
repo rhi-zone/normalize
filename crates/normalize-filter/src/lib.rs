@@ -119,6 +119,7 @@ impl AliasEntry {
 
 /// Known normalize top-level subcommands for syntax inference.
 const KNOWN_SUBCOMMANDS: &[&str] = &[
+    "alias",
     "view",
     "grep",
     "context",

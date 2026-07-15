@@ -17,6 +17,7 @@
 //! `display_output` reads `self.pretty` (set by the method from `--pretty`/
 //! `--compact` globals + config) and calls `format_pretty()` or `format_text()`.
 
+pub mod alias;
 pub mod analyze;
 pub mod config;
 pub mod context;
@@ -55,6 +56,7 @@ pub struct NormalizeService {
     /// per-command against the target root (TTY/config) into `pretty`.
     pretty_raw: Cell<bool>,
     compact_raw: Cell<bool>,
+    alias: alias::AliasService,
     analyze: analyze::AnalyzeService,
     architecture: normalize_architecture::ArchitectureService,
     config: config::ConfigService,
@@ -118,6 +120,7 @@ impl NormalizeService {
     pub fn new() -> Self {
         let pretty = Cell::new(false);
         Self {
+            alias: alias::AliasService::new(&pretty),
             analyze: analyze::AnalyzeService::new(&pretty),
             architecture: normalize_architecture::ArchitectureService::new(&pretty),
             config: config::ConfigService::new(&pretty),
@@ -883,6 +886,16 @@ impl NormalizeService {
             aliases,
             detected_languages: languages,
         })
+    }
+
+    /// Save the previously-run command (or an explicit one) as a named `@alias`.
+    ///
+    /// Examples:
+    ///   normalize rank complexity --root src/
+    ///   normalize alias save complexity-src      # captures the command above
+    #[server(group = "core")]
+    pub fn alias(&self) -> &alias::AliasService {
+        &self.alias
     }
 
     /// Inspect parsed syntax trees and test queries. Use to debug grammars or develop tree-sitter patterns.

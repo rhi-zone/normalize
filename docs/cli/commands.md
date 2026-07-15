@@ -15,6 +15,7 @@
 | `kg` | Knowledge graph — three primitives: read (selector → units), write (jq transform → mutate/delete), walk (graph traversal) |
 | `init` | Initialize normalize in a directory |
 | `aliases` | List all registered aliases (built-in and configured) with syntax, value, description, and status |
+| `alias save <name>` | Save the last-run (or `--command`-given) command as a named `@alias` |
 
 ### Analysis
 | Command | Description |

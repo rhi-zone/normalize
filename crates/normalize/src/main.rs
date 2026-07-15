@@ -155,7 +155,8 @@ fn expand_command_alias(mut argv: Vec<std::ffi::OsString>) -> Vec<std::ffi::OsSt
 fn is_known_subcommand(name: &str) -> bool {
     matches!(
         name,
-        "view"
+        "alias"
+            | "view"
             | "grep"
             | "context"
             | "init"
@@ -192,6 +193,42 @@ fn is_known_subcommand(name: &str) -> bool {
             | "config"
             | "aliases"
     )
+}
+
+/// Return true if this invocation's argv should not be recorded as "the last
+/// command" for `normalize alias save`.
+///
+/// Skips `alias` subcommands themselves (so `normalize alias save foo` doesn't
+/// overwrite the history with its own invocation — the point is to recall the
+/// command that ran *before* it) and informational flags (help/version/schema),
+/// which aren't meaningful things to replay as an alias.
+fn should_skip_last_command_tracking(argv: &[std::ffi::OsString]) -> bool {
+    let sub = argv.get(1).and_then(|s| s.to_str()).unwrap_or("");
+    if matches!(sub, "alias") {
+        return true;
+    }
+    argv.iter().skip(1).filter_map(|s| s.to_str()).any(|s| {
+        matches!(
+            s,
+            "--help" | "-h" | "--version" | "-V" | "--input-schema" | "--output-schema"
+        )
+    })
+}
+
+/// Record `argv[1..]` (shell-quoted) as the last-run command, for `normalize
+/// alias save` to pick up on a later invocation. Best-effort; see
+/// [`normalize::service::alias::write_last_command`].
+fn record_last_command(argv: &[std::ffi::OsString]) {
+    if should_skip_last_command_tracking(argv) {
+        return;
+    }
+    let root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let words: Vec<String> = argv[1..]
+        .iter()
+        .map(|s| s.to_string_lossy().into_owned())
+        .collect();
+    let joined = shell_words::join(&words);
+    normalize::service::alias::write_last_command(&root, &joined);
 }
 
 /// Reset SIGPIPE to default behavior so piping to `head` etc. doesn't panic.
@@ -332,6 +369,10 @@ async fn main() -> std::process::ExitCode {
     // Rewrite command aliases so users from other tools find what they expect.
     // Simple aliases map one name to another; compound aliases expand to two subcommands.
     let argv = rewrite_aliases(argv);
+
+    // Record this invocation (post-expansion) so `normalize alias save` can
+    // recall it on a later invocation without requiring `--command`.
+    record_last_command(&argv);
 
     let service = normalize::service::NormalizeService::new();
     match service.cli_run_with_async(argv).await {

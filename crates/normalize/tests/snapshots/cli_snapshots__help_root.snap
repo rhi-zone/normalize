@@ -1,5 +1,6 @@
 ---
 source: crates/normalize/tests/cli_snapshots.rs
+assertion_line: 26
 expression: "snapshot_help(&[])"
 ---
 normalize - Structural code intelligence: index symbols and calls, enforce rules, track complexity.
@@ -25,6 +26,7 @@ Core:
   aliases       List all registered aliases (built-in and configured).
   view          Browse code structure and symbol relationships. Use to read files, explore types, or trace dependencies.
   structure     Build and query the code index. Run `structure rebuild` after cloning or when cross-file commands return stale results.
+  alias         Save the previously-run command (or an explicit one) as a named `@alias`.
   edit          Edit code by symbol name. Use for batch renames, signature changes, or pattern-based rewrites.
   search        Semantic (vector) search over the code index. Ranks by meaning, not by name.
   rules         Configure and run lint rules. Use to enable/disable checks or see what rules are available.

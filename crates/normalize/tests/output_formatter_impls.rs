@@ -137,6 +137,9 @@ fn test_output_formatter_implementations() {
     assert_output_formatter::<ConfigValidateReport>();
     assert_output_formatter::<ConfigSetReport>();
 
+    use normalize::service::alias::AliasSaveReport;
+    assert_output_formatter::<AliasSaveReport>();
+
     use normalize::commands::syntax::node_types::NodeTypesReport;
     assert_output_formatter::<NodeTypesReport>();
 

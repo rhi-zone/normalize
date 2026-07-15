@@ -301,6 +301,23 @@ At config load time, aliases are validated:
 - **Command** aliases: shell-tokenized via `shell-words`, then validated against the full CLI command tree (unknown subcommands/flags produce warnings)
 - Missing `syntax` field produces a warning with the inferred type
 
+### `normalize alias save <name>` — capture a command as an alias
+
+Every invocation records its argv (post-expansion) to `.normalize/.last-command`;
+`alias save` reads that state by default and writes `[aliases.<name>]` into the
+project's `.normalize/config.toml`, creating the file if needed and preserving
+existing content. `--command` overrides the recorded command (for scripted/agent
+use where there's no prior invocation to recall). Syntax is inferred with the same
+heuristic used everywhere else and always written explicitly. Prompts for an
+optional description on a TTY (`--description` on non-interactive callers); refuses
+to overwrite an existing alias without `--force`.
+
+```
+normalize rank complexity --root src/
+normalize alias save complexity-src
+normalize @complexity-src
+```
+
 ## Hardcoded Command Aliases
 
 Users from other tools often try familiar names. These aliases are rewritten transparently in `main.rs` before server-less dispatch:

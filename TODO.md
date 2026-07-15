@@ -27,6 +27,15 @@ Three live threads from the 2026-06-29/07-01 session — verify state before act
 - [x] Built-in command aliases: `@vocabulary`, `@stable-core`, `@unstable-core`
 - [x] Definition-time validation: glob patterns via `GitignoreBuilder`, command values via `shell_words::split`, command aliases validated against full clap Command tree
 - [x] DX: debug-level logging of alias expansion, error messages attribute failures to alias name
+- [x] `normalize alias save <name>` (2026-07-15): writes `[aliases.<name>]` into the project's
+  `.normalize/config.toml`, preserving existing content. Every invocation records its argv to
+  `.normalize/.last-command` (`main.rs::record_last_command`, skipped for `alias` subcommands
+  and help/version/schema flags); `alias save` reads that state by default, or `--command`
+  overrides it explicitly (chose a flag over `-- <command...>` passthrough — server-less's
+  `#[cli]` macro has no trailing-var-arg support today, so a flag was the no-new-machinery
+  option). Syntax is inferred via the existing `AliasEntry::resolved_syntax()` heuristic and
+  always written explicitly. Prompts for `--description` on a TTY, skipped otherwise. Refuses
+  to overwrite an existing alias without `--force`.
 - [ ] **Shell completion for `@` aliases** — normalize has no existing shell completion infrastructure for the main CLI (rg/ast-grep have their own). Needs: completion script generation that includes dynamic alias names.
 - [ ] **Config file provenance in `normalize aliases` output** — currently shows status (builtin/custom/overridden/disabled) but not the specific config file path that defines each alias. Requires `load_section_hierarchical` to track per-key provenance.
 

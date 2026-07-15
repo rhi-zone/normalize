@@ -8,6 +8,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`normalize alias save <name>` writes the previous command as a named alias.**
+  Every invocation now records its argv to `.normalize/.last-command`; `alias save`
+  reads that state (or an explicit `--command` override), infers the syntax with the
+  same heuristic used elsewhere, and writes `[aliases.<name>]` into the project's
+  `.normalize/config.toml` — creating the file if needed and preserving all existing
+  content. Prompts for an optional description on a TTY (`--description` on non-TTY);
+  refuses to overwrite an existing alias without `--force`.
 - **Unified alias system with `@` sigil command aliases.** Aliases now support four syntax
   types (`command`, `glob`, `sql`, `path`) via `@property`-style declarations in
   `[aliases]` config sections. Command aliases expand `normalize @vocabulary` into full
