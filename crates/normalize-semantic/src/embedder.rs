@@ -2,8 +2,10 @@
 //!
 //! The embedder wraps a fastembed `TextEmbedding` model and serializes/
 //! deserializes raw f32 vectors for storage in SQLite BLOBs.
+//!
+//! Utility functions (encode/decode/similarity/dims) are always available.
+//! The `Embedder` struct requires the `embeddings` feature.
 
-use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use std::path::Path;
 
 /// Default embedding model — nomic-embed-text-v1.5 gives 768 dimensions and
@@ -11,24 +13,28 @@ use std::path::Path;
 pub const DEFAULT_MODEL: &str = "nomic-embed-text-v1.5";
 
 /// Wraps the fastembed model and provides encode/decode helpers.
+/// Only available with the `embeddings` feature.
+#[cfg(feature = "embeddings")]
 pub struct Embedder {
-    model: TextEmbedding,
+    model: fastembed::TextEmbedding,
     pub model_name: String,
     pub dimensions: usize,
 }
 
+#[cfg(feature = "embeddings")]
 impl Embedder {
     /// Load the model, downloading it if necessary.
     ///
     /// `cache_dir` is the directory used for ONNX model caching (typically
     /// `~/.cache/huggingface` or similar); if `None` fastembed uses its default.
     pub fn load(model_name: &str, cache_dir: Option<&Path>) -> anyhow::Result<Self> {
+        use fastembed::InitOptions;
         let embedding_model = resolve_model(model_name)?;
         let mut opts = InitOptions::new(embedding_model);
         if let Some(dir) = cache_dir {
             opts = opts.with_cache_dir(dir.to_path_buf());
         }
-        let mut model = TextEmbedding::try_new(opts).map_err(|e| {
+        let mut model = fastembed::TextEmbedding::try_new(opts).map_err(|e| {
             anyhow::anyhow!("Failed to load embedding model '{}': {}", model_name, e)
         })?;
 
@@ -110,7 +116,10 @@ pub fn dims_for_model(name: &str) -> Option<usize> {
 }
 
 /// Resolve a model name string to a fastembed `EmbeddingModel`.
-fn resolve_model(name: &str) -> anyhow::Result<EmbeddingModel> {
+/// Only available with the `embeddings` feature.
+#[cfg(feature = "embeddings")]
+fn resolve_model(name: &str) -> anyhow::Result<fastembed::EmbeddingModel> {
+    use fastembed::EmbeddingModel;
     match name {
         "nomic-embed-text-v1.5" => Ok(EmbeddingModel::NomicEmbedTextV15),
         "all-MiniLM-L6-v2" => Ok(EmbeddingModel::AllMiniLML6V2),

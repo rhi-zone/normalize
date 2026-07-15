@@ -31,8 +31,9 @@
 
 pub mod chunks;
 pub mod config;
-pub mod embedder;
+pub mod embedder; // Always available (utility functions); Embedder struct is behind embeddings feature
 pub mod git_staleness;
+#[cfg(feature = "embeddings")]
 pub mod populate;
 pub mod schema;
 pub mod search;
@@ -44,6 +45,7 @@ pub mod service;
 
 // Re-export the key public types for convenience.
 pub use config::EmbeddingsConfig;
+#[cfg(feature = "embeddings")]
 pub use populate::{
     DEFAULT_MAX_COMMITS, PopulateStats, populate_commit_messages, populate_context_blocks,
     populate_embeddings, populate_incremental_for_paths, populate_markdown_docs,

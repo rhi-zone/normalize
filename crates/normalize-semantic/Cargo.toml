@@ -7,8 +7,10 @@ repository.workspace = true
 description = "Semantic retrieval layer for normalize: vector embeddings over structurally-derived chunks"
 
 [features]
-default = []
+default = ["embeddings"]
 cli = ["dep:server-less", "dep:schemars"]
+# Local embedding generation via fastembed (ONNX-backed). Not available for musl targets.
+embeddings = ["dep:fastembed"]
 
 [dependencies]
 normalize-git = { workspace = true }
@@ -24,7 +26,8 @@ anyhow = "1"
 
 # Embedding generation (ONNX-backed, no server required).
 # Use rustls TLS to avoid the openssl system dependency.
-fastembed = { version = "5", default-features = false, features = ["ort-download-binaries-rustls-tls", "hf-hub-rustls-tls"] }
+# Behind `embeddings` feature due to ort-sys lacking musl prebuilts.
+fastembed = { version = "5", default-features = false, features = ["ort-download-binaries-rustls-tls", "hf-hub-rustls-tls"], optional = true }
 
 # Vector storage alongside existing SQLite schema
 sqlite-vec = "0.1.9-alpha.1"

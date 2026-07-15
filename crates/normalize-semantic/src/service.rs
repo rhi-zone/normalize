@@ -113,6 +113,7 @@ impl OutputFormatter for SearchReport {
 /// `top_k` is the max number of results to return.
 ///
 /// Returns a human-readable error string (suitable for `Err(...)` in a service method).
+#[cfg(feature = "embeddings")]
 pub async fn run_search(
     root: &std::path::Path,
     query: String,
@@ -290,6 +291,7 @@ impl OutputFormatter for ContextSearchReport {
 ///
 /// Searches the embeddings index restricted to `source_type = "context"` blocks.
 /// Returns the top-k most relevant context blocks by cosine similarity.
+#[cfg(feature = "embeddings")]
 pub async fn run_context_search(
     root: &std::path::Path,
     query: String,
