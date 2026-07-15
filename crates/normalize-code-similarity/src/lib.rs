@@ -286,8 +286,11 @@ pub fn hash_node_recursive(
         };
 
         if should_hash {
-            let text = &content[node.start_byte()..node.end_byte()];
-            text.hash(hasher);
+            let (start, end) = (node.start_byte(), node.end_byte());
+            if start <= end && end <= content.len() {
+                let text = &content[start..end];
+                text.hash(hasher);
+            }
         }
     }
 
@@ -382,8 +385,11 @@ pub fn serialize_subtree_tokens(
             false
         };
         if should_include {
-            let text = &content[node.start_byte()..node.end_byte()];
-            text.hash(&mut h);
+            let (start, end) = (node.start_byte(), node.end_byte());
+            if start <= end && end <= content.len() {
+                let text = &content[start..end];
+                text.hash(&mut h);
+            }
         }
     }
     out.push(h.finish());
