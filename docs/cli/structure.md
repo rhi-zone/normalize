@@ -80,8 +80,9 @@ Run an arbitrary read-only SQL query against the structural index (`.normalize/i
 Results are returned as a table (text) or JSON array of objects (with `--json`).
 
 The index exposes these tables: `files`, `symbols`, `symbol_attributes`, `symbol_implements`,
-`calls`, `imports`, `type_methods`, `type_refs`. Three convenience views are also defined at
-index open time:
+`symbol_words` (one row per camelCase/snake_case word fragment per symbol name, lowercased),
+`calls`, `imports`, `type_methods`, `type_refs`, `file_churn`. Three convenience views are also
+defined at index open time:
 
 | View | Description |
 |------|-------------|

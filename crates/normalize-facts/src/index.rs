@@ -3,7 +3,7 @@ use ignore::WalkBuilder;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use libsql::{Connection, Database, params};
 pub use normalize_facts_core::IndexedFile;
-use normalize_facts_core::{FlatImport, FlatSymbol, TypeRef};
+use normalize_facts_core::{FlatImport, FlatSymbol, TypeRef, split_identifier_words};
 use normalize_languages::support_for_path;
 use normalize_rules_config::WalkConfig;
 use rayon::prelude::*;
@@ -119,7 +119,7 @@ struct CachedFileData {
 }
 
 // Not yet public - just delete .normalize/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 16;
+const SCHEMA_VERSION: i64 = 17;
 
 /// Bump when extraction logic changes to invalidate cached results.
 /// Bumped to "2" (2026-04-27): purge CA cache entries that may have been poisoned
@@ -379,6 +379,29 @@ impl FileIndex {
         )
         .await?;
 
+        // Symbol name vocabulary: one row per word fragment per symbol, split on
+        // camelCase/snake_case/PascalCase/SCREAMING_SNAKE boundaries. Powers
+        // vocabulary queries (e.g. "which symbols mention 'cache'?").
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS symbol_words (
+                file TEXT NOT NULL,
+                symbol_name TEXT NOT NULL,
+                word TEXT NOT NULL
+            )",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_symbol_words_word ON symbol_words(word)",
+            (),
+        )
+        .await?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_symbol_words_file ON symbol_words(file)",
+            (),
+        )
+        .await?;
+
         // Import tracking
         conn.execute(
             "CREATE TABLE IF NOT EXISTS imports (
@@ -527,6 +550,7 @@ impl FileIndex {
             conn.execute("DELETE FROM type_refs", ()).await?;
             conn.execute("DELETE FROM symbol_attributes", ()).await?;
             conn.execute("DELETE FROM symbol_implements", ()).await?;
+            conn.execute("DELETE FROM symbol_words", ()).await.ok();
             // co_change_edges: clear on schema bump so the next rebuild repopulates.
             conn.execute("DELETE FROM co_change_edges", ()).await.ok();
             conn.execute("DELETE FROM meta WHERE key = 'co_change_last_commit'", ())
@@ -1442,6 +1466,14 @@ impl FileIndex {
                     .execute(
                         "INSERT INTO symbol_implements (file, name, interface) VALUES (?1, ?2, ?3)",
                         params![path.to_string(), sym.name.clone(), iface.clone()],
+                    )
+                    .await?;
+            }
+            for word in split_identifier_words(&sym.name) {
+                self.conn
+                    .execute(
+                        "INSERT INTO symbol_words (file, symbol_name, word) VALUES (?1, ?2, ?3)",
+                        params![path.to_string(), sym.name.clone(), word],
                     )
                     .await?;
             }
@@ -3090,6 +3122,7 @@ impl FileIndex {
         self.conn
             .execute("DELETE FROM symbol_implements", ())
             .await?;
+        self.conn.execute("DELETE FROM symbol_words", ()).await?;
         self.conn.execute("DELETE FROM cfg_blocks", ()).await?;
         self.conn.execute("DELETE FROM cfg_edges", ()).await?;
         self.conn.execute("DELETE FROM cfg_defs", ()).await?;
@@ -3122,6 +3155,12 @@ impl FileIndex {
                     self.conn.execute(
                         "INSERT INTO symbol_implements (file, name, interface) VALUES (?1, ?2, ?3)",
                         params![data.file_path.clone(), sym.name.clone(), iface.clone()],
+                    ).await?;
+                }
+                for word in split_identifier_words(&sym.name) {
+                    self.conn.execute(
+                        "INSERT INTO symbol_words (file, symbol_name, word) VALUES (?1, ?2, ?3)",
+                        params![data.file_path.clone(), sym.name.clone(), word],
                     ).await?;
                 }
                 symbol_count += 1;
@@ -3312,6 +3351,12 @@ impl FileIndex {
                 .await?;
             self.conn
                 .execute(
+                    "DELETE FROM symbol_words WHERE file = ?1",
+                    params![path.clone()],
+                )
+                .await?;
+            self.conn
+                .execute(
                     "DELETE FROM type_refs WHERE file = ?1",
                     params![path.clone()],
                 )
@@ -3488,6 +3533,12 @@ impl FileIndex {
                     self.conn.execute(
                         "INSERT INTO symbol_implements (file, name, interface) VALUES (?1, ?2, ?3)",
                         params![file_path.clone(), sym.name.clone(), iface.clone()],
+                    ).await?;
+                }
+                for word in split_identifier_words(&sym.name) {
+                    self.conn.execute(
+                        "INSERT INTO symbol_words (file, symbol_name, word) VALUES (?1, ?2, ?3)",
+                        params![file_path.clone(), sym.name.clone(), word],
                     ).await?;
                 }
                 symbol_count += 1;

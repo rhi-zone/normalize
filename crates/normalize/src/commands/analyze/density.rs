@@ -1,4 +1,5 @@
 use flate2::{Compression, write::GzEncoder};
+use normalize_facts_core::split_identifier_words;
 use normalize_languages::parsers::parse_with_grammar;
 use normalize_languages::support_for_path;
 use normalize_rank::ranked::{
@@ -330,35 +331,6 @@ fn structural_entropy(content: &str, path: &Path) -> f64 {
     };
     let kinds = collect_node_kinds(&tree);
     shannon_entropy_normalized(&kinds)
-}
-
-/// Split an identifier into lowercase word fragments, handling camelCase,
-/// snake_case, PascalCase, and SCREAMING_SNAKE_CASE boundaries.
-fn split_identifier_words(ident: &str) -> Vec<String> {
-    let chars: Vec<char> = ident.chars().collect();
-    let mut words = Vec::new();
-    let mut current = String::new();
-    for (i, &c) in chars.iter().enumerate() {
-        if c == '_' || c == '-' {
-            if !current.is_empty() {
-                words.push(std::mem::take(&mut current));
-            }
-            continue;
-        }
-        if c.is_uppercase() {
-            let prev_lower = i > 0 && chars[i - 1].is_lowercase();
-            let prev_upper = i > 0 && chars[i - 1].is_uppercase();
-            let next_lower = i + 1 < chars.len() && chars[i + 1].is_lowercase();
-            if !current.is_empty() && (prev_lower || (prev_upper && next_lower)) {
-                words.push(std::mem::take(&mut current));
-            }
-        }
-        current.push(c.to_ascii_lowercase());
-    }
-    if !current.is_empty() {
-        words.push(current);
-    }
-    words.into_iter().filter(|w| w.len() > 1).collect()
 }
 
 /// Result of [`vocabulary_entropy`]: the normalized entropy plus the raw word

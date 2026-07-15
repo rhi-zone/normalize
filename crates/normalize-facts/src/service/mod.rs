@@ -1352,9 +1352,12 @@ impl FactsCliService {
     /// Opens the index read-only and returns results as a JSON array of objects.
     /// The index exposes these tables: files, symbols (includes a `complexity`
     /// column — cyclomatic complexity, NULL for non-function/method symbols),
-    /// symbol_attributes, symbol_implements, calls, imports, type_methods,
-    /// type_refs, file_churn (per-file commit_count, last_changed, lines_added,
-    /// lines_deleted — populated by `structure rebuild`'s co-change git walk).
+    /// symbol_attributes, symbol_implements, symbol_words (one row per
+    /// camelCase/snake_case word fragment per symbol name, lowercased — for
+    /// vocabulary queries like "which symbols mention 'cache'?"), calls,
+    /// imports, type_methods, type_refs, file_churn (per-file commit_count,
+    /// last_changed, lines_added, lines_deleted — populated by `structure
+    /// rebuild`'s co-change git walk).
     /// Three convenience views are also available:
     ///   entry_points      — public symbols with no callers
     ///   external_deps     — imports where resolved_file IS NULL

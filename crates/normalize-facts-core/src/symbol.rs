@@ -2,6 +2,38 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Split an identifier into lowercase word fragments, handling camelCase,
+/// snake_case, PascalCase, and SCREAMING_SNAKE_CASE boundaries. Fragments of
+/// length 1 are dropped. Shared by vocabulary-entropy analysis
+/// (`normalize analyze density`) and `symbol_words` index extraction so the
+/// two always agree on what counts as a "word".
+pub fn split_identifier_words(ident: &str) -> Vec<String> {
+    let chars: Vec<char> = ident.chars().collect();
+    let mut words = Vec::new();
+    let mut current = String::new();
+    for (i, &c) in chars.iter().enumerate() {
+        if c == '_' || c == '-' {
+            if !current.is_empty() {
+                words.push(std::mem::take(&mut current));
+            }
+            continue;
+        }
+        if c.is_uppercase() {
+            let prev_lower = i > 0 && chars[i - 1].is_lowercase();
+            let prev_upper = i > 0 && chars[i - 1].is_uppercase();
+            let next_lower = i + 1 < chars.len() && chars[i + 1].is_lowercase();
+            if !current.is_empty() && (prev_lower || (prev_upper && next_lower)) {
+                words.push(std::mem::take(&mut current));
+            }
+        }
+        current.push(c.to_ascii_lowercase());
+    }
+    if !current.is_empty() {
+        words.push(current);
+    }
+    words.into_iter().filter(|w| w.len() > 1).collect()
+}
+
 /// Symbol kind classification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

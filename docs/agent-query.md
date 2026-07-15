@@ -38,6 +38,7 @@ The structural index is already SQLite. The schema is:
 - `symbols` — definitions with kind, visibility, parent, line range
 - `symbol_attributes` — decorator/annotation facts
 - `symbol_implements` — trait/interface implementation edges
+- `symbol_words` — lowercased word fragments per symbol name (camelCase/snake_case split), for vocabulary queries
 - `calls` — caller → callee edges with file and line
 - `imports` — import edges with optional resolution to local file
 - `type_methods` — method membership
