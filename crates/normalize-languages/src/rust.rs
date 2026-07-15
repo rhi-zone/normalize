@@ -615,6 +615,8 @@ fn merge_rust_impl_blocks(symbols: &mut Vec<crate::Symbol>) {
                 children: methods,
                 is_interface_impl: !impls.is_empty(),
                 implements: impls,
+                // Synthesized module-like grouping symbol, not a function — no complexity.
+                complexity: None,
             });
         }
     }

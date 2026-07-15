@@ -86,6 +86,7 @@ struct ParsedSymbol {
     is_interface_impl: bool,
     implements: Vec<String>,
     docstring: Option<String>,
+    complexity: Option<usize>,
 }
 
 /// One call-site entry: (caller_symbol, callee_name, callee_qualifier, access, line).
@@ -118,12 +119,15 @@ struct CachedFileData {
 }
 
 // Not yet public - just delete .normalize/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 15;
+const SCHEMA_VERSION: i64 = 16;
 
 /// Bump when extraction logic changes to invalidate cached results.
 /// Bumped to "2" (2026-04-27): purge CA cache entries that may have been poisoned
 /// by the old bug where rebuilds without grammars loaded cached empty results.
-const EXTRACTOR_VERSION: &str = "2";
+/// Bumped to "3" (2026-07-15): `ParsedSymbol`/`CachedFileData` gained a `complexity`
+/// field; old bincode-serialized cache entries have a different byte layout and
+/// must not be deserialized against the new struct shape.
+const EXTRACTOR_VERSION: &str = "3";
 
 /// Check if a file path has a supported source extension.
 fn is_source_file(path: &str) -> bool {
@@ -326,7 +330,8 @@ impl FileIndex {
                 end_line INTEGER NOT NULL,
                 parent TEXT,
                 visibility TEXT NOT NULL DEFAULT 'public',
-                is_impl INTEGER NOT NULL DEFAULT 0
+                is_impl INTEGER NOT NULL DEFAULT 0,
+                complexity INTEGER
             )",
             (),
         )
@@ -468,6 +473,9 @@ impl FileIndex {
         )
         .await
         .ok();
+        conn.execute("ALTER TABLE symbols ADD COLUMN complexity INTEGER", ())
+            .await
+            .ok();
         // resolved_file was added to imports after schema version 5 was already set;
         // run unconditionally so existing v5 DBs without the column get migrated.
         conn.execute("ALTER TABLE imports ADD COLUMN resolved_file TEXT", ())
@@ -524,6 +532,9 @@ impl FileIndex {
             conn.execute("DELETE FROM meta WHERE key = 'co_change_last_commit'", ())
                 .await
                 .ok();
+            // file_churn: clear on schema bump so the next rebuild_co_change_edges()
+            // repopulates it from the same git walk.
+            conn.execute("DELETE FROM file_churn", ()).await.ok();
             // CFG tables: clear so next rebuild repopulates them.
             conn.execute("DELETE FROM cfg_blocks", ()).await.ok();
             conn.execute("DELETE FROM cfg_edges", ()).await.ok();
@@ -619,6 +630,22 @@ impl FileIndex {
         .await?;
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_co_change_file_b ON co_change_edges(file_b)",
+            (),
+        )
+        .await?;
+
+        // Per-file churn: commit count, last-changed timestamp, and line churn.
+        // Populated by rebuild_co_change_edges() (same git walk, no second traversal);
+        // queried directly or via `normalize structure query`.
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS file_churn (
+                file TEXT NOT NULL,
+                commit_count INTEGER NOT NULL,
+                last_changed TEXT,
+                lines_added INTEGER NOT NULL DEFAULT 0,
+                lines_deleted INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (file)
+            )",
             (),
         )
         .await?;
@@ -1391,8 +1418,8 @@ impl FileIndex {
         // Insert symbols
         for sym in symbols {
             self.conn.execute(
-                "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, visibility, is_impl) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                params![path.to_string(), sym.name.clone(), sym.kind.as_str(), sym.start_line as i64, sym.end_line as i64, sym.parent.clone(), sym.visibility.as_str(), sym.is_interface_impl as i64],
+                "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, visibility, is_impl, complexity) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![path.to_string(), sym.name.clone(), sym.kind.as_str(), sym.start_line as i64, sym.end_line as i64, sym.parent.clone(), sym.visibility.as_str(), sym.is_interface_impl as i64, sym.complexity.map(|c| c as i64)],
             ).await?;
             for attr in &sym.attributes {
                 self.conn
@@ -2905,6 +2932,7 @@ impl FileIndex {
                         is_interface_impl: sym.is_interface_impl,
                         implements: sym.implements.clone(),
                         docstring: sym.docstring.clone(),
+                        complexity: sym.complexity,
                     });
 
                     // Only index calls for functions/methods
@@ -2977,6 +3005,7 @@ impl FileIndex {
                                 is_interface_impl: s.is_interface_impl,
                                 implements: s.implements.clone(),
                                 docstring: s.docstring.clone(),
+                                complexity: s.complexity,
                             })
                             .collect(),
                         calls: call_data.clone(),
@@ -3074,8 +3103,8 @@ impl FileIndex {
         for data in &parsed_data {
             for sym in &data.symbols {
                 self.conn.execute(
-                    "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, visibility, is_impl) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                    params![data.file_path.clone(), sym.name.clone(), sym.kind.clone(), sym.start_line as i64, sym.end_line as i64, sym.parent.clone(), sym.visibility.clone(), sym.is_interface_impl as i64],
+                    "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, visibility, is_impl, complexity) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                    params![data.file_path.clone(), sym.name.clone(), sym.kind.clone(), sym.start_line as i64, sym.end_line as i64, sym.parent.clone(), sym.visibility.clone(), sym.is_interface_impl as i64, sym.complexity.map(|c| c as i64)],
                 ).await?;
                 for attr in &sym.attributes {
                     self.conn.execute(
@@ -3379,6 +3408,7 @@ impl FileIndex {
                         is_interface_impl: sym.is_interface_impl,
                         implements: sym.implements.clone(),
                         docstring: sym.docstring.clone(),
+                        complexity: sym.complexity,
                     });
                     let kind = sym.kind.as_str();
                     if kind == "function" || kind == "method" {
@@ -3418,6 +3448,7 @@ impl FileIndex {
                                 is_interface_impl: s.is_interface_impl,
                                 implements: s.implements.clone(),
                                 docstring: s.docstring.clone(),
+                                complexity: s.complexity,
                             })
                             .collect(),
                         calls: call_data_local.clone(),
@@ -3438,8 +3469,8 @@ impl FileIndex {
             // Insert symbols
             for sym in &sym_data {
                 self.conn.execute(
-                    "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, visibility, is_impl) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                    params![file_path.clone(), sym.name.clone(), sym.kind.clone(), sym.start_line as i64, sym.end_line as i64, sym.parent.clone(), sym.visibility.clone(), sym.is_interface_impl as i64],
+                    "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, visibility, is_impl, complexity) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                    params![file_path.clone(), sym.name.clone(), sym.kind.clone(), sym.start_line as i64, sym.end_line as i64, sym.parent.clone(), sym.visibility.clone(), sym.is_interface_impl as i64, sym.complexity.map(|c| c as i64)],
                 ).await?;
                 for attr in &sym.attributes {
                     self.conn.execute(
@@ -3869,12 +3900,16 @@ impl FileIndex {
             Err(_) => return Ok(0),
         };
 
-        // Walk commits, collecting per-commit file lists.
-        let commit_files = walk_commits_for_co_change(&repo, since_commit);
+        // Walk commits once, collecting per-commit file lists (co-change) and
+        // per-file churn stats (commit count, last-changed, line churn) together.
+        let walk_data = walk_commits_for_co_change(&repo, since_commit);
+        let commit_files = walk_data.commit_files;
+        let new_churn = walk_data.churn;
 
-        if commit_files.is_empty() && since_commit.is_none() {
-            // No history (or empty repo): ensure table is cleared and metadata stored.
+        if commit_files.is_empty() && new_churn.is_empty() && since_commit.is_none() {
+            // No history (or empty repo): ensure tables are cleared and metadata stored.
             self.conn.execute("DELETE FROM co_change_edges", ()).await?;
+            self.conn.execute("DELETE FROM file_churn", ()).await?;
             self.conn
                 .execute(
                     "INSERT OR REPLACE INTO meta (key, value) VALUES ('co_change_last_commit', ?1)",
@@ -3938,6 +3973,69 @@ impl FileIndex {
                 params![a.clone(), b.clone(), *count as i64],
             ).await?;
             inserted += 1;
+        }
+
+        // Merge churn: for incremental runs, load existing per-file stats and
+        // combine with the newly-walked commits before rewriting the table.
+        let mut churn_totals: HashMap<String, FileChurnAcc> = HashMap::new();
+        if since_commit.is_some() {
+            let mut rows = self
+                .conn
+                .query(
+                    "SELECT file, commit_count, last_changed, lines_added, lines_deleted FROM file_churn",
+                    (),
+                )
+                .await?;
+            while let Some(row) = rows.next().await? {
+                let file: String = row.get(0)?;
+                let commit_count: i64 = row.get(1)?;
+                let last_changed_str: Option<String> = row.get(2)?;
+                let lines_added: i64 = row.get(3)?;
+                let lines_deleted: i64 = row.get(4)?;
+                let last_changed = last_changed_str
+                    .as_deref()
+                    .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                    .map(|dt| dt.timestamp() as u64)
+                    .unwrap_or(0);
+                churn_totals.insert(
+                    file,
+                    FileChurnAcc {
+                        commit_count: commit_count as usize,
+                        last_changed,
+                        lines_added: lines_added as usize,
+                        lines_deleted: lines_deleted as usize,
+                    },
+                );
+            }
+        }
+        for (file, new_acc) in new_churn {
+            let acc = churn_totals.entry(file).or_default();
+            acc.commit_count += new_acc.commit_count;
+            acc.lines_added += new_acc.lines_added;
+            acc.lines_deleted += new_acc.lines_deleted;
+            if new_acc.last_changed > acc.last_changed {
+                acc.last_changed = new_acc.last_changed;
+            }
+        }
+
+        self.conn.execute("DELETE FROM file_churn", ()).await?;
+        for (file, acc) in &churn_totals {
+            let last_changed_iso = if acc.last_changed > 0 {
+                chrono::DateTime::<chrono::Utc>::from_timestamp(acc.last_changed as i64, 0)
+                    .map(|dt| dt.to_rfc3339())
+            } else {
+                None
+            };
+            self.conn.execute(
+                "INSERT OR REPLACE INTO file_churn (file, commit_count, last_changed, lines_added, lines_deleted) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    file.clone(),
+                    acc.commit_count as i64,
+                    last_changed_iso,
+                    acc.lines_added as i64,
+                    acc.lines_deleted as i64
+                ],
+            ).await?;
         }
 
         // Record the HEAD SHA so the next incremental run knows where to resume.
@@ -4431,27 +4529,70 @@ fn open_gix_repo(root: &std::path::Path) -> Option<gix::Repository> {
         .map(|r| r.into_sync().to_thread_local())
 }
 
-/// Walk commits via gix, returning per-commit lists of *source* files changed.
+/// Per-file churn accumulated across a single `walk_commits_for_co_change` pass.
+#[derive(Default, Clone)]
+struct FileChurnAcc {
+    commit_count: usize,
+    /// Unix timestamp (seconds) of the most recent commit touching this file.
+    last_changed: u64,
+    lines_added: usize,
+    lines_deleted: usize,
+}
+
+/// Result of a single commit walk: co-change candidate file lists plus per-file churn.
+struct CoChangeWalkData {
+    /// Per-commit lists of *source* files changed, restricted to commits touching
+    /// >= 2 files (the shape `rebuild_co_change_edges` needs for pairing).
+    commit_files: Vec<Vec<String>>,
+    /// Per-file churn stats accumulated across *every* visited commit (including
+    /// single-file commits, which `commit_files` excludes) — piggybacked onto the
+    /// same walk so churn collection costs no extra git-log traversal.
+    churn: std::collections::HashMap<String, FileChurnAcc>,
+}
+
+/// Walk commits via gix, returning per-commit lists of *source* files changed
+/// (for co-change pairing) and per-file churn stats (commit count, last-changed
+/// timestamp, line churn) in the same pass.
 ///
 /// If `since_commit` is `Some(sha)`, only commits after (exclusive) that SHA are returned.
-/// Commits are yielded oldest-first from the HEAD ancestry.
+/// Commits are yielded newest-first from the HEAD ancestry (explicit `ByCommitTime` sort —
+/// required so `info.commit_time` is populated for the churn `last_changed` timestamp;
+/// the default topological order leaves it `None`).
 fn walk_commits_for_co_change(
     repo: &gix::Repository,
     since_commit: Option<&str>,
-) -> Vec<Vec<String>> {
+) -> CoChangeWalkData {
     let head_id = match repo.head_id() {
         Ok(id) => id,
-        Err(_) => return Vec::new(),
+        Err(_) => {
+            return CoChangeWalkData {
+                commit_files: Vec::new(),
+                churn: std::collections::HashMap::new(),
+            };
+        }
     };
-    let walk = match head_id.ancestors().all() {
+    let walk = match head_id
+        .ancestors()
+        .sorting(gix::revision::walk::Sorting::ByCommitTime(
+            gix::traverse::commit::simple::CommitTimeOrder::NewestFirst,
+        ))
+        .all()
+    {
         Ok(w) => w,
-        Err(_) => return Vec::new(),
+        Err(_) => {
+            return CoChangeWalkData {
+                commit_files: Vec::new(),
+                churn: std::collections::HashMap::new(),
+            };
+        }
     };
 
     // If since_commit is specified, resolve it to an ObjectId for fast comparison.
     let stop_id: Option<gix::hash::ObjectId> = since_commit.and_then(|sha| sha.parse().ok());
 
-    let mut result = Vec::new();
+    let mut commit_files = Vec::new();
+    let mut churn: std::collections::HashMap<String, FileChurnAcc> =
+        std::collections::HashMap::new();
 
     for info in walk {
         let Ok(info) = info else { continue };
@@ -4466,6 +4607,7 @@ fn walk_commits_for_co_change(
 
         let Ok(commit) = info.object() else { continue };
         let Ok(tree) = commit.tree() else { continue };
+        let commit_time = info.commit_time.unwrap_or(0) as u64;
 
         let parent_tree = info
             .parent_ids()
@@ -4478,34 +4620,59 @@ fn walk_commits_for_co_change(
             Err(_) => continue,
         };
 
-        let files: Vec<String> = changes
-            .into_iter()
-            .filter_map(|change| {
-                use gix::object::tree::diff::ChangeDetached;
-                let location = match change {
-                    ChangeDetached::Addition { location, .. } => location,
-                    ChangeDetached::Deletion { location, .. } => location,
-                    ChangeDetached::Modification { location, .. } => location,
-                    ChangeDetached::Rewrite {
-                        source_location, ..
-                    } => source_location,
-                };
-                let path_str = String::from_utf8_lossy(&location).into_owned();
-                // Only include source files (those with a supported language extension).
-                if is_source_file(&path_str) {
-                    Some(path_str)
-                } else {
-                    None
+        let mut files: Vec<String> = Vec::new();
+        for change in changes {
+            use gix::object::tree::diff::ChangeDetached;
+            let (location, old_id, new_id) = match &change {
+                ChangeDetached::Addition { location, id, .. } => {
+                    (location.clone(), None, Some(*id))
                 }
-            })
-            .collect();
+                ChangeDetached::Deletion { location, id, .. } => {
+                    (location.clone(), Some(*id), None)
+                }
+                ChangeDetached::Modification {
+                    location,
+                    previous_id,
+                    id,
+                    ..
+                } => (location.clone(), Some(*previous_id), Some(*id)),
+                ChangeDetached::Rewrite {
+                    source_location,
+                    source_id,
+                    id,
+                    ..
+                } => (source_location.clone(), Some(*source_id), Some(*id)),
+            };
+            let path_str = String::from_utf8_lossy(&location).into_owned();
+            // Only include source files (those with a supported language extension) —
+            // matches the scope of the rest of the index (symbols, calls, imports).
+            if !is_source_file(&path_str) {
+                continue;
+            }
+
+            // Churn: accumulated for every commit touching this file, independent of
+            // the >= 2 files co-change threshold below.
+            let diff = normalize_git::count_diff_lines(repo, old_id, new_id);
+            let acc = churn.entry(path_str.clone()).or_default();
+            acc.commit_count += 1;
+            acc.lines_added += diff.added;
+            acc.lines_deleted += diff.deleted;
+            if commit_time > acc.last_changed {
+                acc.last_changed = commit_time;
+            }
+
+            files.push(path_str);
+        }
 
         if files.len() >= 2 {
-            result.push(files);
+            commit_files.push(files);
         }
     }
 
-    result
+    CoChangeWalkData {
+        commit_files,
+        churn,
+    }
 }
 
 /// Apply a per-file fanout cap: for each file, keep only its top `cap` partners by count.

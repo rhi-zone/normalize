@@ -64,6 +64,7 @@ impl ExtractResult {
                     children: type_children,
                     is_interface_impl: sym.is_interface_impl,
                     implements: sym.implements.clone(),
+                    complexity: sym.complexity,
                 })
             } else {
                 None
@@ -111,6 +112,7 @@ impl ExtractResult {
                 children: filtered_children,
                 is_interface_impl: sym.is_interface_impl,
                 implements: sym.implements.clone(),
+                complexity: sym.complexity,
             })
         }
 
@@ -284,10 +286,11 @@ impl Extractor {
         // Bump this string whenever the Symbol struct, post-processing, or query
         // semantics change in a way that invalidates existing cached results.
         // Cross-file resolver results are not cached (resolver.is_none() guard below).
+        // v2 (2026-07-15): Symbol gained a `complexity` field.
         let cache_ver = if self.options.include_private {
-            "symbols-v1-all"
+            "symbols-v2-all"
         } else {
-            "symbols-v1-public"
+            "symbols-v2-public"
         };
 
         // Check the persistent symbol cache before parsing (only when no cross-file
@@ -428,6 +431,10 @@ fn build_symbol_from_def<'tree>(
     } else {
         normalize_languages::ImplementsInfo::default()
     };
+    // Cyclomatic complexity only applies to functions/methods — other symbol kinds
+    // (classes, modules, types, ...) genuinely have no complexity concept.
+    let complexity = matches!(kind, SymbolKind::Function | SymbolKind::Method)
+        .then(|| compute_complexity(&def.node, support, content.as_bytes()));
     Some(Symbol {
         name: name.to_string(),
         kind,
@@ -440,6 +447,7 @@ fn build_symbol_from_def<'tree>(
         children: Vec::new(),
         is_interface_impl: implements_info.is_interface,
         implements: implements_info.implements,
+        complexity,
     })
 }
 

@@ -2557,7 +2557,10 @@ needed.
 1. `coupling-clusters` — replace recomputation with index query (immediate win)
 2. Stale-doc detection native rule — doc file + strongly-coupled code files → flag if code
    changed more recently than doc
-3. Churn analysis — files with high commit frequency (already partially in `analyze hotspots`)
+3. ~~Churn analysis — files with high commit frequency (already partially in `analyze hotspots`)~~
+   ✅ DONE 2026-07-15: `file_churn(file, commit_count, last_changed, lines_added,
+   lines_deleted)` table, populated by the same `rebuild_co_change_edges` git walk (no
+   second traversal), queryable via `normalize structure query`.
 4. Ownership concentration — files only touched by one author
 
 **Implementation steps:**
@@ -2566,6 +2569,7 @@ needed.
 - [x] Incremental update: process only commits since last rebuild (append-only, cheap)
 - [x] Update `coupling-clusters` to query index instead of recomputing
 - [x] Add `stale-doc` native rule as first consumer
+- [x] Persist per-file churn (`file_churn` table) piggybacked on the co-change walk — schema v16
 
 ---
 

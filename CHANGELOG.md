@@ -63,6 +63,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Persisted complexity per symbol and churn per file in the structural index.**
+  `symbols` now has a `complexity` column (cyclomatic complexity, computed via the
+  language's `.complexity.scm` query; `NULL` for symbol kinds other than
+  function/method) queryable via `normalize structure query`. A new `file_churn`
+  table (`file`, `commit_count`, `last_changed` ISO 8601, `lines_added`,
+  `lines_deleted`) is populated by the same git-history walk that builds
+  `co_change_edges` — no extra git-log traversal.
 - **`normalize rank density` gains three entropy metrics.** Alongside the existing
   `compression_ratio` and `token_uniqueness`, per-file and per-module results now report
   `structural_entropy` (Shannon entropy over AST node-kind distribution, normalized to

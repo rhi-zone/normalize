@@ -793,13 +793,17 @@ pub fn git_file_churn_stats(root: &Path) -> HashMap<String, Vec<FileChurnEntry>>
 }
 
 /// Added/deleted line counts from `count_diff_lines`.
-struct LineDiff {
-    added: usize,
-    deleted: usize,
+pub struct LineDiff {
+    pub added: usize,
+    pub deleted: usize,
 }
 
 /// Count added and deleted lines between two blob ids using a simple line count heuristic.
-fn count_diff_lines(
+///
+/// Public so other crates walking commits themselves (e.g. `normalize-facts`'s
+/// co-change index build) can reuse this heuristic without re-walking history
+/// just to get line-churn numbers.
+pub fn count_diff_lines(
     repo: &gix::Repository,
     old_id: Option<gix::hash::ObjectId>,
     new_id: Option<gix::hash::ObjectId>,

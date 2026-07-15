@@ -43,6 +43,8 @@ streaming-iterator = "0.1"
 
 # Git history (for co-change edge index)
 gix = { workspace = true }
+normalize-git = { workspace = true }
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 
 # Database
 libsql.workspace = true

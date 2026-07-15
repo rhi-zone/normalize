@@ -5477,6 +5477,7 @@ version = "0.3.2"
 dependencies = [
  "bincode",
  "blake3",
+ "chrono",
  "dirs 5.0.1",
  "gix",
  "ignore",
@@ -5486,6 +5487,7 @@ dependencies = [
  "normalize-config-paths",
  "normalize-facts-core",
  "normalize-filter",
+ "normalize-git",
  "normalize-languages",
  "normalize-local-deps",
  "normalize-manifest",

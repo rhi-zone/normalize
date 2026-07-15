@@ -73,6 +73,7 @@ impl SymbolParser {
             is_interface_impl: sym.is_interface_impl,
             implements: sym.implements.clone(),
             docstring: sym.docstring.clone(),
+            complexity: sym.complexity,
         });
 
         // Recurse into children with current symbol as parent

@@ -260,6 +260,10 @@ pub fn simple_symbol(
         children: Vec::new(),
         is_interface_impl: false,
         implements: Vec::new(),
+        // This helper has no Language reference to run a `.complexity.scm` query with
+        // (it's a standalone node-only builder); callers needing complexity should use
+        // the tags-based extraction path instead, which computes it per symbol.
+        complexity: None,
     }
 }
 

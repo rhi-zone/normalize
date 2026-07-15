@@ -105,6 +105,10 @@ pub struct Symbol {
     pub is_interface_impl: bool,
     /// Parent interfaces/classes this symbol extends or implements (for semantic matching)
     pub implements: Vec<String>,
+    /// Cyclomatic complexity, computed for function/method symbols via a `.complexity.scm`
+    /// query. `None` for symbol kinds where complexity doesn't apply (classes, modules, etc.)
+    /// or when the language has no complexity query and the base value could not be computed.
+    pub complexity: Option<usize>,
 }
 
 /// A flattened symbol for indexing (parent reference instead of nested children)
@@ -131,4 +135,6 @@ pub struct FlatSymbol {
     /// Documentation comment or docstring attached to this symbol, with markers already
     /// stripped by the Language trait's `extract_docstring` implementation.
     pub docstring: Option<String>,
+    /// Cyclomatic complexity, computed for function/method symbols. See [`Symbol::complexity`].
+    pub complexity: Option<usize>,
 }

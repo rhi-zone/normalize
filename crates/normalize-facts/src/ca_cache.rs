@@ -340,7 +340,8 @@ static SYMBOL_CACHE: OnceLock<Option<CaCache>> = OnceLock::new();
 
 /// Current symbol cache version strings. Bump these when the `Symbol` struct or
 /// post-processing logic changes in ways that invalidate cached results.
-pub(crate) const SYMBOL_CACHE_VERSIONS: &[&str] = &["symbols-v1-all", "symbols-v1-public"];
+/// v2 (2026-07-15): `Symbol` gained a `complexity` field.
+pub(crate) const SYMBOL_CACHE_VERSIONS: &[&str] = &["symbols-v2-all", "symbols-v2-public"];
 
 /// Get the global symbol cache singleton.
 ///
