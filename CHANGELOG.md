@@ -6,6 +6,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Unified alias system with `@` sigil command aliases.** Aliases now support four syntax
+  types (`command`, `glob`, `sql`, `path`) via `@property`-style declarations in
+  `[aliases]` config sections. Command aliases expand `normalize @vocabulary` into full
+  commands (e.g. `structure query "SELECT ..."`). Built-in command aliases: `@vocabulary`,
+  `@stable-core`, `@unstable-core`. The `syntax` field is optional with heuristic inference
+  (warns when omitted). Bare string values (`name = "pattern"`) and legacy array format
+  (`name = ["glob"]`) both supported for backward compatibility.
+- **Top-level `normalize aliases` command** lists all registered aliases (built-in and
+  configured) with syntax, value, description, and status. Supports `--syntax` filter
+  and `--root` override.
+- **Ancestor-directory-walking config resolution for aliases.** The `[aliases]` section
+  is loaded hierarchically: inner `.normalize/config.toml` overrides outer, up to git root,
+  with global config as the outermost layer.
+- **Command alias validation against the real CLI tree.** At config load time, command-syntax
+  aliases are validated against the full clap `Command` tree — unknown subcommands and
+  invalid flags are caught early with warnings.
+
 ### Added (internal)
 
 - **OpenCode session source via libsql (Phase 2c).** `normalize-chat-sessions` now ships

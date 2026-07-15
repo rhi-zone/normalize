@@ -14,6 +14,7 @@
 | `structure` | Manage structural index (symbols, imports, calls) |
 | `kg` | Knowledge graph — three primitives: read (selector → units), write (jq transform → mutate/delete), walk (graph traversal) |
 | `init` | Initialize normalize in a directory |
+| `aliases` | List all registered aliases (built-in and configured) with syntax, value, description, and status |
 
 ### Analysis
 | Command | Description |
@@ -110,7 +111,12 @@ enabled = true
 # See docs/cli/structure.md
 
 [aliases]
-tests = ["*_test.go", "**/__tests__/**"]
+tests = ["*_test.go", "**/__tests__/**"]   # override built-in @tests (glob)
+
+[aliases.hotspots]
+syntax = "command"
+value = "rank complexity --limit 20"
+description = "Top 20 most complex functions"
 
 [serve]
 http_port = 8080

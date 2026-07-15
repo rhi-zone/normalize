@@ -117,6 +117,75 @@ impl ConfigSlices {
     }
 }
 
+/// Collect `.normalize/config.toml` paths from global config through ancestor
+/// directories down to `start`, in precedence order (outermost first, so
+/// last-wins means innermost wins).
+///
+/// Walks from `start` upward, stopping at the nearest `.git` directory (the
+/// project root). The global config is included at the outermost level.
+pub fn ancestor_config_paths(start: &Path) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+
+    // Global config first (outermost)
+    let global = std::env::var("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .ok()
+        .or_else(|| dirs::home_dir().map(|h| h.join(".config")))
+        .map(|c| c.join("normalize").join("config.toml"));
+    if let Some(ref global_path) = global
+        && global_path.exists()
+    {
+        paths.push(global_path.clone());
+    }
+
+    // Walk from start upward, collecting ancestor configs
+    let start_canonical = start.canonicalize().unwrap_or_else(|_| start.to_path_buf());
+    let mut ancestors = Vec::new();
+    let mut dir = start_canonical.as_path();
+    loop {
+        let config = dir.join(".normalize").join("config.toml");
+        if config.exists() && global.as_ref().is_none_or(|g| config != *g) {
+            ancestors.push(config);
+        }
+        // Stop at git root
+        if dir.join(".git").exists() {
+            break;
+        }
+        match dir.parent() {
+            Some(parent) if parent != dir => dir = parent,
+            _ => break,
+        }
+    }
+    // Reverse so outermost ancestor is first (last-wins means innermost wins)
+    ancestors.reverse();
+    paths.extend(ancestors);
+
+    paths
+}
+
+/// Load a single config section with ancestor-directory walking.
+///
+/// Walks from `start` up to the git root (or filesystem root), collecting all
+/// `.normalize/config.toml` files plus the global config. For each file that
+/// declares the requested `section`, the innermost (closest to `start`) wins
+/// (whole-section replacement, not field-level merge).
+///
+/// Returns `T::default()` when no file declares the section.
+pub fn load_section_hierarchical<T: DeserializeOwned + Default>(start: &Path, section: &str) -> T {
+    let paths = ancestor_config_paths(start);
+    let mut value = T::default();
+    for path in paths {
+        if let Ok(content) = std::fs::read_to_string(&path)
+            && let Ok(table) = content.parse::<toml::Table>()
+            && let Some(sub) = table.get(section)
+            && let Ok(parsed) = sub.clone().try_into::<T>()
+        {
+            value = parsed;
+        }
+    }
+    value
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

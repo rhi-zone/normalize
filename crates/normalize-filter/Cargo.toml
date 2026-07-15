@@ -29,8 +29,10 @@ cli = [
 ignore = "0.4"
 normalize-language-meta = { path = "../normalize-language-meta", version = "0.3.2" }
 normalize-output = { path = "../normalize-output", version = "0.3.2" }
+shell-words = "1"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
+tracing = "0.1"
 
 # Optional config integration deps
 normalize-core = { path = "../normalize-core", version = "0.3.2", optional = true }
@@ -41,3 +43,6 @@ tokio = { workspace = true, optional = true }
 # CLI-only: config-slice loading + project language detection for @-alias resolution
 normalize-config-paths = { path = "../normalize-config-paths", version = "0.3.2", optional = true }
 normalize-languages = { path = "../normalize-languages", version = "0.3.2", optional = true }
+
+[dev-dependencies]
+toml = "0.8"

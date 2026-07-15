@@ -17,6 +17,19 @@ Three live threads from the 2026-06-29/07-01 session — verify state before act
 
 ---
 
+## Unified Alias System (2026-07-15)
+
+- [x] `@` sigil command alias expansion in `main.rs` (argv[1] starting with `@` triggers lookup + shell tokenization + splice)
+- [x] Four syntax types: `command`, `glob`, `sql`, `path` — declared via `syntax` field or inferred heuristically
+- [x] Backward-compatible deserialization: legacy `name = ["glob"]` arrays, bare strings `name = "pattern"`, and full `{ syntax, value, description }` tables
+- [x] Ancestor-directory-walking config resolution for `[aliases]` (inner `.normalize/config.toml` overrides outer, up to git root, global outermost)
+- [x] Top-level `normalize aliases` command (reverses B12 decision)
+- [x] Built-in command aliases: `@vocabulary`, `@stable-core`, `@unstable-core`
+- [x] Definition-time validation: glob patterns via `GitignoreBuilder`, command values via `shell_words::split`, command aliases validated against full clap Command tree
+- [x] DX: debug-level logging of alias expansion, error messages attribute failures to alias name
+- [ ] **Shell completion for `@` aliases** — normalize has no existing shell completion infrastructure for the main CLI (rg/ast-grep have their own). Needs: completion script generation that includes dynamic alias names.
+- [ ] **Config file provenance in `normalize aliases` output** — currently shows status (builtin/custom/overridden/disabled) but not the specific config file path that defines each alias. Requires `load_section_hierarchical` to track per-key provenance.
+
 ## CLI Taxonomy Migration
 
 B0 (guide-regression test, CLAUDE.md crate count), B1 (`normalize-git` extraction), B2 (`graph` verb), and B3 (`architecture` verb) have landed. The graph-crate blocker on B2/B3 is **resolved** (2026-07-02, refactor-in-place — see below); B4–B12 can now proceed. The `#[cli(alias)]` server-less prereq is a separate server-less task; it does not block batches that don't move verbs yet.

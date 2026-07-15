@@ -278,7 +278,12 @@ depth = 1
 line_numbers = false
 
 [aliases]
-tests = ["**/test_*.py", "**/*_test.go"]
+tests = ["**/test_*.py", "**/*_test.go"]   # override built-in @tests
+
+[aliases.hotspots]
+syntax = "command"
+value = "rank complexity --limit 20"
+description = "Top 20 most complex functions"
 
 [walk]
 ignore_files = [".gitignore"]       # gitignore-format files to respect (default)

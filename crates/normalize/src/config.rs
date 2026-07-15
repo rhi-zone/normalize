@@ -212,7 +212,7 @@ impl NormalizeConfig {
             sources.push(server_less::ConfigSource::File(global_path));
         }
         sources.push(server_less::ConfigSource::File(project_config.clone()));
-        <Self as server_less::ConfigLoad>::load(&sources).unwrap_or_else(|e| {
+        let mut config = <Self as server_less::ConfigLoad>::load(&sources).unwrap_or_else(|e| {
             // Warn on parse errors so the user knows their config is being ignored.
             // Missing files are silently skipped by ConfigLoad; only real errors surface here.
             eprintln!(
@@ -221,7 +221,17 @@ impl NormalizeConfig {
                 e
             );
             Self::default()
-        })
+        });
+
+        // Override aliases with ancestor-directory-walking resolution.
+        // The two-tier server-less load only sees global + project root;
+        // ancestor walking lets subdirectories define their own aliases.
+        config.aliases = normalize_config_paths::load_section_hierarchical(root, "aliases");
+        normalize_filter::validate_aliases(&config.aliases);
+        #[cfg(feature = "cli")]
+        validate_command_aliases(&config.aliases);
+
+        config
     }
 
     /// Get the global config path.
@@ -231,6 +241,76 @@ impl NormalizeConfig {
             .ok()
             .or_else(|| dirs::home_dir().map(|h| h.join(".config")))?;
         Some(config_home.join("normalize").join("config.toml"))
+    }
+}
+
+/// Validate command-syntax aliases against the real CLI command tree.
+///
+/// Uses server-less's `CliSubcommand::cli_command()` to build the full clap
+/// `Command` and tries matching the tokenized alias value against it. This
+/// catches unknown subcommands and invalid flags at config-load time.
+#[cfg(feature = "cli")]
+fn validate_command_aliases(config: &AliasConfig) {
+    use crate::filter::AliasSyntax;
+
+    for (name, entry) in &config.entries {
+        if entry.resolved_syntax() != AliasSyntax::Command {
+            continue;
+        }
+
+        let cmd_str = match &entry.value {
+            crate::filter::AliasValue::Single(s) => s.clone(),
+            crate::filter::AliasValue::Multiple(v) => v.join(" "),
+        };
+
+        if cmd_str.is_empty() {
+            continue; // Already warned by validate_aliases
+        }
+
+        let tokens = match shell_words::split(&cmd_str) {
+            Ok(t) => t,
+            Err(_) => continue, // Already warned by validate_aliases
+        };
+
+        if tokens.is_empty() {
+            continue;
+        }
+
+        // Build the clap Command tree and try matching.
+        let cmd = <crate::service::NormalizeService as server_less::CliSubcommand>::cli_command()
+            .no_binary_name(true)
+            .disable_help_flag(true)
+            .disable_version_flag(true);
+
+        // Use try_get_matches_from to validate without side effects.
+        // We allow trailing args (the user may append more at invocation time),
+        // so we use try_get_matches_from and accept TrailingArg-like failures.
+        match cmd.try_get_matches_from(tokens.iter()) {
+            Ok(_) => {} // Valid
+            Err(e) => {
+                // InvalidSubcommand and UnknownArgument are real problems.
+                // Other errors (like missing required args) are expected since
+                // the alias may be a partial command that gets more args appended.
+                use clap::error::ErrorKind;
+                match e.kind() {
+                    ErrorKind::InvalidSubcommand | ErrorKind::UnknownArgument => {
+                        tracing::warn!(
+                            "alias @{}: command validation failed: {}",
+                            name,
+                            e.to_string().lines().next().unwrap_or("unknown error")
+                        );
+                    }
+                    _ => {
+                        // Missing required args, etc. — expected for partial commands.
+                        tracing::debug!(
+                            "alias @{}: partial command validation note: {}",
+                            name,
+                            e.to_string().lines().next().unwrap_or("")
+                        );
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -318,16 +398,27 @@ config = []
         .unwrap();
 
         let config = NormalizeConfig::load(dir.path());
+
+        // Legacy format: arrays are deserialized as glob aliases
+        let tests = config.aliases.entries.get("tests").expect("tests alias");
+        assert_eq!(tests.syntax, Some(crate::filter::AliasSyntax::Glob));
         assert_eq!(
-            config.aliases.entries.get("tests"),
-            Some(&vec!["my_tests/**".to_string()])
+            tests.value,
+            crate::filter::AliasValue::Multiple(vec!["my_tests/**".to_string()])
         );
+
+        let vendor = config.aliases.entries.get("vendor").expect("vendor alias");
         assert_eq!(
-            config.aliases.entries.get("vendor"),
-            Some(&vec!["vendor/**".to_string(), "third_party/**".to_string()])
+            vendor.value,
+            crate::filter::AliasValue::Multiple(vec![
+                "vendor/**".to_string(),
+                "third_party/**".to_string()
+            ])
         );
+
         // Empty array disables alias
-        assert_eq!(config.aliases.entries.get("config"), Some(&vec![]));
+        let cfg = config.aliases.entries.get("config").expect("config alias");
+        assert!(cfg.value.is_empty());
     }
 
     #[test]

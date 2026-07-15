@@ -266,6 +266,55 @@ impl OutputFormatter for TranslateReport {
     }
 }
 
+/// Report for `normalize aliases`: all registered aliases.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct AliasListReport {
+    pub aliases: Vec<AliasListEntry>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub detected_languages: Vec<String>,
+}
+
+/// A single alias in the listing report.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub struct AliasListEntry {
+    pub name: String,
+    pub syntax: String,
+    pub status: String,
+    pub value: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+impl OutputFormatter for AliasListReport {
+    fn format_text(&self) -> String {
+        use std::fmt::Write as _;
+        let mut out = String::new();
+        for alias in &self.aliases {
+            let _ = write!(out, "@{} [{}, {}]", alias.name, alias.status, alias.syntax);
+            if !alias.value.is_empty() {
+                if alias.value.len() == 1 {
+                    let _ = write!(out, ": {}", alias.value[0]);
+                } else {
+                    let _ = write!(out, ": {}", alias.value.join(", "));
+                }
+            }
+            out.push('\n');
+            if let Some(desc) = &alias.description {
+                let _ = writeln!(out, "  {}", desc);
+            }
+        }
+        if !self.detected_languages.is_empty() {
+            out.push('\n');
+            let _ = writeln!(
+                out,
+                "Detected languages: {}",
+                self.detected_languages.join(", ")
+            );
+        }
+        out
+    }
+}
+
 #[cli(
     name = "normalize",
     description = "Structural code intelligence: index symbols and calls, enforce rules, track complexity.",
@@ -782,6 +831,58 @@ impl NormalizeService {
     #[server(group = "utilities")]
     pub fn filter(&self) -> &normalize_filter::service::FilterCliService {
         &self.filter
+    }
+
+    /// List all registered aliases (built-in and configured).
+    ///
+    /// Shows each alias with its syntax, value, description, and status.
+    /// Use `normalize @name` to run a command alias, or `--exclude @name` /
+    /// `--only @name` to use a filter alias.
+    ///
+    /// Examples:
+    ///   normalize aliases                        # list all aliases
+    ///   normalize aliases --syntax command        # list only command aliases
+    #[server(group = "core")]
+    #[cli(display_with = "display_output")]
+    pub fn aliases(
+        &self,
+        #[param(short = 'r', help = "Root directory (defaults to current directory)")] root: Option<
+            String,
+        >,
+        #[param(short = 's', help = "Filter by syntax type (command, glob, sql, path)")]
+        syntax: Option<String>,
+    ) -> Result<AliasListReport, String> {
+        let root_path = root
+            .map(PathBuf::from)
+            .map(Ok)
+            .unwrap_or_else(std::env::current_dir)
+            .map_err(|e| format!("Failed to get current directory: {e}"))?;
+
+        self.resolve_format(&root_path);
+
+        let config = NormalizeConfig::load(&root_path);
+        let languages = commands::aliases::detect_project_languages(&root_path);
+        let lang_refs: Vec<&str> = languages.iter().map(String::as_str).collect();
+        let resolved = crate::filter::list_aliases(&config.aliases, &lang_refs);
+
+        let syntax_filter = syntax.as_deref();
+
+        let aliases = resolved
+            .into_iter()
+            .filter(|a| syntax_filter.is_none_or(|f| a.syntax.to_string() == f))
+            .map(|a| AliasListEntry {
+                name: a.name,
+                syntax: a.syntax.to_string(),
+                status: a.status.to_string(),
+                value: a.value.as_strings(),
+                description: a.description,
+            })
+            .collect();
+
+        Ok(AliasListReport {
+            aliases,
+            detected_languages: languages,
+        })
     }
 
     /// Inspect parsed syntax trees and test queries. Use to debug grammars or develop tree-sitter patterns.

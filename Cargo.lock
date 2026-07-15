@@ -5198,6 +5198,7 @@ dependencies = [
  "normalize-cfg",
  "normalize-chat-sessions",
  "normalize-code-similarity",
+ "normalize-config-paths",
  "normalize-context",
  "normalize-core",
  "normalize-deps",
@@ -5246,6 +5247,7 @@ dependencies = [
  "serde_yaml",
  "server-less",
  "sha2",
+ "shell-words",
  "similar",
  "smallvec",
  "streaming-iterator",
@@ -5554,8 +5556,11 @@ dependencies = [
  "serde",
  "serde_json",
  "server-less",
+ "shell-words",
  "thiserror 2.0.18",
  "tokio",
+ "toml",
+ "tracing",
 ]
 
 [[package]]

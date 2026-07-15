@@ -42,20 +42,25 @@ impl OutputFormatter for MatchReport {
 
 /// A single alias entry for display.
 #[derive(Serialize, JsonSchema)]
-pub struct AliasEntry {
+pub struct AliasReportEntry {
     /// The alias name (without `@` prefix).
     pub name: String,
+    /// The syntax type (command, glob, sql, path).
+    pub syntax: String,
     /// Whether the alias is enabled or disabled.
     pub status: String,
-    /// The glob patterns this alias resolves to.
-    pub patterns: Vec<String>,
+    /// The alias value (patterns for glob, command string for command, etc.).
+    pub value: Vec<String>,
+    /// Human-readable description.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 /// List of resolved aliases.
 #[derive(Serialize, JsonSchema)]
 pub struct AliasesReport {
-    /// All known filter aliases with their resolved patterns.
-    pub aliases: Vec<AliasEntry>,
+    /// All known aliases with their definitions.
+    pub aliases: Vec<AliasReportEntry>,
     /// Languages detected in the project (used to resolve `@tests` and friends).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub detected_languages: Vec<String>,
@@ -65,15 +70,20 @@ impl OutputFormatter for AliasesReport {
     fn format_text(&self) -> String {
         let mut out = String::new();
         for alias in &self.aliases {
-            if alias.patterns.is_empty() {
-                out.push_str(&format!("@{} [{}]\n", alias.name, alias.status));
-            } else {
-                out.push_str(&format!(
-                    "@{} [{}]: {}\n",
-                    alias.name,
-                    alias.status,
-                    alias.patterns.join(", ")
-                ));
+            out.push_str(&format!(
+                "@{} [{}, {}]",
+                alias.name, alias.status, alias.syntax
+            ));
+            if !alias.value.is_empty() {
+                if alias.value.len() == 1 {
+                    out.push_str(&format!(": {}", alias.value[0]));
+                } else {
+                    out.push_str(&format!(": {}", alias.value.join(", ")));
+                }
+            }
+            out.push('\n');
+            if let Some(desc) = &alias.description {
+                out.push_str(&format!("  {}\n", desc));
             }
         }
         if !self.detected_languages.is_empty() {
@@ -99,13 +109,14 @@ fn resolve_root(root: Option<String>) -> Result<PathBuf, String> {
         .map_err(|e| format!("failed to determine root directory: {e}"))
 }
 
-/// Load the `[aliases]` slice from the global then project `config.toml` via the
-/// shared [`normalize_config_paths::ConfigSlices`] loader.
+/// Load the `[aliases]` section with ancestor-directory walking.
 ///
-/// Returns an empty (default) config if no file declares `[aliases]` (or it is
-/// unparseable) — the built-in aliases still apply.
+/// Walks from `root` up to the git root (or filesystem root), collecting all
+/// `.normalize/config.toml` files plus the global config. Inner (closer to
+/// `root`) overrides outer. Returns an empty (default) config if no file
+/// declares `[aliases]` — the built-in aliases still apply.
 fn load_alias_config(root: &Path) -> AliasConfig {
-    normalize_config_paths::ConfigSlices::load(root).slice("aliases")
+    normalize_config_paths::load_section_hierarchical(root, "aliases")
 }
 
 /// Detect programming languages present under `root` (bounded depth walk).
@@ -212,10 +223,12 @@ impl FilterCliService {
         let resolved = list_aliases(&config, &lang_refs);
         let aliases = resolved
             .into_iter()
-            .map(|a| AliasEntry {
+            .map(|a| AliasReportEntry {
                 name: a.name,
+                syntax: a.syntax.to_string(),
                 status: a.status.to_string(),
-                patterns: a.patterns,
+                value: a.value.as_strings(),
+                description: a.description,
             })
             .collect();
         Ok(AliasesReport {

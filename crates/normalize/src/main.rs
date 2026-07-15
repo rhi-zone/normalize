@@ -70,6 +70,130 @@ fn rewrite_aliases(mut argv: Vec<std::ffi::OsString>) -> Vec<std::ffi::OsString>
     argv
 }
 
+/// Expand `@`-sigil command aliases in argv.
+///
+/// If `argv[1]` starts with `@`, look up the alias name in the unified alias
+/// system. If it resolves to a command-syntax alias, shell-tokenize its value
+/// and splice the result into argv replacing the `@name`, appending any
+/// remaining user args. Non-command aliases (glob, path, sql) are left
+/// untouched for downstream handling.
+///
+/// On expansion, logs the alias name and expanded command at debug level.
+/// On failure, prints a diagnostic mentioning the alias name and continues
+/// with the original argv so the user sees a normal "unknown command" error.
+fn expand_command_alias(mut argv: Vec<std::ffi::OsString>) -> Vec<std::ffi::OsString> {
+    let subcmd = match argv.get(1).and_then(|s| s.to_str()) {
+        Some(s) if s.starts_with('@') => s,
+        _ => return argv,
+    };
+
+    let alias_name = &subcmd[1..]; // Strip @
+    if alias_name.is_empty() {
+        return argv;
+    }
+
+    let root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let alias_config: normalize::filter::AliasConfig =
+        normalize_config_paths::load_section_hierarchical(&root, "aliases");
+
+    let cmd_str = match alias_config.get_command(alias_name) {
+        Some(cmd) => cmd,
+        None => {
+            // Check if it exists as a non-command alias
+            if alias_config.syntax_of(alias_name).is_some() {
+                eprintln!(
+                    "error: @{} is not a command alias (syntax: {})",
+                    alias_name,
+                    alias_config
+                        .syntax_of(alias_name)
+                        .map(|s| s.to_string())
+                        .unwrap_or_default()
+                );
+            } else {
+                eprintln!("error: unknown alias @{}", alias_name);
+            }
+            return argv;
+        }
+    };
+
+    let tokens = match shell_words::split(&cmd_str) {
+        Ok(tokens) => tokens,
+        Err(e) => {
+            eprintln!(
+                "error: alias @{}: invalid shell syntax in command value: {}",
+                alias_name, e
+            );
+            return argv;
+        }
+    };
+
+    if tokens.is_empty() {
+        eprintln!("error: alias @{}: command value is empty", alias_name);
+        return argv;
+    }
+
+    // Validate first token is a known subcommand (best-effort)
+    let first_token = &tokens[0];
+    if !is_known_subcommand(first_token) {
+        tracing::warn!(
+            "alias @{}: first token '{}' is not a recognized subcommand",
+            alias_name,
+            first_token
+        );
+    }
+
+    tracing::debug!("alias @{} expanded to: {}", alias_name, cmd_str);
+
+    // Build new argv: argv[0] + expanded tokens + remaining user args (argv[2..])
+    let mut new_argv = vec![argv[0].clone()];
+    new_argv.extend(tokens.into_iter().map(std::ffi::OsString::from));
+    new_argv.extend(argv.drain(2..));
+    new_argv
+}
+
+/// Best-effort check if a string is a known top-level normalize subcommand.
+fn is_known_subcommand(name: &str) -> bool {
+    matches!(
+        name,
+        "view"
+            | "grep"
+            | "context"
+            | "init"
+            | "update"
+            | "translate"
+            | "daemon"
+            | "grammars"
+            | "guide"
+            | "generate"
+            | "structure"
+            | "filter"
+            | "syntax"
+            | "package"
+            | "docs"
+            | "sessions"
+            | "sync"
+            | "tools"
+            | "edit"
+            | "analyze"
+            | "overview"
+            | "rank"
+            | "trend"
+            | "budget"
+            | "search"
+            | "cfg"
+            | "kg"
+            | "ratchet"
+            | "rules"
+            | "serve"
+            | "similarity"
+            | "graph"
+            | "history"
+            | "ci"
+            | "config"
+            | "aliases"
+    )
+}
+
 /// Reset SIGPIPE to default behavior so piping to `head` etc. doesn't panic.
 #[cfg(unix)]
 fn reset_sigpipe() {
@@ -200,6 +324,10 @@ async fn main() -> std::process::ExitCode {
     if !should_skip_grammar_check(&argv) {
         let _ = normalize::commands::grammars::ensure_grammars_first_use();
     }
+
+    // Expand @-sigil command aliases before any other dispatch.
+    // e.g. `normalize @vocabulary --json` → `normalize structure query "SELECT ..." --json`
+    let argv = expand_command_alias(argv);
 
     // Rewrite command aliases so users from other tools find what they expect.
     // Simple aliases map one name to another; compound aliases expand to two subcommands.

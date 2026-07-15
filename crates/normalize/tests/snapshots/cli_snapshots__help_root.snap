@@ -22,6 +22,7 @@ Options:
 Core:
   grep          Find code by text pattern. Use when you know what the code looks like but not where it is.
   init          Set up normalize in a new project. Run once after cloning to create .normalize/ config.
+  aliases       List all registered aliases (built-in and configured).
   view          Browse code structure and symbol relationships. Use to read files, explore types, or trace dependencies.
   structure     Build and query the code index. Run `structure rebuild` after cloning or when cross-file commands return stale results.
   edit          Edit code by symbol name. Use for batch renames, signature changes, or pattern-based rewrites.

@@ -21,6 +21,7 @@ The essential daily-driver commands:
 - `rules` - Manage and run analysis rules (syntax + fact)
 - `structure` - Build and query the structural index (rebuild, stats, files, packages, query, test-fixtures) plus CFG dataflow (liveness, effects, exceptions); owned by `normalize-facts`
 - `init` - Initialize normalize in a directory
+- `aliases` - List all registered aliases (built-in and configured). Reinstated (reverses B12 removal). Supports `--syntax` filter and `--root` override.
 
 ### Analysis
 Assessment, metrics, and quality gates:
@@ -38,7 +39,7 @@ Assessment, metrics, and quality gates:
 
 ### Utilities
 Specialized tools and integrations:
-- `filter` - Filter files by glob patterns and inspect --exclude/--only aliases (`filter aliases`, `filter matches`; owned by `normalize-filter`, B6). Old top-level `aliases` removed in B12 (no back-compat).
+- `filter` - Filter files by glob patterns and inspect --exclude/--only aliases (`filter aliases`, `filter matches`; owned by `normalize-filter`, B6). Top-level `aliases` reinstated (reverses B12 removal) for the unified alias system.
 - `context` - Show directory context (.context.md files)
 - `translate` - Translate code between languages
 - `guide` - Workflow guides with examples
@@ -240,7 +241,67 @@ use. Bodies are stored source-native (`doc_body` + `doc_format`); rendering to
 display Markdown happens at the output layer, so `--json` consumers get the raw
 text and pick their own rendering.
 
-## Command Aliases
+## @ Aliases (Unified Alias System)
+
+The `@` sigil provides a unified alias system for both commands and filters.
+Aliases are defined in `[aliases]` sections of `.normalize/config.toml` and support
+four syntax types:
+
+| Syntax | Use | Example |
+|--------|-----|---------|
+| `command` | Expands to a normalize subcommand | `normalize @vocabulary` → `normalize structure query "SELECT ..."` |
+| `glob` | Gitignore-style file patterns for `--only`/`--exclude` | `--only @tests` |
+| `sql` | SQL queries (for structure query) | Reserved for future use |
+| `path` | Literal file paths | `--only @config` |
+
+### Config format
+
+```toml
+[aliases.vocabulary]
+syntax = "command"
+value = 'structure query "SELECT word, COUNT(*) as count FROM symbol_words GROUP BY word ORDER BY count DESC"'
+description = "Most common words in symbol names"
+
+[aliases.my-tests]
+syntax = "glob"
+value = ["my_tests/**", "tests/**"]
+```
+
+The `syntax` field is optional but recommended. When omitted, it is inferred from the value with a warning. Bare strings and legacy arrays are also supported for backward compatibility:
+
+```toml
+[aliases]
+tests = ["**/*test*"]           # legacy array format (inferred: glob)
+my-cmd = "rank complexity src/" # bare string (inferred: command)
+```
+
+### Built-in aliases
+
+| Name | Syntax | Description |
+|------|--------|-------------|
+| `@tests` | glob | Test files (language-aware) |
+| `@config` | glob | Configuration files |
+| `@docs` | glob | Documentation files |
+| `@build` | glob | Build artifacts |
+| `@generated` | glob | Generated code |
+| `@vocabulary` | command | Most common words in symbol names |
+| `@stable-core` | command | High fan-in, low churn files |
+| `@unstable-core` | command | High fan-in, high churn files |
+
+Built-ins can be overridden or disabled (`name = []`) in config.
+
+### Hierarchical config resolution
+
+The `[aliases]` section uses ancestor-directory-walking resolution: inner `.normalize/config.toml` files override outer ones, walking from the current directory up to the git root, with global config (`~/.config/normalize/config.toml`) as the outermost layer.
+
+### Validation
+
+At config load time, aliases are validated:
+- **Glob** aliases: each pattern is checked via `GitignoreBuilder`
+- **Command** aliases: shell-tokenized via `shell-words`, then validated against the full CLI command tree (unknown subcommands/flags produce warnings)
+- Missing `syntax` field produces a warning with the inferred type
+
+## Hardcoded Command Aliases
 
 Users from other tools often try familiar names. These aliases are rewritten transparently in `main.rs` before server-less dispatch:
 
