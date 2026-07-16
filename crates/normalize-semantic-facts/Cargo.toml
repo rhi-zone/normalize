@@ -1,0 +1,18 @@
+[package]
+name = "normalize-semantic-facts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Prototype: language-agnostic semantic fact IR and cross-language restatement detection"
+publish = false
+
+[dependencies]
+tree-sitter = "0.26"
+serde = { workspace = true, features = ["derive"] }
+normalize-languages = { path = "../normalize-languages", version = "0.3.2" }
+walkdir = "2"
+
+[[bin]]
+name = "facts-run"
+path = "src/bin/run.rs"

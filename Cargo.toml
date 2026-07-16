@@ -52,6 +52,7 @@ members = [
     "crates/normalize-context",
     "crates/normalize-knowledge-graph",
     "crates/normalize-semantic",
+    "crates/normalize-semantic-facts",
     "crates/normalize-module-resolve",
     "crates/normalize-cfg",
     "xtask",

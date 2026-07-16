@@ -6012,6 +6012,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "normalize-semantic-facts"
+version = "0.3.2"
+dependencies = [
+ "normalize-languages",
+ "serde",
+ "tree-sitter",
+ "walkdir",
+]
+
+[[package]]
 name = "normalize-session-analysis"
 version = "0.3.2"
 dependencies = [
