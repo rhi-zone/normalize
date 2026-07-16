@@ -34,15 +34,95 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Normalizes a name to "space case" for identity purposes: split on case
-/// boundaries (`camelCase`/`PascalCase`) and on underscores/hyphens
+/// Configuration for entity-name canonicalization. Currently just a list of
+/// suffixes to strip before space-casing — this is what lets a validator
+/// schema variable named `NpsSurveyRowSchema` converge with a TypeScript
+/// `interface NpsSurveyRow` under [`canonical_name`]: strip the `Schema`
+/// suffix first, and the two names produce the same canonical spelling.
+///
+/// Stripping is repeated to a fixpoint, not just applied once — this
+/// matters for layered names like `CreateDiscountInputSchema`, generated
+/// from an authored `CreateDiscountInput` interface. Single-pass stripping
+/// would remove only `Schema` (the first list match) from the generated
+/// name, landing on `CreateDiscountInput`, while the interface's own name
+/// strips `Input` down to `CreateDiscount` — two different canonical forms
+/// for what's meant to be the same entity. Repeating the strip until no
+/// suffix matches lands both on `CreateDiscount`. Confirmed against a real
+/// codebase (`busiless`), not a hypothetical — see the task that added this
+/// note.
+///
+/// Threaded through [`crate::FactExtractor::extract`] /
+/// [`crate::extract_from_source`] rather than being a global — see
+/// CLAUDE.md's "configuration flows in via constructors" rule. Construct
+/// with [`NameConfig::default`] for the standard suffix list, or build a
+/// custom one directly (all fields are `pub`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NameConfig {
+    /// Suffixes stripped from a name (exact case match, checked in list
+    /// order, first match wins per pass, repeated to a fixpoint) before
+    /// space-casing. A strip is only applied when the remainder would be
+    /// non-empty, which also guarantees the loop terminates.
+    pub strip_suffixes: Vec<String>,
+}
+
+impl Default for NameConfig {
+    fn default() -> Self {
+        NameConfig {
+            strip_suffixes: [
+                "Schema",
+                "Validator",
+                "Type",
+                "Input",
+                "Output",
+                "Dto",
+                "Model",
+                "Props",
+                "Params",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+        }
+    }
+}
+
+/// Repeatedly strips the first configured suffix (in list order) that
+/// `name` ends with, provided doing so leaves a non-empty remainder, until
+/// no suffix matches. Returns `name` unchanged if no suffix ever matches.
+/// Termination: each strip strictly shortens a non-empty string, so the
+/// loop runs at most `name.len()` times.
+fn strip_configured_suffix<'a>(name: &'a str, config: &NameConfig) -> &'a str {
+    let mut current = name;
+    loop {
+        let Some(next) = strip_one_configured_suffix(current, config) else {
+            return current;
+        };
+        current = next;
+    }
+}
+
+fn strip_one_configured_suffix<'a>(name: &'a str, config: &NameConfig) -> Option<&'a str> {
+    for suffix in &config.strip_suffixes {
+        if let Some(stripped) = name.strip_suffix(suffix.as_str())
+            && !stripped.is_empty()
+        {
+            return Some(stripped);
+        }
+    }
+    None
+}
+
+/// Normalizes a name to "space case" for identity purposes: strip a
+/// configured suffix (see [`NameConfig`]), split on case boundaries
+/// (`camelCase`/`PascalCase`) and on underscores/hyphens
 /// (`snake_case`/`SCREAMING_SNAKE_CASE`/`kebab-case`), lowercase each word,
 /// and join with single spaces. See the module-level doc comment for why
 /// this normalization exists and what it costs.
 ///
 /// Examples: `createdAt`, `created_at`, `CreatedAt`, and `CREATED_AT` all
 /// normalize to `"created at"`.
-pub fn canonical_name(name: &str) -> String {
+pub fn canonical_name(name: &str, config: &NameConfig) -> String {
+    let name = strip_configured_suffix(name, config);
     let chars: Vec<char> = name.chars().collect();
     let mut words = Vec::new();
     let mut current = String::new();
@@ -268,23 +348,82 @@ mod tests {
 
     #[test]
     fn canonical_name_converges_camel_snake_and_pascal() {
-        assert_eq!(canonical_name("createdAt"), "created at");
-        assert_eq!(canonical_name("created_at"), "created at");
-        assert_eq!(canonical_name("CreatedAt"), "created at");
-        assert_eq!(canonical_name("CREATED_AT"), "created at");
-        assert_eq!(canonical_name("partyRef"), "party ref");
-        assert_eq!(canonical_name("party_ref"), "party ref");
-        assert_eq!(canonical_name("push_subscriptions"), "push subscriptions");
-        assert_eq!(canonical_name("PushSubscriptions"), "push subscriptions");
+        let config = NameConfig::default();
+        assert_eq!(canonical_name("createdAt", &config), "created at");
+        assert_eq!(canonical_name("created_at", &config), "created at");
+        assert_eq!(canonical_name("CreatedAt", &config), "created at");
+        assert_eq!(canonical_name("CREATED_AT", &config), "created at");
+        assert_eq!(canonical_name("partyRef", &config), "party ref");
+        assert_eq!(canonical_name("party_ref", &config), "party ref");
+        assert_eq!(
+            canonical_name("push_subscriptions", &config),
+            "push subscriptions"
+        );
+        assert_eq!(
+            canonical_name("PushSubscriptions", &config),
+            "push subscriptions"
+        );
     }
 
     #[test]
     fn canonical_name_handles_acronyms_and_digits() {
-        assert_eq!(canonical_name("HTTPServer"), "http server");
-        assert_eq!(canonical_name("field2"), "field 2");
-        assert_eq!(canonical_name("kebab-case"), "kebab case");
-        assert_eq!(canonical_name("already lower"), "already lower");
-        assert_eq!(canonical_name("simple"), "simple");
+        let config = NameConfig::default();
+        assert_eq!(canonical_name("HTTPServer", &config), "http server");
+        assert_eq!(canonical_name("field2", &config), "field 2");
+        assert_eq!(canonical_name("kebab-case", &config), "kebab case");
+        assert_eq!(canonical_name("already lower", &config), "already lower");
+        assert_eq!(canonical_name("simple", &config), "simple");
+    }
+
+    #[test]
+    fn canonical_name_strips_configured_suffix_before_space_casing() {
+        let config = NameConfig::default();
+        // Default suffix list includes "Schema" — this is what lets a
+        // validator schema variable converge with a same-shape interface.
+        assert_eq!(
+            canonical_name("NpsSurveyRowSchema", &config),
+            canonical_name("NpsSurveyRow", &config)
+        );
+        assert_eq!(
+            canonical_name("NpsSurveyRowSchema", &config),
+            "nps survey row"
+        );
+    }
+
+    #[test]
+    fn canonical_name_custom_suffix_list_changes_canonicalization() {
+        let default_config = NameConfig::default();
+        let custom_config = NameConfig {
+            strip_suffixes: vec!["Row".to_string()],
+        };
+        // "Schema" is not in the custom list, so it survives space-casing;
+        // "Row" is, so it gets stripped instead.
+        assert_eq!(
+            canonical_name("NpsSurveyRowSchema", &default_config),
+            "nps survey row"
+        );
+        assert_eq!(canonical_name("NpsSurveyRow", &custom_config), "nps survey");
+    }
+
+    /// Suffix stripping repeats to a fixpoint, not just once — this is what
+    /// lets a generated schema name like `CreateDiscountInputSchema`
+    /// (`Schema` appended onto an already-`Input`-suffixed interface name)
+    /// converge with the bare interface `CreateDiscountInput`, which itself
+    /// strips down to `CreateDiscount`. Single-pass stripping would stop
+    /// after removing `Schema`, landing on `CreateDiscountInput` — a
+    /// different canonical form than the interface's own `CreateDiscount`.
+    /// Found via a real `busiless` codegen pattern, not a hypothetical.
+    #[test]
+    fn canonical_name_strips_suffixes_repeatedly_to_a_fixpoint() {
+        let config = NameConfig::default();
+        assert_eq!(
+            canonical_name("CreateDiscountInputSchema", &config),
+            canonical_name("CreateDiscountInput", &config)
+        );
+        assert_eq!(
+            canonical_name("CreateDiscountInputSchema", &config),
+            "create discount"
+        );
     }
 
     #[test]

@@ -11,7 +11,7 @@ pub mod sql;
 pub mod typescript;
 
 pub use extract::{FactExtractor, FactOccurrence};
-pub use ir::{EntityField, EnumDef, Fact, FunctionSignature, TypeRelation, TypeShape};
+pub use ir::{EntityField, EnumDef, Fact, FunctionSignature, NameConfig, TypeRelation, TypeShape};
 pub use restatement::{
     Location, RestatementGroup, SimilarEntry, SimilarGroup, SimilarRelation, find_restatements,
     find_similar, restated_only,
@@ -22,14 +22,16 @@ pub use typescript::TypeScriptExtractor;
 /// Parses `source` with the grammar `extractor.grammar_name()` (via
 /// `normalize_languages`'s shared `GrammarLoader` singleton) and runs the
 /// extractor over the resulting tree. Returns `None` if the grammar can't be
-/// loaded or the source fails to parse.
+/// loaded or the source fails to parse. `config` controls entity-name
+/// canonicalization (see [`NameConfig`]).
 pub fn extract_from_source(
     extractor: &dyn FactExtractor,
     source: &str,
     file: &str,
+    config: &NameConfig,
 ) -> Option<Vec<FactOccurrence>> {
     let tree = normalize_languages::parsers::parse_with_grammar(extractor.grammar_name(), source)?;
-    Some(extractor.extract(&tree, source, file))
+    Some(extractor.extract(&tree, source, file, config))
 }
 
 #[cfg(test)]
@@ -61,13 +63,23 @@ CREATE TABLE lesson (
 "#;
 
     fn ts_facts() -> Vec<FactOccurrence> {
-        extract_from_source(&TypeScriptExtractor, TS_SOURCE, "src/types.ts")
-            .expect("typescript grammar should load and parse")
+        extract_from_source(
+            &TypeScriptExtractor,
+            TS_SOURCE,
+            "src/types.ts",
+            &NameConfig::default(),
+        )
+        .expect("typescript grammar should load and parse")
     }
 
     fn sql_facts() -> Vec<FactOccurrence> {
-        extract_from_source(&SqlExtractor, SQL_SOURCE, "migrations/001.sql")
-            .expect("sql grammar should load and parse")
+        extract_from_source(
+            &SqlExtractor,
+            SQL_SOURCE,
+            "migrations/001.sql",
+            &NameConfig::default(),
+        )
+        .expect("sql grammar should load and parse")
     }
 
     #[test]

@@ -19,7 +19,7 @@
 use tree_sitter::{Node, Tree};
 
 use crate::extract::{FactExtractor, FactOccurrence};
-use crate::ir::{EntityField, Fact, TypeShape, canonical_name};
+use crate::ir::{EntityField, Fact, NameConfig, TypeShape, canonical_name};
 
 /// SQL fact extractor.
 pub struct SqlExtractor;
@@ -29,10 +29,16 @@ impl FactExtractor for SqlExtractor {
         "sql"
     }
 
-    fn extract(&self, tree: &Tree, source: &str, file: &str) -> Vec<FactOccurrence> {
+    fn extract(
+        &self,
+        tree: &Tree,
+        source: &str,
+        file: &str,
+        config: &NameConfig,
+    ) -> Vec<FactOccurrence> {
         let root = tree.root_node();
         let mut out = Vec::new();
-        walk_create_tables(root, source, file, &mut out);
+        walk_create_tables(root, source, file, config, &mut out);
         out
     }
 }
@@ -41,18 +47,30 @@ fn node_text<'a>(node: Node, source: &'a str) -> &'a str {
     &source[node.byte_range()]
 }
 
-fn walk_create_tables(node: Node, source: &str, file: &str, out: &mut Vec<FactOccurrence>) {
+fn walk_create_tables(
+    node: Node,
+    source: &str,
+    file: &str,
+    config: &NameConfig,
+    out: &mut Vec<FactOccurrence>,
+) {
     if node.kind() == "create_table" {
-        extract_create_table(node, source, file, out);
+        extract_create_table(node, source, file, config, out);
         return;
     }
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        walk_create_tables(child, source, file, out);
+        walk_create_tables(child, source, file, config, out);
     }
 }
 
-fn extract_create_table(node: Node, source: &str, file: &str, out: &mut Vec<FactOccurrence>) {
+fn extract_create_table(
+    node: Node,
+    source: &str,
+    file: &str,
+    config: &NameConfig,
+    out: &mut Vec<FactOccurrence>,
+) {
     let mut cursor = node.walk();
     let Some(table_ref) = node
         .children(&mut cursor)
@@ -63,7 +81,7 @@ fn extract_create_table(node: Node, source: &str, file: &str, out: &mut Vec<Fact
     let Some(name_node) = table_ref.child_by_field_name("name") else {
         return;
     };
-    let entity = canonical_name(node_text(name_node, source));
+    let entity = canonical_name(node_text(name_node, source), config);
 
     let mut cursor = node.walk();
     let Some(columns) = node
@@ -85,7 +103,8 @@ fn extract_create_table(node: Node, source: &str, file: &str, out: &mut Vec<Fact
             continue;
         };
 
-        let mut ty = check_in_enum(column, source).unwrap_or_else(|| lower_type(type_node, source));
+        let mut ty =
+            check_in_enum(column, source).unwrap_or_else(|| lower_type(type_node, source, config));
         if !is_not_null(column) {
             ty = TypeShape::Optional(Box::new(ty));
         }
@@ -93,7 +112,7 @@ fn extract_create_table(node: Node, source: &str, file: &str, out: &mut Vec<Fact
         out.push(FactOccurrence {
             fact: Fact::EntityField(EntityField {
                 entity: entity.clone(),
-                field: canonical_name(node_text(field_name_node, source)),
+                field: canonical_name(node_text(field_name_node, source), config),
                 ty,
             }),
             file: file.to_string(),
@@ -168,12 +187,12 @@ fn strip_quotes(text: &str) -> &str {
 /// attempts to handle — only the primitives exercised by the test fixtures
 /// are mapped; anything else falls back to its lowercased source text
 /// rather than fabricating a mapping.
-fn lower_type(node: Node, source: &str) -> TypeShape {
+fn lower_type(node: Node, source: &str, config: &NameConfig) -> TypeShape {
     let name = match node.kind() {
         "keyword_text" | "keyword_varchar" | "keyword_char" => "string".to_string(),
         "int" | "keyword_integer" => "number".to_string(),
         "keyword_boolean" => "boolean".to_string(),
-        _ => canonical_name(node_text(node, source)),
+        _ => canonical_name(node_text(node, source), config),
     };
     TypeShape::Named(name)
 }

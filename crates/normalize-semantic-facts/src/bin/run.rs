@@ -8,8 +8,8 @@ use std::fs;
 use std::path::Path;
 
 use normalize_semantic_facts::{
-    FactExtractor, FactOccurrence, SqlExtractor, TypeScriptExtractor, extract_from_source,
-    find_restatements, find_similar, restated_only,
+    FactExtractor, FactOccurrence, NameConfig, SqlExtractor, TypeScriptExtractor,
+    extract_from_source, find_restatements, find_similar, restated_only,
 };
 use walkdir::{DirEntry, WalkDir};
 
@@ -42,9 +42,10 @@ fn extract_file(path: &Path, root: &Path) -> Vec<FactOccurrence> {
     };
     let rel = path.strip_prefix(root).unwrap_or(path);
     let file = rel.to_string_lossy().to_string();
+    let config = NameConfig::default();
 
     match grammar {
-        "sql" => extract_from_source(&SqlExtractor, &source, &file).unwrap_or_default(),
+        "sql" => extract_from_source(&SqlExtractor, &source, &file, &config).unwrap_or_default(),
         // "typescript" and "tsx" both lower via TypeScriptExtractor's CST
         // walk (the tsx grammar is a superset of typescript's node types);
         // extract_from_source hardcodes grammar_name() to "typescript", so
@@ -55,9 +56,9 @@ fn extract_file(path: &Path, root: &Path) -> Vec<FactOccurrence> {
             else {
                 return Vec::new();
             };
-            TypeScriptExtractor.extract(&tree, &source, &file)
+            TypeScriptExtractor.extract(&tree, &source, &file, &config)
         }
-        _ => extract_from_source(&TypeScriptExtractor, &source, &file).unwrap_or_default(),
+        _ => extract_from_source(&TypeScriptExtractor, &source, &file, &config).unwrap_or_default(),
     }
 }
 

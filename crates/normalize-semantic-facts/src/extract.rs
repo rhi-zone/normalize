@@ -6,7 +6,7 @@
 //! query files (see `OVERVIEW.md` and the task that produced this crate —
 //! query-based extraction is a follow-up once the IR shape has settled).
 
-use crate::ir::Fact;
+use crate::ir::{Fact, NameConfig};
 
 /// A fact together with where it was found. Locations are what the
 /// restatement report groups by fact identity to show — see
@@ -32,6 +32,13 @@ pub trait FactExtractor {
     fn grammar_name(&self) -> &'static str;
 
     /// Walk `tree` (parsed from `source`) and emit every fact this extractor
-    /// can recognize, tagged with `file` for location reporting.
-    fn extract(&self, tree: &tree_sitter::Tree, source: &str, file: &str) -> Vec<FactOccurrence>;
+    /// can recognize, tagged with `file` for location reporting. `config`
+    /// controls entity-name canonicalization (see [`NameConfig`]).
+    fn extract(
+        &self,
+        tree: &tree_sitter::Tree,
+        source: &str,
+        file: &str,
+        config: &NameConfig,
+    ) -> Vec<FactOccurrence>;
 }
