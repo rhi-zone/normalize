@@ -18,15 +18,15 @@
 
 use tree_sitter::{Node, Tree};
 
-use crate::extract::{FactExtractor, FactOccurrence};
+use crate::extract::{FactOccurrence, SemanticFactExtractor};
 use crate::ir::{EntityField, Fact, NameConfig, TypeShape, canonical_name};
 
 /// SQL fact extractor.
 pub struct SqlExtractor;
 
-impl FactExtractor for SqlExtractor {
-    fn grammar_name(&self) -> &'static str {
-        "sql"
+impl SemanticFactExtractor for SqlExtractor {
+    fn grammar_names(&self) -> &'static [&'static str] {
+        &["sql"]
     }
 
     fn extract(

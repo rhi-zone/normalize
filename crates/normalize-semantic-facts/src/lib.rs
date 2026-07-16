@@ -6,12 +6,14 @@
 
 pub mod extract;
 pub mod ir;
+pub mod registry;
 pub mod restatement;
 pub mod sql;
 pub mod typescript;
 
-pub use extract::{FactExtractor, FactOccurrence};
+pub use extract::{FactOccurrence, SemanticFactExtractor};
 pub use ir::{EntityField, EnumDef, Fact, FunctionSignature, NameConfig, TypeRelation, TypeShape};
+pub use registry::extractor_for_grammar;
 pub use restatement::{
     Location, RestatementGroup, SimilarEntry, SimilarGroup, SimilarRelation, find_restatements,
     find_similar, restated_only,
@@ -19,19 +21,28 @@ pub use restatement::{
 pub use sql::SqlExtractor;
 pub use typescript::TypeScriptExtractor;
 
-/// Parses `source` with the grammar `extractor.grammar_name()` (via
-/// `normalize_languages`'s shared `GrammarLoader` singleton) and runs the
-/// extractor over the resulting tree. Returns `None` if the grammar can't be
-/// loaded or the source fails to parse. `config` controls entity-name
+/// Looks up the [`SemanticFactExtractor`] registered for `grammar_name` (see
+/// [`extractor_for_grammar`]), parses `source` with that grammar (via
+/// `normalize_languages`'s shared `GrammarLoader` singleton), and runs the
+/// extractor over the resulting tree. `config` controls entity-name
 /// canonicalization (see [`NameConfig`]).
+///
+/// Returns an empty `Vec` — not an error — both when `grammar_name` has no
+/// registered extractor (most languages don't have semantic fact extraction
+/// yet) and when the grammar fails to load or the source fails to parse.
 pub fn extract_from_source(
-    extractor: &dyn FactExtractor,
+    grammar_name: &str,
     source: &str,
     file: &str,
     config: &NameConfig,
-) -> Option<Vec<FactOccurrence>> {
-    let tree = normalize_languages::parsers::parse_with_grammar(extractor.grammar_name(), source)?;
-    Some(extractor.extract(&tree, source, file, config))
+) -> Vec<FactOccurrence> {
+    let Some(extractor) = registry::extractor_for_grammar(grammar_name) else {
+        return Vec::new();
+    };
+    let Some(tree) = normalize_languages::parsers::parse_with_grammar(grammar_name, source) else {
+        return Vec::new();
+    };
+    extractor.extract(&tree, source, file, config)
 }
 
 #[cfg(test)]
@@ -64,22 +75,27 @@ CREATE TABLE lesson (
 
     fn ts_facts() -> Vec<FactOccurrence> {
         extract_from_source(
-            &TypeScriptExtractor,
+            "typescript",
             TS_SOURCE,
             "src/types.ts",
             &NameConfig::default(),
         )
-        .expect("typescript grammar should load and parse")
     }
 
     fn sql_facts() -> Vec<FactOccurrence> {
         extract_from_source(
-            &SqlExtractor,
+            "sql",
             SQL_SOURCE,
             "migrations/001.sql",
             &NameConfig::default(),
         )
-        .expect("sql grammar should load and parse")
+    }
+
+    #[test]
+    fn unknown_grammar_returns_empty_facts() {
+        assert!(
+            extract_from_source("python", "x = 1", "src/x.py", &NameConfig::default()).is_empty()
+        );
     }
 
     #[test]

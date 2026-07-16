@@ -46,17 +46,19 @@ use std::collections::HashMap;
 
 use tree_sitter::{Node, Tree};
 
-use crate::extract::{FactExtractor, FactOccurrence};
+use crate::extract::{FactOccurrence, SemanticFactExtractor};
 use crate::ir::{
     EntityField, EnumDef, Fact, FunctionSignature, NameConfig, TypeShape, canonical_name,
 };
 
-/// TypeScript fact extractor.
+/// TypeScript fact extractor. Registered for both `"typescript"` and
+/// `"tsx"` — the tsx grammar is a superset of typescript's node types, so
+/// the same CST walk handles both.
 pub struct TypeScriptExtractor;
 
-impl FactExtractor for TypeScriptExtractor {
-    fn grammar_name(&self) -> &'static str {
-        "typescript"
+impl SemanticFactExtractor for TypeScriptExtractor {
+    fn grammar_names(&self) -> &'static [&'static str] {
+        &["typescript", "tsx"]
     }
 
     fn extract(
@@ -765,12 +767,11 @@ mod tests {
 
     fn extract(source: &str) -> Vec<Fact> {
         extract_from_source(
-            &TypeScriptExtractor,
+            "typescript",
             source,
             "src/schema.ts",
             &NameConfig::default(),
         )
-        .expect("typescript grammar should load and parse")
         .into_iter()
         .map(|o| o.fact)
         .collect()
@@ -868,13 +869,8 @@ const NpsSurveyRowSchema = v.object({
   status: v.picklist(["scheduled", "in_progress", "completed", "cancelled"]),
 });
 "#;
-        let occurrences = extract_from_source(
-            &TypeScriptExtractor,
-            SRC,
-            "src/schema.ts",
-            &NameConfig::default(),
-        )
-        .expect("typescript grammar should load and parse");
+        let occurrences =
+            extract_from_source("typescript", SRC, "src/schema.ts", &NameConfig::default());
 
         let restated = restated_only(find_restatements(&occurrences));
         let id_group = restated
@@ -1011,9 +1007,7 @@ const NpsSurveyRowValidator = v.object({
         let custom_config = NameConfig {
             strip_suffixes: vec!["Schema".to_string()],
         };
-        let occurrences =
-            extract_from_source(&TypeScriptExtractor, SRC, "src/schema.ts", &custom_config)
-                .expect("typescript grammar should load and parse");
+        let occurrences = extract_from_source("typescript", SRC, "src/schema.ts", &custom_config);
         let custom_facts: Vec<Fact> = occurrences.into_iter().map(|o| o.fact).collect();
         assert!(custom_facts.iter().any(|f| {
             matches!(f, Fact::EntityField(field) if field.entity == "nps survey row validator")
