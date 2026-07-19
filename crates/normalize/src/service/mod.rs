@@ -4,11 +4,10 @@
 //! server-less's `#[cli]` macro, which generates CLI parsing, JSON output,
 //! schema introspection, and params-json support from method signatures.
 //!
-//! ## Migration status
+//! ## Dispatch model
 //!
-//! Commands are migrated incrementally from the legacy clap dispatch in main.rs.
-//! During migration, both paths coexist: server-less handles migrated commands,
-//! legacy dispatch handles the rest.
+//! All CLI commands are dispatched through the server-less `#[cli]` macro system.
+//! The legacy clap-based dispatch has been removed.
 //!
 //! ## Output formatting
 //!
